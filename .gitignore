@@ -1,0 +1,25 @@
+# Dependencies and Pi package caches
+node_modules/
+.pi/npm/
+.pi/git/
+
+# Credentials, personal provider configuration, and state
+auth.json
+models.json
+models-store.json
+trust.json
+run-history.jsonl
+sessions/
+missions/
+*.backup-*
+
+# ZenPi development/install state
+.zenpi-test/
+*.log
+Screenshot*.png
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

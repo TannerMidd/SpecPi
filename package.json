@@ -1,0 +1,60 @@
+{
+  "name": "zenpi",
+  "version": "0.1.0",
+  "description": "A calm, explicit, provider-safe harness for the Pi coding agent",
+  "author": "Tanner Middleton",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TannerMidd/ZenPi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TannerMidd/ZenPi/issues"
+  },
+  "homepage": "https://github.com/TannerMidd/ZenPi#readme",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "agent-harness"
+  ],
+  "bin": {
+    "zenpi": "./zenpi"
+  },
+  "files": [
+    "zenpi",
+    "scripts",
+    "templates",
+    "extensions",
+    "skills",
+    "themes",
+    "shell",
+    "README.md",
+    "SECURITY.md",
+    "THIRD_PARTY.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "themes": [
+      "./themes"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --test"
+  }
+}

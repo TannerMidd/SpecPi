@@ -1,0 +1,20 @@
+{
+  "toolDescriptionMode": "compact",
+  "inlineToolDisplay": "summary",
+  "defaultSubagentContext": "fresh",
+  "maxSubagentDepth": 1,
+  "maxSubagentSpawnsPerRun": 8,
+  "maxSubagentSpawnsPerSession": 24,
+  "maxActiveAsyncRunsPerSession": 2,
+  "parallel": {
+    "maxTasks": 4,
+    "concurrency": 3
+  },
+  "missions": {
+    "enabled": false
+  },
+  "scheduledRuns": {
+    "enabled": false
+  },
+  "artifactDir": "session"
+}
