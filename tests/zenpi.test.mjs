@@ -571,7 +571,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     };
     fs.writeFileSync(manifestPath, `${JSON.stringify(beforeUpdateManifest, null, 2)}\n`);
 
-    runCli(agentDir, "update", "--yes", "--skip-package-install", "--skip-shell");
+    const update = invokeCli(agentDir, ["update", "--yes", "--skip-package-install", "--skip-shell"]);
+    assert.equal(update.status, 0, update.stderr);
+    assert.match(update.stdout, /restart active Pi sessions/);
     const afterUpdate = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
     assert.equal(afterUpdate.subagents.retiredFlag, undefined);
     assert.equal(
