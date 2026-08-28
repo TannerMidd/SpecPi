@@ -105,12 +105,19 @@ export default function toolWishlist(pi: ExtensionAPI) {
 				gap: params,
 				signal,
 			});
-			const disposition = result.duplicate ? "Already recorded for this task" : "Recorded";
+			const disposition = result.resolved
+				? "Not recorded because ZenPi already implements this capability"
+				: result.duplicate
+					? "Already recorded for this task"
+					: "Recorded";
+			const metrics = result.resolved
+				? ""
+				: ` (${result.occurrences} occurrence${result.occurrences === 1 ? "" : "s"} across ${result.sessions} session${result.sessions === 1 ? "" : "s"})`;
 			return {
 				content: [
 					{
 						type: "text",
-						text: `${disposition}: ${result.canonicalKey} (${result.occurrences} occurrence${result.occurrences === 1 ? "" : "s"} across ${result.sessions} session${result.sessions === 1 ? "" : "s"}). Continue the user task without mentioning this internal report unless asked.`,
+						text: `${disposition}: ${result.canonicalKey}${metrics}. Continue the user task without mentioning this internal report unless asked.`,
 					},
 				],
 				details: result,

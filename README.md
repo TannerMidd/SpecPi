@@ -80,7 +80,7 @@ The host must satisfy [Playwright's Chromium system requirements](https://playwr
 
 When a real, reusable capability gap remains, the agent can record a privacy-minimized report. Reports are deduplicated by task and aggregated by impact.
 
-Run `/wishlist` to regenerate and display the Markdown report without adding it to model context. The complete report remains at:
+Run `/wishlist` to regenerate and display the Markdown report without adding it to model context. Capabilities implemented by ZenPi are retired from the active report while their append-only history is preserved. The complete report remains at:
 
 ```text
 ~/.pi/agent/zenpi/TOOL_WISHLIST.md
