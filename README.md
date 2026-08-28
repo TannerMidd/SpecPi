@@ -19,6 +19,7 @@ Installation is review-first. ZenPi does not silently replace authentication, pr
 
 - Tea House theme and the `/zen` ambience extension.
 - A privacy-minimized capability-gap collector and generated tool wishlist.
+- Managed isolated Chromium tools for rendered web QA and visual regression on hosts satisfying Playwright's Chromium system requirements.
 - Pinned, reviewed Pi packages.
 - A DonSeTch on-demand skill (the external CLI remains optional).
 - Bounded `pi-subagents` runtime configuration.
@@ -68,6 +69,8 @@ Pi project settings override user settings. A trusted repository can replace `su
 - Node.js 22.19 or newer
 - Git
 
+ZenPi installs its pinned Playwright 1.62.1 runtime and matching Chromium build inside the Pi agent directory. It does not use a globally installed browser, the user's Chrome profile, cookies, or authenticated sessions. Browser support works out of the box on hosts satisfying [Playwright's Chromium system requirements](https://playwright.dev/docs/intro#system-requirements). On Linux, ZenPi does not run `sudo`, `apt`, or Playwright `install-deps`; install and `./zenpi doctor` report an actionable error when required host libraries are absent.
+
 The files widget additionally expects:
 
 - `bat` (Ubuntu's `batcat` is accepted)
@@ -99,11 +102,24 @@ The installer shows its complete plan and asks for confirmation. For automation 
 Optional flags:
 
 ```text
---skip-package-install  Write package settings but do not run pi install
+--skip-package-install  Write package settings but skip external package installs, including the browser runtime
+--skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime
 --skip-shell            Do not install or source shell profiles
 ```
 
-ZenPi never installs global external executables. Install DonSeTch separately after reviewing its distribution if you want to use the optional skill.
+ZenPi never installs global external executables. The browser runtime is installed privately under `~/.pi/agent/zenpi/browser-runtime/` after confirmation. Install DonSeTch separately after reviewing its distribution if you want to use the optional skill.
+
+## Browser and visual regression
+
+ZenPi registers native browser tools for opening HTTP(S) pages, setting desktop/tablet/mobile viewports, inspecting rendered DOM content, clicking and filling controls, capturing screenshots, and closing the isolated browser. Screenshots are stored outside the repository by default under:
+
+```text
+~/.pi/agent/zenpi/browser-artifacts/<session>/
+```
+
+`browser_screenshot` returns conservatively sized PNGs directly to image-capable models as well as their artifact paths; oversized images return only the path. Explicit screenshot, current, and diff outputs are never replaced unless `overwrite=true`. `browser_save_baseline` creates a baseline only at an explicit path and refuses to replace an existing file unless `overwrite=true`. `browser_compare_screenshot` rejects aliased baseline/current/diff paths and never changes the baseline; it reports pixel counts and ratio and writes bounded current and diff artifacts. Set the same viewport before baseline and comparison. ZenPi reduces motion and disables CSS animation/transition timing during captures, but applications should still control clocks, random data, fonts, and asynchronous content for stable regression tests.
+
+Browser contexts are fresh and ephemeral. They do not import the user's normal browser profile or authentication state, and service workers are blocked. Use a dedicated test account only when an application itself requires login.
 
 ## Evidence-driven tool wishlist
 
@@ -158,6 +174,10 @@ ZenPi owns only documented paths:
 - its pinned entries in `packages`
 - selected `subagents` defaults, policy, and role overrides
 - `~/.pi/agent/extensions/zen.ts`
+- `~/.pi/agent/extensions/browser/index.ts`
+- `~/.pi/agent/extensions/browser/core.mjs`
+- `~/.pi/agent/extensions/browser/smoke.mjs`
+- `~/.pi/agent/zenpi/browser-runtime/`
 - `~/.pi/agent/extensions/tool-wishlist/index.ts`
 - `~/.pi/agent/extensions/tool-wishlist/core.mjs`
 - `~/.pi/agent/extensions/subagent/config.json`
@@ -174,11 +194,11 @@ State, wishlist data, and backups of replaced ZenPi-managed resource files are s
 ~/.pi/agent/zenpi/
 ```
 
-Set `PI_CODING_AGENT_DIR` to use a different Pi agent directory. Uninstall removes the managed collector extension but preserves its event log and generated report.
+Set `PI_CODING_AGENT_DIR` to use a different Pi agent directory. Uninstall removes the managed browser runtime and extensions but preserves browser artifacts, wishlist events, and the generated report.
 
 ## Pi package mode
 
-The repository also contains a standard `pi` package manifest. Installing it with `pi install` loads only the declared extension, skill, and theme resources; it does not apply the complete harness policy. Use the explicit ZenPi installer for the full setup.
+The repository also contains a standard `pi` package manifest. Installing it with `pi install` loads only the declared extension, skill, and theme resources; it does not provision the managed Chromium runtime or apply the complete harness policy. Use the explicit ZenPi installer for managed browser support on a host satisfying Playwright's Chromium system requirements and for the full setup.
 
 ## Development
 
@@ -187,7 +207,7 @@ npm test
 npm run check
 ```
 
-The integration test uses a temporary Pi agent directory and skips network/package installation.
+Integration tests use temporary Pi agent directories. Most skip external installation; a fake pinned browser runtime exercises successful install/reuse/doctor/uninstall and rollback without network access. Release validation additionally exercises the real managed browser smoke probe in a temporary directory.
 
 The zero-dependency showcase site lives in `site/`. Its GitHub Pages workflow publishes that directory directly, with no generated files or package installation.
 

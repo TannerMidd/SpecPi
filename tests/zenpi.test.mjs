@@ -12,6 +12,14 @@ import {
   refreshWishlist,
 } from "../extensions/tool-wishlist/core.mjs";
 import {
+  assertDistinctPaths,
+  comparePngBuffers,
+  normalizeBrowserUrl,
+  publishBuffer,
+  resolveUserPath,
+  resolveViewport,
+} from "../extensions/browser/core.mjs";
+import {
   AGENTS_END,
   AGENTS_START,
   deletePath,
@@ -46,6 +54,12 @@ function runCli(agentDir, ...args) {
 function writeExecutable(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content, { mode: 0o755 });
+}
+
+function installFakeBrowserNpm(fakeBin) {
+  fs.mkdirSync(fakeBin, { recursive: true });
+  fs.copyFileSync(path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs"), path.join(fakeBin, "npm"));
+  fs.chmodSync(path.join(fakeBin, "npm"), 0o755);
 }
 
 test("npm package identities ignore pinned versions", () => {
@@ -113,6 +127,82 @@ test("showcase site is self-contained and Pages-ready", () => {
 test("capability keys normalize superficial wording", () => {
   assert.equal(normalizeCapability("Missing Browser Automation Tools"), "browser-automation");
   assert.equal(normalizeCapability("browser automations"), "browser-automation");
+});
+
+test("browser inputs normalize local URLs, viewports, and project paths", () => {
+  assert.equal(normalizeBrowserUrl("localhost:4173/demo"), "http://localhost:4173/demo");
+  assert.equal(normalizeBrowserUrl("https://example.com/path"), "https://example.com/path");
+  assert.throws(() => normalizeBrowserUrl("file:///tmp/private.html"), /http: or https:/);
+  assert.deepEqual(resolveViewport({ preset: "mobile" }), { width: 390, height: 844 });
+  assert.deepEqual(resolveViewport({ width: 1024, height: 768 }), { width: 1024, height: 768 });
+  assert.throws(() => resolveViewport({ width: 100, height: 768 }), /200 to 4096/);
+  assert.throws(() => resolveViewport({ width: 4096, height: 4096 }), /pixel limit/);
+  assert.equal(resolveUserPath("/tmp/project", "@screenshots/base.png"), "/tmp/project/screenshots/base.png");
+});
+
+test("browser PNG comparison reports exact pass and dimension mismatch", () => {
+  function fakePng(width, height, value = 0) {
+    const buffer = Buffer.alloc(25);
+    Buffer.from("89504e470d0a1a0a", "hex").copy(buffer);
+    buffer.write("IHDR", 12, "ascii");
+    buffer.writeUInt32BE(width, 16);
+    buffer.writeUInt32BE(height, 20);
+    buffer[24] = value;
+    return buffer;
+  }
+  class FakePng {
+    constructor({ width, height }) {
+      this.width = width;
+      this.height = height;
+      this.data = Buffer.alloc(width * height * 4);
+    }
+  }
+  FakePng.sync = {
+    read(buffer) {
+      const width = buffer.readUInt32BE(16);
+      const height = buffer.readUInt32BE(20);
+      return { width, height, data: Buffer.alloc(width * height * 4, buffer[24]) };
+    },
+    write(image) {
+      return fakePng(image.width, image.height);
+    },
+  };
+  const runtime = {
+    PNG: FakePng,
+    pixelmatch(left, right) {
+      return left.equals(right) ? 0 : left.length / 4;
+    },
+  };
+  const same = comparePngBuffers(fakePng(2, 2, 1), fakePng(2, 2, 1), runtime);
+  assert.equal(same.pass, true);
+  assert.equal(same.diffPixels, 0);
+  const changed = comparePngBuffers(fakePng(2, 2, 1), fakePng(2, 2, 2), runtime);
+  assert.equal(changed.pass, false);
+  assert.equal(changed.diffPixelRatio, 1);
+  const resized = comparePngBuffers(fakePng(2, 2, 1), fakePng(3, 2, 1), runtime);
+  assert.equal(resized.pass, false);
+  assert.equal(resized.dimensionsMatch, false);
+});
+
+test("browser output helpers reject aliases and preserve existing files by default", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-browser-output-"));
+  const output = path.join(root, "capture.png");
+  try {
+    assert.throws(
+      () => assertDistinctPaths([["baselinePath", output], ["currentPath", path.join(root, ".", "capture.png")]]),
+      /must not alias/,
+    );
+    await publishBuffer(output, Buffer.from("first"));
+    const hardlink = path.join(root, "hardlink.png");
+    fs.linkSync(output, hardlink);
+    assert.throws(() => assertDistinctPaths([["baselinePath", output], ["diffPath", hardlink]]), /must not alias/);
+    await assert.rejects(() => publishBuffer(output, Buffer.from("second")), /Output already exists/);
+    assert.equal(fs.readFileSync(output, "utf8"), "first");
+    await publishBuffer(output, Buffer.from("second"), { overwrite: true });
+    assert.equal(fs.readFileSync(output, "utf8"), "second");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("tool wishlist deduplicates a gap per task and stores privacy-minimized metrics", async () => {
@@ -310,6 +400,23 @@ test("wishlist release never removes a substituted lock", async () => {
   }
 });
 
+test("installer plan is non-mutating even when browser installation is planned", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-plan-test-"));
+  const agentDir = path.join(root, "agent");
+  fs.mkdirSync(agentDir, { recursive: true });
+  fs.writeFileSync(path.join(agentDir, "settings.json"), '{"kept":true}\n');
+  const before = fs.readFileSync(path.join(agentDir, "settings.json"), "utf8");
+  try {
+    const result = invokeCli(agentDir, ["plan", "--skip-shell"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Playwright 1\.62\.1 \+ matching managed Chromium/);
+    assert.equal(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"), before);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("install, update, doctor, and uninstall round trip in an isolated agent dir", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-test-"));
   const agentDir = path.join(root, "agent");
@@ -344,6 +451,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "smoke.mjs")));
     assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
     const fakeBin = path.join(root, "bin");
@@ -352,6 +462,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
       PATH: `${fakeBin}:${process.env.PATH}`,
     });
     assert.equal(doctor.status, 0, doctor.stderr);
+    assert.match(doctor.stderr, /Managed browser runtime unavailable: .*installation was skipped/);
 
     // Simulate ownership retired by a future ZenPi version.
     const retiredFile = path.join(agentDir, "extensions", "retired.ts");
@@ -404,7 +515,45 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     );
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("managed browser runtime completes install, reuse update, doctor, and uninstall with fake browser", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-browser-lifecycle-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\nexit 0\n");
+  installFakeBrowserNpm(fakeBin);
+  const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };
+  try {
+    const install = invokeCli(agentDir, ["install", "--yes", "--skip-shell"], env);
+    assert.equal(install.status, 0, install.stderr);
+    const runtime = path.join(agentDir, "zenpi", "browser-runtime");
+    assert.ok(fs.existsSync(path.join(runtime, "zenpi-runtime.json")));
+
+    const doctor = invokeCli(agentDir, ["doctor"], env);
+    assert.equal(doctor.status, 0, doctor.stderr);
+    assert.match(doctor.stdout, /BROWSER Browser smoke passed/);
+
+    const update = invokeCli(agentDir, ["update", "--yes", "--skip-shell"], env);
+    assert.equal(update.status, 0, update.stderr);
+    assert.match(update.stdout, /passed its launch smoke; reusing/);
+
+    fs.writeFileSync(path.join(runtime, "node_modules", "playwright", "index.js"), "throw new Error('broken runtime');\n");
+    const repaired = invokeCli(agentDir, ["update", "--yes", "--skip-shell"], env);
+    assert.equal(repaired.status, 0, repaired.stderr);
+    assert.match(repaired.stderr, /failed validation and will be replaced/);
+    const repairedDoctor = invokeCli(agentDir, ["doctor"], env);
+    assert.equal(repairedDoctor.status, 0, repairedDoctor.stderr);
+
+    const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
+    assert.equal(uninstall.status, 0, uninstall.stderr);
+    assert.equal(fs.existsSync(runtime), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -429,7 +578,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
   };
 
   try {
-    const install = invokeCli(agentDir, ["install", "--yes"], env);
+    const install = invokeCli(agentDir, ["install", "--yes", "--skip-browser-install"], env);
     assert.equal(install.status, 0, install.stderr);
     const shell = fs.readFileSync(shellRc, "utf8");
     assert.match(shell, /# >>> ZenPi >>>/);
@@ -466,6 +615,7 @@ test("failed package installation rolls configuration back and releases the lock
     path.join(fakeBin, "pi"),
     "#!/bin/sh\ncase \"$*\" in *pi-subagents*) exit 9;; esac\nexit 0\n",
   );
+  installFakeBrowserNpm(fakeBin);
   const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };
 
   try {
@@ -473,6 +623,7 @@ test("failed package installation rolls configuration back and releases the lock
     assert.notEqual(result.status, 0);
     assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath, "utf8")), { untouched: true });
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "browser-runtime")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "install.lock")), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

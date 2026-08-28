@@ -24,6 +24,7 @@
   "files": [
     "zenpi",
     "scripts",
+    "browser-runtime",
     "templates",
     "extensions",
     "skills",
@@ -55,6 +56,6 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --test"
+    "check": "node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --test"
   }
 }

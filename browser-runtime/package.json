@@ -1,0 +1,15 @@
+{
+  "name": "zenpi-browser-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned local browser runtime managed by the ZenPi installer",
+  "license": "MIT",
+  "dependencies": {
+    "pixelmatch": "7.2.0",
+    "playwright": "1.62.1",
+    "pngjs": "7.0.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
