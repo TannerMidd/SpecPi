@@ -9,16 +9,41 @@
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
+import { Box, Markdown, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { recordCapabilityGap, refreshWishlist } from "./core.mjs";
 
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
 const stateDir = path.join(agentDir, "zenpi");
+const WISHLIST_REPORT_ENTRY = "zenpi-wishlist-report";
+const MAX_REPORT_DISPLAY_BYTES = 50 * 1024;
+const MAX_REPORT_DISPLAY_LINES = 2000;
+
+interface WishlistReportEntry {
+	markdown: string;
+	reportPath: string;
+	truncated: boolean;
+}
+
+function truncateReportDisplay(markdown: string) {
+	const lines = markdown.split("\n");
+	const lineLimited = lines.length > MAX_REPORT_DISPLAY_LINES
+		? lines.slice(0, MAX_REPORT_DISPLAY_LINES).join("\n")
+		: markdown;
+	const encoded = Buffer.from(lineLimited, "utf8");
+	if (encoded.length <= MAX_REPORT_DISPLAY_BYTES) {
+		return { content: lineLimited, truncated: lines.length > MAX_REPORT_DISPLAY_LINES };
+	}
+	let end = MAX_REPORT_DISPLAY_BYTES;
+	while (end > 0 && (encoded[end] & 0xc0) === 0x80) end -= 1;
+	return { content: encoded.subarray(0, end).toString("utf8"), truncated: true };
+}
 
 export default function toolWishlist(pi: ExtensionAPI) {
 	let activeRunId = randomUUID();
+	const supportsReportEntries = typeof pi.registerEntryRenderer === "function";
 
 	// before_agent_start occurs once for a submitted user task, while an agent
 	// may take several tool-calling turns to complete it. This gives us a stable
@@ -93,13 +118,41 @@ export default function toolWishlist(pi: ExtensionAPI) {
 		},
 	});
 
+	if (supportsReportEntries) {
+		pi.registerEntryRenderer<WishlistReportEntry>(WISHLIST_REPORT_ENTRY, (entry, _options, theme) => {
+			const data = entry.data ?? { markdown: "# Tool Wishlist\n\nReport unavailable.", reportPath: "", truncated: false };
+			const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
+			box.addChild(new Markdown(data.markdown, 0, 0, getMarkdownTheme()));
+			const suffix = data.truncated ? " (display truncated; file contains the complete report)" : "";
+			box.addChild(new Text(theme.fg("dim", `Report: ${data.reportPath}${suffix}`), 0, 0));
+			return box;
+		});
+	}
+
 	pi.registerCommand("wishlist", {
-		description: "Refresh the ZenPi tool wishlist and show its location",
+		description: "Refresh and display the ZenPi tool wishlist report",
 		handler: async (_args, ctx) => {
 			const result = await refreshWishlist({ stateDir });
+			const display = truncateReportDisplay(result.report);
+			const displayPath = result.reportPath.replace(/[\u0000-\u001f\u007f]/g, "?");
+			const markdown = display.truncated
+				? `${display.content}\n\n> Display truncated. Open the report path below to view the complete file.`
+				: display.content;
+			if (supportsReportEntries) {
+				pi.appendEntry<WishlistReportEntry>(WISHLIST_REPORT_ENTRY, {
+					markdown,
+					reportPath: displayPath,
+					truncated: display.truncated,
+				});
+			} else {
+				const mode = (ctx as typeof ctx & { mode?: string }).mode;
+				if ((mode === "tui" || mode === undefined) && typeof ctx.ui.editor === "function") {
+					await ctx.ui.editor("Tool Wishlist (view only; changes are ignored)", `${markdown}\n\n---\nReport: ${displayPath}`);
+				}
+			}
 			const warning = result.invalidLines > 0 ? `; ${result.invalidLines} malformed event line(s) ignored` : "";
 			ctx.ui.notify(
-				`Tool wishlist: ${result.uniqueGaps} gap${result.uniqueGaps === 1 ? "" : "s"}, ${result.occurrences} occurrence${result.occurrences === 1 ? "" : "s"}${warning}. ${result.reportPath}`,
+				`Tool wishlist refreshed: ${result.uniqueGaps} gap${result.uniqueGaps === 1 ? "" : "s"}, ${result.occurrences} occurrence${result.occurrences === 1 ? "" : "s"}${warning}. ${displayPath}`,
 				result.invalidLines > 0 ? "warning" : "info",
 			);
 		},

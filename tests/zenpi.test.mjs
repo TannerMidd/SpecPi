@@ -300,9 +300,10 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
     });
     assert.equal(refreshed.occurrences, 1);
     assert.equal(refreshed.invalidLines, 1);
-    assert.match(
+    assert.match(refreshed.report, /1 malformed event line\(s\) were ignored/);
+    assert.equal(
+      refreshed.report,
       fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"),
-      /1 malformed event line\(s\) were ignored/,
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
