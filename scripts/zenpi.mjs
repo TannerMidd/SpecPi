@@ -35,6 +35,10 @@ const manifestPath = path.join(stateDir, "manifest.json");
 const lockPath = path.join(stateDir, "install.lock");
 const settingsPath = path.join(agentDir, "settings.json");
 const agentsPath = path.join(agentDir, "AGENTS.md");
+const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
+const browserRuntimeDir = path.join(stateDir, "browser-runtime");
+const browserRuntimeMarker = path.join(browserRuntimeDir, "zenpi-runtime.json");
+const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
 
 const PACKAGES = [
   "npm:pi-web-access@0.25.0",
@@ -51,15 +55,16 @@ function usage() {
 
 Usage:
   ./zenpi plan
-  ./zenpi install [--yes] [--skip-package-install] [--skip-shell]
-  ./zenpi update [--yes] [--force] [--skip-package-install] [--skip-shell]
+  ./zenpi install [--yes] [--skip-package-install] [--skip-browser-install] [--skip-shell]
+  ./zenpi update [--yes] [--force] [--skip-package-install] [--skip-browser-install] [--skip-shell]
   ./zenpi doctor
   ./zenpi uninstall [--yes]
 
 Options:
   --yes                   Do not ask for confirmation.
   --force                 Replace locally modified ZenPi-managed files during update.
-  --skip-package-install  Write pinned package settings without running pi install.
+  --skip-package-install  Write pinned package settings without installing external packages (also skips the browser runtime).
+  --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
   --skip-shell            Do not install shell profile functions or edit a shell rc file.
 
 Environment:
@@ -73,6 +78,7 @@ function parseArgs(argv) {
     "--yes",
     "--force",
     "--skip-package-install",
+    "--skip-browser-install",
     "--skip-shell",
   ]);
   for (const arg of argv.slice(1)) {
@@ -83,6 +89,8 @@ function parseArgs(argv) {
     yes: argv.includes("--yes"),
     force: argv.includes("--force"),
     skipPackageInstall: argv.includes("--skip-package-install"),
+    skipBrowserInstall:
+      argv.includes("--skip-browser-install") || argv.includes("--skip-package-install"),
     skipShell: argv.includes("--skip-shell"),
   };
 }
@@ -99,7 +107,7 @@ function commandExists(command) {
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: options.cwd || os.homedir(),
-    env: process.env,
+    env: { ...process.env, ...(options.env || {}) },
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit",
   });
@@ -111,7 +119,123 @@ function run(command, args, options = {}) {
   return result;
 }
 
-function readJson(file, fallback) {
+function browserRuntimeLockHash() {
+  return sha256(fs.readFileSync(path.join(browserRuntimeSourceDir, "package-lock.json")));
+}
+
+function browserRuntimeStatus() {
+  if (!fs.existsSync(browserRuntimeMarker)) return { installed: false, reason: "runtime marker is missing" };
+  try {
+    const marker = readJson(browserRuntimeMarker, {});
+    const playwright = readJson(path.join(browserRuntimeDir, "node_modules", "playwright", "package.json"), {});
+    const browsersDir = path.join(browserRuntimeDir, "browsers");
+    const hasBrowser = fs.existsSync(browsersDir) && fs.readdirSync(browsersDir).some((entry) => !entry.startsWith("."));
+    if (marker.schema !== 1 || marker.lockHash !== browserRuntimeLockHash()) {
+      return { installed: false, reason: "runtime lock does not match this ZenPi release" };
+    }
+    if (playwright.version !== "1.62.1") return { installed: false, reason: "Playwright 1.62.1 is not installed" };
+    if (!hasBrowser) return { installed: false, reason: "managed Chromium is missing" };
+    return { installed: true, version: playwright.version, lockHash: marker.lockHash };
+  } catch (error) {
+    return { installed: false, reason: error.message };
+  }
+}
+
+function smokeBrowserRuntime(directory) {
+  try {
+    return run(process.execPath, [path.join(repoRoot, "extensions", "browser", "smoke.mjs"), directory], {
+      capture: true,
+    });
+  } catch (error) {
+    throw new Error(`${error.message}\nChromium could not launch. Verify the host satisfies Playwright Chromium system dependencies; ZenPi does not install apt/system packages.`);
+  }
+}
+
+function installBrowserRuntime(warnings) {
+  const current = browserRuntimeStatus();
+  if (current.installed) {
+    try {
+      smokeBrowserRuntime(browserRuntimeDir);
+      console.log("Managed browser runtime is current and passed its launch smoke; reusing Playwright 1.62.1 and Chromium.");
+      return { commit() {}, rollback() { return []; }, changed: false };
+    } catch (error) {
+      warnings.push(`Existing managed browser runtime failed validation and will be replaced: ${error.message}`);
+    }
+  }
+
+  const operationStamp = `${process.pid}-${Date.now()}`;
+  const stage = path.join(stateDir, `.browser-runtime-stage-${operationStamp}`);
+  const previous = path.join(stateDir, `.browser-runtime-previous-${operationStamp}`);
+  const failed = path.join(stateDir, `.browser-runtime-failed-${operationStamp}`);
+  let promoted = false;
+  try {
+    fs.rmSync(stage, { recursive: true, force: true });
+    fs.rmSync(previous, { recursive: true, force: true });
+    fs.mkdirSync(stage, { recursive: true, mode: 0o700 });
+    fs.copyFileSync(path.join(browserRuntimeSourceDir, "package.json"), path.join(stage, "package.json"));
+    fs.copyFileSync(path.join(browserRuntimeSourceDir, "package-lock.json"), path.join(stage, "package-lock.json"));
+    run("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: stage });
+    const browsersPath = path.join(stage, "browsers");
+    run(process.execPath, [path.join(stage, "node_modules", "playwright", "cli.js"), "install", "chromium"], {
+      cwd: stage,
+      env: { PLAYWRIGHT_BROWSERS_PATH: browsersPath },
+    });
+    writeJson(
+      path.join(stage, "zenpi-runtime.json"),
+      { schema: 1, playwrightVersion: "1.62.1", lockHash: browserRuntimeLockHash() },
+      0o600,
+    );
+
+    if (fs.existsSync(browserRuntimeDir)) fs.renameSync(browserRuntimeDir, previous);
+    fs.renameSync(stage, browserRuntimeDir);
+    promoted = true;
+    smokeBrowserRuntime(browserRuntimeDir);
+  } catch (error) {
+    const cleanupErrors = [];
+    try { fs.rmSync(stage, { recursive: true, force: true }); } catch (cleanupError) { cleanupErrors.push(cleanupError.message); }
+    if (promoted && fs.existsSync(browserRuntimeDir)) {
+      try { fs.renameSync(browserRuntimeDir, failed); } catch (cleanupError) { cleanupErrors.push(`quarantine failed runtime: ${cleanupError.message}`); }
+    }
+    if (fs.existsSync(previous) && !fs.existsSync(browserRuntimeDir)) {
+      try { fs.renameSync(previous, browserRuntimeDir); } catch (cleanupError) { cleanupErrors.push(`restore previous runtime: ${cleanupError.message}`); }
+    }
+    if (fs.existsSync(failed)) {
+      try { fs.rmSync(failed, { recursive: true, force: true }); } catch (cleanupError) { cleanupErrors.push(`remove failed runtime: ${cleanupError.message}`); }
+    }
+    throw new Error(`${error.message}${cleanupErrors.length ? `\nRuntime cleanup also failed: ${cleanupErrors.join("; ")}` : ""}`);
+  }
+
+  let settled = false;
+  return {
+    changed: true,
+    commit() {
+      if (settled) return;
+      settled = true;
+      try {
+        fs.rmSync(previous, { recursive: true, force: true });
+      } catch (error) {
+        warnings.push(`Could not remove retired browser runtime ${previous}: ${error.message}`);
+      }
+    },
+    rollback() {
+      if (settled) return [];
+      settled = true;
+      const errors = [];
+      if (fs.existsSync(browserRuntimeDir)) {
+        try { fs.renameSync(browserRuntimeDir, failed); } catch (error) { errors.push(`quarantine new runtime: ${error.message}`); }
+      }
+      if (fs.existsSync(previous) && !fs.existsSync(browserRuntimeDir)) {
+        try { fs.renameSync(previous, browserRuntimeDir); } catch (error) { errors.push(`restore previous runtime: ${error.message}`); }
+      }
+      if (fs.existsSync(failed)) {
+        try { fs.rmSync(failed, { recursive: true, force: true }); } catch (error) { errors.push(`remove rolled-back runtime: ${error.message}`); }
+      }
+      return errors;
+    },
+  };
+}
+
+function readJson(file, fallback = {}) {
   if (!fs.existsSync(file)) return structuredClone(fallback);
   try {
     return JSON.parse(fs.readFileSync(file, "utf8"));
@@ -216,6 +340,21 @@ function desiredSettingsOperations() {
 function managedFiles(includeShell) {
   const files = [
     [path.join(repoRoot, "extensions", "zen.ts"), path.join(agentDir, "extensions", "zen.ts"), 0o644],
+    [
+      path.join(repoRoot, "extensions", "browser", "index.ts"),
+      path.join(agentDir, "extensions", "browser", "index.ts"),
+      0o644,
+    ],
+    [
+      path.join(repoRoot, "extensions", "browser", "core.mjs"),
+      path.join(agentDir, "extensions", "browser", "core.mjs"),
+      0o644,
+    ],
+    [
+      path.join(repoRoot, "extensions", "browser", "smoke.mjs"),
+      path.join(agentDir, "extensions", "browser", "smoke.mjs"),
+      0o755,
+    ],
     [
       path.join(repoRoot, "extensions", "tool-wishlist", "index.ts"),
       path.join(agentDir, "extensions", "tool-wishlist", "index.ts"),
@@ -416,6 +555,11 @@ async function confirm(message, yes) {
 function assertSources() {
   const required = [
     "extensions/zen.ts",
+    "extensions/browser/index.ts",
+    "extensions/browser/core.mjs",
+    "extensions/browser/smoke.mjs",
+    "browser-runtime/package.json",
+    "browser-runtime/package-lock.json",
     "extensions/tool-wishlist/index.ts",
     "extensions/tool-wishlist/core.mjs",
     "skills/donsetch/SKILL.md",
@@ -427,8 +571,9 @@ function assertSources() {
   for (const relative of required) {
     if (!fs.existsSync(path.join(repoRoot, relative))) throw new Error(`Missing repository source: ${relative}`);
   }
-  if (Number(process.versions.node.split(".")[0]) < 22) {
-    throw new Error(`Node 22 or newer is required; found ${process.versions.node}`);
+  const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
+  if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 19)) {
+    throw new Error(`Node 22.19 or newer is required; found ${process.versions.node}`);
   }
   readJson(settingsPath, {});
 }
@@ -456,12 +601,23 @@ Managed files:`);
   console.log("  codex-exec and codex-exec-writer disabled");
   console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
   console.log("  capability-gap events use sanitized summaries and salted session/project hashes");
+  console.log("  isolated browser contexts never reuse the user's Chrome profile or cookies");
+
+  console.log("\nManaged browser runtime:");
+  if (options.skipBrowserInstall) {
+    console.log("  skipped by explicit flag (browser tools remain installed but unavailable without an existing runtime)");
+  } else {
+    console.log(`  ${browserRuntimeDir}`);
+    console.log("  Playwright 1.62.1 + matching managed Chromium");
+    console.log("  staged before atomic promotion; no global executable installation");
+  }
 
   console.log("\nPinned packages:");
   for (const spec of PACKAGES) console.log(`  ${spec}`);
 
   console.log("\nExternal prerequisites checked but not installed by default:");
   console.log("  bat (or batcat), delta, glow, donsetch");
+  console.log("  Chromium is installed by default inside the managed browser runtime");
   console.log("\nEvery install/update creates timestamped backups under:");
   console.log(`  ${path.join(stateDir, "backups")}`);
 }
@@ -483,9 +639,13 @@ async function installOrUpdate(options, update) {
   if (!options.skipPackageInstall && !commandExists("pi")) {
     throw new Error("pi is not available on PATH.");
   }
+  if (!options.skipBrowserInstall && !commandExists("npm")) {
+    throw new Error("npm is required to install the managed browser runtime.");
+  }
 
   const releaseLock = acquireLock();
   let transaction;
+  let browserRuntimeTransaction;
   let backupDir;
   try {
     const previousManifest = readManifest(update);
@@ -525,6 +685,12 @@ async function installOrUpdate(options, update) {
       settingsBeforeOperation.packages || [],
       previousManifest?.packageChanges || [],
     );
+
+    if (!options.skipBrowserInstall) {
+      browserRuntimeTransaction = installBrowserRuntime(warnings);
+    } else if (!browserRuntimeStatus().installed) {
+      warnings.push("Managed browser runtime installation was explicitly skipped; browser tools will be unavailable.");
+    }
 
     if (!options.skipPackageInstall) {
       for (const spec of PACKAGES) run("pi", ["install", spec]);
@@ -599,6 +765,7 @@ async function installOrUpdate(options, update) {
         previousManifest?.packagesKeyBeforeExists ?? Object.hasOwn(settingsBeforeOperation, "packages"),
       packageChanges,
       settingsChanges,
+      browserRuntime: browserRuntimeStatus(),
       files: fileRecords,
       backups: [...(previousManifest?.backups || []), path.relative(stateDir, backupDir)],
     };
@@ -608,14 +775,21 @@ async function installOrUpdate(options, update) {
       run("pi", ["--offline", "--list-models", "gpt"], { capture: true });
     }
 
+    browserRuntimeTransaction?.commit();
     console.log(`\nZenPi ${update ? "updated" : "installed"} successfully.`);
     console.log(`Manifest: ${manifestPath}`);
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
     console.log("Run ./zenpi doctor, then /reload in active Pi sessions.");
   } catch (error) {
-    if (transaction) restoreSnapshot(transaction);
-    if (backupDir) fs.rmSync(backupDir, { recursive: true, force: true });
-    throw new Error(`${transaction ? "Installation rolled back: " : ""}${error.message}`);
+    const rollbackErrors = [];
+    try { rollbackErrors.push(...(browserRuntimeTransaction?.rollback() || [])); } catch (rollbackError) { rollbackErrors.push(`browser runtime rollback: ${rollbackError.message}`); }
+    if (transaction) {
+      try { restoreSnapshot(transaction); } catch (rollbackError) { rollbackErrors.push(`configuration rollback: ${rollbackError.message}`); }
+    }
+    if (backupDir) {
+      try { fs.rmSync(backupDir, { recursive: true, force: true }); } catch (rollbackError) { rollbackErrors.push(`backup cleanup: ${rollbackError.message}`); }
+    }
+    throw new Error(`${transaction ? "Installation rolled back: " : ""}${error.message}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`);
   } finally {
     releaseLock();
   }
@@ -639,6 +813,7 @@ function restoreSettingChanges(settings, changes, warnings) {
 async function uninstall(options) {
   const releaseLock = acquireLock();
   let transaction;
+  let retiredBrowserRuntime;
   try {
     const manifest = readManifest(true);
     await confirm(`Uninstall ZenPi ${manifest.version}?`, options.yes);
@@ -687,13 +862,31 @@ async function uninstall(options) {
       );
     }
 
+    if (fs.existsSync(browserRuntimeDir)) {
+      retiredBrowserRuntime = path.join(stateDir, `.browser-runtime-uninstall-${process.pid}-${Date.now()}`);
+      fs.renameSync(browserRuntimeDir, retiredBrowserRuntime);
+    }
     fs.rmSync(manifestPath, { force: true });
-    console.log("ZenPi configuration uninstalled.");
-    console.log("Downloaded npm package caches were left in place; they are inert when absent from settings.");
+    if (retiredBrowserRuntime) {
+      try {
+        fs.rmSync(retiredBrowserRuntime, { recursive: true, force: true });
+      } catch (error) {
+        warnings.push(`Could not remove retired browser runtime ${retiredBrowserRuntime}: ${error.message}`);
+      }
+    }
+    retiredBrowserRuntime = undefined;
+    console.log("ZenPi configuration and managed browser runtime uninstalled.");
+    console.log("Browser artifacts and downloaded Pi package caches were preserved as user state or inert caches.");
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
   } catch (error) {
-    if (transaction) restoreSnapshot(transaction);
-    throw new Error(`${transaction ? "Uninstall rolled back: " : ""}${error.message}`);
+    const rollbackErrors = [];
+    if (retiredBrowserRuntime && fs.existsSync(retiredBrowserRuntime) && !fs.existsSync(browserRuntimeDir)) {
+      try { fs.renameSync(retiredBrowserRuntime, browserRuntimeDir); } catch (rollbackError) { rollbackErrors.push(`browser runtime restore: ${rollbackError.message}`); }
+    }
+    if (transaction) {
+      try { restoreSnapshot(transaction); } catch (rollbackError) { rollbackErrors.push(`configuration rollback: ${rollbackError.message}`); }
+    }
+    throw new Error(`${transaction ? "Uninstall rolled back: " : ""}${error.message}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`);
   } finally {
     releaseLock();
   }
@@ -729,6 +922,23 @@ function doctor() {
     if (!shell.includes(SHELL_START) || !shell.includes(SHELL_END)) errors.push("Missing ZenPi shell block");
   }
 
+  const runtimeStatus = browserRuntimeStatus();
+  let browserSmoke;
+  if (!runtimeStatus.installed) {
+    const message = `Managed browser runtime unavailable: ${runtimeStatus.reason}`;
+    if (manifest.browserRuntime?.installed === false) warnings.push(`${message} (installation was skipped)`);
+    else errors.push(message);
+  } else if (!fs.existsSync(browserSmokePath)) {
+    errors.push(`Browser smoke probe is missing: ${browserSmokePath}`);
+  } else {
+    try {
+      const result = smokeBrowserRuntime(browserRuntimeDir);
+      browserSmoke = (result.stdout || "").trim();
+    } catch (error) {
+      errors.push(`Browser smoke failed: ${error.message}`);
+    }
+  }
+
   if (!commandExists("pi")) errors.push("pi is not available on PATH");
   if (!commandExists("bat") && !commandExists("batcat")) warnings.push("bat/batcat is missing (files widget prerequisite)");
   if (!commandExists("delta")) warnings.push("delta is missing (files widget prerequisite)");
@@ -737,6 +947,7 @@ function doctor() {
 
   console.log(`ZenPi ${manifest.version} doctor`);
   console.log(`Agent directory: ${agentDir}`);
+  if (browserSmoke) console.log(`BROWSER ${browserSmoke}`);
   for (const warning of warnings) console.warn(`WARN  ${warning}`);
   for (const error of errors) console.error(`ERROR ${error}`);
   if (errors.length) {

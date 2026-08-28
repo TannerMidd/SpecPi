@@ -12,6 +12,15 @@ ZenPi pins but does not vendor these Pi packages:
 
 They retain their own copyright and license terms. Pi downloads them from npm when the installer runs `pi install`.
 
+ZenPi also installs these exact browser-runtime packages from the reviewed `browser-runtime/package-lock.json`:
+
+- `playwright@1.62.1` and `playwright-core@1.62.1` — Apache-2.0
+- `pixelmatch@7.2.0` — ISC
+- `pngjs@7.0.0` — MIT
+- optional `fsevents@2.3.2` on macOS — MIT
+
+Playwright downloads its matching Chromium build into ZenPi's private runtime directory. Chromium retains its upstream BSD and third-party component licenses. None of these executables are installed globally.
+
 Repository automation uses these official GitHub Actions at pinned major versions:
 
 - `actions/checkout@v4`

@@ -15,4 +15,6 @@
 - Never claim completion from plausibility alone. Report commands run, validation results, and residual risks.
 - Do not commit, push, publish, deploy, or alter remote state unless the user explicitly requests it.
 - Prefer Pi web tools for ordinary research. Use the DonSeTch skill for whole-site crawling, bot walls, JavaScript-heavy extraction, or focused probes.
+- Use ZenPi browser tools to validate rendered web interfaces at relevant desktop, tablet, and mobile viewports; source review and HTTP checks are not proof of visual correctness.
+- Create or replace visual baselines only when explicitly requested, and report current, baseline, and diff artifact paths for regression comparisons.
 - Keep final responses concise and identify changed files clearly.

@@ -395,7 +395,9 @@ export function renderWishlist(events, options = {}) {
 }
 
 function writeReport(reportPath, events, invalidLines, generatedAt) {
-  atomicWrite(reportPath, renderWishlist(events, { invalidLines, generatedAt }), 0o600);
+  const report = renderWishlist(events, { invalidLines, generatedAt });
+  atomicWrite(reportPath, report, 0o600);
+  return report;
 }
 
 export async function recordCapabilityGap(options) {
@@ -467,10 +469,11 @@ export async function refreshWishlist(options) {
   return withStateLock(stateDir, signal, async () => {
     const files = pathsFor(stateDir);
     const parsed = readEventsFile(files.events);
-    writeReport(files.report, parsed.events, parsed.invalidLines, now);
+    const report = writeReport(files.report, parsed.events, parsed.invalidLines, now);
     const groups = aggregateEvents(parsed.events);
     return {
       reportPath: files.report,
+      report,
       uniqueGaps: groups.length,
       occurrences: groups.reduce((total, group) => total + group.occurrences, 0),
       invalidLines: parsed.invalidLines,
