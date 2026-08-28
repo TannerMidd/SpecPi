@@ -3,14 +3,14 @@
  *
  * - Breathing working indicator: a slow-pulsing dot (~6 breaths/min)
  *   while the agent works, instead of the default spinner.
- * - Tea-house startup header: a small ZenPi wordmark for new sessions.
+ * - Grand centered startup header: a calm Pi glyph for new sessions.
  * - Zen widget: a quiet line of time/session ambience above the editor.
  *
  * Toggle everything with /zen
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 export default function (pi: ExtensionAPI) {
 	let enabled = false;
@@ -40,31 +40,38 @@ export default function (pi: ExtensionAPI) {
 
 		ctx.ui.setWorkingIndicator(breathe(ctx.ui.theme));
 
-		// --- Tea-house startup header ---
+		// --- Grand centered startup header ---
 		if (ctx.mode === "tui" && typeof ctx.ui.setHeader === "function") {
 			ctx.ui.setHeader((_headerTui: any, theme: any) => ({
 				invalidate() {},
 				render(width: number): string[] {
-					if (width < 30) {
+					const center = (line: string) => {
+						const padding = Math.max(0, Math.floor((width - visibleWidth(line)) / 2));
+						return truncateToWidth(`${" ".repeat(padding)}${line}`, width);
+					};
+
+					if (width < 36) {
 						return [
-							truncateToWidth(
-								`${theme.fg("accent", theme.bold("ZenPi"))} ${theme.fg("dim", "· calm tools · clear intent")}`,
-								width,
+							center(
+								`${theme.fg("accent", theme.bold("ZenPi"))} ${theme.fg("dim", "· breathe, then build")}`,
 							),
 						];
 					}
 
 					const lines = [
 						"",
-						theme.fg("dim", "       (  )"),
-						theme.fg("dim", "        )("),
-						theme.fg("accent", "      .-~~-."),
-						`${theme.fg("accent", "     (")} ${theme.bold("ZenPi")} ${theme.fg("accent", ")")}`,
-						theme.fg("accent", "      `-..-'"),
-						theme.fg("muted", "  calm tools · clear intent"),
+						theme.fg("dim", "░░      ░░"),
+						theme.fg("accent", "██████████████████"),
+						theme.fg("accent", "   ████    ████"),
+						theme.fg("accent", "   ████    ████"),
+						theme.fg("accent", "   ████    ████"),
+						theme.fg("accent", "   ████    ████"),
+						"",
+						theme.fg("text", theme.bold("Z e n P i")),
+						theme.fg("muted", "breathe · then build"),
 						"",
 					];
-					return lines.map((line) => truncateToWidth(line, width));
+					return lines.map(center);
 				},
 			}));
 		}

@@ -4,6 +4,8 @@
 
 ZenPi is a calm, explicit, provider-safe harness for the [Pi coding agent](https://pi.dev/). It combines a quiet Tea House interface with conservative automation, bounded delegation, and evidence-driven improvements—without taking ownership of the parts of Pi that should remain yours.
 
+Visit the [ZenPi showcase](https://tannermidd.github.io/ZenPi/) for the ideas, features, and ethos behind the setup.
+
 Installation is review-first. ZenPi does not silently replace authentication, providers, models, trust decisions, sessions, or history.
 
 ### Design principles
@@ -26,18 +28,21 @@ Installation is review-first. ZenPi does not silently replace authentication, pr
 - Optional `pi-core`, `pi-plan`, and `pi-full` shell profiles.
 - A manifest, checksums, and timestamped backups of overwritten ZenPi resource files.
 
-On Pi 0.37.4 or newer, interactive sessions open with a responsive Tea House wordmark:
+On Pi 0.37.4 or newer, interactive sessions open with a grand, centered Pi glyph:
 
 ```text
-       (  )
-        )(
-      .-~~-.
-     ( ZenPi )
-      `-..-'
-  calm tools · clear intent
+      ░░      ░░
+  ██████████████████
+     ████    ████
+     ████    ████
+     ████    ████
+     ████    ████
+
+       Z e n P i
+  breathe · then build
 ```
 
-The banner collapses to one line in narrow terminals. `/zen` toggles the banner, breathing work indicator, and quiet clock together; disabling it restores Pi's default interface.
+The banner collapses to one centered line in narrow terminals. `/zen` toggles the banner, breathing work indicator, and quiet clock together; disabling it restores Pi's default interface.
 
 ## Safety invariant
 
@@ -183,6 +188,8 @@ npm run check
 ```
 
 The integration test uses a temporary Pi agent directory and skips network/package installation.
+
+The zero-dependency showcase site lives in `site/`. Its GitHub Pages workflow publishes that directory directly, with no generated files or package installation.
 
 ## Security
 

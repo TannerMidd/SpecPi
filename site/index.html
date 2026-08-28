@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171310">
+  <meta name="description" content="ZenPi is a calm, explicit, provider-safe harness for the Pi coding agent.">
+  <meta property="og:title" content="ZenPi — Breathe. Then build.">
+  <meta property="og:description" content="A calm, explicit, provider-safe harness for the Pi coding agent.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ZenPi">
+  <meta property="og:url" content="https://tannermidd.github.io/ZenPi/">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="https://tannermidd.github.io/ZenPi/">
+  <title>ZenPi — Breathe. Then build.</title>
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="ZenPi home">
+      <span class="brand-mark" aria-hidden="true">π</span>
+      <span>ZenPi</span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="#principles">Ethos</a>
+      <a href="#features">Features</a>
+      <a href="#wishlist">Wishlist</a>
+      <a href="#install">Install</a>
+      <a class="nav-github" href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="hero-copy reveal">
+        <p class="eyebrow">A considered harness for Pi</p>
+        <h1 id="hero-title">Breathe.<br><span>Then build.</span></h1>
+        <p class="hero-lede">
+          ZenPi turns the Pi coding agent into a quieter, safer, and more deliberate workspace—without hiding what it changes or taking ownership of what should remain yours.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">Begin with a plan</a>
+          <a class="button button-quiet" href="https://github.com/TannerMidd/ZenPi">Read the source <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="trust-note"><span aria-hidden="true">○</span> Review-first installation · explicit ownership · clean rollback</p>
+      </div>
+
+      <div class="terminal-wrap reveal reveal-delay" role="img" aria-label="ZenPi terminal preview with a large centered Pi glyph and the words breathe, then build">
+        <div class="terminal-glow" aria-hidden="true"></div>
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <span>pi · tea-house</span>
+            <span class="terminal-status">zen</span>
+          </div>
+          <pre class="terminal-logo"><code><span class="steam">░░      ░░</span>
+<span class="pi-glyph">██████████████████
+   ████    ████
+   ████    ████
+   ████    ████
+   ████    ████</span>
+
+<span class="wordmark">Z e n P i</span>
+<span class="tagline">breathe · then build</span></code></pre>
+          <div class="terminal-prompt"><span>›</span><span class="cursor" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manifesto" id="principles" aria-labelledby="principles-title">
+      <div class="section-heading">
+        <p class="eyebrow">The ZenPi ethos</p>
+        <h2 id="principles-title">Power does not need to feel noisy.</h2>
+        <p>The best agent setup is not the one with the most machinery. It is the one whose boundaries you understand and whose behavior earns trust over time.</p>
+      </div>
+
+      <div class="principle-grid">
+        <article class="principle-card">
+          <span class="principle-number">01</span>
+          <h3>Calm by default</h3>
+          <p>A Tea House palette, breathing work indicator, and quiet session ambience keep the interface present without demanding attention.</p>
+        </article>
+        <article class="principle-card">
+          <span class="principle-number">02</span>
+          <h3>Explicit by design</h3>
+          <p>Planning never mutates. Install, update, and uninstall show their intent and require confirmation before touching your setup.</p>
+        </article>
+        <article class="principle-card">
+          <span class="principle-number">03</span>
+          <h3>Provider-safe</h3>
+          <p>ZenPi installs strict model inheritance for native children. Trusted project settings take precedence, so the boundary remains visible and inspectable.</p>
+        </article>
+        <article class="principle-card">
+          <span class="principle-number">04</span>
+          <h3>Evidence over folklore</h3>
+          <p>Files, diffs, tests, and runtime behavior outrank assumptions. Repeated friction becomes measured input for improving the harness.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="features" id="features" aria-labelledby="features-title">
+      <div class="section-heading section-heading-split">
+        <div>
+          <p class="eyebrow">A small, effective system</p>
+          <h2 id="features-title">Everything has a reason to be here.</h2>
+        </div>
+        <p>ZenPi assembles a focused baseline around Pi. Each layer stays inspectable, replaceable, and bounded.</p>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature feature-wide feature-interface">
+          <div class="feature-copy">
+            <p class="feature-kicker">Interface</p>
+            <h3>The Tea House</h3>
+            <p>A responsive startup glyph, warm low-contrast theme, six-breaths-per-minute work indicator, and a quiet clock create a workspace that feels composed.</p>
+            <code>/zen</code>
+          </div>
+          <div class="breath-demo" aria-hidden="true">
+            <span>·</span><span>•</span><span>●</span><span>⬤</span><span>●</span><span>•</span>
+          </div>
+        </article>
+
+        <article class="feature">
+          <p class="feature-kicker">Delegation</p>
+          <h3>One model lineage</h3>
+          <p>ZenPi's global <code>inherit</code>-only policy keeps native children on the parent model unless trusted project settings intentionally override it.</p>
+          <div class="lineage" role="img" aria-label="Parent model flows to inherited child models">
+            <span>parent</span><i></i><span>child</span><i></i><span>review</span>
+          </div>
+        </article>
+
+        <article class="feature">
+          <p class="feature-kicker">Operations</p>
+          <h3>Reversible by construction</h3>
+          <p>Managed blocks, checksums, timestamped backups, atomic writes, and rollback keep changes narrow and recoverable.</p>
+          <ul class="check-list">
+            <li>Plan before mutation</li>
+            <li>Preserve unrelated settings</li>
+            <li>Refuse silent overwrites</li>
+          </ul>
+        </article>
+
+        <article class="feature">
+          <p class="feature-kicker">Research</p>
+          <h3>Escalate only when needed</h3>
+          <p>Ordinary web tools handle ordinary research. DonSeTch is available on demand for crawling, bot walls, and JavaScript-heavy pages.</p>
+        </article>
+
+        <article class="feature">
+          <p class="feature-kicker">Workflow</p>
+          <h3>Useful defaults, visible seams</h3>
+          <p>Curated packages, bounded subagent roles, optional shell profiles, and durable working agreements provide leverage without mystery.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="wishlist-section" id="wishlist" aria-labelledby="wishlist-title">
+      <div class="wishlist-copy">
+        <p class="eyebrow">The setup learns from friction</p>
+        <h2 id="wishlist-title">A wishlist earned through use.</h2>
+        <p>
+          When the agent encounters a material, reusable capability gap, ZenPi can record a privacy-minimized report. Ranking uses unique-task occurrences and impact, while distinct-session and distinct-project counts show reach—turning vague frustration into a practical improvement queue.
+        </p>
+        <div class="privacy-note">
+          <span aria-hidden="true">◌</span>
+          <p><strong>Precision before volume.</strong> No automatic failure scraping. Reports are designed to exclude prompts, source code, commands, credentials, and raw project identities, with additional redaction for common sensitive formats.</p>
+        </div>
+      </div>
+
+      <div class="wishlist-flow" role="list" aria-label="Capability gap reporting flow">
+        <div class="flow-step" role="listitem">
+          <span>01</span>
+          <div><strong>Encounter friction</strong><small>Existing capabilities prove insufficient</small></div>
+        </div>
+        <i aria-hidden="true"></i>
+        <div class="flow-step" role="listitem">
+          <span>02</span>
+          <div><strong>Report carefully</strong><small>Structured, sanitized, task-deduplicated</small></div>
+        </div>
+        <i aria-hidden="true"></i>
+        <div class="flow-step" role="listitem">
+          <span>03</span>
+          <div><strong>Measure recurrence</strong><small>Occurrences, reach, impact, and recency</small></div>
+        </div>
+        <i aria-hidden="true"></i>
+        <div class="flow-step flow-step-accent" role="listitem">
+          <span>04</span>
+          <div><strong>Improve the system</strong><small>Tool, skill, prompt, config, or bug fix</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ownership" aria-labelledby="ownership-title">
+      <div class="section-heading">
+        <p class="eyebrow">A boundary you can explain</p>
+        <h2 id="ownership-title">ZenPi knows what is not its own.</h2>
+      </div>
+      <div class="ownership-grid">
+        <article>
+          <p class="ownership-label owns"><span aria-hidden="true">●</span> ZenPi manages</p>
+          <ul>
+            <li>Its theme, extensions, and optional skill</li>
+            <li>Its pinned package entries</li>
+            <li>Selected bounded subagent settings</li>
+            <li>Only its marked AGENTS and shell blocks</li>
+            <li>Its manifest, checksums, and backups</li>
+          </ul>
+        </article>
+        <article>
+          <p class="ownership-label yours"><span aria-hidden="true">○</span> Always yours</p>
+          <ul>
+            <li>Authentication and provider credentials</li>
+            <li>Default provider and model choices</li>
+            <li>Project trust decisions</li>
+            <li>Sessions, missions, and history</li>
+            <li>Unrelated packages and configuration</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="install" id="install" aria-labelledby="install-title">
+      <div class="install-copy">
+        <p class="eyebrow">Start with understanding</p>
+        <h2 id="install-title">Review. Plan. Install.</h2>
+        <p>Clone the repository, inspect what ZenPi owns, and ask the installer to show its complete plan before confirming anything.</p>
+        <a class="text-link" href="https://github.com/TannerMidd/ZenPi#quick-start">Read the installation guide <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="code-window" role="region" aria-label="ZenPi installation commands">
+        <div class="code-window-bar"><span>terminal</span><span>read before running</span></div>
+        <pre><code><span class="comment"># Clone and inspect</span>
+git clone https://github.com/TannerMidd/ZenPi.git
+cd ZenPi
+
+<span class="comment"># Nothing changes here</span>
+./zenpi plan
+
+<span class="comment"># Confirm, verify, then breathe</span>
+./zenpi install
+./zenpi doctor</code></pre>
+      </div>
+    </section>
+
+    <section class="closing" aria-labelledby="closing-title">
+      <div class="closing-mark" aria-hidden="true">π</div>
+      <p class="eyebrow">Calm tools · clear intent</p>
+      <h2 id="closing-title">Build with a system<br>you can trust.</h2>
+      <div class="hero-actions closing-actions">
+        <a class="button button-primary" href="https://github.com/TannerMidd/ZenPi">Explore ZenPi on GitHub</a>
+        <a class="button button-quiet" href="https://pi.dev/">Discover Pi <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand footer-brand" href="#top"><span class="brand-mark" aria-hidden="true">π</span><span>ZenPi</span></a>
+    <p>Open source under the MIT License.<br>Third-party components retain their own terms.</p>
+    <div class="footer-links">
+      <a href="https://github.com/TannerMidd/ZenPi">Source</a>
+      <a href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/TannerMidd/ZenPi/blob/main/LICENSE">License</a>
+    </div>
+  </footer>
+</body>
+</html>

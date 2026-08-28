@@ -17,6 +17,10 @@ The installer:
 
 Package installation can leave downloaded npm caches after rollback or uninstall. Those caches are inert when absent from Pi settings.
 
+## Website publishing
+
+The `deploy-pages` GitHub Actions workflow publishes only the checked-in `site/` directory. The deploy job retains read-only repository contents access and adds only the `pages: write` and `id-token: write` permissions required by GitHub Pages. The local ZenPi installer does not invoke this workflow or upload local configuration and state.
+
 ## Provider isolation
 
 ZenPi enforces native child model inheritance and disables the bundled external Codex CLI runners. This prevents ordinary OpenRouter parent sessions from silently consuming a Codex subscription.

@@ -87,6 +87,29 @@ test("path operations create, read, and prune empty parents", () => {
   assert.deepEqual(value, {});
 });
 
+test("showcase site is self-contained and Pages-ready", () => {
+  const siteDir = path.join(repoRoot, "site");
+  const html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(siteDir, "styles.css"), "utf8");
+  const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
+
+  assert.match(html, /<html lang="en">/);
+  assert.match(html, /name="viewport"/);
+  assert.match(html, /href="styles\.css"/);
+  assert.match(html, /href="logo\.svg"/);
+  assert.match(html, /id="principles"/);
+  assert.match(html, /id="features"/);
+  assert.match(html, /id="wishlist"/);
+  assert.match(html, /id="install"/);
+  assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
+  assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.match(workflow, /actions\/configure-pages@v5/);
+  assert.match(workflow, /actions\/upload-pages-artifact@v4/);
+  assert.match(workflow, /actions\/deploy-pages@v4/);
+  assert.match(workflow, /permissions:\n\s+contents: read\n\s+pages: write\n\s+id-token: write/);
+  assert.match(workflow, /path: site/);
+});
+
 test("capability keys normalize superficial wording", () => {
   assert.equal(normalizeCapability("Missing Browser Automation Tools"), "browser-automation");
   assert.equal(normalizeCapability("browser automations"), "browser-automation");
