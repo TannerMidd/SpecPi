@@ -6,6 +6,12 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  aggregateEvents,
+  normalizeCapability,
+  recordCapabilityGap,
+  refreshWishlist,
+} from "../extensions/tool-wishlist/core.mjs";
+import {
   AGENTS_END,
   AGENTS_START,
   deletePath,
@@ -81,6 +87,206 @@ test("path operations create, read, and prune empty parents", () => {
   assert.deepEqual(value, {});
 });
 
+test("capability keys normalize superficial wording", () => {
+  assert.equal(normalizeCapability("Missing Browser Automation Tools"), "browser-automation");
+  assert.equal(normalizeCapability("browser automations"), "browser-automation");
+});
+
+test("tool wishlist deduplicates a gap per task and stores privacy-minimized metrics", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-test-"));
+  const stateDir = path.join(root, "zenpi");
+  const gap = {
+    capability: "Browser automation tools",
+    scenario: "Interact with src/private/customer.ts in a dynamic web application\nwithout a browser interface",
+    limitation: "Static fetching at https://private.example/token with Authorization: Bearer eyJheader123.eyJpayload123.signature could not complete the interactive flow",
+    impact: "degraded",
+    workaround: "Used (/private/fallback) with api_key=sk-secretvalue123",
+    suggestedFix: "tool",
+  };
+
+  try {
+    const first = await recordCapabilityGap({
+      stateDir,
+      sessionId: "private-session-id",
+      runId: "task-one",
+      cwd: "/private/project/path",
+      gap,
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const duplicate = await recordCapabilityGap({
+      stateDir,
+      sessionId: "private-session-id",
+      runId: "task-one",
+      cwd: "/private/project/path",
+      gap,
+      now: "2026-01-01T00:01:00.000Z",
+    });
+    const secondTask = await recordCapabilityGap({
+      stateDir,
+      sessionId: "private-session-id",
+      runId: "task-two",
+      cwd: "/private/project/path",
+      gap: { ...gap, impact: "blocked" },
+      now: "2026-01-02T00:00:00.000Z",
+    });
+
+    assert.equal(first.duplicate, false);
+    assert.equal(duplicate.duplicate, true);
+    assert.equal(secondTask.duplicate, false);
+    assert.equal(secondTask.occurrences, 2);
+    assert.equal(secondTask.sessions, 1);
+    assert.equal(secondTask.priority, 6);
+
+    const eventText = fs.readFileSync(path.join(stateDir, "tool-wishlist-events.jsonl"), "utf8");
+    assert.equal(eventText.trim().split("\n").length, 2);
+    assert.doesNotMatch(eventText, /private-session-id|private\/project\/path/);
+    assert.doesNotMatch(eventText, /private\.example|private\/fallback|private\/customer|sk-secretvalue123|eyJheader123/);
+    assert.match(eventText, /\[url omitted\]/);
+    assert.match(eventText, /\[credential omitted\]/);
+    assert.match(eventText, /\[path omitted\]/);
+    assert.doesNotMatch(eventText, /\nwithout a browser interface/);
+
+    const report = fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8");
+    assert.match(report, /Occurrences: 2/);
+    assert.match(report, /Distinct sessions: 1/);
+    assert.match(report, /Priority: \*\*6\*\*/);
+    assert.doesNotMatch(report, /private-session-id|private\/project\/path/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist aggregation ignores duplicate run records and malformed lines", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-refresh-test-"));
+  const stateDir = path.join(root, "zenpi");
+  fs.mkdirSync(stateDir, { recursive: true });
+  const event = {
+    schema: 1,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    canonicalKey: "browser-automation",
+    sessionHash: "session-hash",
+    runHash: "run-hash",
+    projectHash: "project-hash",
+    capability: "Browser automation",
+    scenario: "Exercise an interactive site",
+    limitation: "No interactive browser was available",
+    impact: "minor",
+    workaround: "Manual fallback",
+    suggestedFix: "tool",
+  };
+  fs.writeFileSync(
+    path.join(stateDir, "tool-wishlist-events.jsonl"),
+    `${JSON.stringify(event)}\n${JSON.stringify(event)}\nnot-json\n`,
+  );
+
+  try {
+    assert.equal(aggregateEvents([event, event])[0].occurrences, 1);
+    const refreshed = await refreshWishlist({
+      stateDir,
+      now: "2026-01-03T00:00:00.000Z",
+    });
+    assert.equal(refreshed.occurrences, 1);
+    assert.equal(refreshed.invalidLines, 1);
+    assert.match(
+      fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"),
+      /1 malformed event line\(s\) were ignored/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist capacity refusal leaves existing data refreshable", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-capacity-test-"));
+  const stateDir = path.join(root, "zenpi");
+  const gap = {
+    capability: "Browser automation",
+    scenario: "Exercise an interactive site",
+    limitation: "No interactive browser was available",
+    impact: "minor",
+    workaround: "Manual fallback",
+    suggestedFix: "tool",
+  };
+
+  try {
+    await recordCapabilityGap({
+      stateDir,
+      sessionId: "session-one",
+      runId: "run-one",
+      cwd: root,
+      gap,
+    });
+    const eventsPath = path.join(stateDir, "tool-wishlist-events.jsonl");
+    const currentBytes = fs.statSync(eventsPath).size;
+    await assert.rejects(
+      recordCapabilityGap({
+        stateDir,
+        sessionId: "session-two",
+        runId: "run-two",
+        cwd: root,
+        gap,
+        maxEventFileBytes: currentBytes,
+      }),
+      /reached its .*byte limit/,
+    );
+    assert.equal(fs.readFileSync(eventsPath, "utf8").trim().split("\n").length, 1);
+    assert.equal((await refreshWishlist({ stateDir })).occurrences, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist never reclaims an unverified lock", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-lock-test-"));
+  const stateDir = path.join(root, "zenpi");
+  const lockDir = path.join(stateDir, ".tool-wishlist.lock");
+  fs.mkdirSync(lockDir, { recursive: true });
+  fs.writeFileSync(path.join(lockDir, "owner"), "another-process:token\n");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error("test cancellation")), 30);
+
+  try {
+    await assert.rejects(refreshWishlist({ stateDir, signal: controller.signal }), /test cancellation/);
+    assert.equal(fs.readFileSync(path.join(lockDir, "owner"), "utf8"), "another-process:token\n");
+  } finally {
+    clearTimeout(timer);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist release never removes a substituted lock", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-lock-replacement-test-"));
+  const stateDir = path.join(root, "zenpi");
+  const lockDir = path.join(stateDir, ".tool-wishlist.lock");
+  const replacementMarker = path.join(lockDir, "replacement-owner");
+  const gap = {
+    get capability() {
+      fs.rmSync(lockDir, { recursive: true, force: true });
+      fs.mkdirSync(lockDir);
+      fs.writeFileSync(replacementMarker, "owned\n");
+      return "Browser automation";
+    },
+    scenario: "Exercise an interactive site",
+    limitation: "No interactive browser was available",
+    impact: "minor",
+    workaround: "Manual fallback",
+    suggestedFix: "tool",
+  };
+
+  try {
+    await recordCapabilityGap({
+      stateDir,
+      sessionId: "session-one",
+      runId: "run-one",
+      cwd: root,
+      gap,
+    });
+    assert.equal(fs.readFileSync(replacementMarker, "utf8"), "owned\n");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("install, update, doctor, and uninstall round trip in an isolated agent dir", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-test-"));
   const agentDir = path.join(root, "agent");
@@ -113,6 +319,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(installed.subagents.agentOverrides.worker.model, "inherit");
     assert.equal(installed.subagents.agentOverrides["codex-exec"].disabled, true);
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
     assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
     const fakeBin = path.join(root, "bin");
@@ -171,6 +379,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
       fs.readFileSync(path.join(agentDir, "extensions", "zen.ts"), "utf8"),
       "// personal prior zen\n",
     );
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

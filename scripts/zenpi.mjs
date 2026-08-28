@@ -217,6 +217,16 @@ function managedFiles(includeShell) {
   const files = [
     [path.join(repoRoot, "extensions", "zen.ts"), path.join(agentDir, "extensions", "zen.ts"), 0o644],
     [
+      path.join(repoRoot, "extensions", "tool-wishlist", "index.ts"),
+      path.join(agentDir, "extensions", "tool-wishlist", "index.ts"),
+      0o644,
+    ],
+    [
+      path.join(repoRoot, "extensions", "tool-wishlist", "core.mjs"),
+      path.join(agentDir, "extensions", "tool-wishlist", "core.mjs"),
+      0o644,
+    ],
+    [
       path.join(repoRoot, "skills", "donsetch", "SKILL.md"),
       path.join(agentDir, "skills", "donsetch", "SKILL.md"),
       0o644,
@@ -406,6 +416,8 @@ async function confirm(message, yes) {
 function assertSources() {
   const required = [
     "extensions/zen.ts",
+    "extensions/tool-wishlist/index.ts",
+    "extensions/tool-wishlist/core.mjs",
     "skills/donsetch/SKILL.md",
     "themes/tea-house.json",
     "templates/AGENTS.md",
@@ -443,6 +455,7 @@ Managed files:`);
   console.log("  strict modelScope allow = [inherit]");
   console.log("  codex-exec and codex-exec-writer disabled");
   console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
+  console.log("  capability-gap events use sanitized summaries and salted session/project hashes");
 
   console.log("\nPinned packages:");
   for (const spec of PACKAGES) console.log(`  ${spec}`);

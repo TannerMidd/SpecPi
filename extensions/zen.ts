@@ -3,6 +3,7 @@
  *
  * - Breathing working indicator: a slow-pulsing dot (~6 breaths/min)
  *   while the agent works, instead of the default spinner.
+ * - Tea-house startup header: a small ZenPi wordmark for new sessions.
  * - Zen widget: a quiet line of time/session ambience above the editor.
  *
  * Toggle everything with /zen
@@ -39,6 +40,35 @@ export default function (pi: ExtensionAPI) {
 
 		ctx.ui.setWorkingIndicator(breathe(ctx.ui.theme));
 
+		// --- Tea-house startup header ---
+		if (ctx.mode === "tui" && typeof ctx.ui.setHeader === "function") {
+			ctx.ui.setHeader((_headerTui: any, theme: any) => ({
+				invalidate() {},
+				render(width: number): string[] {
+					if (width < 30) {
+						return [
+							truncateToWidth(
+								`${theme.fg("accent", theme.bold("ZenPi"))} ${theme.fg("dim", "· calm tools · clear intent")}`,
+								width,
+							),
+						];
+					}
+
+					const lines = [
+						"",
+						theme.fg("dim", "       (  )"),
+						theme.fg("dim", "        )("),
+						theme.fg("accent", "      .-~~-."),
+						`${theme.fg("accent", "     (")} ${theme.bold("ZenPi")} ${theme.fg("accent", ")")}`,
+						theme.fg("accent", "      `-..-'"),
+						theme.fg("muted", "  calm tools · clear intent"),
+						"",
+					];
+					return lines.map((line) => truncateToWidth(line, width));
+				},
+			}));
+		}
+
 		// --- Zen widget above editor ---
 		ctx.ui.setWidget("zen", (widgetTui: any, theme: any) => {
 			if (clockTimer) clearInterval(clockTimer);
@@ -73,6 +103,7 @@ export default function (pi: ExtensionAPI) {
 			} else {
 				if (clockTimer) clearInterval(clockTimer);
 				ctx.ui.setWorkingIndicator();
+				if (typeof ctx.ui.setHeader === "function") ctx.ui.setHeader(undefined);
 				ctx.ui.setWidget("zen", undefined);
 				ctx.ui.notify("Default interface restored.", "info");
 			}

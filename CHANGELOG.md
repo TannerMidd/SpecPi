@@ -7,4 +7,6 @@
 - Add provider-safe strict native-subagent inheritance.
 - Disable external Codex subscription runners.
 - Bundle Zen extension, Tea House theme, and DonSeTch skill.
+- Add a responsive Tea House startup wordmark to the Zen interface.
+- Add a privacy-minimized, task-deduplicated capability-gap collector and generated tool wishlist.
 - Pin the reviewed Pi package baseline.
