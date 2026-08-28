@@ -7,6 +7,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   aggregateEvents,
+  isImplementedCapability,
   normalizeCapability,
   recordCapabilityGap,
   refreshWishlist,
@@ -127,6 +128,9 @@ test("showcase site is self-contained and Pages-ready", () => {
 test("capability keys normalize superficial wording", () => {
   assert.equal(normalizeCapability("Missing Browser Automation Tools"), "browser-automation");
   assert.equal(normalizeCapability("browser automations"), "browser-automation");
+  assert.equal(isImplementedCapability("Local browser visual regression testing"), true);
+  assert.equal(isImplementedCapability("Local browser automation"), true);
+  assert.equal(isImplementedCapability("Browser automation with persisted authentication"), false);
 });
 
 test("browser inputs normalize local URLs, viewports, and project paths", () => {
@@ -209,7 +213,7 @@ test("tool wishlist deduplicates a gap per task and stores privacy-minimized met
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-test-"));
   const stateDir = path.join(root, "zenpi");
   const gap = {
-    capability: "Browser automation tools",
+    capability: "Local audio transcription",
     scenario: "Interact with src/private/customer.ts in a dynamic web application\nwithout a browser interface",
     limitation: "Static fetching at https://private.example/token with Authorization: Bearer eyJheader123.eyJpayload123.signature could not complete the interactive flow",
     impact: "degraded",
@@ -276,20 +280,33 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
   const event = {
     schema: 1,
     timestamp: "2026-01-01T00:00:00.000Z",
-    canonicalKey: "browser-automation",
+    canonicalKey: "audio-transcription",
     sessionHash: "session-hash",
     runHash: "run-hash",
     projectHash: "project-hash",
-    capability: "Browser automation",
+    capability: "Local audio transcription",
     scenario: "Exercise an interactive site",
     limitation: "No interactive browser was available",
     impact: "minor",
     workaround: "Manual fallback",
     suggestedFix: "tool",
   };
+  const implementedEvent = {
+    ...event,
+    canonicalKey: "local-browser-visual-regression-testing",
+    runHash: "implemented-run-hash",
+    capability: "Local browser visual regression testing",
+  };
+  const localAutomationEvent = {
+    ...implementedEvent,
+    canonicalKey: "local-browser-automation",
+    runHash: "local-automation-run-hash",
+    capability: "Local browser automation",
+  };
+  const eventsPath = path.join(stateDir, "tool-wishlist-events.jsonl");
   fs.writeFileSync(
-    path.join(stateDir, "tool-wishlist-events.jsonl"),
-    `${JSON.stringify(event)}\n${JSON.stringify(event)}\nnot-json\n`,
+    eventsPath,
+    `${JSON.stringify(event)}\n${JSON.stringify(event)}\n${JSON.stringify(implementedEvent)}\n${JSON.stringify(localAutomationEvent)}\nnot-json\n`,
   );
 
   try {
@@ -299,12 +316,70 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
       now: "2026-01-03T00:00:00.000Z",
     });
     assert.equal(refreshed.occurrences, 1);
+    assert.equal(refreshed.uniqueGaps, 1);
     assert.equal(refreshed.invalidLines, 1);
     assert.match(refreshed.report, /1 malformed event line\(s\) were ignored/);
+    assert.doesNotMatch(refreshed.report, /Local browser visual regression testing/);
+    assert.doesNotMatch(refreshed.report, /Local browser automation/);
     assert.equal(
       refreshed.report,
       fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"),
     );
+
+    const eventHistory = fs.readFileSync(eventsPath, "utf8");
+    const resolved = await recordCapabilityGap({
+      stateDir,
+      sessionId: "session-two",
+      runId: "run-two",
+      cwd: root,
+      gap: {
+        capability: "Local browser visual regression testing",
+        scenario: "Compare a local rendered page against an explicit baseline",
+        limitation: "No browser-backed pixel comparison was available",
+        impact: "degraded",
+        workaround: "Manual screenshot review",
+        suggestedFix: "tool",
+      },
+    });
+    assert.equal(resolved.resolved, true);
+    assert.equal(resolved.uniqueGaps, 1);
+    assert.equal(fs.readFileSync(eventsPath, "utf8"), eventHistory);
+
+    const localAutomation = await recordCapabilityGap({
+      stateDir,
+      sessionId: "session-three",
+      runId: "run-three",
+      cwd: root,
+      gap: {
+        capability: "Local browser automation",
+        scenario: "Interact with a locally rendered application",
+        limitation: "No browser interaction capability was available",
+        impact: "degraded",
+        workaround: "Manual browser interaction",
+        suggestedFix: "tool",
+      },
+    });
+    assert.equal(localAutomation.resolved, true);
+    assert.equal(fs.readFileSync(eventsPath, "utf8"), eventHistory);
+
+    const adjacentGap = await recordCapabilityGap({
+      stateDir,
+      sessionId: "session-four",
+      runId: "run-four",
+      cwd: root,
+      gap: {
+        capability: "Browser automation visual regression authentication",
+        scenario: "Compare authenticated application states",
+        limitation: "Fresh isolated contexts do not retain an authenticated session",
+        impact: "degraded",
+        workaround: "Manual authenticated comparison",
+        suggestedFix: "tool",
+      },
+    });
+    assert.equal(adjacentGap.resolved, false);
+    assert.equal(adjacentGap.canonicalKey, "browser-automation-visual-regression-authentication");
+    assert.equal(adjacentGap.uniqueGaps, 2);
+    assert.notEqual(fs.readFileSync(eventsPath, "utf8"), eventHistory);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -314,7 +389,7 @@ test("wishlist capacity refusal leaves existing data refreshable", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-capacity-test-"));
   const stateDir = path.join(root, "zenpi");
   const gap = {
-    capability: "Browser automation",
+    capability: "Local audio transcription",
     scenario: "Exercise an interactive site",
     limitation: "No interactive browser was available",
     impact: "minor",
@@ -378,7 +453,7 @@ test("wishlist release never removes a substituted lock", async () => {
       fs.rmSync(lockDir, { recursive: true, force: true });
       fs.mkdirSync(lockDir);
       fs.writeFileSync(replacementMarker, "owned\n");
-      return "Browser automation";
+      return "Local audio transcription";
     },
     scenario: "Exercise an interactive site",
     limitation: "No interactive browser was available",

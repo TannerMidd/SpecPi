@@ -55,6 +55,22 @@ export function normalizeCapability(value) {
   return [...new Set(tokens)].slice(0, 10).join("-") || "uncategorized-gap";
 }
 
+// Implemented wishlist items stay in the append-only event history but no
+// longer appear as active gaps. Keep this registry exact so adjacent,
+// unsupported browser use cases are not hidden accidentally.
+const IMPLEMENTED_CAPABILITY_KEYS = new Set([
+  "browser-automation",
+  "browser-automation-visual-regression",
+  "browser-visual-regression-testing",
+  "local-browser-automation",
+  "local-browser-visual-regression",
+  "local-browser-visual-regression-testing",
+]);
+
+export function isImplementedCapability(value) {
+  return IMPLEMENTED_CAPABILITY_KEYS.has(normalizeCapability(value));
+}
+
 function keyTokens(key) {
   return new Set(key.split("-").filter(Boolean));
 }
@@ -342,10 +358,14 @@ function day(value) {
   return String(value ?? "").slice(0, 10) || "unknown";
 }
 
+function activeGroups(events) {
+  return aggregateEvents(events).filter((group) => !isImplementedCapability(group.canonicalKey));
+}
+
 export function renderWishlist(events, options = {}) {
   const generatedAt = options.generatedAt ?? new Date().toISOString();
   const invalidLines = options.invalidLines ?? 0;
-  const groups = aggregateEvents(events);
+  const groups = activeGroups(events);
   const totalOccurrences = groups.reduce((total, group) => total + group.occurrences, 0);
   const lines = [
     "# Tool Wishlist",
@@ -420,12 +440,19 @@ export async function recordCapabilityGap(options) {
     const runHash = privateHash(salt, `${sessionId || "ephemeral-session"}\0${runId || "unknown-run"}`);
     const projectHash = privateHash(salt, path.resolve(cwd || process.cwd()));
     const sanitized = sanitizeGap(gap);
-    const canonicalKey = chooseCanonicalKey(sanitized.capability, parsed.events);
+    const proposedKey = normalizeCapability(sanitized.capability);
+    const canonicalKey = isImplementedCapability(proposedKey)
+      ? proposedKey
+      : chooseCanonicalKey(
+          sanitized.capability,
+          parsed.events.filter((event) => !isImplementedCapability(event.canonicalKey)),
+        );
 
-    const duplicate = parsed.events.some(
+    const resolved = isImplementedCapability(canonicalKey);
+    const duplicate = !resolved && parsed.events.some(
       (event) => event.canonicalKey === canonicalKey && event.runHash === runHash,
     );
-    if (!duplicate) {
+    if (!duplicate && !resolved) {
       assertNotSymlink(files.events);
       const event = {
         schema: 1,
@@ -449,10 +476,11 @@ export async function recordCapabilityGap(options) {
     }
 
     writeReport(files.report, parsed.events, parsed.invalidLines, now);
-    const groups = aggregateEvents(parsed.events);
+    const groups = activeGroups(parsed.events);
     const group = groups.find((item) => item.canonicalKey === canonicalKey);
     return {
       duplicate,
+      resolved,
       canonicalKey,
       reportPath: files.report,
       occurrences: group?.occurrences ?? 0,
@@ -470,7 +498,7 @@ export async function refreshWishlist(options) {
     const files = pathsFor(stateDir);
     const parsed = readEventsFile(files.events);
     const report = writeReport(files.report, parsed.events, parsed.invalidLines, now);
-    const groups = aggregateEvents(parsed.events);
+    const groups = activeGroups(parsed.events);
     return {
       reportPath: files.report,
       report,
