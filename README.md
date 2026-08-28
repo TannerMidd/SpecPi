@@ -116,7 +116,7 @@ See [SECURITY.md](SECURITY.md) for the full trust model and [THIRD_PARTY.md](THI
 ./zenpi uninstall
 ```
 
-For an update, review the new release tag, then run `plan`, `update`, and `doctor`. A forced update replaces local changes to managed files; save anything you need first.
+For an update, review the new release tag, then run `plan`, `update`, and `doctor`. Restart active Pi sessions so updated extension dependencies are loaded. A forced update replaces local changes to managed files; save anything you need first.
 
 State, backups, default browser artifacts, and wishlist data live under `~/.pi/agent/zenpi/`. Set `PI_CODING_AGENT_DIR` to move the Pi agent directory. Uninstall removes managed extensions and the browser runtime while preserving browser artifacts and wishlist data.
 

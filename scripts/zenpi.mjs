@@ -779,7 +779,11 @@ async function installOrUpdate(options, update) {
     console.log(`\nZenPi ${update ? "updated" : "installed"} successfully.`);
     console.log(`Manifest: ${manifestPath}`);
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
-    console.log("Run ./zenpi doctor, then /reload in active Pi sessions.");
+    console.log(
+      update
+        ? "Run ./zenpi doctor, then restart active Pi sessions."
+        : "Run ./zenpi doctor, then /reload in active Pi sessions.",
+    );
   } catch (error) {
     const rollbackErrors = [];
     try { rollbackErrors.push(...(browserRuntimeTransaction?.rollback() || [])); } catch (rollbackError) { rollbackErrors.push(`browser runtime rollback: ${rollbackError.message}`); }
