@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 - Unreleased
+## 0.1.0 - 2026-08-28
 
 - Add explicit plan/install/update/doctor/uninstall workflow.
 - Add managed AGENTS and shell blocks with backups and checksums.
