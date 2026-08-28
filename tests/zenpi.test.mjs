@@ -115,7 +115,12 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
     assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
-    runCli(agentDir, "doctor");
+    const fakeBin = path.join(root, "bin");
+    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\nexit 0\n");
+    const doctor = invokeCli(agentDir, ["doctor"], {
+      PATH: `${fakeBin}:${process.env.PATH}`,
+    });
+    assert.equal(doctor.status, 0, doctor.stderr);
 
     // Simulate ownership retired by a future ZenPi version.
     const retiredFile = path.join(agentDir, "extensions", "retired.ts");
