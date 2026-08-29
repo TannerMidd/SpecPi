@@ -102,6 +102,14 @@ test("path operations create, read, and prune empty parents", () => {
   assert.deepEqual(value, {});
 });
 
+test("platform launchers invoke Node directly", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  const windowsLauncher = fs.readFileSync(path.join(repoRoot, "zenpi.cmd"), "utf8");
+  assert.equal(manifest.bin.zenpi, "./scripts/zenpi.mjs");
+  assert.match(windowsLauncher, /node "%~dp0scripts\\zenpi\.mjs" %\*/i);
+  assert.ok(fs.readFileSync(path.join(repoRoot, "zenpi"), "utf8").startsWith("#!/usr/bin/env sh\n"));
+});
+
 test("showcase site is self-contained and Pages-ready", () => {
   const siteDir = path.join(repoRoot, "site");
   const html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
@@ -116,6 +124,8 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /id="features"/);
   assert.match(html, /id="wishlist"/);
   assert.match(html, /id="install"/);
+  assert.match(html, /\\zenpi\.cmd install/);
+  assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
   assert.match(css, /prefers-reduced-motion: reduce/);
   assert.match(workflow, /actions\/configure-pages@v5/);
@@ -493,6 +503,210 @@ test("installer plan is non-mutating even when browser installation is planned",
   }
 });
 
+test("plan shows pinned managed optional-tool assets", () => {
+  if (process.platform !== "linux" || process.arch !== "x64") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-plan-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  writeExecutable(path.join(fakeBin, "tar"), "#!/bin/sh\nexit 0\n");
+
+  try {
+    const result = invokeCli(agentDir, ["plan", "--skip-package-install", "--skip-shell"], { PATH: fakeBin });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /bat-v0\.26\.1-x86_64-unknown-linux-gnu\.tar\.gz/);
+    assert.match(result.stdout, /sha256:726f04c8f576a7fd18b7634f1bbf2f915c43494c1c0f013baa3287edb0d5a2a3/);
+    assert.match(result.stdout, /delta-0\.19\.2-x86_64-unknown-linux-gnu\.tar\.gz/);
+    assert.match(result.stdout, /glow_3\.0\.0_Linux_x86_64\.tar\.gz/);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("--yes installs each missing optional external tool", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-tools-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  const log = path.join(root, "tools.log");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  for (const command of ["bat", "delta", "glow"]) {
+    writeExecutable(path.join(fakeBin, command), "#!/bin/sh\nexit 0\n");
+  }
+  writeExecutable(
+    path.join(fakeBin, "npm"),
+    "#!/bin/sh\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nprintf '#!/bin/sh\\nexit 0\\n' > \"$ZENPI_FAKE_BIN/donsetch\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/donsetch\"\n",
+  );
+  const env = {
+    PATH: fakeBin,
+    ZENPI_FAKE_BIN: fakeBin,
+    ZENPI_FAKE_LOG: log,
+  };
+
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-package-install", "--skip-shell"],
+      env,
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      fs.readFileSync(log, "utf8").trim(),
+      "npm install --global donsetch@3.4.0 --no-audit --no-fund",
+    );
+    runCli(agentDir, "uninstall", "--yes");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("optional tool failures warn without blocking the core install", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-failure-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nexit 8\n");
+
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-package-install", "--skip-shell"],
+      { PATH: fakeBin },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /Could not install optional tool bat: tar is required/);
+    assert.match(result.stderr, /Optional tool DonSeTch failed to install/);
+    assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
+    runCli(agentDir, "uninstall", "--yes");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("managed optional tool targets reject symlinks before download", () => {
+  if (process.platform !== "linux" || process.arch !== "x64") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-symlink-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  const outside = path.join(root, "outside");
+  const target = path.join(agentDir, "zenpi", "bin", "bat");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(outside, "kept\n");
+  fs.symlinkSync(outside, target);
+  for (const command of ["delta", "glow", "donsetch", "tar"]) {
+    writeExecutable(path.join(fakeBin, command), "#!/bin/sh\nexit 0\n");
+  }
+
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-package-install", "--skip-shell"],
+      { PATH: fakeBin },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /Managed optional tool path must not be a symlink/);
+    assert.equal(fs.readFileSync(outside, "utf8"), "kept\n");
+    assert.equal(fs.lstatSync(target).isSymbolicLink(), true);
+    fs.rmSync(target);
+    runCli(agentDir, "uninstall", "--yes");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("later core failure reports external optional tools that remain installed", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-core-failure-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  for (const command of ["bat", "delta", "glow"]) {
+    writeExecutable(path.join(fakeBin, command), "#!/bin/sh\nexit 0\n");
+  }
+  writeExecutable(
+    path.join(fakeBin, "npm"),
+    "#!/bin/sh\nprintf '#!/bin/sh\\nexit 0\\n' > \"$ZENPI_FAKE_BIN/donsetch\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/donsetch\"\n",
+  );
+  writeExecutable(
+    path.join(fakeBin, "pi"),
+    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi\nexit 9\n",
+  );
+
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-browser-install", "--skip-shell"],
+      { PATH: fakeBin, ZENPI_FAKE_BIN: fakeBin },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /External optional tool changes were not rolled back: DonSeTch/);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("uninstall moves modified managed tools outside the trusted bin", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-modified-tool-test-"));
+  const agentDir = path.join(root, "agent");
+  try {
+    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
+    const target = path.join(agentDir, "zenpi", "bin", "bat");
+    const marker = path.join(agentDir, "zenpi", "optional-tools", "bat.json");
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.mkdirSync(path.dirname(marker), { recursive: true });
+    fs.writeFileSync(target, "modified\n", { mode: 0o755 });
+    fs.writeFileSync(marker, '{}\n');
+    const manifestPath = path.join(agentDir, "zenpi", "manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    manifest.managedOptionalTools = [{
+      schema: 1,
+      tool: "bat",
+      version: "0.26.1",
+      installedHash: sha256(Buffer.from("original\n")),
+      target,
+      marker,
+    }];
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+    const result = runCli(agentDir, "uninstall", "--yes");
+    assert.match(result.stderr, /Moved modified managed optional tool outside trusted PATH/);
+    assert.equal(fs.existsSync(target), false);
+    const preservedDir = path.join(agentDir, "zenpi", "preserved-modified-tools");
+    const preserved = fs.readdirSync(preservedDir);
+    assert.equal(preserved.length, 1);
+    assert.equal(fs.readFileSync(path.join(preservedDir, preserved[0]), "utf8"), "modified\n");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("installer rejects an incompatible Pi before mutating configuration", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-version-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  fs.mkdirSync(agentDir, { recursive: true });
+  fs.writeFileSync(path.join(agentDir, "settings.json"), '{"kept":true}\n');
+  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.79.9\n");
+
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      { PATH: `${fakeBin}:${process.env.PATH}` },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Pi 0\.80\.0 or newer is required; found 0\.79\.9/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8")), { kept: true });
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("install, update, doctor, and uninstall round trip in an isolated agent dir", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-test-"));
   const agentDir = path.join(root, "agent");
@@ -512,7 +726,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
   fs.writeFileSync(path.join(agentDir, "extensions", "zen.ts"), "// personal prior zen\n");
 
   try {
-    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-shell");
+    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
     const installed = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
     assert.equal(installed.defaultProvider, "openrouter");
     assert.equal(installed.defaultModel, "example/model");
@@ -533,7 +747,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
     const fakeBin = path.join(root, "bin");
-    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\nexit 0\n");
+    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.3\nexit 0\n");
     const doctor = invokeCli(agentDir, ["doctor"], {
       PATH: `${fakeBin}:${process.env.PATH}`,
     });
@@ -571,7 +785,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     };
     fs.writeFileSync(manifestPath, `${JSON.stringify(beforeUpdateManifest, null, 2)}\n`);
 
-    const update = invokeCli(agentDir, ["update", "--yes", "--skip-package-install", "--skip-shell"]);
+    const update = invokeCli(agentDir, ["update", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell"]);
     assert.equal(update.status, 0, update.stderr);
     assert.match(update.stdout, /restart active Pi sessions/);
     const afterUpdate = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
@@ -605,11 +819,11 @@ test("managed browser runtime completes install, reuse update, doctor, and unins
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-browser-lifecycle-"));
   const agentDir = path.join(root, "agent");
   const fakeBin = path.join(root, "bin");
-  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\nexit 0\n");
+  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.3\nexit 0\n");
   installFakeBrowserNpm(fakeBin);
   const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };
   try {
-    const install = invokeCli(agentDir, ["install", "--yes", "--skip-shell"], env);
+    const install = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
     assert.equal(install.status, 0, install.stderr);
     const runtime = path.join(agentDir, "zenpi", "browser-runtime");
     assert.ok(fs.existsSync(path.join(runtime, "zenpi-runtime.json")));
@@ -618,12 +832,12 @@ test("managed browser runtime completes install, reuse update, doctor, and unins
     assert.equal(doctor.status, 0, doctor.stderr);
     assert.match(doctor.stdout, /BROWSER Browser smoke passed/);
 
-    const update = invokeCli(agentDir, ["update", "--yes", "--skip-shell"], env);
+    const update = invokeCli(agentDir, ["update", "--yes", "--skip-tool-install", "--skip-shell"], env);
     assert.equal(update.status, 0, update.stderr);
     assert.match(update.stdout, /passed its launch smoke; reusing/);
 
     fs.writeFileSync(path.join(runtime, "node_modules", "playwright", "index.js"), "throw new Error('broken runtime');\n");
-    const repaired = invokeCli(agentDir, ["update", "--yes", "--skip-shell"], env);
+    const repaired = invokeCli(agentDir, ["update", "--yes", "--skip-tool-install", "--skip-shell"], env);
     assert.equal(repaired.status, 0, repaired.stderr);
     assert.match(repaired.stderr, /failed validation and will be replaced/);
     const repairedDoctor = invokeCli(agentDir, ["doctor"], env);
@@ -645,7 +859,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
   const log = path.join(root, "pi.log");
   writeExecutable(
     path.join(fakeBin, "pi"),
-    "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nexit 0\n",
+    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi\nprintf '%s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nexit 0\n",
   );
   fs.writeFileSync(shellRc, "# personal shell\n");
   const env = {
@@ -656,7 +870,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
   };
 
   try {
-    const install = invokeCli(agentDir, ["install", "--yes", "--skip-browser-install"], env);
+    const install = invokeCli(agentDir, ["install", "--yes", "--skip-browser-install", "--skip-tool-install"], env);
     assert.equal(install.status, 0, install.stderr);
     const shell = fs.readFileSync(shellRc, "utf8");
     assert.match(shell, /# >>> ZenPi >>>/);
@@ -667,7 +881,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
 
     const update = invokeCli(
       agentDir,
-      ["update", "--yes", "--skip-package-install", "--skip-shell"],
+      ["update", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell"],
       env,
     );
     assert.equal(update.status, 0, update.stderr);
@@ -691,13 +905,13 @@ test("failed package installation rolls configuration back and releases the lock
   fs.writeFileSync(settingsPath, '{"untouched":true}\n');
   writeExecutable(
     path.join(fakeBin, "pi"),
-    "#!/bin/sh\ncase \"$*\" in *pi-subagents*) exit 9;; esac\nexit 0\n",
+    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi\ncase \"$*\" in *pi-subagents*) exit 9;; esac\nexit 0\n",
   );
   installFakeBrowserNpm(fakeBin);
   const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };
 
   try {
-    const result = invokeCli(agentDir, ["install", "--yes", "--skip-shell"], env);
+    const result = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
     assert.notEqual(result.status, 0);
     assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath, "utf8")), { untouched: true });
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
@@ -718,7 +932,7 @@ test("settings symlinks remain symlinks through install and uninstall", () => {
   fs.symlinkSync(target, link);
 
   try {
-    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-shell");
+    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
     assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
     runCli(agentDir, "uninstall", "--yes");
     assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
@@ -745,7 +959,7 @@ test("empty AGENTS and shell symlink targets remain linked after uninstall", () 
   try {
     const install = invokeCli(
       agentDir,
-      ["install", "--yes", "--skip-package-install"],
+      ["install", "--yes", "--skip-package-install", "--skip-tool-install"],
       env,
     );
     assert.equal(install.status, 0, install.stderr);
@@ -769,7 +983,7 @@ test("broken managed-path symlinks fail without leaving a lock", () => {
   try {
     const result = invokeCli(
       agentDir,
-      ["install", "--yes", "--skip-package-install", "--skip-shell"],
+      ["install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell"],
     );
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Broken symlink is unsupported/);

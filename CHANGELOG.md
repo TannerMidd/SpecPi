@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Add a native Windows command launcher and Windows-safe executable discovery for `pi.cmd` and `npm.cmd`.
+- Make the npm binary entry invoke Node directly instead of requiring a POSIX shell.
+- Document platform-specific install commands and automatic dependency installation, and preflight the Pi 0.80.0 package API baseline.
+- Add Windows installation smoke coverage.
+- Offer missing bat, git-delta, glow, and DonSeTch tools individually during interactive installs; `--yes` attempts all and `--skip-tool-install` opts out.
+- Pin bat 0.26.1, git-delta 0.19.2 (0.18.2 on Intel macOS), glow 3.0.0, and DonSeTch 3.4.0; use exact Winget installs on Windows and checksum-verified managed archives on Linux/macOS.
+- Roll managed optional binaries back with failed installs and remove them on uninstall while documenting that Winget/global npm changes remain external.
+
 ## 0.1.0 - 2026-08-28
 
 - Add explicit plan/install/update/doctor/uninstall workflow.

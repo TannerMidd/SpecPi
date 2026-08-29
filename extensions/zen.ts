@@ -11,8 +11,45 @@
  * Toggle with /zen or Ctrl+Alt+Z.
  */
 
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { createHash } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+
+const zenPiAgentDir = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
+const zenPiStateDir = path.join(zenPiAgentDir, "zenpi");
+const zenPiManagedBin = path.join(zenPiStateDir, "bin");
+
+function hasValidatedZenPiTools(): boolean {
+	try {
+		const manifest = JSON.parse(fs.readFileSync(path.join(zenPiStateDir, "manifest.json"), "utf8"));
+		const records = manifest.managedOptionalTools || [];
+		if (records.length === 0) return false;
+		const expectedNames = new Set<string>();
+		for (const record of records) {
+			if (path.dirname(record.target) !== zenPiManagedBin) return false;
+			const stat = fs.lstatSync(record.target);
+			if (!stat.isFile() || stat.isSymbolicLink()) return false;
+			const hash = createHash("sha256").update(fs.readFileSync(record.target)).digest("hex");
+			if (hash !== record.installedHash) return false;
+			expectedNames.add(path.basename(record.target));
+		}
+		const actualNames = fs.readdirSync(zenPiManagedBin).filter((name) => !name.startsWith("."));
+		return actualNames.length === expectedNames.size && actualNames.every((name) => expectedNames.has(name));
+	} catch {
+		return false;
+	}
+}
+
+process.env.PATH = (process.env.PATH || "")
+	.split(path.delimiter)
+	.filter((entry) => path.resolve(entry || ".").toLowerCase() !== path.resolve(zenPiManagedBin).toLowerCase())
+	.join(path.delimiter);
+if (hasValidatedZenPiTools()) {
+	process.env.PATH = `${zenPiManagedBin}${path.delimiter}${process.env.PATH || ""}`;
+}
 
 type ZenPhase = "ready" | "thinking" | "reasoning" | "synthesizing" | `using ${string}` | `${string} failed`;
 

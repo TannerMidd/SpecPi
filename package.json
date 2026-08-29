@@ -19,10 +19,11 @@
     "agent-harness"
   ],
   "bin": {
-    "zenpi": "./zenpi"
+    "zenpi": "./scripts/zenpi.mjs"
   },
   "files": [
     "zenpi",
+    "zenpi.cmd",
     "scripts",
     "browser-runtime",
     "templates",

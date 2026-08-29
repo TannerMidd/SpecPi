@@ -17,3 +17,73 @@ jobs:
           node-version: "22"
       - run: npm test
       - run: npm run check
+
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Exercise Windows launcher and command shims
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          .\zenpi.cmd plan --skip-package-install --skip-shell
+
+          $root = Join-Path $env:RUNNER_TEMP "zenpi-windows-smoke"
+          $agentDir = Join-Path $root "agent"
+          $fakeBin = Join-Path $root "bin"
+          $log = Join-Path $root "pi.log"
+          New-Item -ItemType Directory -Force $agentDir, $fakeBin | Out-Null
+          @'
+          @echo off
+          if "%~1"=="--version" (
+            echo 0.84.3
+            exit /b 0
+          )
+          echo %*>>"%ZENPI_FAKE_LOG%"
+          exit /b 0
+          '@ | Set-Content (Join-Path $fakeBin "pi.cmd") -Encoding ascii
+          "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "pi") -Encoding ascii
+          @'
+          @echo off
+          if "%~1"=="install" if "%~2"=="--global" (
+            echo npm %*>>"%ZENPI_FAKE_LOG%"
+            echo @exit /b 0>"%ZENPI_FAKE_BIN%\donsetch.cmd"
+            exit /b 0
+          )
+          node "%ZENPI_REPO%\tests\fixtures\fake-browser-npm.mjs" %*
+          exit /b %ERRORLEVEL%
+          '@ | Set-Content (Join-Path $fakeBin "npm.cmd") -Encoding ascii
+          "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "npm") -Encoding ascii
+          @'
+          @echo off
+          echo winget %*>>"%ZENPI_FAKE_LOG%"
+          if "%~3"=="sharkdp.bat" echo @exit /b 0>"%ZENPI_FAKE_BIN%\bat.cmd"
+          if "%~3"=="dandavison.delta" echo @exit /b 0>"%ZENPI_FAKE_BIN%\delta.cmd"
+          if "%~3"=="charmbracelet.glow" echo @exit /b 0>"%ZENPI_FAKE_BIN%\glow.cmd"
+          exit /b 0
+          '@ | Set-Content (Join-Path $fakeBin "winget.cmd") -Encoding ascii
+          "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "winget") -Encoding ascii
+
+          $nodeDir = Split-Path (Get-Command node).Source
+          $env:PATH = "$fakeBin;$nodeDir;$env:SystemRoot\System32;$env:SystemRoot"
+          $env:PI_CODING_AGENT_DIR = $agentDir
+          $env:ZENPI_FAKE_BIN = $fakeBin
+          $env:ZENPI_FAKE_LOG = $log
+          $env:ZENPI_REPO = (Get-Location).Path
+          .\zenpi.cmd install --yes --skip-shell
+          .\zenpi.cmd doctor
+
+          $installCalls = @(Get-Content $log | Where-Object { $_ -like "install *" })
+          if ($installCalls.Count -ne 7) {
+            throw "Expected 7 pi install calls, found $($installCalls.Count)"
+          }
+          $toolCalls = @(Get-Content $log | Where-Object { $_ -like "winget install *" -or $_ -like "npm install --global *" })
+          if ($toolCalls.Count -ne 4) {
+            throw "Expected 4 optional tool install calls, found $($toolCalls.Count)"
+          }
+
+          .\zenpi.cmd uninstall --yes

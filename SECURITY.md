@@ -2,11 +2,12 @@
 
 ## Trust model
 
-ZenPi is configuration and executable extension code for Pi. Pi extensions run with the invoking user's permissions. Clone and review a tagged release before running `./zenpi install`; avoid piping remote installer content directly into a shell.
+ZenPi is configuration and executable extension code for Pi. Pi extensions run with the invoking user's permissions. Clone and review a tagged release before running `./zenpi install` on Unix or `.\zenpi.cmd install` on Windows; avoid piping remote installer content directly into a shell.
 
 The installer:
 
 - prints a plan and requires confirmation unless `--yes` is passed;
+- prints exact optional-tool commands, asks about each missing tool interactively, and supports `--skip-tool-install`; `--yes` selects all missing optional tools;
 - backs up only resource files it explicitly replaces, never complete settings or shell startup files;
 - merges documented settings instead of replacing the complete file;
 - modifies AGENTS and shell files only inside marked blocks;
@@ -15,7 +16,9 @@ The installer:
 - never reads `auth.json`, provider credentials, sessions, history, or trust decisions, and never persistently copies complete Pi settings or shell startup files;
 - never commits, pushes, publishes, or creates remote resources.
 
-The managed browser install is staged before atomic promotion and launch-smoked before use or reuse. A failed install restores the prior runtime and rolls configuration files back. ZenPi does not invoke `sudo`, `apt`, or Playwright `install-deps`; the host must satisfy Playwright's Chromium system requirements. Package installation can leave downloaded npm caches after rollback or uninstall. Those caches are inert when absent from Pi settings.
+The managed browser install is staged before atomic promotion and launch-smoked before use or reuse. A failed install restores the prior runtime and rolls configuration files back. Pinned Pi packages are installed through `pi install`, which installs their declared npm dependencies; the separate browser runtime is installed with `npm ci` from ZenPi's reviewed lockfile. ZenPi does not invoke Playwright `install-deps`; the host must satisfy Playwright's Chromium system requirements. Package installation can leave downloaded npm caches after rollback or uninstall. Those caches are inert when absent from Pi settings.
+
+Optional tools use reviewed versions. Windows bat, git-delta, and glow installs invoke Winget with exact versions; Linux/macOS installs download pinned release archives, verify recorded SHA-256 digests, and atomically publish the executable under ZenPi state. DonSeTch uses pinned global npm. Managed release binaries participate in rollback and are removed by `zenpi uninstall`; Winget and global npm changes remain external system state and are not rolled back or removed. Pi adds the managed bin directory to `PATH` only when every entry is backed by the current manifest and matches its installed checksum; modified tools are moved outside that trusted directory during uninstall. `--skip-tool-install` skips optional tools without disabling the normal Pi-package or browser-runtime installation.
 
 ## Website publishing
 
@@ -37,7 +40,7 @@ The browser is not an operating-system sandbox. Pi and its extensions already ru
 
 - The managed browser runtime contains pinned Playwright, Chromium, pixelmatch, and pngjs components. It is private to ZenPi and is removed on uninstall; browser artifacts are preserved.
 - `@tmustier/pi-files-widget` invokes Git, bat, delta, and glow. Avoid hostile filenames and unreviewed repositories.
-- DonSeTch is optional and licensed separately. ZenPi never installs its global executable.
+- DonSeTch is optional and licensed separately. When selected, ZenPi installs pinned `donsetch@3.4.0` globally through npm; its package installation downloads and verifies the platform binary.
 - Shell profiles are convenience wrappers, not sandboxes.
 
 ## Reporting issues

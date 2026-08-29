@@ -31,6 +31,6 @@ Repository automation uses these official GitHub Actions at pinned major version
 
 They retain their own copyright and license terms. The Pages actions receive only the permissions documented in `.github/workflows/pages.yml`.
 
-The optional DonSeTch CLI is distributed under AGPL-3.0-only and is not bundled in this repository. The included skill documents how to invoke it.
+The optional DonSeTch CLI is distributed under AGPL-3.0-only and is not bundled in this repository. When selected during installation, ZenPi installs `donsetch@3.4.0` globally through npm; that package downloads and verifies its platform binary. The included skill documents how to invoke it.
 
-System tools such as Git, bat, delta, and glow are not bundled and retain their own licenses.
+System tools such as Git, bat, delta, and glow are not bundled and retain their own licenses. Optional installation pins bat 0.26.1, git-delta 0.19.2 (0.18.2 on Intel macOS, whose newer release has no Intel asset), and glow 3.0.0. Windows delegates those exact versions to Winget. Linux/macOS downloads the corresponding reviewed GitHub release archive, verifies its recorded SHA-256 digest, and manages the extracted executable under ZenPi state.

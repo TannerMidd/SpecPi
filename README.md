@@ -48,7 +48,17 @@ Use `/zen on`, `/zen off`, or `/zen status` when explicit control is preferable.
 
 ## Install
 
-Requires Pi 0.37.4+, Node.js 22.19+, npm, and Git. Clone a release tag you have reviewed, then:
+Requires Pi 0.80.0+, Node.js 22.19+, npm, and Git. Clone a release tag you have reviewed, open a terminal in the cloned directory, then use the launcher for your platform.
+
+**Windows PowerShell or Command Prompt**
+
+```powershell
+.\zenpi.cmd plan      # inspect every proposed change
+.\zenpi.cmd install   # confirm before anything is written
+.\zenpi.cmd doctor
+```
+
+**Linux, macOS, or Git Bash**
 
 ```bash
 ./zenpi plan      # inspect every proposed change
@@ -56,7 +66,13 @@ Requires Pi 0.37.4+, Node.js 22.19+, npm, and Git. Clone a release tag you have 
 ./zenpi doctor
 ```
 
-Run `/reload` in Pi after installation. Use `./zenpi update` or `./zenpi uninstall` later; both remain explicit and reversible.
+Do not double-click the launchers: Windows may open extensionless scripts as code instead of executing them. Windows installs all core ZenPi resources; only the optional bash/zsh shell-profile integration is skipped.
+
+A default install runs `pi install` for every pinned Pi package. Pi installs each package and its npm dependency tree under the Pi agent directory. ZenPi separately runs `npm ci` from its reviewed lockfile for Playwright and the managed Chromium runtime. Neither dependency install happens when `--skip-package-install` is supplied; `--skip-browser-install` skips only the browser runtime.
+
+For optional command-line tools, the plan prints the exact platform package-manager commands first. Interactive installs ask separately about `bat`, `git-delta`, `glow`, and DonSeTch. `--yes` attempts every missing optional tool; pass `--skip-tool-install` to opt out. An unavailable manager or failed optional-tool command is reported as a warning and does not roll back the core ZenPi install. ZenPi uses exact Winget versions on Windows, checksum-verified pinned release binaries in ZenPi state on Linux/macOS, and pinned `donsetch@3.4.0` through npm. Managed Linux/macOS binaries are removed by `zenpi uninstall`; Winget and global npm changes are external system state and remain installed. On `/reload`, ZenPi validates the managed-tool manifest and adds only matching checksummed binaries to Pi's process `PATH`, even when shell integration was skipped.
+
+Run `/reload` in Pi after installation. Use the same platform launcher with `update` or `uninstall` later; both remain explicit and reversible.
 
 ## Improve through use
 
@@ -70,7 +86,7 @@ Implemented capabilities leave the active list while their history remains. Repo
 
 ## Boundaries
 
-ZenPi does not own or inspect your credentials, providers, models, sessions, history, or trust decisions. It changes only documented settings and its own marked blocks, and it never installs global executables or operating-system packages.
+ZenPi does not own or inspect your credentials, providers, models, sessions, history, or trust decisions. It changes only documented settings and its own marked blocks. Optional executables are installed only after an interactive per-tool choice or when `--yes` explicitly selects all missing tools. `--skip-tool-install` skips optional tools while leaving the normal Pi-package and browser-runtime installation enabled.
 
 For the complete trust model, browser isolation details, installer flags, and update behavior, read [SECURITY.md](SECURITY.md).
 

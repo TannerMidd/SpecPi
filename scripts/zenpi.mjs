@@ -5,6 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import readline from "node:readline/promises";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import {
   AGENTS_END,
@@ -27,6 +28,8 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const VERSION = packageJson.version;
+const MIN_PI_VERSION = "0.80.0";
+const CLI = process.platform === "win32" ? ".\\zenpi.cmd" : "./zenpi";
 const agentDir = path.resolve(
   process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"),
 );
@@ -39,6 +42,15 @@ const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
 const browserRuntimeMarker = path.join(browserRuntimeDir, "zenpi-runtime.json");
 const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
+const managedToolsDir = path.join(stateDir, "optional-tools");
+const managedBinDir = path.join(stateDir, "bin");
+process.env.PATH = (process.env.PATH || "")
+  .split(path.delimiter)
+  .filter((entry) => path.resolve(entry || ".").toLowerCase() !== path.resolve(managedBinDir).toLowerCase())
+  .join(path.delimiter);
+if (hasValidatedManagedTools()) {
+  process.env.PATH = `${managedBinDir}${path.delimiter}${process.env.PATH || ""}`;
+}
 
 const PACKAGES = [
   "npm:pi-web-access@0.25.0",
@@ -50,21 +62,53 @@ const PACKAGES = [
   "npm:@tmustier/pi-files-widget@0.2.0",
 ];
 
+const OPTIONAL_TOOLS = [
+  { id: "bat", label: "bat", commands: ["bat", "batcat"], purpose: "files widget syntax highlighting" },
+  { id: "delta", label: "git-delta", commands: ["delta"], purpose: "files widget diffs" },
+  { id: "glow", label: "glow", commands: ["glow"], purpose: "files widget Markdown rendering" },
+  { id: "donsetch", label: "DonSeTch", commands: ["donsetch"], purpose: "advanced web crawling skill" },
+];
+const DONSETCH_VERSION = "3.4.0";
+const OPTIONAL_TOOL_VERSIONS = { bat: "0.26.1", delta: "0.19.2", glow: "3.0.0" };
+const MANAGED_TOOL_ASSETS = {
+  "linux-x64": {
+    bat: ["bat-v0.26.1-x86_64-unknown-linux-gnu.tar.gz", "726f04c8f576a7fd18b7634f1bbf2f915c43494c1c0f013baa3287edb0d5a2a3"],
+    delta: ["delta-0.19.2-x86_64-unknown-linux-gnu.tar.gz", "8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2"],
+    glow: ["glow_3.0.0_Linux_x86_64.tar.gz", "13e05e4b2acc18d2aee44291aefe6325b077ec321b631a0cfa780e8e3bc33f78"],
+  },
+  "linux-arm64": {
+    bat: ["bat-v0.26.1-aarch64-unknown-linux-gnu.tar.gz", "422eb73e11c854fddd99f5ca8461c2f1d6e6dce0a2a8c3d5daade5ffcb6564aa"],
+    delta: ["delta-0.19.2-aarch64-unknown-linux-gnu.tar.gz", "0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e"],
+    glow: ["glow_3.0.0_Linux_arm64.tar.gz", "810c39f4691feb75e675a5f5f54b9fa091354e7599d9cf9c9fc9b97e47a99759"],
+  },
+  "darwin-x64": {
+    bat: ["bat-v0.26.1-x86_64-apple-darwin.tar.gz", "830d63b0bba1fa040542ec569e3cf77f60d3356b9de75116a344b061e0894245"],
+    delta: ["delta-0.18.2-x86_64-apple-darwin.tar.gz", "e9b5c4a9e73d2119c687e074f0d97f188e30e5fe8ae0e6d455755f74bb5cc0cf", "0.18.2"],
+    glow: ["glow_3.0.0_Darwin_x86_64.tar.gz", "b911b90622e686d44bc072112898584a601ed8353276b735835d8cdbcc27f660"],
+  },
+  "darwin-arm64": {
+    bat: ["bat-v0.26.1-aarch64-apple-darwin.tar.gz", "e30beff26779c9bf60bb541e1d79046250cb74378f2757f8eb250afddb19e114"],
+    delta: ["delta-0.19.2-aarch64-apple-darwin.tar.gz", "9be36612a5a13e9e386dc498fb8e50dc87c72ee42b63db0ea05b32f99a72a69a"],
+    glow: ["glow_3.0.0_Darwin_arm64.tar.gz", "4b8a9a32412c0525e4c239e65171706fc5beb6d423608d99fe16788d47b345d3"],
+  },
+};
+
 function usage() {
   console.log(`ZenPi ${VERSION}
 
 Usage:
-  ./zenpi plan
-  ./zenpi install [--yes] [--skip-package-install] [--skip-browser-install] [--skip-shell]
-  ./zenpi update [--yes] [--force] [--skip-package-install] [--skip-browser-install] [--skip-shell]
-  ./zenpi doctor
-  ./zenpi uninstall [--yes]
+  ${CLI} plan
+  ${CLI} install [--yes] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
+  ${CLI} update [--yes] [--force] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
+  ${CLI} doctor
+  ${CLI} uninstall [--yes]
 
 Options:
-  --yes                   Do not ask for confirmation.
+  --yes                   Do not ask for confirmation; attempt all missing optional tools.
   --force                 Replace locally modified ZenPi-managed files during update.
   --skip-package-install  Write pinned package settings without installing external packages (also skips the browser runtime).
   --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
+  --skip-tool-install     Do not offer or install optional system tools.
   --skip-shell            Do not install shell profile functions or edit a shell rc file.
 
 Environment:
@@ -79,6 +123,7 @@ function parseArgs(argv) {
     "--force",
     "--skip-package-install",
     "--skip-browser-install",
+    "--skip-tool-install",
     "--skip-shell",
   ]);
   for (const arg of argv.slice(1)) {
@@ -91,6 +136,7 @@ function parseArgs(argv) {
     skipPackageInstall: argv.includes("--skip-package-install"),
     skipBrowserInstall:
       argv.includes("--skip-browser-install") || argv.includes("--skip-package-install"),
+    skipToolInstall: argv.includes("--skip-tool-install"),
     skipShell: argv.includes("--skip-shell"),
   };
 }
@@ -99,17 +145,91 @@ function timestamp() {
   return new Date().toISOString().replaceAll(":", "").replaceAll(".", "-");
 }
 
+function envValue(env, name) {
+  if (env[name] !== undefined) return env[name];
+  const key = Object.keys(env).find((item) => item.toLowerCase() === name.toLowerCase());
+  return key ? env[key] : undefined;
+}
+
+function resolveCommand(command, env = process.env) {
+  const hasPath = command.includes("/") || command.includes("\\");
+  const directories = hasPath ? [""] : (envValue(env, "PATH") || "").split(path.delimiter);
+  const extension = path.extname(command);
+  const candidates = process.platform === "win32" && !extension
+    ? (envValue(env, "PATHEXT") || ".COM;.EXE;.BAT;.CMD").split(";").map((item) => `${command}${item}`)
+    : [command];
+
+  for (const directory of directories) {
+    for (const candidate of candidates) {
+      const file = hasPath ? candidate : path.join(directory || ".", candidate);
+      try {
+        const stat = fs.statSync(file);
+        if (stat.isFile() && (process.platform === "win32" || (stat.mode & 0o111) !== 0)) {
+          return path.resolve(file);
+        }
+      } catch (error) {
+        if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
+      }
+    }
+  }
+  return undefined;
+}
+
 function commandExists(command) {
-  const result = spawnSync("sh", ["-c", `command -v "$1" >/dev/null 2>&1`, "sh", command]);
-  return result.status === 0;
+  return resolveCommand(command) !== undefined;
+}
+
+function hasValidatedManagedTools() {
+  if (!fs.existsSync(manifestPath) || !fs.existsSync(managedBinDir)) return false;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const records = manifest.managedOptionalTools || [];
+    if (records.length === 0) return false;
+    const expectedNames = new Set();
+    for (const record of records) {
+      if (path.dirname(record.target) !== managedBinDir || path.dirname(record.marker) !== managedToolsDir) return false;
+      const targetStat = fs.lstatSync(record.target);
+      const markerStat = fs.lstatSync(record.marker);
+      if (!targetStat.isFile() || targetStat.isSymbolicLink() || !markerStat.isFile() || markerStat.isSymbolicLink()) return false;
+      if (sha256(fs.readFileSync(record.target)) !== record.installedHash) return false;
+      expectedNames.add(path.basename(record.target));
+    }
+    const actualNames = fs.readdirSync(managedBinDir).filter((name) => !name.startsWith("."));
+    return actualNames.length === expectedNames.size && actualNames.every((name) => expectedNames.has(name));
+  } catch {
+    return false;
+  }
+}
+
+function compareVersions(left, right) {
+  const leftParts = left.split(".").map(Number);
+  const rightParts = right.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+  }
+  return 0;
+}
+
+function assertPiVersion() {
+  const result = run("pi", ["--version"], { capture: true });
+  const match = (result.stdout || "").match(/\b(\d+\.\d+\.\d+)\b/);
+  if (!match) throw new Error("Could not determine the installed Pi version from `pi --version`.");
+  if (compareVersions(match[1], MIN_PI_VERSION) < 0) {
+    throw new Error(`Pi ${MIN_PI_VERSION} or newer is required; found ${match[1]}.`);
+  }
+  return match[1];
 }
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const env = { ...process.env, ...(options.env || {}) };
+  const executable = resolveCommand(command, env) || command;
+  const needsWindowsShell = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
+  const result = spawnSync(executable, args, {
     cwd: options.cwd || os.homedir(),
-    env: { ...process.env, ...(options.env || {}) },
+    env,
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit",
+    shell: needsWindowsShell,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -117,6 +237,246 @@ function run(command, args, options = {}) {
     throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status}${detail}`);
   }
   return result;
+}
+
+function optionalToolInstalled(tool) {
+  return tool.commands.some(commandExists);
+}
+
+function managedToolUrl(tool, assetName, version) {
+  if (tool.id === "bat") {
+    return `https://github.com/sharkdp/bat/releases/download/v${version}/${assetName}`;
+  }
+  if (tool.id === "delta") {
+    return `https://github.com/dandavison/delta/releases/download/${version}/${assetName}`;
+  }
+  return `https://github.com/charmbracelet/glow/releases/download/v${version}/${assetName}`;
+}
+
+function optionalToolInstallSpec(tool) {
+  if (tool.id === "donsetch") {
+    if (!commandExists("npm")) return { unavailable: "npm is not available" };
+    return {
+      command: "npm",
+      args: ["install", "--global", `donsetch@${DONSETCH_VERSION}`, "--no-audit", "--no-fund"],
+      external: true,
+    };
+  }
+
+  if (process.platform === "win32") {
+    if (!commandExists("winget")) return { unavailable: "winget is not available" };
+    const ids = {
+      bat: "sharkdp.bat",
+      delta: "dandavison.delta",
+      glow: "charmbracelet.glow",
+    };
+    return {
+      command: "winget",
+      args: [
+        "install",
+        "--id",
+        ids[tool.id],
+        "--version",
+        OPTIONAL_TOOL_VERSIONS[tool.id],
+        "--exact",
+        "--source",
+        "winget",
+        "--accept-package-agreements",
+        "--accept-source-agreements",
+      ],
+      external: true,
+    };
+  }
+
+  const platformKey = `${process.platform}-${process.arch}`;
+  const asset = MANAGED_TOOL_ASSETS[platformKey]?.[tool.id];
+  if (!asset) return { unavailable: `no reviewed binary is available for ${platformKey}` };
+  if (!commandExists("tar")) return { unavailable: "tar is required to unpack the reviewed binary" };
+  const version = asset[2] || OPTIONAL_TOOL_VERSIONS[tool.id];
+  return {
+    managed: true,
+    version,
+    assetName: asset[0],
+    sha256: asset[1],
+    url: managedToolUrl(tool, asset[0], version),
+  };
+}
+
+function shellDisplay(value) {
+  const text = String(value);
+  return /^[A-Za-z0-9_@%+=:,./\\-]+$/.test(text) ? text : JSON.stringify(text);
+}
+
+function formatInstallSpec(spec) {
+  if (spec.unavailable) return `unavailable: ${spec.unavailable}`;
+  if (spec.managed) {
+    return `download ${spec.url} (sha256:${spec.sha256}) -> ${managedBinDir}`;
+  }
+  return [spec.command, ...spec.args].map(shellDisplay).join(" ");
+}
+
+async function chooseOptionalTools(options) {
+  if (options.skipToolInstall) return [];
+  const missing = OPTIONAL_TOOLS.filter((tool) => !optionalToolInstalled(tool));
+  if (missing.length === 0) return [];
+  if (options.yes) return missing;
+  if (!process.stdin.isTTY) {
+    throw new Error(`Optional tool selection requires a TTY; pass --yes to install all missing tools or --skip-tool-install.`);
+  }
+
+  const selected = [];
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    console.log("\nOptional tools (external system changes; not removed by ZenPi uninstall):");
+    for (const tool of missing) {
+      const spec = optionalToolInstallSpec(tool);
+      if (spec.unavailable) {
+        console.warn(`  ${tool.label}: ${spec.unavailable}`);
+        continue;
+      }
+      const answer = (await rl.question(
+        `Install ${tool.label} for ${tool.purpose}?\n  ${formatInstallSpec(spec)}\n[y/N] `,
+      )).trim().toLowerCase();
+      if (answer === "y" || answer === "yes") selected.push(tool);
+    }
+  } finally {
+    rl.close();
+  }
+  return selected;
+}
+
+function findManagedExecutable(directory, basename) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      const nested = findManagedExecutable(file, basename);
+      if (nested) return nested;
+    } else if (entry.isFile() && entry.name === basename) return file;
+  }
+  return undefined;
+}
+
+async function downloadManagedArchive(url, maximumBytes = 64 * 1024 * 1024) {
+  const response = await fetch(url, { redirect: "follow" });
+  if (!response.ok) throw new Error(`download failed with HTTP ${response.status}`);
+  const declaredLength = Number.parseInt(response.headers.get("content-length") || "", 10);
+  if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) {
+    await response.body?.cancel();
+    throw new Error(`download content-length exceeds ${maximumBytes} bytes`);
+  }
+  if (!response.body) throw new Error("download response has no body");
+
+  const chunks = [];
+  const hash = createHash("sha256");
+  let total = 0;
+  for await (const chunk of response.body) {
+    const buffer = Buffer.from(chunk);
+    total += buffer.length;
+    if (total > maximumBytes) throw new Error(`download exceeded ${maximumBytes} bytes`);
+    chunks.push(buffer);
+    hash.update(buffer);
+  }
+  return { data: Buffer.concat(chunks, total), hash: hash.digest("hex") };
+}
+
+function assertManagedToolTargets(target, marker) {
+  for (const file of [managedToolsDir, managedBinDir, target, marker]) {
+    if (lstatMaybe(file)?.isSymbolicLink()) {
+      throw new Error(`Managed optional tool path must not be a symlink: ${file}`);
+    }
+  }
+}
+
+async function installManagedTool(tool, spec) {
+  const operationStamp = `${process.pid}-${Date.now()}-${tool.id}`;
+  const stage = path.join(managedToolsDir, `.stage-${operationStamp}`);
+  const target = path.join(managedBinDir, tool.commands[0]);
+  const marker = path.join(managedToolsDir, `${tool.id}.json`);
+  assertManagedToolTargets(target, marker);
+  const before = snapshot([target, marker]);
+  try {
+    fs.mkdirSync(stage, { recursive: true, mode: 0o700 });
+    const archive = await downloadManagedArchive(spec.url);
+    if (archive.hash !== spec.sha256) {
+      throw new Error(`checksum mismatch: expected ${spec.sha256}, received ${archive.hash}`);
+    }
+    const archivePath = path.join(stage, spec.assetName);
+    const extractDir = path.join(stage, "extract");
+    fs.mkdirSync(extractDir, { recursive: true, mode: 0o700 });
+    fs.writeFileSync(archivePath, archive.data, { mode: 0o600 });
+    run("tar", ["-xzf", archivePath, "-C", extractDir]);
+    const executable = findManagedExecutable(extractDir, tool.commands[0]);
+    if (!executable) throw new Error(`archive does not contain ${tool.commands[0]}`);
+    const data = fs.readFileSync(executable);
+    atomicWrite(target, data, 0o755);
+    writeJson(marker, {
+      schema: 1,
+      tool: tool.id,
+      version: spec.version,
+      source: spec.url,
+      archiveHash: spec.sha256,
+      installedHash: sha256(data),
+      target,
+      marker,
+    }, 0o600);
+    if (!(process.env.PATH || "").split(path.delimiter).includes(managedBinDir)) {
+      process.env.PATH = `${managedBinDir}${path.delimiter}${process.env.PATH || ""}`;
+    }
+    fs.rmSync(stage, { recursive: true, force: true });
+    return {
+      record: readJson(marker),
+      rollback() {
+        restoreSnapshot(before);
+      },
+    };
+  } catch (error) {
+    restoreSnapshot(before);
+    fs.rmSync(stage, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function installOptionalTools(tools) {
+  const warnings = [];
+  const managedRecords = [];
+  const managedRollbacks = [];
+  const externalAttempts = [];
+  for (const tool of tools) {
+    const spec = optionalToolInstallSpec(tool);
+    if (spec.unavailable) {
+      warnings.push(`Could not install optional tool ${tool.label}: ${spec.unavailable}.`);
+      continue;
+    }
+    console.log(`\nInstalling optional tool ${tool.label}:`);
+    console.log(`  ${formatInstallSpec(spec)}`);
+    try {
+      if (spec.managed) {
+        const installed = await installManagedTool(tool, spec);
+        managedRecords.push(installed.record);
+        managedRollbacks.push(installed.rollback);
+      } else {
+        externalAttempts.push(tool.label);
+        run(spec.command, spec.args);
+      }
+      if (!optionalToolInstalled(tool)) {
+        warnings.push(`${tool.label} installed successfully but is not visible on the current PATH; restart the terminal before using it.`);
+      }
+    } catch (error) {
+      warnings.push(`Optional tool ${tool.label} failed to install: ${error.message}`);
+    }
+  }
+  return {
+    warnings,
+    managedRecords,
+    externalAttempts,
+    rollback() {
+      const errors = [];
+      for (const rollback of managedRollbacks.reverse()) {
+        try { rollback(); } catch (error) { errors.push(error.message); }
+      }
+      return errors;
+    },
+  };
 }
 
 function browserRuntimeLockHash() {
@@ -147,7 +507,7 @@ function smokeBrowserRuntime(directory) {
       capture: true,
     });
   } catch (error) {
-    throw new Error(`${error.message}\nChromium could not launch. Verify the host satisfies Playwright Chromium system dependencies; ZenPi does not install apt/system packages.`);
+    throw new Error(`${error.message}\nChromium could not launch. Verify the host satisfies Playwright Chromium system dependencies; ZenPi does not install Playwright system dependencies.`);
   }
 }
 
@@ -509,7 +869,7 @@ function finishManagedBlockRemoval(file, result, existedBefore) {
 
 function readManifest(required = false) {
   if (!fs.existsSync(manifestPath)) {
-    if (required) throw new Error("ZenPi is not installed. Run ./zenpi install first.");
+    if (required) throw new Error(`ZenPi is not installed. Run ${CLI} install first.`);
     return undefined;
   }
   const manifest = readJson(manifestPath);
@@ -545,7 +905,7 @@ function acquireLock() {
 
 async function confirm(message, yes) {
   if (yes) return;
-  if (!process.stdin.isTTY) throw new Error("Confirmation requires a TTY; inspect ./zenpi plan, then pass --yes.");
+  if (!process.stdin.isTTY) throw new Error(`Confirmation requires a TTY; inspect ${CLI} plan, then pass --yes.`);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const answer = (await rl.question(`${message} [y/N] `)).trim().toLowerCase();
   rl.close();
@@ -615,8 +975,19 @@ Managed files:`);
   console.log("\nPinned packages:");
   for (const spec of PACKAGES) console.log(`  ${spec}`);
 
-  console.log("\nExternal prerequisites checked but not installed by default:");
-  console.log("  bat (or batcat), delta, glow, donsetch");
+  console.log("\nOptional tools:");
+  if (options.skipToolInstall) console.log("  installation skipped by explicit flag");
+  for (const tool of OPTIONAL_TOOLS) {
+    if (optionalToolInstalled(tool)) console.log(`  ${tool.label}: already available`);
+    else if (options.skipToolInstall) console.log(`  ${tool.label}: missing`);
+    else console.log(`  ${tool.label}: ${formatInstallSpec(optionalToolInstallSpec(tool))}`);
+  }
+  if (!options.skipToolInstall) {
+    console.log(options.yes
+      ? "  --yes attempts every missing optional tool"
+      : "  interactive install asks about each available missing tool individually");
+    console.log("  managed release binaries are reversible; Winget/global npm changes are external");
+  }
   console.log("  Chromium is installed by default inside the managed browser runtime");
   console.log("\nEvery install/update creates timestamped backups under:");
   console.log(`  ${path.join(stateDir, "backups")}`);
@@ -639,6 +1010,7 @@ async function installOrUpdate(options, update) {
   if (!options.skipPackageInstall && !commandExists("pi")) {
     throw new Error("pi is not available on PATH.");
   }
+  if (!options.skipPackageInstall) assertPiVersion();
   if (!options.skipBrowserInstall && !commandExists("npm")) {
     throw new Error("npm is required to install the managed browser runtime.");
   }
@@ -646,11 +1018,12 @@ async function installOrUpdate(options, update) {
   const releaseLock = acquireLock();
   let transaction;
   let browserRuntimeTransaction;
+  let optionalToolTransaction;
   let backupDir;
   try {
     const previousManifest = readManifest(update);
     if (!update && previousManifest) {
-      throw new Error("ZenPi is already installed. Run ./zenpi update.");
+      throw new Error(`ZenPi is already installed. Run ${CLI} update.`);
     }
 
     const shellRc = previousManifest?.shellRc || (options.skipShell ? undefined : detectShellRc());
@@ -662,6 +1035,8 @@ async function installOrUpdate(options, update) {
     validateManagedUpdate(previousManifest, files, options.force);
     printPlan({ ...options, skipShell: !manageShellNow });
     await confirm(`${update ? "Update" : "Install"} ZenPi ${VERSION}?`, options.yes);
+    const selectedOptionalTools = await chooseOptionalTools(options);
+    optionalToolTransaction = await installOptionalTools(selectedOptionalTools);
 
     const watched = [
       settingsPath,
@@ -677,7 +1052,7 @@ async function installOrUpdate(options, update) {
     fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
 
     const settingsBeforeOperation = readJson(settingsPath, {});
-    const warnings = [];
+    const warnings = [...optionalToolTransaction.warnings];
     const blockFiles = structuredClone(previousManifest?.blockFiles || {});
     blockFiles.agents ||= { existed: pathExists(agentsPath) };
     if (shellRc) blockFiles.shell ||= { existed: pathExists(shellRc) };
@@ -766,6 +1141,12 @@ async function installOrUpdate(options, update) {
       packageChanges,
       settingsChanges,
       browserRuntime: browserRuntimeStatus(),
+      managedOptionalTools: [
+        ...(previousManifest?.managedOptionalTools || []).filter(
+          (record) => !optionalToolTransaction.managedRecords.some((item) => item.tool === record.tool),
+        ),
+        ...optionalToolTransaction.managedRecords,
+      ],
       files: fileRecords,
       backups: [...(previousManifest?.backups || []), path.relative(stateDir, backupDir)],
     };
@@ -781,19 +1162,26 @@ async function installOrUpdate(options, update) {
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
     console.log(
       update
-        ? "Run ./zenpi doctor, then restart active Pi sessions."
-        : "Run ./zenpi doctor, then /reload in active Pi sessions.",
+        ? `Run ${CLI} doctor, then restart active Pi sessions.`
+        : `Run ${CLI} doctor, then /reload in active Pi sessions.`,
     );
   } catch (error) {
     const rollbackErrors = [];
     try { rollbackErrors.push(...(browserRuntimeTransaction?.rollback() || [])); } catch (rollbackError) { rollbackErrors.push(`browser runtime rollback: ${rollbackError.message}`); }
+    try { rollbackErrors.push(...(optionalToolTransaction?.rollback() || [])); } catch (rollbackError) { rollbackErrors.push(`managed optional tool rollback: ${rollbackError.message}`); }
     if (transaction) {
       try { restoreSnapshot(transaction); } catch (rollbackError) { rollbackErrors.push(`configuration rollback: ${rollbackError.message}`); }
     }
     if (backupDir) {
       try { fs.rmSync(backupDir, { recursive: true, force: true }); } catch (rollbackError) { rollbackErrors.push(`backup cleanup: ${rollbackError.message}`); }
     }
-    throw new Error(`${transaction ? "Installation rolled back: " : ""}${error.message}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`);
+    const optionalWarnings = optionalToolTransaction?.warnings.length
+      ? `\nOptional tool warnings: ${optionalToolTransaction.warnings.join("; ")}`
+      : "";
+    const externalNote = optionalToolTransaction?.externalAttempts.length
+      ? `\nExternal optional tool changes were not rolled back: ${optionalToolTransaction.externalAttempts.join(", ")}`
+      : "";
+    throw new Error(`${transaction ? "ZenPi-managed changes rolled back: " : ""}${error.message}${optionalWarnings}${externalNote}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`);
   } finally {
     releaseLock();
   }
@@ -818,6 +1206,7 @@ async function uninstall(options) {
   const releaseLock = acquireLock();
   let transaction;
   let retiredBrowserRuntime;
+  const preservedManagedTools = [];
   try {
     const manifest = readManifest(true);
     await confirm(`Uninstall ZenPi ${manifest.version}?`, options.yes);
@@ -827,8 +1216,14 @@ async function uninstall(options) {
       manifestPath,
       ...(manifest.shellRc ? [manifest.shellRc] : []),
       ...Object.keys(manifest.files || {}),
+      ...(manifest.managedOptionalTools || []).flatMap((record) => [record.target, record.marker]),
     ];
     assertNoBrokenSymlinks(watched);
+    for (const record of manifest.managedOptionalTools || []) {
+      if (lstatMaybe(record.target)?.isSymbolicLink() || lstatMaybe(record.marker)?.isSymbolicLink()) {
+        throw new Error(`Managed optional tool paths must not be symlinks during uninstall: ${record.target}`);
+      }
+    }
     transaction = snapshot(watched);
     const warnings = [];
 
@@ -866,6 +1261,23 @@ async function uninstall(options) {
       );
     }
 
+    for (const record of manifest.managedOptionalTools || []) {
+      if (fs.existsSync(record.target) && sha256(fs.readFileSync(record.target)) !== record.installedHash) {
+        const preserveDir = path.join(stateDir, "preserved-modified-tools");
+        fs.mkdirSync(preserveDir, { recursive: true, mode: 0o700 });
+        const preserved = path.join(preserveDir, `${path.basename(record.target)}-${timestamp()}`);
+        fs.renameSync(record.target, preserved);
+        fs.rmSync(record.marker, { force: true });
+        preservedManagedTools.push(preserved);
+        warnings.push(`Moved modified managed optional tool outside trusted PATH: ${preserved}`);
+        continue;
+      }
+      fs.rmSync(record.target, { force: true });
+      fs.rmSync(record.marker, { force: true });
+    }
+    try { fs.rmdirSync(managedBinDir); } catch (error) { if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") throw error; }
+    try { fs.rmdirSync(managedToolsDir); } catch (error) { if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") throw error; }
+
     if (fs.existsSync(browserRuntimeDir)) {
       retiredBrowserRuntime = path.join(stateDir, `.browser-runtime-uninstall-${process.pid}-${Date.now()}`);
       fs.renameSync(browserRuntimeDir, retiredBrowserRuntime);
@@ -879,8 +1291,8 @@ async function uninstall(options) {
       }
     }
     retiredBrowserRuntime = undefined;
-    console.log("ZenPi configuration and managed browser runtime uninstalled.");
-    console.log("Browser artifacts and downloaded Pi package caches were preserved as user state or inert caches.");
+    console.log("ZenPi configuration, managed optional tools, and managed browser runtime uninstalled.");
+    console.log("Externally installed optional tools, browser artifacts, and downloaded Pi package caches were preserved.");
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
   } catch (error) {
     const rollbackErrors = [];
@@ -889,6 +1301,9 @@ async function uninstall(options) {
     }
     if (transaction) {
       try { restoreSnapshot(transaction); } catch (rollbackError) { rollbackErrors.push(`configuration rollback: ${rollbackError.message}`); }
+    }
+    for (const preserved of preservedManagedTools) {
+      try { fs.rmSync(preserved, { force: true }); } catch (rollbackError) { rollbackErrors.push(`preserved tool cleanup: ${rollbackError.message}`); }
     }
     throw new Error(`${transaction ? "Uninstall rolled back: " : ""}${error.message}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`);
   } finally {
@@ -926,6 +1341,11 @@ function doctor() {
     if (!shell.includes(SHELL_START) || !shell.includes(SHELL_END)) errors.push("Missing ZenPi shell block");
   }
 
+  for (const record of manifest.managedOptionalTools || []) {
+    if (!fs.existsSync(record.target)) errors.push(`Missing managed optional tool: ${record.target}`);
+    else if (sha256(fs.readFileSync(record.target)) !== record.installedHash) warnings.push(`Modified managed optional tool: ${record.target}`);
+  }
+
   const runtimeStatus = browserRuntimeStatus();
   let browserSmoke;
   if (!runtimeStatus.installed) {
@@ -944,6 +1364,9 @@ function doctor() {
   }
 
   if (!commandExists("pi")) errors.push("pi is not available on PATH");
+  else {
+    try { assertPiVersion(); } catch (error) { errors.push(error.message); }
+  }
   if (!commandExists("bat") && !commandExists("batcat")) warnings.push("bat/batcat is missing (files widget prerequisite)");
   if (!commandExists("delta")) warnings.push("delta is missing (files widget prerequisite)");
   if (!commandExists("glow")) warnings.push("glow is missing (files widget prerequisite)");
