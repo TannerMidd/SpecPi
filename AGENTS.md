@@ -6,7 +6,7 @@
 - Merge documented settings paths only. Preserve unrelated packages and configuration.
 - Manage global AGENTS and shell integration only inside ZenPi marker blocks.
 - Back up before mutation, write atomically, retain checksums, and roll configuration files back on failure.
-- Native subagents may use a different model only within the parent session's exact Pi provider. Keep strict provider-scoped model policy synchronized, and keep external Codex CLI runners disabled unless a future release makes that change explicit and prominent.
+- Native subagents may use a different model only within the parent session's exact Pi provider. Restore saved exact-provider profiles automatically, keep capacity global, and fail closed when different-provider live sessions would race the shared mirror. Keep strict provider-scoped model policy synchronized, and keep external Codex CLI runners disabled unless a future release makes that change explicit and prominent.
 - Never run installer integration tests against the live Pi directory. Use a temporary `PI_CODING_AGENT_DIR` and skip external package installation.
 - Pin executable package dependencies to reviewed versions. Document version and policy changes in `CHANGELOG.md` and `THIRD_PARTY.md`.
 - Run `npm run check`, inspect the final diff, and exercise install/update/doctor/uninstall round trips before release.

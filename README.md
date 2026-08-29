@@ -25,12 +25,10 @@ Most agent setups grow by accumulation. **ZenPi grows by evidence.**
 
 When a real, reusable capability gap gets in the way, ZenPi records a privacy-minimized local signal, measures recurrence and reach, and gives the human one clear next improvement.
 
-```text
-notice → qualify → /harness-improvement → implement → verification gate
-                                                       ├─ pass → retired
-                                                       └─ fail → selected
-retired + later evidence → review menu → choose → selected
-```
+<p align="center">
+  <img src="site/self-improvement-loop.svg" width="680" alt="ZenPi improvement loop: local friction qualifies privacy-minimized evidence; a human chooses /harness-improvement; ZenPi makes the smallest sufficient change; verification either retires it on success or returns it to selected work on failure; later evidence about retired work returns to human review without reopening automatically.">
+</p>
+<p align="center"><a href="https://tannermidd.github.io/ZenPi/#wishlist">Walk one example through the loop</a></p>
 
 The goal is not autonomous self-modification. It is to make the next justified change obvious, testable, reversible, and explicitly approved.
 
@@ -45,8 +43,6 @@ The goal is not autonomous self-modification. It is to make the next justified c
 /harness-improvement
 ```
 
-[Walk one example through the loop](https://tannermidd.github.io/ZenPi/#wishlist) to see how evidence, human choice, verification, retirement, and later review change the same item.
-
 `retired` means the capability was integrated and passed its verification gate. `review-needed` means new evidence appeared afterward; choosing it from `/harness-improvement` reopens and selects it automatically.
 
 `/wishlist` remains the local inspection and advanced curation surface. Exact merge/unmerge decisions correct fragmented gap names without rewriting history. Local issue drafts and checksummed archive/reset operations remain explicit and offline.
@@ -57,7 +53,7 @@ The goal is not autonomous self-modification. It is to make the next justified c
 - Tea House-native `/files` browser, viewer, diffs, and review comments
 - Evidence-led capability wishlist
 - One-command `/harness-improvement` workflow
-- `/zen-subagents` capacity and same-provider role configuration
+- `/zen-subagents` saved exact-provider role profiles and global capacity configuration
 - Isolated browser interaction and visual regression checks
 - Review-first installation with backups, checksums, and rollback
 
@@ -69,9 +65,9 @@ Inside the browser, use `j`/`k` to move, `Enter` to open, `/` to search, `c` to 
 
 ### Configure native subagents
 
-Run `/zen-subagents` for one confirmed flow that configures cumulative run/session child budgets, active top-level async capacity, and per-role model/thinking choices for `scout`, `researcher`, `worker`, `reviewer`, and `oracle`.
+Run `/zen-subagents` for one confirmed flow that edits the active exact-provider profile for `scout`, `researcher`, `worker`, `reviewer`, and `oracle`, plus cumulative run/session child budgets and active top-level async capacity that remain global.
 
-Model choices are filtered to the active parent's exact Pi provider. ZenPi synchronizes `pi-subagents` strict `modelScope` to that provider on session start and model selection. A saved role from a previous provider becomes stale and is rejected until reconfigured; `openai` and `openai-codex` remain separate boundaries.
+Configure each exact Pi provider once. ZenPi restores its saved profile and strict `modelScope` automatically when a later session switches back, then performs one bounded reload when the startup-loaded runtime mapping changed. `inherit` remains portable. Saved models that are no longer available become stale, remain stored, and are never silently replaced; `openai` and `openai-codex` remain separate boundaries. Simultaneous processes on different providers fail closed instead of racing the shared active mirror.
 
 ```text
 /zen-subagents
@@ -79,7 +75,7 @@ Model choices are filtered to the active parent's exact Pi provider. ZenPi synch
 /zen-subagents reset
 ```
 
-Changes preserve unrelated JSON, create a bounded leaf-only backup, and require one confirmation. Run `/reload` after active subagent work settles so startup-loaded capacity changes take effect. Run and session values are cumulative budgets; the async value limits active top-level async runs. These settings do not control modern `runs.all` child concurrency.
+One confirmation atomically applies the provider profile, active settings mirror, and any explicitly edited global capacity while preserving unrelated JSON and creating a bounded leaf-only backup. Reset changes only the active provider profile; other profiles and global capacity remain unchanged. Automatic reload is limited to lifecycle profile activation; run `/reload` after editing startup-loaded capacity. These settings do not control modern `runs.all` child concurrency.
 
 Trusted project `.pi/settings.json` has higher Pi precedence. ZenPi resolves the effective project from the launch `cwd` and blocks native `subagent` tool launches when that project replaces the managed scope with an unsafe cross-provider policy. File-authored workflows and inline scripts containing a literal child `cwd` are blocked because a config wrapper cannot verify those child projects before `pi-subagents` evaluates the script. Inline JavaScript can dynamically compute child options; such user-authored workflow code, directly administered project configuration, and direct `pi-subagents` commands remain trusted user-controlled boundaries rather than claims ZenPi can sandbox.
 
@@ -88,7 +84,7 @@ Trusted project `.pi/settings.json` has higher Pi precedence. ZenPi resolves the
 Requires Node.js 22.19+, npm, and Git. ZenPi uses an existing Pi 0.80.0+ installation; when Pi is absent, a confirmed install automatically runs npm to globally install the reviewed `@earendil-works/pi-coding-agent@0.84.3` release with lifecycle scripts disabled. Clone a reviewed release tag rather than piping remote code into a shell.
 
 ```bash
-git clone --branch v0.5.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.6.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ```
 
@@ -112,7 +108,7 @@ Installation remains explicit and reversible. The plan and confirmation show Pi 
 
 ## Boundaries
 
-ZenPi does not own or inspect credentials, provider authentication, session content, history, or trust decisions. `/zen-subagents` reads only the active provider/model identifiers and Pi's available scoped model metadata to build an explicit same-provider picker. Wishlist evidence alone grants no authority. A person must choose the exact item in `/harness-improvement`; installs, uploads, publishing, and remote-state changes still require separate explicit approval.
+ZenPi does not own or inspect credentials, provider authentication, session content, history, or trust decisions. `/zen-subagents` reads active provider/model identifiers and available scoped model metadata, and stores only exact provider IDs, model IDs, thinking levels, timestamps, and schema metadata in `~/.pi/agent/zenpi/subagent-provider-profiles.json` (or the equivalent `PI_CODING_AGENT_DIR` path). Profiles are retained on uninstall; after stopping Pi, delete that file manually for a complete profile purge. Wishlist evidence alone grants no authority. A person must choose the exact item in `/harness-improvement`; installs, uploads, publishing, and remote-state changes still require separate explicit approval.
 
 Sanitization is bounded defense in depth. Review local wishlist output before sharing it.
 

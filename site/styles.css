@@ -547,3 +547,9 @@ footer p { margin: 0; text-align: center; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+.delegation-profiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin: 1rem 0; }
+.delegation-profiles p { display: flex; justify-content: space-between; gap: .5rem; margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: .6rem; }
+.delegation-profiles em { color: var(--muted); font-style: normal; }
+.delegation-profiles .allowed { color: var(--matcha); }
+@media (max-width: 520px) { .delegation-profiles { grid-template-columns: 1fr; } }

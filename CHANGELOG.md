@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.6.0 - 2026-08-29
+
+- Add exact-provider subagent profiles that restore automatically with a single bounded runtime reload, while keeping capacity global and unavailable saved models stale without replacement.
+- Add ephemeral provider leases so simultaneous different-provider Pi processes fail closed instead of racing the shared active settings mirror.
+- Preserve private provider profiles across update and uninstall; store no credentials, authentication data, prompts, sessions, history, or complete settings snapshots.
+- Replace the README's text loop with an accessible static Tea House SVG and update the showcase to explain saved provider restoration.
+
 ## 0.5.0 - 2026-08-29
 
 - Automatically install pinned `@earendil-works/pi-coding-agent@0.84.3` through npm after confirmation when `pi` is absent; preserve the external installation on rollback and uninstall, with `--skip-package-install` as the opt-out.

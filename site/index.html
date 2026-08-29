@@ -183,7 +183,7 @@
       <div class="section-intro compact">
         <p class="eyebrow">Provider-safe delegation</p>
         <h2 id="delegation-title">Different model.<br>Same exact provider.</h2>
-        <p><code>/zen-subagents</code> configures builtin roles and capacity through one reviewed, confirmed flow. ZenPi filters choices to the active Pi provider and keeps strict package model scope synchronized.</p>
+        <p>Configure each exact provider once with <code>/zen-subagents</code>. ZenPi restores its saved roles automatically, keeps capacity global, and never silently replaces stale models.</p>
       </div>
 
       <div class="delegation-console" role="region" aria-label="Example same-provider subagent configuration">
@@ -192,17 +192,22 @@
           <strong>openai-codex / gpt-5.6-sol</strong>
           <small>exact provider boundary: openai-codex</small>
         </div>
+        <div class="delegation-profiles" aria-label="Saved exact-provider profiles">
+          <p><strong>openai-codex</strong><em class="allowed">active · restored</em></p>
+          <p><strong>openrouter</strong><em>saved</em></p>
+        </div>
         <ul class="delegation-roles">
           <li><span>worker</span><strong>gpt-5.6-luna</strong><em class="allowed">allowed · same provider</em></li>
           <li><span>reviewer</span><strong>gpt-5.6-sol</strong><em class="allowed">allowed · same provider</em></li>
-          <li><span>researcher</span><strong>anthropic / sonnet</strong><em class="blocked">blocked · different provider</em></li>
+          <li><span>researcher</span><strong>inherit</strong><em class="allowed">portable parent model</em></li>
         </ul>
-        <dl class="delegation-limits">
-          <div><dt>run budget</dt><dd>8 <small>cumulative children</small></dd></div>
-          <div><dt>session budget</dt><dd>24 <small>cumulative children</small></dd></div>
-          <div><dt>async capacity</dt><dd>2 <small>active top-level runs</small></dd></div>
+        <p class="delegation-note"><strong>Policy:</strong> different-provider child execution is blocked; this console never mixes providers.</p>
+        <dl class="delegation-limits" aria-label="Global capacity">
+          <div><dt>global run budget</dt><dd>8 <small>cumulative children</small></dd></div>
+          <div><dt>global session budget</dt><dd>24 <small>cumulative children</small></dd></div>
+          <div><dt>global async capacity</dt><dd>2 <small>active top-level runs</small></dd></div>
         </dl>
-        <p class="delegation-note">Budgets do not control modern <code>runs.all</code> child concurrency. Apply changes explicitly, then <code>/reload</code> after active work settles.</p>
+        <p class="delegation-note">Budgets do not control modern <code>runs.all</code> child concurrency. Lifecycle restoration reloads only when the active mirror changes.</p>
       </div>
     </section>
 
@@ -257,13 +262,13 @@
       <div>
         <p class="eyebrow">Begin deliberately</p>
         <h2 id="install-title">Review the plan.<br>Then build.</h2>
-        <p class="release-note">Stable <code>v0.5.0</code> adds provider-safe subagent configuration and automatic Pi bootstrap.</p>
+        <p class="release-note">Stable <code>v0.6.0</code> adds persistent exact-provider subagent profiles and the visual self-improvement loop.</p>
         <p class="release-note">Requires Node.js, npm, and Git. If Pi is missing, the confirmed install adds the reviewed pinned Pi package globally; ZenPi uninstall leaves it in place.</p>
       </div>
       <div class="install-terminal" role="region" aria-label="ZenPi installation commands">
         <div class="terminal-bar"><span>terminal</span><span>nothing hidden</span></div>
         <pre><code><span># clone a release you have reviewed</span>
-git clone --branch v0.5.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.6.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 
 <span># Windows PowerShell / Command Prompt</span>

@@ -10,13 +10,13 @@ export default async function subagentsExtensionHarness() {
   const confirmations: any[] = [];
   const selections: any[] = [];
   const queue = [
-    "Configure role models",
+    "Configure active-provider role models",
     "worker",
     "gpt-5.6-luna — Luna",
-    "Configure role thinking",
+    "Configure active-provider role thinking",
     "worker",
     "high",
-    "Configure capacity",
+    "Configure global capacity",
     "Run child budget (cumulative) · 8",
     "Review and apply",
   ];
@@ -32,6 +32,7 @@ export default async function subagentsExtensionHarness() {
 
   const codexSol = { provider: "openai-codex", id: "gpt-5.6-sol", name: "Sol", reasoning: true };
   const codexLuna = { provider: "openai-codex", id: "gpt-5.6-luna", name: "Luna", reasoning: true };
+  const openrouter = { provider: "openrouter", id: "vendor/model", name: "Router Model", reasoning: true };
   const anthropic = { provider: "anthropic", id: "claude-sonnet", name: "Sonnet", reasoning: true };
   const ctx: any = {
     cwd: path.join(agentDir, "project", "src"),
@@ -39,9 +40,10 @@ export default async function subagentsExtensionHarness() {
     model: codexSol,
     scopedModels: [],
     modelRegistry: {
-      async getAvailable() { return [codexSol, codexLuna, anthropic]; },
-      find(provider: string, id: string) { return [codexSol, codexLuna, anthropic].find((model) => model.provider === provider && model.id === id); },
+      async getAvailable() { return [codexSol, codexLuna, openrouter, anthropic]; },
+      find(provider: string, id: string) { return [codexSol, codexLuna, openrouter, anthropic].find((model) => model.provider === provider && model.id === id); },
     },
+    async reload() { notifications.push({ message: "ctx.reload", level: "reload" }); },
     ui: {
       async select(title: string, options: string[]) {
         const answer = queue.shift();
@@ -75,6 +77,10 @@ export default async function subagentsExtensionHarness() {
 
   for (const handler of events.get("session_start") ?? []) await handler({}, ctx);
   await commands.get("zen-subagents").handler("", ctx);
+  ctx.model = openrouter;
+  for (const handler of events.get("model_select") ?? []) await handler({ model: openrouter, source: "user" }, ctx);
+  ctx.model = codexSol;
+  for (const handler of events.get("model_select") ?? []) await handler({ model: codexSol, source: "user" }, ctx);
   const beforeStatus = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
   beforeStatus.subagents.modelScope = { enforce: true, strict: true, allow: ["inherit"] };
   fs.writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify(beforeStatus));
@@ -114,11 +120,13 @@ export default async function subagentsExtensionHarness() {
 
   const settings = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
   const config = JSON.parse(fs.readFileSync(path.join(agentDir, "extensions", "subagent", "config.json"), "utf8"));
+  const savedProviders = Object.keys(JSON.parse(fs.readFileSync(path.join(agentDir, "zenpi", "subagent-provider-profiles.json"), "utf8")).providers).sort();
   process.stdout.write(`ZENPI_SUBAGENTS_HARNESS=${JSON.stringify({
     commandNames: [...commands.keys()],
     eventNames: [...events.keys()],
     settings,
     config,
+    savedProviders,
     selections,
     confirmations,
     notifications,
