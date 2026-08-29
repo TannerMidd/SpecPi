@@ -7,16 +7,17 @@ ZenPi is configuration and executable extension code for Pi. Pi extensions run w
 The installer:
 
 - prints a plan and requires confirmation unless `--yes` is passed;
+- prints the exact pinned Pi bootstrap package when Pi is missing, installs it only after confirmation, and supports `--skip-package-install`;
 - prints the exact optional DonSeTch install command, asks before running it interactively, and supports `--skip-tool-install`; `--yes` selects it when missing;
-- backs up only resource files it explicitly replaces, never complete settings or shell startup files;
-- merges documented settings instead of replacing the complete file;
+- backs up only resource files it explicitly replaces and bounded `/zen-subagents` leaves, never complete settings or shell startup files;
+- merges documented settings and subagent runtime-config paths instead of replacing complete files;
 - modifies AGENTS and shell files only inside marked blocks;
 - records checksums and ownership in a private manifest;
 - rolls configuration files back when installation fails;
 - never reads `auth.json`, provider credentials, sessions, history, or trust decisions, and never persistently copies complete Pi settings or shell startup files;
 - never commits, pushes, publishes, or creates remote resources.
 
-The managed browser install is staged before atomic promotion and launch-smoked before use or reuse. A failed install restores the prior runtime and rolls configuration files back. Pinned Pi packages are installed through `pi install`, which installs their declared npm dependencies; the separate browser runtime is installed with `npm ci` from ZenPi's reviewed lockfile. ZenPi does not invoke Playwright `install-deps`; the host must satisfy Playwright's Chromium system requirements. Package installation can leave downloaded npm caches after rollback or uninstall. Those caches are inert when absent from Pi settings.
+When `pi` is absent, the confirmed installer globally installs pinned `@earendil-works/pi-coding-agent@0.84.3` through npm with lifecycle scripts disabled. This is external system state: a failed later step does not remove it, and ZenPi uninstall preserves it. Existing Pi installations must satisfy the minimum version and are not replaced automatically. If npm installs Pi outside the persistent `PATH`, ZenPi reports the exact global executable directory and fails rather than completing with a process-local path that later shells cannot use. The managed browser install is staged before atomic promotion and launch-smoked before use or reuse. A failed install restores the prior runtime and rolls configuration files back. Pinned Pi packages are installed through `pi install`, which installs their declared npm dependencies; the separate browser runtime is installed with `npm ci` from ZenPi's reviewed lockfile. ZenPi does not invoke Playwright `install-deps`; the host must satisfy Playwright's Chromium system requirements. Package installation can leave downloaded npm caches after rollback or uninstall. Those caches are inert when absent from Pi settings.
 
 The optional DonSeTch tool uses pinned global npm and remains external system state, so ZenPi cannot roll it back or remove it. Updates retire legacy ZenPi-managed bat, git-delta, and glow binaries; modified legacy binaries are moved outside the trusted managed `PATH` before their manifest records are removed. `--skip-tool-install` skips DonSeTch without disabling the normal Pi-package or browser-runtime installation.
 
@@ -26,13 +27,15 @@ The `deploy-pages` GitHub Actions workflow publishes only the checked-in `site/`
 
 ## Provider isolation
 
-ZenPi enforces native child model inheritance and disables the bundled external Codex CLI runners. This prevents ordinary OpenRouter parent sessions from silently consuming a Codex subscription.
+ZenPi allows native child models to differ only within the parent session's exact Pi provider and disables the bundled external Codex CLI runners. `openai`, `openai-codex`, OpenRouter, and other routes are distinct boundaries even when they expose similarly named models.
 
-This is a user-settings policy, not an operating-system security boundary. Pi gives trusted project settings higher precedence. A project `.pi/settings.json` can replace model scope or agent overrides. Review trusted project configuration, especially when `defaultProjectTrust` is `always`.
+The `/zen-subagents` wrapper filters model choices by exact provider and synchronizes `pi-subagents` strict `modelScope` to `<active-provider>/*` on session start, model selection, and guarded native launches. Primary models and fallbacks outside that scope are rejected by `pi-subagents`. Saved role models from a prior provider remain stale and fail until explicitly reconfigured.
+
+This remains configuration policy, not an operating-system security boundary. Pi gives trusted project settings higher precedence. ZenPi mirrors `pi-subagents` nearest/git-root discovery for the launch `cwd`; when the effective project `.pi/settings.json` replaces the managed scope with an unsafe policy, ZenPi blocks the native `subagent` tool launch and reports the file. File-authored workflows and inline scripts containing a literal child `cwd` are blocked because their child projects cannot be verified before script evaluation. Inline workflow JavaScript can dynamically construct child options; that executable user-authored code, direct user slash-command administration, manually edited package configuration, and other trusted extensions remain user-controlled boundaries ZenPi does not claim to sandbox.
 
 ## Local improvement state
 
-Capability-gap collection is disabled until the user makes a one-time local on/off decision. When enabled, ZenPi stores only bounded sanitized summaries plus salted hashes used to count distinct tasks, sessions, and projects. It does not read Pi prompts, source files, sessions, history, credentials, provider state, or trust decisions to construct reports, and it never uploads wishlist state.
+Capability-gap collection is disabled until the user makes a one-time local on/off decision. When enabled, ZenPi stores only bounded sanitized summaries plus salted hashes used to count distinct tasks, sessions, and projects. It does not read Pi prompts, source files, sessions, history, credentials, provider authentication state, or trust decisions to construct reports, and it never uploads wishlist state. `/zen-subagents` separately reads only public active provider/model identifiers and available scoped model metadata while presenting or synchronizing its explicit configuration surface.
 
 Sanitization is defense in depth, not a guarantee that arbitrary plain-language identities can always be recognized. Keep reports general, inspect `/wishlist` before copying any draft, and use `/wishlist off` when local persistence is not appropriate.
 
@@ -50,6 +53,7 @@ The browser is not an operating-system sandbox. Pi and its extensions already ru
 
 - The managed browser runtime contains pinned Playwright, Chromium, pixelmatch, and pngjs components. It is private to ZenPi and is removed on uninstall; browser artifacts are preserved.
 - The in-house `/files` extension reads project files and invokes Git without a shell for repository discovery, status, and diffs. It bounds file count, file size, and review excerpts; rejects symbolic links and binary content; sanitizes terminal control characters; and does not modify files.
+- The in-house `/zen-subagents` wrapper edits only documented `settings.json` subagent leaves and `extensions/subagent/config.json` capacity leaves. It rejects symlinked targets, shares the installer lock, writes atomically, rolls both files back on failure, and retains at most five private leaf-only backups.
 - DonSeTch is optional and licensed separately. When selected, ZenPi installs pinned `donsetch@3.4.0` globally through npm; its package installation downloads and verifies the platform binary.
 - Shell profiles are convenience wrappers, not sandboxes.
 

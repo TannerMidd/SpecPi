@@ -28,6 +28,7 @@
     <nav aria-label="Primary navigation">
       <a href="#wishlist">The loop</a>
       <a href="#workings">How it works</a>
+      <a href="#delegation">Delegation</a>
       <a href="#goal">The goal</a>
       <a href="#install">Install</a>
       <a class="github-link" href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
@@ -178,6 +179,33 @@
       </div>
     </section>
 
+    <section class="delegation" id="delegation" aria-labelledby="delegation-title">
+      <div class="section-intro compact">
+        <p class="eyebrow">Provider-safe delegation</p>
+        <h2 id="delegation-title">Different model.<br>Same exact provider.</h2>
+        <p><code>/zen-subagents</code> configures builtin roles and capacity through one reviewed, confirmed flow. ZenPi filters choices to the active Pi provider and keeps strict package model scope synchronized.</p>
+      </div>
+
+      <div class="delegation-console" role="region" aria-label="Example same-provider subagent configuration">
+        <div class="delegation-parent">
+          <span>parent session</span>
+          <strong>openai-codex / gpt-5.6-sol</strong>
+          <small>exact provider boundary: openai-codex</small>
+        </div>
+        <ul class="delegation-roles">
+          <li><span>worker</span><strong>gpt-5.6-luna</strong><em class="allowed">allowed · same provider</em></li>
+          <li><span>reviewer</span><strong>gpt-5.6-sol</strong><em class="allowed">allowed · same provider</em></li>
+          <li><span>researcher</span><strong>anthropic / sonnet</strong><em class="blocked">blocked · different provider</em></li>
+        </ul>
+        <dl class="delegation-limits">
+          <div><dt>run budget</dt><dd>8 <small>cumulative children</small></dd></div>
+          <div><dt>session budget</dt><dd>24 <small>cumulative children</small></dd></div>
+          <div><dt>async capacity</dt><dd>2 <small>active top-level runs</small></dd></div>
+        </dl>
+        <p class="delegation-note">Budgets do not control modern <code>runs.all</code> child concurrency. Apply changes explicitly, then <code>/reload</code> after active work settles.</p>
+      </div>
+    </section>
+
     <section class="belief" id="goal" aria-labelledby="belief-title">
       <div class="belief-mark" aria-hidden="true">π</div>
       <div>
@@ -229,12 +257,13 @@
       <div>
         <p class="eyebrow">Begin deliberately</p>
         <h2 id="install-title">Review the plan.<br>Then build.</h2>
-        <p class="release-note">Stable <code>v0.4.0</code> adds Tea House-native file browsing and review with fewer external dependencies.</p>
+        <p class="release-note">Stable <code>v0.5.0</code> adds provider-safe subagent configuration and automatic Pi bootstrap.</p>
+        <p class="release-note">Requires Node.js, npm, and Git. If Pi is missing, the confirmed install adds the reviewed pinned Pi package globally; ZenPi uninstall leaves it in place.</p>
       </div>
       <div class="install-terminal" role="region" aria-label="ZenPi installation commands">
         <div class="terminal-bar"><span>terminal</span><span>nothing hidden</span></div>
         <pre><code><span># clone a release you have reviewed</span>
-git clone --branch v0.4.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.5.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 
 <span># Windows PowerShell / Command Prompt</span>
