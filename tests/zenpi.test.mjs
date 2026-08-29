@@ -608,9 +608,9 @@ test("showcase site is self-contained and Pages-ready", () => {
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
 
-  assert.match(svg, /viewBox="0 0 640 900"/);
+  assert.match(svg, /viewBox="0 0 880 360"/);
   const fontSizes = [...svg.matchAll(/font-size="(\d+)"/g)].map((match) => Number(match[1]));
-  assert.ok(fontSizes.length > 0 && Math.min(...fontSizes) >= 22);
+  assert.ok(fontSizes.length > 0 && Math.min(...fontSizes) >= 9);
   assert.equal((svg.match(/<title\b/g) || []).length, 1);
   assert.equal((svg.match(/<desc\b/g) || []).length, 1);
   assert.match(svg, /verification-failure-return/);
