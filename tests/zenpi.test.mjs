@@ -28,6 +28,16 @@ import {
   resolveViewport,
 } from "../extensions/browser/core.mjs";
 import {
+  buildFileTree,
+  discoverProject,
+  flattenFileTree,
+  formatReviewMessage,
+  readGitDiff,
+  readTextFile,
+  resolveBrowserRoot,
+  sanitizeTerminalText,
+} from "../extensions/files/core.mjs";
+import {
   AGENTS_END,
   AGENTS_START,
   deletePath,
@@ -153,6 +163,7 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /href="logo\.svg"/);
   assert.match(html, /id="principles"/);
   assert.match(html, /id="features"/);
+  assert.match(html, /themed \/files review/);
   assert.match(html, /id="wishlist"/);
   assert.match(html, /id="workings"/);
   assert.match(html, /id="goal"/);
@@ -215,6 +226,79 @@ test("capability keys and registry validation are exact", () => {
     }),
     /invalid capability entry/,
   );
+});
+
+test("files core resolves paths, builds filtered trees, and formats bounded reviews", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-files-test-"));
+  try {
+    fs.mkdirSync(path.join(root, "src"));
+    fs.writeFileSync(path.join(root, "src", "a.ts"), "const a = 1;\n");
+    assert.equal(resolveBrowserRoot("src", root), path.join(root, "src"));
+    assert.throws(() => resolveBrowserRoot("missing", root), /not accessible/);
+    assert.equal(readTextFile(path.join(root, "src", "a.ts")), "const a = 1;\n");
+    assert.equal(sanitizeTerminalText("bad\u001b]0;title\u0007\tname"), "bad�]0;title�  name");
+    if (process.platform !== "win32") {
+      const outside = path.join(root, "outside.txt");
+      const linked = path.join(root, "src", "linked.txt");
+      fs.writeFileSync(outside, "private\n");
+      fs.symlinkSync(outside, linked);
+      assert.throws(() => readTextFile(linked), /Symbolic links/);
+      assert.equal(discoverProject(path.join(root, "src")).files.includes("linked.txt"), false);
+      const outsideDir = path.join(root, "outside-dir");
+      const linkedDir = path.join(root, "src", "linked-dir");
+      fs.mkdirSync(outsideDir);
+      fs.writeFileSync(path.join(outsideDir, "secret.txt"), "secret\n");
+      fs.symlinkSync(outsideDir, linkedDir, "dir");
+      assert.throws(
+        () => readTextFile(path.join(linkedDir, "secret.txt"), undefined, path.join(root, "src")),
+        /Symbolic links/,
+      );
+    }
+
+    const snapshot = {
+      root,
+      files: ["README.md", "src/a.ts", "src/b.ts"],
+      statuses: new Map([["src/b.ts", " M"]]),
+    };
+    const tree = buildFileTree(snapshot);
+    const collapsed = flattenFileTree(tree, new Set());
+    assert.deepEqual(collapsed.map((row) => row.node.name), ["src", "README.md"]);
+    const changed = flattenFileTree(tree, new Set(["src"]), "", true);
+    assert.deepEqual(changed.map((row) => row.node.relativePath), ["src", "src/b.ts"]);
+    assert.equal(
+      formatReviewMessage("src/a.ts", 2, 3, "one\ntwo", "Use clearer names."),
+      "Review comment for \"src/a.ts\" (lines 2-3):\n\n```ts\none\ntwo\n```\n\nUse clearer names.",
+    );
+    assert.match(formatReviewMessage("notes.md", 1, 1, "```nested```", "Fix."), /````md/);
+    assert.doesNotMatch(formatReviewMessage("bad.\u001b[31m", 1, 1, "safe", "Fix."), /\u001b/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("files keeps deleted Git files available as diff-only entries", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-files-deleted-"));
+  try {
+    const deleted = path.join(root, "deleted.txt");
+    const secondDeleted = path.join(root, "second-deleted.txt");
+    assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
+    fs.writeFileSync(deleted, "removed line\n");
+    fs.writeFileSync(secondDeleted, "also removed\n");
+    assert.equal(spawnSync("git", ["-C", root, "add", "deleted.txt", "second-deleted.txt"]).status, 0);
+    assert.equal(spawnSync("git", ["-C", root, "-c", "user.name=ZenPi Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture"]).status, 0);
+    fs.rmSync(deleted);
+    fs.rmSync(secondDeleted);
+    const snapshot = discoverProject(root);
+    assert.equal(snapshot.files.includes("deleted.txt"), true);
+    assert.equal(snapshot.files.includes("second-deleted.txt"), true);
+    assert.match(snapshot.statuses.get("deleted.txt"), /D/);
+    assert.match(readGitDiff(deleted, snapshot.repoRoot).join("\n"), /-removed line/);
+    const bounded = discoverProject(root, { maxFiles: 1 });
+    assert.equal(bounded.files.length, 1);
+    assert.equal(bounded.truncated, true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("browser inputs normalize local URLs, viewports, and project paths", () => {
@@ -893,27 +977,6 @@ test("installer plan is non-mutating even when browser installation is planned",
   }
 });
 
-test("plan shows pinned managed optional-tool assets", () => {
-  if (process.platform !== "linux" || process.arch !== "x64") return;
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-plan-test-"));
-  const agentDir = path.join(root, "agent");
-  const fakeBin = path.join(root, "bin");
-  fs.mkdirSync(fakeBin, { recursive: true });
-  writeExecutable(path.join(fakeBin, "tar"), "#!/bin/sh\nexit 0\n");
-
-  try {
-    const result = invokeCli(agentDir, ["plan", "--skip-package-install", "--skip-shell"], { PATH: fakeBin });
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /bat-v0\.26\.1-x86_64-unknown-linux-gnu\.tar\.gz/);
-    assert.match(result.stdout, /sha256:726f04c8f576a7fd18b7634f1bbf2f915c43494c1c0f013baa3287edb0d5a2a3/);
-    assert.match(result.stdout, /delta-0\.19\.2-x86_64-unknown-linux-gnu\.tar\.gz/);
-    assert.match(result.stdout, /glow_3\.0\.0_Linux_x86_64\.tar\.gz/);
-    assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
 test("--yes installs each missing optional external tool", () => {
   if (process.platform === "win32") return;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-tools-test-"));
@@ -921,9 +984,6 @@ test("--yes installs each missing optional external tool", () => {
   const fakeBin = path.join(root, "bin");
   const log = path.join(root, "tools.log");
   fs.mkdirSync(fakeBin, { recursive: true });
-  for (const command of ["bat", "delta", "glow"]) {
-    writeExecutable(path.join(fakeBin, command), "#!/bin/sh\nexit 0\n");
-  }
   writeExecutable(
     path.join(fakeBin, "npm"),
     "#!/bin/sh\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nprintf '#!/bin/sh\\nexit 0\\n' > \"$ZENPI_FAKE_BIN/donsetch\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/donsetch\"\n",
@@ -966,41 +1026,8 @@ test("optional tool failures warn without blocking the core install", () => {
       { PATH: fakeBin },
     );
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stderr, /Could not install optional tool bat: tar is required/);
     assert.match(result.stderr, /Optional tool DonSeTch failed to install/);
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
-    runCli(agentDir, "uninstall", "--yes");
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("managed optional tool targets reject symlinks before download", () => {
-  if (process.platform !== "linux" || process.arch !== "x64") return;
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-symlink-test-"));
-  const agentDir = path.join(root, "agent");
-  const fakeBin = path.join(root, "bin");
-  const outside = path.join(root, "outside");
-  const target = path.join(agentDir, "zenpi", "bin", "bat");
-  fs.mkdirSync(fakeBin, { recursive: true });
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(outside, "kept\n");
-  fs.symlinkSync(outside, target);
-  for (const command of ["delta", "glow", "donsetch", "tar"]) {
-    writeExecutable(path.join(fakeBin, command), "#!/bin/sh\nexit 0\n");
-  }
-
-  try {
-    const result = invokeCli(
-      agentDir,
-      ["install", "--yes", "--skip-package-install", "--skip-shell"],
-      { PATH: fakeBin },
-    );
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stderr, /Managed optional tool path must not be a symlink/);
-    assert.equal(fs.readFileSync(outside, "utf8"), "kept\n");
-    assert.equal(fs.lstatSync(target).isSymbolicLink(), true);
-    fs.rmSync(target);
     runCli(agentDir, "uninstall", "--yes");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -1013,9 +1040,6 @@ test("later core failure reports external optional tools that remain installed",
   const agentDir = path.join(root, "agent");
   const fakeBin = path.join(root, "bin");
   fs.mkdirSync(fakeBin, { recursive: true });
-  for (const command of ["bat", "delta", "glow"]) {
-    writeExecutable(path.join(fakeBin, command), "#!/bin/sh\nexit 0\n");
-  }
   writeExecutable(
     path.join(fakeBin, "npm"),
     "#!/bin/sh\nprintf '#!/bin/sh\\nexit 0\\n' > \"$ZENPI_FAKE_BIN/donsetch\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/donsetch\"\n",
@@ -1129,6 +1153,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(installed.subagents.agentOverrides.worker.model, "inherit");
     assert.equal(installed.subagents.agentOverrides["codex-exec"].disabled, true);
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")));
@@ -1163,6 +1189,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     );
     beforeUpdateSettings.subagents.retiredFlag = true;
     beforeUpdateSettings.packages.push("npm:retired-zenpi-package@1.0.0");
+    beforeUpdateSettings.packages.push("npm:@tmustier/pi-files-widget@0.2.0");
     fs.writeFileSync(
       path.join(agentDir, "settings.json"),
       `${JSON.stringify(beforeUpdateSettings, null, 2)}\n`,
@@ -1180,6 +1207,23 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
       beforeExists: false,
       installed: "npm:retired-zenpi-package@1.0.0",
     });
+    beforeUpdateManifest.packageChanges.push({
+      identity: "npm:@tmustier/pi-files-widget",
+      beforeExists: false,
+      installed: "npm:@tmustier/pi-files-widget@0.2.0",
+    });
+    const legacyTool = path.join(agentDir, "zenpi", "bin", "bat");
+    const legacyMarker = path.join(agentDir, "zenpi", "optional-tools", "bat.json");
+    fs.mkdirSync(path.dirname(legacyTool), { recursive: true });
+    fs.mkdirSync(path.dirname(legacyMarker), { recursive: true });
+    fs.writeFileSync(legacyTool, "legacy tool\n", { mode: 0o755 });
+    fs.writeFileSync(legacyMarker, "{}\n");
+    beforeUpdateManifest.managedOptionalTools = [{
+      tool: "bat",
+      target: legacyTool,
+      marker: legacyMarker,
+      installedHash: sha256(fs.readFileSync(legacyTool)),
+    }];
     beforeUpdateManifest.files[retiredFile] = {
       existed: false,
       installedHash: sha256(fs.readFileSync(retiredFile)),
@@ -1195,6 +1239,12 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
       afterUpdate.packages.some((entry) => String(entry).includes("retired-zenpi-package")),
       false,
     );
+    assert.equal(
+      afterUpdate.packages.some((entry) => String(entry).includes("pi-files-widget")),
+      false,
+    );
+    assert.equal(fs.existsSync(legacyTool), false);
+    assert.equal(fs.existsSync(legacyMarker), false);
     assert.equal(fs.existsSync(retiredFile), false);
 
     const retainedWishlist = path.join(agentDir, "zenpi", "tool-wishlist-events.jsonl");
@@ -1210,6 +1260,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
       fs.readFileSync(path.join(agentDir, "extensions", "zen.ts"), "utf8"),
       "// personal prior zen\n",
     );
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")), false);
@@ -1285,7 +1337,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
     assert.match(shell, /# >>> ZenPi >>>/);
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "pi-profiles.sh")));
     const calls = fs.readFileSync(log, "utf8").trim().split("\n");
-    assert.equal(calls.filter((line) => line.startsWith("install ")).length, 7);
+    assert.equal(calls.filter((line) => line.startsWith("install ")).length, 6);
     assert.ok(calls.some((line) => line.startsWith("--offline --list-models")));
 
     const update = invokeCli(

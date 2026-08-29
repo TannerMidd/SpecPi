@@ -54,11 +54,18 @@ The goal is not autonomous self-modification. It is to make the next justified c
 ## What ZenPi adds
 
 - Focused `/zen` execution mode
+- Tea House-native `/files` browser, viewer, diffs, and review comments
 - Evidence-led capability wishlist
 - One-command `/harness-improvement` workflow
 - Strict native-subagent model inheritance
 - Isolated browser interaction and visual regression checks
 - Review-first installation with backups, checksums, and rollback
+
+### Browse and review files
+
+Run `/files` to open the Tea House-native project browser, or `/files <path>` to start in another directory. It uses Pi's built-in syntax and Markdown renderers, with no bat, git-delta, or glow prerequisite.
+
+Inside the browser, use `j`/`k` to move, `Enter` to open, `/` to search, `c` to show changed files, and `r` to refresh. The viewer supports source, rendered Markdown, Git diffs, and `v` line selection followed by `c` to write a review comment; submit it with `Ctrl+Enter`.
 
 ## Install
 

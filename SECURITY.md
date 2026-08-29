@@ -7,7 +7,7 @@ ZenPi is configuration and executable extension code for Pi. Pi extensions run w
 The installer:
 
 - prints a plan and requires confirmation unless `--yes` is passed;
-- prints exact optional-tool commands, asks about each missing tool interactively, and supports `--skip-tool-install`; `--yes` selects all missing optional tools;
+- prints the exact optional DonSeTch install command, asks before running it interactively, and supports `--skip-tool-install`; `--yes` selects it when missing;
 - backs up only resource files it explicitly replaces, never complete settings or shell startup files;
 - merges documented settings instead of replacing the complete file;
 - modifies AGENTS and shell files only inside marked blocks;
@@ -18,7 +18,7 @@ The installer:
 
 The managed browser install is staged before atomic promotion and launch-smoked before use or reuse. A failed install restores the prior runtime and rolls configuration files back. Pinned Pi packages are installed through `pi install`, which installs their declared npm dependencies; the separate browser runtime is installed with `npm ci` from ZenPi's reviewed lockfile. ZenPi does not invoke Playwright `install-deps`; the host must satisfy Playwright's Chromium system requirements. Package installation can leave downloaded npm caches after rollback or uninstall. Those caches are inert when absent from Pi settings.
 
-Optional tools use reviewed versions. Windows bat, git-delta, and glow installs invoke Winget with exact versions; Linux/macOS installs download pinned release archives, verify recorded SHA-256 digests, and atomically publish the executable under ZenPi state. DonSeTch uses pinned global npm. Managed release binaries participate in rollback and are removed by `zenpi uninstall`; Winget and global npm changes remain external system state and are not rolled back or removed. Pi adds the managed bin directory to `PATH` only when every entry is backed by the current manifest and matches its installed checksum; modified tools are moved outside that trusted directory during uninstall. `--skip-tool-install` skips optional tools without disabling the normal Pi-package or browser-runtime installation.
+The optional DonSeTch tool uses pinned global npm and remains external system state, so ZenPi cannot roll it back or remove it. Updates retire legacy ZenPi-managed bat, git-delta, and glow binaries; modified legacy binaries are moved outside the trusted managed `PATH` before their manifest records are removed. `--skip-tool-install` skips DonSeTch without disabling the normal Pi-package or browser-runtime installation.
 
 ## Website publishing
 
@@ -49,7 +49,7 @@ The browser is not an operating-system sandbox. Pi and its extensions already ru
 ## External tools
 
 - The managed browser runtime contains pinned Playwright, Chromium, pixelmatch, and pngjs components. It is private to ZenPi and is removed on uninstall; browser artifacts are preserved.
-- `@tmustier/pi-files-widget` invokes Git, bat, delta, and glow. Avoid hostile filenames and unreviewed repositories.
+- The in-house `/files` extension reads project files and invokes Git without a shell for repository discovery, status, and diffs. It bounds file count, file size, and review excerpts; rejects symbolic links and binary content; sanitizes terminal control characters; and does not modify files.
 - DonSeTch is optional and licensed separately. When selected, ZenPi installs pinned `donsetch@3.4.0` globally through npm; its package installation downloads and verifies the platform binary.
 - Shell profiles are convenience wrappers, not sandboxes.
 

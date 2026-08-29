@@ -59,16 +59,6 @@ jobs:
           exit /b %ERRORLEVEL%
           '@ | Set-Content (Join-Path $fakeBin "npm.cmd") -Encoding ascii
           "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "npm") -Encoding ascii
-          @'
-          @echo off
-          echo winget %*>>"%ZENPI_FAKE_LOG%"
-          if "%~3"=="sharkdp.bat" echo @exit /b 0>"%ZENPI_FAKE_BIN%\bat.cmd"
-          if "%~3"=="dandavison.delta" echo @exit /b 0>"%ZENPI_FAKE_BIN%\delta.cmd"
-          if "%~3"=="charmbracelet.glow" echo @exit /b 0>"%ZENPI_FAKE_BIN%\glow.cmd"
-          exit /b 0
-          '@ | Set-Content (Join-Path $fakeBin "winget.cmd") -Encoding ascii
-          "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "winget") -Encoding ascii
-
           $nodeDir = Split-Path (Get-Command node).Source
           $env:PATH = "$fakeBin;$nodeDir;$env:SystemRoot\System32;$env:SystemRoot"
           $env:PI_CODING_AGENT_DIR = $agentDir
@@ -79,14 +69,14 @@ jobs:
           .\zenpi.cmd doctor
 
           $installCalls = @(Get-Content $log | Where-Object { $_ -match '^"?install"? ' })
-          if ($installCalls.Count -ne 7) {
-            throw "Expected 7 pi install calls, found $($installCalls.Count)"
+          if ($installCalls.Count -ne 6) {
+            throw "Expected 6 pi install calls, found $($installCalls.Count)"
           }
           $toolCalls = @(Get-Content $log | Where-Object {
-            $_ -match '^winget "?install"? ' -or $_ -match '^npm "?install"? "?--global"? '
+            $_ -match '^npm "?install"? "?--global"? '
           })
-          if ($toolCalls.Count -ne 4) {
-            throw "Expected 4 optional tool install calls, found $($toolCalls.Count)"
+          if ($toolCalls.Count -ne 1) {
+            throw "Expected 1 optional tool install call, found $($toolCalls.Count)"
           }
 
           .\zenpi.cmd uninstall --yes

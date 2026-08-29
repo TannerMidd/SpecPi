@@ -5,7 +5,6 @@ import path from "node:path";
 import process from "node:process";
 import readline from "node:readline/promises";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import {
   AGENTS_END,
@@ -61,39 +60,12 @@ const PACKAGES = [
   "npm:@llblab/pi-codex-usage@0.9.3",
   "npm:@tunnckocore/pi-gpt-fast-mode@0.4.0",
   "npm:@narumitw/pi-goal@0.54.3",
-  "npm:@tmustier/pi-files-widget@0.2.0",
 ];
 
 const OPTIONAL_TOOLS = [
-  { id: "bat", label: "bat", commands: ["bat", "batcat"], purpose: "files widget syntax highlighting" },
-  { id: "delta", label: "git-delta", commands: ["delta"], purpose: "files widget diffs" },
-  { id: "glow", label: "glow", commands: ["glow"], purpose: "files widget Markdown rendering" },
   { id: "donsetch", label: "DonSeTch", commands: ["donsetch"], purpose: "advanced web crawling skill" },
 ];
 const DONSETCH_VERSION = "3.4.0";
-const OPTIONAL_TOOL_VERSIONS = { bat: "0.26.1", delta: "0.19.2", glow: "3.0.0" };
-const MANAGED_TOOL_ASSETS = {
-  "linux-x64": {
-    bat: ["bat-v0.26.1-x86_64-unknown-linux-gnu.tar.gz", "726f04c8f576a7fd18b7634f1bbf2f915c43494c1c0f013baa3287edb0d5a2a3"],
-    delta: ["delta-0.19.2-x86_64-unknown-linux-gnu.tar.gz", "8e695c5f586a8c53d6c3b01be0b4a422ed218bfed2a56191caebe373a1c18ab2"],
-    glow: ["glow_3.0.0_Linux_x86_64.tar.gz", "13e05e4b2acc18d2aee44291aefe6325b077ec321b631a0cfa780e8e3bc33f78"],
-  },
-  "linux-arm64": {
-    bat: ["bat-v0.26.1-aarch64-unknown-linux-gnu.tar.gz", "422eb73e11c854fddd99f5ca8461c2f1d6e6dce0a2a8c3d5daade5ffcb6564aa"],
-    delta: ["delta-0.19.2-aarch64-unknown-linux-gnu.tar.gz", "0bfce159a5cddd5feb3d6db4a616d883ff51253ce08ac7ec11cb1d208cfaab9e"],
-    glow: ["glow_3.0.0_Linux_arm64.tar.gz", "810c39f4691feb75e675a5f5f54b9fa091354e7599d9cf9c9fc9b97e47a99759"],
-  },
-  "darwin-x64": {
-    bat: ["bat-v0.26.1-x86_64-apple-darwin.tar.gz", "830d63b0bba1fa040542ec569e3cf77f60d3356b9de75116a344b061e0894245"],
-    delta: ["delta-0.18.2-x86_64-apple-darwin.tar.gz", "e9b5c4a9e73d2119c687e074f0d97f188e30e5fe8ae0e6d455755f74bb5cc0cf", "0.18.2"],
-    glow: ["glow_3.0.0_Darwin_x86_64.tar.gz", "b911b90622e686d44bc072112898584a601ed8353276b735835d8cdbcc27f660"],
-  },
-  "darwin-arm64": {
-    bat: ["bat-v0.26.1-aarch64-apple-darwin.tar.gz", "e30beff26779c9bf60bb541e1d79046250cb74378f2757f8eb250afddb19e114"],
-    delta: ["delta-0.19.2-aarch64-apple-darwin.tar.gz", "9be36612a5a13e9e386dc498fb8e50dc87c72ee42b63db0ea05b32f99a72a69a"],
-    glow: ["glow_3.0.0_Darwin_arm64.tar.gz", "4b8a9a32412c0525e4c239e65171706fc5beb6d423608d99fe16788d47b345d3"],
-  },
-};
 
 function usage() {
   console.log(`ZenPi ${VERSION}
@@ -110,7 +82,7 @@ Options:
   --force                 Replace locally modified ZenPi-managed files during update.
   --skip-package-install  Write pinned package settings without installing external packages (also skips the browser runtime).
   --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
-  --skip-tool-install     Do not offer or install optional system tools.
+  --skip-tool-install     Do not offer or install the optional DonSeTch CLI.
   --skip-shell            Do not install shell profile functions or edit a shell rc file.
 
 Environment:
@@ -267,62 +239,11 @@ function optionalToolInstalled(tool) {
   return tool.commands.some(commandExists);
 }
 
-function managedToolUrl(tool, assetName, version) {
-  if (tool.id === "bat") {
-    return `https://github.com/sharkdp/bat/releases/download/v${version}/${assetName}`;
-  }
-  if (tool.id === "delta") {
-    return `https://github.com/dandavison/delta/releases/download/${version}/${assetName}`;
-  }
-  return `https://github.com/charmbracelet/glow/releases/download/v${version}/${assetName}`;
-}
-
-function optionalToolInstallSpec(tool) {
-  if (tool.id === "donsetch") {
-    if (!commandExists("npm")) return { unavailable: "npm is not available" };
-    return {
-      command: "npm",
-      args: ["install", "--global", `donsetch@${DONSETCH_VERSION}`, "--no-audit", "--no-fund"],
-      external: true,
-    };
-  }
-
-  if (process.platform === "win32") {
-    if (!commandExists("winget")) return { unavailable: "winget is not available" };
-    const ids = {
-      bat: "sharkdp.bat",
-      delta: "dandavison.delta",
-      glow: "charmbracelet.glow",
-    };
-    return {
-      command: "winget",
-      args: [
-        "install",
-        "--id",
-        ids[tool.id],
-        "--version",
-        OPTIONAL_TOOL_VERSIONS[tool.id],
-        "--exact",
-        "--source",
-        "winget",
-        "--accept-package-agreements",
-        "--accept-source-agreements",
-      ],
-      external: true,
-    };
-  }
-
-  const platformKey = `${process.platform}-${process.arch}`;
-  const asset = MANAGED_TOOL_ASSETS[platformKey]?.[tool.id];
-  if (!asset) return { unavailable: `no reviewed binary is available for ${platformKey}` };
-  if (!commandExists("tar")) return { unavailable: "tar is required to unpack the reviewed binary" };
-  const version = asset[2] || OPTIONAL_TOOL_VERSIONS[tool.id];
+function optionalToolInstallSpec(_tool) {
+  if (!commandExists("npm")) return { unavailable: "npm is not available" };
   return {
-    managed: true,
-    version,
-    assetName: asset[0],
-    sha256: asset[1],
-    url: managedToolUrl(tool, asset[0], version),
+    command: "npm",
+    args: ["install", "--global", `donsetch@${DONSETCH_VERSION}`, "--no-audit", "--no-fund"],
   };
 }
 
@@ -333,9 +254,6 @@ function shellDisplay(value) {
 
 function formatInstallSpec(spec) {
   if (spec.unavailable) return `unavailable: ${spec.unavailable}`;
-  if (spec.managed) {
-    return `download ${spec.url} (sha256:${spec.sha256}) -> ${managedBinDir}`;
-  }
   return [spec.command, ...spec.args].map(shellDisplay).join(" ");
 }
 
@@ -351,7 +269,7 @@ async function chooseOptionalTools(options) {
   const selected = [];
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
-    console.log("\nOptional tools (managed downloads are removed on uninstall; Winget/global npm installs are not):");
+    console.log("\nOptional tools (global npm installs are external and are not removed on uninstall):");
     for (const tool of missing) {
       const spec = optionalToolInstallSpec(tool);
       if (spec.unavailable) {
@@ -369,101 +287,8 @@ async function chooseOptionalTools(options) {
   return selected;
 }
 
-function findManagedExecutable(directory, basename) {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const file = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      const nested = findManagedExecutable(file, basename);
-      if (nested) return nested;
-    } else if (entry.isFile() && entry.name === basename) return file;
-  }
-  return undefined;
-}
-
-async function downloadManagedArchive(url, maximumBytes = 64 * 1024 * 1024) {
-  const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok) throw new Error(`download failed with HTTP ${response.status}`);
-  const declaredLength = Number.parseInt(response.headers.get("content-length") || "", 10);
-  if (Number.isFinite(declaredLength) && declaredLength > maximumBytes) {
-    await response.body?.cancel();
-    throw new Error(`download content-length exceeds ${maximumBytes} bytes`);
-  }
-  if (!response.body) throw new Error("download response has no body");
-
-  const chunks = [];
-  const hash = createHash("sha256");
-  let total = 0;
-  for await (const chunk of response.body) {
-    const buffer = Buffer.from(chunk);
-    total += buffer.length;
-    if (total > maximumBytes) throw new Error(`download exceeded ${maximumBytes} bytes`);
-    chunks.push(buffer);
-    hash.update(buffer);
-  }
-  return { data: Buffer.concat(chunks, total), hash: hash.digest("hex") };
-}
-
-function assertManagedToolTargets(target, marker) {
-  for (const file of [managedToolsDir, managedBinDir, target, marker]) {
-    if (lstatMaybe(file)?.isSymbolicLink()) {
-      throw new Error(`Managed optional tool path must not be a symlink: ${file}`);
-    }
-  }
-}
-
-async function installManagedTool(tool, spec) {
-  const operationStamp = `${process.pid}-${Date.now()}-${tool.id}`;
-  const stage = path.join(managedToolsDir, `.stage-${operationStamp}`);
-  const target = path.join(managedBinDir, tool.commands[0]);
-  const marker = path.join(managedToolsDir, `${tool.id}.json`);
-  assertManagedToolTargets(target, marker);
-  const before = snapshot([target, marker]);
-  try {
-    fs.mkdirSync(stage, { recursive: true, mode: 0o700 });
-    const archive = await downloadManagedArchive(spec.url);
-    if (archive.hash !== spec.sha256) {
-      throw new Error(`checksum mismatch: expected ${spec.sha256}, received ${archive.hash}`);
-    }
-    const archivePath = path.join(stage, spec.assetName);
-    const extractDir = path.join(stage, "extract");
-    fs.mkdirSync(extractDir, { recursive: true, mode: 0o700 });
-    fs.writeFileSync(archivePath, archive.data, { mode: 0o600 });
-    run("tar", ["-xzf", archivePath, "-C", extractDir]);
-    const executable = findManagedExecutable(extractDir, tool.commands[0]);
-    if (!executable) throw new Error(`archive does not contain ${tool.commands[0]}`);
-    const data = fs.readFileSync(executable);
-    atomicWrite(target, data, 0o755);
-    writeJson(marker, {
-      schema: 1,
-      tool: tool.id,
-      version: spec.version,
-      source: spec.url,
-      archiveHash: spec.sha256,
-      installedHash: sha256(data),
-      target,
-      marker,
-    }, 0o600);
-    if (!(process.env.PATH || "").split(path.delimiter).includes(managedBinDir)) {
-      process.env.PATH = `${managedBinDir}${path.delimiter}${process.env.PATH || ""}`;
-    }
-    fs.rmSync(stage, { recursive: true, force: true });
-    return {
-      record: readJson(marker),
-      rollback() {
-        restoreSnapshot(before);
-      },
-    };
-  } catch (error) {
-    restoreSnapshot(before);
-    fs.rmSync(stage, { recursive: true, force: true });
-    throw error;
-  }
-}
-
 async function installOptionalTools(tools) {
   const warnings = [];
-  const managedRecords = [];
-  const managedRollbacks = [];
   const externalAttempts = [];
   for (const tool of tools) {
     const spec = optionalToolInstallSpec(tool);
@@ -474,14 +299,8 @@ async function installOptionalTools(tools) {
     console.log(`\nInstalling optional tool ${tool.label}:`);
     console.log(`  ${formatInstallSpec(spec)}`);
     try {
-      if (spec.managed) {
-        const installed = await installManagedTool(tool, spec);
-        managedRecords.push(installed.record);
-        managedRollbacks.push(installed.rollback);
-      } else {
-        externalAttempts.push(tool.label);
-        run(spec.command, spec.args);
-      }
+      externalAttempts.push(tool.label);
+      run(spec.command, spec.args);
       if (!optionalToolInstalled(tool)) {
         warnings.push(`${tool.label} installed successfully but is not visible on the current PATH; restart the terminal before using it.`);
       }
@@ -491,15 +310,9 @@ async function installOptionalTools(tools) {
   }
   return {
     warnings,
-    managedRecords,
+    managedRecords: [],
     externalAttempts,
-    rollback() {
-      const errors = [];
-      for (const rollback of managedRollbacks.reverse()) {
-        try { rollback(); } catch (error) { errors.push(error.message); }
-      }
-      return errors;
-    },
+    rollback() { return []; },
   };
 }
 
@@ -724,6 +537,16 @@ function desiredSettingsOperations() {
 function managedFiles(includeShell) {
   const files = [
     [path.join(repoRoot, "extensions", "zen.ts"), path.join(agentDir, "extensions", "zen.ts"), 0o644],
+    [
+      path.join(repoRoot, "extensions", "files", "index.ts"),
+      path.join(agentDir, "extensions", "files", "index.ts"),
+      0o644,
+    ],
+    [
+      path.join(repoRoot, "extensions", "files", "core.mjs"),
+      path.join(agentDir, "extensions", "files", "core.mjs"),
+      0o644,
+    ],
     [
       path.join(repoRoot, "extensions", "browser", "index.ts"),
       path.join(agentDir, "extensions", "browser", "index.ts"),
@@ -954,6 +777,8 @@ async function confirm(message, yes) {
 function assertSources() {
   const required = [
     "extensions/zen.ts",
+    "extensions/files/index.ts",
+    "extensions/files/core.mjs",
     "extensions/browser/index.ts",
     "extensions/browser/core.mjs",
     "extensions/browser/smoke.mjs",
@@ -1030,7 +855,7 @@ Managed files:`);
     console.log(options.yes
       ? "  --yes attempts every missing optional tool"
       : "  interactive install asks about each available missing tool individually");
-    console.log("  managed release binaries are reversible; Winget/global npm changes are external");
+    console.log("  global npm changes are external and remain after uninstall");
   }
   console.log("  Chromium is installed by default inside the managed browser runtime");
   console.log("\nEvery install/update creates timestamped backups under:");
@@ -1049,6 +874,30 @@ function validateManagedUpdate(manifest, files, force) {
   }
 }
 
+function retireManagedOptionalToolRecords(records, warnings, preserved) {
+  for (const record of records || []) {
+    if (path.dirname(record.target) !== managedBinDir || path.dirname(record.marker) !== managedToolsDir) {
+      throw new Error(`Legacy managed optional tool path is outside ZenPi state: ${record.target}`);
+    }
+    if (lstatMaybe(record.target)?.isSymbolicLink() || lstatMaybe(record.marker)?.isSymbolicLink()) {
+      throw new Error(`Legacy managed optional tool paths must not be symlinks: ${record.target}`);
+    }
+    if (fs.existsSync(record.target) && sha256(fs.readFileSync(record.target)) !== record.installedHash) {
+      const preserveDir = path.join(stateDir, "preserved-modified-tools");
+      fs.mkdirSync(preserveDir, { recursive: true, mode: 0o700 });
+      const destination = path.join(preserveDir, `${path.basename(record.target)}-${timestamp()}`);
+      fs.renameSync(record.target, destination);
+      preserved.push(destination);
+      warnings.push(`Moved retired modified optional tool outside trusted PATH: ${destination}`);
+    } else {
+      fs.rmSync(record.target, { force: true });
+    }
+    fs.rmSync(record.marker, { force: true });
+  }
+  try { fs.rmdirSync(managedBinDir); } catch (error) { if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") throw error; }
+  try { fs.rmdirSync(managedToolsDir); } catch (error) { if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") throw error; }
+}
+
 async function installOrUpdate(options, update) {
   assertSources();
   if (!options.skipPackageInstall && !commandExists("pi")) {
@@ -1064,6 +913,7 @@ async function installOrUpdate(options, update) {
   let browserRuntimeTransaction;
   let optionalToolTransaction;
   let backupDir;
+  const preservedRetiredTools = [];
   try {
     const previousManifest = readManifest(update);
     if (!update && previousManifest) {
@@ -1089,6 +939,7 @@ async function installOrUpdate(options, update) {
       ...(shellRc ? [shellRc] : []),
       ...files.map(([, target]) => target),
       ...Object.keys(previousManifest?.files || {}),
+      ...(previousManifest?.managedOptionalTools || []).flatMap((record) => [record.target, record.marker]),
     ];
     assertNoBrokenSymlinks(watched);
     transaction = snapshot(watched);
@@ -1172,6 +1023,8 @@ async function installOrUpdate(options, update) {
       );
     }
 
+    retireManagedOptionalToolRecords(previousManifest?.managedOptionalTools, warnings, preservedRetiredTools);
+
     const manifest = {
       schema: 1,
       version: VERSION,
@@ -1185,12 +1038,7 @@ async function installOrUpdate(options, update) {
       packageChanges,
       settingsChanges,
       browserRuntime: browserRuntimeStatus(),
-      managedOptionalTools: [
-        ...(previousManifest?.managedOptionalTools || []).filter(
-          (record) => !optionalToolTransaction.managedRecords.some((item) => item.tool === record.tool),
-        ),
-        ...optionalToolTransaction.managedRecords,
-      ],
+      managedOptionalTools: optionalToolTransaction.managedRecords,
       files: fileRecords,
       backups: [...(previousManifest?.backups || []), path.relative(stateDir, backupDir)],
     };
@@ -1215,6 +1063,9 @@ async function installOrUpdate(options, update) {
     try { rollbackErrors.push(...(optionalToolTransaction?.rollback() || [])); } catch (rollbackError) { rollbackErrors.push(`managed optional tool rollback: ${rollbackError.message}`); }
     if (transaction) {
       try { restoreSnapshot(transaction); } catch (rollbackError) { rollbackErrors.push(`configuration rollback: ${rollbackError.message}`); }
+    }
+    for (const preserved of preservedRetiredTools) {
+      try { fs.rmSync(preserved, { force: true }); } catch (rollbackError) { rollbackErrors.push(`retired tool cleanup: ${rollbackError.message}`); }
     }
     if (backupDir) {
       try { fs.rmSync(backupDir, { recursive: true, force: true }); } catch (rollbackError) { rollbackErrors.push(`backup cleanup: ${rollbackError.message}`); }
@@ -1418,9 +1269,6 @@ function doctor() {
   else {
     try { assertPiVersion(); } catch (error) { errors.push(error.message); }
   }
-  if (!commandExists("bat") && !commandExists("batcat")) warnings.push("bat/batcat is missing (files widget prerequisite)");
-  if (!commandExists("delta")) warnings.push("delta is missing (files widget prerequisite)");
-  if (!commandExists("glow")) warnings.push("glow is missing (files widget prerequisite)");
   if (!commandExists("donsetch")) warnings.push("donsetch is missing (optional skill prerequisite)");
 
   console.log(`ZenPi ${manifest.version} doctor`);

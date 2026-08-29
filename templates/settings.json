@@ -6,8 +6,7 @@
     "npm:@juicesharp/rpiv-ask-user-question@2.7.1",
     "npm:@llblab/pi-codex-usage@0.9.3",
     "npm:@tunnckocore/pi-gpt-fast-mode@0.4.0",
-    "npm:@narumitw/pi-goal@0.54.3",
-    "npm:@tmustier/pi-files-widget@0.2.0"
+    "npm:@narumitw/pi-goal@0.54.3"
   ],
   "subagents": {
     "defaultThinking": "medium",
