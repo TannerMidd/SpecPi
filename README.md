@@ -83,12 +83,29 @@ Run `/reload` in Pi after installation. Use the same platform launcher with `upd
 
 ## Improve through use
 
-When existing tools cannot solve a material, reusable problem, ZenPi can record a sanitized capability-gap report. `/wishlist` turns those reports into a ranked improvement queue based on recurrence, reach, impact, and recency.
+When existing tools cannot solve a material, reusable problem, ZenPi can record a sanitized capability-gap report. Collection is local-only and fail-closed: the first report asks for an explicit on/off decision, which can later be changed with `/wishlist on` or `/wishlist off`.
 
-Implemented capabilities leave the active list while their history remains. Reports are designed to exclude prompts, source code, commands, credentials, and raw project identities.
+`/wishlist` ranks unique-task evidence by impact, project reach, session reach, recency, and stable ID. `/wishlist next` shows one qualified candidate and a minimal improvement card rather than a dashboard. Selection, decline, retirement, and reopening happen only through explicit commands; the reporting tool cannot change lifecycle state or modify ZenPi.
+
+```text
+/wishlist next
+/wishlist select <gap-id>
+/wishlist decline <gap-id>
+/wishlist retire <gap-id> <validation note>
+/wishlist reopen <gap-id>
+```
+
+The bundled `zenpi-improve` skill guides an approved selected gap through a smallest-change hypothesis, direct acceptance check, rollback, and review. Selection authorizes preparation of that card—not source edits. Implementation still requires explicit approval.
+
+Implemented capabilities come from a reviewed registry linked to closed, deterministic `zenpi doctor` validators. Later friction is retained as a regression signal and marked `review-needed`; it never reopens work automatically. Exact `/wishlist merge` decisions can join fragmented names and `/wishlist unmerge <decision-id>` reverses them without rewriting observations. `/wishlist draft <gap-id>` renders a sanitized local issue draft but never uploads it.
+
+Confirmed `/wishlist archive` and `/wishlist reset` prepare a private checksummed, recoverable snapshot before clearing the active queue. Collection preference and the private salt remain in place. The reporting contract forbids prompts, source code, commands, credentials, and raw project identities; bounded redaction removes recognizable paths, URLs, and credential patterns, but users should still review local output before sharing it.
 
 ```text
 ~/.pi/agent/zenpi/TOOL_WISHLIST.md
+~/.pi/agent/zenpi/tool-wishlist-events.jsonl
+~/.pi/agent/zenpi/tool-wishlist-decisions.jsonl
+~/.pi/agent/zenpi/tool-wishlist-archives/
 ```
 
 ## Boundaries

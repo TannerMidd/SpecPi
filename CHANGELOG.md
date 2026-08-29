@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Complete the local improvement loop with explicit collection consent, deterministic evidence ranking, lifecycle decisions, one-candidate improvement cards, and regression-aware retirement.
+- Replace hard-coded implemented capability keys with a reviewed registry linked to closed `zenpi doctor` validators; the browser smoke now verifies both exact and changed pixel comparisons.
+- Add reversible exact alias decisions, local sanitized issue drafts, and recoverable checksummed archive/reset operations.
+- Add the `zenpi-improve` skill for approval-gated, evidence-backed, reversible harness improvements.
+
 ## 0.2.0 - 2026-08-29
 
 - Add a native Windows command launcher and Windows-safe executable discovery for `pi.cmd`, `npm.cmd`, and access-restricted Windows App Execution Aliases such as `winget.exe`.
