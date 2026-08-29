@@ -241,18 +241,18 @@ function run(command, args, options = {}) {
   const env = { ...process.env, ...(options.env || {}) };
   const executable = resolveCommand(command, env) || command;
   const needsWindowsCommandProcessor = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
-  const spawnCommand = needsWindowsCommandProcessor
-    ? envValue(env, "ComSpec") || "cmd.exe"
-    : executable;
-  const spawnArgs = needsWindowsCommandProcessor
-    ? ["/d", "/s", "/c", [executable, ...args].map(quoteWindowsCommandArg).join(" ")]
-    : args;
-  const result = spawnSync(spawnCommand, spawnArgs, {
+  const spawnOptions = {
     cwd: options.cwd || os.homedir(),
     env,
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit",
-  });
+  };
+  const result = needsWindowsCommandProcessor
+    ? spawnSync(
+      [executable, ...args].map(quoteWindowsCommandArg).join(" "),
+      { ...spawnOptions, shell: envValue(env, "ComSpec") || "cmd.exe" },
+    )
+    : spawnSync(executable, args, spawnOptions);
   if (result.error) throw result.error;
   if (result.status !== 0) {
     const detail = options.capture ? `\n${result.stderr || result.stdout || ""}` : "";

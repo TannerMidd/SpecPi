@@ -78,11 +78,13 @@ jobs:
           .\zenpi.cmd install --yes --skip-shell
           .\zenpi.cmd doctor
 
-          $installCalls = @(Get-Content $log | Where-Object { $_ -like "install *" })
+          $installCalls = @(Get-Content $log | Where-Object { $_ -match '^"?install"? ' })
           if ($installCalls.Count -ne 7) {
             throw "Expected 7 pi install calls, found $($installCalls.Count)"
           }
-          $toolCalls = @(Get-Content $log | Where-Object { $_ -like "winget install *" -or $_ -like "npm install --global *" })
+          $toolCalls = @(Get-Content $log | Where-Object {
+            $_ -match '^winget "?install"? ' -or $_ -match '^npm "?install"? "?--global"? '
+          })
           if ($toolCalls.Count -ne 4) {
             throw "Expected 4 optional tool install calls, found $($toolCalls.Count)"
           }

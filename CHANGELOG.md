@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Add a native Windows command launcher and Windows-safe executable discovery for `pi.cmd`, `npm.cmd`, and access-restricted Windows App Execution Aliases such as `winget.exe`.
-- Invoke `.cmd`/`.bat` shims through `ComSpec` without Node's deprecated `shell: true` argument handling.
+- Invoke `.cmd`/`.bat` shims as a single quoted `ComSpec` command, avoiding Node's deprecated shell-plus-arguments path.
 - Make the npm binary entry invoke Node directly instead of requiring a POSIX shell.
 - Document platform-specific install commands and automatic dependency installation, and preflight the Pi 0.80.0 package API baseline.
 - Add Windows installation smoke coverage.
