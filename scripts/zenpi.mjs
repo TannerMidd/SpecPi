@@ -23,7 +23,7 @@ import {
   upsertManagedBlock,
 } from "./lib.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
-import { acquireZenPiLock } from "../extensions/subagents/core.mjs";
+import { acquireZenPiLock, readProviderProfiles, readProviderLeases } from "../extensions/subagents/core.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -40,6 +40,8 @@ const stateDir = path.join(agentDir, "zenpi");
 const manifestPath = path.join(stateDir, "manifest.json");
 const settingsPath = path.join(agentDir, "settings.json");
 const subagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
+const subagentProfilePath = path.join(agentDir, "zenpi", "subagent-provider-profiles.json");
+const subagentLeasePath = path.join(agentDir, "zenpi", "subagent-provider-leases.json");
 const agentsPath = path.join(agentDir, "AGENTS.md");
 const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
@@ -915,7 +917,8 @@ Managed files:`);
   console.log("  theme = tea-house");
   console.log("  pinned package entries (merged by npm package identity)");
   console.log("  subagent security policy leaves are enforced");
-  console.log("  role model/thinking and capacity defaults are user-tunable and preserved on update");
+  console.log("  exact-provider role profiles are created lazily at runtime and preserved byte-for-byte on update");
+  console.log("  global capacity remains user-tunable; provider leases prevent shared-mirror races");
   console.log("  strict modelScope starts at [inherit] and /zen-subagents synchronizes it to the active provider");
   console.log("  codex-exec and codex-exec-writer disabled");
   console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
@@ -1328,6 +1331,10 @@ async function uninstall(options) {
       fs.renameSync(browserRuntimeDir, retiredBrowserRuntime);
     }
     fs.rmSync(manifestPath, { force: true });
+    if (fs.existsSync(subagentLeasePath)) {
+      try { if (readProviderLeases(agentDir).leases.length === 0) fs.rmSync(subagentLeasePath, { force: true }); }
+      catch (error) { warnings.push(`Provider lease state was retained because it could not be verified: ${error.message}`); }
+    }
     if (retiredBrowserRuntime) {
       try {
         fs.rmSync(retiredBrowserRuntime, { recursive: true, force: true });
@@ -1337,8 +1344,9 @@ async function uninstall(options) {
     }
     retiredBrowserRuntime = undefined;
     console.log("ZenPi configuration, managed optional tools, and managed browser runtime uninstalled.");
-    console.log("Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved.");
+    console.log("Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved. Provider profiles were also preserved.");
     console.log(`Wishlist state: ${stateDir}`);
+    console.log(`Provider profiles (remove manually after stopping Pi for a complete purge): ${subagentProfilePath}`);
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
   } catch (error) {
     const rollbackErrors = [];
@@ -1379,6 +1387,23 @@ function doctor() {
         : current.exists && deepEqual(current.value, operation.value);
     if (!valid) errors.push(`${operation.userTunable ? "Invalid user-tunable setting" : "Setting drift"}: ${operation.path.join(".")}`);
   }
+
+  try {
+    const profiles = readProviderProfiles(agentDir);
+    const allow = settings?.subagents?.modelScope?.allow;
+    const inferred = Array.isArray(allow) && allow.length === 1 && typeof allow[0] === "string" && allow[0].endsWith("/*") ? allow[0].slice(0, -2) : undefined;
+    const profile = inferred && profiles.providers[inferred];
+    if (profile) {
+      for (const [role, fields] of Object.entries(profile.roles)) {
+        const mirror = settings?.subagents?.agentOverrides?.[role];
+        if (mirror?.model !== fields.model || mirror?.thinking !== fields.thinking) errors.push(`Active settings mirror differs from saved provider profile: ${inferred}/${role}`);
+      }
+    }
+  } catch (error) { errors.push(`Provider profiles invalid: ${error.message}`); }
+  try {
+    const leases = readProviderLeases(agentDir).leases;
+    if (new Set(leases.map((lease) => lease.provider)).size > 1) errors.push("Provider leases contain conflicting exact providers.");
+  } catch (error) { errors.push(`Provider leases invalid: ${error.message}`); }
 
   const subagentConfig = readJson(subagentConfigPath, {});
   for (const operation of desiredSubagentConfigOperations()) {

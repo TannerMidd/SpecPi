@@ -22,6 +22,14 @@ import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js
 import {
   applySubagentConfiguration,
   acquireZenPiLock,
+  ROLE_DEFAULTS,
+  activateProviderProfile,
+  applyProviderConfiguration,
+  readProviderProfiles,
+  readProviderLeases,
+  validateProviderProfiles,
+  registerOrRefreshProviderLease,
+  releaseProviderLease,
   isSafeProviderScope,
   modelChoices,
   readSubagentState,
@@ -120,6 +128,20 @@ function runSubagentsExtensionHarness(agentDir) {
   const marker = result.stdout.split("\n").find((line) => line.startsWith("ZENPI_SUBAGENTS_HARNESS="));
   if (!marker) throw new Error(`subagents extension harness result missing\n${result.stdout}`);
   return JSON.parse(marker.slice("ZENPI_SUBAGENTS_HARNESS=".length));
+}
+
+function runSubagentsRuntimeHarness(agentDir) {
+  const runner = path.join(repoRoot, "tests", "fixtures", "subagents-runtime-alignment-harness.ts");
+  const loader = path.join(repoRoot, "tests", "fixtures", "pi-extension-stub-loader.mjs");
+  const result = spawnSync(process.execPath, ["--no-warnings", "--experimental-strip-types", "--loader", pathToFileURL(loader).href, runner], {
+    cwd: repoRoot,
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" },
+    encoding: "utf8",
+  });
+  if (result.status !== 0) throw new Error(`subagents runtime harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  const marker = result.stdout.split("\n").find((line) => line.startsWith("ZENPI_SUBAGENTS_RUNTIME="));
+  if (!marker) throw new Error(`subagents runtime harness result missing\n${result.stdout}`);
+  return JSON.parse(marker.slice("ZENPI_SUBAGENTS_RUNTIME=".length));
 }
 
 function installFakeBrowserNpm(fakeBin) {
@@ -290,6 +312,235 @@ test("shared ZenPi lock fails closed and release preserves a substituted lock", 
   }
 });
 
+test("provider profiles validate exact affinity and restore mirrors across providers", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-provider-profiles-"));
+  const agentDir = path.join(root, "agent");
+  try {
+    fs.mkdirSync(path.join(agentDir, "extensions", "subagent"), { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ unrelated: true, subagents: { agentOverrides: { scout: { prompt: "keep" } } } }));
+    fs.writeFileSync(path.join(agentDir, "extensions", "subagent", "config.json"), JSON.stringify({ maxSubagentSpawnsPerRun: 8, maxSubagentSpawnsPerSession: 24, maxActiveAsyncRunsPerSession: 2 }));
+    const token = "a".repeat(48);
+    activateProviderProfile({ agentDir, provider: "openai-codex", leaseToken: token });
+    const codexRoles = structuredClone(readSubagentState(agentDir).roles);
+    codexRoles.worker.model = "openai-codex/owner/model";
+    applyProviderConfiguration({ agentDir, provider: "openai-codex", leaseToken: token, roles: codexRoles, capacity: { maxSubagentSpawnsPerRun: 12 } });
+    activateProviderProfile({ agentDir, provider: "openrouter", leaseToken: token });
+    const routerRoles = structuredClone(readSubagentState(agentDir).roles);
+    routerRoles.worker.model = "openrouter/vendor/model";
+    applyProviderConfiguration({ agentDir, provider: "openrouter", leaseToken: token, roles: routerRoles });
+    activateProviderProfile({ agentDir, provider: "openai-codex", leaseToken: token });
+    const state = readSubagentState(agentDir);
+    assert.equal(state.roles.worker.model, "openai-codex/owner/model");
+    assert.equal(state.settings.subagents.agentOverrides.scout.prompt, "keep");
+    assert.equal(state.settings.unrelated, true);
+    assert.deepEqual(Object.keys(readProviderProfiles(agentDir).providers).sort(), ["openai-codex", "openrouter"]);
+    applyProviderConfiguration({ agentDir, provider: "openai-codex", leaseToken: token, reset: true });
+    assert.equal(readSubagentState(agentDir).capacity.maxSubagentSpawnsPerRun, 12);
+    assert.equal(readProviderProfiles(agentDir).providers.openrouter.roles.worker.model, "openrouter/vendor/model");
+    assert.throws(() => validateProviderProfiles({ schema: 1, providers: { "open*": {} } }), /Invalid exact provider/);
+    const invalid = readProviderProfiles(agentDir); invalid.providers["openai"] = structuredClone(invalid.providers.openrouter);
+    assert.throws(() => validateProviderProfiles(invalid), /outside the active provider/);
+    const valid = readProviderProfiles(agentDir);
+    assert.equal(Object.hasOwn(valid.providers["openai-codex"], "capacity"), false);
+    assert.throws(() => validateProviderProfiles({ ...valid, extra: true }), /unsupported keys/);
+    const tooMany = { schema: 1, providers: {} };
+    for (let index = 0; index < 65; index++) tooMany.providers[`provider-${index}`] = { updatedAt: new Date(0).toISOString(), origin: "default", roles: structuredClone({ scout: { model: "inherit", thinking: "low" }, researcher: { model: "inherit", thinking: "medium" }, worker: { model: "inherit", thinking: "medium" }, reviewer: { model: "inherit", thinking: "high" }, oracle: { model: "inherit", thinking: "high" } }) };
+    assert.throws(() => validateProviderProfiles(tooMany), /limited to 64/);
+    releaseProviderLease({ agentDir, token });
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("legacy migration rejects malformed leaves and explicit configuration repairs mixed providers", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-provider-migration-"));
+  const malformed = path.join(root, "malformed");
+  const mixed = path.join(root, "mixed");
+  try {
+    for (const agentDir of [malformed, mixed]) fs.mkdirSync(agentDir, { recursive: true });
+    const malformedSettings = { unrelated: true, subagents: { agentOverrides: { worker: { model: 7, thinking: ["high"] } } } };
+    fs.writeFileSync(path.join(malformed, "settings.json"), JSON.stringify(malformedSettings));
+    const before = fs.readFileSync(path.join(malformed, "settings.json"));
+    const result = activateProviderProfile({ agentDir: malformed, provider: "openai", leaseToken: "e".repeat(48) });
+    assert.equal(result.state, "migration-needed");
+    assert.match(result.diagnostic, /non-string/);
+    assert.deepEqual(fs.readFileSync(path.join(malformed, "settings.json")), before);
+    assert.equal(fs.existsSync(path.join(malformed, "zenpi", "subagent-provider-profiles.json")), false);
+    assert.equal(fs.existsSync(path.join(malformed, "zenpi", "subagent-provider-leases.json")), false);
+
+    fs.writeFileSync(path.join(mixed, "settings.json"), JSON.stringify({ subagents: { agentOverrides: {
+      scout: { model: "openai/model", thinking: "low" },
+      worker: { model: "openrouter/model", thinking: "medium" },
+    } } }));
+    const blocked = activateProviderProfile({ agentDir: mixed, provider: "openai", leaseToken: "f".repeat(48) });
+    assert.equal(blocked.state, "migration-needed");
+    assert.match(blocked.diagnostic, /mixed providers/);
+    const repaired = applyProviderConfiguration({ agentDir: mixed, provider: "openai", leaseToken: "f".repeat(48), reset: true, repairLegacy: true });
+    assert.equal(repaired.state, "saved");
+    assert.equal(readProviderProfiles(mixed).providers.openai.origin, "reset");
+    assert.deepEqual(readSubagentState(mixed).settings.subagents.modelScope.allow, ["openai/*"]);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("provider state bounds fail before mutation and public readers reject symlinked parents", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-provider-bounds-"));
+  const agentDir = path.join(root, "agent");
+  try {
+    fs.mkdirSync(agentDir, { recursive: true });
+    fs.writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ unrelated: true }));
+    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
+    activateProviderProfile({ agentDir, provider: "openai", leaseToken: "1".repeat(48) });
+    const profileBefore = fs.readFileSync(path.join(agentDir, "zenpi", "subagent-provider-profiles.json"));
+    const settingsBefore = fs.readFileSync(path.join(agentDir, "settings.json"));
+    const roles = structuredClone(readSubagentState(agentDir).roles);
+    roles.worker.model = `openai/${"x".repeat(2048)}`;
+    assert.throws(() => applyProviderConfiguration({ agentDir, provider: "openai", leaseToken: "1".repeat(48), roles }), /no longer than 1024/);
+    assert.deepEqual(fs.readFileSync(path.join(agentDir, "zenpi", "subagent-provider-profiles.json")), profileBefore);
+    assert.deepEqual(fs.readFileSync(path.join(agentDir, "settings.json")), settingsBefore);
+
+    const huge = { schema: 1, providers: {} };
+    for (let index = 0; index < 64; index++) {
+      const provider = `provider-${index}`;
+      const model = `${provider}/${"m".repeat(1000)}`;
+      huge.providers[provider] = { updatedAt: new Date(0).toISOString(), origin: "configured", roles: Object.fromEntries(Object.keys(ROLE_DEFAULTS).map((role) => [role, { model, thinking: ROLE_DEFAULTS[role].thinking }])) };
+    }
+    assert.throws(() => validateProviderProfiles(huge), /262144-byte limit/);
+
+    if (process.platform !== "win32") {
+      const outside = path.join(root, "outside");
+      fs.renameSync(path.join(agentDir, "zenpi"), outside);
+      fs.symlinkSync(outside, path.join(agentDir, "zenpi"));
+      assert.throws(() => readProviderProfiles(agentDir), /symlinked configuration parent/);
+      assert.throws(() => readProviderLeases(agentDir), /symlinked configuration parent/);
+      const doctor = invokeCli(agentDir, ["doctor"]);
+      assert.notEqual(doctor.status, 0);
+      assert.match(doctor.stderr, /Provider profiles invalid: .*symlinked configuration parent/);
+      assert.match(doctor.stderr, /Provider leases invalid: .*symlinked configuration parent/);
+    }
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("oversized on-disk provider state blocks every profile and lease mutation path", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-provider-raw-bounds-"));
+  const profileAgent = path.join(root, "profile-agent");
+  const leaseAgent = path.join(root, "lease-agent");
+  try {
+    for (const agentDir of [profileAgent, leaseAgent]) {
+      fs.mkdirSync(agentDir, { recursive: true });
+      fs.writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ unrelated: true }));
+      activateProviderProfile({ agentDir, provider: "openai" });
+    }
+    const oversizedProfile = Buffer.alloc(256 * 1024 + 1, 0x70);
+    const profilePath = path.join(profileAgent, "zenpi", "subagent-provider-profiles.json");
+    fs.writeFileSync(profilePath, oversizedProfile);
+    const profileSettings = fs.readFileSync(path.join(profileAgent, "settings.json"));
+    assert.throws(() => activateProviderProfile({ agentDir: profileAgent, provider: "openai" }), /262144-byte limit/);
+    assert.throws(() => applyProviderConfiguration({ agentDir: profileAgent, provider: "openai", reset: true }), /262144-byte limit/);
+    assert.deepEqual(fs.readFileSync(profilePath), oversizedProfile);
+    assert.deepEqual(fs.readFileSync(path.join(profileAgent, "settings.json")), profileSettings);
+
+    const oversizedLease = Buffer.alloc(64 * 1024 + 1, 0x6c);
+    const leasePath = path.join(leaseAgent, "zenpi", "subagent-provider-leases.json");
+    fs.writeFileSync(leasePath, oversizedLease);
+    const leaseProfile = fs.readFileSync(path.join(leaseAgent, "zenpi", "subagent-provider-profiles.json"));
+    const leaseSettings = fs.readFileSync(path.join(leaseAgent, "settings.json"));
+    const token = "8".repeat(48);
+    assert.throws(() => activateProviderProfile({ agentDir: leaseAgent, provider: "openai", leaseToken: token }), /65536-byte limit/);
+    assert.throws(() => applyProviderConfiguration({ agentDir: leaseAgent, provider: "openai", leaseToken: token, reset: true }), /65536-byte limit/);
+    assert.throws(() => registerOrRefreshProviderLease({ agentDir: leaseAgent, token, provider: "openai" }), /65536-byte limit/);
+    assert.throws(() => releaseProviderLease({ agentDir: leaseAgent, token }), /65536-byte limit/);
+    assert.deepEqual(fs.readFileSync(leasePath), oversizedLease);
+    assert.deepEqual(fs.readFileSync(path.join(leaseAgent, "zenpi", "subagent-provider-profiles.json")), leaseProfile);
+    assert.deepEqual(fs.readFileSync(path.join(leaseAgent, "settings.json")), leaseSettings);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("doctor rejects broken provider targets and a symlinked state parent before profile creation", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-provider-doctor-links-"));
+  const agentDir = path.join(root, "agent");
+  try {
+    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
+    const stateDir = path.join(agentDir, "zenpi");
+    const profilePath = path.join(stateDir, "subagent-provider-profiles.json");
+    const leasePath = path.join(stateDir, "subagent-provider-leases.json");
+    assert.equal(fs.existsSync(profilePath), false);
+    assert.equal(fs.existsSync(leasePath), false);
+    fs.symlinkSync(path.join(root, "missing-profile"), profilePath);
+    fs.symlinkSync(path.join(root, "missing-lease"), leasePath);
+    const brokenDoctor = invokeCli(agentDir, ["doctor"]);
+    assert.notEqual(brokenDoctor.status, 0);
+    assert.match(brokenDoctor.stderr, /Provider profiles invalid: .*symlinked provider profile target/);
+    assert.match(brokenDoctor.stderr, /Provider leases invalid: .*symlinked provider lease target/);
+    fs.rmSync(profilePath);
+    fs.rmSync(leasePath);
+
+    const outside = path.join(root, "state-outside");
+    fs.renameSync(stateDir, outside);
+    fs.symlinkSync(outside, stateDir);
+    const parentDoctor = invokeCli(agentDir, ["doctor"]);
+    assert.notEqual(parentDoctor.status, 0);
+    assert.match(parentDoctor.stderr, /Provider profiles invalid: .*symlinked configuration parent/);
+    assert.match(parentDoctor.stderr, /Provider leases invalid: .*symlinked configuration parent/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("provider backup failure occurs before activation or apply configuration mutation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-provider-backup-order-"));
+  const activationAgent = path.join(root, "activation");
+  const applyAgent = path.join(root, "apply");
+  const originalWrite = fs.writeFileSync;
+  try {
+    for (const agentDir of [activationAgent, applyAgent]) {
+      fs.mkdirSync(agentDir, { recursive: true });
+      fs.writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ unrelated: true }));
+    }
+    const activationSettings = fs.readFileSync(path.join(activationAgent, "settings.json"));
+    fs.writeFileSync = function(file, ...args) {
+      if (String(file).includes("subagent-backups")) throw new Error("injected backup failure");
+      return originalWrite.call(this, file, ...args);
+    };
+    assert.throws(() => activateProviderProfile({ agentDir: activationAgent, provider: "openai" }), /injected backup failure/);
+    assert.deepEqual(fs.readFileSync(path.join(activationAgent, "settings.json")), activationSettings);
+    assert.equal(fs.existsSync(path.join(activationAgent, "zenpi", "subagent-provider-profiles.json")), false);
+    fs.writeFileSync = originalWrite;
+
+    activateProviderProfile({ agentDir: applyAgent, provider: "openai" });
+    const profilePath = path.join(applyAgent, "zenpi", "subagent-provider-profiles.json");
+    const settingsPath = path.join(applyAgent, "settings.json");
+    const profileBefore = fs.readFileSync(profilePath);
+    const settingsBefore = fs.readFileSync(settingsPath);
+    const roles = structuredClone(readSubagentState(applyAgent).roles);
+    roles.worker.model = "openai/worker";
+    fs.writeFileSync = function(file, ...args) {
+      if (String(file).includes("subagent-backups")) throw new Error("injected backup failure");
+      return originalWrite.call(this, file, ...args);
+    };
+    assert.throws(() => applyProviderConfiguration({ agentDir: applyAgent, provider: "openai", roles }), /injected backup failure/);
+    assert.deepEqual(fs.readFileSync(profilePath), profileBefore);
+    assert.deepEqual(fs.readFileSync(settingsPath), settingsBefore);
+  } finally {
+    fs.writeFileSync = originalWrite;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("provider leases allow same provider and block a different live provider", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-provider-leases-"));
+  try {
+    const first = "b".repeat(48), second = "c".repeat(48), third = "d".repeat(48);
+    assert.equal(registerOrRefreshProviderLease({ agentDir: root, token: first, provider: "openai" }).blocked, false);
+    assert.equal(registerOrRefreshProviderLease({ agentDir: root, token: second, provider: "openai" }).blocked, false);
+    const blocked = registerOrRefreshProviderLease({ agentDir: root, token: third, provider: "openrouter" });
+    assert.equal(blocked.blocked, true); assert.equal(blocked.conflictProvider, "openai");
+    assert.equal(releaseProviderLease({ agentDir: root, token: first }), true);
+    assert.equal(releaseProviderLease({ agentDir: root, token: first }), false);
+    assert.equal(releaseProviderLease({ agentDir: root, token: second }), true);
+    assert.equal(fs.existsSync(path.join(root, "zenpi", "subagent-provider-leases.json")), false);
+    assert.equal(registerOrRefreshProviderLease({ agentDir: root, token: first, pid: 99999999, provider: "openai" }).blocked, false);
+    assert.equal(registerOrRefreshProviderLease({ agentDir: root, token: third, provider: "openrouter" }).blocked, false);
+    releaseProviderLease({ agentDir: root, token: third });
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test("zen-subagents extension runs one confirmed same-provider configuration flow", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-subagents-extension-"));
   try {
@@ -300,6 +551,7 @@ test("zen-subagents extension runs one confirmed same-provider configuration flo
     assert.deepEqual(result.settings.subagents.modelScope, { enforce: true, strict: true, allow: ["openai-codex/*"] });
     assert.equal(result.settings.subagents.agentOverrides.worker.model, "openai-codex/gpt-5.6-luna");
     assert.equal(result.settings.subagents.agentOverrides.worker.thinking, "high");
+    assert.deepEqual(result.savedProviders, ["openai-codex", "openrouter"]);
     const modelMenu = result.selections.find((item) => item.title.startsWith("worker model"));
     assert.ok(modelMenu.options.includes("gpt-5.6-luna — Luna"));
     assert.equal(modelMenu.options.some((item) => item.includes("Sonnet")), false);
@@ -307,16 +559,34 @@ test("zen-subagents extension runs one confirmed same-provider configuration flo
     assert.equal(result.config.maxSubagentSpawnsPerRun, 12);
     assert.equal(result.config.unrelated, true);
     assert.equal(result.confirmations.length, 1);
-    assert.equal(result.statusNonMutating, true);
+    assert.equal(result.statusNonMutating, false);
     assert.match(result.confirmations[0].message, /openai-codex\/\*/);
     assert.match(result.guardResult.reason, /Project .*project.*settings\.json replaces ZenPi/);
     assert.match(result.explicitCwdGuardResult.reason, /Project .*other-project.*settings\.json replaces ZenPi/);
     assert.match(result.gitRootGuardResult.reason, /Project .*monorepo.*settings\.json replaces ZenPi/);
     assert.match(result.workflowCwdGuardResult.reason, /cannot verify provider policy for file-authored workflows/);
-    assert.ok(result.notifications.some((item) => item.message.includes("Run /reload")));
+    assert.ok(result.notifications.some((item) => item.message === "ctx.reload"));
+    const status = result.notifications.find((item) => item.message.includes("Saved providers: openai-codex, openrouter"));
+    assert.match(status.message, /Provider: openai-codex/);
+    assert.match(status.message, /Profile: saved/);
+    assert.match(status.message, /Model scope: openai-codex\/\* \(strict\)/);
+    assert.match(status.message, /Global capacity:/);
+    assert.match(status.message, /Active provider roles:/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("runtime fingerprint remains latched until a fresh post-reload session start", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-subagents-runtime-"));
+  try {
+    const result = runSubagentsRuntimeHarness(path.join(root, "agent"));
+    assert.match(result.preReloadGuard.reason, /runtime is not yet aligned/);
+    assert.equal(result.postReloadGuard, undefined);
+    assert.match(result.externalDriftGuard.reason, /runtime is not yet aligned/);
+    assert.equal(result.providerSwitchReloads, 1);
+    assert.equal(result.sameProviderReloads, 0);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 test("platform launchers invoke Node directly", () => {
@@ -332,7 +602,22 @@ test("showcase site is self-contained and Pages-ready", () => {
   const html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
   const css = fs.readFileSync(path.join(siteDir, "styles.css"), "utf8");
   const cycle = fs.readFileSync(path.join(siteDir, "cycle.js"), "utf8");
+  const svg = fs.readFileSync(path.join(siteDir, "self-improvement-loop.svg"), "utf8");
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
+
+  assert.match(svg, /viewBox="0 0 640 900"/);
+  const fontSizes = [...svg.matchAll(/font-size="(\d+)"/g)].map((match) => Number(match[1]));
+  assert.ok(fontSizes.length > 0 && Math.min(...fontSizes) >= 22);
+  assert.equal((svg.match(/<title\b/g) || []).length, 1);
+  assert.equal((svg.match(/<desc\b/g) || []).length, 1);
+  assert.match(svg, /verification-failure-return/);
+  assert.match(svg, /later-evidence-review-return/);
+  assert.doesNotMatch(svg.replace('xmlns="http://www.w3.org/2000/svg"', ""), /<script|<foreignObject|<image|<animate|\bhref=|https?:|data:image|@import|@font-face/i);
+  assert.match(readme, /src="site\/self-improvement-loop\.svg"/);
+  assert.match(readme, /alt="[^"]*failure[^"]*later evidence[^"]*human review/i);
+  assert.doesNotMatch(readme, /notice → qualify/);
+  assert.ok(JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).files.includes("site/self-improvement-loop.svg"));
 
   assert.match(html, /<html lang="en">/);
   assert.match(html, /name="viewport"/);
@@ -348,7 +633,10 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /Provider-safe delegation/);
   assert.match(html, /<code>\/zen-subagents<\/code>/);
   assert.match(html, /allowed · same provider/);
-  assert.match(html, /blocked · different provider/);
+  assert.match(html, /different-provider child execution is blocked/);
+  assert.match(html, /openrouter/);
+  assert.match(html, /active · restored/);
+  assert.match(html, /Global capacity/);
   assert.match(html, /cumulative children/);
   assert.match(html, /active top-level runs/);
   assert.match(html, /Budgets do not control modern/);
@@ -366,7 +654,7 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.doesNotMatch(html, /cycle-charts|cycle-orbit|gate-outcomes/);
   assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
-  assert.match(html, /Stable <code>v0\.5\.0<\/code> adds provider-safe subagent configuration/);
+  assert.match(html, /Stable <code>v0\.6\.0<\/code> adds persistent exact-provider subagent profiles/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
@@ -1564,6 +1852,11 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     customizedConfig.maxSubagentDepth = 3;
     customizedConfig.unrelated = "preserved";
     fs.writeFileSync(subagentConfigPath, `${JSON.stringify(customizedConfig, null, 2)}\n`);
+    const lifecycleLease = "7".repeat(48);
+    activateProviderProfile({ agentDir, provider: "openai-codex", leaseToken: lifecycleLease });
+    releaseProviderLease({ agentDir, token: lifecycleLease });
+    const providerProfilePath = path.join(agentDir, "zenpi", "subagent-provider-profiles.json");
+    const providerProfileBytes = fs.readFileSync(providerProfilePath);
 
     // Simulate ownership retired by a future ZenPi version.
     const retiredFile = path.join(agentDir, "extensions", "retired.ts");
@@ -1647,6 +1940,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(fs.existsSync(legacyTool), false);
     assert.equal(fs.existsSync(legacyMarker), false);
     assert.equal(fs.existsSync(retiredFile), false);
+    assert.deepEqual(fs.readFileSync(providerProfilePath), providerProfileBytes);
 
     const validCustomizedDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
     assert.equal(validCustomizedDoctor.status, 0, validCustomizedDoctor.stderr);
@@ -1663,6 +1957,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     fs.writeFileSync(retainedWishlist, '{"local":"evidence"}\n', { mode: 0o600 });
     const uninstall = runCli(agentDir, "uninstall", "--yes");
     assert.match(uninstall.stdout, /local wishlist state\/archives were preserved/);
+    assert.match(uninstall.stdout, /provider profiles were (?:also )?preserved/i);
+    assert.deepEqual(fs.readFileSync(providerProfilePath), providerProfileBytes);
     assert.equal(fs.readFileSync(retainedWishlist, "utf8"), '{"local":"evidence"}\n');
 
     const restored = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
@@ -1693,6 +1989,11 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+
+    runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
+    assert.deepEqual(fs.readFileSync(providerProfilePath), providerProfileBytes);
+    const reinstallDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+    assert.equal(reinstallDoctor.status, 0, reinstallDoctor.stderr);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -20,6 +20,9 @@ export const CAPACITY_DEFAULTS = Object.freeze({
 export const THINKING_LEVELS = Object.freeze(["off", "minimal", "low", "medium", "high"]);
 export const SUPPORTED_ROLES = Object.freeze(Object.keys(ROLE_DEFAULTS));
 
+const MODEL_REF_MAX_LENGTH = 1024;
+const LEAF_BACKUP_MAX_BYTES = 256 * 1024;
+
 const CAPACITY_BOUNDS = Object.freeze({
   maxSubagentSpawnsPerRun: Object.freeze({ min: 1, max: 1000 }),
   maxSubagentSpawnsPerSession: Object.freeze({ min: 0, max: 10000 }),
@@ -108,6 +111,8 @@ export function configurationPaths(agentDir) {
     stateDir: path.join(root, "zenpi"),
     lockPath: path.join(root, "zenpi", "install.lock"),
     backupDir: path.join(root, "zenpi", "subagent-backups"),
+    profilePath: path.join(root, "zenpi", "subagent-provider-profiles.json"),
+    leasePath: path.join(root, "zenpi", "subagent-provider-leases.json"),
   };
 }
 
@@ -138,13 +143,15 @@ function assertNotSymlink(file, label) {
 }
 
 function assertSafeConfigurationPaths(paths) {
-  for (const file of [paths.settingsPath, paths.configPath, paths.lockPath, paths.backupDir]) {
+  for (const file of [paths.settingsPath, paths.configPath, paths.lockPath, paths.backupDir, paths.profilePath, paths.leasePath]) {
     assertSafeParentComponents(file, paths.agentDir);
   }
   assertNotSymlink(paths.settingsPath, "configuration target");
   assertNotSymlink(paths.configPath, "configuration target");
   assertNotSymlink(paths.lockPath, "lock target");
   assertNotSymlink(paths.backupDir, "backup directory");
+  assertNotSymlink(paths.profilePath, "provider profile target");
+  assertNotSymlink(paths.leasePath, "provider lease target");
 }
 
 function processState(pid) {
@@ -226,6 +233,9 @@ export function splitModelRef(value) {
 }
 
 export function validateRoleModel(value, provider) {
+  if (typeof value !== "string" || value.length > MODEL_REF_MAX_LENGTH) {
+    throw new Error(`Model references must be strings no longer than ${MODEL_REF_MAX_LENGTH} characters.`);
+  }
   const parsed = splitModelRef(value);
   if (!parsed) throw new Error(`Invalid model reference: ${String(value)}`);
   if (!parsed.inherit && parsed.provider !== provider) {
@@ -323,10 +333,13 @@ function pruneBackups(directory, keep = 5) {
 }
 
 function writeLeafBackup(paths, before, after, reason) {
+  const value = { schema: 1, createdAt: new Date().toISOString(), reason, before, after };
+  const bytes = Buffer.byteLength(`${JSON.stringify(value, null, 2)}\n`);
+  if (bytes > LEAF_BACKUP_MAX_BYTES) throw new Error(`Subagent leaf backup exceeds its ${LEAF_BACKUP_MAX_BYTES}-byte limit.`);
   fs.mkdirSync(paths.backupDir, { recursive: true, mode: 0o700 });
   const stamp = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
   const file = path.join(paths.backupDir, `${stamp}-${process.pid}.json`);
-  writeJson(file, { schema: 1, createdAt: new Date().toISOString(), reason, before, after }, 0o600);
+  writeJson(file, value, 0o600);
   pruneBackups(paths.backupDir);
   return file;
 }
@@ -430,5 +443,360 @@ export function formatSubagentStatus(state, provider, availableValues = undefine
   for (const role of SUPPORTED_ROLES) lines.push(`  ${role}: ${state.roles[role].model} · ${state.roles[role].thinking}`);
   const stale = provider ? staleRoleModels(state.roles, provider, availableValues) : [];
   if (stale.length) lines.push(`Reconfigure stale roles: ${stale.map((item) => `${item.role} (${item.model})`).join(", ")}`);
+  return lines.join("\n");
+}
+
+const PROFILE_SCHEMA = 1;
+const PROFILE_MAX_BYTES = 256 * 1024;
+const LEASE_MAX_BYTES = 64 * 1024;
+const MAX_PROVIDERS = 64;
+
+function exactKeys(value, allowed, label) {
+  const keys = Object.keys(value);
+  const unexpected = keys.filter((key) => !allowed.includes(key));
+  if (unexpected.length) throw new Error(`${label} contains unsupported keys: ${unexpected.join(", ")}`);
+}
+
+function validateProviderId(provider) {
+  if (typeof provider !== "string" || provider !== provider.trim() || !provider || provider.length > 128 || provider.includes("/") || provider.includes("*") || /[\x00-\x1f\x7f]/.test(provider)) {
+    throw new Error(`Invalid exact provider ID: ${String(provider)}`);
+  }
+  return provider;
+}
+
+function canonicalTimestamp(value, label) {
+  if (typeof value !== "string" || value.length > 40 || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
+    throw new Error(`${label} must be a canonical ISO timestamp.`);
+  }
+  return value;
+}
+
+export function validateProviderProfiles(value) {
+  if (!isRecord(value)) throw new Error("Provider profile state must be an object.");
+  exactKeys(value, ["schema", "providers"], "Provider profile state");
+  if (value.schema !== PROFILE_SCHEMA || !isRecord(value.providers)) throw new Error("Unsupported provider profile schema.");
+  const entries = Object.entries(value.providers);
+  if (entries.length > MAX_PROVIDERS) throw new Error(`Provider profiles are limited to ${MAX_PROVIDERS} providers.`);
+  const providers = Object.create(null);
+  for (const [provider, record] of entries) {
+    validateProviderId(provider);
+    if (!isRecord(record)) throw new Error(`Profile '${provider}' must be an object.`);
+    exactKeys(record, ["updatedAt", "origin", "roles"], `Profile '${provider}'`);
+    canonicalTimestamp(record.updatedAt, `Profile '${provider}' updatedAt`);
+    if (!["default", "configured", "migrated", "reset"].includes(record.origin)) throw new Error(`Profile '${provider}' has an invalid origin.`);
+    if (!isRecord(record.roles)) throw new Error(`Profile '${provider}' roles must be an object.`);
+    exactKeys(record.roles, SUPPORTED_ROLES, `Profile '${provider}' roles`);
+    if (Object.keys(record.roles).length !== SUPPORTED_ROLES.length) throw new Error(`Profile '${provider}' must contain every supported role.`);
+    const roles = Object.create(null);
+    for (const role of SUPPORTED_ROLES) {
+      const fields = record.roles[role];
+      if (!isRecord(fields)) throw new Error(`Profile '${provider}' role '${role}' must be an object.`);
+      exactKeys(fields, ["model", "thinking"], `Profile '${provider}' role '${role}'`);
+      if (Object.keys(fields).length !== 2) throw new Error(`Profile '${provider}' role '${role}' must contain model and thinking.`);
+      roles[role] = { model: validateRoleModel(fields.model, provider), thinking: validateThinking(fields.thinking) };
+    }
+    Object.defineProperty(providers, provider, { value: { updatedAt: record.updatedAt, origin: record.origin, roles }, enumerable: true, writable: true, configurable: true });
+  }
+  const canonical = { schema: PROFILE_SCHEMA, providers };
+  const bytes = Buffer.byteLength(`${JSON.stringify(canonical, null, 2)}\n`);
+  if (bytes > PROFILE_MAX_BYTES) throw new Error(`Provider profile state exceeds its ${PROFILE_MAX_BYTES}-byte limit.`);
+  return canonical;
+}
+
+function boundedRawBytes(file, maxBytes, fallback = undefined) {
+  let stat;
+  try { stat = fs.lstatSync(file); }
+  catch (error) { if (error.code === "ENOENT") return clone(fallback); throw error; }
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`ZenPi refuses an unsafe state target: ${file}`);
+  if (stat.size > maxBytes) throw new Error(`ZenPi state file exceeds its ${maxBytes}-byte limit: ${file}`);
+  return fs.readFileSync(file);
+}
+
+function boundedJson(file, maxBytes, fallback) {
+  const bytes = boundedRawBytes(file, maxBytes);
+  if (bytes === undefined) return clone(fallback);
+  try { return JSON.parse(bytes.toString("utf8")); } catch (error) { throw new Error(`Cannot parse ${file}: ${error.message}`); }
+}
+
+export function readProviderProfiles(agentDir) {
+  const paths = configurationPaths(agentDir);
+  assertSafeParentComponents(paths.profilePath, paths.agentDir);
+  assertNotSymlink(paths.profilePath, "provider profile target");
+  return validateProviderProfiles(boundedJson(paths.profilePath, PROFILE_MAX_BYTES, { schema: PROFILE_SCHEMA, providers: {} }));
+}
+
+export function profileForProvider(profiles, provider) {
+  validateProviderId(provider);
+  return profiles?.providers && Object.hasOwn(profiles.providers, provider) ? clone(profiles.providers[provider]) : undefined;
+}
+
+function defaultRoles() { return clone(ROLE_DEFAULTS); }
+function makeProfile(roles, provider, origin = "configured", now = new Date().toISOString()) {
+  const record = { updatedAt: now, origin, roles: {} };
+  for (const role of SUPPORTED_ROLES) record.roles[role] = { model: validateRoleModel(roles[role].model, provider), thinking: validateThinking(roles[role].thinking) };
+  return record;
+}
+
+function legacyRoles(state) {
+  const roles = {};
+  const providers = new Set();
+  for (const role of SUPPORTED_ROLES) {
+    const modelLeaf = readPath(state.settings, ["subagents", "agentOverrides", role, "model"]);
+    const thinkingLeaf = readPath(state.settings, ["subagents", "agentOverrides", role, "thinking"]);
+    const fields = {
+      model: modelLeaf.exists ? modelLeaf.value : ROLE_DEFAULTS[role].model,
+      thinking: thinkingLeaf.exists ? thinkingLeaf.value : ROLE_DEFAULTS[role].thinking,
+    };
+    if (typeof fields.thinking !== "string") return { diagnostic: `Legacy role '${role}' has a non-string thinking level.` };
+    try { validateThinking(fields.thinking); }
+    catch { return { diagnostic: `Legacy role '${role}' has an unsupported thinking level.` }; }
+    if (typeof fields.model !== "string") return { diagnostic: `Legacy role '${role}' has a non-string model reference.` };
+    const parsed = splitModelRef(fields.model);
+    if (!parsed || fields.model.length > MODEL_REF_MAX_LENGTH) return { diagnostic: `Legacy role '${role}' has a non-canonical model reference.` };
+    if (!parsed.inherit) providers.add(parsed.provider);
+    roles[role] = clone(fields);
+  }
+  if (providers.size > 1) return { diagnostic: "Legacy builtin roles contain mixed providers; run /zen-subagents to repair them explicitly." };
+  return { roles, inferredProvider: [...providers][0] };
+}
+
+export function migrateLegacyProfile(state, activeProvider) {
+  validateProviderId(activeProvider);
+  const legacy = legacyRoles(state);
+  if (legacy.diagnostic) return { state: "migration-needed", diagnostic: legacy.diagnostic };
+  const inferred = legacy.inferredProvider || activeProvider;
+  for (const role of SUPPORTED_ROLES) {
+    try { validateRoleModel(legacy.roles[role].model, inferred); } catch (error) { return { state: "migration-needed", diagnostic: error.message }; }
+  }
+  const providers = Object.create(null);
+  Object.defineProperty(providers, inferred, { value: makeProfile(legacy.roles, inferred, "migrated"), enumerable: true, writable: true });
+  if (inferred !== activeProvider) Object.defineProperty(providers, activeProvider, { value: makeProfile(defaultRoles(), activeProvider, "default"), enumerable: true, writable: true });
+  return { state: "migrated", profiles: { schema: PROFILE_SCHEMA, providers }, inferredProvider: inferred };
+}
+
+function readLeaseState(paths) {
+  const value = boundedJson(paths.leasePath, LEASE_MAX_BYTES, { schema: 1, leases: [] });
+  if (!isRecord(value)) throw new Error("Provider lease state must be an object.");
+  exactKeys(value, ["schema", "leases"], "Provider lease state");
+  if (value.schema !== 1 || !Array.isArray(value.leases) || value.leases.length > 128) throw new Error("Malformed provider lease state.");
+  const seen = new Set();
+  for (const lease of value.leases) {
+    if (!isRecord(lease)) throw new Error("Malformed provider lease record.");
+    exactKeys(lease, ["token", "pid", "provider", "updatedAt"], "Provider lease record");
+    if (typeof lease.token !== "string" || !/^[a-f0-9]{32,128}$/.test(lease.token) || seen.has(lease.token)) throw new Error("Malformed provider lease token.");
+    seen.add(lease.token);
+    if (!Number.isSafeInteger(lease.pid) || lease.pid <= 0) throw new Error("Malformed provider lease PID.");
+    validateProviderId(lease.provider);
+    canonicalTimestamp(lease.updatedAt, "Provider lease updatedAt");
+  }
+  return value;
+}
+
+export function readProviderLeases(agentDir) {
+  const paths = configurationPaths(agentDir);
+  assertSafeParentComponents(paths.leasePath, paths.agentDir);
+  assertNotSymlink(paths.leasePath, "provider lease target");
+  return clone(readLeaseState(paths));
+}
+
+function liveLeases(leases) {
+  const kept = [];
+  for (const lease of leases) {
+    const state = processState(lease.pid);
+    if (state === "active") kept.push(lease);
+  }
+  return kept;
+}
+
+function writeLeases(paths, value) {
+  assertSafeParentComponents(paths.leasePath, paths.agentDir); assertNotSymlink(paths.leasePath, "provider lease target");
+  if (!value.leases.length) fs.rmSync(paths.leasePath, { force: true });
+  else writeJson(paths.leasePath, value, existingMode(paths.leasePath, 0o600));
+}
+
+function registerLeaseLocked(paths, { token, pid = process.pid, provider }) {
+  validateProviderId(provider);
+  if (typeof token !== "string" || !/^[a-f0-9]{32,128}$/.test(token)) throw new Error("Invalid provider lease token.");
+  const initialBytes = boundedRawBytes(paths.leasePath, LEASE_MAX_BYTES);
+  const state = readLeaseState(paths);
+  const leases = liveLeases(state.leases);
+  const verifyBytes = boundedRawBytes(paths.leasePath, LEASE_MAX_BYTES);
+  if (initialBytes === undefined ? verifyBytes !== undefined : verifyBytes === undefined || !verifyBytes.equals(initialBytes)) throw new Error("Provider lease state changed during recovery.");
+  const conflicts = [...new Set(leases.filter((item) => item.token !== token && item.provider !== provider).map((item) => item.provider))];
+  if (conflicts.length) {
+    const withoutObsoleteToken = leases.filter((item) => item.token !== token);
+    if (withoutObsoleteToken.length !== leases.length) writeLeases(paths, { schema: 1, leases: withoutObsoleteToken });
+    return { blocked: true, conflictProvider: conflicts[0], changed: false };
+  }
+  const now = new Date().toISOString();
+  const next = leases.filter((item) => item.token !== token);
+  next.push({ token, pid, provider, updatedAt: now });
+  writeLeases(paths, { schema: 1, leases: next });
+  return { blocked: false, changed: true };
+}
+
+export function registerOrRefreshProviderLease({ agentDir, token, pid = process.pid, provider }) {
+  const paths = configurationPaths(agentDir); assertSafeConfigurationPaths(paths); const release = acquireZenPiLock(agentDir);
+  try { return registerLeaseLocked(paths, { token, pid, provider }); } finally { release(); }
+}
+
+export function releaseProviderLease({ agentDir, token }) {
+  const paths = configurationPaths(agentDir); assertSafeConfigurationPaths(paths); const release = acquireZenPiLock(agentDir);
+  try {
+    const before = boundedRawBytes(paths.leasePath, LEASE_MAX_BYTES);
+    if (before === undefined) return false;
+    const state = readLeaseState(paths);
+    const next = state.leases.filter((item) => item.token !== token);
+    if (next.length === state.leases.length) return false;
+    const verify = boundedRawBytes(paths.leasePath, LEASE_MAX_BYTES);
+    if (verify === undefined || !verify.equals(before)) throw new Error("Provider lease state was substituted during release.");
+    writeLeases(paths, { schema: 1, leases: next }); return true;
+  } finally { release(); }
+}
+
+function controlledRoles(settings) {
+  const roles = {};
+  for (const role of SUPPORTED_ROLES) {
+    const value = readPath(settings, ["subagents", "agentOverrides", role]).value;
+    roles[role] = { model: typeof value?.model === "string" ? value.model : ROLE_DEFAULTS[role].model, thinking: typeof value?.thinking === "string" ? value.thinking : ROLE_DEFAULTS[role].thinking };
+  }
+  return roles;
+}
+
+function mirrorProfile(settings, profile, provider) {
+  setPath(settings, ["subagents", "modelScope"], providerScope(provider));
+  for (const role of SUPPORTED_ROLES) {
+    setPath(settings, ["subagents", "agentOverrides", role, "model"], profile.roles[role].model);
+    setPath(settings, ["subagents", "agentOverrides", role, "thinking"], profile.roles[role].thinking);
+  }
+}
+
+function runtimeFingerprint(provider, profile, settings) {
+  return JSON.stringify({
+    provider,
+    profile,
+    mirror: { modelScope: readPath(settings, ["subagents", "modelScope"]).value, roles: controlledRoles(settings) },
+  });
+}
+
+function restoreFile(file, bytes, mode) { if (bytes === undefined) fs.rmSync(file, { force: true }); else atomicWrite(file, bytes, mode); }
+function serializedBytes(value) { return Buffer.from(`${JSON.stringify(value, null, 2)}\n`); }
+function fileWillChange(item) { return item.before === undefined || !serializedBytes(item.value).equals(item.before); }
+function logicalWrite(files) {
+  const changed = [];
+  try {
+    for (const item of files) {
+      const next = serializedBytes(item.value);
+      if (item.before !== undefined && next.equals(item.before)) continue;
+      atomicWrite(item.file, next, item.mode); changed.push(item);
+      const check = item.maxBytes
+        ? boundedRawBytes(item.file, item.maxBytes)
+        : fs.readFileSync(item.file);
+      if (check === undefined || !check.equals(next)) throw new Error(`Verification failed for ${item.file}`);
+    }
+  } catch (error) {
+    try { for (const item of changed.reverse()) restoreFile(item.file, item.before, item.mode); } catch (rollback) { throw new Error(`${error.message}; rollback failed: ${rollback.message}`); }
+    throw error;
+  }
+  return changed.length > 0;
+}
+
+function loadProfilesForChange(paths, state, provider, repairLegacy = false) {
+  const profileBefore = boundedRawBytes(paths.profilePath, PROFILE_MAX_BYTES);
+  if (profileBefore !== undefined) return { profiles: readProviderProfiles(paths.agentDir), profileBefore, migrated: false };
+  const migration = migrateLegacyProfile(state, provider);
+  if (migration.state === "migration-needed") {
+    if (!repairLegacy) return migration;
+    return { profiles: { schema: PROFILE_SCHEMA, providers: Object.create(null) }, profileBefore, migrated: false, repaired: true };
+  }
+  return { profiles: migration.profiles, profileBefore, migrated: true };
+}
+
+function activateLocked({ paths, provider, leaseToken, reason = "activation", availableValues }) {
+  validateProviderId(provider);
+  const state = readSubagentState(paths.agentDir);
+  const loaded = loadProfilesForChange(paths, state, provider);
+  if (loaded.state === "migration-needed") return { ...loaded, changed: false };
+  const profiles = loaded.profiles;
+  if (leaseToken) {
+    const lease = registerLeaseLocked(paths, { token: leaseToken, provider });
+    if (lease.blocked) return { state: "blocked", changed: false, conflictProvider: lease.conflictProvider };
+  }
+  let profile = profileForProvider(profiles, provider);
+  let profileCreated = false;
+  if (!profile) {
+    if (Object.keys(profiles.providers).length >= MAX_PROVIDERS) throw new Error(`Provider profiles are limited to ${MAX_PROVIDERS} providers.`);
+    profile = makeProfile(defaultRoles(), provider, "default"); profiles.providers[provider] = profile; profileCreated = true;
+  }
+  const settings = clone(state.settings); mirrorProfile(settings, profile, provider);
+  const files = [
+    { file: paths.profilePath, value: validateProviderProfiles(profiles), before: loaded.profileBefore, mode: existingMode(paths.profilePath, 0o600), maxBytes: PROFILE_MAX_BYTES },
+    { file: paths.settingsPath, value: settings, before: fs.existsSync(paths.settingsPath) ? fs.readFileSync(paths.settingsPath) : undefined, mode: existingMode(paths.settingsPath, 0o600) },
+  ];
+  const predictedChange = files.some(fileWillChange);
+  const backup = predictedChange
+    ? writeLeafBackup(paths, controlledSnapshot(state.settings, state.config), controlledSnapshot(settings, state.config), `${reason}:${provider}`)
+    : undefined;
+  const changed = logicalWrite(files);
+  const staleRoles = staleProfileRoles(profile, provider, availableValues);
+  return { state: staleRoles.length ? "stale" : (profile.origin === "default" ? "default" : "saved"), changed, backup, profileCreated, migrated: loaded.migrated, mirrorChanged: JSON.stringify(controlledRoles(state.settings)) !== JSON.stringify(profile.roles) || !isSafeProviderScope(state.modelScope, provider), profile: clone(profile), providers: Object.keys(profiles.providers).sort(), staleRoles, reason, fingerprint: runtimeFingerprint(provider, profile, settings) };
+}
+
+export function activateProviderProfile({ agentDir, provider, leaseToken, reason, availableValues }) {
+  const paths = configurationPaths(agentDir); assertSafeConfigurationPaths(paths); const release = acquireZenPiLock(agentDir);
+  try { return activateLocked({ paths, provider, leaseToken, reason, availableValues }); } finally { release(); }
+}
+
+export function applyProviderConfiguration({ agentDir, provider, roles, capacity, leaseToken, reset = false, repairLegacy = false, reason = "configure" }) {
+  const paths = configurationPaths(agentDir); assertSafeConfigurationPaths(paths); const release = acquireZenPiLock(agentDir);
+  try {
+    validateProviderId(provider);
+    const state = readSubagentState(paths.agentDir);
+    const loaded = loadProfilesForChange(paths, state, provider, repairLegacy);
+    if (loaded.state === "migration-needed") return { ...loaded, changed: false };
+    const profiles = loaded.profiles;
+    const beforeProfile = profileForProvider(profiles, provider);
+    const nextRoles = reset ? defaultRoles() : clone(roles || beforeProfile?.roles || defaultRoles());
+    profiles.providers[provider] = makeProfile(nextRoles, provider, reset ? "reset" : "configured");
+    const settings = clone(state.settings); mirrorProfile(settings, profiles.providers[provider], provider);
+    const config = clone(state.config);
+    if (!reset && capacity) for (const name of Object.keys(CAPACITY_DEFAULTS)) if (Object.hasOwn(capacity, name)) config[name] = validateCapacity(name, capacity[name]);
+    const configBefore = fs.existsSync(paths.configPath) ? fs.readFileSync(paths.configPath) : undefined;
+    const files = [
+      { file: paths.profilePath, value: validateProviderProfiles(profiles), before: loaded.profileBefore, mode: existingMode(paths.profilePath), maxBytes: PROFILE_MAX_BYTES },
+      { file: paths.settingsPath, value: settings, before: fs.existsSync(paths.settingsPath) ? fs.readFileSync(paths.settingsPath) : undefined, mode: existingMode(paths.settingsPath) },
+    ];
+    if (configBefore !== undefined || (!reset && capacity)) files.push({ file: paths.configPath, value: config, before: configBefore, mode: existingMode(paths.configPath) });
+    if (leaseToken) {
+      const lease = registerLeaseLocked(paths, { token: leaseToken, provider });
+      if (lease.blocked) return { state: "blocked", changed: false, conflictProvider: lease.conflictProvider };
+    }
+    const changed = files.some(fileWillChange);
+    const before = controlledSnapshot(state.settings, state.config);
+    const after = controlledSnapshot(settings, config);
+    const backup = changed ? writeLeafBackup(paths, before, after, `${reason}:${provider}`) : undefined;
+    logicalWrite(files);
+    return { state: "saved", changed, backup, profile: clone(profiles.providers[provider]), providers: Object.keys(profiles.providers).sort(), staleRoles: [] };
+  } finally { release(); }
+}
+
+export function staleProfileRoles(profile, provider, availableValues) { return staleRoleModels(profile?.roles || {}, provider, availableValues); }
+
+export function formatProviderSubagentStatus(result, state, provider, availableValues) {
+  const stale = result?.staleRoles || staleRoleModels(result?.profile?.roles || state.roles, provider, availableValues);
+  const lines = [
+    `Provider: ${provider}`,
+    `Profile: ${result?.state || "migration-needed"}`,
+    `Model scope: ${isSafeProviderScope(state.modelScope, provider) ? `${provider}/* (strict)` : "needs synchronization"}`,
+    `Saved providers: ${(result?.providers || []).join(", ") || "none"}`,
+    "Global capacity:",
+    `  Run child budget: ${state.capacity.maxSubagentSpawnsPerRun}`,
+    `  Session child budget: ${state.capacity.maxSubagentSpawnsPerSession}`,
+    `  Active top-level async runs: ${state.capacity.maxActiveAsyncRunsPerSession}`,
+    "Active provider roles:",
+  ];
+  const roles = result?.profile?.roles || state.roles;
+  for (const role of SUPPORTED_ROLES) lines.push(`  ${role}: ${roles[role].model} · ${roles[role].thinking}`);
+  if (stale.length) lines.push(`Stale roles: ${stale.map((x) => `${x.role} (${x.model})`).join(", ")}`);
   return lines.join("\n");
 }
