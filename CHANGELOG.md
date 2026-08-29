@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-08-29
 
 - Add a native Windows command launcher and Windows-safe executable discovery for `pi.cmd`, `npm.cmd`, and access-restricted Windows App Execution Aliases such as `winget.exe`.
 - Invoke `.cmd`/`.bat` shims as a single quoted `ComSpec` command, avoiding Node's deprecated shell-plus-arguments path.

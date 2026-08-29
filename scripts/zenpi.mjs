@@ -349,7 +349,7 @@ async function chooseOptionalTools(options) {
   const selected = [];
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
-    console.log("\nOptional tools (external system changes; not removed by ZenPi uninstall):");
+    console.log("\nOptional tools (managed downloads are removed on uninstall; Winget/global npm installs are not):");
     for (const tool of missing) {
       const spec = optionalToolInstallSpec(tool);
       if (spec.unavailable) {
