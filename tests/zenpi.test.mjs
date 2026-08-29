@@ -555,6 +555,8 @@ test("provider leases allow same provider and block a different live provider", 
 });
 
 test("UI prompt refresh flushes one immediate TUI frame and cleans up its invisible widget", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+  assert.equal(manifest.peerDependencies["@earendil-works/pi-coding-agent"], ">=0.84.4");
   const result = runUiRefreshHarness();
   assert.deepEqual(result.eventNames, ["session_start", "ui_prompt_start", "session_shutdown"]);
   assert.deepEqual(result.widgetCalls, [
@@ -1547,7 +1549,7 @@ test("later core failure reports external optional tools that remain installed",
   );
   writeExecutable(
     path.join(fakeBin, "pi"),
-    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi\nexit 9\n",
+    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi\nexit 9\n",
   );
 
   try {
@@ -1610,7 +1612,7 @@ test("plan previews missing Pi bootstrap without invoking npm", () => {
   try {
     const result = invokeCli(agentDir, ["plan", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], { PATH: fakeBin, ZENPI_FAKE_LOG: log });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.3 after confirmation/);
+    assert.match(result.stdout, /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.4 after confirmation/);
     assert.equal(fs.existsSync(log), false);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
   } finally {
@@ -1651,7 +1653,7 @@ test("installer bootstraps a missing pinned Pi after confirmation", () => {
   fs.mkdirSync(fakeBin, { recursive: true });
   writeExecutable(
     path.join(fakeBin, "npm"),
-    "#!/bin/sh\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi' 'printf '\"'\"'pi %s\\n'\"'\"' \"$*\" >> \"$ZENPI_FAKE_LOG\"' 'exit 0' > \"$ZENPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/pi\"\n",
+    "#!/bin/sh\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi' 'printf '\"'\"'pi %s\\n'\"'\"' \"$*\" >> \"$ZENPI_FAKE_LOG\"' 'exit 0' > \"$ZENPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/pi\"\n",
   );
   const env = { PATH: fakeBin, ZENPI_FAKE_BIN: fakeBin, ZENPI_FAKE_LOG: log };
 
@@ -1662,14 +1664,14 @@ test("installer bootstraps a missing pinned Pi after confirmation", () => {
       env,
     );
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.3 after confirmation/);
+    assert.match(result.stdout, /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.4 after confirmation/);
     const calls = fs.readFileSync(log, "utf8").trim().split("\n");
-    assert.equal(calls[0], "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.3 --no-audit --no-fund");
+    assert.equal(calls[0], "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 --no-audit --no-fund");
     assert.equal(calls.filter((line) => line.startsWith("pi install ")).length, 6);
     const manifest = JSON.parse(fs.readFileSync(path.join(agentDir, "zenpi", "manifest.json"), "utf8"));
     assert.deepEqual(
       { ...manifest.piBootstrap, installedAt: "ignored" },
-      { package: "@earendil-works/pi-coding-agent", version: "0.84.3", installedAt: "ignored", external: true },
+      { package: "@earendil-works/pi-coding-agent", version: "0.84.4", installedAt: "ignored", external: true },
     );
 
     fs.rmSync(path.join(fakeBin, "pi"));
@@ -1681,7 +1683,7 @@ test("installer bootstraps a missing pinned Pi after confirmation", () => {
     );
     assert.equal(update.status, 0, update.stderr);
     const updateCalls = fs.readFileSync(log, "utf8").trim().split("\n");
-    assert.equal(updateCalls[0], "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.3 --no-audit --no-fund");
+    assert.equal(updateCalls[0], "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 --no-audit --no-fund");
     assert.equal(updateCalls.filter((line) => line.startsWith("pi install ")).length, 6);
 
     const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
@@ -1704,7 +1706,7 @@ test("bootstrap fails actionably when npm global bin is not persistently on PATH
   fs.mkdirSync(fakeBin, { recursive: true });
   writeExecutable(
     path.join(fakeBin, "npm"),
-    "#!/bin/sh\nif [ \"$1\" = \"prefix\" ]; then echo \"$ZENPI_FAKE_PREFIX\"; exit 0; fi\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\n/bin/mkdir -p \"$ZENPI_FAKE_PREFIX/bin\"\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi' 'exit 0' > \"$ZENPI_FAKE_PREFIX/bin/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_PREFIX/bin/pi\"\n",
+    "#!/bin/sh\nif [ \"$1\" = \"prefix\" ]; then echo \"$ZENPI_FAKE_PREFIX\"; exit 0; fi\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\n/bin/mkdir -p \"$ZENPI_FAKE_PREFIX/bin\"\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi' 'exit 0' > \"$ZENPI_FAKE_PREFIX/bin/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_PREFIX/bin/pi\"\n",
   );
   const baseEnv = { PATH: fakeBin, ZENPI_FAKE_PREFIX: globalPrefix, ZENPI_FAKE_LOG: log };
 
@@ -1716,7 +1718,7 @@ test("bootstrap fails actionably when npm global bin is not persistently on PATH
     );
     assert.notEqual(first.status, 0);
     assert.ok(first.stderr.includes(`Pi was installed by npm, but ${globalBin} is not available on PATH`), first.stderr);
-    assert.match(first.stderr, /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.3 was attempted and is not rolled back automatically/);
+    assert.match(first.stderr, /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.4 was attempted and is not rolled back automatically/);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
 
     const persistentEnv = { ...baseEnv, PATH: `${globalBin}${path.delimiter}${fakeBin}` };
@@ -1745,7 +1747,7 @@ test("later bootstrap failure discloses retained external Pi", () => {
   fs.mkdirSync(fakeBin, { recursive: true });
   writeExecutable(
     path.join(fakeBin, "npm"),
-    "#!/bin/sh\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi' 'exit 9' > \"$ZENPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/pi\"\n",
+    "#!/bin/sh\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi' 'exit 9' > \"$ZENPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/pi\"\n",
   );
   try {
     const result = invokeCli(
@@ -1754,7 +1756,7 @@ test("later bootstrap failure discloses retained external Pi", () => {
       { PATH: fakeBin, ZENPI_FAKE_BIN: fakeBin },
     );
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.3 was attempted and is not rolled back automatically/);
+    assert.match(result.stderr, /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.4 was attempted and is not rolled back automatically/);
     assert.equal(fs.existsSync(path.join(fakeBin, "pi")), true);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
   } finally {
@@ -1774,7 +1776,7 @@ test("missing Pi fails before mutation when npm is unavailable", () => {
       { PATH: emptyBin },
     );
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /npm is required to install missing Pi @earendil-works\/pi-coding-agent@0\.84\.3/);
+    assert.match(result.stderr, /npm is required to install missing Pi @earendil-works\/pi-coding-agent@0\.84\.4/);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -1787,7 +1789,7 @@ test("installer rejects an incompatible Pi before mutating configuration", () =>
   const fakeBin = path.join(root, "bin");
   fs.mkdirSync(agentDir, { recursive: true });
   fs.writeFileSync(path.join(agentDir, "settings.json"), '{"kept":true}\n');
-  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.79.9\n");
+  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.3\n");
 
   try {
     const result = invokeCli(
@@ -1796,7 +1798,7 @@ test("installer rejects an incompatible Pi before mutating configuration", () =>
       { PATH: `${fakeBin}:${process.env.PATH}` },
     );
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /Pi 0\.80\.0 or newer is required; found 0\.79\.9/);
+    assert.match(result.stderr, /Pi 0\.84\.4 or newer is required; found 0\.84\.3/);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8")), { kept: true });
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
   } finally {
@@ -1852,7 +1854,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
     const fakeBin = path.join(root, "bin");
-    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.3\nexit 0\n");
+    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.4\nexit 0\n");
     const doctor = invokeCli(agentDir, ["doctor"], {
       PATH: `${fakeBin}:${process.env.PATH}`,
     });
@@ -2030,7 +2032,7 @@ test("managed browser runtime completes install, reuse update, doctor, and unins
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-browser-lifecycle-"));
   const agentDir = path.join(root, "agent");
   const fakeBin = path.join(root, "bin");
-  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.3\nexit 0\n");
+  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.4\nexit 0\n");
   installFakeBrowserNpm(fakeBin);
   const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };
   try {
@@ -2071,7 +2073,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
   const log = path.join(root, "pi.log");
   writeExecutable(
     path.join(fakeBin, "pi"),
-    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi\nprintf '%s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nexit 0\n",
+    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi\nprintf '%s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nexit 0\n",
   );
   fs.writeFileSync(shellRc, "# personal shell\n");
   const env = {
@@ -2117,7 +2119,7 @@ test("failed package installation rolls configuration back and releases the lock
   fs.writeFileSync(settingsPath, '{"untouched":true}\n');
   writeExecutable(
     path.join(fakeBin, "pi"),
-    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi\ncase \"$*\" in *pi-subagents*) exit 9;; esac\nexit 0\n",
+    "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi\ncase \"$*\" in *pi-subagents*) exit 9;; esac\nexit 0\n",
   );
   installFakeBrowserNpm(fakeBin);
   const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };

@@ -29,9 +29,9 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const VERSION = packageJson.version;
-const MIN_PI_VERSION = "0.80.0";
+const MIN_PI_VERSION = "0.84.4";
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
-const PI_PACKAGE_VERSION = "0.84.3";
+const PI_PACKAGE_VERSION = "0.84.4";
 const CLI = process.platform === "win32" ? ".\\zenpi.cmd" : "./zenpi";
 const agentDir = path.resolve(
   process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"),

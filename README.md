@@ -81,7 +81,7 @@ Trusted project `.pi/settings.json` has higher Pi precedence. ZenPi resolves the
 
 ## Install
 
-Requires Node.js 22.19+, npm, and Git. ZenPi uses an existing Pi 0.80.0+ installation; when Pi is absent, a confirmed install automatically runs npm to globally install the reviewed `@earendil-works/pi-coding-agent@0.84.3` release with lifecycle scripts disabled. Clone a reviewed release tag rather than piping remote code into a shell.
+Requires Node.js 22.19+, npm, and Git. ZenPi uses an existing Pi 0.84.4+ installation; when Pi is absent, a confirmed install automatically runs npm to globally install the reviewed `@earendil-works/pi-coding-agent@0.84.4` release with lifecycle scripts disabled. Clone a reviewed release tag rather than piping remote code into a shell.
 
 ```bash
 git clone --branch v0.6.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
