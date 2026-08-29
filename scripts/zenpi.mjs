@@ -23,6 +23,7 @@ import {
   sha256,
   upsertManagedBlock,
 } from "./lib.mjs";
+import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -42,6 +43,7 @@ const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
 const browserRuntimeMarker = path.join(browserRuntimeDir, "zenpi-runtime.json");
 const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
+const capabilityRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
 const managedToolsDir = path.join(stateDir, "optional-tools");
 const managedBinDir = path.join(stateDir, "bin");
 process.env.PATH = (process.env.PATH || "")
@@ -748,6 +750,21 @@ function managedFiles(includeShell) {
       0o644,
     ],
     [
+      path.join(repoRoot, "extensions", "tool-wishlist", "registry.mjs"),
+      path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs"),
+      0o644,
+    ],
+    [
+      path.join(repoRoot, "extensions", "tool-wishlist", "capabilities.json"),
+      path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json"),
+      0o644,
+    ],
+    [
+      path.join(repoRoot, "skills", "zenpi-improve", "SKILL.md"),
+      path.join(agentDir, "skills", "zenpi-improve", "SKILL.md"),
+      0o644,
+    ],
+    [
       path.join(repoRoot, "skills", "donsetch", "SKILL.md"),
       path.join(agentDir, "skills", "donsetch", "SKILL.md"),
       0o644,
@@ -944,6 +961,9 @@ function assertSources() {
     "browser-runtime/package-lock.json",
     "extensions/tool-wishlist/index.ts",
     "extensions/tool-wishlist/core.mjs",
+    "extensions/tool-wishlist/registry.mjs",
+    "extensions/tool-wishlist/capabilities.json",
+    "skills/zenpi-improve/SKILL.md",
     "skills/donsetch/SKILL.md",
     "themes/tea-house.json",
     "templates/AGENTS.md",
@@ -982,7 +1002,9 @@ Managed files:`);
   console.log("  strict modelScope allow = [inherit]");
   console.log("  codex-exec and codex-exec-writer disabled");
   console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
-  console.log("  capability-gap events use sanitized summaries and salted session/project hashes");
+  console.log("  capability-gap events use sanitized summaries and salted task/session/project hashes");
+  console.log("  collection requires one explicit local on/off decision and never uploads data");
+  console.log("  wishlist lifecycle decisions are explicit, append-only, and reversible");
   console.log("  isolated browser contexts never reuse the user's Chrome profile or cookies");
 
   console.log("\nManaged browser runtime:");
@@ -1314,7 +1336,8 @@ async function uninstall(options) {
     }
     retiredBrowserRuntime = undefined;
     console.log("ZenPi configuration, managed optional tools, and managed browser runtime uninstalled.");
-    console.log("Externally installed optional tools, browser artifacts, and downloaded Pi package caches were preserved.");
+    console.log("Externally installed optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved.");
+    console.log(`Wishlist state: ${stateDir}`);
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
   } catch (error) {
     const rollbackErrors = [];
@@ -1339,6 +1362,12 @@ function doctor() {
   const errors = [];
   const warnings = [];
   const settings = readJson(settingsPath, {});
+  let capabilityRegistry;
+  try {
+    capabilityRegistry = validateCapabilityRegistry(JSON.parse(fs.readFileSync(capabilityRegistryPath, "utf8")));
+  } catch (error) {
+    errors.push(`Capability registry invalid: ${error.message}`);
+  }
 
   for (const operation of desiredSettingsOperations()) {
     const current = readPath(settings, operation.path);
@@ -1397,6 +1426,15 @@ function doctor() {
   console.log(`ZenPi ${manifest.version} doctor`);
   console.log(`Agent directory: ${agentDir}`);
   if (browserSmoke) console.log(`BROWSER ${browserSmoke}`);
+  for (const capability of capabilityRegistry?.capabilities || []) {
+    for (const validator of capability.validations) {
+      if (validator === "browser-runtime-smoke" && browserSmoke) {
+        console.log(`CAPABILITY ${capability.id} verified by ${validator}`);
+      } else if (validator === "browser-runtime-smoke" && manifest.browserRuntime?.installed === false) {
+        warnings.push(`Capability ${capability.id} could not be verified because browser runtime installation was skipped`);
+      }
+    }
+  }
   for (const warning of warnings) console.warn(`WARN  ${warning}`);
   for (const error of errors) console.error(`ERROR ${error}`);
   if (errors.length) {

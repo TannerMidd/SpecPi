@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171310">
-  <meta name="description" content="ZenPi is a self-improving harness for the Pi coding agent. It turns recurring friction into a measured capability wishlist.">
+  <meta name="description" content="ZenPi turns recurring Pi capability gaps into explicit, verified, reversible improvements.">
   <meta property="og:title" content="ZenPi — Improve through use">
-  <meta property="og:description" content="A Pi harness that turns recurring friction into a measured improvement queue.">
+  <meta property="og:description" content="A human-directed improvement loop for the Pi coding agent.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ZenPi">
   <meta property="og:url" content="https://tannermidd.github.io/ZenPi/">
@@ -26,7 +26,8 @@
     </a>
     <nav aria-label="Primary navigation">
       <a href="#wishlist">The loop</a>
-      <a href="#principles">Principles</a>
+      <a href="#workings">How it works</a>
+      <a href="#goal">The goal</a>
       <a href="#install">Install</a>
       <a class="github-link" href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
@@ -37,7 +38,7 @@
       <div class="hero-copy reveal">
         <p class="eyebrow">A self-improving harness for Pi</p>
         <h1 id="hero-title">Let friction<br><em>teach the system.</em></h1>
-        <p class="hero-lede">ZenPi gives real capability gaps somewhere useful to go: a private, measured wishlist that turns repeated obstacles into the next clear improvement.</p>
+        <p class="hero-lede">ZenPi turns recurring capability gaps into one measured, human-directed improvement at a time—without quietly rewriting itself.</p>
         <div class="hero-actions">
           <a class="button button-primary" href="#wishlist">See how it learns</a>
           <a class="button button-secondary" href="https://github.com/TannerMidd/ZenPi">Explore the source <span aria-hidden="true">↗</span></a>
@@ -61,12 +62,12 @@
           <div><strong>08</strong><span>occurrences</span></div>
           <div><strong>05</strong><span>sessions</span></div>
           <div><strong>03</strong><span>projects</span></div>
-          <div><strong>high</strong><span>impact</span></div>
+          <div><strong>degraded</strong><span>impact</span></div>
         </div>
         <div class="card-footer">
-          <span>suggested fix</span>
-          <strong>tool</strong>
-          <span class="rank">01 / 06</span>
+          <span>status</span>
+          <strong>qualified</strong>
+          <span class="rank">next / 06</span>
         </div>
       </div>
     </section>
@@ -106,26 +107,55 @@
           <span class="step-number">04</span>
           <div class="step-mark" aria-hidden="true">↗</div>
           <h3>Improve</h3>
-          <p>The strongest signal becomes a tool, skill, prompt, config, or fix.</p>
+          <p>A selected signal becomes a smallest-change experiment with proof and rollback.</p>
         </li>
         <li>
           <span class="step-number">05</span>
           <div class="step-mark" aria-hidden="true">✓</div>
           <h3>Retire</h3>
-          <p>Solved gaps leave the active list. Their history remains.</p>
+          <p>Verified gaps leave the queue. Later regressions remain visible without reopening themselves.</p>
         </li>
       </ol>
+      <div class="state-line" aria-label="Explicit wishlist lifecycle">
+        <span>open</span><i>→</i><span>selected</span><i>→</i><span>retired</span>
+        <b>verification required · regression → review-needed</b>
+      </div>
     </section>
 
-    <section class="belief" aria-labelledby="belief-title">
+    <section class="mechanics" id="workings" aria-labelledby="workings-title">
+      <div class="section-intro compact">
+        <p class="eyebrow">How it works</p>
+        <h2 id="workings-title">A control loop,<br>not an autopilot.</h2>
+        <p>Evidence can recommend work. Only a person can select it, approve an implementation, or retire it.</p>
+      </div>
+      <div class="mechanic-grid">
+        <article>
+          <span>01 / signal</span>
+          <h3>Observe locally</h3>
+          <p>Collection begins only after consent. Reusable gaps are sanitized, task-deduplicated, and stored locally—never uploaded.</p>
+        </article>
+        <article>
+          <span>02 / decision</span>
+          <h3>Choose one change</h3>
+          <p><code>/wishlist next</code> surfaces qualified evidence. Selection prepares a smallest-change card with proof and rollback; it grants no edit authority.</p>
+        </article>
+        <article>
+          <span>03 / outcome</span>
+          <h3>Verify, then retire</h3>
+          <p>Direct checks and reviewed validators close the loop. New friction stays visible as a review signal without reopening itself.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="belief" id="goal" aria-labelledby="belief-title">
       <div class="belief-mark" aria-hidden="true">π</div>
       <div>
-        <p class="eyebrow">The ethos</p>
-        <h2 id="belief-title">The agent should help improve the environment it works in.</h2>
+        <p class="eyebrow">The goal</p>
+        <h2 id="belief-title">Let the environment learn from the work—without taking control from the human.</h2>
       </div>
       <div class="belief-copy">
-        <p>ZenPi does not quietly rewrite itself. It makes friction legible, preserves human judgment, and creates a practical queue for deliberate improvement.</p>
-        <p>Use becomes signal. Signal becomes care. The system gets better without getting noisier.</p>
+        <p>ZenPi makes friction legible, preserves the evidence, and asks for the smallest intervention that can be proved and reversed.</p>
+        <p>Use becomes signal. Human judgment turns signal into care. The system gets better without getting noisier.</p>
       </div>
     </section>
 
@@ -138,7 +168,7 @@
         <article>
           <span>01</span>
           <h3>Privacy-minimized</h3>
-          <p>Reports exclude raw project identities, credentials, prompts, source, and commands.</p>
+          <p>Bounded sanitization removes recognizable private patterns. Review local reports before sharing.</p>
         </article>
         <article>
           <span>02</span>

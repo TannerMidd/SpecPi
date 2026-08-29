@@ -7,11 +7,17 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   aggregateEvents,
+  appendWishlistDecision,
+  archiveWishlist,
+  createIssueDraft,
   isImplementedCapability,
   normalizeCapability,
+  readCollectionMode,
   recordCapabilityGap,
   refreshWishlist,
+  setCollectionMode,
 } from "../extensions/tool-wishlist/core.mjs";
+import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import {
   assertDistinctPaths,
   comparePngBuffers,
@@ -52,9 +58,32 @@ function runCli(agentDir, ...args) {
   return result;
 }
 
+async function recordTestGap(options) {
+  if (readCollectionMode(options.stateDir) !== "on") {
+    await setCollectionMode({ stateDir: options.stateDir, mode: "on" });
+  }
+  return recordCapabilityGap(options);
+}
+
 function writeExecutable(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, content, { mode: 0o755 });
+}
+
+function runWishlistExtensionHarness(agentDir) {
+  const harness = path.join(repoRoot, "tests", "fixtures", "wishlist-extension-harness.ts");
+  const result = spawnSync("pi", ["--offline", "--no-extensions", "--no-skills", "-e", harness, "--list-models"], {
+    cwd: repoRoot,
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" },
+    encoding: "utf8",
+  });
+  if (result.error?.code === "ENOENT") return undefined;
+  if (result.status !== 0) {
+    throw new Error(`wishlist extension harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+  const marker = result.stdout.split("\n").find((line) => line.startsWith("ZENPI_WISHLIST_HARNESS="));
+  if (!marker) throw new Error(`wishlist extension harness result missing\n${result.stdout}`);
+  return JSON.parse(marker.slice("ZENPI_WISHLIST_HARNESS=".length));
 }
 
 function installFakeBrowserNpm(fakeBin) {
@@ -123,6 +152,11 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /id="principles"/);
   assert.match(html, /id="features"/);
   assert.match(html, /id="wishlist"/);
+  assert.match(html, /id="workings"/);
+  assert.match(html, /id="goal"/);
+  assert.match(html, /A control loop,<br>not an autopilot\./);
+  assert.match(html, /verification required · regression → review-needed/);
+  assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
@@ -135,12 +169,29 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(workflow, /path: site/);
 });
 
-test("capability keys normalize superficial wording", () => {
+test("capability keys and registry validation are exact", () => {
   assert.equal(normalizeCapability("Missing Browser Automation Tools"), "browser-automation");
   assert.equal(normalizeCapability("browser automations"), "browser-automation");
   assert.equal(isImplementedCapability("Local browser visual regression testing"), true);
   assert.equal(isImplementedCapability("Local browser automation"), true);
   assert.equal(isImplementedCapability("Browser automation with persisted authentication"), false);
+  assert.throws(
+    () => validateCapabilityRegistry({
+      schema: 1,
+      capabilities: [
+        { id: "browser-automation", title: "Browser automation", aliases: ["shared-alias"], shippedVersion: "1.0.0", shippedAt: "2026-01-01T00:00:00.000Z", validations: ["browser-runtime-smoke"] },
+        { id: "visual-regression", title: "Visual regression", aliases: ["shared-alias"], shippedVersion: "1.0.0", shippedAt: "2026-01-01T00:00:00.000Z", validations: ["browser-runtime-smoke"] },
+      ],
+    }),
+    /duplicate or invalid capability alias/,
+  );
+  assert.throws(
+    () => validateCapabilityRegistry({
+      schema: 1,
+      capabilities: [{ id: "browser-automation", title: "Browser automation", aliases: [], shippedVersion: "1.0.0", shippedAt: "2026-01-01T00:00:00.000Z", validations: ["shell-command"] }],
+    }),
+    /invalid capability entry/,
+  );
 });
 
 test("browser inputs normalize local URLs, viewports, and project paths", () => {
@@ -232,7 +283,7 @@ test("tool wishlist deduplicates a gap per task and stores privacy-minimized met
   };
 
   try {
-    const first = await recordCapabilityGap({
+    const first = await recordTestGap({
       stateDir,
       sessionId: "private-session-id",
       runId: "task-one",
@@ -240,7 +291,7 @@ test("tool wishlist deduplicates a gap per task and stores privacy-minimized met
       gap,
       now: "2026-01-01T00:00:00.000Z",
     });
-    const duplicate = await recordCapabilityGap({
+    const duplicate = await recordTestGap({
       stateDir,
       sessionId: "private-session-id",
       runId: "task-one",
@@ -248,7 +299,7 @@ test("tool wishlist deduplicates a gap per task and stores privacy-minimized met
       gap,
       now: "2026-01-01T00:01:00.000Z",
     });
-    const secondTask = await recordCapabilityGap({
+    const secondTask = await recordTestGap({
       stateDir,
       sessionId: "private-session-id",
       runId: "task-two",
@@ -328,16 +379,17 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
     assert.equal(refreshed.occurrences, 1);
     assert.equal(refreshed.uniqueGaps, 1);
     assert.equal(refreshed.invalidLines, 1);
-    assert.match(refreshed.report, /1 malformed event line\(s\) were ignored/);
-    assert.doesNotMatch(refreshed.report, /Local browser visual regression testing/);
-    assert.doesNotMatch(refreshed.report, /Local browser automation/);
+    assert.match(refreshed.report, /1 malformed observation line\(s\) were ignored/);
+    assert.doesNotMatch(refreshed.report, /## Local browser visual regression testing/);
+    assert.doesNotMatch(refreshed.report, /## Local browser automation/);
+    assert.match(refreshed.report, /# Retired/);
     assert.equal(
       refreshed.report,
       fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"),
     );
 
     const eventHistory = fs.readFileSync(eventsPath, "utf8");
-    const resolved = await recordCapabilityGap({
+    const resolved = await recordTestGap({
       stateDir,
       sessionId: "session-two",
       runId: "run-two",
@@ -352,10 +404,13 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
       },
     });
     assert.equal(resolved.resolved, true);
+    assert.equal(resolved.regression, true);
     assert.equal(resolved.uniqueGaps, 1);
-    assert.equal(fs.readFileSync(eventsPath, "utf8"), eventHistory);
+    assert.equal(resolved.reviewNeeded, true);
+    assert.notEqual(fs.readFileSync(eventsPath, "utf8"), eventHistory);
+    assert.match(fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"), /# Needs review/);
 
-    const localAutomation = await recordCapabilityGap({
+    const localAutomation = await recordTestGap({
       stateDir,
       sessionId: "session-three",
       runId: "run-three",
@@ -370,9 +425,10 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
       },
     });
     assert.equal(localAutomation.resolved, true);
-    assert.equal(fs.readFileSync(eventsPath, "utf8"), eventHistory);
+    assert.equal(localAutomation.regression, true);
+    assert.equal(fs.readFileSync(eventsPath, "utf8").trim().split("\n").length, 7);
 
-    const adjacentGap = await recordCapabilityGap({
+    const adjacentGap = await recordTestGap({
       stateDir,
       sessionId: "session-four",
       runId: "run-four",
@@ -395,6 +451,299 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
   }
 });
 
+test("wishlist ranking uses reach and recency after impact-weighted task evidence", () => {
+  const base = {
+    schema: 1,
+    sessionHash: "session",
+    projectHash: "project",
+    capability: "Gap",
+    scenario: "Reusable need",
+    limitation: "Current capability falls short",
+    workaround: "Manual fallback",
+    suggestedFix: "tool",
+    impact: "degraded",
+  };
+  const events = [
+    { ...base, canonicalKey: "alpha", runHash: "a1", timestamp: "2026-01-01T00:00:00.000Z" },
+    { ...base, canonicalKey: "beta", runHash: "b1", timestamp: "2026-01-01T00:00:00.000Z" },
+    { ...base, canonicalKey: "beta", runHash: "b2", projectHash: "project-2", timestamp: "2026-01-01T00:00:00.000Z", impact: "minor" },
+    { ...base, canonicalKey: "alpha", runHash: "a2", timestamp: "2026-02-01T00:00:00.000Z", impact: "minor" },
+  ];
+  const ranked = aggregateEvents(events);
+  assert.equal(ranked[0].canonicalKey, "beta");
+  assert.equal(ranked[0].projects, 2);
+
+  const sameTaskAfterMerge = aggregateEvents([
+    { ...base, observedKey: "left-gap", canonicalKey: "left-gap", runHash: "same", timestamp: "2026-03-01T00:00:00.000Z", impact: "minor" },
+    { ...base, observedKey: "right-gap", canonicalKey: "right-gap", runHash: "same", timestamp: "2026-03-02T00:00:00.000Z", impact: "blocked" },
+  ], {
+    decisions: [{ schema: 1, id: "merge-1", timestamp: "2026-03-03T00:00:00.000Z", action: "merge", canonicalKey: "left-gap", targetKey: "right-gap", reverses: "", note: "" }],
+  });
+  assert.equal(sameTaskAfterMerge.length, 1);
+  assert.equal(sameTaskAfterMerge[0].occurrences, 1);
+  assert.equal(sameTaskAfterMerge[0].priority, 4);
+
+  const offsetOrder = aggregateEvents([
+    { ...base, canonicalKey: "earlier-offset", runHash: "o1", timestamp: "2026-01-01T00:30:00+02:00" },
+    { ...base, canonicalKey: "later-zulu", runHash: "o2", timestamp: "2025-12-31T23:00:00Z" },
+  ]);
+  assert.equal(offsetOrder[0].canonicalKey, "later-zulu");
+});
+
+test("wishlist next requires qualified evidence and gives selected-state guidance", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-next-"));
+  const gap = {
+    capability: "Local audio transcription",
+    scenario: "Transcribe a local recording",
+    limitation: "No local transcription capability was available",
+    impact: "minor",
+    workaround: "Manual transcription",
+    suggestedFix: "skill",
+  };
+  try {
+    await recordTestGap({ stateDir: root, sessionId: "s1", runId: "r1", cwd: root, gap });
+    let refreshed = await refreshWishlist({ stateDir: root });
+    assert.match(refreshed.next, /No candidate is available/);
+    assert.doesNotMatch(refreshed.next, /wishlist select/);
+
+    await recordTestGap({ stateDir: root, sessionId: "s2", runId: "r2", cwd: root, gap });
+    refreshed = await refreshWishlist({ stateDir: root });
+    assert.match(refreshed.next, /wishlist select local-audio-transcription/);
+
+    await appendWishlistDecision({ stateDir: root, action: "select", canonicalKey: "local-audio-transcription" });
+    refreshed = await refreshWishlist({ stateDir: root });
+    assert.match(refreshed.next, /This gap is selected/);
+    assert.match(refreshed.next, /zenpi-improve/);
+    assert.doesNotMatch(refreshed.next, /wishlist select local-audio-transcription/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist collection is fail-closed and explicit at the mutation boundary", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-consent-"));
+  const gap = {
+    capability: "Local audio transcription",
+    scenario: "Transcribe a local recording",
+    limitation: "No local transcription capability was available",
+    impact: "minor",
+    workaround: "Manual transcription",
+    suggestedFix: "tool",
+  };
+  try {
+    assert.equal(readCollectionMode(root), "undecided");
+    await assert.rejects(
+      () => recordCapabilityGap({ stateDir: root, sessionId: "s", runId: "r1", cwd: root, gap }),
+      /must be explicitly on/,
+    );
+    assert.equal(fs.existsSync(path.join(root, ".tool-wishlist-salt")), false);
+    assert.equal(fs.existsSync(path.join(root, "tool-wishlist-events.jsonl")), false);
+
+    await setCollectionMode({ stateDir: root, mode: "on" });
+    await recordCapabilityGap({ stateDir: root, sessionId: "s", runId: "r1", cwd: root, gap });
+    const eventsPath = path.join(root, "tool-wishlist-events.jsonl");
+    const recorded = fs.readFileSync(eventsPath, "utf8");
+    assert.equal(readCollectionMode(root), "on");
+
+    await setCollectionMode({ stateDir: root, mode: "off" });
+    await assert.rejects(
+      () => recordCapabilityGap({ stateDir: root, sessionId: "s", runId: "r2", cwd: root, gap }),
+      /must be explicitly on/,
+    );
+    assert.equal(fs.readFileSync(eventsPath, "utf8"), recorded);
+    assert.equal(readCollectionMode(root), "off");
+    await assert.rejects(() => setCollectionMode({ stateDir: root, mode: "ask" }), /on or off/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist lifecycle requires evidence, captures regressions, and reopens explicitly", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-lifecycle-"));
+  const gap = {
+    capability: "Local audio transcription",
+    scenario: "Transcribe a local recording",
+    limitation: "No local transcription capability was available",
+    impact: "blocked",
+    workaround: "Manual transcription",
+    suggestedFix: "tool",
+  };
+  try {
+    await recordTestGap({ stateDir: root, sessionId: "s1", runId: "r1", cwd: root, gap, now: "2026-01-01T00:00:00.000Z" });
+    await appendWishlistDecision({ stateDir: root, action: "select", canonicalKey: "local-audio-transcription", now: "2026-01-02T00:00:00.000Z" });
+    await assert.rejects(
+      () => appendWishlistDecision({ stateDir: root, action: "retire", canonicalKey: "local-audio-transcription" }),
+      /validation note/,
+    );
+    await appendWishlistDecision({
+      stateDir: root,
+      action: "retire",
+      canonicalKey: "local-audio-transcription",
+      note: "Focused transcription smoke passed",
+      now: "2026-01-03T00:00:00.000Z",
+    });
+    let report = await refreshWishlist({ stateDir: root });
+    assert.match(report.report, /# Retired/);
+
+    const regression = await recordTestGap({ stateDir: root, sessionId: "s2", runId: "r2", cwd: root, gap, now: "2026-01-04T00:00:00.000Z" });
+    assert.equal(regression.regression, true);
+    report = await refreshWishlist({ stateDir: root });
+    assert.equal(regression.uniqueGaps, 0);
+    assert.equal(regression.reviewNeeded, true);
+    assert.match(report.report, /# Needs review/);
+    assert.match(report.report, /Unresolved post-retirement signals: 1/);
+    assert.match(report.report, /- Status: retired/);
+
+    await appendWishlistDecision({ stateDir: root, action: "reopen", canonicalKey: "local-audio-transcription", now: "2026-01-05T00:00:00.000Z" });
+    report = await refreshWishlist({ stateDir: root });
+    assert.match(report.report, /- Status: open/);
+    assert.doesNotMatch(report.report, /# Needs review/);
+
+    await appendWishlistDecision({ stateDir: root, action: "select", canonicalKey: "local-audio-transcription", now: "2026-01-06T00:00:00.000Z" });
+    await appendWishlistDecision({
+      stateDir: root,
+      action: "retire",
+      canonicalKey: "local-audio-transcription",
+      note: "Revalidated transcription smoke passed",
+      now: "2026-01-07T00:00:00.000Z",
+    });
+    report = await refreshWishlist({ stateDir: root });
+    assert.doesNotMatch(report.report, /# Needs review/);
+    assert.match(report.report, /# Retired/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist aliases are exact and reversibly reference merge decisions", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-alias-"));
+  const gap = (capability) => ({
+    capability,
+    scenario: "Exercise a reusable workflow",
+    limitation: "No matching capability was available",
+    impact: "degraded",
+    workaround: "Manual fallback",
+    suggestedFix: "skill",
+  });
+  try {
+    await recordTestGap({ stateDir: root, sessionId: "s", runId: "left", cwd: root, gap: gap("Audio transcript generation") });
+    await recordTestGap({ stateDir: root, sessionId: "s", runId: "right", cwd: root, gap: gap("Audio transcription") });
+    let report = await refreshWishlist({ stateDir: root });
+    assert.equal(report.uniqueGaps, 2);
+
+    const merge = await appendWishlistDecision({
+      stateDir: root,
+      action: "merge",
+      canonicalKey: "audio-transcript-generation",
+      targetKey: "audio-transcription",
+    });
+    report = await refreshWishlist({ stateDir: root });
+    assert.equal(report.uniqueGaps, 1);
+    assert.ok(report.report.includes(`merge decision \`${merge.decisionId}\``));
+
+    await appendWishlistDecision({ stateDir: root, action: "unmerge", canonicalKey: merge.decisionId });
+    report = await refreshWishlist({ stateDir: root });
+    assert.equal(report.uniqueGaps, 2);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("merging an observed gap into a retired registry capability surfaces review without reopening", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-registry-merge-"));
+  const gap = {
+    capability: "Rendered page interaction",
+    scenario: "Interact with a locally rendered page",
+    limitation: "No matching browser interaction capability was available",
+    impact: "degraded",
+    workaround: "Manual browser interaction",
+    suggestedFix: "tool",
+  };
+  try {
+    await recordTestGap({ stateDir: root, sessionId: "s", runId: "r", cwd: root, gap });
+    await appendWishlistDecision({
+      stateDir: root,
+      action: "merge",
+      canonicalKey: "rendered-page-interaction",
+      targetKey: "local-browser-automation",
+    });
+    const refreshed = await refreshWishlist({ stateDir: root });
+    assert.equal(refreshed.uniqueGaps, 0);
+    assert.match(refreshed.report, /# Needs review/);
+    assert.match(refreshed.report, /- Status: retired/);
+    assert.match(refreshed.report, /Unresolved post-retirement signals: 1/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist issue drafts stay local and archives recover after a prepared operation failure", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-archive-"));
+  const gap = {
+    capability: "Local audio transcription",
+    scenario: "Transcribe a local recording at /private/customer.wav",
+    limitation: "No capability at https://private.example was available",
+    impact: "degraded",
+    workaround: "Manual fallback",
+    suggestedFix: "tool",
+  };
+  try {
+    await setCollectionMode({ stateDir: root, mode: "on" });
+    await recordTestGap({ stateDir: root, sessionId: "s", runId: "r", cwd: root, gap });
+    const draft = await createIssueDraft({ stateDir: root, canonicalKey: "local-audio-transcription" });
+    assert.match(draft.markdown, /Local draft only/);
+    assert.doesNotMatch(draft.markdown, /private\.example|private\/customer/);
+
+    await assert.rejects(
+      () => archiveWishlist({ stateDir: root, now: "2026-04-01T00:00:00.000Z", failAfterPrepared: true }),
+      /Injected failure/,
+    );
+    assert.ok(fs.existsSync(path.join(root, ".tool-wishlist-archive-transaction.json")));
+    const refreshed = await refreshWishlist({ stateDir: root, now: "2026-04-01T00:01:00.000Z" });
+    assert.equal(refreshed.uniqueGaps, 0);
+    assert.equal(readCollectionMode(root), "on");
+    assert.equal(fs.existsSync(path.join(root, ".tool-wishlist-salt")), true);
+    assert.equal(fs.existsSync(path.join(root, ".tool-wishlist-archive-transaction.json")), false);
+    const archives = fs.readdirSync(path.join(root, "tool-wishlist-archives"));
+    assert.equal(archives.length, 1);
+    assert.ok(fs.existsSync(path.join(root, "tool-wishlist-archives", archives[0], "archive.json")));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("wishlist extension keeps lifecycle command-only and wires consent, drafts, reset, and checksums", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-extension-"));
+  try {
+    const result = runWishlistExtensionHarness(path.join(root, "agent"));
+    if (!result) {
+      const source = fs.readFileSync(path.join(repoRoot, "extensions", "tool-wishlist", "index.ts"), "utf8");
+      assert.equal(source.match(/pi\.registerTool\(/g)?.length, 1);
+      assert.match(source, /name: "report_capability_gap"/);
+      assert.equal(source.match(/pi\.registerCommand\(/g)?.length, 1);
+      assert.match(source, /pi\.registerCommand\("wishlist"/);
+      assert.match(source, /salted task, session, and project hashes locally/);
+      assert.match(source, /archiveWishlist\(\{ stateDir, reason: action \}\)/);
+      return;
+    }
+    assert.deepEqual(result.toolNames, ["report_capability_gap"]);
+    assert.deepEqual(result.commandNames, ["wishlist"]);
+    assert.equal(result.lifecycleToolExposed, false);
+    assert.match(result.consent, /salted task, session, and project hashes locally/);
+    assert.equal(result.resetConfirmed, true);
+    assert.equal(result.reportStableAfterRevalidation, true);
+    assert.equal(result.issueDraftRendered, true);
+    assert.equal(result.checksumsValid, true);
+    assert.equal(result.eventsAfterReset, "");
+    assert.equal(result.collectionMode, "on");
+    assert.equal(result.saltPreserved, true);
+    assert.ok(result.notifications.some((item) => item.message.startsWith("Wishlist decline:")));
+    assert.ok(result.notifications.some((item) => item.message.startsWith("Wishlist reset complete.")));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("wishlist capacity refusal leaves existing data refreshable", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-capacity-test-"));
   const stateDir = path.join(root, "zenpi");
@@ -408,7 +757,7 @@ test("wishlist capacity refusal leaves existing data refreshable", async () => {
   };
 
   try {
-    await recordCapabilityGap({
+    await recordTestGap({
       stateDir,
       sessionId: "session-one",
       runId: "run-one",
@@ -418,7 +767,7 @@ test("wishlist capacity refusal leaves existing data refreshable", async () => {
     const eventsPath = path.join(stateDir, "tool-wishlist-events.jsonl");
     const currentBytes = fs.statSync(eventsPath).size;
     await assert.rejects(
-      recordCapabilityGap({
+      recordTestGap({
         stateDir,
         sessionId: "session-two",
         runId: "run-two",
@@ -473,7 +822,7 @@ test("wishlist release never removes a substituted lock", async () => {
   };
 
   try {
-    await recordCapabilityGap({
+    await recordTestGap({
       stateDir,
       sessionId: "session-one",
       runId: "run-one",
@@ -496,6 +845,7 @@ test("installer plan is non-mutating even when browser installation is planned",
     const result = invokeCli(agentDir, ["plan", "--skip-shell"]);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Playwright 1\.62\.1 \+ matching managed Chromium/);
+    assert.match(result.stdout, /salted task\/session\/project hashes/);
     assert.equal(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"), before);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
   } finally {
@@ -741,6 +1091,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")));
+    assert.ok(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "smoke.mjs")));
@@ -753,6 +1106,14 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     });
     assert.equal(doctor.status, 0, doctor.stderr);
     assert.match(doctor.stderr, /Managed browser runtime unavailable: .*installation was skipped/);
+
+    const installedRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
+    const installedRegistry = fs.readFileSync(installedRegistryPath);
+    fs.writeFileSync(installedRegistryPath, '{"schema":1,"capabilities":[{"id":"Invalid ID","title":"Broken","aliases":[],"shippedVersion":"1","validations":["browser-runtime-smoke"]}]}\n');
+    const invalidRegistryDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+    assert.notEqual(invalidRegistryDoctor.status, 0);
+    assert.match(invalidRegistryDoctor.stderr, /Capability registry invalid/);
+    fs.writeFileSync(installedRegistryPath, installedRegistry);
 
     // Simulate ownership retired by a future ZenPi version.
     const retiredFile = path.join(agentDir, "extensions", "retired.ts");
@@ -796,7 +1157,11 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     );
     assert.equal(fs.existsSync(retiredFile), false);
 
-    runCli(agentDir, "uninstall", "--yes");
+    const retainedWishlist = path.join(agentDir, "zenpi", "tool-wishlist-events.jsonl");
+    fs.writeFileSync(retainedWishlist, '{"local":"evidence"}\n', { mode: 0o600 });
+    const uninstall = runCli(agentDir, "uninstall", "--yes");
+    assert.match(uninstall.stdout, /local wishlist state\/archives were preserved/);
+    assert.equal(fs.readFileSync(retainedWishlist, "utf8"), '{"local":"evidence"}\n');
 
     const restored = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
     assert.deepEqual(restored, originalSettings);
@@ -807,6 +1172,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     );
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
@@ -831,6 +1199,7 @@ test("managed browser runtime completes install, reuse update, doctor, and unins
     const doctor = invokeCli(agentDir, ["doctor"], env);
     assert.equal(doctor.status, 0, doctor.stderr);
     assert.match(doctor.stdout, /BROWSER Browser smoke passed/);
+    assert.match(doctor.stdout, /CAPABILITY local-browser-automation verified by browser-runtime-smoke/);
 
     const update = invokeCli(agentDir, ["update", "--yes", "--skip-tool-install", "--skip-shell"], env);
     assert.equal(update.status, 0, update.stderr);

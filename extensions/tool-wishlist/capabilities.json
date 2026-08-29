@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "capabilities": [
+    {
+      "id": "local-browser-automation",
+      "title": "Local browser automation and visual regression",
+      "aliases": [
+        "browser-automation",
+        "browser-automation-visual-regression",
+        "browser-visual-regression-testing",
+        "local-browser-visual-regression",
+        "local-browser-visual-regression-testing"
+      ],
+      "shippedVersion": "0.1.0",
+      "shippedAt": "2026-08-28T00:00:00.000Z",
+      "validations": [
+        "browser-runtime-smoke"
+      ]
+    }
+  ]
+}
