@@ -152,6 +152,11 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /id="principles"/);
   assert.match(html, /id="features"/);
   assert.match(html, /id="wishlist"/);
+  assert.match(html, /id="workings"/);
+  assert.match(html, /id="goal"/);
+  assert.match(html, /A control loop,<br>not an autopilot\./);
+  assert.match(html, /verification required · regression → review-needed/);
+  assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
