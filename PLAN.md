@@ -27,7 +27,7 @@ Capacity settings remain global. Provider isolation remains exact: `openai`, `op
 - Persist only exact provider IDs, model IDs, thinking levels, timestamps, and schema metadata.
 - Preserve explicit preview, confirmation, shared locking, symlink rejection, atomic writes, rollback, bounded backups, and unrelated JSON.
 - Keep trusted project settings and dynamically constructed workflow code documented as user-controlled boundaries.
-- When `session_start` or `model_select` changes the active provider profile/settings mirror, call the documented `ctx.reload()` exactly once and treat reload as terminal for that handler. The reloaded session must detect the aligned mirror and avoid recursion. Do not reload for no-op same-provider activation; pre-launch guards fail closed unless profile, disk mirror, and runtime are known aligned.
+- When `session_start` or `model_select` changes the active provider profile/settings mirror, prompt the user to run the documented `/reload` command and keep pre-launch guards fail-closed until a fresh `session_start` verifies alignment. Lifecycle handlers receive `ExtensionContext`; command-only `ctx.reload()` must not be called from them. Do not prompt for reload after no-op same-provider activation.
 
 ## Current behavior
 

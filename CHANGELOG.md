@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix provider-profile activation on model changes by prompting the user to run the documented `/reload` flow instead of calling command-only `ctx.reload()` from a lifecycle event context.
+
 ## 0.6.0 - 2026-08-29
 
 - Add exact-provider subagent profiles that restore automatically with a single bounded runtime reload, while keeping capacity global and unavailable saved models stale without replacement.

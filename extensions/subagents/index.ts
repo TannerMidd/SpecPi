@@ -201,9 +201,11 @@ export default function registerZenSubagents(pi: ExtensionAPI) {
       runtimeFingerprint = undefined;
       reloadRequired = true;
       if (lifecycle) {
-        ctx.ui.notify(`Restored the '${provider}' subagent profile; reloading Pi once to apply the runtime mapping.`, "info");
-        await ctx.reload();
-        return { ...result, reloaded: true };
+        // Lifecycle handlers receive ExtensionContext, while reload() is only
+        // available on command contexts. Keep launches fail-closed until the
+        // user runs the built-in command and a fresh session_start verifies
+        // the runtime mapping.
+        ctx.ui.notify(`Restored the '${provider}' subagent profile. Run /reload before launching subagents.`, "warning");
       }
     } else if (lifecycle && reason === "session-start" && !reloadRequired) {
       // Only a fresh extension's post-load session_start proves what the

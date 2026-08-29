@@ -67,7 +67,7 @@ Inside the browser, use `j`/`k` to move, `Enter` to open, `/` to search, `c` to 
 
 Run `/zen-subagents` for one confirmed flow that edits the active exact-provider profile for `scout`, `researcher`, `worker`, `reviewer`, and `oracle`, plus cumulative run/session child budgets and active top-level async capacity that remain global.
 
-Configure each exact Pi provider once. ZenPi restores its saved profile and strict `modelScope` automatically when a later session switches back, then performs one bounded reload when the startup-loaded runtime mapping changed. `inherit` remains portable. Saved models that are no longer available become stale, remain stored, and are never silently replaced; `openai` and `openai-codex` remain separate boundaries. Simultaneous processes on different providers fail closed instead of racing the shared active mirror.
+Configure each exact Pi provider once. ZenPi restores its saved profile and strict `modelScope` automatically when a later session switches back, then prompts for `/reload` when the startup-loaded runtime mapping changed. `inherit` remains portable. Saved models that are no longer available become stale, remain stored, and are never silently replaced; `openai` and `openai-codex` remain separate boundaries. Simultaneous processes on different providers fail closed instead of racing the shared active mirror.
 
 ```text
 /zen-subagents
@@ -75,7 +75,7 @@ Configure each exact Pi provider once. ZenPi restores its saved profile and stri
 /zen-subagents reset
 ```
 
-One confirmation atomically applies the provider profile, active settings mirror, and any explicitly edited global capacity while preserving unrelated JSON and creating a bounded leaf-only backup. Reset changes only the active provider profile; other profiles and global capacity remain unchanged. Automatic reload is limited to lifecycle profile activation; run `/reload` after editing startup-loaded capacity. These settings do not control modern `runs.all` child concurrency.
+One confirmation atomically applies the provider profile, active settings mirror, and any explicitly edited global capacity while preserving unrelated JSON and creating a bounded leaf-only backup. Reset changes only the active provider profile; other profiles and global capacity remain unchanged. Run `/reload` after ZenPi restores a provider profile or edits startup-loaded role/capacity settings; native launches remain blocked until the refreshed runtime is verified. These settings do not control modern `runs.all` child concurrency.
 
 Trusted project `.pi/settings.json` has higher Pi precedence. ZenPi resolves the effective project from the launch `cwd` and blocks native `subagent` tool launches when that project replaces the managed scope with an unsafe cross-provider policy. File-authored workflows and inline scripts containing a literal child `cwd` are blocked because a config wrapper cannot verify those child projects before `pi-subagents` evaluates the script. Inline JavaScript can dynamically compute child options; such user-authored workflow code, directly administered project configuration, and direct `pi-subagents` commands remain trusted user-controlled boundaries rather than claims ZenPi can sandbox.
 

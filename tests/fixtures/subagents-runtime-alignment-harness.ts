@@ -18,16 +18,15 @@ releaseProviderLease({ agentDir, token: seedToken });
 
 const openai = { provider: "openai", id: "parent", name: "Parent", reasoning: true };
 const openrouter = { provider: "openrouter", id: "parent", name: "Router", reasoning: true };
-let reloads = 0;
+const notifications: any[] = [];
 const ctx: any = {
   cwd: path.join(agentDir, "project"),
   hasUI: true,
   model: openai,
   scopedModels: [],
   modelRegistry: { async getAvailable() { return [openai, openrouter]; } },
-  async reload() { reloads += 1; },
   ui: {
-    notify() {},
+    notify(message: string, level: string) { notifications.push({ message, level }); },
     async confirm() { return true; },
     async select() { throw new Error("unexpected selection"); },
     async input() { throw new Error("unexpected input"); },
@@ -63,18 +62,18 @@ const externallyChanged = structuredClone(readSubagentState(agentDir).roles);
 externallyChanged.worker.model = "openai/worker";
 applyProviderConfiguration({ agentDir, provider: "openai", roles: externallyChanged });
 const externalDriftGuard = await second.emit("tool_call", { toolName: "subagent", input: { agent: "worker", task: "test" } });
-const beforeSwitch = reloads;
+const beforeSwitch = notifications.length;
 ctx.model = openrouter;
 await second.emit("model_select", { model: openrouter, source: "user" });
 await second.emit("model_select", { model: openrouter, source: "user" });
-const providerSwitchReloads = reloads - beforeSwitch;
+const providerSwitchNotifications = notifications.slice(beforeSwitch);
 await second.emit("session_shutdown", {});
 
 const third = runtime();
 await third.emit("session_start", {});
-const beforeSameProvider = reloads;
+const beforeSameProvider = notifications.length;
 await third.emit("model_select", { model: openrouter, source: "user" });
-const sameProviderReloads = reloads - beforeSameProvider;
+const sameProviderNotifications = notifications.slice(beforeSameProvider);
 await third.emit("session_shutdown", {});
 
-process.stdout.write(`ZENPI_SUBAGENTS_RUNTIME=${JSON.stringify({ preReloadGuard, postReloadGuard, externalDriftGuard, providerSwitchReloads, sameProviderReloads })}\n`);
+process.stdout.write(`ZENPI_SUBAGENTS_RUNTIME=${JSON.stringify({ preReloadGuard, postReloadGuard, externalDriftGuard, providerSwitchNotifications, sameProviderNotifications })}\n`);

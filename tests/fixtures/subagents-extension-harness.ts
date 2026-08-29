@@ -43,7 +43,6 @@ export default async function subagentsExtensionHarness() {
       async getAvailable() { return [codexSol, codexLuna, openrouter, anthropic]; },
       find(provider: string, id: string) { return [codexSol, codexLuna, openrouter, anthropic].find((model) => model.provider === provider && model.id === id); },
     },
-    async reload() { notifications.push({ message: "ctx.reload", level: "reload" }); },
     ui: {
       async select(title: string, options: string[]) {
         const answer = queue.shift();

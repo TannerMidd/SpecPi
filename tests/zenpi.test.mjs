@@ -565,7 +565,8 @@ test("zen-subagents extension runs one confirmed same-provider configuration flo
     assert.match(result.explicitCwdGuardResult.reason, /Project .*other-project.*settings\.json replaces ZenPi/);
     assert.match(result.gitRootGuardResult.reason, /Project .*monorepo.*settings\.json replaces ZenPi/);
     assert.match(result.workflowCwdGuardResult.reason, /cannot verify provider policy for file-authored workflows/);
-    assert.ok(result.notifications.some((item) => item.message === "ctx.reload"));
+    assert.ok(result.notifications.some((item) => /Restored the 'openrouter' subagent profile\. Run \/reload before launching subagents\./.test(item.message)));
+    assert.equal(result.notifications.some((item) => item.message.includes("ctx.reload is not a function")), false);
     const status = result.notifications.find((item) => item.message.includes("Saved providers: openai-codex, openrouter"));
     assert.match(status.message, /Provider: openai-codex/);
     assert.match(status.message, /Profile: saved/);
@@ -584,8 +585,9 @@ test("runtime fingerprint remains latched until a fresh post-reload session star
     assert.match(result.preReloadGuard.reason, /runtime is not yet aligned/);
     assert.equal(result.postReloadGuard, undefined);
     assert.match(result.externalDriftGuard.reason, /runtime is not yet aligned/);
-    assert.equal(result.providerSwitchReloads, 1);
-    assert.equal(result.sameProviderReloads, 0);
+    assert.equal(result.providerSwitchNotifications.filter((item) => item.message.includes("Run /reload before launching subagents.")).length, 1);
+    assert.equal(result.providerSwitchNotifications.some((item) => item.message.includes("Could not activate")), false);
+    assert.equal(result.sameProviderNotifications.length, 0);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
