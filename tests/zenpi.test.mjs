@@ -629,12 +629,12 @@ test("showcase site is self-contained and Pages-ready", () => {
   const html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
   const css = fs.readFileSync(path.join(siteDir, "styles.css"), "utf8");
   const cycle = fs.readFileSync(path.join(siteDir, "cycle.js"), "utf8");
-  const svg = fs.readFileSync(path.join(siteDir, "self-improvement-loop.svg"), "utf8");
+  const svg = fs.readFileSync(path.join(siteDir, "self-improvement-loop-v2.svg"), "utf8");
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
 
   const svgViewBox = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
-  const readmeImage = readme.match(/src="site\/self-improvement-loop\.svg" width="(\d+)"/);
+  const readmeImage = readme.match(/src="site\/self-improvement-loop-v2\.svg" width="(\d+)"/);
   assert.ok(svgViewBox && readmeImage);
   const renderScale = Number(readmeImage[1]) / Number(svgViewBox[1]);
   assert.ok(Number(svgViewBox[1]) / Number(svgViewBox[2]) >= 2);
@@ -645,10 +645,10 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(svg, /verification-failure-return/);
   assert.match(svg, /later-evidence-review-return/);
   assert.doesNotMatch(svg.replace('xmlns="http://www.w3.org/2000/svg"', ""), /<script|<foreignObject|<image|<animate|\bhref=|https?:|data:image|@import|@font-face/i);
-  assert.match(readme, /src="site\/self-improvement-loop\.svg"/);
+  assert.match(readme, /src="site\/self-improvement-loop-v2\.svg"/);
   assert.match(readme, /alt="[^"]*failure[^"]*later evidence[^"]*human review/i);
   assert.doesNotMatch(readme, /notice → qualify/);
-  assert.ok(JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).files.includes("site/self-improvement-loop.svg"));
+  assert.ok(JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).files.includes("site/self-improvement-loop-v2.svg"));
 
   assert.match(html, /<html lang="en">/);
   assert.match(html, /name="viewport"/);
@@ -685,7 +685,7 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.doesNotMatch(html, /cycle-charts|cycle-orbit|gate-outcomes/);
   assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
-  assert.match(html, /Stable <code>v0\.6\.0<\/code> adds persistent exact-provider subagent profiles/);
+  assert.match(html, /Stable <code>v0\.6\.1<\/code> fixes prompt rendering and refreshes the visual self-improvement loop/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));

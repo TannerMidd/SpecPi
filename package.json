@@ -1,6 +1,6 @@
 {
   "name": "zenpi",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "An explicit, provider-safe, self-improving harness for the Pi coding agent",
   "author": "Tanner Middleton",
   "repository": {
@@ -32,7 +32,7 @@
     "themes",
     "shell",
     "README.md",
-    "site/self-improvement-loop.svg",
+    "site/self-improvement-loop-v2.svg",
     "SECURITY.md",
     "THIRD_PARTY.md",
     "CHANGELOG.md",
