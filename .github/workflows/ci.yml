@@ -30,6 +30,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
+          $env:NODE_OPTIONS = "--throw-deprecation"
           .\zenpi.cmd plan --skip-package-install --skip-shell
 
           $root = Join-Path $env:RUNNER_TEMP "zenpi-windows-smoke"

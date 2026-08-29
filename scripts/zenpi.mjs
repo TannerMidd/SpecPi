@@ -168,6 +168,19 @@ function resolveCommand(command, env = process.env) {
           return path.resolve(file);
         }
       } catch (error) {
+        const windowsAppsWinget = envValue(env, "LOCALAPPDATA")
+          ? path.join(envValue(env, "LOCALAPPDATA"), "Microsoft", "WindowsApps", "winget.exe")
+          : undefined;
+        if (
+          process.platform === "win32" &&
+          (error.code === "EACCES" || error.code === "EPERM") &&
+          windowsAppsWinget &&
+          path.resolve(file).toLowerCase() === path.resolve(windowsAppsWinget).toLowerCase()
+        ) {
+          // The winget App Execution Alias can execute even when Windows denies
+          // metadata access to its reparse point under WindowsApps.
+          return path.resolve(file);
+        }
         if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
       }
     }
@@ -220,16 +233,25 @@ function assertPiVersion() {
   return match[1];
 }
 
+function quoteWindowsCommandArg(value) {
+  return `"${String(value).replaceAll("%", "%%").replaceAll('"', '""')}"`;
+}
+
 function run(command, args, options = {}) {
   const env = { ...process.env, ...(options.env || {}) };
   const executable = resolveCommand(command, env) || command;
-  const needsWindowsShell = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
-  const result = spawnSync(executable, args, {
+  const needsWindowsCommandProcessor = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
+  const spawnCommand = needsWindowsCommandProcessor
+    ? envValue(env, "ComSpec") || "cmd.exe"
+    : executable;
+  const spawnArgs = needsWindowsCommandProcessor
+    ? ["/d", "/s", "/c", [executable, ...args].map(quoteWindowsCommandArg).join(" ")]
+    : args;
+  const result = spawnSync(spawnCommand, spawnArgs, {
     cwd: options.cwd || os.homedir(),
     env,
     encoding: "utf8",
     stdio: options.capture ? "pipe" : "inherit",
-    shell: needsWindowsShell,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
