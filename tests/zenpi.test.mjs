@@ -628,6 +628,8 @@ test("showcase site is self-contained and Pages-ready", () => {
   const siteDir = path.join(repoRoot, "site");
   const html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
   const css = fs.readFileSync(path.join(siteDir, "styles.css"), "utf8");
+  const wikiHtml = fs.readFileSync(path.join(siteDir, "wiki", "index.html"), "utf8");
+  const wikiCss = fs.readFileSync(path.join(siteDir, "wiki.css"), "utf8");
   const cycle = fs.readFileSync(path.join(siteDir, "cycle.js"), "utf8");
   const svg = fs.readFileSync(path.join(siteDir, "self-improvement-loop-v2.svg"), "utf8");
   const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
@@ -694,6 +696,33 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(css, /\.delegation-roles \.blocked/);
   assert.match(css, /\.story-tabs button\[aria-selected="true"\]/);
   assert.match(css, /prefers-reduced-motion: reduce/);
+
+  assert.match(html, /class="wiki-link" href="wiki\/"/);
+  assert.match(css, /\.site-header nav \.wiki-link \{ display: block; \}/);
+  assert.match(readme, /tannermidd\.github\.io\/ZenPi\/wiki\//);
+  assert.match(wikiHtml, /<html lang="en">/);
+  assert.match(wikiHtml, /name="viewport"/);
+  assert.match(wikiHtml, /href="\.\.\/styles\.css"/);
+  assert.match(wikiHtml, /href="\.\.\/wiki\.css"/);
+  assert.match(wikiHtml, /href="\.\.\/logo\.svg"/);
+  assert.match(wikiHtml, /aria-label="Wiki navigation"/);
+  assert.match(wikiHtml, /class="mobile-wiki-nav"[\s\S]*?href="#first-session"/);
+  for (const id of ["overview", "getting-started", "first-session", "workflows", "file-review", "delegation", "browser-qa", "reference", "configuration", "security", "development"]) {
+    assert.match(wikiHtml, new RegExp(`id="${id}"`));
+  }
+  assert.match(wikiHtml, /\/harness-improvement/);
+  assert.match(wikiHtml, /\/zen-subagents status/);
+  assert.match(wikiHtml, /\.\\zenpi\.cmd doctor/);
+  assert.match(wikiHtml, /\.\/zenpi doctor/);
+  assert.match(wikiHtml, /npm run check/);
+  assert.match(wikiHtml, /Nothing self-starts/);
+  assert.match(wikiHtml, /Same exact provider/);
+  assert.match(wikiHtml, /fresh isolated Chromium context/);
+  assert.match(wikiCss, /\.wiki-layout/);
+  assert.match(wikiCss, /\.wiki-sidebar/);
+  assert.match(wikiCss, /\.mobile-wiki-nav nav a \{ display: flex; min-height: 2rem;/);
+  assert.match(wikiCss, /@media \(max-width: 520px\)/);
+
   assert.equal(cycle.match(/stage: "/g)?.length, 7);
   assert.match(cycle, /scrollIntoView/);
   assert.match(cycle, /ArrowRight|ArrowDown/);

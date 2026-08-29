@@ -496,6 +496,7 @@ footer p { margin: 0; text-align: center; }
 @media (max-width: 700px) {
   .site-header, main, footer { width: min(100% - 2rem, 1160px); }
   nav a:not(.github-link) { display: none; }
+  .site-header nav .wiki-link { display: block; }
   section { padding-block: 5rem; }
   .hero { min-height: auto; padding-top: 5.5rem; }
   h1 { font-size: clamp(3.6rem, 17vw, 5.5rem); }

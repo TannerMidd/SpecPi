@@ -13,6 +13,7 @@
 
 <p align="center">
   <a href="https://tannermidd.github.io/ZenPi/"><strong>Showcase</strong></a>
+  · <a href="https://tannermidd.github.io/ZenPi/wiki/">Wiki</a>
   · <a href="#install">Install</a>
   · <a href="SECURITY.md">Security</a>
 </p>
