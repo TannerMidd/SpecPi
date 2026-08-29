@@ -45,6 +45,8 @@ The goal is not autonomous self-modification. It is to make the next justified c
 /harness-improvement
 ```
 
+[Walk one example through the loop](https://tannermidd.github.io/ZenPi/#wishlist) to see how evidence, human choice, verification, retirement, and later review change the same item.
+
 `retired` means the capability was integrated and passed its verification gate. `review-needed` means new evidence appeared afterward; choosing it from `/harness-improvement` reopens and selects it automatically.
 
 `/wishlist` remains the local inspection and advanced curation surface. Exact merge/unmerge decisions correct fragmented gap names without rewriting history. Local issue drafts and checksummed archive/reset operations remain explicit and offline.

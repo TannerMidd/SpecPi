@@ -15,6 +15,7 @@
   <title>ZenPi — Improve through use</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <script type="module" src="cycle.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -84,69 +85,72 @@
         <p>Not a feature dump. Not automatic failure scraping. A small feedback system for gaps that are real, reusable, and still unsolved.</p>
       </div>
 
-      <div class="cycle-charts" aria-label="Self-improvement cycle charts">
-        <figure class="cycle-panel orbit-panel">
-          <figcaption><span>Cycle chart</span><strong>One item. One complete loop.</strong></figcaption>
-          <div class="cycle-orbit" role="img" aria-label="Observe, qualify, choose, improve, verify, and retire one capability gap; later evidence returns it for review">
-            <div class="orbit-core"><strong>one item</strong><span>at a time</span></div>
-            <span class="orbit-node orbit-one"><b>01</b>observe</span>
-            <span class="orbit-node orbit-two"><b>02</b>qualify</span>
-            <span class="orbit-node orbit-three"><b>03</b>choose</span>
-            <span class="orbit-node orbit-four"><b>04</b>improve</span>
-            <span class="orbit-node orbit-five"><b>05</b>verify</span>
-            <span class="orbit-node orbit-six"><b>06</b>retire / review</span>
+      <section class="cycle-story" aria-labelledby="cycle-story-title" data-cycle-story>
+        <div class="story-heading">
+          <div>
+            <p class="story-kicker">Try the loop</p>
+            <h3 id="cycle-story-title">Walk one gap from friction to proof.</h3>
           </div>
-        </figure>
+          <p>Use the stages or controls to see exactly what changes—and what never happens automatically.</p>
+        </div>
 
-        <figure class="cycle-panel gate-panel">
-          <figcaption><span>Outcome chart</span><strong>Proof decides what happens next.</strong></figcaption>
-          <div class="gate-flow" role="img" aria-label="A selected improvement passes through repository and capability gates; passing retires it, while failure leaves it selected">
-            <div class="gate-source"><span>selected</span><strong>smallest sufficient change</strong></div>
-            <div class="gate-check"><span>verification gate</span><strong>repository check</strong><strong>capability validator</strong></div>
-            <div class="gate-outcomes">
-              <div class="gate-pass"><span>pass</span><strong>retire</strong><small>close with evidence</small></div>
-              <div class="gate-fail"><span>fail</span><strong>stay selected</strong><small>fix, revert, or report</small></div>
+        <div class="story-fallback">
+          <p>One gap, start to finish:</p>
+          <ol>
+            <li><strong>Friction</strong><span>record one local signal</span></li>
+            <li><strong>Repeat</strong><span>qualify reusable evidence</span></li>
+            <li><strong>Choose</strong><span>authorize one exact item</span></li>
+            <li><strong>Build</strong><span>make the smallest change</span></li>
+            <li><strong>Prove</strong><span>run repository and capability gates</span></li>
+            <li><strong>Retire</strong><span>close only after proof passes</span></li>
+            <li><strong>Return</strong><span>surface later evidence for human review</span></li>
+          </ol>
+        </div>
+
+        <div class="story-tabs" role="tablist" aria-label="Improvement stages">
+          <button type="button" role="tab" aria-selected="true" aria-controls="cycle-story-panel" data-cycle-step="0"><span>01</span>Friction</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="1" tabindex="-1"><span>02</span>Repeat</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="2" tabindex="-1"><span>03</span>Choose</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="3" tabindex="-1"><span>04</span>Build</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="4" tabindex="-1"><span>05</span>Prove</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="5" tabindex="-1"><span>06</span>Retire</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="6" tabindex="-1"><span>07</span>Return</button>
+        </div>
+
+        <div class="story-workbench" id="cycle-story-panel" role="tabpanel" tabindex="0">
+          <article class="story-narrative">
+            <p class="story-stage" data-story-stage>01 / friction</p>
+            <h3 data-story-headline>A real task hits a real limit.</h3>
+            <p data-story-copy>A responsive page needs rendered desktop and mobile inspection, but no local browser is available.</p>
+            <div class="story-boundary">
+              <span>ZenPi does</span>
+              <strong data-story-action>record one sanitized local signal</strong>
+              <small data-story-boundary>No work begins. One report is evidence, not authority.</small>
             </div>
-          </div>
-        </figure>
-      </div>
+          </article>
 
-      <ol class="loop" aria-label="ZenPi improvement loop">
-        <li>
-          <span class="step-number">01</span>
-          <div class="step-mark" aria-hidden="true">×</div>
-          <h3>Notice</h3>
-          <p>An existing tool or workaround proves insufficient.</p>
-        </li>
-        <li>
-          <span class="step-number">02</span>
-          <div class="step-mark" aria-hidden="true">◇</div>
-          <h3>Name</h3>
-          <p>The reusable gap is described without prompts, code, or secrets.</p>
-        </li>
-        <li>
-          <span class="step-number">03</span>
-          <div class="step-mark" aria-hidden="true">≋</div>
-          <h3>Measure</h3>
-          <p>Recurrence, reach, impact, and recency reveal what matters.</p>
-        </li>
-        <li>
-          <span class="step-number">04</span>
-          <div class="step-mark" aria-hidden="true">↗</div>
-          <h3>Improve</h3>
-          <p>A selected signal becomes a smallest-change experiment with proof and rollback.</p>
-        </li>
-        <li>
-          <span class="step-number">05</span>
-          <div class="step-mark" aria-hidden="true">✓</div>
-          <h3>Retire</h3>
-          <p>Verified gaps leave the queue. Later regressions remain visible without reopening themselves.</p>
-        </li>
-      </ol>
-      <div class="state-line" aria-label="Explicit wishlist lifecycle">
-        <span>open</span><i>→</i><span>selected</span><i>→</i><span>retired</span>
-        <b>verification required · regression → review-needed</b>
-      </div>
+          <article class="story-item" aria-label="Example wishlist item as it moves through the loop">
+            <div class="story-item-topline"><span>local-browser-automation</span><strong data-story-status data-status="open">open</strong></div>
+            <h3>Rendered interface inspection</h3>
+            <p data-story-signal>Signal recorded locally</p>
+            <div class="story-meter" aria-hidden="true"><i data-story-meter style="--story-progress: 18%"></i></div>
+            <dl class="story-metrics">
+              <div><dt>tasks</dt><dd data-story-tasks>1</dd></div>
+              <div><dt>projects</dt><dd data-story-projects>1</dd></div>
+              <div><dt>impact</dt><dd data-story-impact>degraded</dd></div>
+            </dl>
+          </article>
+        </div>
+
+        <div class="story-controls">
+          <p><span data-story-count>1</span> of 7 · <strong data-story-next-label>add a second task</strong></p>
+          <div>
+            <button type="button" class="story-control" data-story-previous disabled><span aria-hidden="true">←</span> Previous</button>
+            <button type="button" class="story-control story-control-next" data-story-next>Next <span aria-hidden="true">→</span></button>
+          </div>
+        </div>
+        <p class="sr-only" aria-live="polite" data-story-announcement></p>
+      </section>
     </section>
 
     <section class="mechanics" id="workings" aria-labelledby="workings-title">
