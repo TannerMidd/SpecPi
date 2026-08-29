@@ -18,6 +18,7 @@ import {
   setCollectionMode,
 } from "../extensions/tool-wishlist/core.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
+import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
 import {
   assertDistinctPaths,
   comparePngBuffers,
@@ -143,6 +144,7 @@ test("showcase site is self-contained and Pages-ready", () => {
   const siteDir = path.join(repoRoot, "site");
   const html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
   const css = fs.readFileSync(path.join(siteDir, "styles.css"), "utf8");
+  const cycle = fs.readFileSync(path.join(siteDir, "cycle.js"), "utf8");
   const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
 
   assert.match(html, /<html lang="en">/);
@@ -156,19 +158,33 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /id="goal"/);
   assert.match(html, /A control loop,<br>not an autopilot\./);
   assert.match(html, /<code>\/harness-improvement<\/code> opens one clean menu/);
-  assert.match(html, /class="cycle-charts"/);
-  assert.match(html, /aria-label="Observe, qualify, choose, improve, verify, and retire one capability gap/);
-  assert.match(html, /Proof decides what happens next\./);
-  assert.match(html, /verification required · regression → review-needed/);
+  assert.match(html, /type="module" src="cycle\.js"/);
+  assert.match(html, /data-cycle-story/);
+  assert.match(html, /role="tablist" aria-label="Improvement stages"/);
+  assert.equal(html.match(/data-cycle-step=/g)?.length, 7);
+  assert.match(html, /class="story-fallback"/);
+  assert.match(html, /surface later evidence for human review/);
+  assert.match(html, /aria-live="polite" data-story-announcement/);
+  assert.match(html, /Walk one gap from friction to proof\./);
+  assert.doesNotMatch(html, /cycle-charts|cycle-orbit|gate-outcomes/);
   assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
   assert.match(html, /Stable <code>v0\.3\.0<\/code> includes the one-command improvement loop/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
-  assert.match(css, /\.cycle-orbit/);
-  assert.match(css, /\.gate-outcomes/);
+  assert.match(css, /\.cycle-story/);
+  assert.match(css, /\.story-tabs button\[aria-selected="true"\]/);
   assert.match(css, /prefers-reduced-motion: reduce/);
+  assert.equal(cycle.match(/stage: "/g)?.length, 7);
+  assert.match(cycle, /scrollIntoView/);
+  assert.match(cycle, /ArrowRight|ArrowDown/);
+  assert.equal(CYCLE_STAGES.length, 7);
+  assert.deepEqual(CYCLE_STAGES.map((stage) => stage.status), ["open", "qualified", "selected", "selected", "verifying", "retired", "review-needed"]);
+  assert.equal(nextCycleStep(0), 1);
+  assert.equal(nextCycleStep(6), 2);
+  assert.equal(previousCycleStep(3), 2);
+  assert.equal(previousCycleStep(0), 0);
   assert.match(workflow, /actions\/configure-pages@v5/);
   assert.match(workflow, /actions\/upload-pages-artifact@v4/);
   assert.match(workflow, /actions\/deploy-pages@v4/);

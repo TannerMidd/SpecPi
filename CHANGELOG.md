@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Replace the abstract cycle charts with an accessible interactive walkthrough that shows one gap moving through evidence, human choice, proof, retirement, and later review.
+
 ## 0.3.0 - 2026-08-29
 
 - Complete the local improvement loop with explicit collection consent, deterministic evidence ranking, lifecycle decisions, and regression-aware retirement.
