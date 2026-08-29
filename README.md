@@ -44,74 +44,41 @@ The goal is not autonomous self-modification. It is to make the next justified c
 /harness-improvement
 ```
 
-`retired` means the capability was integrated and passed its verification gate. `review-needed` means new evidence appeared afterward; choosing it from `/harness-improvement` reopens and selects it automatically.
+`retired` means the fix is done and verified. `review-needed` means new friction showed up later; picking it from the menu reopens it automatically.
 
-`/wishlist` remains the local inspection and advanced curation surface. Exact merge/unmerge decisions correct fragmented gap names without rewriting history. Local issue drafts and checksummed archive/reset operations remain explicit and offline.
+`/wishlist` is where you can look through the private list yourself — tidy up duplicates, draft an issue, or archive or reset it. Everything stays on your machine, and nothing changes without your confirmation.
 
 ## What ZenPi adds
 
-- Focused `/zen` execution mode
-- Tea House-native `/files` browser, viewer, diffs, and review comments
-- Evidence-led capability wishlist
-- One-command `/harness-improvement` workflow
-- `/zen-subagents` saved exact-provider role profiles and global capacity configuration
-- Isolated browser interaction and visual regression checks
-- Review-first installation with backups, checksums, and rollback
+- **`/zen`** — a focused execution mode
+- **`/files`** — browse files, view diffs, and leave review comments
+- **Wishlist** — a private log of friction, ready to act on
+- **`/harness-improvement`** — pick one item and let ZenPi fix and verify it
+- **`/zen-subagents`** — remember how you like your subagents set up
+- **Isolated browser** — check your web UI with screenshots, safely sandboxed
+- **Careful installs** — everything is backed up and can be rolled back
 
-### Browse and review files
-
-Run `/files` to open the Tea House-native project browser, or `/files <path>` to start in another directory. It uses Pi's built-in syntax and Markdown renderers, with no bat, git-delta, or glow prerequisite.
-
-Inside the browser, use `j`/`k` to move, `Enter` to open, `/` to search, `c` to show changed files, and `r` to refresh. The viewer supports source, rendered Markdown, Git diffs, and `v` line selection followed by `c` to write a review comment; submit it with `Ctrl+Enter`.
-
-### Configure native subagents
-
-Run `/zen-subagents` for one confirmed flow that edits the active exact-provider profile for `scout`, `researcher`, `worker`, `reviewer`, and `oracle`, plus cumulative run/session child budgets and active top-level async capacity that remain global.
-
-Configure each exact Pi provider once. ZenPi restores its saved profile and strict `modelScope` automatically when a later session switches back, then prompts for `/reload` when the startup-loaded runtime mapping changed. `inherit` remains portable. Saved models that are no longer available become stale, remain stored, and are never silently replaced; `openai` and `openai-codex` remain separate boundaries. Simultaneous processes on different providers fail closed instead of racing the shared active mirror.
-
-```text
-/zen-subagents
-/zen-subagents status
-/zen-subagents reset
-```
-
-One confirmation atomically applies the provider profile, active settings mirror, and any explicitly edited global capacity while preserving unrelated JSON and creating a bounded leaf-only backup. Reset changes only the active provider profile; other profiles and global capacity remain unchanged. Run `/reload` after ZenPi restores a provider profile or edits startup-loaded role/capacity settings; native launches remain blocked until the refreshed runtime is verified. These settings do not control modern `runs.all` child concurrency.
-
-Trusted project `.pi/settings.json` has higher Pi precedence. ZenPi resolves the effective project from the launch `cwd` and blocks native `subagent` tool launches when that project replaces the managed scope with an unsafe cross-provider policy. File-authored workflows and inline scripts containing a literal child `cwd` are blocked because a config wrapper cannot verify those child projects before `pi-subagents` evaluates the script. Inline JavaScript can dynamically compute child options; such user-authored workflow code, directly administered project configuration, and direct `pi-subagents` commands remain trusted user-controlled boundaries rather than claims ZenPi can sandbox.
+Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
 
 ## Install
 
-Requires Node.js 22.19+, npm, and Git. ZenPi uses an existing Pi 0.84.4+ installation; when Pi is absent, a confirmed install automatically runs npm to globally install the reviewed `@earendil-works/pi-coding-agent@0.84.4` release with lifecycle scripts disabled. Clone a reviewed release tag rather than piping remote code into a shell.
+You need Node.js 22.19+, npm, and Git. If Pi (0.84.4+) isn't installed yet, the installer sets it up for you.
 
 ```bash
 git clone --branch v0.6.1 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
+./zenpi plan      # preview what will change (changes nothing)
+./zenpi install   # asks for confirmation first
+./zenpi doctor    # verify everything works
 ```
 
-**Windows**
-
-```powershell
-.\zenpi.cmd plan
-.\zenpi.cmd install
-.\zenpi.cmd doctor
-```
-
-**Linux, macOS, or Git Bash**
-
-```bash
-./zenpi plan
-./zenpi install
-./zenpi doctor
-```
-
-Installation remains explicit and reversible. The plan and confirmation show Pi bootstrap before any global installation. `--skip-package-install` also disables automatic Pi installation. A Pi installation created by ZenPi is external and remains after ZenPi uninstall. If npm's global executable directory is not already on `PATH`, ZenPi stops with that exact directory and requires it to be added before installation can complete; it never relies on a process-only `PATH` change. Use `--skip-browser-install`, `--skip-package-install`, or `--skip-tool-install` when needed, then run `/reload` in Pi. See [SECURITY.md](SECURITY.md) for dependency, platform, state-retention, and trust details.
+On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible — see [SECURITY.md](SECURITY.md) for details.
 
 ## Boundaries
 
-ZenPi does not own or inspect credentials, provider authentication, session content, history, or trust decisions. `/zen-subagents` reads active provider/model identifiers and available scoped model metadata, and stores only exact provider IDs, model IDs, thinking levels, timestamps, and schema metadata in `~/.pi/agent/zenpi/subagent-provider-profiles.json` (or the equivalent `PI_CODING_AGENT_DIR` path). Profiles are retained on uninstall; after stopping Pi, delete that file manually for a complete profile purge. Wishlist evidence alone grants no authority. A person must choose the exact item in `/harness-improvement`; installs, uploads, publishing, and remote-state changes still require separate explicit approval.
+ZenPi never touches your credentials, sessions, or history, and nothing is ever uploaded. Wishlist reports are stored locally only — skim them before sharing. Nothing happens without your say-so: improving ZenPi, installing, or publishing all need your explicit approval.
 
-Sanitization is bounded defense in depth. Review local wishlist output before sharing it.
+See [SECURITY.md](SECURITY.md) for the full picture.
 
 ## Development
 
