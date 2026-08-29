@@ -437,6 +437,13 @@ function queueGroups(events, decisions) {
   return groupsWithState(events, decisions).filter((group) => ["open", "selected"].includes(group.state));
 }
 
+export function harnessImprovementCandidates(events, decisions = []) {
+  const rank = (group) => group.state === "selected" ? 0 : group.reviewNeeded ? 1 : 2;
+  return groupsWithState(events, decisions)
+    .filter((group) => group.state === "selected" || group.reviewNeeded || (group.state === "open" && group.qualified))
+    .sort((a, b) => rank(a) - rank(b));
+}
+
 export function nextWishlistCandidate(events, decisions = []) {
   const groups = queueGroups(events, decisions).filter((group) => group.qualified);
   return groups.find((group) => group.state === "selected") ?? groups.find((group) => group.state === "open");
@@ -536,8 +543,8 @@ function renderImprovementCard(group) {
     "- **Rollback:** Define how to reverse the change without losing observations.",
     "- **Privacy/security:** Confirm the change adds no unapproved collection, credentials, or remote state.", "",
     group.state === "selected"
-      ? "This gap is selected. Load the `zenpi-improve` skill to prepare an approval-gated implementation proposal."
-      : `Select explicitly with \`/wishlist select ${group.canonicalKey}\`. Selection never edits source or installs anything.`,
+      ? "This gap is selected. Run `/harness-improvement` to resume its verified implementation workflow."
+      : "Run `/harness-improvement` to choose an item and begin its verified implementation workflow.",
     "",
   ];
   return lines.join("\n");
@@ -725,6 +732,7 @@ export async function refreshWishlist(options) {
     return {
       reportPath: files.report, report,
       next: renderNextWishlist(parsed.events, decisionData.decisions),
+      improvements: harnessImprovementCandidates(parsed.events, decisionData.decisions),
       uniqueGaps: groups.length,
       occurrences: groups.reduce((total, group) => total + group.occurrences, 0),
       invalidLines: parsed.invalidLines + decisionData.invalidLines,
