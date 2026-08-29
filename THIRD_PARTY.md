@@ -1,6 +1,6 @@
 # Third-party components
 
-When Pi is absent, ZenPi can install the reviewed `@earendil-works/pi-coding-agent@0.84.3` npm package globally after confirmation. The package provides the `pi` executable, is installed with lifecycle scripts disabled, retains its upstream license, and remains external system state after ZenPi uninstall.
+When Pi is absent, ZenPi can install the reviewed `@earendil-works/pi-coding-agent@0.84.4` npm package globally after confirmation. The package provides the `pi` executable, is installed with lifecycle scripts disabled, retains its upstream license, and remains external system state after ZenPi uninstall.
 
 ZenPi pins but does not vendor these Pi packages:
 

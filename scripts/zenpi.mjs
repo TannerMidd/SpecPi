@@ -29,9 +29,9 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const VERSION = packageJson.version;
-const MIN_PI_VERSION = "0.80.0";
+const MIN_PI_VERSION = "0.84.4";
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
-const PI_PACKAGE_VERSION = "0.84.3";
+const PI_PACKAGE_VERSION = "0.84.4";
 const CLI = process.platform === "win32" ? ".\\zenpi.cmd" : "./zenpi";
 const agentDir = path.resolve(
   process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"),
@@ -622,6 +622,11 @@ function managedFiles(includeShell) {
   const files = [
     [path.join(repoRoot, "extensions", "zen.ts"), path.join(agentDir, "extensions", "zen.ts"), 0o644],
     [
+      path.join(repoRoot, "extensions", "ui-refresh", "index.ts"),
+      path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts"),
+      0o644,
+    ],
+    [
       path.join(repoRoot, "extensions", "files", "index.ts"),
       path.join(agentDir, "extensions", "files", "index.ts"),
       0o644,
@@ -868,6 +873,7 @@ async function confirm(message, yes) {
 function assertSources() {
   const required = [
     "extensions/zen.ts",
+    "extensions/ui-refresh/index.ts",
     "extensions/files/index.ts",
     "extensions/files/core.mjs",
     "extensions/browser/index.ts",
@@ -1005,11 +1011,12 @@ function retireManagedOptionalToolRecords(records, warnings, preserved) {
 
 async function installOrUpdate(options, update) {
   assertSources();
-  const piMissing = !options.skipPackageInstall && !commandExists("pi");
-  if (piMissing && !commandExists("npm")) {
+  const piAvailable = commandExists("pi");
+  const shouldBootstrapPi = !piAvailable && !options.skipPackageInstall;
+  if (shouldBootstrapPi && !commandExists("npm")) {
     throw new Error(`npm is required to install missing Pi ${PI_PACKAGE}@${PI_PACKAGE_VERSION}.`);
   }
-  if (!options.skipPackageInstall && !piMissing) assertPiVersion();
+  if (piAvailable) assertPiVersion();
   if (!options.skipBrowserInstall && !commandExists("npm")) {
     throw new Error("npm is required to install the managed browser runtime.");
   }
@@ -1037,7 +1044,7 @@ async function installOrUpdate(options, update) {
     validateManagedUpdate(previousManifest, files, options.force);
     printPlan({ ...options, skipShell: !manageShellNow });
     await confirm(`${update ? "Update" : "Install"} ZenPi ${VERSION}?`, options.yes);
-    if (piMissing) {
+    if (shouldBootstrapPi) {
       piBootstrapAttempted = true;
       installPi();
       piInstalledByOperation = true;
