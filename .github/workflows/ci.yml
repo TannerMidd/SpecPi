@@ -41,7 +41,7 @@ jobs:
           @'
           @echo off
           if "%~1"=="--version" (
-            echo 0.84.3
+            echo 0.84.4
             exit /b 0
           )
           echo %*>>"%ZENPI_FAKE_LOG%"
@@ -78,7 +78,7 @@ jobs:
             throw "Expected 6 pi install calls, found $($installCalls.Count)"
           }
           $piBootstrapCalls = @(Get-Content $log | Where-Object {
-            $_ -match '^npm "?install"? "?--global"? "?--ignore-scripts"? "?@earendil-works/pi-coding-agent@0\.84\.3"? '
+            $_ -match '^npm "?install"? "?--global"? "?--ignore-scripts"? "?@earendil-works/pi-coding-agent@0\.84\.4"? '
           })
           if ($piBootstrapCalls.Count -ne 1) {
             throw "Expected 1 Pi bootstrap call, found $($piBootstrapCalls.Count)"
