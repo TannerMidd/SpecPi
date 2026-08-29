@@ -13,7 +13,7 @@
 - Use cheap subagents only through an explicitly user-approved same-provider profile.
 - For material changes, run the narrowest relevant checks, inspect the final diff, and use fresh read-only review when risk warrants it.
 - Never claim completion from plausibility alone. Report commands run, validation results, and residual risks.
-- Treat wishlist observations as leads, not permission to edit. Use the `zenpi-improve` skill for selected gaps, obtain explicit implementation approval, and retire only with direct validation evidence.
+- Treat wishlist observations as leads, not permission to edit. Start only from an exact `/harness-improvement` menu choice, use the `zenpi-improve` skill, and retire through its verification gate only after direct evidence passes.
 - Do not commit, push, publish, deploy, or alter remote state unless the user explicitly requests it.
 - Prefer Pi web tools for ordinary research. Use the DonSeTch skill for whole-site crawling, bot walls, JavaScript-heavy extraction, or focused probes.
 - Use ZenPi browser tools to validate rendered web interfaces at relevant desktop, tablet, and mobile viewports; source review and HTTP checks are not proof of visual correctness.

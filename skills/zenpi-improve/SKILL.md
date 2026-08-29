@@ -9,8 +9,8 @@ Improve the harness through an explicit experiment, never through quiet self-mod
 
 ## Preconditions
 
-1. Ask the user to run `/wishlist next` when no gap ID or evidence card is available.
-2. Require a persisted selected gap. If it is still open, ask the user to run `/wishlist select <id>`; conversational confirmation does not replace the explicit lifecycle decision.
+1. Begin through `/harness-improvement`. Its menu exposes qualified and review-needed items, records the chosen item as selected, and starts this workflow.
+2. Treat that exact menu choice as approval for the smallest sufficient implementation of that item. Ask again only if scope expands or external/remote state would change.
 3. Treat wishlist summaries as leads, not proof. Inspect the current repository, tools, docs, tests, and runtime behavior before designing a change.
 4. Do not inspect Pi credentials, trust decisions, sessions, history, missions, or unrelated private state.
 
@@ -26,7 +26,7 @@ Before editing, present one compact card:
 - **Privacy/security:** state what new data, permissions, dependencies, or external state would be introduced; prefer none.
 - **Non-goals:** reject adjacent feature accumulation.
 
-Ask for approval before modifying source unless the user already explicitly authorized implementation of this exact card.
+The `/harness-improvement` selection authorizes this exact smallest-sufficient card. Do not add another approval step unless the proposed work exceeds it.
 
 ## Implementation
 
@@ -43,9 +43,9 @@ Ask for approval before modifying source unless the user already explicitly auth
 1. Run the narrowest focused checks, then `npm run check`.
 2. For installer changes, exercise plan/install/doctor/update/uninstall with a temporary `PI_CODING_AGENT_DIR`; never use the live Pi directory.
 3. Inspect the final diff and obtain fresh read-only review when risk warrants it.
-4. Retire only after direct acceptance evidence passes. Record retirement explicitly with `/wishlist retire <id>` when the local lifecycle is selected and the shipped registry/validation evidence is correct.
-5. If validation fails, fix or revert. Do not retire on plausibility.
-6. If a retired capability later produces a regression signal, investigate and require an explicit `/wishlist reopen <id>` before treating it as open work.
+4. At the end, call `finish_harness_improvement` with the exact gap ID, concise direct acceptance evidence, and a sanitized validation note. The tool independently requires source-registry integration, runs `npm run check`, executes supported closed validators, and retires only if every gate passes.
+5. If validation fails, fix or revert. Do not retire on plausibility; leave the item selected and report the blocker.
+6. A later regression returns the retired item to the `/harness-improvement` menu. Choosing it there explicitly reopens and selects it for review.
 
 ## Handoff
 

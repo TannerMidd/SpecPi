@@ -155,12 +155,19 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /id="workings"/);
   assert.match(html, /id="goal"/);
   assert.match(html, /A control loop,<br>not an autopilot\./);
+  assert.match(html, /<code>\/harness-improvement<\/code> opens one clean menu/);
+  assert.match(html, /class="cycle-charts"/);
+  assert.match(html, /aria-label="Observe, qualify, choose, improve, verify, and retire one capability gap/);
+  assert.match(html, /Proof decides what happens next\./);
   assert.match(html, /verification required · regression → review-needed/);
   assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
+  assert.match(html, /Stable <code>v0\.2\.0<\/code> installs below/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
+  assert.match(css, /\.cycle-orbit/);
+  assert.match(css, /\.gate-outcomes/);
   assert.match(css, /prefers-reduced-motion: reduce/);
   assert.match(workflow, /actions\/configure-pages@v5/);
   assert.match(workflow, /actions\/upload-pages-artifact@v4/);
@@ -508,12 +515,12 @@ test("wishlist next requires qualified evidence and gives selected-state guidanc
 
     await recordTestGap({ stateDir: root, sessionId: "s2", runId: "r2", cwd: root, gap });
     refreshed = await refreshWishlist({ stateDir: root });
-    assert.match(refreshed.next, /wishlist select local-audio-transcription/);
+    assert.match(refreshed.next, /Run `\/harness-improvement` to choose an item/);
 
     await appendWishlistDecision({ stateDir: root, action: "select", canonicalKey: "local-audio-transcription" });
     refreshed = await refreshWishlist({ stateDir: root });
     assert.match(refreshed.next, /This gap is selected/);
-    assert.match(refreshed.next, /zenpi-improve/);
+    assert.match(refreshed.next, /Run `\/harness-improvement` to resume/);
     assert.doesNotMatch(refreshed.next, /wishlist select local-audio-transcription/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -712,32 +719,49 @@ test("wishlist issue drafts stay local and archives recover after a prepared ope
   }
 });
 
-test("wishlist extension keeps lifecycle command-only and wires consent, drafts, reset, and checksums", () => {
+test("wishlist extension runs the one-command improvement loop and preserves consent, drafts, reset, and checksums", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-extension-"));
   try {
     const result = runWishlistExtensionHarness(path.join(root, "agent"));
     if (!result) {
       const source = fs.readFileSync(path.join(repoRoot, "extensions", "tool-wishlist", "index.ts"), "utf8");
-      assert.equal(source.match(/pi\.registerTool\(/g)?.length, 1);
+      assert.equal(source.match(/pi\.registerTool\(/g)?.length, 2);
       assert.match(source, /name: "report_capability_gap"/);
-      assert.equal(source.match(/pi\.registerCommand\(/g)?.length, 1);
+      assert.match(source, /name: "finish_harness_improvement"/);
+      assert.equal(source.match(/pi\.registerCommand\(/g)?.length, 2);
+      assert.match(source, /pi\.registerCommand\("harness-improvement"/);
       assert.match(source, /pi\.registerCommand\("wishlist"/);
       assert.match(source, /salted task, session, and project hashes locally/);
       assert.match(source, /archiveWishlist\(\{ stateDir, reason: action \}\)/);
       return;
     }
-    assert.deepEqual(result.toolNames, ["report_capability_gap"]);
-    assert.deepEqual(result.commandNames, ["wishlist"]);
-    assert.equal(result.lifecycleToolExposed, false);
+    assert.deepEqual(result.toolNames, ["report_capability_gap", "finish_harness_improvement"]);
+    assert.deepEqual(result.commandNames, ["harness-improvement", "wishlist"]);
+    assert.equal(result.completionToolExposed, true);
+    assert.equal(result.lifecycleBypassBlocked, true);
     assert.match(result.consent, /salted task, session, and project hashes locally/);
     assert.equal(result.resetConfirmed, true);
     assert.equal(result.reportStableAfterRevalidation, true);
+    assert.match(result.improvementMenu.title, /Choose one harness improvement/);
+    assert.match(result.improvementMenu.options[0], /REVIEW · Local browser automation · local-browser-automation/);
+    assert.equal(result.legacyCandidate.canonicalKey, "local-browser-automation");
+    assert.equal(result.legacyCandidate.reviewNeeded, true);
+    assert.match(result.unauthorizedCompletion, /not authorized by \/harness-improvement in the current session/);
+    assert.match(result.implementationStarted, /Begin the selected ZenPi harness improvement: local-browser-automation/);
+    assert.deepEqual(result.verificationCommands.map((item) => item.args), [
+      ["run", "check"],
+      ["run", "check"],
+      [path.join(root, "agent", "project", "extensions", "browser", "smoke.mjs"), path.join(root, "agent", "zenpi", "browser-runtime")],
+    ]);
+    assert.equal(result.rawSessionIdPersisted, false);
+    assert.equal(result.acceptanceEvidencePersisted, false);
+    assert.match(result.failedGate, /repository verification failed/);
+    assert.equal(result.selectedAfterFailedGate, true);
     assert.equal(result.issueDraftRendered, true);
     assert.equal(result.checksumsValid, true);
     assert.equal(result.eventsAfterReset, "");
     assert.equal(result.collectionMode, "on");
     assert.equal(result.saltPreserved, true);
-    assert.ok(result.notifications.some((item) => item.message.startsWith("Wishlist decline:")));
     assert.ok(result.notifications.some((item) => item.message.startsWith("Wishlist reset complete.")));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

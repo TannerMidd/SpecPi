@@ -84,6 +84,33 @@
         <p>Not a feature dump. Not automatic failure scraping. A small feedback system for gaps that are real, reusable, and still unsolved.</p>
       </div>
 
+      <div class="cycle-charts" aria-label="Self-improvement cycle charts">
+        <figure class="cycle-panel orbit-panel">
+          <figcaption><span>Cycle chart</span><strong>One item. One complete loop.</strong></figcaption>
+          <div class="cycle-orbit" role="img" aria-label="Observe, qualify, choose, improve, verify, and retire one capability gap; later evidence returns it for review">
+            <div class="orbit-core"><strong>one item</strong><span>at a time</span></div>
+            <span class="orbit-node orbit-one"><b>01</b>observe</span>
+            <span class="orbit-node orbit-two"><b>02</b>qualify</span>
+            <span class="orbit-node orbit-three"><b>03</b>choose</span>
+            <span class="orbit-node orbit-four"><b>04</b>improve</span>
+            <span class="orbit-node orbit-five"><b>05</b>verify</span>
+            <span class="orbit-node orbit-six"><b>06</b>retire / review</span>
+          </div>
+        </figure>
+
+        <figure class="cycle-panel gate-panel">
+          <figcaption><span>Outcome chart</span><strong>Proof decides what happens next.</strong></figcaption>
+          <div class="gate-flow" role="img" aria-label="A selected improvement passes through repository and capability gates; passing retires it, while failure leaves it selected">
+            <div class="gate-source"><span>selected</span><strong>smallest sufficient change</strong></div>
+            <div class="gate-check"><span>verification gate</span><strong>repository check</strong><strong>capability validator</strong></div>
+            <div class="gate-outcomes">
+              <div class="gate-pass"><span>pass</span><strong>retire</strong><small>close with evidence</small></div>
+              <div class="gate-fail"><span>fail</span><strong>stay selected</strong><small>fix, revert, or report</small></div>
+            </div>
+          </div>
+        </figure>
+      </div>
+
       <ol class="loop" aria-label="ZenPi improvement loop">
         <li>
           <span class="step-number">01</span>
@@ -126,7 +153,7 @@
       <div class="section-intro compact">
         <p class="eyebrow">How it works</p>
         <h2 id="workings-title">A control loop,<br>not an autopilot.</h2>
-        <p>Evidence can recommend work. Only a person can select it, approve an implementation, or retire it.</p>
+        <p>Evidence recommends the work. One human choice starts it; proof—not ceremony—closes it.</p>
       </div>
       <div class="mechanic-grid">
         <article>
@@ -137,12 +164,12 @@
         <article>
           <span>02 / decision</span>
           <h3>Choose one change</h3>
-          <p><code>/wishlist next</code> surfaces qualified evidence. Selection prepares a smallest-change card with proof and rollback; it grants no edit authority.</p>
+          <p><code>/harness-improvement</code> opens one clean menu. Choosing an item starts its smallest-sufficient implementation workflow.</p>
         </article>
         <article>
           <span>03 / outcome</span>
-          <h3>Verify, then retire</h3>
-          <p>Direct checks and reviewed validators close the loop. New friction stays visible as a review signal without reopening itself.</p>
+          <h3>Verify and finish</h3>
+          <p>The harness runs the repository gate and supported validators, then retires only on success. Failures stay selected; later friction returns to the menu.</p>
         </article>
       </div>
     </section>
@@ -178,7 +205,7 @@
         <article>
           <span>03</span>
           <h3>Human-directed</h3>
-          <p>The wishlist informs change. It never grants itself permission to make it.</p>
+          <p>The wishlist informs change. One explicit menu choice authorizes one exact improvement—nothing broader.</p>
         </article>
       </div>
     </section>
@@ -197,6 +224,7 @@
       <div>
         <p class="eyebrow">Begin deliberately</p>
         <h2 id="install-title">Review the plan.<br>Then build.</h2>
+        <p class="release-note">Stable <code>v0.2.0</code> installs below. The one-command improvement loop ships in the next reviewed tag.</p>
       </div>
       <div class="install-terminal" role="region" aria-label="ZenPi installation commands">
         <div class="terminal-bar"><span>terminal</span><span>nothing hidden</span></div>
