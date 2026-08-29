@@ -8,9 +8,9 @@
 - Use visible `PLAN.md`, `TODO.md`, `DECISIONS.md`, or `HANDOFF.md` artifacts only when they improve continuity.
 - Delegate only when fresh context, parallel independent investigation, specialist judgment, or review justifies the overhead.
 - Keep one writer per shared working directory. Use isolated worktrees for intentional parallel writers.
-- Native subagents must inherit the parent session model; never route a child to a different provider.
+- Native subagents may use a different model only within the parent session's exact Pi provider. Use `/zen-subagents` for supported role model, thinking, and capacity changes.
 - Never launch `codex-exec` or `codex-exec-writer`; ZenPi disables these external subscription runners.
-- Use cheap subagents only through an explicitly user-approved same-provider profile.
+- Use cheaper role models only through an explicitly configured same-provider choice.
 - For material changes, run the narrowest relevant checks, inspect the final diff, and use fresh read-only review when risk warrants it.
 - Never claim completion from plausibility alone. Report commands run, validation results, and residual risks.
 - Treat wishlist observations as leads, not permission to edit. Start only from an exact `/harness-improvement` menu choice, use the `zenpi-improve` skill, and retire through its verification gate only after direct evidence passes.

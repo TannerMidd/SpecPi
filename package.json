@@ -57,6 +57,6 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
+    "check": "node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/subagents/core.mjs && node --experimental-strip-types --check extensions/subagents/index.ts && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
   }
 }

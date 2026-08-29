@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   aggregateEvents,
   appendWishlistDecision,
@@ -19,6 +19,15 @@ import {
 } from "../extensions/tool-wishlist/core.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
+import {
+  applySubagentConfiguration,
+  acquireZenPiLock,
+  isSafeProviderScope,
+  modelChoices,
+  readSubagentState,
+  staleRoleModels,
+  syncProviderScope,
+} from "../extensions/subagents/core.mjs";
 import {
   assertDistinctPaths,
   comparePngBuffers,
@@ -97,6 +106,22 @@ function runWishlistExtensionHarness(agentDir) {
   return JSON.parse(marker.slice("ZENPI_WISHLIST_HARNESS=".length));
 }
 
+function runSubagentsExtensionHarness(agentDir) {
+  const runner = path.join(repoRoot, "tests", "fixtures", "run-subagents-extension-harness.ts");
+  const loader = path.join(repoRoot, "tests", "fixtures", "pi-extension-stub-loader.mjs");
+  const result = spawnSync(process.execPath, ["--no-warnings", "--experimental-strip-types", "--loader", pathToFileURL(loader).href, runner], {
+    cwd: repoRoot,
+    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" },
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    throw new Error(`subagents extension harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+  const marker = result.stdout.split("\n").find((line) => line.startsWith("ZENPI_SUBAGENTS_HARNESS="));
+  if (!marker) throw new Error(`subagents extension harness result missing\n${result.stdout}`);
+  return JSON.parse(marker.slice("ZENPI_SUBAGENTS_HARNESS=".length));
+}
+
 function installFakeBrowserNpm(fakeBin) {
   fs.mkdirSync(fakeBin, { recursive: true });
   fs.copyFileSync(path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs"), path.join(fakeBin, "npm"));
@@ -142,6 +167,158 @@ test("path operations create, read, and prune empty parents", () => {
   assert.deepEqual(value, {});
 });
 
+test("subagent helpers filter exact providers and identify stale role models", () => {
+  const models = [
+    { provider: "openai", id: "shared", name: "Shared" },
+    { provider: "openai-codex", id: "shared", name: "Shared Codex" },
+    { provider: "openai-codex", id: "worker", name: "Worker" },
+  ];
+  assert.deepEqual(modelChoices(models, "openai-codex").map((item) => item.value), [
+    "openai-codex/shared",
+    "openai-codex/worker",
+  ]);
+  assert.equal(isSafeProviderScope({ enforce: true, strict: true, allow: ["openai-codex/*"] }, "openai-codex"), true);
+  assert.equal(isSafeProviderScope({ enforce: true, strict: true, allow: ["openai/*"] }, "openai-codex"), false);
+  assert.deepEqual(staleRoleModels({
+    scout: { model: "inherit" },
+    researcher: { model: "openai-codex/shared" },
+    worker: { model: "openai/other" },
+    reviewer: { model: "openai-codex/missing" },
+    oracle: { model: "inherit" },
+  }, "openai-codex", ["openai-codex/shared"]), [
+    { role: "worker", model: "openai/other" },
+    { role: "reviewer", model: "openai-codex/missing" },
+  ]);
+});
+
+test("subagent configuration is scoped, atomic, and preserves unrelated JSON", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-subagents-core-"));
+  const agentDir = path.join(root, "agent");
+  const settingsPath = path.join(agentDir, "settings.json");
+  const configPath = path.join(agentDir, "extensions", "subagent", "config.json");
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify({ unrelated: { kept: true }, subagents: { agentOverrides: { worker: { systemPrompt: "private-unrelated-role-value", tools: ["read"] } } } }));
+  fs.writeFileSync(configPath, JSON.stringify({ unrelated: { kept: true } }));
+  try {
+    assert.equal(syncProviderScope(agentDir, "openai-codex"), true);
+    assert.equal(syncProviderScope(agentDir, "openai-codex"), false);
+    const result = applySubagentConfiguration({
+      agentDir,
+      provider: "openai-codex",
+      roles: { worker: { model: "openai-codex/gpt-5.6-luna", thinking: "high" } },
+      capacity: { maxSubagentSpawnsPerRun: 12, maxSubagentSpawnsPerSession: 40, maxActiveAsyncRunsPerSession: 3 },
+    });
+    assert.equal(result.changed, true);
+    assert.ok(fs.existsSync(result.backup));
+    const state = readSubagentState(agentDir);
+    assert.deepEqual(state.settings.unrelated, { kept: true });
+    assert.equal(state.settings.subagents.agentOverrides.worker.systemPrompt, "private-unrelated-role-value");
+    assert.deepEqual(state.settings.subagents.agentOverrides.worker.tools, ["read"]);
+    const backup = fs.readFileSync(result.backup, "utf8");
+    assert.doesNotMatch(backup, /private-unrelated-role-value|systemPrompt|tools/);
+    assert.deepEqual(state.config.unrelated, { kept: true });
+    assert.deepEqual(state.modelScope, { enforce: true, strict: true, allow: ["openai-codex/*"] });
+    assert.equal(state.roles.worker.model, "openai-codex/gpt-5.6-luna");
+    assert.equal(state.roles.worker.thinking, "high");
+    assert.equal(state.capacity.maxSubagentSpawnsPerRun, 12);
+    assert.throws(() => applySubagentConfiguration({ agentDir, provider: "anthropic", roles: { worker: { model: "openai-codex/gpt-5.6-luna" } } }), /outside the active provider/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("subagent configuration rejects symlinked targets and rolls back a first-file write", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-subagents-rollback-"));
+  const agentDir = path.join(root, "agent");
+  const settingsPath = path.join(agentDir, "settings.json");
+  const configDir = path.join(agentDir, "extensions", "subagent");
+  const configPath = path.join(configDir, "config.json");
+  fs.mkdirSync(configDir, { recursive: true });
+  fs.writeFileSync(settingsPath, '{"kept":true}\n');
+  fs.writeFileSync(configPath, '{}\n');
+  const originalSettings = fs.readFileSync(settingsPath);
+  try {
+    const realConfig = path.join(root, "real-config.json");
+    fs.writeFileSync(realConfig, '{}\n');
+    fs.rmSync(configPath);
+    fs.symlinkSync(realConfig, configPath);
+    assert.throws(() => applySubagentConfiguration({ agentDir, provider: "openai-codex" }), /symlinked configuration target/);
+    fs.rmSync(configPath);
+    fs.writeFileSync(configPath, '{}\n');
+    if (process.platform !== "win32") {
+      fs.chmodSync(configDir, 0o500);
+      assert.throws(() => applySubagentConfiguration({ agentDir, provider: "openai-codex" }), /EACCES|permission denied/i);
+      assert.deepEqual(fs.readFileSync(settingsPath), originalSettings);
+      fs.chmodSync(configDir, 0o700);
+      fs.rmSync(configDir, { recursive: true, force: true });
+      const redirectedConfigDir = path.join(root, "redirected-subagent-config");
+      fs.mkdirSync(redirectedConfigDir);
+      fs.writeFileSync(path.join(redirectedConfigDir, "config.json"), '{}\n');
+      fs.symlinkSync(redirectedConfigDir, configDir);
+      assert.throws(() => applySubagentConfiguration({ agentDir, provider: "openai-codex" }), /symlinked configuration parent/);
+      fs.rmSync(configDir);
+      fs.mkdirSync(configDir);
+      fs.writeFileSync(configPath, '{}\n');
+      const backupDir = path.join(agentDir, "zenpi", "subagent-backups");
+      fs.rmSync(backupDir, { recursive: true, force: true });
+      const redirectedBackups = path.join(root, "redirected-backups");
+      fs.mkdirSync(redirectedBackups);
+      fs.symlinkSync(redirectedBackups, backupDir);
+      assert.throws(() => applySubagentConfiguration({ agentDir, provider: "openai-codex" }), /symlinked backup directory/);
+    }
+  } finally {
+    try { fs.chmodSync(configDir, 0o700); } catch {}
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shared ZenPi lock fails closed and release preserves a substituted lock", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-subagents-lock-"));
+  const agentDir = path.join(root, "agent");
+  const lockPath = path.join(agentDir, "zenpi", "install.lock");
+  try {
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    fs.writeFileSync(lockPath, "malformed\n");
+    assert.throws(() => acquireZenPiLock(agentDir), /malformed/);
+    fs.rmSync(lockPath);
+    const release = acquireZenPiLock(agentDir);
+    fs.writeFileSync(lockPath, '{"pid":999999,"token":"replacement"}\n');
+    release();
+    assert.equal(fs.existsSync(lockPath), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("zen-subagents extension runs one confirmed same-provider configuration flow", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-subagents-extension-"));
+  try {
+    const result = runSubagentsExtensionHarness(path.join(root, "agent"));
+    assert.deepEqual(result.commandNames, ["zen-subagents"]);
+    assert.ok(result.eventNames.includes("model_select"));
+    assert.ok(result.eventNames.includes("tool_call"));
+    assert.deepEqual(result.settings.subagents.modelScope, { enforce: true, strict: true, allow: ["openai-codex/*"] });
+    assert.equal(result.settings.subagents.agentOverrides.worker.model, "openai-codex/gpt-5.6-luna");
+    assert.equal(result.settings.subagents.agentOverrides.worker.thinking, "high");
+    const modelMenu = result.selections.find((item) => item.title.startsWith("worker model"));
+    assert.ok(modelMenu.options.includes("gpt-5.6-luna — Luna"));
+    assert.equal(modelMenu.options.some((item) => item.includes("Sonnet")), false);
+    assert.equal(result.settings.unrelated, true);
+    assert.equal(result.config.maxSubagentSpawnsPerRun, 12);
+    assert.equal(result.config.unrelated, true);
+    assert.equal(result.confirmations.length, 1);
+    assert.equal(result.statusNonMutating, true);
+    assert.match(result.confirmations[0].message, /openai-codex\/\*/);
+    assert.match(result.guardResult.reason, /Project .*project.*settings\.json replaces ZenPi/);
+    assert.match(result.explicitCwdGuardResult.reason, /Project .*other-project.*settings\.json replaces ZenPi/);
+    assert.match(result.gitRootGuardResult.reason, /Project .*monorepo.*settings\.json replaces ZenPi/);
+    assert.match(result.workflowCwdGuardResult.reason, /cannot verify provider policy for file-authored workflows/);
+    assert.ok(result.notifications.some((item) => item.message.includes("Run /reload")));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("platform launchers invoke Node directly", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
   const windowsLauncher = fs.readFileSync(path.join(repoRoot, "zenpi.cmd"), "utf8");
@@ -166,6 +343,15 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /themed \/files review/);
   assert.match(html, /id="wishlist"/);
   assert.match(html, /id="workings"/);
+  assert.match(html, /href="#delegation"/);
+  assert.match(html, /id="delegation"/);
+  assert.match(html, /Provider-safe delegation/);
+  assert.match(html, /<code>\/zen-subagents<\/code>/);
+  assert.match(html, /allowed · same provider/);
+  assert.match(html, /blocked · different provider/);
+  assert.match(html, /cumulative children/);
+  assert.match(html, /active top-level runs/);
+  assert.match(html, /Budgets do not control modern/);
   assert.match(html, /id="goal"/);
   assert.match(html, /A control loop,<br>not an autopilot\./);
   assert.match(html, /<code>\/harness-improvement<\/code> opens one clean menu/);
@@ -185,6 +371,8 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
   assert.match(css, /\.cycle-story/);
+  assert.match(css, /\.delegation-console/);
+  assert.match(css, /\.delegation-roles \.blocked/);
   assert.match(css, /\.story-tabs button\[aria-selected="true"\]/);
   assert.match(css, /prefers-reduced-motion: reduce/);
   assert.equal(cycle.match(/stage: "/g)?.length, 7);
@@ -1098,6 +1286,188 @@ test("uninstall moves modified managed tools outside the trusted bin", () => {
   }
 });
 
+test("plan previews missing Pi bootstrap without invoking npm", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-plan-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  const log = path.join(root, "npm.log");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$ZENPI_FAKE_LOG\"\n");
+  try {
+    const result = invokeCli(agentDir, ["plan", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], { PATH: fakeBin, ZENPI_FAKE_LOG: log });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.3 after confirmation/);
+    assert.equal(fs.existsSync(log), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("unconfirmed install never bootstraps missing Pi", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-decline-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  const log = path.join(root, "npm.log");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$ZENPI_FAKE_LOG\"\n");
+  try {
+    const result = spawnSync(process.execPath, [cli, "install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], {
+      cwd: repoRoot,
+      env: { ...process.env, PATH: fakeBin, ZENPI_FAKE_LOG: log, PI_CODING_AGENT_DIR: agentDir },
+      input: "n\n",
+      encoding: "utf8",
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Confirmation requires a TTY/);
+    assert.equal(fs.existsSync(log), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("installer bootstraps a missing pinned Pi after confirmation", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  const log = path.join(root, "bootstrap.log");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  writeExecutable(
+    path.join(fakeBin, "npm"),
+    "#!/bin/sh\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi' 'printf '\"'\"'pi %s\\n'\"'\"' \"$*\" >> \"$ZENPI_FAKE_LOG\"' 'exit 0' > \"$ZENPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/pi\"\n",
+  );
+  const env = { PATH: fakeBin, ZENPI_FAKE_BIN: fakeBin, ZENPI_FAKE_LOG: log };
+
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      env,
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.3 after confirmation/);
+    const calls = fs.readFileSync(log, "utf8").trim().split("\n");
+    assert.equal(calls[0], "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.3 --no-audit --no-fund");
+    assert.equal(calls.filter((line) => line.startsWith("pi install ")).length, 6);
+    const manifest = JSON.parse(fs.readFileSync(path.join(agentDir, "zenpi", "manifest.json"), "utf8"));
+    assert.deepEqual(
+      { ...manifest.piBootstrap, installedAt: "ignored" },
+      { package: "@earendil-works/pi-coding-agent", version: "0.84.3", installedAt: "ignored", external: true },
+    );
+
+    fs.rmSync(path.join(fakeBin, "pi"));
+    fs.writeFileSync(log, "");
+    const update = invokeCli(
+      agentDir,
+      ["update", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      env,
+    );
+    assert.equal(update.status, 0, update.stderr);
+    const updateCalls = fs.readFileSync(log, "utf8").trim().split("\n");
+    assert.equal(updateCalls[0], "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.3 --no-audit --no-fund");
+    assert.equal(updateCalls.filter((line) => line.startsWith("pi install ")).length, 6);
+
+    const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
+    assert.equal(uninstall.status, 0, uninstall.stderr);
+    assert.match(uninstall.stdout, /Externally installed Pi.*were preserved/);
+    assert.equal(fs.existsSync(path.join(fakeBin, "pi")), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("bootstrap fails actionably when npm global bin is not persistently on PATH", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-prefix-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  const globalPrefix = path.join(root, "npm-prefix");
+  const globalBin = path.join(globalPrefix, "bin");
+  const log = path.join(root, "bootstrap.log");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  writeExecutable(
+    path.join(fakeBin, "npm"),
+    "#!/bin/sh\nif [ \"$1\" = \"prefix\" ]; then echo \"$ZENPI_FAKE_PREFIX\"; exit 0; fi\nprintf 'npm %s\\n' \"$*\" >> \"$ZENPI_FAKE_LOG\"\n/bin/mkdir -p \"$ZENPI_FAKE_PREFIX/bin\"\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi' 'exit 0' > \"$ZENPI_FAKE_PREFIX/bin/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_PREFIX/bin/pi\"\n",
+  );
+  const baseEnv = { PATH: fakeBin, ZENPI_FAKE_PREFIX: globalPrefix, ZENPI_FAKE_LOG: log };
+
+  try {
+    const first = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      baseEnv,
+    );
+    assert.notEqual(first.status, 0);
+    assert.ok(first.stderr.includes(`Pi was installed by npm, but ${globalBin} is not available on PATH`), first.stderr);
+    assert.match(first.stderr, /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.3 was attempted and is not rolled back automatically/);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+
+    const persistentEnv = { ...baseEnv, PATH: `${globalBin}${path.delimiter}${fakeBin}` };
+    const second = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      persistentEnv,
+    );
+    assert.equal(second.status, 0, second.stderr);
+    assert.equal(fs.readFileSync(log, "utf8").trim().split("\n").filter((line) => line.startsWith("npm install ")).length, 1);
+    const doctor = invokeCli(agentDir, ["doctor"], persistentEnv);
+    assert.equal(doctor.status, 0, doctor.stderr);
+    const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], persistentEnv);
+    assert.equal(uninstall.status, 0, uninstall.stderr);
+    assert.equal(fs.existsSync(path.join(globalBin, "pi")), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("later bootstrap failure discloses retained external Pi", () => {
+  if (process.platform === "win32") return;
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-rollback-test-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  fs.mkdirSync(fakeBin, { recursive: true });
+  writeExecutable(
+    path.join(fakeBin, "npm"),
+    "#!/bin/sh\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.3; exit 0; fi' 'exit 9' > \"$ZENPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/pi\"\n",
+  );
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      { PATH: fakeBin, ZENPI_FAKE_BIN: fakeBin },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.3 was attempted and is not rolled back automatically/);
+    assert.equal(fs.existsSync(path.join(fakeBin, "pi")), true);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("missing Pi fails before mutation when npm is unavailable", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-no-npm-test-"));
+  const agentDir = path.join(root, "agent");
+  const emptyBin = path.join(root, "empty-bin");
+  fs.mkdirSync(emptyBin, { recursive: true });
+  try {
+    const result = invokeCli(
+      agentDir,
+      ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      { PATH: emptyBin },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /npm is required to install missing Pi @earendil-works\/pi-coding-agent@0\.84\.3/);
+    assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("installer rejects an incompatible Pi before mutating configuration", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-version-test-"));
   const agentDir = path.join(root, "agent");
@@ -1159,6 +1529,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "index.ts")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")));
@@ -1181,6 +1553,18 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.match(invalidRegistryDoctor.stderr, /Capability registry invalid/);
     fs.writeFileSync(installedRegistryPath, installedRegistry);
 
+    const customizedSettings = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
+    customizedSettings.subagents.agentOverrides.worker.model = "openai-codex/gpt-5.6-luna";
+    customizedSettings.subagents.agentOverrides.worker.thinking = "high";
+    customizedSettings.subagents.defaultExtensions = ["unsafe-project-extension"];
+    fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(customizedSettings, null, 2)}\n`);
+    const subagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
+    const customizedConfig = JSON.parse(fs.readFileSync(subagentConfigPath, "utf8"));
+    customizedConfig.maxSubagentSpawnsPerRun = 12;
+    customizedConfig.maxSubagentDepth = 3;
+    customizedConfig.unrelated = "preserved";
+    fs.writeFileSync(subagentConfigPath, `${JSON.stringify(customizedConfig, null, 2)}\n`);
+
     // Simulate ownership retired by a future ZenPi version.
     const retiredFile = path.join(agentDir, "extensions", "retired.ts");
     fs.writeFileSync(retiredFile, "// retired\n");
@@ -1196,6 +1580,13 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     );
     const manifestPath = path.join(agentDir, "zenpi", "manifest.json");
     const beforeUpdateManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    // Simulate the v0.4.0 whole-file runtime config ownership record.
+    delete beforeUpdateManifest.subagentConfigChanges;
+    delete beforeUpdateManifest.subagentConfigExisted;
+    beforeUpdateManifest.files[subagentConfigPath] = {
+      existed: false,
+      installedHash: sha256(fs.readFileSync(path.join(repoRoot, "templates", "subagent-config.json"))),
+    };
     beforeUpdateManifest.settingsChanges.push({
       path: ["subagents", "retiredFlag"],
       beforeExists: false,
@@ -1235,6 +1626,16 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.match(update.stdout, /restart active Pi sessions/);
     const afterUpdate = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
     assert.equal(afterUpdate.subagents.retiredFlag, undefined);
+    assert.equal(afterUpdate.subagents.agentOverrides.worker.model, "openai-codex/gpt-5.6-luna");
+    assert.equal(afterUpdate.subagents.agentOverrides.worker.thinking, "high");
+    assert.deepEqual(afterUpdate.subagents.defaultExtensions, []);
+    const afterUpdateConfig = JSON.parse(fs.readFileSync(subagentConfigPath, "utf8"));
+    assert.equal(afterUpdateConfig.maxSubagentSpawnsPerRun, 12);
+    assert.equal(afterUpdateConfig.maxSubagentDepth, 1);
+    assert.equal(afterUpdateConfig.unrelated, "preserved");
+    const afterUpdateManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    assert.equal(afterUpdateManifest.files[subagentConfigPath], undefined);
+    assert.ok(afterUpdateManifest.subagentConfigChanges.some((change) => change.path.join(".") === "maxSubagentSpawnsPerRun"));
     assert.equal(
       afterUpdate.packages.some((entry) => String(entry).includes("retired-zenpi-package")),
       false,
@@ -1247,6 +1648,17 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(fs.existsSync(legacyMarker), false);
     assert.equal(fs.existsSync(retiredFile), false);
 
+    const validCustomizedDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+    assert.equal(validCustomizedDoctor.status, 0, validCustomizedDoctor.stderr);
+    const invalidCapacityConfig = JSON.parse(fs.readFileSync(subagentConfigPath, "utf8"));
+    invalidCapacityConfig.maxSubagentSpawnsPerRun = -1;
+    fs.writeFileSync(subagentConfigPath, `${JSON.stringify(invalidCapacityConfig, null, 2)}\n`);
+    const invalidCapacityDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+    assert.notEqual(invalidCapacityDoctor.status, 0);
+    assert.match(invalidCapacityDoctor.stderr, /Invalid user-tunable subagent config: maxSubagentSpawnsPerRun/);
+    invalidCapacityConfig.maxSubagentSpawnsPerRun = 12;
+    fs.writeFileSync(subagentConfigPath, `${JSON.stringify(invalidCapacityConfig, null, 2)}\n`);
+
     const retainedWishlist = path.join(agentDir, "zenpi", "tool-wishlist-events.jsonl");
     fs.writeFileSync(retainedWishlist, '{"local":"evidence"}\n', { mode: 0o600 });
     const uninstall = runCli(agentDir, "uninstall", "--yes");
@@ -1254,7 +1666,16 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(fs.readFileSync(retainedWishlist, "utf8"), '{"local":"evidence"}\n');
 
     const restored = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
-    assert.deepEqual(restored, originalSettings);
+    assert.equal(restored.defaultProvider, originalSettings.defaultProvider);
+    assert.equal(restored.defaultModel, originalSettings.defaultModel);
+    assert.deepEqual(restored.packages, originalSettings.packages);
+    assert.equal(restored.subagents.defaultModel, originalSettings.subagents.defaultModel);
+    assert.equal(restored.subagents.customSetting, true);
+    assert.equal(restored.subagents.agentOverrides.worker.model, "openai-codex/gpt-5.6-luna");
+    assert.equal(restored.subagents.agentOverrides.worker.thinking, "high");
+    const preservedConfig = JSON.parse(fs.readFileSync(subagentConfigPath, "utf8"));
+    assert.equal(preservedConfig.maxSubagentSpawnsPerRun, 12);
+    assert.equal(preservedConfig.unrelated, "preserved");
     assert.equal(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), "# Personal instructions\n");
     assert.equal(
       fs.readFileSync(path.join(agentDir, "extensions", "zen.ts"), "utf8"),
@@ -1266,6 +1687,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "index.ts")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);

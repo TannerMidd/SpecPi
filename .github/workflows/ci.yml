@@ -46,10 +46,15 @@ jobs:
           )
           echo %*>>"%ZENPI_FAKE_LOG%"
           exit /b 0
-          '@ | Set-Content (Join-Path $fakeBin "pi.cmd") -Encoding ascii
+          '@ | Set-Content (Join-Path $fakeBin "pi-template.cmd") -Encoding ascii
           "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "pi") -Encoding ascii
           @'
           @echo off
+          if "%~1"=="install" if "%~2"=="--global" if "%~3"=="--ignore-scripts" (
+            echo npm %*>>"%ZENPI_FAKE_LOG%"
+            copy /y "%ZENPI_FAKE_BIN%\pi-template.cmd" "%ZENPI_FAKE_BIN%\pi.cmd" >nul
+            exit /b 0
+          )
           if "%~1"=="install" if "%~2"=="--global" (
             echo npm %*>>"%ZENPI_FAKE_LOG%"
             echo @exit /b 0>"%ZENPI_FAKE_BIN%\donsetch.cmd"
@@ -72,8 +77,14 @@ jobs:
           if ($installCalls.Count -ne 6) {
             throw "Expected 6 pi install calls, found $($installCalls.Count)"
           }
+          $piBootstrapCalls = @(Get-Content $log | Where-Object {
+            $_ -match '^npm "?install"? "?--global"? "?--ignore-scripts"? "?@earendil-works/pi-coding-agent@0\.84\.3"? '
+          })
+          if ($piBootstrapCalls.Count -ne 1) {
+            throw "Expected 1 Pi bootstrap call, found $($piBootstrapCalls.Count)"
+          }
           $toolCalls = @(Get-Content $log | Where-Object {
-            $_ -match '^npm "?install"? "?--global"? '
+            $_ -match '^npm "?install"? "?--global"? "?donsetch@3\.4\.0"? '
           })
           if ($toolCalls.Count -ne 1) {
             throw "Expected 1 optional tool install call, found $($toolCalls.Count)"

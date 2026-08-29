@@ -23,20 +23,23 @@ import {
   upsertManagedBlock,
 } from "./lib.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
+import { acquireZenPiLock } from "../extensions/subagents/core.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const VERSION = packageJson.version;
 const MIN_PI_VERSION = "0.80.0";
+const PI_PACKAGE = "@earendil-works/pi-coding-agent";
+const PI_PACKAGE_VERSION = "0.84.3";
 const CLI = process.platform === "win32" ? ".\\zenpi.cmd" : "./zenpi";
 const agentDir = path.resolve(
   process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"),
 );
 const stateDir = path.join(agentDir, "zenpi");
 const manifestPath = path.join(stateDir, "manifest.json");
-const lockPath = path.join(stateDir, "install.lock");
 const settingsPath = path.join(agentDir, "settings.json");
+const subagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
 const agentsPath = path.join(agentDir, "AGENTS.md");
 const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
@@ -80,7 +83,7 @@ Usage:
 Options:
   --yes                   Do not ask for confirmation; attempt all missing optional tools.
   --force                 Replace locally modified ZenPi-managed files during update.
-  --skip-package-install  Write pinned package settings without installing external packages (also skips the browser runtime).
+  --skip-package-install  Do not bootstrap Pi or install external Pi packages (also skips the browser runtime).
   --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
   --skip-tool-install     Do not offer or install the optional DonSeTch CLI.
   --skip-shell            Do not install shell profile functions or edit a shell rc file.
@@ -195,6 +198,29 @@ function compareVersions(left, right) {
     if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
   }
   return 0;
+}
+
+function npmGlobalBinDir() {
+  const result = run("npm", ["prefix", "--global"], { capture: true });
+  const prefix = (result.stdout || "").trim();
+  if (!prefix) throw new Error("Could not determine npm's global installation prefix.");
+  return process.platform === "win32" ? prefix : path.join(prefix, "bin");
+}
+
+function installPi() {
+  run("npm", [
+    "install",
+    "--global",
+    "--ignore-scripts",
+    `${PI_PACKAGE}@${PI_PACKAGE_VERSION}`,
+    "--no-audit",
+    "--no-fund",
+  ]);
+  if (!commandExists("pi")) {
+    const binDir = npmGlobalBinDir();
+    throw new Error(`Pi was installed by npm, but ${binDir} is not available on PATH. Add that directory to PATH, open a new terminal, and rerun ZenPi install.`);
+  }
+  assertPiVersion();
 }
 
 function assertPiVersion() {
@@ -503,35 +529,91 @@ function shellQuote(value) {
   return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
+function validManagedModelScope(value) {
+  return value?.enforce === true
+    && value?.strict === true
+    && Array.isArray(value.allow)
+    && value.allow.length === 1
+    && (value.allow[0] === "inherit" || /^[^/*]+\/\*$/.test(value.allow[0]));
+}
+
+function validThinking(value) {
+  return ["off", "minimal", "low", "medium", "high"].includes(value);
+}
+
+function validRoleModel(value) {
+  return value === "inherit" || (typeof value === "string" && /^[^/]+\/.+/.test(value));
+}
+
 function desiredSettingsOperations() {
   const webExtension = path.join(agentDir, "npm", "node_modules", "pi-web-access", "index.ts");
   return [
     { path: ["theme"], value: "tea-house" },
     { path: ["subagents", "defaultModel"], delete: true },
-    { path: ["subagents", "defaultThinking"], value: "medium" },
+    { path: ["subagents", "defaultThinking"], value: "medium", userTunable: true, validate: validThinking },
     { path: ["subagents", "defaultExtensions"], value: [] },
     { path: ["subagents", "maxThinking"], value: "high" },
     {
       path: ["subagents", "modelScope"],
       value: { enforce: true, strict: true, allow: ["inherit"] },
+      dynamicPolicy: true,
+      validate: validManagedModelScope,
     },
     { path: ["subagents", "agentOverrides", "codex-exec", "disabled"], value: true },
     { path: ["subagents", "agentOverrides", "codex-exec-writer", "disabled"], value: true },
-    { path: ["subagents", "agentOverrides", "scout", "model"], value: "inherit" },
-    { path: ["subagents", "agentOverrides", "scout", "thinking"], value: "low" },
-    { path: ["subagents", "agentOverrides", "researcher", "model"], value: "inherit" },
-    { path: ["subagents", "agentOverrides", "researcher", "thinking"], value: "medium" },
+    { path: ["subagents", "agentOverrides", "scout", "model"], value: "inherit", userTunable: true, validate: validRoleModel },
+    { path: ["subagents", "agentOverrides", "scout", "thinking"], value: "low", userTunable: true, validate: validThinking },
+    { path: ["subagents", "agentOverrides", "researcher", "model"], value: "inherit", userTunable: true, validate: validRoleModel },
+    { path: ["subagents", "agentOverrides", "researcher", "thinking"], value: "medium", userTunable: true, validate: validThinking },
     {
       path: ["subagents", "agentOverrides", "researcher", "extensions"],
       value: [webExtension],
     },
-    { path: ["subagents", "agentOverrides", "worker", "model"], value: "inherit" },
-    { path: ["subagents", "agentOverrides", "worker", "thinking"], value: "medium" },
-    { path: ["subagents", "agentOverrides", "reviewer", "model"], value: "inherit" },
-    { path: ["subagents", "agentOverrides", "reviewer", "thinking"], value: "high" },
-    { path: ["subagents", "agentOverrides", "oracle", "model"], value: "inherit" },
-    { path: ["subagents", "agentOverrides", "oracle", "thinking"], value: "high" },
+    { path: ["subagents", "agentOverrides", "worker", "model"], value: "inherit", userTunable: true, validate: validRoleModel },
+    { path: ["subagents", "agentOverrides", "worker", "thinking"], value: "medium", userTunable: true, validate: validThinking },
+    { path: ["subagents", "agentOverrides", "reviewer", "model"], value: "inherit", userTunable: true, validate: validRoleModel },
+    { path: ["subagents", "agentOverrides", "reviewer", "thinking"], value: "high", userTunable: true, validate: validThinking },
+    { path: ["subagents", "agentOverrides", "oracle", "model"], value: "inherit", userTunable: true, validate: validRoleModel },
+    { path: ["subagents", "agentOverrides", "oracle", "thinking"], value: "high", userTunable: true, validate: validThinking },
   ];
+}
+
+function desiredSubagentConfigOperations() {
+  const defaults = readJson(path.join(repoRoot, "templates", "subagent-config.json"));
+  return [
+    { path: ["toolDescriptionMode"], value: defaults.toolDescriptionMode },
+    { path: ["inlineToolDisplay"], value: defaults.inlineToolDisplay },
+    { path: ["defaultSubagentContext"], value: defaults.defaultSubagentContext },
+    { path: ["maxSubagentDepth"], value: defaults.maxSubagentDepth },
+    { path: ["maxSubagentSpawnsPerRun"], value: defaults.maxSubagentSpawnsPerRun, userTunable: true, validate: (value) => Number.isSafeInteger(value) && value >= 1 && value <= 1000 },
+    { path: ["maxSubagentSpawnsPerSession"], value: defaults.maxSubagentSpawnsPerSession, userTunable: true, validate: (value) => Number.isSafeInteger(value) && value >= 0 && value <= 10000 },
+    { path: ["maxActiveAsyncRunsPerSession"], value: defaults.maxActiveAsyncRunsPerSession, userTunable: true, validate: (value) => Number.isSafeInteger(value) && value >= 0 && value <= 64 },
+    { path: ["parallel"], value: defaults.parallel, userTunable: true, validate: (value) => value && typeof value === "object" && !Array.isArray(value) },
+    { path: ["missions", "enabled"], value: false },
+    { path: ["scheduledRuns", "enabled"], value: false },
+    { path: ["artifactDir"], value: defaults.artifactDir },
+  ];
+}
+
+function legacySubagentConfigChanges(record) {
+  if (!record) return [];
+  let original = {};
+  if (record.existed) {
+    const backup = path.join(stateDir, record.backup);
+    if (!fs.existsSync(backup)) throw new Error(`Missing original subagent config backup: ${backup}`);
+    original = readJson(backup, {});
+  }
+  return desiredSubagentConfigOperations().map((operation) => {
+    const before = readPath(original, operation.path);
+    return {
+      path: operation.path,
+      beforeExists: before.exists,
+      ...(before.exists ? { before: structuredClone(before.value) } : {}),
+      installedExists: true,
+      installed: structuredClone(operation.value),
+      ...(operation.userTunable ? { userTunable: true } : {}),
+    };
+  });
 }
 
 function managedFiles(includeShell) {
@@ -583,6 +665,16 @@ function managedFiles(includeShell) {
       0o644,
     ],
     [
+      path.join(repoRoot, "extensions", "subagents", "index.ts"),
+      path.join(agentDir, "extensions", "zen-subagents", "index.ts"),
+      0o644,
+    ],
+    [
+      path.join(repoRoot, "extensions", "subagents", "core.mjs"),
+      path.join(agentDir, "extensions", "zen-subagents", "core.mjs"),
+      0o644,
+    ],
+    [
       path.join(repoRoot, "skills", "zenpi-improve", "SKILL.md"),
       path.join(agentDir, "skills", "zenpi-improve", "SKILL.md"),
       0o644,
@@ -595,11 +687,6 @@ function managedFiles(includeShell) {
     [
       path.join(repoRoot, "themes", "tea-house.json"),
       path.join(agentDir, "themes", "tea-house.json"),
-      0o644,
-    ],
-    [
-      path.join(repoRoot, "templates", "subagent-config.json"),
-      path.join(agentDir, "extensions", "subagent", "config.json"),
       0o644,
     ],
   ];
@@ -655,20 +742,44 @@ function applySettings(settings, operations, previousChanges = []) {
   for (const operation of operations) {
     const key = operation.path.join(".");
     const existingChange = changesByPath.get(key);
-    const before = existingChange || (() => {
-      const current = readPath(settings, operation.path);
-      return {
-        path: operation.path,
-        beforeExists: current.exists,
-        ...(current.exists ? { before: current.value } : {}),
-      };
-    })();
+    const current = readPath(settings, operation.path);
+    const before = existingChange || {
+      path: operation.path,
+      beforeExists: current.exists,
+      ...(current.exists ? { before: structuredClone(current.value) } : {}),
+    };
+    const currentMatchesPrevious = existingChange
+      ? (existingChange.installedExists
+        ? current.exists && deepEqual(current.value, existingChange.installed)
+        : !current.exists)
+      : false;
+    const currentIsValid = current.exists && (!operation.validate || operation.validate(current.value));
+    const preserveTunable = operation.userTunable
+      && currentIsValid
+      && (!existingChange || !currentMatchesPrevious);
+    const preserveDynamicPolicy = operation.dynamicPolicy && currentIsValid;
+
+    if (preserveTunable) {
+      changes.push({ ...structuredClone(before), userTunable: true });
+      continue;
+    }
+    if (preserveDynamicPolicy) {
+      changes.push({
+        ...structuredClone(before),
+        dynamicPolicy: true,
+        installedExists: true,
+        installed: structuredClone(current.value),
+      });
+      continue;
+    }
 
     if (operation.delete) deletePath(settings, operation.path);
     else setPath(settings, operation.path, operation.value);
 
     changes.push({
-      ...before,
+      ...structuredClone(before),
+      ...(operation.userTunable ? { userTunable: true } : {}),
+      ...(operation.dynamicPolicy ? { dynamicPolicy: true } : {}),
       installedExists: !operation.delete,
       ...(!operation.delete ? { installed: structuredClone(operation.value) } : {}),
     });
@@ -740,29 +851,7 @@ function readManifest(required = false) {
 }
 
 function acquireLock() {
-  fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
-  let fd;
-  try {
-    fd = fs.openSync(lockPath, "wx", 0o600);
-  } catch (error) {
-    if (error.code !== "EEXIST") throw error;
-    const stalePid = Number.parseInt(fs.readFileSync(lockPath, "utf8").trim(), 10);
-    let active = Number.isInteger(stalePid) && stalePid > 0;
-    if (active) {
-      try {
-        process.kill(stalePid, 0);
-      } catch (probeError) {
-        if (probeError.code === "ESRCH") active = false;
-        else throw probeError;
-      }
-    }
-    if (active) throw new Error(`Another ZenPi operation appears active: ${lockPath}`);
-    fs.rmSync(lockPath, { force: true });
-    fd = fs.openSync(lockPath, "wx", 0o600);
-  }
-  fs.writeFileSync(fd, `${process.pid}\n`);
-  fs.closeSync(fd);
-  return () => fs.rmSync(lockPath, { force: true });
+  return acquireZenPiLock(agentDir);
 }
 
 async function confirm(message, yes) {
@@ -788,6 +877,8 @@ function assertSources() {
     "extensions/tool-wishlist/core.mjs",
     "extensions/tool-wishlist/registry.mjs",
     "extensions/tool-wishlist/capabilities.json",
+    "extensions/subagents/index.ts",
+    "extensions/subagents/core.mjs",
     "skills/zenpi-improve/SKILL.md",
     "skills/donsetch/SKILL.md",
     "themes/tea-house.json",
@@ -823,8 +914,9 @@ Managed files:`);
   console.log("\nSettings ownership:");
   console.log("  theme = tea-house");
   console.log("  pinned package entries (merged by npm package identity)");
-  console.log("  bounded subagent defaults and role overrides");
-  console.log("  strict modelScope allow = [inherit]");
+  console.log("  subagent security policy leaves are enforced");
+  console.log("  role model/thinking and capacity defaults are user-tunable and preserved on update");
+  console.log("  strict modelScope starts at [inherit] and /zen-subagents synchronizes it to the active provider");
   console.log("  codex-exec and codex-exec-writer disabled");
   console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
   console.log("  capability-gap events use sanitized summaries and salted task/session/project hashes");
@@ -839,6 +931,16 @@ Managed files:`);
     console.log(`  ${browserRuntimeDir}`);
     console.log("  Playwright 1.62.1 + matching managed Chromium");
     console.log("  staged before atomic promotion; no global executable installation");
+  }
+
+  console.log("\nPi runtime:");
+  if (options.skipPackageInstall) {
+    console.log("  bootstrap skipped by explicit flag");
+  } else if (commandExists("pi")) {
+    console.log("  existing Pi installation will be used");
+  } else {
+    console.log(`  missing; npm will globally install ${PI_PACKAGE}@${PI_PACKAGE_VERSION} after confirmation`);
+    console.log("  this external installation is preserved by ZenPi uninstall");
   }
 
   console.log("\nPinned packages:");
@@ -900,16 +1002,19 @@ function retireManagedOptionalToolRecords(records, warnings, preserved) {
 
 async function installOrUpdate(options, update) {
   assertSources();
-  if (!options.skipPackageInstall && !commandExists("pi")) {
-    throw new Error("pi is not available on PATH.");
+  const piMissing = !options.skipPackageInstall && !commandExists("pi");
+  if (piMissing && !commandExists("npm")) {
+    throw new Error(`npm is required to install missing Pi ${PI_PACKAGE}@${PI_PACKAGE_VERSION}.`);
   }
-  if (!options.skipPackageInstall) assertPiVersion();
+  if (!options.skipPackageInstall && !piMissing) assertPiVersion();
   if (!options.skipBrowserInstall && !commandExists("npm")) {
     throw new Error("npm is required to install the managed browser runtime.");
   }
 
   const releaseLock = acquireLock();
   let transaction;
+  let piBootstrapAttempted = false;
+  let piInstalledByOperation = false;
   let browserRuntimeTransaction;
   let optionalToolTransaction;
   let backupDir;
@@ -929,11 +1034,17 @@ async function installOrUpdate(options, update) {
     validateManagedUpdate(previousManifest, files, options.force);
     printPlan({ ...options, skipShell: !manageShellNow });
     await confirm(`${update ? "Update" : "Install"} ZenPi ${VERSION}?`, options.yes);
+    if (piMissing) {
+      piBootstrapAttempted = true;
+      installPi();
+      piInstalledByOperation = true;
+    }
     const selectedOptionalTools = await chooseOptionalTools(options);
     optionalToolTransaction = await installOptionalTools(selectedOptionalTools);
 
     const watched = [
       settingsPath,
+      subagentConfigPath,
       agentsPath,
       manifestPath,
       ...(shellRc ? [shellRc] : []),
@@ -987,6 +1098,22 @@ async function installOrUpdate(options, update) {
     );
     writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
 
+    const legacySubagentRecord = previousManifest?.files?.[subagentConfigPath];
+    const subagentConfigExisted = previousManifest?.subagentConfigExisted
+      ?? legacySubagentRecord?.existed
+      ?? pathExists(subagentConfigPath);
+    const subagentConfig = readJson(subagentConfigPath, {});
+    const subagentConfigOperations = desiredSubagentConfigOperations();
+    const previousSubagentConfigChanges = previousManifest?.subagentConfigChanges
+      || legacySubagentConfigChanges(legacySubagentRecord);
+    retireSettings(subagentConfig, previousSubagentConfigChanges, subagentConfigOperations, warnings);
+    const subagentConfigChanges = applySettings(
+      subagentConfig,
+      subagentConfigOperations,
+      previousSubagentConfigChanges,
+    );
+    writeJson(subagentConfigPath, subagentConfig, existingMode(subagentConfigPath, 0o600));
+
     const fileRecords = structuredClone(previousManifest?.files || {});
     const desiredTargets = new Set(files.map(([, target]) => target));
     if (update && options.skipShell && previousManifest?.shellRc) {
@@ -994,6 +1121,10 @@ async function installOrUpdate(options, update) {
     }
     for (const [target, record] of Object.entries(fileRecords)) {
       if (desiredTargets.has(target)) continue;
+      if (target === subagentConfigPath) {
+        delete fileRecords[target];
+        continue;
+      }
       restoreFileRecord(target, record, warnings, "update retirement");
       delete fileRecords[target];
     }
@@ -1037,7 +1168,12 @@ async function installOrUpdate(options, update) {
         previousManifest?.packagesKeyBeforeExists ?? Object.hasOwn(settingsBeforeOperation, "packages"),
       packageChanges,
       settingsChanges,
+      subagentConfigExisted,
+      subagentConfigChanges,
       browserRuntime: browserRuntimeStatus(),
+      piBootstrap: piInstalledByOperation
+        ? { package: PI_PACKAGE, version: PI_PACKAGE_VERSION, installedAt: new Date().toISOString(), external: true }
+        : previousManifest?.piBootstrap,
       managedOptionalTools: optionalToolTransaction.managedRecords,
       files: fileRecords,
       backups: [...(previousManifest?.backups || []), path.relative(stateDir, backupDir)],
@@ -1073,9 +1209,12 @@ async function installOrUpdate(options, update) {
     const optionalWarnings = optionalToolTransaction?.warnings.length
       ? `\nOptional tool warnings: ${optionalToolTransaction.warnings.join("; ")}`
       : "";
-    const externalNote = optionalToolTransaction?.externalAttempts.length
-      ? `\nExternal optional tool changes were not rolled back: ${optionalToolTransaction.externalAttempts.join(", ")}`
-      : "";
+    const externalNotes = [];
+    if (piBootstrapAttempted) externalNotes.push(`Pi bootstrap ${PI_PACKAGE}@${PI_PACKAGE_VERSION} was attempted and is not rolled back automatically`);
+    if (optionalToolTransaction?.externalAttempts.length) {
+      externalNotes.push(`External optional tool changes were not rolled back: ${optionalToolTransaction.externalAttempts.join(", ")}`);
+    }
+    const externalNote = externalNotes.length ? `\n${externalNotes.join("\n")}` : "";
     throw new Error(`${transaction ? "ZenPi-managed changes rolled back: " : ""}${error.message}${optionalWarnings}${externalNote}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`);
   } finally {
     releaseLock();
@@ -1085,9 +1224,11 @@ async function installOrUpdate(options, update) {
 function restoreSettingChanges(settings, changes, warnings) {
   for (const change of changes) {
     const current = readPath(settings, change.path);
-    const matchesInstalled = change.installedExists
-      ? current.exists && deepEqual(current.value, change.installed)
-      : !current.exists;
+    const matchesInstalled = change.dynamicPolicy
+      ? current.exists && validManagedModelScope(current.value)
+      : change.installedExists
+        ? current.exists && deepEqual(current.value, change.installed)
+        : !current.exists;
     if (!matchesInstalled) {
       warnings.push(`Preserved modified setting: ${change.path.join(".")}`);
       continue;
@@ -1107,6 +1248,7 @@ async function uninstall(options) {
     await confirm(`Uninstall ZenPi ${manifest.version}?`, options.yes);
     const watched = [
       settingsPath,
+      subagentConfigPath,
       agentsPath,
       manifestPath,
       ...(manifest.shellRc ? [manifest.shellRc] : []),
@@ -1133,6 +1275,14 @@ async function uninstall(options) {
       delete settings.packages;
     }
     writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
+
+    const subagentConfig = readJson(subagentConfigPath, {});
+    restoreSettingChanges(subagentConfig, manifest.subagentConfigChanges || [], warnings);
+    if (manifest.subagentConfigExisted === false && Object.keys(subagentConfig).length === 0) {
+      fs.rmSync(subagentConfigPath, { force: true });
+    } else {
+      writeJson(subagentConfigPath, subagentConfig, existingMode(subagentConfigPath, 0o600));
+    }
 
     for (const [target, record] of Object.entries(manifest.files || {})) {
       restoreFileRecord(target, record, warnings, "uninstall");
@@ -1187,7 +1337,7 @@ async function uninstall(options) {
     }
     retiredBrowserRuntime = undefined;
     console.log("ZenPi configuration, managed optional tools, and managed browser runtime uninstalled.");
-    console.log("Externally installed optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved.");
+    console.log("Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved.");
     console.log(`Wishlist state: ${stateDir}`);
     for (const warning of warnings) console.warn(`Warning: ${warning}`);
   } catch (error) {
@@ -1222,8 +1372,21 @@ function doctor() {
 
   for (const operation of desiredSettingsOperations()) {
     const current = readPath(settings, operation.path);
-    const valid = operation.delete ? !current.exists : current.exists && deepEqual(current.value, operation.value);
-    if (!valid) errors.push(`Setting drift: ${operation.path.join(".")}`);
+    const valid = operation.delete
+      ? !current.exists
+      : operation.userTunable || operation.dynamicPolicy
+        ? current.exists && (!operation.validate || operation.validate(current.value))
+        : current.exists && deepEqual(current.value, operation.value);
+    if (!valid) errors.push(`${operation.userTunable ? "Invalid user-tunable setting" : "Setting drift"}: ${operation.path.join(".")}`);
+  }
+
+  const subagentConfig = readJson(subagentConfigPath, {});
+  for (const operation of desiredSubagentConfigOperations()) {
+    const current = readPath(subagentConfig, operation.path);
+    const valid = operation.userTunable
+      ? current.exists && (!operation.validate || operation.validate(current.value))
+      : current.exists && deepEqual(current.value, operation.value);
+    if (!valid) errors.push(`${operation.userTunable ? "Invalid user-tunable subagent config" : "Subagent config drift"}: ${operation.path.join(".")}`);
   }
 
   for (const spec of PACKAGES) {

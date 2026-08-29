@@ -1,5 +1,7 @@
 # Third-party components
 
+When Pi is absent, ZenPi can install the reviewed `@earendil-works/pi-coding-agent@0.84.3` npm package globally after confirmation. The package provides the `pi` executable, is installed with lifecycle scripts disabled, retains its upstream license, and remains external system state after ZenPi uninstall.
+
 ZenPi pins but does not vendor these Pi packages:
 
 - `pi-web-access@0.25.0`
@@ -9,7 +11,7 @@ ZenPi pins but does not vendor these Pi packages:
 - `@tunnckocore/pi-gpt-fast-mode@0.4.0`
 - `@narumitw/pi-goal@0.54.3`
 
-They retain their own copyright and license terms. Pi downloads them from npm when the installer runs `pi install`.
+They retain their own copyright and license terms. Pi downloads them from npm when the installer runs `pi install`. ZenPi's `/zen-subagents` command is a configuration wrapper around the documented `pi-subagents` settings and runtime config; ZenPi does not patch, fork, vendor, or deep-import that package.
 
 ZenPi also installs these exact browser-runtime packages from the reviewed `browser-runtime/package-lock.json`:
 

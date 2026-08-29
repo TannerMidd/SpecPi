@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Automatically install pinned `@earendil-works/pi-coding-agent@0.84.3` through npm after confirmation when `pi` is absent; preserve the external installation on rollback and uninstall, with `--skip-package-install` as the opt-out.
+- Add `/zen-subagents` with confirmed capacity, builtin-role model, and thinking configuration using only the documented `pi-subagents` config surface.
+- Synchronize strict native subagent scope to the parent's exact Pi provider, filter model choices accordingly, flag stale role models after provider changes, and block unsafe project-scope tool launches.
+- Preserve user-tunable role and capacity leaves across update/uninstall while continuing to enforce security-owned settings; add bounded leaf backups, shared locking, atomic writes, rollback, doctor validation, and legacy whole-file config migration.
+- Add provider-safe delegation guidance to the working agreement, README, security documentation, and static showcase.
+
 ## 0.4.0 - 2026-08-29
 
 - Replace the abstract cycle charts with an accessible interactive walkthrough that shows one gap moving through evidence, human choice, proof, retirement, and later review.
