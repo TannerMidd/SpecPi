@@ -1783,7 +1783,7 @@ test("missing Pi fails before mutation when npm is unavailable", () => {
   }
 });
 
-test("installer rejects an incompatible Pi before mutating configuration", () => {
+test("installer rejects an incompatible Pi even when package installation is skipped", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-version-test-"));
   const agentDir = path.join(root, "agent");
   const fakeBin = path.join(root, "bin");
@@ -1794,7 +1794,7 @@ test("installer rejects an incompatible Pi before mutating configuration", () =>
   try {
     const result = invokeCli(
       agentDir,
-      ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+      ["install", "--yes", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
       { PATH: `${fakeBin}:${process.env.PATH}` },
     );
     assert.notEqual(result.status, 0);

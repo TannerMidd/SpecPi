@@ -1011,11 +1011,12 @@ function retireManagedOptionalToolRecords(records, warnings, preserved) {
 
 async function installOrUpdate(options, update) {
   assertSources();
-  const piMissing = !options.skipPackageInstall && !commandExists("pi");
-  if (piMissing && !commandExists("npm")) {
+  const piAvailable = commandExists("pi");
+  const shouldBootstrapPi = !piAvailable && !options.skipPackageInstall;
+  if (shouldBootstrapPi && !commandExists("npm")) {
     throw new Error(`npm is required to install missing Pi ${PI_PACKAGE}@${PI_PACKAGE_VERSION}.`);
   }
-  if (!options.skipPackageInstall && !piMissing) assertPiVersion();
+  if (piAvailable) assertPiVersion();
   if (!options.skipBrowserInstall && !commandExists("npm")) {
     throw new Error("npm is required to install the managed browser runtime.");
   }
@@ -1043,7 +1044,7 @@ async function installOrUpdate(options, update) {
     validateManagedUpdate(previousManifest, files, options.force);
     printPlan({ ...options, skipShell: !manageShellNow });
     await confirm(`${update ? "Update" : "Install"} ZenPi ${VERSION}?`, options.yes);
-    if (piMissing) {
+    if (shouldBootstrapPi) {
       piBootstrapAttempted = true;
       installPi();
       piInstalledByOperation = true;
