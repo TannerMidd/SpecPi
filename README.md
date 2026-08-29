@@ -60,10 +60,10 @@ The goal is not autonomous self-modification. It is to make the next justified c
 
 ## Install
 
-Requires Pi 0.80.0+, Node.js 22.19+, npm, and Git. The one-command improvement loop above is currently **Unreleased** and will ship in the next reviewed tag. The commands below install stable `v0.2.0`; clone reviewed releases rather than piping remote code into a shell.
+Requires Pi 0.80.0+, Node.js 22.19+, npm, and Git. Clone a reviewed release tag rather than piping remote code into a shell.
 
 ```bash
-git clone --branch v0.2.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.3.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ```
 

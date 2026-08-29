@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-08-29
 
 - Complete the local improvement loop with explicit collection consent, deterministic evidence ranking, lifecycle decisions, and regression-aware retirement.
 - Replace hard-coded implemented capability keys with a reviewed registry linked to closed `zenpi doctor` validators; the browser smoke now verifies both exact and changed pixel comparisons.
