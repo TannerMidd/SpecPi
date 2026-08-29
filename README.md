@@ -72,7 +72,7 @@ Inside the browser, use `j`/`k` to move, `Enter` to open, `/` to search, `c` to 
 Requires Pi 0.80.0+, Node.js 22.19+, npm, and Git. Clone a reviewed release tag rather than piping remote code into a shell.
 
 ```bash
-git clone --branch v0.3.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.4.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ```
 

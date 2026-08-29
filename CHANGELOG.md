@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 - 2026-08-29
+
 - Replace the abstract cycle charts with an accessible interactive walkthrough that shows one gap moving through evidence, human choice, proof, retirement, and later review.
 - Replace `@tmustier/pi-files-widget` with an in-house, Tea House-native `/files` browser using Pi's built-in syntax and Markdown renderers; remove the bat, git-delta, and glow prerequisites and retire their legacy managed binaries on update.
 
