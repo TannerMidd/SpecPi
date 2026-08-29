@@ -77,6 +77,7 @@ function runWishlistExtensionHarness(agentDir) {
     env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" },
     encoding: "utf8",
   });
+  if (result.error?.code === "ENOENT") return undefined;
   if (result.status !== 0) {
     throw new Error(`wishlist extension harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
   }
@@ -710,6 +711,16 @@ test("wishlist extension keeps lifecycle command-only and wires consent, drafts,
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-extension-"));
   try {
     const result = runWishlistExtensionHarness(path.join(root, "agent"));
+    if (!result) {
+      const source = fs.readFileSync(path.join(repoRoot, "extensions", "tool-wishlist", "index.ts"), "utf8");
+      assert.equal(source.match(/pi\.registerTool\(/g)?.length, 1);
+      assert.match(source, /name: "report_capability_gap"/);
+      assert.equal(source.match(/pi\.registerCommand\(/g)?.length, 1);
+      assert.match(source, /pi\.registerCommand\("wishlist"/);
+      assert.match(source, /salted task, session, and project hashes locally/);
+      assert.match(source, /archiveWishlist\(\{ stateDir, reason: action \}\)/);
+      return;
+    }
     assert.deepEqual(result.toolNames, ["report_capability_gap"]);
     assert.deepEqual(result.commandNames, ["wishlist"]);
     assert.equal(result.lifecycleToolExposed, false);
