@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-08-29
+
 - Automatically install pinned `@earendil-works/pi-coding-agent@0.84.3` through npm after confirmation when `pi` is absent; preserve the external installation on rollback and uninstall, with `--skip-package-install` as the opt-out.
 - Add `/zen-subagents` with confirmed capacity, builtin-role model, and thinking configuration using only the documented `pi-subagents` config surface.
 - Synchronize strict native subagent scope to the parent's exact Pi provider, filter model choices accordingly, flag stale role models after provider changes, and block unsafe project-scope tool launches.

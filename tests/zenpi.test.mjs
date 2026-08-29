@@ -366,7 +366,7 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.doesNotMatch(html, /cycle-charts|cycle-orbit|gate-outcomes/);
   assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
-  assert.match(html, /Stable <code>v0\.4\.0<\/code> adds Tea House-native file browsing/);
+  assert.match(html, /Stable <code>v0\.5\.0<\/code> adds provider-safe subagent configuration/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
