@@ -342,7 +342,7 @@ Replace the ASCII/text flow under README’s **“Let friction teach the system�
 
 Create a checked-in, hand-reviewable SVG asset:
 
-`site/self-improvement-loop.svg`
+`site/self-improvement-loop-v2.svg`
 
 The diagram must communicate the complete control loop:
 
@@ -476,7 +476,7 @@ Verify:
 
 ### Graphic, site, and release checks
 
-- parse `site/self-improvement-loop.svg` as XML and verify a stable `viewBox`, `<title>`, `<desc>`, expected stage labels, and both return paths;
+- parse `site/self-improvement-loop-v2.svg` as XML and verify a stable `viewBox`, `<title>`, `<desc>`, expected stage labels, and both return paths;
 - assert the SVG contains no `<script>`, `<foreignObject>`, externally loaded `href`/CSS resource, animation element, or embedded raster data;
 - assert README embeds the relative SVG with meaningful alt text and no longer contains the `notice → qualify` ASCII flow;
 - render the standalone SVG and the README section at desktop and mobile widths, checking text legibility, arrow clarity, contrast, clipping, and overflow;

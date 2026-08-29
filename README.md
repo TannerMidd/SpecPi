@@ -26,7 +26,7 @@ Most agent setups grow by accumulation. **ZenPi grows by evidence.**
 When a real, reusable capability gap gets in the way, ZenPi records a privacy-minimized local signal, measures recurrence and reach, and gives the human one clear next improvement.
 
 <p align="center">
-  <img src="site/self-improvement-loop.svg" width="760" alt="ZenPi improvement loop: local friction becomes qualified evidence; a person chooses one exact change; proof retires it, while failure leaves it selected and later evidence returns to human review.">
+  <img src="site/self-improvement-loop-v2.svg" width="760" alt="ZenPi improvement loop: local friction becomes qualified evidence; a person chooses one exact change; proof retires it, while failure leaves it selected and later evidence returns to human review.">
 </p>
 <p align="center"><a href="https://tannermidd.github.io/ZenPi/#wishlist">Walk one example through the loop</a></p>
 
@@ -84,7 +84,7 @@ Trusted project `.pi/settings.json` has higher Pi precedence. ZenPi resolves the
 Requires Node.js 22.19+, npm, and Git. ZenPi uses an existing Pi 0.84.4+ installation; when Pi is absent, a confirmed install automatically runs npm to globally install the reviewed `@earendil-works/pi-coding-agent@0.84.4` release with lifecycle scripts disabled. Clone a reviewed release tag rather than piping remote code into a shell.
 
 ```bash
-git clone --branch v0.6.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.6.1 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ```
 
