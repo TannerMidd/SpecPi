@@ -622,6 +622,11 @@ function managedFiles(includeShell) {
   const files = [
     [path.join(repoRoot, "extensions", "zen.ts"), path.join(agentDir, "extensions", "zen.ts"), 0o644],
     [
+      path.join(repoRoot, "extensions", "ui-refresh", "index.ts"),
+      path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts"),
+      0o644,
+    ],
+    [
       path.join(repoRoot, "extensions", "files", "index.ts"),
       path.join(agentDir, "extensions", "files", "index.ts"),
       0o644,
@@ -868,6 +873,7 @@ async function confirm(message, yes) {
 function assertSources() {
   const required = [
     "extensions/zen.ts",
+    "extensions/ui-refresh/index.ts",
     "extensions/files/index.ts",
     "extensions/files/core.mjs",
     "extensions/browser/index.ts",

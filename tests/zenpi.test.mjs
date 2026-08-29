@@ -144,6 +144,19 @@ function runSubagentsRuntimeHarness(agentDir) {
   return JSON.parse(marker.slice("ZENPI_SUBAGENTS_RUNTIME=".length));
 }
 
+function runUiRefreshHarness() {
+  const runner = path.join(repoRoot, "tests", "fixtures", "ui-refresh-harness.ts");
+  const result = spawnSync(process.execPath, ["--no-warnings", "--experimental-strip-types", runner], {
+    cwd: repoRoot,
+    env: { ...process.env, PI_OFFLINE: "1" },
+    encoding: "utf8",
+  });
+  if (result.status !== 0) throw new Error(`UI refresh harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  const marker = result.stdout.split("\n").find((line) => line.startsWith("ZENPI_UI_REFRESH_HARNESS="));
+  if (!marker) throw new Error(`UI refresh harness result missing\n${result.stdout}`);
+  return JSON.parse(marker.slice("ZENPI_UI_REFRESH_HARNESS=".length));
+}
+
 function installFakeBrowserNpm(fakeBin) {
   fs.mkdirSync(fakeBin, { recursive: true });
   fs.copyFileSync(path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs"), path.join(fakeBin, "npm"));
@@ -539,6 +552,16 @@ test("provider leases allow same provider and block a different live provider", 
     assert.equal(registerOrRefreshProviderLease({ agentDir: root, token: third, provider: "openrouter" }).blocked, false);
     releaseProviderLease({ agentDir: root, token: third });
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("UI prompt refresh flushes one immediate TUI frame and cleans up its invisible widget", () => {
+  const result = runUiRefreshHarness();
+  assert.deepEqual(result.eventNames, ["session_start", "ui_prompt_start", "session_shutdown"]);
+  assert.deepEqual(result.widgetCalls, [
+    { key: "zenpi-ui-prompt-refresh", cleared: false },
+    { key: "zenpi-ui-prompt-refresh", cleared: true },
+  ]);
+  assert.equal(result.renderCount, 1);
 });
 
 test("zen-subagents extension runs one confirmed same-provider configuration flow", () => {
@@ -1813,6 +1836,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(installed.subagents.agentOverrides.worker.model, "inherit");
     assert.equal(installed.subagents.agentOverrides["codex-exec"].disabled, true);
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
@@ -1979,6 +2003,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
       fs.readFileSync(path.join(agentDir, "extensions", "zen.ts"), "utf8"),
       "// personal prior zen\n",
     );
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
