@@ -203,6 +203,15 @@ function ordinaryLeaf(leaf, options) {
   const name = normalized(leaf.executable);
   const args = leaf.args || [];
   const joined = args.join(" ").toLowerCase();
+  // Guard gates what is irreversible or reaches beyond the workspace. Creating and editing files inside the
+  // workspace, and running the project's own scripts, are ordinary agent work that only Strict asks about;
+  // every critical rule above still applies, and anything touching a protected or out-of-workspace path
+  // keeps its approval. Mirrors decidePath, which already allows in-workspace writes in Guard mode.
+  const guard = options.mode === "guard";
+  const classifiedTargets = pathArguments(args, options).map((target) => classifyPath(target, options));
+  const escapesWorkspace = classifiedTargets.some((result) => result.protected || !result.withinWorkspace);
+  const workspaceFileOperation = guard && classifiedTargets.length > 0 && !escapesWorkspace;
+  const workspaceExecution = guard && !escapesWorkspace;
 
   if (name === "git" && /(?:reset\s+--hard|clean\s+-[a-z]*f|push\s+.*(?:--force|-f\b|--delete)|branch\s+-[dD]|tag\s+-d|rebase\b|filter-(?:branch|repo)|checkout\s+--\s|restore\s+.*(?:--worktree|--staged|--source)|stash\s+(?:drop|clear)|reflog\s+expire|gc\s+.*--prune)/i.test(joined)) return match("git.destructive", "high", "git", "This Git operation discards or rewrites working-tree or remote history.", leaf, "Inspect with git status and git diff first.");
   if (["docker", "podman"].includes(name) && /(?:system\s+prune|(?:rm|rmi|volume\s+rm|network\s+rm)|--volumes|compose\s+down.*(?:-v\b|--volumes))/i.test(joined)) return match("container.destructive", "high", "container", "This container operation removes images, volumes, networks, or resources.", leaf);
@@ -212,7 +221,7 @@ function ordinaryLeaf(leaf, options) {
   if (["npm", "pnpm", "yarn", "twine", "cargo", "dotnet", "gem"].includes(name) && /\b(?:publish|unpublish|deprecate|upload|nuget\s+push|yank)\b/i.test(joined)) return match("package.registry-mutation", "high", "package", "Package publication or registry mutation needs approval.", leaf);
   if (["npm", "pnpm", "yarn", "pip", "pip3", "apt", "apt-get", "dnf", "yum", "brew", "winget", "choco"].includes(name) && /\b(?:remove|uninstall|update|upgrade|install|add)\b/i.test(joined)) return match("package.mutation", "medium", "package", "Package installation, update, or removal needs approval.", leaf);
   const pluginExecution = ["npx", "pre-commit"].includes(name) || ["npm", "pnpm"].includes(name) && /^(?:run|test|exec|x)\b/i.test(joined.trim()) || name === "yarn" && joined.trim().length > 0 || ["bun", "deno"].includes(name) && /^(?:run|test|task)\b/i.test(joined.trim()) || name === "cargo" && /^(?:build|check|test|run)\b/i.test(joined.trim());
-  if (pluginExecution) return match("execution.plugins-or-hooks", "medium", "dynamic", "This tool can execute project plugins, hooks, scripts, or configuration and needs approval.", leaf);
+  if (pluginExecution) return workspaceExecution ? undefined : match("execution.plugins-or-hooks", "medium", "dynamic", "This tool can execute project plugins, hooks, scripts, or configuration and needs approval.", leaf);
   if (["export", "set", "setx"].includes(name) && /(?:^|\s)(?:path|[A-Za-z_][A-Za-z0-9_]*)=/i.test(joined)) return match("environment.mutation", "medium", "system", "Environment or PATH mutation needs approval.", leaf);
   if (["set-alias", "new-alias", "import-alias"].includes(name)) return match("dynamic.generated-code", "high", "dynamic", "Alias definitions can redirect later command execution and need approval.", leaf);
   if (["source", "."].includes(name)) return match("dynamic.local-script", "high", "dynamic", "Sourcing an uninspected local script needs approval.", leaf);
@@ -220,8 +229,8 @@ function ordinaryLeaf(leaf, options) {
   if (["kill", "killall", "pkill", "taskkill", "stop-process"].includes(name)) return match("process.termination", "medium", "process", "Process termination needs approval.", leaf);
   // Ordered ahead of the delete family so find keeps its own rule instead of being labelled a recursive delete.
   if (name === "find" && findMutates(args)) return match("filesystem.find-mutation", "high", "filesystem", "Find execution or deletion needs approval.", leaf);
-  if (deletesFiles(name, args)) return match(hasRecursiveFlag(args) ? "filesystem.recursive-delete" : "filesystem.mutation", "high", "filesystem", hasRecursiveFlag(args) ? "Recursive deletion needs approval." : "File deletion or truncation needs approval.", leaf, "Use a bounded, explicitly reviewed workspace target.");
-  if (POWERSHELL_WRITE_NAMES.has(name) || ["cp", "copy", "mv", "move", "tee", "touch", "mkdir", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za"].includes(name) || name === "dd" && !args.every((arg) => /^(?:--?h(?:elp)?|--version|-v)$/i.test(arg)) || name === "sed" && args.some((arg) => /^-[a-z]*i/i.test(arg))) return match("filesystem.write", "high", "filesystem", "Filesystem creation, overwrite, or movement needs approval.", leaf);
+  if (deletesFiles(name, args)) return !hasRecursiveFlag(args) && workspaceFileOperation ? undefined : match(hasRecursiveFlag(args) ? "filesystem.recursive-delete" : "filesystem.mutation", "high", "filesystem", hasRecursiveFlag(args) ? "Recursive deletion needs approval." : "File deletion or truncation needs approval.", leaf, "Use a bounded, explicitly reviewed workspace target.");
+  if (POWERSHELL_WRITE_NAMES.has(name) || ["cp", "copy", "mv", "move", "tee", "touch", "mkdir", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za"].includes(name) || name === "dd" && !args.every((arg) => /^(?:--?h(?:elp)?|--version|-v)$/i.test(arg)) || name === "sed" && args.some((arg) => /^-[a-z]*i/i.test(arg))) return workspaceFileOperation ? undefined : match("filesystem.write", "high", "filesystem", "Filesystem creation, overwrite, or movement needs approval.", leaf);
   if (AWK_NAMES.has(name) && args.some((arg) => AWK_ESCAPE.test(String(arg)) || AWK_PROGRAM_SOURCE.test(String(arg)))) return match("dynamic.inline-code", "high", "dynamic", "An awk program that can spawn shells, read the environment, load modules, or write files needs approval.", leaf);
   if (["xargs", "eval", "invoke-expression", "iex"].includes(name)) return match("dynamic.generated-code", "high", "dynamic", "Generated or indirectly invoked code needs approval.", leaf);
   if (SERVICE_NAMES.has(name) && /\b(?:stop|restart|disable|delete|remove|create|start)\b/i.test(joined)) return match("service.mutation", "high", "system", "Service mutation needs approval.", leaf);
@@ -235,7 +244,7 @@ function ordinaryLeaf(leaf, options) {
   if (["psql", "mysql", "sqlcmd", "sqlite3", "mongosh", "mongo", "redis-cli"].includes(name) && /\b(?:drop|truncate|delete\s+from|flushall|flushdb)\b/i.test(joined)) return match("database.destructive", "high", "database", "Destructive database statements need approval.", leaf);
   if (["prisma", "knex", "sequelize", "alembic", "rails", "rake", "dotnet"].includes(name) && /\b(?:migrate\s+reset|migrate:rollback|migrate:undo|downgrade|db:rollback|database\s+drop)\b/i.test(joined)) return match("database.migration-rollback", "high", "database", "Database reset, drop, or migration rollback needs approval.", leaf);
   if (SHELL_NAMES.has(name) && args.some((arg) => inlineCodeFlag(name, arg))) return match("dynamic.inline-code", "high", "dynamic", "Inline interpreter code needs approval.", leaf);
-  if ((SHELL_NAMES.has(name) && args.some((arg) => /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)(?:$|[?#])/i.test(arg))) || /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)$/i.test(String(leaf.executable || ""))) return match("dynamic.local-script", "high", "dynamic", "Executing a local script that was not statically inspected needs approval.", leaf);
+  if ((SHELL_NAMES.has(name) && args.some((arg) => /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)(?:$|[?#])/i.test(arg))) || /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)$/i.test(String(leaf.executable || ""))) return workspaceExecution ? undefined : match("dynamic.local-script", "high", "dynamic", "Executing a local script that was not statically inspected needs approval.", leaf);
   return undefined;
 }
 
@@ -300,7 +309,13 @@ export function evaluateRules(analysis, options = {}) {
     const target = typeof redirect === "string" ? undefined : redirect.target || redirect.targetLiteral;
     const output = typeof redirect === "string" ? redirect.includes(">") : redirect.operator ? String(redirect.operator).includes(">") : true;
     if (target && classifyPath(target, { ...redirectOptions, read: !output }).protected) findings.push({ action: "deny", severity: "critical", category: output ? "protected-path" : "security", ruleIds: [output ? "guard.redirect-tamper" : "credential.protected-read"], leaves: [], reason: output ? "A shell redirect targets a protected path." : "A shell redirect reads credential or private-state data." });
-    else if (output) findings.push({ action: "ask", severity: "high", category: "filesystem", ruleIds: ["filesystem.redirect"], leaves: [], reason: "A shell redirect may mutate a file and needs approval." });
+    else if (output) {
+      // A redirect into the workspace is ordinary file writing; one that escapes it, or whose target could not
+      // be resolved, still needs approval.
+      const resolved = target ? classifyPath(target, redirectOptions) : undefined;
+      const inWorkspace = options.mode === "guard" && resolved && !resolved.protected && resolved.withinWorkspace;
+      if (!inWorkspace) findings.push({ action: "ask", severity: "high", category: "filesystem", ruleIds: ["filesystem.redirect"], leaves: [], reason: "A shell redirect may mutate a file and needs approval." });
+    }
   }
   if (analysis.indeterminate || (analysis.dynamicConstructs || []).some((entry) => /substitution|environment-expansion|dynamic|depth|limit|batch|nested|heredoc|stopparsing/i.test(entry.kind))) findings.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["parser.indeterminate"], leaves: [], reason: "The command could not be completely analyzed; it will not be treated as safe." });
   return findings;

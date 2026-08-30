@@ -78,7 +78,7 @@ cd ZenPi
 
 On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible — see [SECURITY.md](SECURITY.md) for details.
 
-At each interactive top-level session start, choose **Guard** (recommended), **Strict**, or **Off for this session**. Guard blocks catastrophic filesystem, disk, boot, security-control, download-to-shell, and parser-integrity failures, and asks before other classified destructive or indeterminate commands. Strict additionally asks before ordinary mutation and every uncatalogued tool. Use `/guard status`, `/guard guard`, `/guard strict`, `/guard off`, or `/guard unlock` to inspect or change the session-only state. Print/JSON sessions default to Guard and deny any decision that needs a prompt.
+At each interactive top-level session start, choose **Guard** (recommended), **Strict**, or **Off for this session**. Guard blocks catastrophic filesystem, disk, boot, security-control, download-to-shell, and parser-integrity failures, and asks before operations that are irreversible or reach beyond the workspace — recursive deletion, force push, package publication and installation, network transfer, process termination, service and registry changes — plus anything it could not fully analyze. Creating and editing files inside the workspace and running the project's own scripts are ordinary work that Guard allows. Strict additionally asks before all of that and every uncatalogued tool. Use `/guard status`, `/guard guard`, `/guard strict`, `/guard off`, or `/guard unlock` to inspect or change the session-only state. Print/JSON sessions default to Guard and deny any decision that needs a prompt.
 
 ## Boundaries
 

@@ -275,7 +275,7 @@ cd ZenPi</code></pre>
         <div class="section-label"><span>06</span><p>Command guard</p></div>
         <div class="doc-content">
           <h2 id="command-guard-title">Stop dangerous model commands before execution.</h2>
-          <p>Interactive top-level sessions start with a choice: <strong>Guard</strong> blocks catastrophic operations and parser-integrity failures, and asks about other classified destructive or indeterminate work; <strong>Strict</strong> also asks about ordinary mutation and every uncatalogued tool; <strong>Off</strong> requires a second confirmation and lasts only for that session.</p>
+          <p>Interactive top-level sessions start with a choice: <strong>Guard</strong> blocks catastrophic operations and parser-integrity failures, and asks about work that is irreversible or reaches beyond the workspace — recursive deletion, force push, publication, network transfer, process and service control — while leaving in-workspace file edits and the project's own scripts alone; <strong>Strict</strong> also asks about ordinary mutation and every uncatalogued tool; <strong>Off</strong> requires a second confirmation and lasts only for that session.</p>
           <div class="command-list">
             <div><code>/guard status</code><span>Show mode, lock state, policy version, and in-memory counters.</span></div>
             <div><code>/guard guard</code><span>Use recommended critical-deny and high-risk approval behavior.</span></div>

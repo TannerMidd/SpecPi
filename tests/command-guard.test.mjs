@@ -112,9 +112,49 @@ test("every PowerShell parameter prefix is gated, not just the full spelling", (
     assert.notEqual(decision.action, "allow", command);
     assert.equal(decideCommand(command, { ...windows, hasUI: false }).action, "deny", command);
   }
-  // A host with no inline payload is not an interpreter invocation and must not be swept up.
-  assert.equal(decideCommand("powershell.exe -NoProfile -File build.ps1", windows).ruleIds[0], "dynamic.local-script");
+  // A host with no inline payload is not an interpreter invocation and must not be swept up. Running a
+  // workspace script is ordinary work in Guard; Strict still asks about it.
+  assert.equal(decideCommand("powershell.exe -NoProfile -File build.ps1", windows).action, "allow");
+  assert.equal(decideCommand("powershell.exe -NoProfile -File build.ps1", { ...windows, mode: "strict" }).action, "ask");
+  // A script outside the workspace does not get the in-workspace exemption.
+  assert.equal(decideCommand("powershell.exe -NoProfile -File C:/Windows/evil.ps1", windows).ruleIds[0], "dynamic.local-script");
   assert.equal(decideCommand("powershell.exe -Version", windows).action, "allow");
+});
+
+test("guard gates the irreversible and the out-of-workspace, not ordinary in-workspace work", () => {
+  const strict = { ...posix, mode: "strict" };
+  // In-workspace file mutation and running the project's own scripts are ordinary agent work in Guard.
+  for (const command of [
+    "mkdir src/components", "cp src/a.ts src/b.ts", "mv old.ts new.ts", "touch notes.md", "tee out.log",
+    "rm build.log", "sed -i 's/a/b/' src/x.ts", "echo hi > out.txt", "tar -cf dist.tar dist",
+    "npm test", "npm run build", "npx tsc", "cargo build", "./scripts/build.sh", "node --test tests/x.test.mjs",
+  ]) {
+    assert.equal(decideCommand(command, posix).action, "allow", command);
+    // Strict is the tier that still asks about all of it.
+    assert.equal(decideCommand(command, strict).action, "ask", `strict: ${command}`);
+  }
+  // Irreversible, outward-facing, or escaping the workspace still needs approval in Guard.
+  for (const [command, rule] of [
+    ["rm -rf node_modules", "filesystem.recursive-delete"],
+    ["echo x > ../outside.txt", "filesystem.redirect"],
+    ["git push --force", "git.destructive"],
+    ["npm publish", "package.registry-mutation"],
+    ["npm install lodash", "package.mutation"],
+    ["curl -O https://example.invalid/y", "network.or.remote"],
+    ["scp a.txt host:/tmp", "network.or.remote"],
+    ["kill -9 1234", "process.termination"],
+    ["systemctl restart nginx", "service.mutation"],
+  ]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "ask", command);
+    assert.ok(decision.ruleIds.includes(rule), `${command}: ${JSON.stringify(decision)}`);
+  }
+  // Every critical rule is untouched by the tier change.
+  for (const command of ["rm -rf /", "cat ~/.ssh/id_rsa", "dd if=/dev/zero of=/dev/sda", "cp secrets.env /etc/app.env", "mkdir /usr/local/thing"]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "deny", command);
+    assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+  }
 });
 
 test("guard self-tamper keys on the agent directory, not on names inside a command", () => {
