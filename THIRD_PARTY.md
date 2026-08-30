@@ -22,6 +22,16 @@ ZenPi also installs these exact browser-runtime packages from the reviewed `brow
 
 Playwright downloads its matching Chromium build into ZenPi's private runtime directory. Chromium retains its upstream BSD and third-party component licenses. None of these executables are installed globally.
 
+Repository development uses these exact, project-local formatting and linting packages:
+
+- `prettier@3.9.6` — MIT
+- `eslint@10.9.1` — MIT
+- `@stylistic/eslint-plugin@5.10.0` — MIT
+- `@typescript-eslint/parser@8.68.0` — MIT
+- `typescript@6.0.3` — Apache-2.0
+
+They are development-only dependencies, are not shipped by the ZenPi installer, and enforce the repository's JavaScript and TypeScript readability rules.
+
 Repository automation uses these official GitHub Actions at pinned major versions:
 
 - `actions/checkout@v4`

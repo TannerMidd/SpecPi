@@ -4,44 +4,70 @@ import path from "node:path";
 
 export const PATH_LIMIT = 4096;
 const unixProtected = [
-  /^\/$/, /^\/boot(?:\/|$)/i, /^\/etc(?:\/|$)/i, /^\/bin(?:\/|$)/i,
-  /^\/sbin(?:\/|$)/i, /^\/(?:usr|lib|lib64|opt|srv|var)(?:\/|$)/i,
-  /^\/root\/?$/i, /^\/home\/?$/i, /^\/home\/[^/]+\/?$/i,
-  // macOS system roots. /System/Volumes/Data/… is the firmlinked user-data tree, not system state.
-  /^\/System(?:$|\/(?!Volumes\/Data\/.))/i, /^\/(?:Library|Applications|cores)(?:\/|$)/i,
-  /^\/Users\/?$/i, /^\/Users\/[^/]+\/?$/i,
-  /^\/Volumes\/?$/i, /^\/Volumes\/[^/]+\/?$/i,
-  /^\/private\/?$/i, /^\/private\/(?:etc|var|db)(?:\/|$)/i,
+    /^\/$/,
+    /^\/boot(?:\/|$)/i,
+    /^\/etc(?:\/|$)/i,
+    /^\/bin(?:\/|$)/i,
+    /^\/sbin(?:\/|$)/i,
+    /^\/(?:usr|lib|lib64|opt|srv|var)(?:\/|$)/i,
+    /^\/root\/?$/i,
+    /^\/home\/?$/i,
+    /^\/home\/[^/]+\/?$/i,
+    // macOS system roots. /System/Volumes/Data/… is the firmlinked user-data tree, not system state.
+    /^\/System(?:$|\/(?!Volumes\/Data\/.))/i,
+    /^\/(?:Library|Applications|cores)(?:\/|$)/i,
+    /^\/Users\/?$/i,
+    /^\/Users\/[^/]+\/?$/i,
+    /^\/Volumes\/?$/i,
+    /^\/Volumes\/[^/]+\/?$/i,
+    /^\/private\/?$/i,
+    /^\/private\/(?:etc|var|db)(?:\/|$)/i,
 ];
 const unixCatastrophic = [
-  /^\/$/, /^\/boot(?:\/|$)/i,
-  /^\/(?:etc|bin|sbin|lib|lib64|usr|opt|srv|var)\/?$/i,
-  /^\/usr\/(?:bin|sbin|lib|lib64)\/?$/i, /^\/var\/lib\/?$/i,
-  /^\/(?:root|home|Users|Volumes|private)\/?$/i, /^\/(?:home|Users|Volumes)\/[^/]+\/?$/i,
-  /^\/System\/?$/i, /^\/System\/Library\/?$/i, /^\/(?:Library|Applications|cores)\/?$/i,
-  /^\/Library\/(?:LaunchDaemons|LaunchAgents|PrivilegedHelperTools)(?:\/|$)/i,
-  /^\/(?:etc|private\/etc)\/(?:passwd|shadow|sudoers|fstab|crypttab|ld\.so\.preload)$/i,
-  /^\/(?:bin|sbin)\/(?:sh|bash|init|systemd)$/i, /^\/usr\/lib\/systemd\/systemd$/i,
+    /^\/$/,
+    /^\/boot(?:\/|$)/i,
+    /^\/(?:etc|bin|sbin|lib|lib64|usr|opt|srv|var)\/?$/i,
+    /^\/usr\/(?:bin|sbin|lib|lib64)\/?$/i,
+    /^\/var\/lib\/?$/i,
+    /^\/(?:root|home|Users|Volumes|private)\/?$/i,
+    /^\/(?:home|Users|Volumes)\/[^/]+\/?$/i,
+    /^\/System\/?$/i,
+    /^\/System\/Library\/?$/i,
+    /^\/(?:Library|Applications|cores)\/?$/i,
+    /^\/Library\/(?:LaunchDaemons|LaunchAgents|PrivilegedHelperTools)(?:\/|$)/i,
+    /^\/(?:etc|private\/etc)\/(?:passwd|shadow|sudoers|fstab|crypttab|ld\.so\.preload)$/i,
+    /^\/(?:bin|sbin)\/(?:sh|bash|init|systemd)$/i,
+    /^\/usr\/lib\/systemd\/systemd$/i,
 ];
-const unixSensitive = [/(?:^|\/)(?:\.bashrc|\.bash_profile|\.bash_login|\.profile|\.zshrc|\.zshenv|\.zprofile|\.zlogin)$/i];
+const unixSensitive = [
+    /(?:^|\/)(?:\.bashrc|\.bash_profile|\.bash_login|\.profile|\.zshrc|\.zshenv|\.zprofile|\.zlogin)$/i,
+];
 const windowsProtected = [
-  /^[a-z]:[\\/]$/i, /^[a-z]:[\\/]Windows(?:[\\/]|$)/i,
-  /^[a-z]:[\\/]Boot(?:[\\/]|$)/i, /^[a-z]:[\\/](?:ProgramData|Program Files(?: \(x86\))?)(?:[\\/]|$)/i,
-  /^[a-z]:[\\/]Users[\\/]?$/i, /^[a-z]:[\\/]Users[\\/][^\\/]+[\\/]?$/i,
-  /^\\\\[^\\/]+\\[^\\/]+[\\/]?$/i,
+    /^[a-z]:[\\/]$/i,
+    /^[a-z]:[\\/]Windows(?:[\\/]|$)/i,
+    /^[a-z]:[\\/]Boot(?:[\\/]|$)/i,
+    /^[a-z]:[\\/](?:ProgramData|Program Files(?: \(x86\))?)(?:[\\/]|$)/i,
+    /^[a-z]:[\\/]Users[\\/]?$/i,
+    /^[a-z]:[\\/]Users[\\/][^\\/]+[\\/]?$/i,
+    /^\\\\[^\\/]+\\[^\\/]+[\\/]?$/i,
 ];
 const windowsCatastrophic = [
-  /^[a-z]:[\\\/]$/i, /^[a-z]:[\\\/]Windows[\\\/]?$/i, /^[a-z]:[\\\/]Windows[\\\/]System32[\\\/]?$/i,
-  /^[a-z]:[\\\/]Boot(?:[\\\/]|$)/i, /^[a-z]:[\\\/]Users[\\\/]?$/i, /^[a-z]:[\\\/]Users[\\\/][^\\\/]+[\\\/]?$/i,
-  /^[a-z]:[\\\/]Windows[\\\/]System32[\\\/]config[\\\/](?:SAM|SECURITY|SYSTEM)$/i,
-  /^[a-z]:[\\\/]Windows[\\\/](?:System32[\\\/])?(?:ntoskrnl\.exe|winload\.exe)$/i,
-  /^\\\\[^\\\/]+\\[^\\\/]+[\\\/]?$/i,
+    /^[a-z]:[\\\/]$/i,
+    /^[a-z]:[\\\/]Windows[\\\/]?$/i,
+    /^[a-z]:[\\\/]Windows[\\\/]System32[\\\/]?$/i,
+    /^[a-z]:[\\\/]Boot(?:[\\\/]|$)/i,
+    /^[a-z]:[\\\/]Users[\\\/]?$/i,
+    /^[a-z]:[\\\/]Users[\\\/][^\\\/]+[\\\/]?$/i,
+    /^[a-z]:[\\\/]Windows[\\\/]System32[\\\/]config[\\\/](?:SAM|SECURITY|SYSTEM)$/i,
+    /^[a-z]:[\\\/]Windows[\\\/](?:System32[\\\/])?(?:ntoskrnl\.exe|winload\.exe)$/i,
+    /^\\\\[^\\\/]+\\[^\\\/]+[\\\/]?$/i,
 ];
 const windowsSensitive = [
-  /(?:^|[\\/])Documents[\\/](?:WindowsPowerShell|PowerShell)[\\/](?:Microsoft\.)?PowerShell_profile\.ps1$/i,
-  /(?:^|[\\/])profile\.ps1$/i,
+    /(?:^|[\\/])Documents[\\/](?:WindowsPowerShell|PowerShell)[\\/](?:Microsoft\.)?PowerShell_profile\.ps1$/i,
+    /(?:^|[\\/])profile\.ps1$/i,
 ];
-const privatePath = /^\/proc\/(?:\d+|self|thread-self)\/(?:environ|mem)(?:$|\/)|(?:^|[\\/])(?:\.ssh|\.aws|\.azure|\.gnupg)(?:[\\/]|$)|(?:^|[\\/])(?:\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|credentials|token|secret|private\.key|config\.gcloud|hosts\.yml|passwd|shadow|ntuser\.dat|login data)(?:$|[\\/])|(?:^|[\\/])(?:\.docker|\.kube)[\\/]config(?:\.json)?$|(?:^|[\\/])\.config[\\/]gcloud(?:[\\/]|$)|(?:^|[\\/])Windows[\\/]System32[\\/]config[\\/](?:SAM|SECURITY|SYSTEM)(?:$|[\\/])|(?:^|[\\/])(?:Microsoft[\\/])?(?:Credentials|Vault|Keychains)(?:[\\/]|$)|\.(?:pem|key|p12|pfx)$/i;
+const privatePath =
+    /^\/proc\/(?:\d+|self|thread-self)\/(?:environ|mem)(?:$|\/)|(?:^|[\\/])(?:\.ssh|\.aws|\.azure|\.gnupg)(?:[\\/]|$)|(?:^|[\\/])(?:\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|credentials|token|secret|private\.key|config\.gcloud|hosts\.yml|passwd|shadow|ntuser\.dat|login data)(?:$|[\\/])|(?:^|[\\/])(?:\.docker|\.kube)[\\/]config(?:\.json)?$|(?:^|[\\/])\.config[\\/]gcloud(?:[\\/]|$)|(?:^|[\\/])Windows[\\/]System32[\\/]config[\\/](?:SAM|SECURITY|SYSTEM)(?:$|[\\/])|(?:^|[\\/])(?:Microsoft[\\/])?(?:Credentials|Vault|Keychains)(?:[\\/]|$)|\.(?:pem|key|p12|pfx)$/i;
 
 // A .pi directory is Pi state wherever it appears, including the default agent directory.
 const dotPi = /(?:^|[\\/])\.pi(?:[\\/]|$)/i;
@@ -49,111 +75,249 @@ const dotPi = /(?:^|[\\/])\.pi(?:[\\/]|$)/i;
 // protected every repository that merely contained a zenpi/ or extensions/command-guard/ path — ZenPi's own
 // source tree included — and the unanchored POSIX variant matched ordinary project files such as
 // src/api/session.ts ("pi" inside "api", then "session"), denying them critically and locking the session.
-const agentPrivateState = /^(?:zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json))(?:[\\/]|$)/i;
+const agentPrivateState =
+    /^(?:zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json))(?:[\\/]|$)/i;
 const agentPrivateName = /^(?:auth|sessions?|history|missions?|trust|private)[^\\/]*(?:[\\/]|$)/i;
 const agentGuardSource = /^extensions[\\/]command-guard(?:[\\/]|$)/i;
 const agentEnforcementState = /^(?:settings\.json|zenpi[\\/]manifest\.json|extensions[\\/]command-guard(?:[\\/]|$))/i;
 function agentDirectory() {
-  return path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
+    return path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
 }
+
 // Returns the path's location relative to the resolved agent directory, or undefined when it is outside it.
 function agentRelative(value, windows) {
-  const root = slash(agentDirectory(), windows);
-  const compare = (entry) => windows ? entry.toLowerCase() : entry;
-  const separator = windows ? "\\" : "/";
-  const candidate = compare(value), base = compare(root);
-  if (candidate === base) return "";
-  if (!candidate.startsWith(`${base}${separator}`)) return undefined;
-  return value.slice(root.length + 1);
+    const root = slash(agentDirectory(), windows);
+    const compare = (entry) => (windows ? entry.toLowerCase() : entry);
+    const separator = windows ? "\\" : "/";
+    const candidate = compare(value),
+        base = compare(root);
+    if (candidate === base) {
+        return "";
+    }
+
+    if (!candidate.startsWith(`${base}${separator}`)) {
+        return undefined;
+    }
+
+    return value.slice(root.length + 1);
 }
-function slash(value, windows) { return windows ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/"); }
+
+function slash(value, windows) {
+    return windows ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/");
+}
+
 function lexical(value, cwd, windows) {
-  let raw = String(value).slice(0, PATH_LIMIT);
-  if (!windows && raw === "~") raw = os.homedir();
-  else if (!windows && raw.startsWith("~/")) raw = path.posix.join(os.homedir(), raw.slice(2));
-  if (windows) {
-    const normalized = slash(raw, true);
-    const base = path.win32.isAbsolute(normalized) || normalized.startsWith("\\\\") ? normalized : path.win32.resolve(slash(cwd, true), normalized);
-    return path.win32.normalize(base).replace(/\\+$/, (m) => m.length > 1 ? "\\" : m);
-  }
-  return path.posix.normalize(path.posix.isAbsolute(raw) ? raw : path.posix.resolve(cwd, raw));
+    let raw = String(value).slice(0, PATH_LIMIT);
+    if (!windows && raw === "~") {
+        raw = os.homedir();
+    } else if (!windows && raw.startsWith("~/")) {
+        raw = path.posix.join(os.homedir(), raw.slice(2));
+    }
+
+    if (windows) {
+        const normalized = slash(raw, true);
+        const base =
+            path.win32.isAbsolute(normalized) || normalized.startsWith("\\\\")
+                ? normalized
+                : path.win32.resolve(slash(cwd, true), normalized);
+
+        return path.win32.normalize(base).replace(/\\+$/, (m) => (m.length > 1 ? "\\" : m));
+    }
+
+    return path.posix.normalize(path.posix.isAbsolute(raw) ? raw : path.posix.resolve(cwd, raw));
 }
+
 function canonicalNearest(value, windows) {
-  const api = windows ? fs.realpathSync.native : fs.realpathSync;
-  const pathApi = windows ? path.win32 : path.posix;
-  let current = value;
-  try { return api(current); } catch { /* Find the nearest existing ancestor without enumerating protected directories. */ }
-  const suffix = [];
-  while (current && current !== pathApi.dirname(current)) {
-    suffix.unshift(pathApi.basename(current));
-    current = pathApi.dirname(current);
-    try { return pathApi.join(api(current), ...suffix); } catch { /* continue */ }
-  }
-  return undefined;
+    const api = windows ? fs.realpathSync.native : fs.realpathSync;
+    const pathApi = windows ? path.win32 : path.posix;
+    let current = value;
+    try {
+        return api(current);
+    } catch {
+        /* Find the nearest existing ancestor without enumerating protected directories. */
+    }
+
+    const suffix = [];
+    while (current && current !== pathApi.dirname(current)) {
+        suffix.unshift(pathApi.basename(current));
+        current = pathApi.dirname(current);
+        try {
+            return pathApi.join(api(current), ...suffix);
+        } catch {
+            /* continue */
+        }
+    }
+
+    return undefined;
 }
+
 function isProtected(value, windows, read, mode) {
-  const relative = agentRelative(value, windows);
-  const agentPrivate = relative !== undefined && (agentPrivateState.test(relative) || agentPrivateName.test(relative));
-  if (read) return privatePath.test(value) || dotPi.test(value) || agentPrivate;
-  const system = (windows ? windowsProtected : unixProtected).some((pattern) => pattern.test(value));
-  const catastrophic = (windows ? windowsCatastrophic : unixCatastrophic).some((pattern) => pattern.test(value));
-  const enforcement = relative !== undefined && agentEnforcementState.test(relative);
-  if (mode === "guard" || mode === "strict") return catastrophic || enforcement;
-  const sensitive = (windows ? windowsSensitive : unixSensitive).some((pattern) => pattern.test(value));
-  return system || sensitive || privatePath.test(value) || dotPi.test(value) || agentPrivate
-    || (relative !== undefined && agentGuardSource.test(relative));
+    const relative = agentRelative(value, windows);
+    const agentPrivate =
+        relative !== undefined && (agentPrivateState.test(relative) || agentPrivateName.test(relative));
+    if (read) {
+        return privatePath.test(value) || dotPi.test(value) || agentPrivate;
+    }
+
+    const system = (windows ? windowsProtected : unixProtected).some((pattern) => pattern.test(value));
+    const catastrophic = (windows ? windowsCatastrophic : unixCatastrophic).some((pattern) => pattern.test(value));
+    const enforcement = relative !== undefined && agentEnforcementState.test(relative);
+    if (mode === "guard" || mode === "strict") {
+        return catastrophic || enforcement;
+    }
+
+    const sensitive = (windows ? windowsSensitive : unixSensitive).some((pattern) => pattern.test(value));
+
+    return (
+        system ||
+        sensitive ||
+        privatePath.test(value) ||
+        dotPi.test(value) ||
+        agentPrivate ||
+        (relative !== undefined && agentGuardSource.test(relative))
+    );
 }
 
 export function classifyPath(input, options = {}) {
-  const windows = options.platform === "win32" || options.platform === "windows" || (process.platform === "win32" && !options.platform);
-  const cwd = typeof options.cwd === "string" && options.cwd ? options.cwd : (windows ? process.cwd() : process.cwd());
-  if (typeof input !== "string" || !input || Buffer.byteLength(input, "utf8") > PATH_LIMIT) return { protected: false, indeterminate: true, reason: "The path is malformed or exceeds the safety limit." };
-  let requested = input;
-  const bashOnWindows = windows && /^(?:bash|sh|zsh|dash|ksh|fish)$/i.test(String(options.shell || ""));
-  if (bashOnWindows) {
-    if (requested === "~" || requested.startsWith("~/")) requested = path.win32.join(os.homedir(), requested === "~" ? "" : requested.slice(2).replaceAll("/", "\\"));
-    else {
-      const msysDrive = /^\/(?:cygdrive\/)?([a-z])(?:\/(.*))?$/i.exec(requested);
-      if (msysDrive) requested = `${msysDrive[1]}:\\${String(msysDrive[2] || "").replaceAll("/", "\\")}`;
+    const windows =
+        options.platform === "win32" ||
+        options.platform === "windows" ||
+        (process.platform === "win32" && !options.platform);
+    const cwd = typeof options.cwd === "string" && options.cwd ? options.cwd : windows ? process.cwd() : process.cwd();
+    if (typeof input !== "string" || !input || Buffer.byteLength(input, "utf8") > PATH_LIMIT) {
+        return { protected: false, indeterminate: true, reason: "The path is malformed or exceeds the safety limit." };
     }
-  }
-  const lexicalPath = lexical(requested, cwd, windows);
-  const protectedLexical = isProtected(lexicalPath, windows, Boolean(options.read), options.mode);
-  const normalizedCwd = lexical(cwd, cwd, windows);
-  const comparable = (value) => windows ? value.toLowerCase() : value;
-  const within = (candidate, root) => comparable(candidate) === comparable(root) || comparable(candidate).startsWith(`${comparable(root)}${windows ? "\\" : "/"}`);
-  if (options.read && protectedLexical) {
-    return { input, lexical: lexicalPath, canonical: undefined, protected: true, device: false, ads: false, withinWorkspace: within(lexicalPath, normalizedCwd), indeterminate: false, kind: "protected" };
-  }
-  const canonicalPath = canonicalNearest(lexicalPath, windows);
-  const protectedCanonical = canonicalPath ? isProtected(slash(canonicalPath, windows), windows, Boolean(options.read), options.mode) : false;
-  const canonicalCwd = canonicalNearest(normalizedCwd, windows);
-  const withinWorkspace = within(lexicalPath, normalizedCwd) && (!canonicalPath || !canonicalCwd || within(canonicalPath, canonicalCwd));
-  const safePseudoDevice = !windows && /^\/dev\/(?:null|zero|random|urandom|stdin|stdout|stderr|fd\/[012])$/i.test(lexicalPath);
-  const device = windows ? ((lexicalPath.startsWith("\\\\.") || lexicalPath.startsWith("\\\\?")) ? lexicalPath[3] === "\\" : lexicalPath.toLowerCase().startsWith("\\\\device\\")) : !safePseudoDevice && /^\/dev(?:\/|$)/.test(lexicalPath);
-  const ads = windows && /:[^\\/]+$/.test(lexicalPath.slice(3));
-  const indeterminate = !canonicalPath && (protectedLexical || windows && lexicalPath.startsWith("\\\\"));
-  return {
-    input, lexical: lexicalPath, canonical: canonicalPath, protected: protectedLexical || protectedCanonical || device || ads,
-    device, ads, withinWorkspace, indeterminate, kind: device ? "device" : ads ? "alternate-data-stream" : protectedLexical || protectedCanonical ? "protected" : "ordinary",
-  };
+
+    let requested = input;
+    const bashOnWindows = windows && /^(?:bash|sh|zsh|dash|ksh|fish)$/i.test(String(options.shell || ""));
+    if (bashOnWindows) {
+        if (requested === "~" || requested.startsWith("~/")) {
+            requested = path.win32.join(
+                os.homedir(),
+                requested === "~" ? "" : requested.slice(2).replaceAll("/", "\\"),
+            );
+        } else {
+            const msysDrive = /^\/(?:cygdrive\/)?([a-z])(?:\/(.*))?$/i.exec(requested);
+            if (msysDrive) {
+                requested = `${msysDrive[1]}:\\${String(msysDrive[2] || "").replaceAll("/", "\\")}`;
+            }
+        }
+    }
+
+    const lexicalPath = lexical(requested, cwd, windows);
+    const protectedLexical = isProtected(lexicalPath, windows, Boolean(options.read), options.mode);
+    const normalizedCwd = lexical(cwd, cwd, windows);
+    const comparable = (value) => (windows ? value.toLowerCase() : value);
+    const within = (candidate, root) =>
+        comparable(candidate) === comparable(root) ||
+        comparable(candidate).startsWith(`${comparable(root)}${windows ? "\\" : "/"}`);
+    if (options.read && protectedLexical) {
+        return {
+            input,
+            lexical: lexicalPath,
+            canonical: undefined,
+            protected: true,
+            device: false,
+            ads: false,
+            withinWorkspace: within(lexicalPath, normalizedCwd),
+            indeterminate: false,
+            kind: "protected",
+        };
+    }
+
+    const canonicalPath = canonicalNearest(lexicalPath, windows);
+    const protectedCanonical = canonicalPath
+        ? isProtected(slash(canonicalPath, windows), windows, Boolean(options.read), options.mode)
+        : false;
+    const canonicalCwd = canonicalNearest(normalizedCwd, windows);
+    const withinWorkspace =
+        within(lexicalPath, normalizedCwd) && (!canonicalPath || !canonicalCwd || within(canonicalPath, canonicalCwd));
+    const safePseudoDevice =
+        !windows && /^\/dev\/(?:null|zero|random|urandom|stdin|stdout|stderr|fd\/[012])$/i.test(lexicalPath);
+    const device = windows
+        ? lexicalPath.startsWith("\\\\.") || lexicalPath.startsWith("\\\\?")
+            ? lexicalPath[3] === "\\"
+            : lexicalPath.toLowerCase().startsWith("\\\\device\\")
+        : !safePseudoDevice && /^\/dev(?:\/|$)/.test(lexicalPath);
+    const ads = windows && /:[^\\/]+$/.test(lexicalPath.slice(3));
+    const indeterminate = !canonicalPath && (protectedLexical || (windows && lexicalPath.startsWith("\\\\")));
+
+    return {
+        input,
+        lexical: lexicalPath,
+        canonical: canonicalPath,
+        protected: protectedLexical || protectedCanonical || device || ads,
+        device,
+        ads,
+        withinWorkspace,
+        indeterminate,
+        kind: device
+            ? "device"
+            : ads
+              ? "alternate-data-stream"
+              : protectedLexical || protectedCanonical
+                ? "protected"
+                : "ordinary",
+    };
 }
 
 // True when the path resolves to installed state required to enforce the guard. A checkout that merely
 // contains a zenpi/ or extensions/command-guard/ directory remains ordinary work.
 export function isAgentPath(input, options = {}) {
-  const result = classifyPath(input, options);
-  if (typeof result.lexical !== "string") return false;
-  const windows = options.platform === "win32" || options.platform === "windows" || (process.platform === "win32" && !options.platform);
-  const lexicalRelative = agentRelative(result.lexical, windows);
-  const canonicalRelative = result.canonical === undefined ? undefined : agentRelative(slash(result.canonical, windows), windows);
-  return lexicalRelative !== undefined && agentEnforcementState.test(lexicalRelative)
-    || canonicalRelative !== undefined && agentEnforcementState.test(canonicalRelative);
+    const result = classifyPath(input, options);
+    if (typeof result.lexical !== "string") {
+        return false;
+    }
+
+    const windows =
+        options.platform === "win32" ||
+        options.platform === "windows" ||
+        (process.platform === "win32" && !options.platform);
+    const lexicalRelative = agentRelative(result.lexical, windows);
+    const canonicalRelative =
+        result.canonical === undefined ? undefined : agentRelative(slash(result.canonical, windows), windows);
+
+    return (
+        (lexicalRelative !== undefined && agentEnforcementState.test(lexicalRelative)) ||
+        (canonicalRelative !== undefined && agentEnforcementState.test(canonicalRelative))
+    );
 }
-export function normalizePath(input, options = {}) { return classifyPath(input, options).lexical; }
-export function isProtectedPath(input, options = {}) { return classifyPath(input, options).protected; }
+
+export function normalizePath(input, options = {}) {
+    return classifyPath(input, options).lexical;
+}
+
+export function isProtectedPath(input, options = {}) {
+    return classifyPath(input, options).protected;
+}
 
 export function pathDecision(input, options = {}) {
-  const result = classifyPath(input, options);
-  return result.protected ? { action: "deny", severity: "critical", category: "protected-path", ruleIds: ["path.protected"], leaves: [], reason: "The requested path is protected." } : result.indeterminate ? { action: "ask", severity: "high", category: "protected-path", ruleIds: ["path.canonicalization"], leaves: [], reason: "The requested path could not be safely canonicalized." } : { action: "allow", severity: "low", category: "filesystem", ruleIds: [], leaves: [], reason: "The path is outside protected locations." };
+    const result = classifyPath(input, options);
+
+    return result.protected
+        ? {
+              action: "deny",
+              severity: "critical",
+              category: "protected-path",
+              ruleIds: ["path.protected"],
+              leaves: [],
+              reason: "The requested path is protected.",
+          }
+        : result.indeterminate
+          ? {
+                action: "ask",
+                severity: "high",
+                category: "protected-path",
+                ruleIds: ["path.canonicalization"],
+                leaves: [],
+                reason: "The requested path could not be safely canonicalized.",
+            }
+          : {
+                action: "allow",
+                severity: "low",
+                category: "filesystem",
+                ruleIds: [],
+                leaves: [],
+                reason: "The path is outside protected locations.",
+            };
 }

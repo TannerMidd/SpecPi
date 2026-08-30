@@ -91,9 +91,11 @@ See [SECURITY.md](SECURITY.md) for the full picture.
 ## Development
 
 ```bash
+npm install --ignore-scripts --omit=peer --no-package-lock
+npm run format
 npm run check
 ```
 
-The repository check validates syntax, runs the complete Node test suite, and executes every validator linked from the capability registry with isolated prerequisites.
+JavaScript and TypeScript use four-space indentation, explicit braced control-flow blocks, one statement per line, and breathing room after blocks and before returns. `npm run format` applies the project-local Prettier and ESLint rules. The repository check enforces that formatting before validating syntax and running the complete Node test suite. It also executes every validator linked from the capability registry with isolated prerequisites.
 
 MIT licensed.

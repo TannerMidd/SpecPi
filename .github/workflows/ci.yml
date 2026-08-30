@@ -15,6 +15,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install pinned repository development tools
+        run: npm install --ignore-scripts --omit=peer --no-package-lock
       - name: Install pinned native-child test runtime
         run: npm install --prefix "$RUNNER_TEMP/zenpi-subagents-runtime" --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 pi-subagents@0.58.0
       - run: npm test
