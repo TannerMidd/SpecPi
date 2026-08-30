@@ -1,518 +1,228 @@
-# Per-provider subagent profiles
+# Durable proofs, improvement journal, and loop health
 
 ## Goal
 
-Extend ZenPi’s existing `/zen-subagents` wrapper so a user configures each exact Pi provider once and ZenPi automatically restores that provider’s builtin-role model and thinking choices whenever the parent switches back to it.
+Close the gap between "verified once" and "verified forever" in the self-improvement loop. Four changes ship together as one coherent release:
 
-Example:
-
-1. Configure `openai-codex` roles.
-2. Configure `openrouter` roles.
-3. Switch between providers in later sessions.
-4. ZenPi restores the matching saved profile automatically; no repeated setup is required.
-
-Capacity settings remain global. Provider isolation remains exact: `openai`, `openai-codex`, `openrouter`, and every other provider ID are separate boundaries.
+1. **Durable retirement proofs.** Every retired capability ships a cheap, deterministic, closed validator. `npm run check` and `zenpi doctor` continuously re-prove retired capabilities instead of only the browser runtime.
+2. **Improvement journal.** Each retirement persists bounded, sanitized proof — acceptance evidence, gates, changed files, ZenPi version — and `/wishlist history` renders the harness's own changelog, giving every retirement an auditable revert path.
+3. **Loop health metrics.** The report shows deterministic local metrics (retirements, reopen rate, open reviews, median time-to-retire, qualification rate) so the human can see whether improvements stick.
+4. **Context-rich reopens.** When post-retirement friction reopens a retired item, the reopen links back to the original retirement and the `/harness-improvement` prompt carries the original proof and what changed since.
 
 ## Constraints
 
-- Keep `pi-subagents@0.58.0` unchanged.
-- Do not fork, patch, vendor, deep-import, or recreate `pi-subagents`.
-- Use only its documented settings surface:
-  - `subagents.agentOverrides.<role>.model`
-  - `subagents.agentOverrides.<role>.thinking`
-  - `subagents.modelScope`
-  - documented runtime capacity config
-- Preserve strict scope as `{ enforce: true, strict: true, allow: ["<active-provider>/*"] }`.
-- Never inspect or persist credentials, authentication, sessions, history, prompts, or trust decisions.
-- Persist only exact provider IDs, model IDs, thinking levels, timestamps, and schema metadata.
-- Preserve explicit preview, confirmation, shared locking, symlink rejection, atomic writes, rollback, bounded backups, and unrelated JSON.
-- Keep trusted project settings and dynamically constructed workflow code documented as user-controlled boundaries.
-- When `session_start` or `model_select` changes the active provider profile/settings mirror, prompt the user to run the documented `/reload` command and keep pre-launch guards fail-closed until a fresh `session_start` verifies alignment. Lifecycle handlers receive `ExtensionContext`; command-only `ctx.reload()` must not be called from them. Do not prompt for reload after no-op same-provider activation.
+- Wishlist state remains local-only, salted-hash, append-only JSONL with existing size bounds, `0600` modes, symlink rejection, atomic writes, and archive/reset semantics. New fields ride the existing bounded append and archive paths.
+- Decision schema stays `1`; this change only adds **optional, strictly validated** fields. Old decision and event logs must remain readable without migration.
+- Validators are closed: no network, no provider calls, no live `PI_CODING_AGENT_DIR`, bounded runtime (default 2 minutes), deterministic on Windows and POSIX, and invoked through `process.execPath` without shell-specific syntax.
+- ZenPi never commits, pushes, or reverts on its own. Git integration is a recorded context and a documented trailer convention, not automation.
+- Never inspect or persist credentials, sessions, history, prompts, or trust decisions. Evidence and changed-file paths are sanitized with explicit allowlists before storage.
+- `plan` stays non-mutating; `install`, `update`, and `uninstall` keep requiring confirmation; installer tests always use a temporary `PI_CODING_AGENT_DIR`.
 
 ## Current behavior
 
-ZenPi currently stores one set of builtin-role overrides directly in user `settings.json`. Those values persist across sessions, but configuring a second provider overwrites the first provider’s role choices.
-
-The extension already:
-
-- filters model choices to `ctx.model.provider`;
-- synchronizes strict model scope on session start, model selection, and guarded launches;
-- identifies stale role models after provider changes;
-- edits only controlled role/model/thinking and capacity leaves;
-- shares the installer lock and performs atomic writes with rollback.
-
-The new work must retain those properties while adding a provider-indexed source of truth.
+- `extensions/tool-wishlist/registry.mjs` allows exactly one validator name, `browser-runtime-smoke`.
+- `finish_harness_improvement` (extensions/tool-wishlist/index.ts) runs `npm run check`, then executes only the `browser-runtime-smoke` branch and `continue`s past every other validator name. The agent-supplied `acceptanceEvidence` array is returned in tool details but never persisted.
+- `zenpi doctor` (scripts/zenpi.mjs) prints `CAPABILITY <id> verified by <validator>` only for `browser-runtime-smoke`.
+- Retirement decisions store `note` (sanitized, ≤240 chars) with the gates text folded in; there is no structured evidence, changed-file set, or version. Reopen decisions carry only a generic note; the menu's reopen path writes "Chosen for harness review".
+- The report's `Retired` section lists `id — title` only. No history view, no metrics, no reopen lineage exist.
 
 ## Design decisions
 
-### 1. ZenPi owns provider profiles
+### 1. Generic closed-validator registry and runtime
 
-Add a private state file:
+Add `extensions/tool-wishlist/validators.mjs`:
 
-`~/.pi/agent/zenpi/subagent-provider-profiles.json`
+- Exports `VALIDATOR_CATALOG`: a frozen map of validator id → `{ description, timeoutMs }`. The catalog is the single source of truth; `registry.mjs` imports its key set so `VALIDATORS` and the catalog cannot drift.
+- Ship two validators:
+  - `browser-runtime-smoke` — delegates to the existing `extensions/browser/smoke.mjs` against the managed runtime directory.
+  - `wishlist-state-smoke` — creates its own temporary state directory, drives the real core API (`setCollectionMode on` → record two gaps → refresh → select → retire with evidence → refresh → reopen → metrics), asserts report sections and invariants, cleans up, and exits 0. No arguments required; never touches the live agent dir.
+- CLI entry: `node validators.mjs <validator> [--state-dir <dir>] [--cwd <dir>] [--browser-runtime <dir>]` prints bounded output and exits non-zero with a clear message for unknown validator names (fail closed).
+- A shared `runValidator(validator, environment)` helper returns `{ code, stdout }` so both callers use identical semantics.
 
-Equivalent path under `PI_CODING_AGENT_DIR` must be supported.
+### 2. Continuous re-proof in check and doctor
 
-Schema:
+- `finish_harness_improvement` dispatches **every** validator named by the selected capability's `validations` array through the validators CLI in the source checkout via `pi.exec`, with per-validator timeouts. This verifies the implementation under review rather than the older installed validator. An unknown or unregistered validator name fails the retirement attempt with an explicit error.
+- `zenpi doctor` replaces the hard-coded branch with a loop over each capability's validators, running each through the validators CLI and printing `CAPABILITY <id> verified by <validator>`. A validator failure is a doctor error; a skipped prerequisite (for example, browser runtime installation was declined) remains a warning.
+- `npm run check` gains a test that iterates `CAPABILITY_REGISTRY` and executes every linked validator CLI as a child process, skipping `browser-runtime-smoke` only when the manifest records the runtime as not installed (mirroring doctor's warning semantics). Retired capabilities are therefore re-proved on every check run.
+- Add `node --check extensions/tool-wishlist/validators.mjs` to the `check` script.
+
+### 3. Structured retirement journal in decision events
+
+Extend the decision record with one optional `journal` object, validated by `isStoredDecision` whenever present:
 
 ```json
 {
   "schema": 1,
-  "providers": {
-    "openai-codex": {
-      "updatedAt": "2026-08-29T00:00:00.000Z",
-      "origin": "configured",
-      "roles": {
-        "scout": { "model": "openai-codex/model-id", "thinking": "low" },
-        "researcher": { "model": "inherit", "thinking": "medium" },
-        "worker": { "model": "openai-codex/model-id", "thinking": "medium" },
-        "reviewer": { "model": "openai-codex/model-id", "thinking": "high" },
-        "oracle": { "model": "inherit", "thinking": "high" }
-      }
-    }
+  "journal": {
+    "schema": 1,
+    "evidence": ["…≤ 8 sanitized strings, ≤ 240 chars each"],
+    "gates": ["npm run check", "wishlist-state-smoke"],
+    "changedFiles": ["extensions/tool-wishlist/core.mjs"],
+    "changedFilesTruncated": false,
+    "version": "0.7.0"
   }
 }
 ```
 
-Requirements:
+- `evidence` items pass through `sanitizeReportText(…, 240)`; count bounded at 8.
+- `gates` are compacted and matched against `/^[A-Za-z0-9 ._-]{1,60}$/`; count bounded at 8.
+- `changedFiles` are computed by `finish_harness_improvement` from `git status --porcelain` in the source checkout at retire time: repo-relative paths only, matched against `/^[A-Za-z0-9._/-]{1,200}$/`, `..` rejected, absolute paths and anything outside the checkout rejected; bounded at 40 entries with `changedFilesTruncated: true` beyond that. If git is unavailable or the checkout is not a repository, the field is omitted rather than guessed.
+- `version` is the ZenPi manifest version captured by the existing `sourceCheckout` helper.
+- `appendWishlistDecision` accepts an optional `journal` argument, validates and bounds every field, and rejects a `journal` on non-`retire` actions. Old logs without `journal` stay valid.
+- The human-readable `note` keeps its existing role (summary + gate list); the journal carries structure so renderers never parse the note.
 
-- provider keys must be non-empty exact IDs without wildcards;
-- every explicit model must belong to its profile’s exact provider;
-- every provider record has a bounded `origin` enum: `default`, `configured`, `migrated`, or `reset`; this durably distinguishes status across sessions without storing additional user data;
-- only `SUPPORTED_ROLES` are stored;
-- every role contains only `model` and `thinking`;
-- unknown top-level/provider keys are rejected rather than silently interpreted;
-- cap profiles at 64 providers and bound file size before parsing;
-- write with mode `0600` where supported;
-- reject symlinked targets and parent directories;
-- never store complete Pi settings snapshots.
+### 4. Git trailer convention (not automation)
 
-### 2. Pi settings remain the active compatibility mirror
+- `skills/zenpi-improve/SKILL.md` gains one instruction: when the user chooses to commit the improvement, include a `ZenPi-Gap: <gap-id>` trailer. ZenPi itself never commits.
+- The journal's changed-file set — not commit archaeology — is the durable link between a retirement and its diff, so the loop works even when nothing was ever committed.
 
-`pi-subagents` documents one active `agentOverrides` map, not a provider-indexed map. ZenPi therefore keeps the selected provider profile mirrored into the existing controlled settings leaves.
+### 5. `/wishlist history` view
 
-The profile file is the durable source of truth. The active settings mirror exists only so the unchanged `pi-subagents` package can consume the selected provider’s role defaults.
+- New subcommand `history [id]`:
+  - Without an id: the last 20 `retire` and `reopen` decisions in chronological order — timestamp, action, gap id, note, gates, version, evidence count.
+  - With an id: full detail for that gap — every retirement (evidence bullets, gates, changed files), every reopen with linked retirement and post-retirement signal count.
+- Rendered as markdown through the existing `displayMarkdown` path; add `history` to command completions and usage text.
+- The main report's `Retired` section is extended in place: `- \`id\` — title (verified YYYY-MM-DD via <gates>)` using the latest retire decision's journal; entries without journal keep the old shape.
+- Archive/reset already moves the decisions file, so the journal is preserved by existing archive transactions; no new archive surface.
 
-Activation writes, in one transaction:
+### 6. Loop health metrics
 
-- strict `subagents.modelScope` for the active provider;
-- the active provider’s builtin role model/thinking leaves;
-- profile state when configuration or migration changes it;
-- global capacity only when explicitly edited.
+Add a pure `loopMetrics(events, decisions, registry)` in `core.mjs`, deterministic over current state:
 
-Do not modify unrelated `agentOverrides` fields such as prompts, tools, skills, extensions, context, or custom roles.
+- `retirements` — count of `retire` decisions.
+- `reopenRate` — `reopen` decisions from retired state ÷ retirements, as a whole percentage (`0` when no retirements).
+- `openReviews` — retired groups currently flagged `reviewNeeded`.
+- `medianTimeToRetire` — median over retirements of (retire timestamp − first observation timestamp for that key), in days with one decimal; omitted when no data.
+- `qualificationRate` — groups with at least one observation that are qualified or reached `selected`/`retired` ÷ all observed groups, as a whole percentage.
 
-### 3. Profiles activate automatically
+Render a bounded `# Loop health` section at the foot of the report, only when at least one observation exists. `refreshWishlist` returns `metrics` so `/wishlist status` can append one line (retirements, reopen rate, open reviews).
 
-Attempt activation on:
+### 7. Context-rich reopens
 
-- `session_start`;
-- `model_select` when the exact provider changes;
-- immediately before guarded native `subagent` launches;
-- `/zen-subagents`, `/zen-subagents status`, and `/zen-subagents reset`.
+- When the `/harness-improvement` menu reopens a retired item, the `reopen` decision records:
+  - `targetKey` = the latest `retire` decision id for that gap (documented action-specific meaning, consistent with `unmerge` already storing the merge target there);
+  - `evidence` = up to 5 sanitized lines summarizing post-retirement signals (count, date range, latest limitation);
+  - note `Reopened for review: N post-retirement signal(s)` (sanitized).
+- A pure resolver in `core.mjs` maps a reopen decision to its linked retirement journal, so renderers and the prompt can reconstruct lineage without new state.
+- `improvementPrompt` gains bounded sections when context exists:
+  - **Original proof** — up to 5 evidence bullets from the linked retirement journal;
+  - **Files touched by the original change** — up to 10 `changedFiles`;
+  - **Changed since retirement** — best-effort `git log --format=%h %s -8` since the retirement timestamp, extension-side, fail-open; each untrusted Git-metadata line is sanitized and bounded to 240 characters (skipped silently when git is unavailable or the checkout is not a repository; this content stays in the session prompt and is never persisted to wishlist state).
+- The zenpi-improve skill's reopen guidance points to `/wishlist history <id>` as the first step: original proof and changed-file set in, explicit revert plan proposed to the human, never executed autonomously.
 
-Switching models within the same exact provider must not rewrite files when the active mirror already matches.
+## Core API changes (core.mjs)
 
-If a provider has a valid saved profile, restore it automatically. If it has no profile, create a default profile using `ROLE_DEFAULTS` and notify once that the provider is using inherited defaults until configured.
+- `appendWishlistDecision(options)` — new optional `journal` (retire only) and `evidence` (retire/reopen) arguments, with validation and bounds as specified above.
+- `isStoredDecision` — validates the optional `journal` object (shape, types, bounds) when present; tolerates its absence.
+- `linkReopenToRetirement(decisions, canonicalKey)` — resolves the latest linked retirement for a reopen decision.
+- `loopMetrics(events, decisions)` — as specified in Design decision 6.
+- `renderWishlistHistory(events, decisions, requestedKey?)` — journal markdown for the history subcommand.
+- `renderWishlist` — extended `Retired` lines and the `# Loop health` section; byte-for-byte stable for state without the new fields.
 
-A saved model that is no longer available remains stored but is reported as stale. Do not silently choose a replacement. Launches using a stale default must fail with a clear `/zen-subagents` remediation message; `inherit` remains valid.
+## Extension changes (index.ts)
 
-Explicit per-run `model` or `thinking` inputs retain `pi-subagents` precedence and are not overwritten by ZenPi. Strict model scope still rejects cross-provider overrides.
+- `finish_harness_improvement`: generic validator dispatch; compute bounded repo-relative `changedFiles` via `git status --porcelain`; pass `journal` (evidence, gates, changed files, version) into the retire decision; unknown validator names fail closed.
+- `/harness-improvement` reopen path: link the reopen to the latest retirement, attach signal evidence, enrich the prompt with original proof and changed-since context (best-effort git log).
+- `/wishlist`: new `history` subcommand with completion and usage updates; `status` line gains the metrics summary.
 
-### 4. Capacity stays global
+## Registry changes (capabilities.json)
 
-Keep these values in `extensions/subagent/config.json` as global settings:
+Add reviewed entries for the capabilities this release ships. Each canonical gap phrase below must normalize to the exact registry id, and every id and alias must satisfy `normalizeCapability(value) === value` (verified by test; phrases checked against the shipped `normalizeCapability`):
 
-- cumulative run child budget;
-- cumulative session child budget;
-- active top-level async capacity.
+| id | canonical gap phrase | title | validations |
+| --- | --- | --- | --- |
+| `durable-retirement-proof` | "Durable retirement proofs" | Durable re-runnable retirement proofs | `wishlist-state-smoke` |
+| `improvement-journal` | "Improvement journal" | Improvement journal with evidence history | `wishlist-state-smoke` |
+| `loop-health-metric` | "Loop health metrics" | Loop health metrics | `wishlist-state-smoke` |
+| `context-rich-reopen` | "Context-rich reopens" | Context-rich reopens for retired gaps | `wishlist-state-smoke` |
 
-Do not duplicate capacity into every provider profile.
+Registry entries are added only when the corresponding capability actually ships in this release; `shippedVersion`/`shippedAt` reflect the release. If a feature is deferred, its entry is deferred with it — the registry never leads the implementation.
 
-The configuration preview must label capacity as global and role model/thinking changes as applying only to the active provider.
+## Installer, doctor, and check
 
-### 5. Prevent cross-process provider races
-
-User `settings.json` is shared by all Pi processes. A short write lock alone cannot make two simultaneous sessions on different providers safe because either process could replace the active mirror before the other process’s `pi-subagents` launch reads it.
-
-Add an ephemeral provider-lease file:
-
-`~/.pi/agent/zenpi/subagent-provider-leases.json`
-
-Each live extension instance records:
-
-- random lease token;
-- PID;
-- exact provider;
-- last update timestamp.
-
-Lease behavior:
-
-- register on `session_start`;
-- update on successful provider changes and guarded launches;
-- remove the matching token on `session_shutdown`;
-- reclaim an entry only when its recorded PID is positively absent;
-- never reclaim malformed or unverifiable entries automatically;
-- allow multiple live sessions using the same provider;
-- fail closed when another live process holds a different-provider lease;
-- report which provider conflicts, but do not expose unrelated process data;
-- retry naturally on the next status/configuration/launch after the conflicting session exits.
-
-The lease file is ephemeral, contains no model or prompt data, and is removed when empty. It is not included in persistent backups.
-
-Do not hold the shared lock for the lifetime of a subagent run. The lease prevents conflicting provider activation; the existing lock serializes each bounded file transaction.
-
-### 6. Lazy migration preserves existing configuration
-
-The installer cannot know the active runtime provider, so migrate the current single-profile settings lazily in the extension.
-
-On first activation when no profile file exists:
-
-1. Read the controlled builtin role model/thinking leaves.
-2. Collect provider IDs from non-`inherit` models.
-3. If all explicit models use one provider, save the current roles under that provider.
-4. If every role uses `inherit`, save them under the active provider.
-5. If explicit roles contain mixed or invalid providers, do not guess; leave settings unchanged, report a migration diagnostic, and require `/zen-subagents` to repair.
-6. If the inferred provider differs from the active provider, preserve the inferred profile and create/activate defaults for the active provider.
-7. Record schema state only after profile and mirror writes verify successfully.
-
-Migration must be idempotent and covered for:
-
-- existing Codex configuration while starting Codex;
-- existing Codex configuration while starting OpenRouter;
-- all-`inherit` configuration;
-- malformed and mixed-provider legacy values;
-- interrupted first migration and rollback.
-
-## `/zen-subagents` behavior
-
-### Default command
-
-The existing interactive flow edits the active provider profile.
-
-Header example:
-
-`ZenPi subagents · openai-codex · saved profile`
-
-Review text must show:
-
-- active exact provider;
-- provider-specific role changes;
-- global capacity changes;
-- strict provider scope;
-- stale/unavailable model diagnostics;
-- project-scope warnings;
-- whether this is a new or existing profile.
-
-One confirmation applies profile, mirror, and capacity changes atomically.
-
-### Status
-
-`/zen-subagents status` must show:
-
-- active provider;
-- active profile state: saved, default, stale, migration-needed, or blocked by a live provider lease;
-- strict scope status;
-- each active role’s model and thinking;
-- global capacity values;
-- saved provider IDs, without dumping the complete profile file;
-- stale roles and unavailable models;
-- project precedence warnings.
-
-Status remains non-mutating except for safe lazy migration/activation required to establish the active profile. If that distinction is confusing in implementation, split pure inspection from activation and ensure the UI states when activation occurred.
-
-### Reset
-
-`/zen-subagents reset` resets only the active provider profile to `ROLE_DEFAULTS` and keeps other provider profiles intact.
-
-The confirmation must say:
-
-- which exact provider will be reset;
-- that global capacity is unchanged;
-- that other provider profiles are unchanged.
-
-Do not add a reset-all operation in this change.
-
-### Completion and notifications
-
-Keep `status` and `reset` completions. No provider name argument is required; configuration always targets the active provider.
-
-Notify on provider changes only when:
-
-- a different saved profile was restored;
-- a new default profile was created;
-- saved roles are stale;
-- activation is blocked by a conflicting live provider lease;
-- migration needs user action.
-
-Avoid notifications for no-op same-provider model changes.
-
-## Core API changes
-
-Refactor `extensions/subagents/core.mjs` around lock-aware internal operations so public functions do not acquire the same lock recursively.
-
-Add or equivalent:
-
-- `readProviderProfiles(agentDir)`
-- `validateProviderProfiles(value)`
-- `profileForProvider(profiles, provider)`
-- `migrateLegacyProfile(state, activeProvider)`
-- `activateProviderProfile({ agentDir, provider, leaseToken, reason })`
-- `applyProviderConfiguration({ agentDir, provider, roles, capacity, leaseToken, reset, reason })`
-- `readProviderLeases(agentDir)`
-- `registerOrRefreshProviderLease(...)`
-- `releaseProviderLease(...)`
-- `staleProfileRoles(profile, provider, availableValues)`
-- `formatSubagentStatus(...)`
-
-Transaction requirements:
-
-- snapshot only exact bytes needed for same-process rollback;
-- persist only controlled leaf backups;
-- write profile state, settings mirror, and capacity atomically as one logical operation;
-- on any failure, restore every file changed by that operation;
-- verify each written JSON file before returning success;
-- preserve original file modes;
-- reject target and parent symlinks before locking and again at write boundaries where practical;
-- keep at most five bounded leaf-only backups;
-- include provider ID and reason in backup metadata;
-- never include leases or unrelated settings fields in backups.
-
-Extend `configurationPaths()` with profile and lease paths.
-
-## Extension changes
-
-Update `extensions/subagents/index.ts` to:
-
-- generate one random lease token per extension runtime;
-- register/refresh/release leases through lifecycle hooks;
-- replace scope-only synchronization with profile activation;
-- build command drafts from the active profile rather than the current global mirror;
-- retain exact-provider model filtering;
-- retain nearest/git-root project resolution and launch-`cwd` checks;
-- retain file-authored/literal-child-`cwd` workflow guards and the documented dynamic-workflow trust boundary;
-- fail closed before a launch when activation, lease validation, migration, scope validation, or stale-role validation fails;
-- avoid rewriting settings for no-op activation.
-
-Do not parse or rewrite workflow JavaScript to inject role models. The active mirror plus same-provider lease is the supported wrapper mechanism.
-
-## Installer, update, doctor, and uninstall
-
-Update `scripts/zenpi.mjs` without changing the pinned `pi-subagents` package.
-
-### Install
-
-- Do not seed provider names because no active provider is known.
-- Leave profile creation to lazy runtime migration.
-- Ensure the ZenPi state directory remains private.
-- Include profile/lease policy in the printed plan.
-
-### Update
-
-- Preserve valid provider profiles byte-for-byte unless schema migration is required.
-- Never replace user profiles with defaults.
-- Continue preserving global capacity customization.
-- Do not interpret a missing profile file as damage before first runtime activation.
-
-### Doctor
-
-Validate separately:
-
-- profile file schema and size bounds;
-- exact provider/model affinity for every saved role;
-- supported roles and thinking levels;
-- active settings mirror consistency when an active provider can be inferred;
-- malformed or conflicting lease data;
-- policy-owned strict scope;
-- existing global capacity bounds.
-
-Doctor must not require provider authentication or enumerate private provider state. It may report provider/model IDs already present in ZenPi’s profile file.
-
-### Uninstall
-
-Provider profiles are user-tunable ZenPi state. Preserve them on uninstall, alongside existing retained local state, and report the retained path. Remove an empty lease file and the current process’s lease; never delete another active process’s lease.
-
-Restore settings/runtime-config leaves using existing manifest ownership rules. Do not copy complete settings into the profile store during uninstall.
-
-Document manual profile removal for users who want a complete state purge.
-
-## README self-improvement loop graphic
-
-Replace the ASCII/text flow under README’s **“Let friction teach the system”** section with a purpose-built visual diagram. Do not replace the numbered explanatory content under **“How the loop works”**; the graphic should summarize it rather than become the only explanation.
-
-Create a checked-in, hand-reviewable SVG asset:
-
-`site/self-improvement-loop-v2.svg`
-
-The diagram must communicate the complete control loop:
-
-1. real friction is observed locally;
-2. privacy-minimized evidence accumulates and qualifies;
-3. a human explicitly chooses `/harness-improvement`;
-4. ZenPi implements the smallest sufficient change;
-5. verification gates the result;
-6. a passing change is retired;
-7. a failed verification returns to selected work without pretending completion;
-8. later evidence against a retired capability returns to human review rather than reopening automatically.
-
-Visual requirements:
-
-- use a circular or clearly cyclical composition rather than a left-to-right text imitation;
-- make the human-choice and verification gates visually distinct from ordinary stages;
-- show both the failed-verification return path and later-evidence review path without crossing labels or ambiguous arrows;
-- use the existing Tea House visual language and palette while remaining readable on GitHub light and dark themes;
-- use a transparent or intentionally framed background with sufficient text/line contrast;
-- include a descriptive `<title>` and `<desc>` inside the SVG;
-- provide meaningful README `alt` text that describes the loop and its two return paths;
-- remain legible when rendered at approximately 320px mobile width and crisp at large desktop widths;
-- use a stable `viewBox`, vector text/shapes, and no raster screenshots;
-- contain no scripts, animation, externally loaded `href`/CSS resources, embedded HTML, tracking, or external fonts;
-- respect reduced-motion expectations by being fully static;
-- keep important labels as real SVG text where practical.
-
-Embed it in `README.md` with a relative repository path so tagged releases and forks render independently. Center it and cap the displayed width without using GitHub-unsupported styling. Add a short text link below the image to the existing interactive showcase walkthrough for users who want the stage-by-stage example.
-
-The existing ASCII block beginning with `notice → qualify` must be removed. Do not use Mermaid as the final artifact; the intent is a branded, deterministic graphic that renders consistently without a diagram runtime.
-
-The website already has an interactive loop walkthrough. Keep that interaction, but make the new SVG visually consistent with it. Reuse the SVG on the website only if it adds value without duplicating the interactive story.
+- `zenpi.mjs` `check` script: add the validators file to the `node --check` list.
+- `doctor`: generic validator loop per capability as specified in Design decision 2; existing runtime/pi/donsetch checks unchanged.
+- The installer explicitly manages `validators.mjs` beside the wishlist extension modules; plan/install/update/uninstall and required-source checks include it.
 
 ## Documentation
 
-Update together:
+Update together, where the change requires it:
 
-- `README.md`
-- `SECURITY.md`
-- `THIRD_PARTY.md` only if dependency policy changes (none expected)
-- `CHANGELOG.md`
-- `AGENTS.md`
-- `templates/AGENTS.md`
-- `site/index.html`
-- `site/styles.css` only if needed
-
-Documentation must explain:
-
-- configure each exact provider once;
-- profiles restore automatically in future sessions;
-- capacity is global;
-- `inherit` remains portable;
-- unavailable models become stale and are not silently replaced;
-- exact-provider isolation is unchanged;
-- simultaneous different-provider Pi processes fail closed rather than racing the shared mirror;
-- project settings and trusted dynamic workflow code remain explicit boundaries;
-- profile contents, location, retention, and manual deletion;
-- no credentials or authentication data are stored;
-- the README’s ASCII self-improvement flow is replaced by an accessible static SVG that accurately shows human choice, verification failure, retirement, and later-evidence review.
-
-Update the showcase delegation console to depict at least two saved provider profiles and automatic restoration without implying cross-provider child execution.
+- `README.md` — mention durable proofs and `/wishlist history` under "What ZenPi adds".
+- `SECURITY.md` — document the new local-only data classes (sanitized evidence, gates, changed-file names, version), retention, and manual deletion.
+- `CHANGELOG.md` — release entry.
+- `skills/zenpi-improve/SKILL.md` — evidence recording, journal-first reopen guidance, `ZenPi-Gap:` trailer convention.
+- `templates/AGENTS.md` and the managed root block only if agent-facing guidance changes.
+- Site showcase only if the loop story gains a stage (journal/metrics are refinements of existing stages; avoid inflating the walkthrough).
 
 ## Tests
 
-### Core profile tests
+Extend `tests/zenpi.test.mjs` (and add focused cases under `tests/` as needed):
 
-- profile schema accepts exact valid providers and rejects malformed, wildcard, oversized, unknown-role, and cross-provider values;
-- model IDs containing additional `/` characters remain valid under the exact first-segment provider rule;
-- profiles for `openai` and `openai-codex` remain distinct;
-- capacity is not duplicated into profiles;
-- unrelated settings and role fields survive activation;
-- active mirror switches Codex → OpenRouter → Codex and restores original Codex choices;
-- same-provider model changes are no-op writes;
-- stale unavailable models are reported without replacement;
-- reset affects only the active provider;
-- at most five leaf-only backups remain;
-- profile, settings, and capacity transaction failures roll every changed file back;
-- target and parent symlinks fail closed.
+### Journal
 
-### Lease tests
+- retire with `journal` stores sanitized, bounded evidence, gates, changed files, and version; oversized or malformed items are rejected, not silently truncated past bounds;
+- retire without `journal` (legacy shape) remains valid; pre-change decision fixtures still parse;
+- `journal` on a non-retire action is rejected;
+- changed-file validation rejects absolute paths, `..`, whitespace, and entries outside repo-relative form.
 
-Use child processes where needed:
+### Reopen lineage
 
-- multiple leases for the same provider are allowed;
-- a live different-provider PID blocks activation and launch;
-- positively absent PIDs are reclaimed;
-- malformed, permission-unknown, changed-during-recovery, and PID-reuse-ambiguous records fail closed;
-- release removes only the matching token;
-- substituted lease files survive release;
-- empty lease files are removed;
-- session shutdown cleanup is idempotent.
+- reopen from the menu records `targetKey` = latest retire id plus sanitized signal evidence;
+- `linkReopenToRetirement` resolves the original journal and tolerates missing/unlinked reopens;
+- report and history render correctly with zero, one, and multiple reopen cycles.
 
-### Migration tests
+### Metrics
 
-- single-provider legacy settings migrate once;
-- starting on another provider preserves the inferred legacy profile and activates defaults for the current provider;
-- all-`inherit` settings seed the current provider;
-- mixed-provider legacy values require explicit repair;
-- interrupted migration rolls back and retries safely;
-- no complete settings snapshot is persisted.
+- deterministic fixtures produce exact retirement count, reopen rate, open reviews, median time-to-retire, and qualification rate;
+- empty and single-event states omit or zero the section without crashing;
+- `# Loop health` is absent from reports for state with no observations.
+
+### Validators
+
+- catalog key set equals the `VALIDATORS` set (no drift);
+- `wishlist-state-smoke` passes on a clean temp dir, exercises record → select → retire → reopen → metrics, and fails when core assertions are broken (fault-injected fixture);
+- unknown validator name exits non-zero with a clear message;
+- every capability in `CAPABILITY_REGISTRY` links only to registered validators;
+- the check-integration test deduplicates and executes every linked validator as a child process with isolated prerequisites, including a temporary fake browser runtime for `browser-runtime-smoke`.
 
 ### Extension harness
 
-Extend the deterministic TypeScript harness to cover:
+- `finish_harness_improvement` persists the journal and retires only after all named validators pass; a failing validator leaves the item selected;
+- unknown validator names block retirement with an explicit error;
+- reopen prompt contains original proof and changed-since sections when context exists and omits them cleanly when it does not;
+- `history` renders through the markdown display path with truncation respected.
 
-- configure Codex profile;
-- switch to OpenRouter and configure it;
-- switch back and observe automatic Codex restoration;
-- status lists both saved provider IDs;
-- reset preserves the other profile and global capacity;
-- stale-role notification;
-- no-op same-provider selection;
-- conflicting live-provider lease blocks the tool call;
-- unsafe project scope still blocks;
-- command cancellation remains non-mutating;
-- exactly one confirmation per apply/reset.
+### Lifecycle
 
-### Installer lifecycle
+- `npm run check` passes with the new file list;
+- install/update/doctor/uninstall round trip in a temporary `PI_CODING_AGENT_DIR`, with doctor exercising the generic validator loop;
+- archive/reset preserves journal state and the salt, per existing transaction tests.
 
-Use temporary `PI_CODING_AGENT_DIR` values and no live user Pi state.
+## Out of scope
 
-Verify:
-
-- fresh install before first profile;
-- lazy first activation;
-- update preserves profiles and global capacity;
-- doctor accepts valid profiles and diagnoses invalid profiles/leases;
-- uninstall restores managed leaves while preserving provider profiles;
-- reinstall reuses preserved profiles;
-- rollback and lock release.
-
-### Graphic, site, and release checks
-
-- parse `site/self-improvement-loop-v2.svg` as XML and verify a stable `viewBox`, `<title>`, `<desc>`, expected stage labels, and both return paths;
-- assert the SVG contains no `<script>`, `<foreignObject>`, externally loaded `href`/CSS resource, animation element, or embedded raster data;
-- assert README embeds the relative SVG with meaningful alt text and no longer contains the `notice → qualify` ASCII flow;
-- render the standalone SVG and the README section at desktop and mobile widths, checking text legibility, arrow clarity, contrast, clipping, and overflow;
-- update static site contract tests;
-- run `npm run check`;
-- run isolated install/update/doctor/uninstall round trips;
-- run `git diff --check`;
-- load the extension through the deterministic harness and an isolated Pi smoke;
-- validate the showcase at desktop, tablet, and mobile viewports;
-- use a fresh read-only reviewer before release.
+- Automated commits, reverts, or scheduled self-fixing — the revert path is journal context plus an explicit human-approved plan.
+- Uploading, syncing, or backing up wishlist state anywhere.
+- Tunable qualification thresholds, suppression lists, and cadence nudges (Tier 2 leads).
+- Migrating or rewriting existing decision logs.
 
 ## Implementation order
 
-1. Add profile schema, validation, bounded reads, and paths in `core.mjs`.
-2. Add migration and provider activation transactions.
-3. Add provider leases and conflict handling.
-4. Refactor configuration apply/reset around provider profiles and global capacity.
-5. Update extension lifecycle hooks, status, dialogs, and launch guards.
-6. Add core, lease, migration, and extension harness tests.
-7. Integrate installer/update/doctor/uninstall behavior.
-8. Design and validate the self-improvement loop SVG, then replace the README ASCII flow.
-9. Update remaining documentation and showcase content.
-10. Run full lifecycle, graphic/UI, and review validation.
+1. `validators.mjs` catalog + `wishlist-state-smoke`; wire `registry.mjs` `VALIDATORS` to the catalog; generic dispatch in `finish_harness_improvement` and doctor; add to the `check` script.
+2. Journal in `core.mjs`: optional `journal` on retire decisions, validation, bounds; `appendWishlistDecision` argument; extension-side changed-file capture and evidence pass-through.
+3. `/wishlist history` and the extended `Retired` report lines.
+4. `loopMetrics`, the `# Loop health` section, and the `status` summary line.
+5. Context-rich reopens: reopen linkage, signal evidence, prompt enrichment, skill guidance.
+6. Registry entries with exact ids/aliases and validator links.
+7. Documentation updates.
+8. Full test pass, isolated lifecycle round trip, rendered QA for the history view, `git diff --check`, fresh read-only review.
 
 ## Acceptance criteria
 
-The change is complete when:
-
-- a user configures Codex and OpenRouter once each;
-- later provider switches automatically restore the correct saved role models and thinking levels;
-- switching back does not require `/zen-subagents` again unless a saved model became unavailable;
-- exact-provider scope is re-established before every native launch;
-- simultaneous live sessions on different providers fail closed instead of racing shared settings;
-- profiles, current settings mirror, and global capacity remain atomic and recoverable;
-- valid profiles survive update, uninstall, reinstall, and future sessions;
-- no credentials, prompts, sessions, history, complete settings, or unrelated JSON are persisted in profile state or backups;
-- `pi-subagents@0.58.0` remains unchanged;
-- the README uses the accessible branded SVG instead of the ASCII flow and the diagram remains legible on GitHub-sized desktop/mobile renders;
-- all tests, lifecycle checks, rendered QA, and fresh review pass.
+- Every capability in the registry is re-proved by `npm run check` and `zenpi doctor` through its linked validators, offline and without touching live user state; unknown validator names fail closed at retirement time.
+- Each retirement persists bounded sanitized proof (evidence, gates, changed files, version) locally; legacy decision logs remain readable; archive/reset preserve the journal.
+- `/wishlist history` renders per-gap proof and reopen lineage; the report's retired list shows verification dates and gates.
+- The report shows deterministic loop metrics only when observations exist, and `/wishlist status` summarizes them in one line.
+- Reopening a retired gap records the linked retirement and post-retirement signals, and the improvement prompt carries the original proof and what changed since, without persisting git output to wishlist state.
+- ZenPi still never commits, reverts, or uploads; all new writes stay bounded, atomic, `0600`, and symlink-rejected.
+- All tests, `npm run check`, the isolated install/update/doctor/uninstall round trip, and a fresh read-only review pass.

@@ -40,7 +40,7 @@
       <div class="sidebar-heading">
         <p>Documentation</p>
         <strong>ZenPi Wiki</strong>
-        <span>v0.6.1</span>
+        <span>v0.7.0</span>
       </div>
       <nav aria-label="Wiki sections">
         <div class="sidebar-group">
@@ -90,7 +90,7 @@
       </details>
 
       <header class="wiki-hero" id="overview">
-        <p class="eyebrow">Documentation / v0.6.1</p>
+        <p class="eyebrow">Documentation / v0.7.0</p>
         <h1>Build with care,<br><em>work with proof.</em></h1>
         <p>Everything you need to install ZenPi, understand its human-directed improvement loop, and use its focused review, delegation, and browser tools.</p>
         <div class="wiki-hero-actions">
@@ -130,8 +130,8 @@
 
           <h3>1. Clone a reviewed release</h3>
           <div class="code-block">
-            <div><span>terminal</span><span>release v0.6.1</span></div>
-            <pre><code>git clone --branch v0.6.1 --depth 1 https://github.com/TannerMidd/ZenPi.git
+            <div><span>terminal</span><span>release v0.7.0</span></div>
+            <pre><code>git clone --branch v0.7.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi</code></pre>
           </div>
 
@@ -160,7 +160,7 @@ cd ZenPi</code></pre>
           <div class="definition-list">
             <div><code>plan</code><p>Prints intended changes without mutating your system.</p></div>
             <div><code>install</code><p>Confirms, backs up, writes atomically, and rolls configuration back if setup fails.</p></div>
-            <div><code>doctor</code><p>Checks managed files, settings, runtime dependencies, profiles, and browser readiness.</p></div>
+            <div><code>doctor</code><p>Checks managed files, settings, runtime dependencies, profiles, browser readiness, and every validator linked from the capability registry.</p></div>
             <div><code>update</code><p>Refreshes managed resources while preserving unrelated settings and user-tunable state.</p></div>
             <div><code>uninstall</code><p>Removes managed integration while retaining local evidence, profiles, and external packages.</p></div>
           </div>
@@ -195,8 +195,8 @@ cd ZenPi</code></pre>
             <div class="gate"><span>03</span><strong>Choose</strong><p>A person authorizes one exact wishlist item.</p></div>
             <div><span>04</span><strong>Build</strong><p>The smallest sufficient intervention is implemented.</p></div>
             <div class="gate"><span>05</span><strong>Prove</strong><p>Repository checks and closed validators gate completion.</p></div>
-            <div><span>06</span><strong>Retire</strong><p>Passing proof closes the item and preserves its history.</p></div>
-            <div><span>07</span><strong>Return</strong><p>Later evidence surfaces human review; it never reopens work itself.</p></div>
+            <div><span>06</span><strong>Retire</strong><p>Passing proof closes the item and journals evidence, gates, changed files, and version.</p></div>
+            <div><span>07</span><strong>Return</strong><p>Later evidence links to that retirement and surfaces bounded context for human review.</p></div>
           </div>
 
           <h3>Run an improvement</h3>
@@ -205,6 +205,14 @@ cd ZenPi</code></pre>
             <pre><code>/harness-improvement</code></pre>
           </div>
           <p>Choose a qualified or review-needed item. The <code>zenpi-improve</code> workflow scopes the intervention, makes the change, and gathers direct acceptance evidence. A failed gate leaves the item selected instead of pretending it is complete.</p>
+
+          <h3>Inspect proof and loop health</h3>
+          <div class="command-stack">
+            <div><code>/wishlist status</code><span>Summarize the queue, retirements, reopen rate, and open reviews.</span></div>
+            <div><code>/wishlist history</code><span>Show the latest retirement and reopen decisions across the local journal.</span></div>
+            <div><code>/wishlist history &lt;gap-id&gt;</code><span>Show one gap's evidence, gates, changed files, linked reopens, and rollback context.</span></div>
+          </div>
+          <p>Every registry capability names a closed offline validator. Completion runs the source validator under review, while <code>npm run check</code> and <code>zenpi doctor</code> continuously re-prove shipped capabilities. Reopens include the original proof, a post-retirement signal window, and sanitized bounded Git context.</p>
           <p><a class="text-link" href="../#wishlist">Walk through the interactive loop <span aria-hidden="true">→</span></a></p>
         </div>
       </section>
@@ -290,6 +298,8 @@ cd ZenPi</code></pre>
                 <tr><th scope="row"><code>/zen [on|off|status]</code></th><td>Toggle or inspect focused Zen execution mode.</td></tr>
                 <tr><th scope="row"><code>/files [path]</code></th><td>Browse, render, diff, and review project files.</td></tr>
                 <tr><th scope="row"><code>/wishlist</code></th><td>Inspect and curate the local capability wishlist.</td></tr>
+                <tr><th scope="row"><code>/wishlist status</code></th><td>Show collection mode, queue size, retirements, reopen rate, and open reviews.</td></tr>
+                <tr><th scope="row"><code>/wishlist history [gap-id]</code></th><td>Review the bounded local improvement journal globally or for one gap.</td></tr>
                 <tr><th scope="row"><code>/wishlist off</code></th><td>Disable local capability-gap collection.</td></tr>
                 <tr><th scope="row"><code>/harness-improvement</code></th><td>Select and begin one qualified or review-needed improvement.</td></tr>
                 <tr><th scope="row"><code>/zen-subagents</code></th><td>Configure role defaults for the active exact provider.</td></tr>
@@ -311,7 +321,7 @@ cd ZenPi</code></pre>
             <div><code>settings.json</code><p>Active provider-safe subagent mirror and package settings. Unrelated values are preserved.</p></div>
             <div><code>zenpi/subagent-provider-profiles.json</code><p>Exact provider/model IDs, thinking levels, timestamps, and schema metadata. Retained on uninstall.</p></div>
             <div><code>zenpi/subagent-provider-leases.json</code><p>Ephemeral tokens, process IDs, providers, and timestamps used to prevent cross-process races.</p></div>
-            <div><code>zenpi/</code><p>Private wishlist evidence, checksummed archives, browser artifacts, and bounded managed state.</p></div>
+            <div><code>zenpi/</code><p>Private wishlist evidence, retirement journals, loop-health source data, checksummed archives, browser artifacts, and bounded managed state.</p></div>
           </div>
           <p>No profile contains credentials, authentication data, prompts, sessions, history, or a complete settings snapshot. Stop Pi before manually removing retained state.</p>
         </div>
@@ -322,7 +332,7 @@ cd ZenPi</code></pre>
         <div class="doc-content">
           <h2 id="security-title">Trust is explicit.</h2>
           <div class="boundary-grid">
-            <article><span>Local</span><h3>Evidence stays here</h3><p>Wishlist reports are bounded, sanitized, and never uploaded by ZenPi.</p></article>
+            <article><span>Local</span><h3>Evidence stays here</h3><p>Wishlist reports and journals are bounded, sanitized, archive-safe, and never uploaded by ZenPi.</p></article>
             <article><span>Human</span><h3>Choice grants authority</h3><p>Qualification recommends work; one explicit selection starts it.</p></article>
             <article><span>Exact</span><h3>Providers do not blur</h3><p>Different-provider child execution is blocked, even for similarly named models.</p></article>
             <article><span>Reversible</span><h3>Mutation has a way back</h3><p>Installer changes are confirmed, backed up, atomic, and rolled back on failure.</p></article>
@@ -336,7 +346,7 @@ cd ZenPi</code></pre>
         <div class="section-label"><span>10</span><p>Development</p></div>
         <div class="doc-content">
           <h2 id="development-title">Contribute with evidence.</h2>
-          <p>Inspect repository guidance before editing, keep changes surgical, and use project-native dependencies. The standard check validates syntax and runs the complete Node test suite.</p>
+          <p>Inspect repository guidance before editing, keep changes surgical, and use project-native dependencies. The standard check validates syntax, runs the complete Node test suite, and executes every registry-linked capability validator with isolated prerequisites.</p>
           <div class="code-block compact-code">
             <div><span>repository check</span></div>
             <pre><code>npm run check</code></pre>

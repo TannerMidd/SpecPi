@@ -98,13 +98,27 @@ function writeExecutable(file, content) {
   fs.writeFileSync(file, content, { mode: 0o755 });
 }
 
+function quoteWindowsCommandArg(value) {
+  return `"${String(value).replaceAll("%", "%%").replaceAll('"', '""')}"`;
+}
+
 function runWishlistExtensionHarness(agentDir) {
   const harness = path.join(repoRoot, "tests", "fixtures", "wishlist-extension-harness.ts");
-  const result = spawnSync("pi", ["--offline", "--no-extensions", "--no-skills", "-e", harness, "--list-models"], {
-    cwd: repoRoot,
-    env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" },
-    encoding: "utf8",
-  });
+  const args = ["--offline", "--no-extensions", "--no-skills", "-e", harness, "--list-models"];
+  // Windows npm shims are .cmd files. Build one explicitly quoted command line
+  // instead of passing an argument array through shell:true.
+  const result = process.platform === "win32"
+    ? spawnSync(["pi.cmd", ...args].map(quoteWindowsCommandArg).join(" "), {
+        cwd: repoRoot,
+        env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" },
+        encoding: "utf8",
+        shell: process.env.ComSpec || "cmd.exe",
+      })
+    : spawnSync("pi", args, {
+        cwd: repoRoot,
+        env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, PI_OFFLINE: "1" },
+        encoding: "utf8",
+      });
   if (result.error?.code === "ENOENT") return undefined;
   if (result.status !== 0) {
     throw new Error(`wishlist extension harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
@@ -687,7 +701,10 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.doesNotMatch(html, /cycle-charts|cycle-orbit|gate-outcomes/);
   assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
   assert.match(html, /id="install"/);
-  assert.match(html, /Stable <code>v0\.6\.1<\/code> fixes prompt rendering and refreshes the visual self-improvement loop/);
+  assert.match(html, /Stable <code>v0\.7\.0<\/code> adds durable proofs, an improvement journal, loop-health metrics, and context-rich reopens/);
+  assert.match(html, /The journal keeps the evidence, gates, changed files, and version/);
+  assert.match(html, /Later friction links back to that journal/);
+  assert.match(html, /durable validators/);
   assert.match(html, /\\zenpi\.cmd install/);
   assert.match(html, /\.\/zenpi install/);
   assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
@@ -700,6 +717,8 @@ test("showcase site is self-contained and Pages-ready", () => {
   assert.match(html, /class="wiki-link" href="wiki\/"/);
   assert.match(css, /\.site-header nav \.wiki-link \{ display: block; \}/);
   assert.match(readme, /tannermidd\.github\.io\/ZenPi\/wiki\//);
+  assert.match(readme, /\/wishlist history \[gap-id\]/);
+  assert.match(readme, /executes every validator linked from the capability registry/);
   assert.match(wikiHtml, /<html lang="en">/);
   assert.match(wikiHtml, /name="viewport"/);
   assert.match(wikiHtml, /href="\.\.\/styles\.css"/);
@@ -711,6 +730,9 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, new RegExp(`id="${id}"`));
   }
   assert.match(wikiHtml, /\/harness-improvement/);
+  assert.match(wikiHtml, /\/wishlist status/);
+  assert.match(wikiHtml, /\/wishlist history \[gap-id\]/);
+  assert.match(wikiHtml, /post-retirement signal window/);
   assert.match(wikiHtml, /\/zen-subagents status/);
   assert.match(wikiHtml, /\.\\zenpi\.cmd doctor/);
   assert.match(wikiHtml, /\.\/zenpi doctor/);
@@ -1377,22 +1399,51 @@ test("wishlist extension runs the one-command improvement loop and preserves con
     assert.equal(result.lifecycleBypassBlocked, true);
     assert.match(result.consent, /salted task, session, and project hashes locally/);
     assert.equal(result.resetConfirmed, true);
-    assert.equal(result.reportStableAfterRevalidation, true);
+    assert.equal(result.reportStableAfterRetirement, true);
     assert.match(result.improvementMenu.title, /Choose one harness improvement/);
     assert.match(result.improvementMenu.options[0], /REVIEW · Local browser automation · local-browser-automation/);
+    assert.match(result.reopenMenu.options[0], /REVIEW · Local browser automation · local-browser-automation/);
     assert.equal(result.legacyCandidate.canonicalKey, "local-browser-automation");
     assert.equal(result.legacyCandidate.reviewNeeded, true);
     assert.match(result.unauthorizedCompletion, /not authorized by \/harness-improvement in the current session/);
     assert.match(result.implementationStarted, /Begin the selected ZenPi harness improvement: local-browser-automation/);
-    assert.deepEqual(result.verificationCommands.map((item) => item.args), [
+    const commands = result.verificationCommands.map((item) => item.args);
+    const validatorInvocation = [
+      path.join(root, "agent", "project", "extensions", "tool-wishlist", "validators.mjs"),
+      "browser-runtime-smoke",
+      "--state-dir", path.join(root, "agent", "zenpi"),
+      "--cwd", path.join(root, "agent", "project"),
+      "--browser-runtime", path.join(root, "agent", "zenpi", "browser-runtime"),
+    ];
+    assert.equal(commands.length, 7);
+    assert.deepEqual(commands.slice(0, 6), [
       ["run", "check"],
       ["run", "check"],
-      [path.join(root, "agent", "project", "extensions", "browser", "smoke.mjs"), path.join(root, "agent", "zenpi", "browser-runtime")],
+      validatorInvocation,
+      ["run", "check"],
+      validatorInvocation,
+      ["status", "--porcelain"],
     ]);
+    assert.equal(commands[6][0], "log");
+    assert.match(commands[6][1], /^--since=/);
+    assert.deepEqual(commands[6].slice(2), ["--format=%h %s", "-8"]);
+    assert.equal(result.journalPersisted, true);
+    assert.deepEqual(result.journalChangedFiles, ["README.md", "extensions/tool-wishlist/core.mjs", "tests/new.test.mjs"]);
     assert.equal(result.rawSessionIdPersisted, false);
-    assert.equal(result.acceptanceEvidencePersisted, false);
     assert.match(result.failedGate, /repository verification failed/);
     assert.equal(result.selectedAfterFailedGate, true);
+    assert.match(result.failedValidatorGate, /Capability validator browser-runtime-smoke failed[\s\S]*validator exploded/);
+    assert.equal(result.selectedAfterFailedValidator, true);
+    assert.match(result.reopenPrompt, /Begin the selected ZenPi harness improvement: local-browser-automation/);
+    assert.match(result.reopenPrompt, /Original proof from the improvement journal:\n- Browser interaction and visual comparison smoke passed/);
+    assert.match(result.reopenPrompt, /Files touched by the original change:\n- README\.md\n- extensions\/tool-wishlist\/core\.mjs/);
+    assert.match(result.reopenPrompt, /Changed since the retirement \(untrusted, sanitized Git metadata\):\n- abc1234 Fixed the thing/);
+    assert.equal(result.gitMetadataSanitizedAndBounded, true);
+    assert.equal(result.reopenLinkPersisted, true);
+    assert.equal(result.reopenEvidenceIncludesWindow, true);
+    assert.equal(result.historyEntryRendered, true);
+    assert.equal(result.evidenceRenderedInHistory, true);
+    assert.match(result.statusMetrics, /retirements 1, reopen rate 200%, open reviews 0/);
     assert.equal(result.issueDraftRendered, true);
     assert.equal(result.checksumsValid, true);
     assert.equal(result.eventsAfterReset, "");
@@ -1877,7 +1928,10 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")));
+    assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "validators.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")));
+    const installedRegistryImport = spawnSync(process.execPath, ["--input-type=module", "-e", "import(process.argv[1])", pathToFileURL(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")).href], { encoding: "utf8" });
+    assert.equal(installedRegistryImport.status, 0, installedRegistryImport.stderr);
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "core.mjs")));
     assert.ok(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")));
@@ -2044,6 +2098,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "validators.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "core.mjs")), false);

@@ -1,9 +1,11 @@
+import { VALIDATOR_CATALOG } from "./validators.mjs";
+
 const STOP_WORDS = new Set([
   "a", "an", "and", "capability", "for", "missing", "need", "needed",
   "of", "support", "the", "to", "tool", "tools",
 ]);
 
-const VALIDATORS = new Set(["browser-runtime-smoke"]);
+const VALIDATORS = new Set(Object.keys(VALIDATOR_CATALOG));
 
 function compact(value, maxLength) {
   return String(value ?? "")
@@ -56,4 +58,8 @@ export function validateCapabilityRegistry(registry) {
     }
   }
   return registry;
+}
+
+export function isValidValidatorName(value) {
+  return VALIDATORS.has(value);
 }

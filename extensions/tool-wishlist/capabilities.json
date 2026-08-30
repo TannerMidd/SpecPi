@@ -16,6 +16,46 @@
       "validations": [
         "browser-runtime-smoke"
       ]
+    },
+    {
+      "id": "durable-retirement-proof",
+      "title": "Durable re-runnable retirement proofs",
+      "aliases": [],
+      "shippedVersion": "0.7.0",
+      "shippedAt": "2026-08-29T00:00:00.000Z",
+      "validations": [
+        "wishlist-state-smoke"
+      ]
+    },
+    {
+      "id": "improvement-journal",
+      "title": "Improvement journal with evidence history",
+      "aliases": [],
+      "shippedVersion": "0.7.0",
+      "shippedAt": "2026-08-29T00:00:00.000Z",
+      "validations": [
+        "wishlist-state-smoke"
+      ]
+    },
+    {
+      "id": "loop-health-metric",
+      "title": "Loop health metrics",
+      "aliases": [],
+      "shippedVersion": "0.7.0",
+      "shippedAt": "2026-08-29T00:00:00.000Z",
+      "validations": [
+        "wishlist-state-smoke"
+      ]
+    },
+    {
+      "id": "context-rich-reopen",
+      "title": "Context-rich reopens for retired gaps",
+      "aliases": [],
+      "shippedVersion": "0.7.0",
+      "shippedAt": "2026-08-29T00:00:00.000Z",
+      "validations": [
+        "wishlist-state-smoke"
+      ]
     }
   ]
 }

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.7.0 - 2026-08-29
+
+- Make retirement durable: every capability now ships a closed validator from a reviewed catalog, `finish_harness_improvement` dispatches all linked validators generically and fails closed on unknown names, and `npm run check` plus `zenpi doctor` continuously re-prove retired capabilities in temporary state.
+- Add the improvement journal: retirements persist bounded sanitized proof (acceptance evidence, gates, repo-relative changed files, ZenPi version) in the local decision log, `/wishlist history [id]` renders the harness's own changelog with rollback context, and the report's retired list shows verification dates and gates.
+- Add loop health metrics: deterministic retirements, reopen rate, open reviews, median time-to-retire, and qualification rate rendered in the report footer and summarized by `/wishlist status`.
+- Make reopens context-rich: reopen decisions link to the retirement they review, carry up to five sanitized post-retirement signals, and the `/harness-improvement` prompt includes the original proof and what changed since.
+- Extend repository checks to the wishlist extension and validator sources, ship the validator module through install/update/uninstall, and run completion validators from the source checkout under review; document the new local-only journal data classes in SECURITY.md and the `ZenPi-Gap:` commit trailer convention in the improvement skill.
+
 ## 0.6.1 - 2026-08-29
 
 - Flush a prompt frame when extension dialogs mount so chained menus such as `/zen-subagents` do not remain invisible until the next keypress in regular TUI sessions, notably through Windows SSH terminals; require and bootstrap the reviewed Pi 0.84.4 baseline that provides prompt lifecycle events.

@@ -1,6 +1,6 @@
 {
   "name": "zenpi",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "An explicit, provider-safe, self-improving harness for the Pi coding agent",
   "author": "Tanner Middleton",
   "repository": {
@@ -58,6 +58,6 @@
   },
   "scripts": {
     "test": "node --test",
-    "check": "node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/subagents/core.mjs && node --experimental-strip-types --check extensions/subagents/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
+    "check": "node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/tool-wishlist/validators.mjs && node --check extensions/subagents/core.mjs && node --experimental-strip-types --check extensions/subagents/index.ts && node --experimental-strip-types --check extensions/tool-wishlist/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
   }
 }
