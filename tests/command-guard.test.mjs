@@ -84,6 +84,67 @@ test("environment enumeration is denied whichever builtin spells it", () => {
   assert.notEqual(decideCommand("env --help", posix).ruleIds[0], "credential.environment-read");
 });
 
+test("every PowerShell parameter prefix is gated, not just the full spelling", () => {
+  // PowerShell runs -enc exactly like -EncodedCommand. Matching only full names let a shorter prefix carry a
+  // base64 payload straight past the guard when the invocation arrived through the Bash or cmd parser.
+  const windows = { shell: "bash", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
+  const payload = Buffer.from("Remove-Item -Recurse -Force C:\\Windows", "utf16le").toString("base64");
+  const encodedFlags = ["-e", "-ec", "-en", "-enc", "-enco", "-encod", "-encode", "-encoded", "-encodedc", "-encodedco", "-encodedcom", "-encodedcomm", "-encodedcomma", "-encodedcomman", "-encodedcommand"];
+  for (const host of ["powershell.exe", "pwsh"]) {
+    for (const flag of encodedFlags) {
+      const decision = decideCommand(`${host} ${flag} ${payload}`, windows);
+      assert.equal(decision.action, "deny", `${host} ${flag}`);
+      assert.equal(decision.severity, "critical", `${host} ${flag}: ${JSON.stringify(decision)}`);
+    }
+    for (const flag of ["-c", "-co", "-com", "-comm", "-comma", "-comman", "-command"]) {
+      const decision = decideCommand(`${host} ${flag} "Remove-Item -Recurse -Force C:\\Windows"`, windows);
+      assert.equal(decision.action, "deny", `${host} ${flag}`);
+      assert.equal(decision.severity, "critical", `${host} ${flag}: ${JSON.stringify(decision)}`);
+    }
+  }
+  for (const command of [`powershell -nop -w hidden -enc ${payload}`, `powershell.exe -NoProfile -Enc ${payload}`]) {
+    assert.equal(decideCommand(command, windows).severity, "critical", command);
+  }
+  // Undecodable or absent payloads stay unresolved rather than silently passing.
+  for (const command of ["powershell.exe -enc not-base64!!", "powershell.exe -enc", "powershell.exe -Command $dynamic"]) {
+    const decision = decideCommand(command, windows);
+    assert.notEqual(decision.action, "allow", command);
+    assert.equal(decideCommand(command, { ...windows, hasUI: false }).action, "deny", command);
+  }
+  // A host with no inline payload is not an interpreter invocation and must not be swept up.
+  assert.equal(decideCommand("powershell.exe -NoProfile -File build.ps1", windows).ruleIds[0], "dynamic.local-script");
+  assert.equal(decideCommand("powershell.exe -Version", windows).action, "allow");
+});
+
+test("plain find is read-only while mutating find keeps its own rule", () => {
+  // find sits in the delete family for -delete/-exec, but hasRecursiveFlag matches any predicate containing
+  // an "r", so a plain search used to be reported as a recursive deletion — or worse, as guard self-tampering.
+  for (const command of [
+    "find . -name '*.ts'", "find src -type f -print", "find . -perm 644", "find . -newer a.txt",
+    "find . -regex '.*\\.js'", "find . -type f -printf '%p\\n'", "find /etc -name '*.conf'",
+    "find . -name zenpi", "find . -size +1M -prune", "find . -maxdepth 2 -type d",
+  ]) assert.equal(decideCommand(command, posix).action, "allow", command);
+
+  for (const [command, rule] of [
+    ["find . -delete", "filesystem.find-mutation"],
+    ["find . -name '*.log' -exec rm {} ;", "filesystem.find-mutation"],
+    ["find . -ok rm {} ;", "filesystem.find-mutation"],
+    ["find . -fprint /tmp/out", "filesystem.find-mutation"],
+  ]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "ask", command);
+    assert.ok(decision.ruleIds.includes(rule), `${command}: ${JSON.stringify(decision)}`);
+  }
+  for (const command of ["find /etc -delete", "find /etc -exec rm -rf {} ;", "find / -name x -delete"]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "deny", command);
+    assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+  }
+  // Strict mode agrees with the policy about which find invocations are read-only.
+  assert.equal(decideCommand("find . -name '*.ts'", { ...posix, mode: "strict" }).action, "allow");
+  assert.equal(decideCommand("find . -delete", { ...posix, mode: "strict" }).action, "ask");
+});
+
 test("PowerShell parser hosts are ordered, fixed-path, and only authoritative when every host rejects", () => {
   assert.deepEqual(parserHosts({ executable: "C:\\custom\\pwsh.exe" }), ["C:\\custom\\pwsh.exe"]);
   if (process.platform === "win32") {

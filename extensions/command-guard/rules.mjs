@@ -1,4 +1,5 @@
 import { classifyPath } from "./paths.mjs";
+import { COMMAND_FLAG, ENCODED_COMMAND_FLAG, HOST_NAMES as POWERSHELL_HOSTS } from "./powershell.mjs";
 
 export const POLICY_VERSION = 1;
 
@@ -15,6 +16,14 @@ const AWK_ESCAPE = /\b(?:system|ENVIRON)\s*[([]|\|\s*&?\s*["']|>>?\s*["']/;
 const AWK_PROGRAM_SOURCE = /^--?(?:f|file|e|source|l|load|include)$/i;
 const ENVIRONMENT_DUMP_NAMES = new Set(["env", "printenv", "set", "export", "declare", "typeset", "compgen"]);
 const SECRET_VARIABLE = /(?:token|secret|password|credential|api[_-]?key|aws_(?:secret|session)|github_token)/i;
+// PowerShell resolves any unambiguous parameter prefix, so -enc and -com run the same code as their full
+// spellings. Matching only the full names lets a shorter one walk past the inline-code gate entirely.
+const INLINE_CODE_FLAG = /^(?:-c|-command|-encodedcommand|\/c|\/k|-e|--eval|-r)$/i;
+function inlineCodeFlag(name, arg) {
+  const value = String(arg);
+  if (INLINE_CODE_FLAG.test(value)) return true;
+  return POWERSHELL_HOSTS.includes(name) && (COMMAND_FLAG.test(value) || ENCODED_COMMAND_FLAG.test(value));
+}
 const DOWNLOAD_NAMES = new Set(["curl", "wget", "invoke-webrequest", "invoke-restmethod", "iwr", "irm", "start-bitstransfer", "bitsadmin", "certutil"]);
 const DECODER_NAMES = new Set(["base64", "openssl", "certutil", "uudecode"]);
 const NETWORK_NAMES = new Set([...DOWNLOAD_NAMES, "scp", "rsync", "invoke-command", "ssh", "sftp", "ftp", "start-process"]);
@@ -75,6 +84,12 @@ function optionTargets(args, names) {
 function hasRecursiveFlag(args) {
   return args.some((arg) => /^(?:--recursive|--force|-{1}[a-z]*r[a-z]*|-recurse|-force|\/s|\/mir)$/i.test(arg));
 }
+// find only mutates when it carries an action predicate. A plain search is read-only, so it must not inherit
+// the delete-family rules — and hasRecursiveFlag matches any predicate containing an "r" (-print, -perm,
+// -newer), which would otherwise report `find src -type f -print` as a recursive deletion.
+export const FIND_MUTATION_PREDICATES = Object.freeze(["-delete", "-exec", "-execdir", "-ok", "-okdir", "-fls", "-fprint", "-fprintf"]);
+export function findMutates(args) { return (args || []).some((arg) => FIND_MUTATION_PREDICATES.includes(String(arg))); }
+function deletesFiles(name, args) { return DELETE_NAMES.has(name) && (name !== "find" || findMutates(args)); }
 // True when the invocation prints or enumerates the whole environment rather than one named variable.
 function dumpsEnvironment(name, args, helpOnly) {
   // compgen -v lists variables; the shared helpOnly heuristic would misread it as --version.
@@ -98,10 +113,10 @@ function criticalLeaf(leaf, options) {
   const joined = args.join(" ").toLowerCase();
   const targets = targetState(args, options);
 
-  if (DELETE_NAMES.has(name) && (hasRecursiveFlag(args) || name === "find" && args.some((arg) => ["-delete", "-exec", "-execdir"].includes(arg))) && (targets.protectedTarget || targets.rootTarget)) {
+  if (deletesFiles(name, args) && (hasRecursiveFlag(args) || name === "find") && (targets.protectedTarget || targets.rootTarget)) {
     return match("fs.root-recursive-delete", "critical", "filesystem", "Recursive deletion can encompass a protected system, profile, or filesystem root.", leaf, "Delete one specific reviewed workspace path instead.");
   }
-  if (DELETE_NAMES.has(name) && targets.protectedTarget) {
+  if (deletesFiles(name, args) && targets.protectedTarget) {
     return match("path.protected-mutation", "critical", "protected-path", "The command mutates a protected path.", leaf);
   }
   if (["remove-item", "ri", "del", "erase", "rd"].includes(name) && /(?:registry::|cert:\\?)/i.test(joined)) {
@@ -151,7 +166,7 @@ function criticalLeaf(leaf, options) {
   if (PERMISSION_NAMES.has(name) && targets.protectedTarget && hasRecursiveFlag(args)) {
     return match("security.protected-permissions", "critical", "security", "Recursive permission or ownership changes to protected paths are permanently denied.", leaf);
   }
-  const mutationIntent = DELETE_NAMES.has(name) || PERMISSION_NAMES.has(name) || POWERSHELL_WRITE_NAMES.has(name) || ["<redirect>", "cp", "copy", "copy-item", "mv", "move", "move-item", "rename-item", "set-item", "set-content", "add-content", "out-file", "tee", "touch", "mkdir", "new-item", "sed", "dd", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za", "expand-archive", ...DOWNLOAD_NAMES].includes(name) || ["npm", "pnpm", "yarn"].includes(name) && /\b(?:remove|uninstall|unlink)\b/i.test(joined);
+  const mutationIntent = deletesFiles(name, args) || PERMISSION_NAMES.has(name) || POWERSHELL_WRITE_NAMES.has(name) || ["<redirect>", "cp", "copy", "copy-item", "mv", "move", "move-item", "rename-item", "set-item", "set-content", "add-content", "out-file", "tee", "touch", "mkdir", "new-item", "sed", "dd", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za", "expand-archive", ...DOWNLOAD_NAMES].includes(name) || ["npm", "pnpm", "yarn"].includes(name) && /\b(?:remove|uninstall|unlink)\b/i.test(joined);
   const destinationOptions = ["cp", "install", "ln"].includes(name) ? ["-t", "--target-directory"]
     : name === "copy-item" || name === "move-item" ? ["-destination"]
       : ["compress-archive", "expand-archive"].includes(name) ? ["-destinationpath"]
@@ -201,9 +216,10 @@ function ordinaryLeaf(leaf, options) {
   if (["source", "."].includes(name)) return match("dynamic.local-script", "high", "dynamic", "Sourcing an uninspected local script needs approval.", leaf);
   if (NETWORK_NAMES.has(name)) return match("network.or.remote", "high", "network", "Network transfer, download, upload, or remote execution needs approval.", leaf);
   if (["kill", "killall", "pkill", "taskkill", "stop-process"].includes(name)) return match("process.termination", "medium", "process", "Process termination needs approval.", leaf);
-  if (DELETE_NAMES.has(name)) return match(hasRecursiveFlag(args) ? "filesystem.recursive-delete" : "filesystem.mutation", "high", "filesystem", hasRecursiveFlag(args) ? "Recursive deletion needs approval." : "File deletion or truncation needs approval.", leaf, "Use a bounded, explicitly reviewed workspace target.");
+  // Ordered ahead of the delete family so find keeps its own rule instead of being labelled a recursive delete.
+  if (name === "find" && findMutates(args)) return match("filesystem.find-mutation", "high", "filesystem", "Find execution or deletion needs approval.", leaf);
+  if (deletesFiles(name, args)) return match(hasRecursiveFlag(args) ? "filesystem.recursive-delete" : "filesystem.mutation", "high", "filesystem", hasRecursiveFlag(args) ? "Recursive deletion needs approval." : "File deletion or truncation needs approval.", leaf, "Use a bounded, explicitly reviewed workspace target.");
   if (POWERSHELL_WRITE_NAMES.has(name) || ["cp", "copy", "mv", "move", "tee", "touch", "mkdir", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za"].includes(name) || name === "dd" && !args.every((arg) => /^(?:--?h(?:elp)?|--version|-v)$/i.test(arg)) || name === "sed" && args.some((arg) => /^-[a-z]*i/i.test(arg))) return match("filesystem.write", "high", "filesystem", "Filesystem creation, overwrite, or movement needs approval.", leaf);
-  if (name === "find" && args.some((arg) => ["-delete", "-exec", "-execdir"].includes(arg))) return match("filesystem.find-mutation", "high", "filesystem", "Find execution or deletion needs approval.", leaf);
   if (AWK_NAMES.has(name) && args.some((arg) => AWK_ESCAPE.test(String(arg)) || AWK_PROGRAM_SOURCE.test(String(arg)))) return match("dynamic.inline-code", "high", "dynamic", "An awk program that can spawn shells, read the environment, load modules, or write files needs approval.", leaf);
   if (["xargs", "eval", "invoke-expression", "iex"].includes(name)) return match("dynamic.generated-code", "high", "dynamic", "Generated or indirectly invoked code needs approval.", leaf);
   if (SERVICE_NAMES.has(name) && /\b(?:stop|restart|disable|delete|remove|create|start)\b/i.test(joined)) return match("service.mutation", "high", "system", "Service mutation needs approval.", leaf);
@@ -216,7 +232,7 @@ function ordinaryLeaf(leaf, options) {
   if ((name === "robocopy" && /\/mir\b/i.test(joined)) || name === "clear-winevent" || (name === "wevtutil" && /^cl\b/i.test(joined))) return match("filesystem.broad-mutation", "high", "filesystem", "Mirroring or clearing host data needs approval.", leaf);
   if (["psql", "mysql", "sqlcmd", "sqlite3", "mongosh", "mongo", "redis-cli"].includes(name) && /\b(?:drop|truncate|delete\s+from|flushall|flushdb)\b/i.test(joined)) return match("database.destructive", "high", "database", "Destructive database statements need approval.", leaf);
   if (["prisma", "knex", "sequelize", "alembic", "rails", "rake", "dotnet"].includes(name) && /\b(?:migrate\s+reset|migrate:rollback|migrate:undo|downgrade|db:rollback|database\s+drop)\b/i.test(joined)) return match("database.migration-rollback", "high", "database", "Database reset, drop, or migration rollback needs approval.", leaf);
-  if (SHELL_NAMES.has(name) && args.some((arg) => /^(?:-c|-command|-encodedcommand|\/c|\/k|-e|--eval|-r)$/i.test(arg))) return match("dynamic.inline-code", "high", "dynamic", "Inline interpreter code needs approval.", leaf);
+  if (SHELL_NAMES.has(name) && args.some((arg) => inlineCodeFlag(name, arg))) return match("dynamic.inline-code", "high", "dynamic", "Inline interpreter code needs approval.", leaf);
   if ((SHELL_NAMES.has(name) && args.some((arg) => /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)(?:$|[?#])/i.test(arg))) || /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)$/i.test(String(leaf.executable || ""))) return match("dynamic.local-script", "high", "dynamic", "Executing a local script that was not statically inspected needs approval.", leaf);
   return undefined;
 }
@@ -255,7 +271,7 @@ export function evaluateRules(analysis, options = {}) {
     const semanticShell = ["cmd", "cmd.exe"].includes(name) ? "cmd" : ["powershell", "pwsh"].includes(name) ? "powershell" : leaf.shell;
     const scoped = { ...leafOptions(leaf, options), shell: semanticShell, read: true };
     const args = leaf.args || [];
-    const inline = args.findIndex((arg) => /^(?:-c|-command|-encodedcommand|\/c|\/k|-e|--eval|-r)$/i.test(String(arg)));
+    const inline = args.findIndex((arg) => inlineCodeFlag(name, arg));
     const candidateArgs = inline >= 0 ? args.slice(0, inline) : args;
     return pathArguments(candidateArgs, scoped).some((arg) => classifyPath(arg, scoped).protected);
   })) findings.push({ action: "deny", severity: "critical", category: "security", ruleIds: ["credential.execution"], leaves: [], reason: "Credential or private-state content connected to an interpreter is permanently denied." });

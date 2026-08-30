@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { analyze as analyzeBash, stripHeredocBodies } from "./bash.mjs";
 import { analyze as analyzeCmd } from "./cmd.mjs";
 import { analyze as analyzePowerShell } from "./powershell.mjs";
-import { evaluateRules, POLICY_VERSION, ruleCatalog } from "./rules.mjs";
+import { evaluateRules, findMutates, POLICY_VERSION, ruleCatalog } from "./rules.mjs";
 import { classifyPath, pathDecision } from "./paths.mjs";
 import { boundedReason, redactCommand } from "./redact.mjs";
 
@@ -75,7 +75,7 @@ function clearlyReadOnly(analysis) {
   return leaves.every((leaf) => {
     const name = String(leaf.executable || "").toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
     if (["pwd", "ls", "printf", "echo", "true", "false", "whoami", "id", "uname", "date", "basename", "dirname", "realpath", "which", "where", "type", "grep", "rg", "head", "tail", "wc"].includes(name)) return true;
-    if (name === "find") return !(leaf.args || []).some((arg) => ["-delete", "-exec", "-execdir", "-ok", "-okdir"].includes(arg));
+    if (name === "find") return !findMutates(leaf.args);
     if (name === "git") return ["status", "diff", "log", "show", "blame"].includes(String(leaf.args?.[0] || "").toLowerCase()) || String(leaf.args?.[0] || "").toLowerCase() === "branch" && (leaf.args || []).some((arg) => ["--list", "-l"].includes(arg));
     if (/^(?:get|test|select|where|measure|compare)-/.test(name)) return true;
     return ["gci", "gl", "gps", "pwd", "dir"].includes(name);

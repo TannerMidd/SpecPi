@@ -9,6 +9,20 @@ export const POWERSHELL_LIMITS = Object.freeze({ maxInput: 128 * 1024, maxComman
 const aliasMap = new Map(Object.entries({ ac: "add-content", cat: "get-content", clc: "clear-content", cli: "clear-item", clp: "clear-itemproperty", copy: "copy-item", cp: "copy-item", cpi: "copy-item", cpp: "copy-itemproperty", del: "remove-item", epal: "export-alias", epcsv: "export-csv", epsn: "export-pssession", erase: "remove-item", gc: "get-content", gci: "get-childitem", gi: "get-item", gps: "get-process", iex: "invoke-expression", irm: "invoke-restmethod", iwr: "invoke-webrequest", kill: "stop-process", mi: "move-item", move: "move-item", mp: "move-itemproperty", mv: "move-item", nal: "new-alias", ni: "new-item", np: "new-itemproperty", rd: "remove-item", ren: "rename-item", ri: "remove-item", rm: "remove-item", rmdir: "remove-item", rni: "rename-item", rnp: "rename-itemproperty", rp: "remove-itemproperty", sal: "set-alias", saps: "start-process", sc: "set-content", si: "set-item", sp: "set-itemproperty", spps: "stop-process", spsv: "stop-service", start: "start-process", tee: "tee-object", type: "get-content", wget: "invoke-webrequest", curl: "invoke-webrequest" }));
 const canonicalName = (value) => { const raw = String(value || ""); const lower = raw.toLowerCase(); return lower.endsWith(".exe") ? raw : aliasMap.get(lower) || raw; };
 function unavailable(reason) { return { shell: "powershell", leaves: [], redirects: [], dynamicConstructs: [{ kind: reason }], parseErrors: [{ message: reason }], indeterminate: true }; }
+// PowerShell accepts any unambiguous prefix of a parameter name, so -enc runs the same code as
+// -EncodedCommand. Every consumer must match the whole prefix range or a shorter spelling walks past it.
+export const ENCODED_COMMAND_FLAG = /^-(?:e|ec|en|enc|enco|encod|encode|encoded|encodedc|encodedco|encodedcom|encodedcomm|encodedcomma|encodedcomman|encodedcommand)$/i;
+export const COMMAND_FLAG = /^-(?:c|co|com|comm|comma|comman|command)$/i;
+export const HOST_NAMES = Object.freeze(["powershell", "pwsh"]);
+export function decodeEncodedCommand(value, maxInput = POWERSHELL_LIMITS.maxInput) {
+  const encoded = typeof value === "string" ? value : "";
+  if (!encoded || encoded.includes("[dynamic]") || encoded.length > 65536 || !/^[A-Za-z0-9+/=]+$/.test(encoded)) return undefined;
+  try {
+    const decoded = Buffer.from(encoded, "base64");
+    if (!decoded.length || decoded.length > maxInput || decoded.length % 2 !== 0) return undefined;
+    return decoded.toString("utf16le");
+  } catch { return undefined; }
+}
 function validate(data, limits) {
   if (!data || data.schema !== 1 || typeof data.ok !== "boolean" || !data.parser || typeof data.parser.version !== "string" || !Array.isArray(data.commands) || !Array.isArray(data.errors)) return undefined;
   if (!Array.isArray(data.dynamicConstructs) || !Array.isArray(data.stopParsingTokens) || data.commands.length > limits.maxCommands || data.errors.length > 32 || data.dynamicConstructs.length > 256 || data.stopParsingTokens.length > 128) return undefined;
@@ -121,21 +135,17 @@ function attachNested(parsed, options, limits) {
         parsed.indeterminate ||= leaf.nested.indeterminate;
       }
     }
-    if (name === "powershell" || name === "pwsh") {
-      const commandFlag = leaf.args.findIndex((arg) => /^-(?:command|c)$/i.test(arg));
-      const encodedFlag = leaf.args.findIndex((arg) => /^-(?:e|ec|en|enc|enco|encod|encode|encoded|encodedc|encodedco|encodedcom|encodedcomm|encodedcomma|encodedcomman|encodedcommand)$/i.test(arg));
+    if (HOST_NAMES.includes(name)) {
+      const commandFlag = leaf.args.findIndex((arg) => COMMAND_FLAG.test(String(arg)));
+      const encodedFlag = leaf.args.findIndex((arg) => ENCODED_COMMAND_FLAG.test(String(arg)));
       if (encodedFlag >= 0) {
-        const encoded = leaf.args[encodedFlag + 1];
-        if (!encoded || encoded.includes("[dynamic]") || encoded.length > 65536 || !/^[A-Za-z0-9+/=]+$/.test(encoded) || depth >= limits.maxDepth) {
+        const decoded = depth >= limits.maxDepth ? undefined : decodeEncodedCommand(leaf.args[encodedFlag + 1], limits.maxInput);
+        if (!decoded) {
           parsed.dynamicConstructs.push({ kind: "dynamic-encoded-command" }); parsed.parseErrors.push({ message: "encoded-command-unavailable" }); parsed.indeterminate = true;
         } else {
-          try {
-            const decoded = Buffer.from(encoded, "base64");
-            if (!decoded.length || decoded.length > limits.maxInput || decoded.length % 2 !== 0) throw new Error("encoded size");
-            leaf.nested = analyze(decoded.toString("utf16le"), { ...options, depth: depth + 1 });
-            parsed.dynamicConstructs.push({ kind: "encoded-command" }, ...leaf.nested.dynamicConstructs);
-            parsed.indeterminate ||= leaf.nested.indeterminate;
-          } catch { parsed.dynamicConstructs.push({ kind: "dynamic-encoded-command" }); parsed.parseErrors.push({ message: "encoded-command-invalid" }); parsed.indeterminate = true; }
+          leaf.nested = analyze(decoded, { ...options, depth: depth + 1 });
+          parsed.dynamicConstructs.push({ kind: "encoded-command" }, ...leaf.nested.dynamicConstructs);
+          parsed.indeterminate ||= leaf.nested.indeterminate;
         }
       } else if (commandFlag >= 0) {
         const payload = leaf.args.slice(commandFlag + 1).join(" ");
@@ -198,6 +208,27 @@ export function analyze(input, options = {}) {
     if (!(chosen.parseErrors || []).length) break;
   }
   return attachNested(chosen, options, limits);
+}
+// Analyzes the inline payload of a powershell/pwsh invocation seen from another shell's parser, so an
+// encoded or -Command payload is classified rather than passed through as an opaque argument.
+// Returns undefined when the invocation carries no inline payload.
+export function analyzeHostArguments(args, options = {}) {
+  const limits = { ...POWERSHELL_LIMITS, ...options };
+  const list = (args || []).map((arg) => String(arg));
+  const encodedIndex = list.findIndex((arg) => ENCODED_COMMAND_FLAG.test(arg));
+  const commandIndex = list.findIndex((arg) => COMMAND_FLAG.test(arg));
+  if (encodedIndex < 0 && commandIndex < 0) return undefined;
+  const depth = options.depth || 0;
+  const payload = encodedIndex >= 0
+    ? decodeEncodedCommand(list[encodedIndex + 1], limits.maxInput)
+    : list.slice(commandIndex + 1).join(" ");
+  if (!payload || payload.includes("[dynamic]") || /[$`]/.test(payload) || depth >= limits.maxDepth) return { unresolved: true };
+  const nested = analyze(payload, { ...options, depth: depth + 1 });
+  // A missing or failing PowerShell parser means this command cannot run on this host either. Report it as
+  // unresolved so the caller asks, rather than propagating a fatal parser-integrity kind into an unrelated
+  // shell's analysis and locking the session over an absent interpreter.
+  if ((nested.parseErrors || []).length || infrastructureFailure(nested)) return { unresolved: true };
+  return { nested };
 }
 export const analyzePowerShell = analyze;
 export const aliases = Object.freeze(Object.fromEntries(aliasMap));

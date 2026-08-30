@@ -1,5 +1,6 @@
 import { redactCommand } from "./redact.mjs";
 import { analyze as analyzeCmd } from "./cmd.mjs";
+import { analyzeHostArguments, HOST_NAMES as POWERSHELL_HOSTS } from "./powershell.mjs";
 
 export const BASH_LIMITS = Object.freeze({ maxInput: 128 * 1024, maxTokens: 4096, maxLeaves: 128, maxDepth: 8 });
 const separators = new Set([";", "&&", "||", "|", "&", "(", ")"]);
@@ -215,6 +216,16 @@ function addNested(leaves, options, dynamicConstructs, depth) {
       // A command string is fully described by its nested analysis; never let a later branch replace it.
       continue;
     }
+    // A PowerShell host invoked from Bash carries its payload in -Command or -EncodedCommand. Classify it
+    // here; otherwise an encoded payload reaches the policy as one opaque base64 argument.
+    if (POWERSHELL_HOSTS.includes(name)) {
+      const host = analyzeHostArguments(leaf.args, { ...options, depth, shell: name });
+      if (host) {
+        if (host.unresolved) dynamicConstructs.push({ kind: "dynamic-nested-powershell" });
+        else adopt(leaf, host.nested, "nested-powershell");
+        continue;
+      }
+    }
     // watch joins its remaining arguments and hands them to a shell, so its tail is a command string in both
     // `watch rm -rf /etc` and `watch 'rm -rf /etc'` form.
     if (name === "eval" || name === "xargs" || name === "watch") {
@@ -238,9 +249,10 @@ function addNested(leaves, options, dynamicConstructs, depth) {
       dynamicConstructs.push(...leaf.nested.dynamicConstructs);
       if (leaf.nested.indeterminate) dynamicConstructs.push({ kind: `dynamic-${name}` });
     }
-    if (name === "find" && leaf.args.some((arg) => arg === "-exec" || arg === "-execdir" || arg === "-delete")) {
+    const findExec = (arg) => arg === "-exec" || arg === "-execdir" || arg === "-ok" || arg === "-okdir";
+    if (name === "find" && leaf.args.some((arg) => findExec(arg) || arg === "-delete")) {
       dynamicConstructs.push({ kind: "find-exec" });
-      const execIndex = leaf.args.findIndex((arg) => arg === "-exec" || arg === "-execdir");
+      const execIndex = leaf.args.findIndex(findExec);
       if (execIndex >= 0) {
         const payload = leaf.args.slice(execIndex + 1).filter((arg) => arg !== ";" && arg !== "+").join(" ");
         if (!payload || /[$`{}]/.test(payload)) dynamicConstructs.push({ kind: "dynamic-find-exec" });
