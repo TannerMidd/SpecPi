@@ -81,7 +81,9 @@ function map(data) {
   resolveLiteralAliases(leaves, localDynamicConstructs);
   const literalTruncated = data.commands.some((command) => command.elements.some((element) => element?.literalTruncated === true) || command.redirections.some((redirection) => redirection?.targetTruncated === true));
   const limitConstructs = [...(typeof data.limitExceeded === "string" ? [{ kind: `${data.limitExceeded.replace(/s$/, "")}-limit` }] : []), ...(literalTruncated ? [{ kind: "literal-limit" }] : [])];
-  return { shell: "powershell", leaves, redirects: leaves.flatMap((leaf) => leaf.redirections), dynamicConstructs: [...localDynamicConstructs, ...limitConstructs], parseErrors: data.errors, indeterminate: !data.ok || data.errors.length > 0 || localDynamicConstructs.length > 0 || limitConstructs.length > 0 || data.stopParsingTokens.length > 0 || leaves.some((leaf) => leaf.dynamic) };
+  const stopParsing = data.stopParsingTokens.length > 0 || leaves.some((leaf) => leaf.args.some((arg) => arg === "--%"));
+  if (stopParsing && !localDynamicConstructs.some((entry) => entry.kind === "stop-parsing")) localDynamicConstructs.push({ kind: "stop-parsing" });
+  return { shell: "powershell", leaves, redirects: leaves.flatMap((leaf) => leaf.redirections), dynamicConstructs: [...localDynamicConstructs, ...limitConstructs], parseErrors: data.errors, indeterminate: !data.ok || data.errors.length > 0 || localDynamicConstructs.length > 0 || limitConstructs.length > 0 || stopParsing || leaves.some((leaf) => leaf.dynamic) };
 }
 function attachNested(parsed, options, limits) {
   const depth = options.depth || 0;

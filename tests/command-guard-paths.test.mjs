@@ -55,6 +55,9 @@ test("ordinary profile-contained and UNC workspaces remain usable", () => {
   const unc = classifyPath("src\\file.ts", { platform: "win32", cwd: "\\\\server\\share\\project" });
   assert.equal(unc.protected, false);
   assert.equal(unc.withinWorkspace, true);
+  const namedZenPi = classifyPath("D:\\a\\ZenPi\\ZenPi\\$TARGET", { platform: "win32", cwd: "D:\\a\\ZenPi\\ZenPi" });
+  assert.equal(namedZenPi.protected, false);
+  assert.equal(classifyPath("D:\\a\\ZenPi\\ZenPi\\README.md", { platform: "win32", cwd: "D:\\a\\ZenPi\\ZenPi", read: true }).protected, false);
 });
 
 test("canonicalization detects a workspace symlink escaping outside", () => {

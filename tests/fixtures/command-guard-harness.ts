@@ -72,7 +72,7 @@ for (const handler of events.get("tool_call") || []) timedPathResult = await han
 const unknownTerminal: any = { toolName: "neutral-mcp", input: { command: "inert" } };
 let unknownTerminalResult: any;
 for (const handler of events.get("tool_call") || []) unknownTerminalResult = await handler(unknownTerminal, ctx);
-const mutatedApprovalCall: any = { toolName: "bash", input: { command: "curl https://approval-race-input.invalid" } };
+const mutatedApprovalCall: any = { toolName: "bash", input: { command: "git reset --hard approval-race-input.invalid" } };
 const mutatedApprovalPromise = Promise.all((events.get("tool_call") || []).map((handler) => handler(mutatedApprovalCall, ctx)));
 await mutatedApprovalEntered;
 mutatedApprovalCall.input.command = "rm -rf /";
@@ -85,7 +85,7 @@ await commands.get("guard").handler("status", ctx);
 const statusNotice = notifications.find((entry) => typeof entry.message === "string" && entry.message.startsWith("Mode:"));
 const statusInspectable = Boolean(statusNotice && /Mode: guard/.test(statusNotice.message) && /blocks:/.test(statusNotice.message) && /rules:/.test(statusNotice.message) && !statusNotice.message.includes("git reset --hard"));
 await commands.get("guard").handler("strict", ctx);
-const lockedApprovalCall: any = { toolName: "bash", input: { command: "curl https://approval-race-lock.invalid" } };
+const lockedApprovalCall: any = { toolName: "bash", input: { command: "git reset --hard approval-race-lock.invalid" } };
 const lockedApprovalPromise = Promise.all((events.get("tool_call") || []).map((handler) => handler(lockedApprovalCall, ctx)));
 await lockedApprovalEntered;
 const delayedLaunch: any = { toolName: "subagent", input: { agent: "delayed", task: "inert" } };

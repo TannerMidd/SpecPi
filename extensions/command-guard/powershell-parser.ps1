@@ -33,7 +33,7 @@ try {
     @{ start = $p.start; end = $p.end; pipelineStart = $pipelineStart; commandName = $name; invocationOperator = ([string]$command.InvocationOperator); elements = $elements; elementsTruncated = ($command.CommandElements.Count -gt 256); redirections = $reds; redirectionsTruncated = ($command.Redirections.Count -gt 128) }
   })
   $dynamic = @($ast.FindAll({ param($n) DynamicNode $n }, $true) | Select-Object -First 256 | ForEach-Object { $p = Pos $_.Extent; @{ kind = $_.GetType().Name; start = $p.start; end = $p.end } })
-  $stop = @($tokens | Where-Object { $_.Kind -eq [System.Management.Automation.Language.TokenKind]::StopParsing } | Select-Object -First 128 | ForEach-Object { $p = Pos $_.Extent; @{ start = $p.start; end = $p.end } })
+  $stop = @($tokens | Where-Object { ([string]$_.Kind -eq 'StopParsing') -or $_.Text -eq '--%' } | Select-Object -First 128 | ForEach-Object { $p = Pos $_.Extent; @{ start = $p.start; end = $p.end } })
   $limit = $null; if ($tokens.Count -gt $maxTokens) { $limit = 'tokens' }; if ($commands.Count -gt $maxCommands) { $limit = 'commands' }; if (@($commands | Where-Object { $_.elementsTruncated }).Count -gt 0) { $limit = 'elements' }; if (@($commands | Where-Object { $_.redirectionsTruncated }).Count -gt 0) { $limit = 'redirections' }
   $out = @{ schema = 1; ok = ($errorItems.Count -eq 0 -and $null -eq $limit); parser = @{ edition = $edition; version = [string]$PSVersionTable.PSVersion }; tokenCount = [int]$tokens.Count; errors = $errorItems; commands = @($commands | Select-Object -First $maxCommands); dynamicConstructs = $dynamic; stopParsingTokens = $stop }
   if ($null -ne $limit) { $out.limitExceeded = $limit }

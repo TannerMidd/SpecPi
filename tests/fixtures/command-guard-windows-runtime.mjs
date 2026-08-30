@@ -54,7 +54,10 @@ for (const command of criticalPowerShell) {
 }
 assert.equal(decideCommand("Get-ChildItem C:\\work", powershell).action, "allow");
 for (const command of ["New-PSDrive -Name Z -PSProvider Registry -Root HKEY_CURRENT_USER | Out-Null; sp -WhatIf -Path Z:\\Software\\ZenPiGuardProbe -Name Probe -Value 1", "Copy-ItemProperty -Path HKCU:\\Software\\Source -Destination HKCU:\\Software\\Destination -Name Value", "cpp -Path HKCU:\\Software\\Source -Destination HKCU:\\Software\\Destination -Name Value", "Move-ItemProperty -Path HKCU:\\Software\\Source -Destination HKCU:\\Software\\Destination -Name Value", "mp -Path HKCU:\\Software\\Source -Destination HKCU:\\Software\\Destination -Name Value", "Rename-ItemProperty -Path HKCU:\\Software\\Source -Name Old -NewName New", "rnp -Path HKCU:\\Software\\Source -Name Old -NewName New", "Export-Alias C:\\work\\out.aliases", "Export-Csv -Path C:\\work\\out.csv -InputObject value", "Export-Clixml -Path C:\\work\\out.xml -InputObject value", "Tee-Object -FilePath C:\\work\\out.txt -InputObject value"]) assert.equal(decideCommand(command, powershell).action, "ask", command);
-assert.equal(decideCommand(fs.readFileSync(new URL("./command-guard-powershell.ps1", import.meta.url), "utf8"), powershell).action, "allow");
+{
+  const quotedLiteral = decideCommand(fs.readFileSync(new URL("./command-guard-powershell.ps1", import.meta.url), "utf8"), powershell);
+  assert.equal(quotedLiteral.action, "allow", JSON.stringify(quotedLiteral));
+}
 assert.equal(decideCommand("Write-Output 'unterminated", powershell).action, "deny");
 for (const command of ["& { Get-ChildItem C:\\work }", "Write-Output $(Get-Date)", "& $dynamicCommand", "native.exe --% $unparsed | text"]) {
   assert.equal(decideCommand(command, powershell).action, "ask", command);

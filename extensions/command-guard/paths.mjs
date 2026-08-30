@@ -14,7 +14,8 @@ const windowsProtected = [
   /^[a-z]:[\\/]$/i, /^[a-z]:[\\/]Windows(?:[\\/]|$)/i,
   /^[a-z]:[\\/]Boot(?:[\\/]|$)/i, /^[a-z]:[\\/](?:ProgramData|Program Files(?: \(x86\))?)(?:[\\/]|$)/i,
   /^[a-z]:[\\/]Users[\\/]?$/i, /^[a-z]:[\\/]Users[\\/][^\\/]+[\\/]?$/i,
-  /^\\\\[^\\/]+\\[^\\/]+[\\/]?$/i, /(?:^|[\\/])(?:\.pi|zenpi)(?:[\\/]|$)/i,
+  /^\\\\[^\\/]+\\[^\\/]+[\\/]?$/i, /(?:^|[\\/])\.pi(?:[\\/]|$)/i,
+  /(?:^|[\\/])(?:extensions[\\/]command-guard|zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json))(?:[\\/]|$)/i,
   /(?:^|[\\/])Documents[\\/](?:WindowsPowerShell|PowerShell)[\\/](?:Microsoft\.)?PowerShell_profile\.ps1$/i,
   /(?:^|[\\/])profile\.ps1$/i,
 ];
@@ -46,7 +47,7 @@ function canonicalNearest(value, windows) {
   return undefined;
 }
 function isProtected(value, windows, read) {
-  if (read) return privatePath.test(value) || /(?:^|[\\/])(?:\.pi|zenpi)(?:[\\/]|$)/i.test(value) || /(?:zenpi|pi).*(?:auth|session|history|mission|trust|private)/i.test(value);
+  if (read) return privatePath.test(value) || /(?:^|[\\/])\.pi(?:[\\/]|$)/i.test(value) || /(?:^|[\\/])zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json)(?:[\\/]|$)/i.test(value) || /(?:^|[\\/])(?:zenpi|pi)[-_]?(?:auth|sessions?|history|missions?|trust|private)(?:[\\/]|$)/i.test(value);
   return (windows ? windowsProtected : unixProtected).some((pattern) => pattern.test(value)) || privatePath.test(value);
 }
 
