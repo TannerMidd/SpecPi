@@ -11,7 +11,7 @@ ZenPi pins but does not vendor these Pi packages:
 - `@tunnckocore/pi-gpt-fast-mode@0.4.0`
 - `@narumitw/pi-goal@0.54.3`
 
-They retain their own copyright and license terms. Pi downloads them from npm when the installer runs `pi install`. ZenPi's `/zen-subagents` command is a configuration wrapper around the documented `pi-subagents` settings and runtime config; ZenPi does not patch, fork, vendor, or deep-import that package.
+They retain their own copyright and license terms. Pi downloads them from npm when the installer runs `pi install`. ZenPi's `/zen-subagents` command is a configuration wrapper around the documented `pi-subagents` settings and runtime config. The command guard also calls the package's public `pi-subagents/preflight` export to verify the exact native-child extension plan before dispatch; its installed `jiti` dependency loads that public TypeScript entry. ZenPi pins the accepted preflight contract to `pi-subagents@0.58.0` and fails closed on load or version mismatch. ZenPi does not patch, fork, vendor, or use unsupported deep imports from that package.
 
 ZenPi also installs these exact browser-runtime packages from the reviewed `browser-runtime/package-lock.json`:
 

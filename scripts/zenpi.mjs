@@ -51,6 +51,9 @@ const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs
 const capabilityRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
 const managedToolsDir = path.join(stateDir, "optional-tools");
 const managedBinDir = path.join(stateDir, "bin");
+function injectTestFailure(point) {
+  if (process.env.ZENPI_TESTING === "1" && process.env.ZENPI_TEST_FAIL_POINT === point) throw new Error(`Injected test failure at ${point}`);
+}
 process.env.PATH = (process.env.PATH || "")
   .split(path.delimiter)
   .filter((entry) => path.resolve(entry || ".").toLowerCase() !== path.resolve(managedBinDir).toLowerCase())
@@ -170,6 +173,15 @@ function resolveCommand(command, env = process.env) {
 
 function commandExists(command) {
   return resolveCommand(command) !== undefined;
+}
+
+function powerShellVersion(executable) {
+  if (!executable) return undefined;
+  try {
+    const result = run(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"], { capture: true });
+    const version = String(result.stdout || "").trim();
+    return /^\d+\.\d+(?:\.\d+){0,2}$/.test(version) ? version : "unknown";
+  } catch { return "unknown"; }
 }
 
 function hasValidatedManagedTools() {
@@ -550,11 +562,12 @@ function validRoleModel(value) {
 
 function desiredSettingsOperations() {
   const webExtension = path.join(agentDir, "npm", "node_modules", "pi-web-access", "index.ts");
+  const commandGuardExtension = path.join(agentDir, "extensions", "command-guard", "index.ts");
   return [
     { path: ["theme"], value: "tea-house" },
     { path: ["subagents", "defaultModel"], delete: true },
     { path: ["subagents", "defaultThinking"], value: "medium", userTunable: true, validate: validThinking },
-    { path: ["subagents", "defaultExtensions"], value: [] },
+    { path: ["subagents", "defaultExtensions"], arrayIncludes: [commandGuardExtension] },
     { path: ["subagents", "maxThinking"], value: "high" },
     {
       path: ["subagents", "modelScope"],
@@ -570,7 +583,7 @@ function desiredSettingsOperations() {
     { path: ["subagents", "agentOverrides", "researcher", "thinking"], value: "medium", userTunable: true, validate: validThinking },
     {
       path: ["subagents", "agentOverrides", "researcher", "extensions"],
-      value: [webExtension],
+      arrayIncludes: [webExtension, commandGuardExtension],
     },
     { path: ["subagents", "agentOverrides", "worker", "model"], value: "inherit", userTunable: true, validate: validRoleModel },
     { path: ["subagents", "agentOverrides", "worker", "thinking"], value: "medium", userTunable: true, validate: validThinking },
@@ -687,6 +700,22 @@ function managedFiles(includeShell) {
       path.join(agentDir, "extensions", "zen-subagents", "core.mjs"),
       0o644,
     ],
+    ...[
+      "index.ts",
+      "core.mjs",
+      "rules.mjs",
+      "bash.mjs",
+      "powershell.mjs",
+      "powershell-parser.ps1",
+      "cmd.mjs",
+      "paths.mjs",
+      "redact.mjs",
+      "smoke.mjs",
+    ].map((name) => [
+      path.join(repoRoot, "extensions", "command-guard", name),
+      path.join(agentDir, "extensions", "command-guard", name),
+      0o644,
+    ]),
     [
       path.join(repoRoot, "skills", "zenpi-improve", "SKILL.md"),
       path.join(agentDir, "skills", "zenpi-improve", "SKILL.md"),
@@ -771,6 +800,29 @@ function applySettings(settings, operations, previousChanges = []) {
       && currentIsValid
       && (!existingChange || !currentMatchesPrevious);
     const preserveDynamicPolicy = operation.dynamicPolicy && currentIsValid;
+
+    if (operation.arrayIncludes) {
+      const original = existingChange
+        ? {
+            path: structuredClone(existingChange.path),
+            beforeExists: existingChange.beforeExists,
+            ...(existingChange.beforeExists ? { before: structuredClone(existingChange.before) } : {}),
+          }
+        : structuredClone(before);
+      const existingValues = current.exists && Array.isArray(current.value) ? current.value : [];
+      const installed = [...existingValues];
+      for (const entry of operation.arrayIncludes) {
+        if (!installed.some((value) => deepEqual(value, entry))) installed.push(structuredClone(entry));
+      }
+      setPath(settings, operation.path, installed);
+      changes.push({
+        ...original,
+        managedArrayEntries: structuredClone(operation.arrayIncludes),
+        installedExists: true,
+        installed: structuredClone(installed),
+      });
+      continue;
+    }
 
     if (preserveTunable) {
       changes.push({ ...structuredClone(before), userTunable: true });
@@ -894,6 +946,16 @@ function assertSources() {
     "extensions/tool-wishlist/capabilities.json",
     "extensions/subagents/index.ts",
     "extensions/subagents/core.mjs",
+    "extensions/command-guard/index.ts",
+    "extensions/command-guard/core.mjs",
+    "extensions/command-guard/rules.mjs",
+    "extensions/command-guard/bash.mjs",
+    "extensions/command-guard/powershell.mjs",
+    "extensions/command-guard/powershell-parser.ps1",
+    "extensions/command-guard/cmd.mjs",
+    "extensions/command-guard/paths.mjs",
+    "extensions/command-guard/redact.mjs",
+    "extensions/command-guard/smoke.mjs",
     "skills/zenpi-improve/SKILL.md",
     "skills/donsetch/SKILL.md",
     "themes/tea-house.json",
@@ -934,6 +996,8 @@ Managed files:`);
   console.log("  global capacity remains user-tunable; provider leases prevent shared-mirror races");
   console.log("  strict modelScope starts at [inherit] and /zen-subagents synchronizes it to the active provider");
   console.log("  codex-exec and codex-exec-writer disabled");
+  console.log("  command guard extension is required for native children; unrelated extension entries are preserved");
+  console.log("  command-guard mode and approvals are session-only and no raw commands are persisted");
   console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
   console.log("  capability-gap events use sanitized summaries and salted task/session/project hashes");
   console.log("  collection requires one explicit local on/off decision and never uploads data");
@@ -1114,6 +1178,7 @@ async function installOrUpdate(options, update) {
       previousManifest?.settingsChanges || [],
     );
     writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
+    injectTestFailure("after-settings");
 
     const legacySubagentRecord = previousManifest?.files?.[subagentConfigPath];
     const subagentConfigExisted = previousManifest?.subagentConfigExisted
@@ -1151,6 +1216,7 @@ async function installOrUpdate(options, update) {
       const record = createOriginalFileRecord(target, backupDir, fileRecords[target], fileIndex++);
       const data = fs.readFileSync(source);
       atomicWrite(target, data, mode);
+      if (target.startsWith(`${path.join(agentDir, "extensions", "command-guard")}${path.sep}`)) injectTestFailure("after-first-command-guard-file");
       record.installedHash = sha256(data);
       fileRecords[target] = record;
     }
@@ -1241,6 +1307,29 @@ async function installOrUpdate(options, update) {
 function restoreSettingChanges(settings, changes, warnings) {
   for (const change of changes) {
     const current = readPath(settings, change.path);
+    if (Array.isArray(change.managedArrayEntries)) {
+      if (!current.exists || !Array.isArray(current.value)) {
+        warnings.push(`Preserved modified setting: ${change.path.join(".")}`);
+        continue;
+      }
+      if (change.beforeExists && !Array.isArray(change.before)) {
+        if (change.installedExists && deepEqual(current.value, change.installed)) setPath(settings, change.path, structuredClone(change.before));
+        else warnings.push(`Preserved modified setting instead of restoring non-array value: ${change.path.join(".")}`);
+        continue;
+      }
+      const originallyPresent = new Set(
+        change.beforeExists && Array.isArray(change.before)
+          ? change.managedArrayEntries.filter((entry) => change.before.some((value) => deepEqual(value, entry))).map((entry) => JSON.stringify(entry))
+          : [],
+      );
+      const restored = current.value.filter((value) => {
+        const managed = change.managedArrayEntries.some((entry) => deepEqual(value, entry));
+        return !managed || originallyPresent.has(JSON.stringify(value));
+      });
+      if (!change.beforeExists && restored.length === 0) deletePath(settings, change.path);
+      else setPath(settings, change.path, restored);
+      continue;
+    }
     const matchesInstalled = change.dynamicPolicy
       ? current.exists && validManagedModelScope(current.value)
       : change.installedExists
@@ -1384,7 +1473,17 @@ function doctor() {
   const manifest = readManifest(true);
   const errors = [];
   const warnings = [];
+  const commandGuardRoot = path.resolve(agentDir, "extensions", "command-guard");
+  let commandGuardIntegrity = true;
   const settings = readJson(settingsPath, {});
+  const commandGuardHelper = path.join(commandGuardRoot, "powershell-parser.ps1");
+  try { fs.accessSync(commandGuardHelper, fs.constants.R_OK); } catch { errors.push(`PowerShell parser helper is missing or unreadable: ${commandGuardHelper}`); commandGuardIntegrity = false; }
+  const windowsPowerShellPath = process.platform === "win32" ? resolveCommand("powershell.exe") || (process.env.SystemRoot ? path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : undefined) : undefined;
+  const powerShell7Path = process.platform === "win32" ? resolveCommand("pwsh.exe") || (process.env.ProgramFiles ? path.join(process.env.ProgramFiles, "PowerShell", "7", "pwsh.exe") : undefined) : undefined;
+  const powershellStatus = process.platform === "win32"
+    ? { windowsPowerShell: windowsPowerShellPath && fs.existsSync(windowsPowerShellPath) ? powerShellVersion(windowsPowerShellPath) : undefined, powerShell7: powerShell7Path && fs.existsSync(powerShell7Path) ? powerShellVersion(powerShell7Path) : undefined }
+    : undefined;
+  if (powershellStatus && !powershellStatus.windowsPowerShell) errors.push("Windows PowerShell 5.1 parser host is unavailable.");
   let capabilityRegistry;
   try {
     capabilityRegistry = validateCapabilityRegistry(JSON.parse(fs.readFileSync(capabilityRegistryPath, "utf8")));
@@ -1396,9 +1495,11 @@ function doctor() {
     const current = readPath(settings, operation.path);
     const valid = operation.delete
       ? !current.exists
-      : operation.userTunable || operation.dynamicPolicy
-        ? current.exists && (!operation.validate || operation.validate(current.value))
-        : current.exists && deepEqual(current.value, operation.value);
+      : operation.arrayIncludes
+        ? current.exists && Array.isArray(current.value) && operation.arrayIncludes.every((entry) => current.value.some((value) => deepEqual(value, entry)))
+        : operation.userTunable || operation.dynamicPolicy
+          ? current.exists && (!operation.validate || operation.validate(current.value))
+          : current.exists && deepEqual(current.value, operation.value);
     if (!valid) errors.push(`${operation.userTunable ? "Invalid user-tunable setting" : "Setting drift"}: ${operation.path.join(".")}`);
   }
 
@@ -1434,8 +1535,15 @@ function doctor() {
   }
 
   for (const [target, record] of Object.entries(manifest.files || {})) {
-    if (!fs.existsSync(target)) errors.push(`Missing managed file: ${target}`);
-    else if (sha256(fs.readFileSync(target)) !== record.installedHash) warnings.push(`Modified managed file: ${target}`);
+    const resolvedTarget = path.resolve(target);
+    const commandGuardFile = resolvedTarget === commandGuardRoot || resolvedTarget.startsWith(`${commandGuardRoot}${path.sep}`);
+    if (!fs.existsSync(target)) {
+      errors.push(`Missing managed file: ${target}`);
+      if (commandGuardFile) commandGuardIntegrity = false;
+    } else if (sha256(fs.readFileSync(target)) !== record.installedHash) {
+      if (commandGuardFile) { commandGuardIntegrity = false; errors.push(`Modified command-guard file: ${target}`); }
+      else warnings.push(`Modified managed file: ${target}`);
+    }
   }
 
   const agents = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, "utf8") : "";
@@ -1475,6 +1583,7 @@ function doctor() {
 
   console.log(`ZenPi ${manifest.version} doctor`);
   console.log(`Agent directory: ${agentDir}`);
+  if (powershellStatus) console.log(`POWERSHELL WindowsPowerShell=${powershellStatus.windowsPowerShell || "unavailable"} PowerShell7=${powershellStatus.powerShell7 || "unavailable"}`);
   if (browserSmoke) console.log(`BROWSER ${browserSmoke}`);
   const validatorOutcomes = new Map();
   for (const capability of capabilityRegistry?.capabilities || []) {
@@ -1484,6 +1593,10 @@ function doctor() {
         continue;
       }
       if (validatorOutcomes.has(validator)) continue;
+      if (validator === "command-guard-smoke" && !commandGuardIntegrity) {
+        validatorOutcomes.set(validator, { status: "fail", detail: "installed command-guard checksum integrity failed" });
+        continue;
+      }
       if (validator === "browser-runtime-smoke") {
         // The browser smoke already ran above; reuse its outcome instead of launching Chromium twice.
         validatorOutcomes.set(validator, browserSmoke

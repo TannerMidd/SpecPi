@@ -1,0 +1,18 @@
+import registerCommandGuard from "../../extensions/command-guard/index.ts";
+const events = new Map<string, any[]>();
+const commands = new Map<string, any>();
+const fakePi: any = { on(name: string, handler: any) { events.set(name, [...(events.get(name) || []), handler]); }, registerCommand(name: string, command: any) { commands.set(name, command); } };
+registerCommandGuard(fakePi);
+const ctx: any = { cwd: process.cwd(), hasUI: true, ui: { async select() { return undefined; }, async confirm() { return true; }, notify() {}, setStatus() {} } };
+for (const handler of events.get("session_start") || []) await handler({ reason: "startup" }, ctx);
+await commands.get("guard").handler("off", ctx);
+await commands.get("guard").handler("guard", ctx);
+let childOffResult: any;
+for (const handler of events.get("tool_call") || []) childOffResult = await handler({ toolName: "neutral-mcp", input: { command: "inert" } }, ctx);
+let writeResult: any;
+for (const handler of events.get("tool_call") || []) writeResult = await handler({ toolName: "write", input: { path: "strict-workspace-file.txt", content: "inert" } }, ctx);
+let unknownResult: any;
+for (const handler of events.get("tool_call") || []) unknownResult = await handler({ toolName: "terminal", input: { command: "inert" } }, ctx);
+let result: any;
+for (const handler of events.get("tool_call") || []) result = await handler({ toolName: "bash", input: { command: "rm -rf /" } }, ctx);
+process.stdout.write(`COMMAND_GUARD_CHILD=${JSON.stringify({ blocked: result?.block === true, childOffRejected: childOffResult?.block === true, strictWriteBlocked: writeResult?.block === true, strictUnknownBlocked: unknownResult?.block === true })}\n`);

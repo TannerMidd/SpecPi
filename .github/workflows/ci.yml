@@ -15,8 +15,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install pinned native-child test runtime
+        run: npm install --prefix "$RUNNER_TEMP/zenpi-subagents-runtime" --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 pi-subagents@0.58.0
       - run: npm test
+        env:
+          ZENPI_SUBAGENTS_NPM_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime
+          ZENPI_PI_CLI: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
+          ZENPI_PI_PACKAGE_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent
+          ZENPI_REQUIRE_NATIVE_CHILD_TEST: "1"
       - run: npm run check
+        env:
+          ZENPI_SUBAGENTS_NPM_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime
+          ZENPI_PI_CLI: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
+          ZENPI_PI_PACKAGE_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent
+          ZENPI_REQUIRE_NATIVE_CHILD_TEST: "1"
+      - run: git diff --check
 
   windows-smoke:
     runs-on: windows-latest
@@ -25,13 +38,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Exercise Windows launcher and command shims
+      - name: Install pinned Windows validation runtime
+        shell: pwsh
+        run: npm install --prefix "$env:RUNNER_TEMP\zenpi-subagents-runtime" --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 pi-subagents@0.58.0
+      - name: Exercise PowerShell 5.1, PowerShell 7, cmd, policy, and real child propagation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:ZENPI_SUBAGENTS_NPM_ROOT = "$env:RUNNER_TEMP\zenpi-subagents-runtime"
+          $env:ZENPI_PI_CLI = "$env:RUNNER_TEMP\zenpi-subagents-runtime\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js"
+          $env:ZENPI_PI_PACKAGE_ROOT = "$env:RUNNER_TEMP\zenpi-subagents-runtime\node_modules\@earendil-works\pi-coding-agent"
+          $env:ZENPI_REQUIRE_NATIVE_CHILD_TEST = "1"
+          $env:ZENPI_TEST_GIT_BASH = Join-Path $env:ProgramFiles "Git\bin\bash.exe"
+          if (-not (Test-Path $env:ZENPI_TEST_GIT_BASH)) { throw "Git Bash is required for the Windows command-guard matrix" }
+          $env:ZENPI_TEST_POWERSHELL_EXE = (Get-Command powershell.exe).Source
+          node tests/fixtures/command-guard-windows-runtime.mjs
+          $env:ZENPI_TEST_POWERSHELL_EXE = (Get-Command pwsh.exe).Source
+          node tests/fixtures/command-guard-windows-runtime.mjs
+          node --test tests/command-guard.test.mjs tests/command-guard-paths.test.mjs tests/command-guard-extension.test.mjs
+      - name: Exercise Windows launcher and lifecycle shims
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
           $env:NODE_OPTIONS = "--throw-deprecation"
-          .\zenpi.cmd plan --skip-package-install --skip-shell
 
           $root = Join-Path $env:RUNNER_TEMP "zenpi-windows-smoke"
           $agentDir = Join-Path $root "agent"
@@ -70,7 +100,25 @@ jobs:
           $env:ZENPI_FAKE_BIN = $fakeBin
           $env:ZENPI_FAKE_LOG = $log
           $env:ZENPI_REPO = (Get-Location).Path
+          .\zenpi.cmd plan --skip-package-install --skip-shell
           .\zenpi.cmd install --yes --skip-shell
+          .\zenpi.cmd doctor
+
+          $settingsBefore = [IO.File]::ReadAllBytes((Join-Path $agentDir "settings.json"))
+          $manifestBefore = [IO.File]::ReadAllBytes((Join-Path $agentDir "zenpi\manifest.json"))
+          $guardBefore = @{}
+          Get-ChildItem (Join-Path $agentDir "extensions\command-guard") -File | ForEach-Object { $guardBefore[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
+          $env:ZENPI_TESTING = "1"
+          $env:ZENPI_TEST_FAIL_POINT = "after-first-command-guard-file"
+          $PSNativeCommandUseErrorActionPreference = $false
+          .\zenpi.cmd update --yes --force --skip-package-install --skip-browser-install --skip-tool-install --skip-shell
+          if ($LASTEXITCODE -eq 0) { throw "Injected Windows update failure unexpectedly succeeded" }
+          $PSNativeCommandUseErrorActionPreference = $true
+          Remove-Item Env:ZENPI_TEST_FAIL_POINT, Env:ZENPI_TESTING
+          if ([Convert]::ToBase64String($settingsBefore) -ne [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $agentDir "settings.json")))) { throw "Settings were not rolled back byte-for-byte" }
+          if ([Convert]::ToBase64String($manifestBefore) -ne [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $agentDir "zenpi\manifest.json")))) { throw "Manifest was not rolled back byte-for-byte" }
+          Get-ChildItem (Join-Path $agentDir "extensions\command-guard") -File | ForEach-Object { if ($guardBefore[$_.Name] -ne (Get-FileHash $_.FullName -Algorithm SHA256).Hash) { throw "Guard file was not rolled back: $($_.Name)" } }
+          .\zenpi.cmd update --yes --skip-package-install --skip-browser-install --skip-tool-install --skip-shell
           .\zenpi.cmd doctor
 
           $installCalls = @(Get-Content $log | Where-Object { $_ -match '^"?install"? ' })
@@ -91,3 +139,5 @@ jobs:
           }
 
           .\zenpi.cmd uninstall --yes
+      - shell: pwsh
+        run: git diff --check

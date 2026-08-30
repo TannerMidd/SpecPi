@@ -58,7 +58,8 @@ The goal is not autonomous self-modification. It is to make the next justified c
 - **Loop health** — `/wishlist status` and the report show retirements, reopen rate, open reviews, time-to-retire, and qualification rate
 - **`/harness-improvement`** — pick one item and let ZenPi fix and verify it
 - **`/zen-subagents`** — remember how you like your subagents set up
-- **Isolated browser** — check your web UI with screenshots, safely sandboxed
+- **Command guard** — choose Guard, Strict, or Off at session start; known catastrophic commands are blocked before execution
+- **Isolated browser** — check your web UI with screenshots in a fresh browser context
 - **Careful installs** — everything is backed up and can be rolled back
 
 Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
@@ -77,9 +78,13 @@ cd ZenPi
 
 On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible — see [SECURITY.md](SECURITY.md) for details.
 
+At each interactive top-level session start, choose **Guard** (recommended), **Strict**, or **Off for this session**. Guard blocks catastrophic filesystem, disk, boot, security-control, download-to-shell, and parser-integrity failures, and asks before other classified destructive or indeterminate commands. Strict additionally asks before ordinary mutation and every uncatalogued tool. Use `/guard status`, `/guard guard`, `/guard strict`, `/guard off`, or `/guard unlock` to inspect or change the session-only state. Print/JSON sessions default to Guard and deny any decision that needs a prompt.
+
 ## Boundaries
 
-ZenPi never touches your credentials, sessions, or history, and nothing is ever uploaded. Wishlist reports are stored locally only — skim them before sharing. Nothing happens without your say-so: improving ZenPi, installing, or publishing all need your explicit approval.
+ZenPi never persists command text and does not read Pi credentials, sessions, or history. Wishlist reports are stored locally only — skim them before sharing. Nothing happens without your say-so: improving ZenPi, installing, or publishing all need your explicit approval.
+
+The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, `edit`, and native-subagent seams. It is defense in depth, not an OS sandbox: direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its hard boundary. Use a least-privilege account, container, or VM when code is hostile.
 
 See [SECURITY.md](SECURITY.md) for the full picture.
 

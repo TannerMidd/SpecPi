@@ -25,6 +25,10 @@ export const VALIDATOR_CATALOG = Object.freeze({
 		description: "Drives the wishlist core API in a temporary state directory through record, select, retire with journal, reopen, metrics, and history",
 		timeoutMs: 2 * 60 * 1000,
 	}),
+	"command-guard-smoke": Object.freeze({
+		description: "Classifies safe, destructive, malformed, protected-path, and nested-shell fixtures with the real command-guard policy",
+		timeoutMs: 2 * 60 * 1000,
+	}),
 });
 
 export function validatorNames() {
@@ -131,9 +135,16 @@ async function runWishlistStateSmoke() {
 	}
 }
 
+async function runCommandGuardSmoke() {
+	const smoke = await import("../command-guard/smoke.mjs");
+	if (typeof smoke.runCommandGuardSmoke !== "function") throw new Error("command guard smoke export is unavailable");
+	return smoke.runCommandGuardSmoke();
+}
+
 async function runValidatorInProcess(validator, environment) {
 	if (validator === "browser-runtime-smoke") return runBrowserRuntimeSmoke(environment);
 	if (validator === "wishlist-state-smoke") return runWishlistStateSmoke();
+	if (validator === "command-guard-smoke") return runCommandGuardSmoke();
 	throw new Error(`Unknown validator: ${validator}`);
 }
 

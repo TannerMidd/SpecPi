@@ -462,6 +462,9 @@ test("validator catalog, registry, and capability links stay in sync", () => {
     assert.ok(entry, `missing registry entry for ${id}`);
     assert.deepEqual(entry.validations, ["wishlist-state-smoke"]);
   }
+  const commandGuard = registry.capabilities.find((capability) => capability.id === "command-guard");
+  assert.ok(commandGuard, "missing registry entry for command-guard");
+  assert.deepEqual(commandGuard.validations, ["command-guard-smoke"]);
 });
 
 test("every registry-linked validator executes through the shared CLI with isolated prerequisites", () => {
@@ -510,7 +513,7 @@ test("unknown validators fail closed with the registered set", () => {
   const result = spawnSync(process.execPath, [validatorsCli, "made-up-validator"], { encoding: "utf8", timeout: 30000 });
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Unknown validator: made-up-validator/);
-  assert.match(result.stderr, /browser-runtime-smoke, wishlist-state-smoke/);
+  assert.match(result.stderr, /browser-runtime-smoke, wishlist-state-smoke, command-guard-smoke/);
 });
 
 test("validator runs are killed at their timeout and reported as failures", () => {

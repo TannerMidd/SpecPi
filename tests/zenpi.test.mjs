@@ -1890,6 +1890,70 @@ test("installer rejects an incompatible Pi even when package installation is ski
   }
 });
 
+test("command guard install and update failures roll back settings, files, and manifest", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-command-guard-rollback-"));
+  const agentDir = path.join(root, "agent");
+  const fakeBin = path.join(root, "bin");
+  fs.mkdirSync(agentDir, { recursive: true });
+  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.4\nexit 0\n");
+  const env = { PATH: `${fakeBin}:${process.env.PATH}`, ZENPI_TESTING: "1" };
+  const settingsPath = path.join(agentDir, "settings.json");
+  const originalSettings = Buffer.from('{"subagents":{"defaultExtensions":["user-extension"]},"kept":true}\n');
+  fs.writeFileSync(settingsPath, originalSettings);
+  try {
+    const failedInstall = invokeCli(agentDir, ["install", "--yes", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], { ...env, ZENPI_TEST_FAIL_POINT: "after-settings" });
+    assert.notEqual(failedInstall.status, 0);
+    assert.match(failedInstall.stderr, /ZenPi-managed changes rolled back/);
+    assert.deepEqual(fs.readFileSync(settingsPath), originalSettings);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")), false);
+
+    const install = invokeCli(agentDir, ["install", "--yes", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], env);
+    assert.equal(install.status, 0, install.stderr);
+    const guardDir = path.join(agentDir, "extensions", "command-guard");
+    const manifestPath = path.join(agentDir, "zenpi", "manifest.json");
+    const customized = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    customized.subagents.defaultExtensions.unshift("second-user-extension");
+    fs.writeFileSync(settingsPath, `${JSON.stringify(customized, null, 2)}\n`);
+    fs.appendFileSync(path.join(guardDir, "core.mjs"), "\n// preserved local drift\n");
+    const beforeSettings = fs.readFileSync(settingsPath);
+    const beforeManifest = fs.readFileSync(manifestPath);
+    const beforeFiles = new Map(fs.readdirSync(guardDir).map((name) => [name, fs.readFileSync(path.join(guardDir, name))]));
+
+    const failedUpdate = invokeCli(agentDir, ["update", "--yes", "--force", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], { ...env, ZENPI_TEST_FAIL_POINT: "after-first-command-guard-file" });
+    assert.notEqual(failedUpdate.status, 0);
+    assert.match(failedUpdate.stderr, /ZenPi-managed changes rolled back/);
+    assert.deepEqual(fs.readFileSync(settingsPath), beforeSettings);
+    assert.deepEqual(fs.readFileSync(manifestPath), beforeManifest);
+    assert.deepEqual(fs.readdirSync(guardDir).sort(), [...beforeFiles.keys()].sort());
+    for (const [name, bytes] of beforeFiles) assert.deepEqual(fs.readFileSync(path.join(guardDir, name)), bytes, name);
+
+    const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
+    assert.equal(uninstall.status, 0, uninstall.stderr);
+    assert.match(uninstall.stderr, /Preserved modified file during uninstall: .*command-guard.*core\.mjs/);
+    assert.equal(fs.existsSync(path.join(guardDir, "core.mjs")), true);
+    assert.equal(fs.existsSync(path.join(guardDir, "index.ts")), false);
+    assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath, "utf8")).subagents.defaultExtensions, ["second-user-extension", "user-extension"]);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("command guard array ownership restores a pre-existing non-array setting", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-command-guard-array-"));
+  const agentDir = path.join(root, "agent"); const fakeBin = path.join(root, "bin");
+  fs.mkdirSync(agentDir, { recursive: true });
+  writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.4\nexit 0\n");
+  const settingsPath = path.join(agentDir, "settings.json");
+  fs.writeFileSync(settingsPath, '{"subagents":{"defaultExtensions":"legacy-invalid"}}\n');
+  const env = { PATH: `${fakeBin}:${process.env.PATH}`, ZENPI_TESTING: "1" };
+  try {
+    const install = invokeCli(agentDir, ["install", "--yes", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], env);
+    assert.equal(install.status, 0, install.stderr);
+    assert.ok(Array.isArray(JSON.parse(fs.readFileSync(settingsPath, "utf8")).subagents.defaultExtensions));
+    const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
+    assert.equal(uninstall.status, 0, uninstall.stderr);
+    assert.equal(JSON.parse(fs.readFileSync(settingsPath, "utf8")).subagents.defaultExtensions, "legacy-invalid");
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test("install, update, doctor, and uninstall round trip in an isolated agent dir", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-test-"));
   const agentDir = path.join(root, "agent");
@@ -1909,6 +1973,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
   fs.writeFileSync(path.join(agentDir, "extensions", "zen.ts"), "// personal prior zen\n");
 
   try {
+    const commandGuardExtension = path.join(agentDir, "extensions", "command-guard", "index.ts");
+    const webExtension = path.join(agentDir, "npm", "node_modules", "pi-web-access", "index.ts");
     runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
     const installed = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
     assert.equal(installed.defaultProvider, "openrouter");
@@ -1921,6 +1987,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     });
     assert.equal(installed.subagents.agentOverrides.worker.model, "inherit");
     assert.equal(installed.subagents.agentOverrides["codex-exec"].disabled, true);
+    assert.deepEqual(installed.subagents.defaultExtensions, [commandGuardExtension]);
+    assert.deepEqual(installed.subagents.agentOverrides.researcher.extensions, [webExtension, commandGuardExtension]);
     assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
@@ -1934,6 +2002,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(installedRegistryImport.status, 0, installedRegistryImport.stderr);
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "core.mjs")));
+    for (const file of ["index.ts", "core.mjs", "rules.mjs", "bash.mjs", "powershell.mjs", "powershell-parser.ps1", "cmd.mjs", "paths.mjs", "redact.mjs", "smoke.mjs"]) {
+      assert.ok(fs.existsSync(path.join(agentDir, "extensions", "command-guard", file)), `missing installed command guard file ${file}`);
+    }
     assert.ok(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
     assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")));
@@ -1946,7 +2017,17 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
       PATH: `${fakeBin}:${process.env.PATH}`,
     });
     assert.equal(doctor.status, 0, doctor.stderr);
+    assert.match(doctor.stdout, /CAPABILITY command-guard verified by command-guard-smoke/);
     assert.match(doctor.stderr, /Managed browser runtime unavailable: .*installation was skipped/);
+
+    const installedGuardCore = path.join(agentDir, "extensions", "command-guard", "core.mjs");
+    const installedGuardCoreBytes = fs.readFileSync(installedGuardCore);
+    fs.appendFileSync(installedGuardCore, "\n// injected doctor drift\n");
+    const driftDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+    assert.notEqual(driftDoctor.status, 0);
+    assert.match(driftDoctor.stderr, /Modified command-guard file/);
+    assert.doesNotMatch(driftDoctor.stdout, /CAPABILITY command-guard verified/);
+    fs.writeFileSync(installedGuardCore, installedGuardCoreBytes);
 
     const installedRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
     const installedRegistry = fs.readFileSync(installedRegistryPath);
@@ -1959,7 +2040,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     const customizedSettings = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
     customizedSettings.subagents.agentOverrides.worker.model = "openai-codex/gpt-5.6-luna";
     customizedSettings.subagents.agentOverrides.worker.thinking = "high";
-    customizedSettings.subagents.defaultExtensions = ["unsafe-project-extension"];
+    customizedSettings.subagents.defaultExtensions = ["unrelated-user-extension"];
+    customizedSettings.subagents.agentOverrides.researcher.extensions.unshift("unrelated-research-extension");
     fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(customizedSettings, null, 2)}\n`);
     const subagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
     const customizedConfig = JSON.parse(fs.readFileSync(subagentConfigPath, "utf8"));
@@ -2036,7 +2118,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(afterUpdate.subagents.retiredFlag, undefined);
     assert.equal(afterUpdate.subagents.agentOverrides.worker.model, "openai-codex/gpt-5.6-luna");
     assert.equal(afterUpdate.subagents.agentOverrides.worker.thinking, "high");
-    assert.deepEqual(afterUpdate.subagents.defaultExtensions, []);
+    assert.deepEqual(afterUpdate.subagents.defaultExtensions, ["unrelated-user-extension", commandGuardExtension]);
+    assert.deepEqual(afterUpdate.subagents.agentOverrides.researcher.extensions, ["unrelated-research-extension", webExtension, commandGuardExtension]);
     const afterUpdateConfig = JSON.parse(fs.readFileSync(subagentConfigPath, "utf8"));
     assert.equal(afterUpdateConfig.maxSubagentSpawnsPerRun, 12);
     assert.equal(afterUpdateConfig.maxSubagentDepth, 1);
@@ -2084,6 +2167,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(restored.subagents.customSetting, true);
     assert.equal(restored.subagents.agentOverrides.worker.model, "openai-codex/gpt-5.6-luna");
     assert.equal(restored.subagents.agentOverrides.worker.thinking, "high");
+    assert.deepEqual(restored.subagents.defaultExtensions, ["unrelated-user-extension"]);
+    assert.deepEqual(restored.subagents.agentOverrides.researcher.extensions, ["unrelated-research-extension"]);
     const preservedConfig = JSON.parse(fs.readFileSync(subagentConfigPath, "utf8"));
     assert.equal(preservedConfig.maxSubagentSpawnsPerRun, 12);
     assert.equal(preservedConfig.unrelated, "preserved");
@@ -2102,6 +2187,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "core.mjs")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "powershell-parser.ps1")), false);
+    assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "smoke.mjs")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
     assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);

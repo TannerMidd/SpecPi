@@ -56,6 +56,20 @@
       "validations": [
         "wishlist-state-smoke"
       ]
+    },
+    {
+      "id": "command-guard",
+      "title": "Cross-platform session command guard",
+      "aliases": [
+        "command-protection",
+        "dangerou-command-protection",
+        "session-command-safety"
+      ],
+      "shippedVersion": "0.8.0",
+      "shippedAt": "2026-08-30T00:00:00.000Z",
+      "validations": [
+        "command-guard-smoke"
+      ]
     }
   ]
 }

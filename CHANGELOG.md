@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add a first-party, session-scoped command guard with Guard, Strict, Off, and Locked states; block catastrophic Bash, PowerShell, cmd, protected-path, and native-child operations before execution while denying parser, prompt, and propagation uncertainty.
+- Add bounded shell-specific analyzers, native PowerShell AST parsing without evaluation, protected-path canonicalization, display redaction, deterministic policy smoke validation, and Linux/Windows regression coverage across PowerShell 5.1, PowerShell 7, cmd, and inert adversarial corpora.
+- Propagate protected modes to supported native subagents through the pinned public preflight contract, a managed child extension, and a reserved binding; preserve unrelated child extensions, block unverifiable launch forms, and exercise a real inert native-child process in CI.
+- Fail doctor on installed command-guard checksum drift and add byte-for-byte installer/update rollback injection coverage.
+- Document the defense-in-depth boundary, including direct user commands, custom tools, approved scripts, trusted extensions/configuration, TOCTOU behavior, and the need for OS-level isolation with hostile code.
+
 ## 0.7.0 - 2026-08-29
 
 - Make retirement durable: every capability now ships a closed validator from a reviewed catalog, `finish_harness_improvement` dispatches all linked validators generically and fails closed on unknown names, and `npm run check` plus `zenpi doctor` continuously re-prove retired capabilities in temporary state.

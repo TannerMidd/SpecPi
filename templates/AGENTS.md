@@ -11,6 +11,7 @@
 - Native subagents may use a different model only within the parent session's exact Pi provider. Configure each exact provider once with `/zen-subagents`; its saved profile restores automatically. `inherit` is portable, while capacity remains global rather than profile-specific.
 - Never launch `codex-exec` or `codex-exec-writer`; ZenPi disables these external subscription runners.
 - Use cheaper role models only through an explicitly configured same-provider choice.
+- Treat command-guard denials as hard runtime constraints: use the stated safer alternative or ask the user; never obfuscate, split, encode, or reroute a denied operation to evade protection.
 - For material changes, run the narrowest relevant checks, inspect the final diff, and use fresh read-only review when risk warrants it.
 - Never claim completion from plausibility alone. Report commands run, validation results, and residual risks.
 - Treat wishlist observations as leads, not permission to edit. Start only from an exact `/harness-improvement` menu choice, use the `zenpi-improve` skill, and retire through its verification gate only after direct evidence passes.
