@@ -90,21 +90,22 @@ test("every PowerShell parameter prefix is gated, not just the full spelling", (
   const windows = { shell: "bash", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
   const payload = Buffer.from("Remove-Item -Recurse -Force C:\\Windows", "utf16le").toString("base64");
   const encodedFlags = ["-e", "-ec", "-en", "-enc", "-enco", "-encod", "-encode", "-encoded", "-encodedc", "-encodedco", "-encodedcom", "-encodedcomm", "-encodedcomma", "-encodedcomman", "-encodedcommand"];
+  // The payload can only be decoded where a PowerShell parser exists. Never allowing it is the invariant on
+  // every host; classifying it as critical is the stronger outcome a Windows host can reach.
+  const parserAvailable = parserHosts({ shell: "powershell" }).some((entry) => fs.existsSync(entry));
+  const gated = (command) => {
+    const decision = decideCommand(command, windows);
+    assert.notEqual(decision.action, "allow", command);
+    assert.equal(decideCommand(command, { ...windows, hasUI: false }).action, "deny", command);
+    if (parserAvailable) assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+  };
   for (const host of ["powershell.exe", "pwsh"]) {
-    for (const flag of encodedFlags) {
-      const decision = decideCommand(`${host} ${flag} ${payload}`, windows);
-      assert.equal(decision.action, "deny", `${host} ${flag}`);
-      assert.equal(decision.severity, "critical", `${host} ${flag}: ${JSON.stringify(decision)}`);
-    }
+    for (const flag of encodedFlags) gated(`${host} ${flag} ${payload}`);
     for (const flag of ["-c", "-co", "-com", "-comm", "-comma", "-comman", "-command"]) {
-      const decision = decideCommand(`${host} ${flag} "Remove-Item -Recurse -Force C:\\Windows"`, windows);
-      assert.equal(decision.action, "deny", `${host} ${flag}`);
-      assert.equal(decision.severity, "critical", `${host} ${flag}: ${JSON.stringify(decision)}`);
+      gated(`${host} ${flag} "Remove-Item -Recurse -Force C:\\Windows"`);
     }
   }
-  for (const command of [`powershell -nop -w hidden -enc ${payload}`, `powershell.exe -NoProfile -Enc ${payload}`]) {
-    assert.equal(decideCommand(command, windows).severity, "critical", command);
-  }
+  for (const command of [`powershell -nop -w hidden -enc ${payload}`, `powershell.exe -NoProfile -Enc ${payload}`]) gated(command);
   // Undecodable or absent payloads stay unresolved rather than silently passing.
   for (const command of ["powershell.exe -enc not-base64!!", "powershell.exe -enc", "powershell.exe -Command $dynamic"]) {
     const decision = decideCommand(command, windows);

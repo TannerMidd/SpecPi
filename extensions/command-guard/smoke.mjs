@@ -19,7 +19,9 @@ export async function runCommandGuardSmoke() {
     ["process environment pseudo-file", decideCommand("cat /proc/self/environ", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "deny"],
     ["macOS system root", decidePath("/Library/LaunchDaemons/x.plist", "write", { mode: "guard", cwd: "/Users/alice/work", platform: "darwin", hasUI: true }), "deny"],
     ["ordinary awk pipeline", decideCommand("printf 'a b\\n' | awk '{print $1}'", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "allow"],
-    ["abbreviated encoded command", decideCommand(`powershell.exe -enc ${Buffer.from("Remove-Item -Recurse -Force C:\\Windows", "utf16le").toString("base64")}`, { shell: "bash", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true }), "deny"],
+    // hasUI:false so the check is deterministic: a host with a PowerShell parser denies this critically, one
+    // without it can only reach "unresolved", and both must refuse without an approval prompt.
+    ["abbreviated encoded command", decideCommand(`powershell.exe -enc ${Buffer.from("Remove-Item -Recurse -Force C:\\Windows", "utf16le").toString("base64")}`, { shell: "bash", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: false }), "deny"],
     ["plain find is read-only", decideCommand("find src -type f -print", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "allow"],
     ["find deletion on a protected root", decideCommand("find /etc -delete", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "deny"],
   ];
