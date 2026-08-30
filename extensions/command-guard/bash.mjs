@@ -4,7 +4,7 @@ import { analyze as analyzeCmd } from "./cmd.mjs";
 export const BASH_LIMITS = Object.freeze({ maxInput: 128 * 1024, maxTokens: 4096, maxLeaves: 128, maxDepth: 8 });
 const separators = new Set([";", "&&", "||", "|", "&", "(", ")"]);
 const shells = new Set(["bash", "sh", "zsh", "dash", "ksh", "fish"]);
-const wrappers = new Set(["sudo", "doas", "env", "command", "nohup", "nice", "time", "timeout", "chroot", "busybox", "toybox"]);
+const wrappers = new Set(["sudo", "doas", "env", "command", "exec", "nohup", "nice", "time", "timeout", "chroot", "busybox", "toybox"]);
 
 function heredocOpeners(line) {
   const found = []; let quote = "", escaped = false, comment = false;
@@ -149,7 +149,8 @@ function makeLeaves(tokens, limits) {
   return { leaves: leaves.slice(0, limits.maxLeaves), redirects, dynamicConstructs };
 }
 function wrapperCommandIndex(name, args) {
-  const rawTakesValue = name === "sudo" ? new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-c", "--close-from", "-t", "--command-timeout", "-d", "--chdir", "-r", "--chroot", "--role", "--type"])
+  const rawTakesValue = name === "exec" ? new Set(["-a"])
+    : name === "sudo" ? new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-c", "--close-from", "-t", "--command-timeout", "-d", "--chdir", "-r", "--chroot", "--role", "--type"])
     : name === "doas" ? new Set(["-u", "-c"])
       : name === "env" ? new Set(["-u", "--unset", "-c", "--chdir", "--argv0", "-s", "--split-string"])
         : name === "nice" ? new Set(["-n", "--adjustment"])

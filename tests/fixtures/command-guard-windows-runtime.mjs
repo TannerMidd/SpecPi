@@ -46,6 +46,8 @@ const criticalPowerShell = [
   "Set-Item Alias:zap Remove-Item; zap -Recurse -Force C:\\Windows",
   "Set-Alias zap Remove-Item; & { Set-Alias zap Write-Output }; zap -Recurse -Force C:\\Windows",
   "cli -LiteralPath C:\\Windows\\guard.txt",
+  "Remove-Item -Recurse -Force C:\\Win*",
+  "cmd /c \"@rd /s /q C:\\Windows\"",
 ];
 for (const command of criticalPowerShell) {
   const result = decideCommand(command, powershell);

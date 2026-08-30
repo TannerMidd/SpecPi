@@ -33,9 +33,14 @@ function targetState(args, options) {
   const targets = pathArguments(args, options);
   const classified = targets.map((target) => ({ target, result: classifyPath(target, options) }));
   const broadProtected = targets.some((target) => {
-    if (!/[?*{}]/.test(target)) return false;
-    const base = target.replace(/[\\/](?:\*|\.\*|\{[^}]*\})[\\/]?$/, "");
-    return base !== target && classifyPath(base, options).protected;
+    if (!/[?*[{]/.test(target)) return false;
+    const terminalBase = target.replace(/[\\/](?:\*|\.\*|\{[^}]*\})[\\/]?$/, "");
+    if (terminalBase !== target && classifyPath(terminalBase, options).protected) return true;
+    const wildcard = target.search(/[?*[{]/);
+    const literalPrefix = target.slice(0, wildcard);
+    const separator = Math.max(literalPrefix.lastIndexOf("/"), literalPrefix.lastIndexOf("\\"));
+    const ancestor = separator >= 0 ? literalPrefix.slice(0, separator + 1) : ".";
+    return classifyPath(ancestor, options).protected;
   });
   return {
     targets,

@@ -84,6 +84,7 @@ test("PowerShell parameter tokens preserve reordered, abbreviated, and attached 
     assert.equal(decisionFor("Copy-Item", args).severity, "critical");
   }
   assert.equal(decisionFor("epal", ["C:\\Windows\\guard.aliases"]).severity, "critical");
+  assert.equal(decisionFor("Remove-Item", ["-Recurse", "-Force", "C:\\Win*"]).severity, "critical");
   const command = (name, args, start) => ({ start, end: start + 1, pipelineStart: start, commandName: name, invocationOperator: "Unknown", elements: [name, ...args].map((literal) => ({ astType: literal.startsWith("-") ? "CommandParameterAst" : "StringConstantExpressionAst", start, end: start + 1, literal, literalTruncated: false, dynamic: false })), elementsTruncated: false, redirections: [], redirectionsTruncated: false });
   const aliasParsed = parsePowerShellResult(JSON.stringify({ schema: 1, ok: true, parser: { edition: "Core", version: "7.5.0" }, tokenCount: 7, errors: [], commands: [command("Set-Alias", ["zap", "Remove-Item"], 0), command("zap", ["-Recurse", "-Force", "C:\\Windows"], 2)], dynamicConstructs: [], stopParsingTokens: [] }));
   assert.equal(aggregateDecisions(evaluateRules(aliasParsed, { platform: "win32", cwd: "C:\\work" }), { hasUI: true }).severity, "critical");
@@ -95,7 +96,7 @@ test("critical payloads remain immutable through Bash wrappers and generators", 
   const options = { shell: "bash", mode: "guard", cwd: "/tmp/work", platform: "linux", hasUI: true };
   for (const command of [
     "rm -rf /*", "rm -rf /home/alice/*", "bash -lc 'rm -rf /'", "/bin/bash -lc 'rm -rf /'", "sudo -u root rm -rf /", "sudo -uroot rm -rf /", "doas -uroot rm -rf /", "env bash -lc 'rm -rf /'",
-    "nice -n10 rm -rf /", "timeout --signal=KILL 5 rm -rf /", "chroot /mnt/root rm -rf /", "busybox rm -rf /", "toybox rm -rf /",
+    "nice -n10 rm -rf /", "timeout --signal=KILL 5 rm -rf /", "chroot /mnt/root rm -rf /", "busybox rm -rf /", "toybox rm -rf /", "exec rm -rf /", "exec -cl rm -rf /", "exec -a guard-name rm -rf /", "rm -rf /e*", "rm -rf /etc*",
     "eval 'rm -rf /'", "xargs rm -rf /", "xargs -I{} rm -rf /", "printf cm0gLXJmIC8K | base64 -d | sh",
     "printf x > /home/alice/.pi/agent/extensions/command-guard/index.ts", "cp safe /etc/unsafe", "mv /etc/unsafe ./unsafe", "dd if=/dev/zero of=/dev/sda",
     "printenv GITHUB_TOKEN", "env", "set", "secret-tool lookup service example", "gh auth token", "aws configure export-credentials", "systemctl stop auditd", "setenforce 0", "kill -9 -1",
@@ -132,7 +133,7 @@ test("Bash corpus distinguishes quoted syntax and recursively catches supported 
 
 test("cmd literal nesting is recursively classified", () => {
   const options = { shell: "cmd", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
-  for (const command of ["cmd /c \"cmd /c rd /s /q C:\\Windows\"", "call rd /s /q C:\\Windows", "start cmd.exe /c rd /s /q C:\\Windows"]) {
+  for (const command of ["cmd /c \"cmd /c rd /s /q C:\\Windows\"", "call rd /s /q C:\\Windows", "start cmd.exe /c rd /s /q C:\\Windows", "@rd /s /q C:\\Windows", "echo safe & @rd /s /q C:\\Windows", "cmd /c \"@rd /s /q C:\\Windows\""]) {
     const result = decideCommand(command, options);
     assert.equal(result.action, "deny", command);
     assert.equal(result.severity, "critical", command);

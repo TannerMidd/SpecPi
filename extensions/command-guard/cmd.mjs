@@ -31,7 +31,7 @@ function unwrap(tokens) {
   const leaves = [], redirects = []; let current = [], pendingSeparator, pendingRedirect;
   const flush = () => {
     if (current.length) {
-      const executable = current[0];
+      const executable = current[0].replace(/^@+/, "");
       leaves.push({ shell: "cmd", executable, operation: current.slice(1).join(" "), args: current.slice(1), redactedTarget: redactCommand(current.slice(1).join(" ")), dynamic: /[%!]/.test(executable), separatorBefore: pendingSeparator });
       pendingSeparator = undefined; current = [];
     }
