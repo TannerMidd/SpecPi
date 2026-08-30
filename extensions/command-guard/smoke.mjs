@@ -13,6 +13,12 @@ export async function runCommandGuardSmoke() {
     ["decoded interpreter pipe", decideCommand("printf cm0gLXJmIC8K | base64 -d | sh", { shell: "bash", mode: "guard", cwd: process.cwd(), hasUI: true }), "deny"],
     ["nested cmd deletion", decideCommand('cmd /c "cmd /c rd /s /q C:\\\\Windows"', { shell: "cmd", mode: "guard", cwd: "C:\\\\work", platform: "win32", hasUI: true }), "deny"],
     ["strict workspace mutation without UI", decidePath("file.txt", "write", { mode: "strict", cwd: process.cwd(), hasUI: false }), "deny"],
+    ["argv-prefix runner laundering", decideCommand("setsid rm -rf /etc", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "deny"],
+    ["command-string runner laundering", decideCommand("watch 'rm -rf /etc'", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "deny"],
+    ["environment enumeration", decideCommand("printenv", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "deny"],
+    ["process environment pseudo-file", decideCommand("cat /proc/self/environ", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "deny"],
+    ["macOS system root", decidePath("/Library/LaunchDaemons/x.plist", "write", { mode: "guard", cwd: "/Users/alice/work", platform: "darwin", hasUI: true }), "deny"],
+    ["ordinary awk pipeline", decideCommand("printf 'a b\\n' | awk '{print $1}'", { shell: "bash", mode: "guard", cwd: "/home/pi/work", platform: "linux", hasUI: true }), "allow"],
   ];
   for (const [name, result, expected] of checks) {
     if (result.action !== expected) throw new Error(`${name} expected ${expected}, got ${result.action}`);

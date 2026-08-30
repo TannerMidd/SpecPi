@@ -157,18 +157,47 @@ export function parsePowerShellResult(stdout, limits = POWERSHELL_LIMITS) {
   const valid = validate(data, limits); if (!valid) return unavailable("invalid-helper-result");
   return map(valid);
 }
-export function analyze(input, options = {}) {
-  const limits = { ...POWERSHELL_LIMITS, ...options };
-  if (typeof input !== "string" || Buffer.byteLength(input, "utf8") > limits.maxInput) return unavailable("input-limit");
-  const helper = options.helperPath || path.join(path.dirname(fileURLToPath(import.meta.url)), "powershell-parser.ps1");
-  const systemPowerShell = process.env.SystemRoot ? path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe") : "";
-  const executable = options.executable || systemPowerShell;
-  if (!fs.existsSync(helper) || !executable || !path.isAbsolute(executable) || !fs.existsSync(executable)) return unavailable("helper-unavailable");
+const INFRASTRUCTURE_FAILURES = new Set(["helper-unavailable", "helper-failure", "helper-timeout", "invalid-helper-json", "invalid-helper-result", "input-limit", "output-limit"]);
+function infrastructureFailure(result) { return (result.dynamicConstructs || []).some((entry) => INFRASTRUCTURE_FAILURES.has(entry.kind)); }
+export function parserHosts(options = {}) {
+  if (options.executable) return [String(options.executable)];
+  if (process.platform !== "win32") return [];
+  const windowsPowerShell = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  // Fixed installer-owned locations only: resolving pwsh.exe through PATH would let a planted binary answer for the guard.
+  const powerShell7 = [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]]
+    .filter((root) => typeof root === "string" && root)
+    .map((root) => path.join(root, "PowerShell", "7", "pwsh.exe"));
+  const ordered = String(options.shell || "").toLowerCase() === "pwsh" ? [...powerShell7, windowsPowerShell] : [windowsPowerShell, ...powerShell7];
+  return [...new Set(ordered)];
+}
+// A clean parse always wins; otherwise keep a real grammar rejection over a spawn failure so
+// infrastructure noise cannot escalate an ordinary syntax error into a critical parser-integrity denial.
+export function preferParserResult(previous, candidate) {
+  if (!(candidate.parseErrors || []).length || !previous) return candidate;
+  return infrastructureFailure(previous) && !infrastructureFailure(candidate) ? candidate : previous;
+}
+function runParser(executable, helper, input, limits) {
   const env = { SystemRoot: process.env.SystemRoot || "C:\\Windows", PATH: process.env.PATH || "", TEMP: process.env.TEMP || "" };
   const result = spawnSync(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper], { input, encoding: "utf8", timeout: limits.timeoutMs, maxBuffer: limits.maxOutput, shell: false, windowsHide: true, env });
   if (result.error) return unavailable(result.error.code === "ETIMEDOUT" ? "helper-timeout" : "helper-failure");
   if (result.status !== 0 || typeof result.stdout !== "string" || result.stderr) return unavailable("helper-failure");
-  return attachNested(parsePowerShellResult(result.stdout, limits), options, limits);
+  return parsePowerShellResult(result.stdout, limits);
+}
+export function analyze(input, options = {}) {
+  const limits = { ...POWERSHELL_LIMITS, ...options };
+  if (typeof input !== "string" || Buffer.byteLength(input, "utf8") > limits.maxInput) return unavailable("input-limit");
+  const helper = options.helperPath || path.join(path.dirname(fileURLToPath(import.meta.url)), "powershell-parser.ps1");
+  if (!fs.existsSync(helper)) return unavailable("helper-unavailable");
+  const hosts = parserHosts(options).filter((executable) => path.isAbsolute(executable) && fs.existsSync(executable));
+  if (!hosts.length) return unavailable("helper-unavailable");
+  // Windows PowerShell 5.1 rejects PowerShell 7 grammar (&&, ??, ?:) that a co-installed pwsh executes happily.
+  // Text any installed host accepts can really run, so a rejection is authoritative only when every host rejects it.
+  let chosen;
+  for (const executable of hosts) {
+    chosen = preferParserResult(chosen, runParser(executable, helper, input, limits));
+    if (!(chosen.parseErrors || []).length) break;
+  }
+  return attachNested(chosen, options, limits);
 }
 export const analyzePowerShell = analyze;
 export const aliases = Object.freeze(Object.fromEntries(aliasMap));

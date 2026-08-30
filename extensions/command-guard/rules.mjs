@@ -6,12 +6,19 @@ const DELETE_NAMES = new Set(["rm", "rmdir", "find", "shred", "truncate", "remov
 const REGISTRY_PROPERTY_NAMES = new Set(["set-itemproperty", "new-itemproperty", "copy-itemproperty", "move-itemproperty", "rename-itemproperty", "remove-itemproperty", "clear-itemproperty"]);
 const POWERSHELL_WRITE_NAMES = new Set(["set-content", "add-content", "out-file", "tee-object", "export-alias", "export-csv", "export-clixml", "export-counter", "export-formatdata", "export-pssession", "new-item", "copy-item", "move-item", "rename-item", "set-item", "compress-archive", "expand-archive", "start-transcript", "add-type", "new-modulemanifest", "save-help", "save-module", "save-package", "save-script"]);
 const DISK_NAMES = new Set(["dd", "mkfs", "mkfs.ext4", "wipefs", "fdisk", "parted", "diskpart", "format", "clear-disk", "initialize-disk", "format-volume", "remove-partition", "cipher"]);
-const INTERPRETER_NAMES = new Set(["python", "python3", "py", "node", "deno", "bun", "ruby", "perl", "php", "lua", "rscript"]);
-const SHELL_NAMES = new Set(["bash", "sh", "zsh", "dash", "ksh", "fish", "powershell", "pwsh", "cmd", "cmd.exe", "eval", "iex", "invoke-expression", ...INTERPRETER_NAMES]);
+const INTERPRETER_NAMES = new Set(["python", "python3", "py", "node", "deno", "bun", "ruby", "perl", "php", "lua", "rscript", "osascript", "tclsh", "expect"]);
+// su and runuser are not interpreters, but their -c argument is an unrestricted shell command string.
+const SHELL_NAMES = new Set(["bash", "sh", "zsh", "dash", "ksh", "fish", "powershell", "pwsh", "cmd", "cmd.exe", "eval", "iex", "invoke-expression", "su", "runuser", ...INTERPRETER_NAMES]);
+// awk is deliberately kept out of SHELL_NAMES so ordinary `… | awk '{print $1}'` pipelines stay allowed.
+const AWK_NAMES = new Set(["awk", "gawk", "mawk", "nawk"]);
+const AWK_ESCAPE = /\b(?:system|ENVIRON)\s*[([]|\|\s*&?\s*["']|>>?\s*["']/;
+const AWK_PROGRAM_SOURCE = /^--?(?:f|file|e|source|l|load|include)$/i;
+const ENVIRONMENT_DUMP_NAMES = new Set(["env", "printenv", "set", "export", "declare", "typeset", "compgen"]);
+const SECRET_VARIABLE = /(?:token|secret|password|credential|api[_-]?key|aws_(?:secret|session)|github_token)/i;
 const DOWNLOAD_NAMES = new Set(["curl", "wget", "invoke-webrequest", "invoke-restmethod", "iwr", "irm", "start-bitstransfer", "bitsadmin", "certutil"]);
 const DECODER_NAMES = new Set(["base64", "openssl", "certutil", "uudecode"]);
 const NETWORK_NAMES = new Set([...DOWNLOAD_NAMES, "scp", "rsync", "invoke-command", "ssh", "sftp", "ftp", "start-process"]);
-const READ_NAMES = new Set(["cat", "head", "tail", "less", "more", "get-content", "gc", "type", "copy", "cp"]);
+const READ_NAMES = new Set(["cat", "head", "tail", "less", "more", "get-content", "gc", "type", "copy", "cp", "tac", "nl", "od", "xxd", "hexdump", "strings"]);
 const SERVICE_NAMES = new Set(["service", "systemctl", "launchctl", "sc", "sc.exe", "stop-service", "restart-service", "new-service", "remove-service"]);
 const PERMISSION_NAMES = new Set(["chmod", "chown", "chgrp", "setfacl", "icacls", "takeown", "set-acl"]);
 const ACCOUNT_NAMES = new Set(["useradd", "usermod", "userdel", "groupadd", "groupmod", "groupdel", "passwd", "chpasswd", "dscl", "net", "new-localuser", "set-localuser", "remove-localuser", "add-localgroupmember", "remove-localgroupmember"]);
@@ -68,6 +75,22 @@ function optionTargets(args, names) {
 function hasRecursiveFlag(args) {
   return args.some((arg) => /^(?:--recursive|--force|-{1}[a-z]*r[a-z]*|-recurse|-force|\/s|\/mir)$/i.test(arg));
 }
+// True when the invocation prints or enumerates the whole environment rather than one named variable.
+function dumpsEnvironment(name, args, helpOnly) {
+  // compgen -v lists variables; the shared helpOnly heuristic would misread it as --version.
+  if (name === "compgen") {
+    return args.some((arg) => /^-[a-z]*[ve][a-z]*$/i.test(String(arg)))
+      || args.some((arg, index) => String(arg).toLowerCase() === "-a" && /^(?:variable|export|exported)$/i.test(String(args[index + 1] || "")));
+  }
+  if (helpOnly) return false;
+  if (name === "printenv" || name === "set") return args.length === 0;
+  if (name === "export" || name === "declare" || name === "typeset") {
+    const named = args.filter((arg) => !String(arg).startsWith("-"));
+    if (named.length > 0 || args.some((arg) => String(arg).includes("="))) return false;
+    return args.length === 0 || name === "export" || args.some((arg) => /^-[a-z]*[px][a-z]*$/i.test(String(arg)));
+  }
+  return false;
+}
 
 function criticalLeaf(leaf, options) {
   const name = normalized(leaf.executable);
@@ -113,7 +136,7 @@ function criticalLeaf(leaf, options) {
   if ([...SERVICE_NAMES, "net"].includes(name) && /\b(?:stop|disable|delete|remove|unload)\b/i.test(joined) && /(?:windefend|securityhealth|sense|defender|auditd|firewall|crowdstrike|falcon|sentinel|endpoint)/i.test(joined)) return match("security.disable", "critical", "security", "Stopping or removing endpoint, audit, or firewall services is permanently denied.", leaf);
   if ((name === "reg" || REGISTRY_PROPERTY_NAMES.has(name)) && /(?:defender|windows defender|securityhealth)/i.test(joined) && /(?:disable|exclusion|tamper|realtime)/i.test(joined)) return match("security.disable", "critical", "security", "Weakening endpoint security through registry or policy state is permanently denied.", leaf);
   if (name === "set-executionpolicy" && /(?:bypass|unrestricted)/i.test(joined)) return match("security.disable", "critical", "security", "Weakening script execution policy is permanently denied.", leaf);
-  if (["printenv", "set"].includes(name) && (name === "set" && args.length === 0 || args.some((arg) => /(?:token|secret|password|credential|api[_-]?key|aws_(?:secret|session)|github_token)/i.test(arg)))) return match("credential.environment-read", "critical", "security", "Reading secret-bearing environment state through a shell is permanently denied.", leaf);
+  if (ENVIRONMENT_DUMP_NAMES.has(name) && name !== "env" && (dumpsEnvironment(name, args, helpOnly) || args.some((arg) => SECRET_VARIABLE.test(String(arg))))) return match("credential.environment-read", "critical", "security", "Reading secret-bearing or complete environment state through a shell is permanently denied.", leaf);
   if (name === "env" && !leaf.nested && !helpOnly) return match("credential.environment-read", "critical", "security", "Dumping the complete process environment can expose credentials and is permanently denied.", leaf);
   if (["get-childitem", "gci", "dir", "get-item", "gi"].includes(name) && args.some((arg) => /^env:/i.test(arg))) return match("credential.environment-read", "critical", "security", "Reading the PowerShell environment provider can expose credentials and is permanently denied.", leaf);
   if (name === "security" && /\b(?:find-(?:generic|internet)-password.*\s-w\b|export)\b/i.test(joined) || name === "secret-tool" && /\b(?:lookup|get|show)\b/i.test(joined) || name === "get-storedcredential" || name === "vaultcmd" && /\/listcreds/i.test(joined)) return match("credential.store-read", "critical", "security", "Reading operating-system credential stores through a shell is permanently denied.", leaf);
@@ -181,6 +204,7 @@ function ordinaryLeaf(leaf, options) {
   if (DELETE_NAMES.has(name)) return match(hasRecursiveFlag(args) ? "filesystem.recursive-delete" : "filesystem.mutation", "high", "filesystem", hasRecursiveFlag(args) ? "Recursive deletion needs approval." : "File deletion or truncation needs approval.", leaf, "Use a bounded, explicitly reviewed workspace target.");
   if (POWERSHELL_WRITE_NAMES.has(name) || ["cp", "copy", "mv", "move", "tee", "touch", "mkdir", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za"].includes(name) || name === "dd" && !args.every((arg) => /^(?:--?h(?:elp)?|--version|-v)$/i.test(arg)) || name === "sed" && args.some((arg) => /^-[a-z]*i/i.test(arg))) return match("filesystem.write", "high", "filesystem", "Filesystem creation, overwrite, or movement needs approval.", leaf);
   if (name === "find" && args.some((arg) => ["-delete", "-exec", "-execdir"].includes(arg))) return match("filesystem.find-mutation", "high", "filesystem", "Find execution or deletion needs approval.", leaf);
+  if (AWK_NAMES.has(name) && args.some((arg) => AWK_ESCAPE.test(String(arg)) || AWK_PROGRAM_SOURCE.test(String(arg)))) return match("dynamic.inline-code", "high", "dynamic", "An awk program that can spawn shells, read the environment, load modules, or write files needs approval.", leaf);
   if (["xargs", "eval", "invoke-expression", "iex"].includes(name)) return match("dynamic.generated-code", "high", "dynamic", "Generated or indirectly invoked code needs approval.", leaf);
   if (SERVICE_NAMES.has(name) && /\b(?:stop|restart|disable|delete|remove|create|start)\b/i.test(joined)) return match("service.mutation", "high", "system", "Service mutation needs approval.", leaf);
   if (PERMISSION_NAMES.has(name) || ACCOUNT_NAMES.has(name)) return match("security.identity-or-permission", "high", "security", "Account, group, ACL, permission, or ownership mutation needs approval.", leaf);
@@ -193,7 +217,7 @@ function ordinaryLeaf(leaf, options) {
   if (["psql", "mysql", "sqlcmd", "sqlite3", "mongosh", "mongo", "redis-cli"].includes(name) && /\b(?:drop|truncate|delete\s+from|flushall|flushdb)\b/i.test(joined)) return match("database.destructive", "high", "database", "Destructive database statements need approval.", leaf);
   if (["prisma", "knex", "sequelize", "alembic", "rails", "rake", "dotnet"].includes(name) && /\b(?:migrate\s+reset|migrate:rollback|migrate:undo|downgrade|db:rollback|database\s+drop)\b/i.test(joined)) return match("database.migration-rollback", "high", "database", "Database reset, drop, or migration rollback needs approval.", leaf);
   if (SHELL_NAMES.has(name) && args.some((arg) => /^(?:-c|-command|-encodedcommand|\/c|\/k|-e|--eval|-r)$/i.test(arg))) return match("dynamic.inline-code", "high", "dynamic", "Inline interpreter code needs approval.", leaf);
-  if ((SHELL_NAMES.has(name) && args.some((arg) => /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r)(?:$|[?#])/i.test(arg))) || /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r)$/i.test(String(leaf.executable || ""))) return match("dynamic.local-script", "high", "dynamic", "Executing a local script that was not statically inspected needs approval.", leaf);
+  if ((SHELL_NAMES.has(name) && args.some((arg) => /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)(?:$|[?#])/i.test(arg))) || /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)$/i.test(String(leaf.executable || ""))) return match("dynamic.local-script", "high", "dynamic", "Executing a local script that was not statically inspected needs approval.", leaf);
   return undefined;
 }
 

@@ -4,7 +4,14 @@ import { analyze as analyzeCmd } from "./cmd.mjs";
 export const BASH_LIMITS = Object.freeze({ maxInput: 128 * 1024, maxTokens: 4096, maxLeaves: 128, maxDepth: 8 });
 const separators = new Set([";", "&&", "||", "|", "&", "(", ")"]);
 const shells = new Set(["bash", "sh", "zsh", "dash", "ksh", "fish"]);
-const wrappers = new Set(["sudo", "doas", "env", "command", "exec", "nohup", "nice", "time", "timeout", "chroot", "busybox", "toybox"]);
+// Runners whose -c argument is a shell command string rather than an argv vector.
+const commandStringRunners = new Set([...shells, "su", "runuser", "script"]);
+// Runners that prefix an argv vector. Every entry must also be resolvable by wrapperCommandIndex.
+const wrappers = new Set([
+  "sudo", "doas", "env", "command", "exec", "nohup", "nice", "time", "timeout", "chroot", "busybox", "toybox",
+  "setsid", "setarch", "stdbuf", "ionice", "taskset", "flock", "systemd-run", "unbuffer", "runuser",
+  "xvfb-run", "proxychains", "proxychains4",
+]);
 
 function heredocOpeners(line) {
   const found = []; let quote = "", escaped = false, comment = false;
@@ -120,7 +127,10 @@ function leafFrom(words) {
   const first = commandWords[0];
   if (!first) return undefined;
   const executable = first.text;
-  const dynamic = /[$`*?{}]/.test(executable) || executable.startsWith("-");
+  // Whitespace in command position means the token was never resolved to one program: `wrapper 'rm -rf /etc'`
+  // is either a filename containing spaces or a command string the runner hands to a shell. Stay indeterminate
+  // instead of letting normalized() reduce it to a harmless-looking trailing segment.
+  const dynamic = /[$`*?{}]|\s/.test(executable) || executable.startsWith("-");
   return { shell: "bash", executable, operation: commandWords.slice(1).map((x) => x.text).join(" "), args: commandWords.slice(1).map((x) => x.text), redactedTarget: redactCommand(commandWords.slice(1).map((x) => x.text).join(" ")), dynamic };
 }
 function makeLeaves(tokens, limits) {
@@ -148,19 +158,32 @@ function makeLeaves(tokens, limits) {
   if (leaves.length > limits.maxLeaves) dynamicConstructs.push({ kind: "leaf-limit" });
   return { leaves: leaves.slice(0, limits.maxLeaves), redirects, dynamicConstructs };
 }
+const wrapperValueOptions = new Map([
+  ["exec", ["-a"]],
+  ["sudo", ["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-c", "--close-from", "-t", "--command-timeout", "-d", "--chdir", "-r", "--chroot", "--role", "--type"]],
+  ["doas", ["-u", "-c"]],
+  ["env", ["-u", "--unset", "-c", "--chdir", "--argv0", "-s", "--split-string"]],
+  ["nice", ["-n", "--adjustment"]],
+  ["time", ["-f", "--format", "-o", "--output"]],
+  ["timeout", ["-s", "--signal", "-k", "--kill-after"]],
+  ["chroot", ["--userspec", "--groups"]],
+  ["xargs", ["-E", "-I", "-L", "-n", "-P", "-s", "--eof", "--replace", "--max-lines", "--max-args", "--max-procs", "--max-chars", "--arg-file"]],
+  ["stdbuf", ["-i", "-o", "-e", "--input", "--output", "--error"]],
+  ["ionice", ["-c", "-n", "-p", "-P", "-u", "--class", "--classdata", "--pid", "--pgid", "--uid"]],
+  ["watch", ["-n", "--interval", "--chgexit"]],
+  ["flock", ["-w", "--wait", "--timeout", "-E", "--conflict-exit-code"]],
+  ["runuser", ["-u", "--user", "-g", "--group", "-G", "--supp-group", "-s", "--shell", "-w", "--whitelist-environment"]],
+  ["xvfb-run", ["-n", "--server-num", "-s", "--server-args", "-e", "--error-file", "-f", "--auth-file", "-p", "--xauth-protocol"]],
+  ["proxychains", ["-f"]],
+  ["proxychains4", ["-f"]],
+  ["systemd-run", ["-p", "--property", "-u", "--unit", "--description", "--slice", "--uid", "--gid", "--nice", "--setenv", "-E", "-M", "--machine", "-H", "--host", "--working-directory", "--service-type", "--timer-property", "--on-active", "--on-boot", "--on-startup", "--on-unit-active", "--on-unit-inactive", "--on-calendar"]],
+]);
+// Runners whose first positional argument is a parameter — duration, new root, CPU mask, lock file, architecture — not the command.
+const wrapperPositionalParameter = new Set(["timeout", "chroot", "taskset", "flock", "setarch"]);
 function wrapperCommandIndex(name, args) {
-  const rawTakesValue = name === "exec" ? new Set(["-a"])
-    : name === "sudo" ? new Set(["-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-c", "--close-from", "-t", "--command-timeout", "-d", "--chdir", "-r", "--chroot", "--role", "--type"])
-    : name === "doas" ? new Set(["-u", "-c"])
-      : name === "env" ? new Set(["-u", "--unset", "-c", "--chdir", "--argv0", "-s", "--split-string"])
-        : name === "nice" ? new Set(["-n", "--adjustment"])
-          : name === "time" ? new Set(["-f", "--format", "-o", "--output"])
-            : name === "timeout" ? new Set(["-s", "--signal", "-k", "--kill-after"])
-              : name === "chroot" ? new Set(["--userspec", "--groups"])
-                : name === "xargs" ? new Set(["-E", "-I", "-L", "-n", "-P", "-s", "--eof", "--replace", "--max-lines", "--max-args", "--max-procs", "--max-chars", "--arg-file"])
-                  : new Set();
-  const takesValue = new Set([...rawTakesValue].map((option) => option.toLowerCase()));
-  let skipPositional = name === "timeout" || name === "chroot";
+  // taskset keeps -c out of the value list so its CPU list is consumed as the positional parameter instead.
+  const takesValue = new Set((wrapperValueOptions.get(name) || []).map((option) => option.toLowerCase()));
+  let skipPositional = wrapperPositionalParameter.has(name);
   for (let index = 0; index < args.length; index += 1) {
     const arg = String(args[index]);
     if (name === "env" && /^[A-Za-z_][A-Za-z0-9_]*=/.test(arg)) continue;
@@ -176,25 +199,31 @@ function wrapperCommandIndex(name, args) {
 }
 function addNested(leaves, options, dynamicConstructs, depth) {
   if (depth >= options.maxDepth) { dynamicConstructs.push({ kind: "depth-limit" }); return; }
+  // A nested analysis that could not be fully resolved must not be reported as a clean parse upstream.
+  const adopt = (leaf, nested, kind) => {
+    leaf.nested = nested;
+    dynamicConstructs.push(...nested.dynamicConstructs);
+    if (nested.indeterminate) dynamicConstructs.push({ kind: `dynamic-${kind}` });
+  };
   for (const leaf of [...leaves]) {
     const name = leaf.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
-    if ((shells.has(name) || name === "cmd") && leaf.args.some((arg) => /^-[a-z]*c[a-z]*$/i.test(arg) || /^\/(?:c|k)$/i.test(arg))) {
+    if ((commandStringRunners.has(name) || name === "cmd") && leaf.args.some((arg) => /^-[a-z]*c[a-z]*$/i.test(arg) || /^\/(?:c|k)$/i.test(arg))) {
       const flag = leaf.args.findIndex((arg) => /^-[a-z]*c[a-z]*$/i.test(arg) || /^\/(?:c|k)$/i.test(arg));
       const nested = leaf.args[flag + 1];
       if (!nested || /[$`]/.test(nested)) { dynamicConstructs.push({ kind: "dynamic-nested-shell" }); continue; }
-      const parsed = name === "cmd" ? analyzeCmd(nested, { ...options, depth: depth + 1 }) : analyze(nested, { ...options, depth: depth + 1 });
-      leaf.nested = parsed;
-      dynamicConstructs.push(...parsed.dynamicConstructs);
+      adopt(leaf, name === "cmd" ? analyzeCmd(nested, { ...options, depth: depth + 1 }) : analyze(nested, { ...options, depth: depth + 1 }), "nested-shell");
+      // A command string is fully described by its nested analysis; never let a later branch replace it.
+      continue;
     }
-    if (name === "eval" || name === "xargs") {
+    // watch joins its remaining arguments and hands them to a shell, so its tail is a command string in both
+    // `watch rm -rf /etc` and `watch 'rm -rf /etc'` form.
+    if (name === "eval" || name === "xargs" || name === "watch") {
       dynamicConstructs.push({ kind: `${name}-wrapper` });
-      const start = name === "xargs" ? wrapperCommandIndex(name, leaf.args || []) : 0;
+      const start = name === "eval" ? 0 : wrapperCommandIndex(name, leaf.args || []);
       const payload = start >= 0 ? leaf.args.slice(start).join(" ") : "";
       if (!payload || /[$`]/.test(payload)) dynamicConstructs.push({ kind: `dynamic-${name}` });
-      else {
-        leaf.nested = analyze(payload, { ...options, depth: depth + 1 });
-        dynamicConstructs.push(...leaf.nested.dynamicConstructs);
-      }
+      else adopt(leaf, analyze(payload, { ...options, depth: depth + 1 }), name);
+      continue;
     }
     if (wrappers.has(name)) {
       dynamicConstructs.push({ kind: `${name}-wrapper` });
@@ -207,6 +236,7 @@ function addNested(leaves, options, dynamicConstructs, depth) {
       addNested(leaf.nested.leaves, options, leaf.nested.dynamicConstructs, depth + 1);
       leaf.nested.indeterminate ||= leaf.nested.leaves.some((entry) => entry.dynamic) || leaf.nested.dynamicConstructs.some((item) => /limit|dynamic/.test(item.kind));
       dynamicConstructs.push(...leaf.nested.dynamicConstructs);
+      if (leaf.nested.indeterminate) dynamicConstructs.push({ kind: `dynamic-${name}` });
     }
     if (name === "find" && leaf.args.some((arg) => arg === "-exec" || arg === "-execdir" || arg === "-delete")) {
       dynamicConstructs.push({ kind: "find-exec" });
@@ -214,7 +244,7 @@ function addNested(leaves, options, dynamicConstructs, depth) {
       if (execIndex >= 0) {
         const payload = leaf.args.slice(execIndex + 1).filter((arg) => arg !== ";" && arg !== "+").join(" ");
         if (!payload || /[$`{}]/.test(payload)) dynamicConstructs.push({ kind: "dynamic-find-exec" });
-        else { leaf.nested = analyze(payload, { ...options, depth: depth + 1 }); dynamicConstructs.push(...leaf.nested.dynamicConstructs); }
+        else adopt(leaf, analyze(payload, { ...options, depth: depth + 1 }), "find-exec");
       }
     }
   }

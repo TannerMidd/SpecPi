@@ -7,6 +7,10 @@ import { classifyPath, pathDecision } from "./paths.mjs";
 import { boundedReason, redactCommand } from "./redact.mjs";
 
 export const MODES = Object.freeze(["guard", "strict", "off", "locked"]);
+// The single place the accepted native-child preflight contract is pinned. `zenpi doctor` compares the
+// installed package against this so a pi-subagents bump surfaces as a diagnostic instead of silently
+// failing every protected launch closed.
+export const SUPPORTED_SUBAGENT_CONTRACT = Object.freeze({ packageName: "pi-subagents", packageVersion: "0.58.0", version: 2 });
 export const LIMITS = Object.freeze({ maxInput: 128 * 1024, maxDepth: 8, maxTokens: 4096, maxLeaves: 128, timeoutMs: 3000, cacheSize: 256 });
 const rank = Object.freeze({ low: 0, medium: 1, high: 2, critical: 3 });
 const actionRank = Object.freeze({ allow: 0, ask: 1, deny: 2 });

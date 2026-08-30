@@ -7,7 +7,12 @@ const unixProtected = [
   /^\/$/, /^\/boot(?:\/|$)/i, /^\/etc(?:\/|$)/i, /^\/bin(?:\/|$)/i,
   /^\/sbin(?:\/|$)/i, /^\/(?:usr|lib|lib64|opt|srv|var)(?:\/|$)/i,
   /^\/root\/?$/i, /^\/home\/?$/i, /^\/home\/[^/]+\/?$/i,
-  /(?:^|\/)(?:\.bashrc|\.profile|\.zshrc|\.zprofile)$/i,
+  // macOS system roots. /System/Volumes/Data/… is the firmlinked user-data tree, not system state.
+  /^\/System(?:$|\/(?!Volumes\/Data\/.))/i, /^\/(?:Library|Applications|cores)(?:\/|$)/i,
+  /^\/Users\/?$/i, /^\/Users\/[^/]+\/?$/i,
+  /^\/Volumes\/?$/i, /^\/Volumes\/[^/]+\/?$/i,
+  /^\/private\/?$/i, /^\/private\/(?:etc|var|db)(?:\/|$)/i,
+  /(?:^|\/)(?:\.bashrc|\.bash_profile|\.bash_login|\.profile|\.zshrc|\.zshenv|\.zprofile|\.zlogin)$/i,
   /(?:zenpi|pi).*(?:auth|session|history|mission|trust|private|command.guard)/i,
 ];
 const windowsProtected = [
@@ -19,7 +24,7 @@ const windowsProtected = [
   /(?:^|[\\/])Documents[\\/](?:WindowsPowerShell|PowerShell)[\\/](?:Microsoft\.)?PowerShell_profile\.ps1$/i,
   /(?:^|[\\/])profile\.ps1$/i,
 ];
-const privatePath = /(?:^|[\\/])(?:\.ssh|\.aws|\.azure|\.gnupg)(?:[\\/]|$)|(?:^|[\\/])(?:\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|credentials|token|secret|private\.key|config\.gcloud|hosts\.yml|passwd|shadow|ntuser\.dat|login data)(?:$|[\\/])|(?:^|[\\/])(?:\.docker|\.kube)[\\/]config(?:\.json)?$|(?:^|[\\/])\.config[\\/]gcloud(?:[\\/]|$)|(?:^|[\\/])Windows[\\/]System32[\\/]config[\\/](?:SAM|SECURITY|SYSTEM)(?:$|[\\/])|(?:^|[\\/])(?:Microsoft[\\/])?(?:Credentials|Vault|Keychains)(?:[\\/]|$)|\.(?:pem|key|p12|pfx)$/i;
+const privatePath = /^\/proc\/(?:\d+|self|thread-self)\/(?:environ|mem)(?:$|\/)|(?:^|[\\/])(?:\.ssh|\.aws|\.azure|\.gnupg)(?:[\\/]|$)|(?:^|[\\/])(?:\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|credentials|token|secret|private\.key|config\.gcloud|hosts\.yml|passwd|shadow|ntuser\.dat|login data)(?:$|[\\/])|(?:^|[\\/])(?:\.docker|\.kube)[\\/]config(?:\.json)?$|(?:^|[\\/])\.config[\\/]gcloud(?:[\\/]|$)|(?:^|[\\/])Windows[\\/]System32[\\/]config[\\/](?:SAM|SECURITY|SYSTEM)(?:$|[\\/])|(?:^|[\\/])(?:Microsoft[\\/])?(?:Credentials|Vault|Keychains)(?:[\\/]|$)|\.(?:pem|key|p12|pfx)$/i;
 
 function slash(value, windows) { return windows ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/"); }
 function lexical(value, cwd, windows) {

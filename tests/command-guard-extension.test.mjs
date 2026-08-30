@@ -40,6 +40,18 @@ test("extension blocks before executor and latches critical lock", () => {
   assert.equal(value.startOnlyReset, true);
 });
 
+test("approval prompts wait on the person while startup falls back on its own bound", () => {
+  const fixture = path.resolve("tests/fixtures/command-guard-timeout-harness.ts");
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], { encoding: "utf8", env: { ...process.env, PI_SUBAGENT_CHILD: "" } });
+  assert.equal(result.status, 0, result.stderr);
+  const line = result.stdout.split("\n").find((entry) => entry.startsWith("COMMAND_GUARD_TIMEOUT="));
+  assert.ok(line, result.stdout);
+  const value = JSON.parse(line.slice("COMMAND_GUARD_TIMEOUT=".length));
+  assert.equal(value.slowApprovalAllowed, true, "an approval slower than the startup bound must not be auto-denied");
+  assert.equal(value.shortApprovalBlocked, true, "an approval past its own bound must still fail closed");
+  assert.equal(value.legacyAliasBlocked, true, "promptTimeoutMs must keep bounding both prompt kinds");
+});
+
 function findPiExecutable() {
   if (process.env.ZENPI_PI_BIN && fs.existsSync(process.env.ZENPI_PI_BIN)) return process.env.ZENPI_PI_BIN;
   const result = spawnSync(process.platform === "win32" ? "where.exe" : "which", ["pi"], { encoding: "utf8" });

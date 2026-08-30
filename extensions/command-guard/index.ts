@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   clearAnalysisCache, decideCommand, decidePath, injectBinding, readChildBinding,
-  validateBinding, bindingForChild,
+  validateBinding, bindingForChild, SUPPORTED_SUBAGENT_CONTRACT,
 } from "./core.mjs";
 import { boundedReason } from "./redact.mjs";
 
@@ -94,7 +94,9 @@ export async function verifySubagentLaunch(input: Record<string, any>, ctx: Exte
   };
   const result = await preflight(request);
   if (!result?.ok) return { ok: false, reason: `Native child preflight failed: ${boundedReason(result?.message || "unverifiable launch")}` };
-  if (result.contract?.version !== 2 || result.contract?.protocol?.packageVersion !== "0.58.0") return { ok: false, reason: "The native child preflight contract version is unsupported." };
+  if (result.contract?.version !== SUPPORTED_SUBAGENT_CONTRACT.version || result.contract?.protocol?.packageVersion !== SUPPORTED_SUBAGENT_CONTRACT.packageVersion) {
+    return { ok: false, reason: `The native child preflight contract is unsupported; this guard accepts ${SUPPORTED_SUBAGENT_CONTRACT.packageName}@${SUPPORTED_SUBAGENT_CONTRACT.packageVersion}. Run zenpi doctor.` };
+  }
   const expected = canonicalPath(path.join(agentDirectory(), "extensions", "command-guard", "index.ts"));
   const extensions = result.contract?.tools?.extensionArgs;
   if (!Array.isArray(extensions) || !extensions.some((entry: unknown) => typeof entry === "string" && canonicalPath(entry) === expected)) return { ok: false, reason: "The native child launch does not include the managed command guard." };
@@ -145,8 +147,13 @@ function deny(state: State, reason: string, critical = false): { block: true; re
   return { block: true, reason: boundedReason(reason) };
 }
 
-export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { resolveSubagentLaunchContract?: (value: any) => Promise<any>; promptTimeoutMs?: number } = {}): void {
-  const promptTimeoutMs = dependencies.promptTimeoutMs ?? 3000;
+export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { resolveSubagentLaunchContract?: (value: any) => Promise<any>; promptTimeoutMs?: number; startupTimeoutMs?: number; approvalTimeoutMs?: number } = {}): void {
+  // Startup only picks a default and falls back to the recommended Guard mode, so it stays short.
+  // An approval waits on a person reading severity, category, cwd, affected paths, reason, and alternative;
+  // withTimeout cannot cancel the underlying prompt, so a short bound would deny work mid-decision and leave
+  // a live selector on screen. Both directions still fail closed, just on a human timescale.
+  const startupTimeoutMs = dependencies.startupTimeoutMs ?? dependencies.promptTimeoutMs ?? 30_000;
+  const approvalTimeoutMs = dependencies.approvalTimeoutMs ?? dependencies.promptTimeoutMs ?? 600_000;
   const state: State = { mode: "guard", baseMode: "guard", childBound: false, generation: 0, ready: false, startupFailed: true, nonce: "", blocks: 0, approvals: 0, categories: {}, rules: {} };
   const reset = () => { clearAnalysisCache(); state.mode = "guard"; state.baseMode = "guard"; state.childBound = false; state.generation += 1; state.ready = false; state.startupFailed = true; state.nonce = ""; state.blocks = 0; state.approvals = 0; state.categories = {}; state.rules = {}; state.criticalRule = undefined; };
 
@@ -165,10 +172,10 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
         updateStatus(ctx, state);
         return;
       }
-      const choice = ctx.hasUI ? await startupChoice(ctx, promptTimeoutMs) : undefined;
+      const choice = ctx.hasUI ? await startupChoice(ctx, startupTimeoutMs) : undefined;
       if (choice === "Strict") state.mode = "strict";
       else if (choice === "Off for this session") {
-        const confirmed = ctx.hasUI ? await withTimeout(ctx.ui.confirm("Turn command guard off for this session?", "This removes command-guard defense in depth until this session ends. It is not persisted or inherited by protected children."), false, promptTimeoutMs) : false;
+        const confirmed = ctx.hasUI ? await withTimeout(ctx.ui.confirm("Turn command guard off for this session?", "This removes command-guard defense in depth until this session ends. It is not persisted or inherited by protected children."), false, startupTimeoutMs) : false;
         state.mode = confirmed ? "off" : "guard";
       }
       state.baseMode = state.mode;
@@ -194,18 +201,18 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
       if (state.mode === "locked" && action !== "unlock") { ctx.ui.notify("The command guard is locked. Use /guard unlock after reviewing the critical rule.", "warning"); return; }
       if (action === "unlock") {
         if (state.mode !== "locked") { ctx.ui.notify("The command guard is not locked.", "info"); return; }
-        const ok = ctx.hasUI && await withTimeout(ctx.ui.confirm("Unlock command guard?", `The last critical rule was ${state.criticalRule || "unknown"}. Review it before continuing.`), false, promptTimeoutMs);
+        const ok = ctx.hasUI && await withTimeout(ctx.ui.confirm("Unlock command guard?", `The last critical rule was ${state.criticalRule || "unknown"}. Review it before continuing.`), false, approvalTimeoutMs);
         if (ok) { state.mode = state.baseMode; state.generation += 1; state.criticalRule = undefined; updateStatus(ctx, state); ctx.ui.notify(`Command guard unlocked in ${state.baseMode} mode.`, "warning"); }
         return;
       }
       if (action === "off") {
         if (state.childBound) { ctx.ui.notify("A native child cannot weaken or disable its supervisor-bound guard mode.", "error"); return; }
-        if (!ctx.hasUI || !await withTimeout(ctx.ui.confirm("Turn command guard off?", "This applies only to the current top-level session and removes defense in depth."), false, promptTimeoutMs)) return;
+        if (!ctx.hasUI || !await withTimeout(ctx.ui.confirm("Turn command guard off?", "This applies only to the current top-level session and removes defense in depth."), false, approvalTimeoutMs)) return;
         state.mode = "off"; state.baseMode = "off"; state.generation += 1; updateStatus(ctx, state); return;
       }
       if (action === "strict" || action === "guard") {
         if (state.childBound && action === "guard" && state.baseMode === "strict") { ctx.ui.notify("A Strict native child cannot weaken its supervisor-bound mode.", "error"); return; }
-        if (action === "guard" && state.mode === "strict" && (!ctx.hasUI || !await withTimeout(ctx.ui.confirm("Switch to Guard mode?", "This weakens protection for the rest of this session."), false, promptTimeoutMs))) return;
+        if (action === "guard" && state.mode === "strict" && (!ctx.hasUI || !await withTimeout(ctx.ui.confirm("Switch to Guard mode?", "This weakens protection for the rest of this session."), false, approvalTimeoutMs))) return;
         state.mode = action; state.baseMode = action; state.generation += 1; updateStatus(ctx, state); return;
       }
       ctx.ui.notify("Usage: /guard [status|guard|strict|off|unlock]", "error");
@@ -229,7 +236,7 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
         const affected = decision.leaves.map((leaf: any) => leaf.redactedTarget).filter(Boolean).slice(0, 4).join(", ");
         const approvalGeneration = state.generation; const approvalFingerprint = toolFingerprint(name, input);
         if (!approvalFingerprint) return deny(state, "Approval input is malformed or exceeds the safety bound.");
-        const answer = await withTimeout(ctx.ui.select(`Command guard approval — ${decisionPrompt(decision, ctx.cwd, affected)}`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, promptTimeoutMs);
+        const answer = await withTimeout(ctx.ui.select(`Command guard approval — ${decisionPrompt(decision, ctx.cwd, affected)}`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, approvalTimeoutMs);
         if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; execution is denied.");
         if (answer === "Allow once") { state.approvals += 1; state.generation += 1; return; }
         if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; updateStatus(ctx, state); return deny(state, "The session was locked by command-guard approval."); }
@@ -246,7 +253,7 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
         if (!ctx.hasUI) return deny(state, decision.reason);
         const approvalGeneration = state.generation; const approvalFingerprint = toolFingerprint(name, input);
         if (!approvalFingerprint) return deny(state, "Approval input is malformed or exceeds the safety bound.");
-        const answer = await withTimeout(ctx.ui.select(`Path mutation approval — ${decisionPrompt(decision, ctx.cwd, boundedReason(input.path, 180))}`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, promptTimeoutMs);
+        const answer = await withTimeout(ctx.ui.select(`Path mutation approval — ${decisionPrompt(decision, ctx.cwd, boundedReason(input.path, 180))}`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, approvalTimeoutMs);
         if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; mutation is denied.");
         if (answer === "Allow once") { state.approvals += 1; state.generation += 1; return; }
         if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; updateStatus(ctx, state); return deny(state, "The session was locked by command-guard approval."); }
@@ -285,7 +292,7 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
       if (!ctx.hasUI) return deny(state, "Unknown tools requiring policy review are denied without approval UI.");
       const approvalGeneration = state.generation; const approvalFingerprint = toolFingerprint(name, input);
       if (!approvalFingerprint) return deny(state, "Unknown-tool approval input is malformed or exceeds the safety bound.");
-      const answer = await withTimeout(ctx.ui.select(`Unknown tool approval — name: ${boundedReason(name, 96)}; mode: ${state.mode}; capability is not in the reviewed command-guard catalog.`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, promptTimeoutMs);
+      const answer = await withTimeout(ctx.ui.select(`Unknown tool approval — name: ${boundedReason(name, 96)}; mode: ${state.mode}; capability is not in the reviewed command-guard catalog.`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, approvalTimeoutMs);
       if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; execution is denied.");
       if (answer === "Allow once") { state.approvals += 1; state.generation += 1; return; }
       if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; updateStatus(ctx, state); }

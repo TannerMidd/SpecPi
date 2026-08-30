@@ -10,6 +10,33 @@ test("Unix protected mutation paths are lexical and do not require enumeration",
   assert.equal(classifyPath("/etc/passwd", { platform: "linux", cwd: "/tmp" }).protected, true);
   assert.equal(classifyPath("/workspace/src/file.txt", { platform: "linux", cwd: "/tmp" }).protected, false);
 });
+test("macOS system roots are protected without swallowing the user data tree", () => {
+  const mac = { platform: "darwin", cwd: "/Users/alice/work" };
+  for (const target of [
+    "/System", "/System/Library/LaunchDaemons", "/Library", "/Library/LaunchAgents/x.plist",
+    "/Applications", "/Applications/Xcode.app", "/Users", "/Users/alice", "/Volumes", "/Volumes/Backup",
+    "/private", "/private/etc/hosts", "/private/var/db", "/cores",
+    "/Users/alice/.zshenv", "/Users/alice/.bash_profile", "/Users/alice/.zprofile",
+  ]) assert.equal(classifyPath(target, mac).protected, true, target);
+  // Firmlinked user data lives under /System/Volumes/Data; only the volume root itself is system state.
+  assert.equal(classifyPath("/System/Volumes/Data", mac).protected, true);
+  for (const target of [
+    "/Users/alice/work/src/file.ts", "/Users/alice/work", "/Volumes/Backup/projects/app",
+    "/System/Volumes/Data/Users/alice/work/src/file.ts", "/private/tmp/scratch", "/tmp/scratch",
+    "/Applications2", "/Libraryish/notes.md",
+  ]) assert.equal(classifyPath(target, mac).protected, false, target);
+  assert.equal(pathDecision("/Library/LaunchDaemons/x.plist", mac).action, "deny");
+  assert.equal(pathDecision("/Users/alice/work/src/file.ts", mac).action, "allow");
+});
+test("process environment and memory pseudo-files are protected reads", () => {
+  const linux = { platform: "linux", cwd: "/home/alice/work", read: true };
+  for (const target of ["/proc/self/environ", "/proc/1/environ", "/proc/thread-self/environ", "/proc/4242/mem"]) {
+    assert.equal(classifyPath(target, linux).protected, true, target);
+  }
+  for (const target of ["/proc/self/status", "/proc/cpuinfo", "/home/alice/work/proc/self/environ"]) {
+    assert.equal(classifyPath(target, linux).protected, false, target);
+  }
+});
 test("recognized private reads deny lexically without probing filesystem metadata", () => {
   const original = fs.realpathSync;
   let calls = 0;

@@ -5,7 +5,7 @@ import path from "node:path";
 import process from "node:process";
 import readline from "node:readline/promises";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   AGENTS_END,
   AGENTS_START,
@@ -1468,7 +1468,7 @@ async function uninstall(options) {
   }
 }
 
-function doctor() {
+async function doctor() {
   assertSources();
   const manifest = readManifest(true);
   const errors = [];
@@ -1483,7 +1483,22 @@ function doctor() {
   const powershellStatus = process.platform === "win32"
     ? { windowsPowerShell: windowsPowerShellPath && fs.existsSync(windowsPowerShellPath) ? powerShellVersion(windowsPowerShellPath) : undefined, powerShell7: powerShell7Path && fs.existsSync(powerShell7Path) ? powerShellVersion(powerShell7Path) : undefined }
     : undefined;
-  if (powershellStatus && !powershellStatus.windowsPowerShell) errors.push("Windows PowerShell 5.1 parser host is unavailable.");
+  // The guard parses with whichever installed host accepts the command text, so either one is sufficient.
+  if (powershellStatus && !powershellStatus.windowsPowerShell && !powershellStatus.powerShell7) errors.push("No PowerShell parser host is available; PowerShell tool calls will be denied.");
+  else if (powershellStatus && !powershellStatus.windowsPowerShell) warnings.push("Windows PowerShell 5.1 is unavailable; the command guard parses with PowerShell 7 only.");
+  else if (powershellStatus && !powershellStatus.powerShell7) warnings.push("PowerShell 7 is unavailable; the command guard parses with Windows PowerShell 5.1 only, which rejects PowerShell 7 syntax.");
+  let subagentContractStatus;
+  const subagentPackagePath = path.join(agentDir, "npm", "node_modules", "pi-subagents", "package.json");
+  try {
+    const { SUPPORTED_SUBAGENT_CONTRACT } = await import(pathToFileURL(path.join(repoRoot, "extensions", "command-guard", "core.mjs")).href);
+    const installedSubagents = fs.existsSync(subagentPackagePath) ? JSON.parse(fs.readFileSync(subagentPackagePath, "utf8")).version : undefined;
+    if (!installedSubagents) warnings.push(`${SUPPORTED_SUBAGENT_CONTRACT.packageName} is not installed; protected native child launches are unavailable.`);
+    else if (installedSubagents !== SUPPORTED_SUBAGENT_CONTRACT.packageVersion) {
+      errors.push(`Command guard accepts ${SUPPORTED_SUBAGENT_CONTRACT.packageName}@${SUPPORTED_SUBAGENT_CONTRACT.packageVersion} but ${installedSubagents} is installed; every protected native child launch is denied until the pinned contract is revalidated.`);
+    } else subagentContractStatus = `${SUPPORTED_SUBAGENT_CONTRACT.packageName}@${installedSubagents} matches the pinned command-guard contract`;
+  } catch (error) {
+    warnings.push(`Could not verify the pinned native-child contract: ${error.message}`);
+  }
   let capabilityRegistry;
   try {
     capabilityRegistry = validateCapabilityRegistry(JSON.parse(fs.readFileSync(capabilityRegistryPath, "utf8")));
@@ -1584,6 +1599,7 @@ function doctor() {
   console.log(`ZenPi ${manifest.version} doctor`);
   console.log(`Agent directory: ${agentDir}`);
   if (powershellStatus) console.log(`POWERSHELL WindowsPowerShell=${powershellStatus.windowsPowerShell || "unavailable"} PowerShell7=${powershellStatus.powerShell7 || "unavailable"}`);
+  if (subagentContractStatus) console.log(`SUBAGENT CONTRACT ${subagentContractStatus}`);
   if (browserSmoke) console.log(`BROWSER ${browserSmoke}`);
   const validatorOutcomes = new Map();
   for (const capability of capabilityRegistry?.capabilities || []) {
@@ -1650,7 +1666,7 @@ async function main() {
       await installOrUpdate(options, true);
       break;
     case "doctor":
-      doctor();
+      await doctor();
       break;
     case "uninstall":
       await uninstall(options);

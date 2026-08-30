@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { decideCommand } from "../../extensions/command-guard/core.mjs";
+import { parserHosts } from "../../extensions/command-guard/powershell.mjs";
 
 const executable = process.env.ZENPI_TEST_POWERSHELL_EXE;
 const gitBash = process.env.ZENPI_TEST_GIT_BASH;
@@ -65,6 +66,26 @@ for (const command of ["& { Get-ChildItem C:\\work }", "Write-Output $(Get-Date)
   assert.equal(decideCommand(command, powershell).action, "ask", command);
   assert.equal(decideCommand(command, { ...powershell, hasUI: false }).action, "deny", command);
 }
+
+// Everything above pins one parser host. This block uses real host resolution instead, so PowerShell 7 grammar
+// that Windows PowerShell 5.1 rejects is proven to reach the policy rather than being denied as malformed.
+const resolvedHosts = parserHosts({ shell: "powershell" });
+const installedHosts = resolvedHosts.filter((entry) => fs.existsSync(entry));
+if (!installedHosts.some((entry) => /[\\/]pwsh\.exe$/i.test(entry))) {
+  throw new Error(`PowerShell 7 is required for the Windows command-guard matrix; resolved hosts: ${resolvedHosts.join(", ")}`);
+}
+const resolved = { shell: "powershell", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
+for (const command of ["Get-ChildItem C:\\work && Write-Output ok", "npm run build && npm test", "$value = $env:MISSING ?? 'fallback'", "$flag = $true ? 1 : 2"]) {
+  const decision = decideCommand(command, resolved);
+  assert.notEqual(decision.ruleIds?.[0], "parser.syntax", `${command}: ${JSON.stringify(decision)}`);
+}
+assert.equal(decideCommand("Get-ChildItem C:\\work && Get-Location", resolved).action, "allow");
+// The fallback must not become a hole: a critical payload behind PowerShell 7 grammar still denies.
+const chainedCritical = decideCommand("Get-ChildItem C:\\work && Remove-Item -Recurse -Force C:\\Windows", resolved);
+assert.equal(chainedCritical.action, "deny", JSON.stringify(chainedCritical));
+assert.equal(chainedCritical.severity, "critical", JSON.stringify(chainedCritical));
+// Text that no installed host accepts is still a hard denial.
+assert.equal(decideCommand("Write-Output 'unterminated", resolved).action, "deny");
 
 const cmd = { shell: "cmd", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
 for (const command of ["cmd /c \"cmd /c rd /s /q C:\\Windows\"", "call rd /s /q C:\\Windows", "echo x>C:\\Users\\Alice\\.npmrc"]) {

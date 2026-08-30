@@ -5,7 +5,106 @@ import assert from "node:assert/strict";
 import { analyzeCommand, aggregateDecisions, decideCommand, decidePath, MODES, bindingForChild, validateBinding, injectBinding } from "../extensions/command-guard/core.mjs";
 import { redactCommand } from "../extensions/command-guard/redact.mjs";
 import { evaluateRules, ruleCatalog } from "../extensions/command-guard/rules.mjs";
-import { parsePowerShellResult } from "../extensions/command-guard/powershell.mjs";
+import { parsePowerShellResult, parserHosts, preferParserResult } from "../extensions/command-guard/powershell.mjs";
+
+const posix = { shell: "bash", mode: "guard", cwd: "/home/tanner/work", platform: "linux", hasUI: true };
+
+test("argv-prefix runners and command-string runners cannot launder a critical payload", () => {
+  for (const command of [
+    "setsid rm -rf /etc", "stdbuf -o0 rm -rf /etc", "stdbuf -o 0 rm -rf /etc", "ionice -c3 rm -rf /etc",
+    "ionice -c 3 rm -rf /etc", "taskset 1 rm -rf /etc", "taskset -c 0,1 rm -rf /etc", "flock /tmp/l rm -rf /etc",
+    "flock -w 5 /tmp/l rm -rf /etc", "watch rm -rf /etc", "watch -n 5 rm -rf /etc", "systemd-run rm -rf /etc",
+    "systemd-run -u job rm -rf /etc", "systemd-run --unit=job rm -rf /etc", "unbuffer rm -rf /etc",
+    "setarch x86_64 rm -rf /etc", "xvfb-run -a rm -rf /etc", "proxychains4 -f p.conf rm -rf /etc",
+    "runuser -u root -- rm -rf /etc", "runuser -u root -c 'rm -rf /etc'", "su -c 'rm -rf /' root",
+    "su root -c 'rm -rf /etc'", "script -qc 'rm -rf /etc' /dev/null", "setsid nohup runuser -u root -- rm -rf /etc",
+  ]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "deny", command);
+    assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+  }
+  // The added runners must not swallow ordinary work into a silent allow.
+  for (const command of ["setsid printf ok", "watch -n 5 git status", "flock /tmp/l printf ok", "taskset -c 0 printf ok"]) {
+    assert.equal(decideCommand(command, posix).action, "allow", command);
+  }
+});
+
+test("a quoted command string is never resolved into a harmless-looking program name", () => {
+  // watch really does hand its joined tail to a shell, so both spellings must reach the same critical rule.
+  for (const command of ["watch 'rm -rf /etc'", "watch -n 5 'rm -rf /etc'", "watch -d 'rm -rf /etc'"]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "deny", command);
+    assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+  }
+  // Everywhere else a whitespace-bearing command token is unresolved, not safe: normalized() would otherwise
+  // reduce "rm -rf /etc" to its trailing path segment and match no rule at all.
+  for (const command of [
+    "setsid 'rm -rf /etc'", "nohup 'rm -rf /etc'", "sudo 'rm -rf /etc'", "systemd-run 'rm -rf /etc'",
+    "unbuffer 'rm -rf /etc'", "xvfb-run 'rm -rf /etc'", "flock /tmp/l 'rm -rf /etc'",
+    "sh -c \"'rm -rf /etc'\"", "'rm -rf /etc'",
+  ]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "ask", `${command}: ${JSON.stringify(decision)}`);
+    assert.equal(decideCommand(command, { ...posix, hasUI: false }).action, "deny", command);
+  }
+  // An unresolved nested child must mark the whole analysis indeterminate, not just its own sub-analysis.
+  for (const command of ["sudo 'rm -rf /etc'", "sh -c \"'rm -rf /etc'\"", "find . -exec 'rm -rf /etc' {} ;"]) {
+    assert.equal(analyzeCommand(command, posix).indeterminate, true, command);
+  }
+});
+
+test("awk shell escapes are classified without flagging ordinary awk pipelines", () => {
+  for (const command of [
+    "awk 'BEGIN{system(\"rm -rf /\")}'", "gawk 'BEGIN{system(\"id\")}'", "mawk '{print $1 | \"sh\"}'",
+    "awk '{print > \"/tmp/out\"}'", "awk 'BEGIN{print ENVIRON[\"AWS_SECRET_ACCESS_KEY\"]}'", "gawk -f collect.awk data.txt",
+    "osascript -e 'do shell script \"rm -rf /\"'",
+  ]) assert.equal(decideCommand(command, posix).action, "ask", command);
+  for (const command of ["awk '{print $2}' data.txt", "printf 'a b\\n' | awk '{print $1}'", "grep x f | awk '{ total += $3 } END { print total }'"]) {
+    assert.equal(decideCommand(command, posix).action, "allow", command);
+  }
+});
+
+test("environment enumeration is denied whichever builtin spells it", () => {
+  for (const command of ["env", "printenv", "set", "declare", "declare -x", "declare -p", "typeset -x", "export", "export -p", "compgen -v", "compgen -e", "compgen -A variable"]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "deny", command);
+    assert.equal(decision.ruleIds[0], "credential.environment-read", `${command}: ${JSON.stringify(decision)}`);
+  }
+  for (const command of ["cat /proc/self/environ", "od -c /proc/1/environ", "xxd /proc/self/mem", "strings /proc/2/environ"]) {
+    const decision = decideCommand(command, posix);
+    assert.equal(decision.action, "deny", command);
+    assert.equal(decision.ruleIds[0], "credential.protected-read", `${command}: ${JSON.stringify(decision)}`);
+  }
+  // Scoped, non-secret reads and ordinary assignments keep working.
+  for (const command of ["printenv PATH", "declare -i counter=1", "export EDITOR", "compgen -c"]) {
+    assert.notEqual(decideCommand(command, posix).action, "deny", command);
+  }
+  assert.equal(decideCommand("printenv GITHUB_TOKEN", posix).action, "deny");
+  // env --help stays an indeterminate wrapper ask, but must not be read as a credential dump.
+  assert.notEqual(decideCommand("env --help", posix).ruleIds[0], "credential.environment-read");
+});
+
+test("PowerShell parser hosts are ordered, fixed-path, and only authoritative when every host rejects", () => {
+  assert.deepEqual(parserHosts({ executable: "C:\\custom\\pwsh.exe" }), ["C:\\custom\\pwsh.exe"]);
+  if (process.platform === "win32") {
+    const preferred = parserHosts({ shell: "powershell" });
+    const pwshFirst = parserHosts({ shell: "pwsh" });
+    assert.ok(preferred.length >= 1 && pwshFirst.length >= 1);
+    assert.match(preferred[0], /WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/i);
+    assert.match(pwshFirst[0], /pwsh\.exe$/i);
+    assert.deepEqual([...preferred].sort(), [...pwshFirst].sort());
+    // A PATH lookup would let a planted binary answer for the guard; every candidate must be absolute.
+    assert.ok(preferred.every((entry) => path.isAbsolute(entry)));
+  } else assert.deepEqual(parserHosts({ shell: "powershell" }), []);
+
+  const clean = { shell: "powershell", leaves: [], redirects: [], dynamicConstructs: [], parseErrors: [], indeterminate: false };
+  const syntax = { shell: "powershell", leaves: [], redirects: [], dynamicConstructs: [], parseErrors: [{ message: "unexpected token" }], indeterminate: true };
+  const spawnFailure = { shell: "powershell", leaves: [], redirects: [], dynamicConstructs: [{ kind: "helper-failure" }], parseErrors: [{ message: "helper-failure" }], indeterminate: true };
+  assert.equal(preferParserResult(undefined, syntax), syntax);
+  assert.equal(preferParserResult(syntax, clean), clean, "a host that accepts the text wins over one that rejects it");
+  assert.equal(preferParserResult(spawnFailure, syntax), syntax, "a real rejection outranks infrastructure noise");
+  assert.equal(preferParserResult(syntax, spawnFailure), syntax, "infrastructure noise must not escalate a syntax error to critical");
+});
 
 test("policy catalog has stable unique bounded rule IDs and malformed decisions fail closed", () => {
   assert.equal(new Set(ruleCatalog.ruleIds).size, ruleCatalog.ruleIds.length);
