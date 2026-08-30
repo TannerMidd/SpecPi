@@ -13,19 +13,39 @@ const unixProtected = [
   /^\/Volumes\/?$/i, /^\/Volumes\/[^/]+\/?$/i,
   /^\/private\/?$/i, /^\/private\/(?:etc|var|db)(?:\/|$)/i,
   /(?:^|\/)(?:\.bashrc|\.bash_profile|\.bash_login|\.profile|\.zshrc|\.zshenv|\.zprofile|\.zlogin)$/i,
-  /(?:zenpi|pi).*(?:auth|session|history|mission|trust|private|command.guard)/i,
 ];
 const windowsProtected = [
   /^[a-z]:[\\/]$/i, /^[a-z]:[\\/]Windows(?:[\\/]|$)/i,
   /^[a-z]:[\\/]Boot(?:[\\/]|$)/i, /^[a-z]:[\\/](?:ProgramData|Program Files(?: \(x86\))?)(?:[\\/]|$)/i,
   /^[a-z]:[\\/]Users[\\/]?$/i, /^[a-z]:[\\/]Users[\\/][^\\/]+[\\/]?$/i,
-  /^\\\\[^\\/]+\\[^\\/]+[\\/]?$/i, /(?:^|[\\/])\.pi(?:[\\/]|$)/i,
-  /(?:^|[\\/])(?:extensions[\\/]command-guard|zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json))(?:[\\/]|$)/i,
+  /^\\\\[^\\/]+\\[^\\/]+[\\/]?$/i,
   /(?:^|[\\/])Documents[\\/](?:WindowsPowerShell|PowerShell)[\\/](?:Microsoft\.)?PowerShell_profile\.ps1$/i,
   /(?:^|[\\/])profile\.ps1$/i,
 ];
 const privatePath = /^\/proc\/(?:\d+|self|thread-self)\/(?:environ|mem)(?:$|\/)|(?:^|[\\/])(?:\.ssh|\.aws|\.azure|\.gnupg)(?:[\\/]|$)|(?:^|[\\/])(?:\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|credentials|token|secret|private\.key|config\.gcloud|hosts\.yml|passwd|shadow|ntuser\.dat|login data)(?:$|[\\/])|(?:^|[\\/])(?:\.docker|\.kube)[\\/]config(?:\.json)?$|(?:^|[\\/])\.config[\\/]gcloud(?:[\\/]|$)|(?:^|[\\/])Windows[\\/]System32[\\/]config[\\/](?:SAM|SECURITY|SYSTEM)(?:$|[\\/])|(?:^|[\\/])(?:Microsoft[\\/])?(?:Credentials|Vault|Keychains)(?:[\\/]|$)|\.(?:pem|key|p12|pfx)$/i;
 
+// A .pi directory is Pi state wherever it appears, including the default agent directory.
+const dotPi = /(?:^|[\\/])\.pi(?:[\\/]|$)/i;
+// Pi and ZenPi private state is identified by LOCATION, not by name. Matching these as bare relative segments
+// protected every repository that merely contained a zenpi/ or extensions/command-guard/ path — ZenPi's own
+// source tree included — and the unanchored POSIX variant matched ordinary project files such as
+// src/api/session.ts ("pi" inside "api", then "session"), denying them critically and locking the session.
+const agentPrivateState = /^(?:zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json))(?:[\\/]|$)/i;
+const agentPrivateName = /^(?:auth|sessions?|history|missions?|trust|private)[^\\/]*(?:[\\/]|$)/i;
+const agentGuardSource = /^extensions[\\/]command-guard(?:[\\/]|$)/i;
+function agentDirectory() {
+  return path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
+}
+// Returns the path's location relative to the resolved agent directory, or undefined when it is outside it.
+function agentRelative(value, windows) {
+  const root = slash(agentDirectory(), windows);
+  const compare = (entry) => windows ? entry.toLowerCase() : entry;
+  const separator = windows ? "\\" : "/";
+  const candidate = compare(value), base = compare(root);
+  if (candidate === base) return "";
+  if (!candidate.startsWith(`${base}${separator}`)) return undefined;
+  return value.slice(root.length + 1);
+}
 function slash(value, windows) { return windows ? value.replaceAll("/", "\\") : value.replaceAll("\\", "/"); }
 function lexical(value, cwd, windows) {
   let raw = String(value).slice(0, PATH_LIMIT);
@@ -52,8 +72,13 @@ function canonicalNearest(value, windows) {
   return undefined;
 }
 function isProtected(value, windows, read) {
-  if (read) return privatePath.test(value) || /(?:^|[\\/])\.pi(?:[\\/]|$)/i.test(value) || /(?:^|[\\/])zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json)(?:[\\/]|$)/i.test(value) || /(?:^|[\\/])(?:zenpi|pi)[-_]?(?:auth|sessions?|history|missions?|trust|private)(?:[\\/]|$)/i.test(value);
-  return (windows ? windowsProtected : unixProtected).some((pattern) => pattern.test(value)) || privatePath.test(value);
+  const relative = agentRelative(value, windows);
+  const agentPrivate = relative !== undefined && (agentPrivateState.test(relative) || agentPrivateName.test(relative));
+  if (read) return privatePath.test(value) || dotPi.test(value) || agentPrivate;
+  // Guard sources are tamper targets only where they are installed; editing them in a checkout is ordinary work.
+  return (windows ? windowsProtected : unixProtected).some((pattern) => pattern.test(value))
+    || privatePath.test(value) || dotPi.test(value) || agentPrivate
+    || (relative !== undefined && agentGuardSource.test(relative));
 }
 
 export function classifyPath(input, options = {}) {
@@ -91,6 +116,16 @@ export function classifyPath(input, options = {}) {
   };
 }
 
+// True when the path resolves inside the installed agent directory. Guard self-protection keys on this
+// instead of on names appearing anywhere in a command, so a checkout that merely contains a zenpi/ or
+// extensions/command-guard/ directory is ordinary work.
+export function isAgentPath(input, options = {}) {
+  const result = classifyPath(input, options);
+  if (typeof result.lexical !== "string") return false;
+  const windows = options.platform === "win32" || options.platform === "windows" || (process.platform === "win32" && !options.platform);
+  return agentRelative(result.lexical, windows) !== undefined
+    || (result.canonical !== undefined && agentRelative(slash(result.canonical, windows), windows) !== undefined);
+}
 export function normalizePath(input, options = {}) { return classifyPath(input, options).lexical; }
 export function isProtectedPath(input, options = {}) { return classifyPath(input, options).protected; }
 

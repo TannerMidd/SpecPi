@@ -248,7 +248,9 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
       if (!validPathInput(input, name)) return deny(state, `Malformed ${name} input is denied.`);
       const decision = decidePath(input.path, name, { mode: state.mode, cwd: ctx.cwd, platform: process.platform, hasUI: ctx.hasUI });
       recordDecision(state, decision);
-      if (decision.action === "deny") { state.criticalRule = decision.ruleIds[0]; const critical = decision.severity === "critical"; const result = deny(state, critical ? `${decision.reason} The session is locked; use /guard status and /guard unlock after review.` : decision.reason, critical); if (critical) updateStatus(ctx, state); return result; }
+      // Refusing a read is enough on its own: nothing was changed, so latching the lock would strand the whole
+      // session — every later command, including read-only ones — over one blocked file.
+      if (decision.action === "deny") { state.criticalRule = decision.ruleIds[0]; const critical = decision.severity === "critical" && name !== "read"; const result = deny(state, critical ? `${decision.reason} The session is locked; use /guard status and /guard unlock after review.` : decision.reason, critical); if (critical) updateStatus(ctx, state); return result; }
       if (decision.action === "ask") {
         if (!ctx.hasUI) return deny(state, decision.reason);
         const approvalGeneration = state.generation; const approvalFingerprint = toolFingerprint(name, input);

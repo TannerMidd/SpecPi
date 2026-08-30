@@ -117,6 +117,45 @@ test("every PowerShell parameter prefix is gated, not just the full spelling", (
   assert.equal(decideCommand("powershell.exe -Version", windows).action, "allow");
 });
 
+test("guard self-tamper keys on the agent directory, not on names inside a command", () => {
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  const agent = process.platform === "win32" ? "C:\\agent" : "/opt/agent";
+  const shell = { shell: "bash", mode: "guard", cwd: process.platform === "win32" ? "C:\\work" : "/work", platform: process.platform, hasUI: true };
+  // Forward slashes throughout: the Bash lexer consumes backslashes as escapes.
+  const agentUrl = agent.replaceAll("\\", "/");
+  process.env.PI_CODING_AGENT_DIR = agent;
+  try {
+    for (const command of [
+      `cp evil.mjs ${agentUrl}/extensions/command-guard/rules.mjs`,
+      `mkdir ${agentUrl}/extensions/command-guard-bypass`,
+      `cp evil.json ${agentUrl}/skills/x/SKILL.md`,
+      `mv ${agentUrl}/zenpi/manifest.json /tmp/x`,
+      `rm -rf ${agentUrl}/zenpi/backups`,
+      `cat ${agentUrl}/zenpi/subagent-provider-profiles.json`,
+      `echo x > ${agentUrl}/auth.json`,
+    ]) {
+      const decision = decideCommand(command, shell);
+      assert.equal(decision.action, "deny", command);
+      assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+    }
+    // Working inside a ZenPi checkout is ordinary work, not self-tampering.
+    for (const command of [
+      "cp extensions/command-guard/rules.mjs /tmp/backup.mjs", "mkdir zenpi-experiment",
+      "touch zenpi/notes.md", "mv zenpi/old.json zenpi/new.json", "tar -cf out.tar extensions/command-guard",
+    ]) {
+      const decision = decideCommand(command, shell);
+      assert.notEqual(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+      assert.notEqual(decision.ruleIds[0], "guard.self-tamper", command);
+    }
+    for (const command of ["cat extensions/command-guard/rules.mjs", "cat zenpi/manifest.json", "grep -rn guard extensions/command-guard"]) {
+      assert.equal(decideCommand(command, shell).action, "allow", command);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previous;
+  }
+});
+
 test("plain find is read-only while mutating find keeps its own rule", () => {
   // find sits in the delete family for -delete/-exec, but hasRecursiveFlag matches any predicate containing
   // an "r", so a plain search used to be reported as a recursive deletion — or worse, as guard self-tampering.

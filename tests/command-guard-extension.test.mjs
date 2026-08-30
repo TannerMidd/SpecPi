@@ -52,6 +52,19 @@ test("approval prompts wait on the person while startup falls back on its own bo
   assert.equal(value.legacyAliasBlocked, true, "promptTimeoutMs must keep bounding both prompt kinds");
 });
 
+test("a refused read does not strand the session, a refused mutation still locks it", () => {
+  const fixture = path.resolve("tests/fixtures/command-guard-lock-harness.ts");
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], { encoding: "utf8", env: { ...process.env, PI_SUBAGENT_CHILD: "" } });
+  assert.equal(result.status, 0, result.stderr);
+  const line = result.stdout.split("\n").find((entry) => entry.startsWith("COMMAND_GUARD_LOCK="));
+  assert.ok(line, result.stdout);
+  const value = JSON.parse(line.slice("COMMAND_GUARD_LOCK=".length));
+  assert.equal(value.readDenied, true, "a protected read must still be refused");
+  assert.equal(value.readDidNotLock, true, "refusing a read must not lock every later call");
+  assert.equal(value.writeDenied, true, "a protected mutation must be refused");
+  assert.equal(value.writeLatchedLock, true, "a critical mutation attempt must still latch the lock");
+});
+
 function findPiExecutable() {
   if (process.env.ZENPI_PI_BIN && fs.existsSync(process.env.ZENPI_PI_BIN)) return process.env.ZENPI_PI_BIN;
   const result = spawnSync(process.platform === "win32" ? "where.exe" : "which", ["pi"], { encoding: "utf8" });

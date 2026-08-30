@@ -3,13 +3,61 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { classifyPath, pathDecision } from "../extensions/command-guard/paths.mjs";
+import { classifyPath, isAgentPath, pathDecision } from "../extensions/command-guard/paths.mjs";
 
 test("Unix protected mutation paths are lexical and do not require enumeration", () => {
   assert.equal(classifyPath("/", { platform: "linux", cwd: "/tmp" }).protected, true);
   assert.equal(classifyPath("/etc/passwd", { platform: "linux", cwd: "/tmp" }).protected, true);
   assert.equal(classifyPath("/workspace/src/file.txt", { platform: "linux", cwd: "/tmp" }).protected, false);
 });
+test("agent-private state is identified by location, not by name appearing in a path", () => {
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  const agent = process.platform === "win32" ? "C:\\agent" : "/opt/agent";
+  const sep = process.platform === "win32" ? "\\" : "/";
+  const options = { cwd: process.platform === "win32" ? "C:\\work" : "/work" };
+  process.env.PI_CODING_AGENT_DIR = agent;
+  try {
+    // Installed state stays protected for reads and writes alike.
+    for (const relative of ["zenpi/manifest.json", "zenpi/backups/001.json", "zenpi/wishlist/state.json", "zenpi/subagent-provider-profiles.json", "auth.json", "sessions/abc.json", "history.db", "trust.json"]) {
+      const target = `${agent}${sep}${relative.replaceAll("/", sep)}`;
+      assert.equal(classifyPath(target, { ...options, read: true }).protected, true, `read ${relative}`);
+      assert.equal(classifyPath(target, options).protected, true, `write ${relative}`);
+    }
+    // Installed guard sources are a tamper target; reading them is not secret.
+    const guardSource = `${agent}${sep}extensions${sep}command-guard${sep}rules.mjs`;
+    assert.equal(classifyPath(guardSource, options).protected, true);
+    assert.equal(classifyPath(guardSource, { ...options, read: true }).protected, false);
+    assert.equal(isAgentPath(guardSource, options), true);
+
+    // A checkout that merely contains these names is ordinary work — this is ZenPi's own source tree.
+    for (const relative of ["zenpi/manifest.json", "extensions/command-guard/rules.mjs", "zenpi/wishlist/state.json"]) {
+      assert.equal(classifyPath(relative, { ...options, read: true }).protected, false, `read ${relative}`);
+      assert.equal(classifyPath(relative, options).protected, false, `write ${relative}`);
+      assert.equal(isAgentPath(relative, options), false, relative);
+    }
+  } finally {
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previous;
+  }
+});
+
+test("ordinary project paths are not mistaken for Pi private state", () => {
+  // The POSIX rule used to be an unanchored /(?:zenpi|pi).*(?:auth|session|…)/, so "pi" inside "api" plus a
+  // later "session" or "auth" denied everyday source files critically and locked the session.
+  const unix = { platform: "linux", cwd: "/home/dev/app" };
+  for (const target of [
+    "/home/dev/app/src/api/session.ts", "/home/dev/app/src/api/sessions/index.js",
+    "/home/dev/app/lib/api/auth.py", "/home/dev/app/docs/api/authentication.md",
+    "/home/dev/app/src/pipeline/mission-control.ts", "/home/dev/app/spi/history.go",
+    "/home/dev/app/src/components/Trustpilot.tsx", "/home/dev/app/api/private/index.ts",
+  ]) {
+    assert.equal(classifyPath(target, unix).protected, false, target);
+    assert.equal(pathDecision(target, unix).action, "allow", target);
+  }
+  // A .pi directory is still Pi state wherever it lives.
+  assert.equal(classifyPath("/home/dev/app/.pi/settings.json", { ...unix, read: true }).protected, true);
+});
+
 test("macOS system roots are protected without swallowing the user data tree", () => {
   const mac = { platform: "darwin", cwd: "/Users/alice/work" };
   for (const target of [

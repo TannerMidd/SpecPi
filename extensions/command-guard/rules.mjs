@@ -1,4 +1,4 @@
-import { classifyPath } from "./paths.mjs";
+import { classifyPath, isAgentPath } from "./paths.mjs";
 import { COMMAND_FLAG, ENCODED_COMMAND_FLAG, HOST_NAMES as POWERSHELL_HOSTS } from "./powershell.mjs";
 
 export const POLICY_VERSION = 1;
@@ -191,7 +191,9 @@ function criticalLeaf(leaf, options) {
   if (mutationIntent && protectedMutationTargets.some((target) => classifyPath(target, options).protected)) {
     return match("path.protected-mutation", "critical", "protected-path", "The command writes, moves, or mutates a protected path.", leaf);
   }
-  if (mutationIntent && (/zenpi|command-guard|\.pi[\\/].*(?:settings|extensions)/i.test(joined) || targets.targets.some((target) => /(?:\.pi|zenpi).*(?:guard|settings|extensions|auth|session|history|mission|trust)/i.test(target)))) {
+  // Keyed on where the target resolves, not on "zenpi" or "command-guard" appearing anywhere in the arguments:
+  // that substring test made `mkdir zenpi-experiment` a critical, session-locking denial in any checkout.
+  if (mutationIntent && [...targets.targets, ...protectedMutationTargets].some((target) => isAgentPath(target, options))) {
     return match("guard.self-tamper", "critical", "protected-path", "The command targets ZenPi guard, configuration, or private state.", leaf);
   }
   return undefined;
