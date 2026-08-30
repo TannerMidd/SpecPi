@@ -9,12 +9,13 @@ import {
   validateBinding, bindingForChild, SUPPORTED_SUBAGENT_CONTRACT,
 } from "./core.mjs";
 import { boundedReason } from "./redact.mjs";
+import { POLICY_VERSION } from "./rules.mjs";
 
 const BINDING_NAME = "zenpi.command-guard/1";
 const SAFE_SUBAGENT_ACTIONS = new Set(["list", "get", "models", "guide", "status", "children.list", "mission", "mission.list", "mission.show", "watchdog.status", "diagnostics", "doctor", "interrupt", "stop"]);
 let preflightModule: Promise<any> | undefined;
 type Mode = "guard" | "strict" | "off" | "locked";
-type State = { mode: Mode; baseMode: "guard" | "strict" | "off"; childBound: boolean; generation: number; ready: boolean; startupFailed: boolean; nonce: string; blocks: number; approvals: number; categories: Record<string, number>; rules: Record<string, number>; criticalRule?: string };
+type State = { mode: Mode; baseMode: "guard" | "strict" | "off"; childBound: boolean; generation: number; ready: boolean; startupFailed: boolean; nonce: string; blocks: number; approvals: number; sessionApprovals: Set<string>; categories: Record<string, number>; rules: Record<string, number>; criticalRule?: string };
 
 function validRecord(value: unknown): value is Record<string, unknown> { return Boolean(value && typeof value === "object" && !Array.isArray(value)); }
 function launchFingerprint(value: unknown): string | undefined {
@@ -24,9 +25,17 @@ function launchFingerprint(value: unknown): string | undefined {
     return crypto.createHash("sha256").update(serialized).digest("hex");
   } catch { return undefined; }
 }
-function toolFingerprint(name: string, input: unknown): string | undefined {
-  if ((name === "read" || name === "write" || name === "edit") && validRecord(input)) return launchFingerprint({ name, path: input.path });
-  return launchFingerprint({ name, input });
+function toolFingerprint(name: string, input: unknown, cwd: string, mode: Mode): string | undefined {
+  try {
+    const serialized = JSON.stringify({ name, input, cwd: path.resolve(cwd), mode, policyVersion: POLICY_VERSION });
+    if (typeof serialized !== "string") return undefined;
+    return crypto.createHash("sha256").update(serialized).digest("hex");
+  } catch { return undefined; }
+}
+function rememberApproval(state: State, fingerprint: string): void {
+  if (state.sessionApprovals.has(fingerprint)) state.sessionApprovals.delete(fingerprint);
+  while (state.sessionApprovals.size >= 128) state.sessionApprovals.delete(state.sessionApprovals.values().next().value!);
+  state.sessionApprovals.add(fingerprint);
 }
 function agentDirectory(): string { return path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent")); }
 function packageRootFrom(start: string | undefined, expectedName: string): string | undefined {
@@ -112,12 +121,6 @@ function validPathInput(input: unknown, toolName: string): input is Record<strin
   if (toolName === "write") return typeof input.content === "string";
   return Array.isArray(input.edits) && input.edits.length > 0 && input.edits.every((edit: any) => validRecord(edit) && typeof edit.oldText === "string" && typeof edit.newText === "string");
 }
-function unknownExecutionName(name: string): boolean { return /(?:exec|shell|command|terminal|process|spawn|run|write|delete|remove|file|upload|download|http|network|docker|kube|script)/i.test(name); }
-function unknownExecutionShape(input: unknown): boolean {
-  if (!validRecord(input)) return false;
-  if (["command", "cmd", "script", "shell", "executable", "program"].some((key) => typeof input[key] === "string")) return true;
-  return typeof input.path === "string" && (typeof input.content === "string" || Array.isArray(input.edits) || input.delete === true || input.remove === true);
-}
 async function withTimeout<T>(promise: Promise<T>, fallback: T, milliseconds = 3000): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try { return await Promise.race([promise.catch(() => fallback), new Promise<T>((resolve) => { timer = setTimeout(() => resolve(fallback), milliseconds); })]); }
@@ -143,7 +146,7 @@ function decisionPrompt(decision: any, cwd: string, affected: string): string {
 }
 function deny(state: State, reason: string, critical = false): { block: true; reason: string } {
   state.blocks += 1;
-  if (critical) { state.mode = "locked"; state.generation += 1; }
+  if (critical) { state.mode = "locked"; state.generation += 1; state.sessionApprovals.clear(); }
   return { block: true, reason: boundedReason(reason) };
 }
 
@@ -154,8 +157,8 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
   // a live selector on screen. Both directions still fail closed, just on a human timescale.
   const startupTimeoutMs = dependencies.startupTimeoutMs ?? dependencies.promptTimeoutMs ?? 30_000;
   const approvalTimeoutMs = dependencies.approvalTimeoutMs ?? dependencies.promptTimeoutMs ?? 600_000;
-  const state: State = { mode: "guard", baseMode: "guard", childBound: false, generation: 0, ready: false, startupFailed: true, nonce: "", blocks: 0, approvals: 0, categories: {}, rules: {} };
-  const reset = () => { clearAnalysisCache(); state.mode = "guard"; state.baseMode = "guard"; state.childBound = false; state.generation += 1; state.ready = false; state.startupFailed = true; state.nonce = ""; state.blocks = 0; state.approvals = 0; state.categories = {}; state.rules = {}; state.criticalRule = undefined; };
+  const state: State = { mode: "guard", baseMode: "guard", childBound: false, generation: 0, ready: false, startupFailed: true, nonce: "", blocks: 0, approvals: 0, sessionApprovals: new Set(), categories: {}, rules: {} };
+  const reset = () => { clearAnalysisCache(); state.mode = "guard"; state.baseMode = "guard"; state.childBound = false; state.generation += 1; state.ready = false; state.startupFailed = true; state.nonce = ""; state.blocks = 0; state.approvals = 0; state.sessionApprovals.clear(); state.categories = {}; state.rules = {}; state.criticalRule = undefined; };
 
   pi.on("session_start", async (_event, ctx) => {
     reset();
@@ -194,28 +197,29 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
 
   pi.registerCommand("guard", {
     description: "Show or change the session command guard",
-    getArgumentCompletions: (prefix: string) => ["status", "guard", "strict", "off", "unlock"].filter((value) => value.startsWith(prefix.trim().toLowerCase())).map((value) => ({ value, label: value })),
+    getArgumentCompletions: (prefix: string) => ["status", "guard", "strict", "off", "unlock", "clear-approvals"].filter((value) => value.startsWith(prefix.trim().toLowerCase())).map((value) => ({ value, label: value })),
     handler: async (args: string, ctx: ExtensionContext) => {
       const action = args.trim().toLowerCase() || "status";
-      if (action === "status") { ctx.ui.notify(`Mode: ${state.mode}; policy: 1; lock: ${state.mode === "locked" ? "locked" : "unlocked"}; blocks: ${state.blocks}; approvals: ${state.approvals}; categories: ${JSON.stringify(state.categories)}; rules: ${JSON.stringify(state.rules)}`, "info"); return; }
+      if (action === "status") { ctx.ui.notify(`Mode: ${state.mode}; policy: ${POLICY_VERSION}; lock: ${state.mode === "locked" ? "locked" : "unlocked"}; blocks: ${state.blocks}; approvals: ${state.approvals}; session approvals: ${state.sessionApprovals.size}; categories: ${JSON.stringify(state.categories)}; rules: ${JSON.stringify(state.rules)}`, "info"); return; }
       if (state.mode === "locked" && action !== "unlock") { ctx.ui.notify("The command guard is locked. Use /guard unlock after reviewing the critical rule.", "warning"); return; }
+      if (action === "clear-approvals") { state.sessionApprovals.clear(); state.generation += 1; ctx.ui.notify("Session approvals cleared.", "info"); return; }
       if (action === "unlock") {
         if (state.mode !== "locked") { ctx.ui.notify("The command guard is not locked.", "info"); return; }
         const ok = ctx.hasUI && await withTimeout(ctx.ui.confirm("Unlock command guard?", `The last critical rule was ${state.criticalRule || "unknown"}. Review it before continuing.`), false, approvalTimeoutMs);
-        if (ok) { state.mode = state.baseMode; state.generation += 1; state.criticalRule = undefined; updateStatus(ctx, state); ctx.ui.notify(`Command guard unlocked in ${state.baseMode} mode.`, "warning"); }
+        if (ok) { state.mode = state.baseMode; state.generation += 1; state.sessionApprovals.clear(); state.criticalRule = undefined; updateStatus(ctx, state); ctx.ui.notify(`Command guard unlocked in ${state.baseMode} mode.`, "warning"); }
         return;
       }
       if (action === "off") {
         if (state.childBound) { ctx.ui.notify("A native child cannot weaken or disable its supervisor-bound guard mode.", "error"); return; }
         if (!ctx.hasUI || !await withTimeout(ctx.ui.confirm("Turn command guard off?", "This applies only to the current top-level session and removes defense in depth."), false, approvalTimeoutMs)) return;
-        state.mode = "off"; state.baseMode = "off"; state.generation += 1; updateStatus(ctx, state); return;
+        state.mode = "off"; state.baseMode = "off"; state.generation += 1; state.sessionApprovals.clear(); updateStatus(ctx, state); return;
       }
       if (action === "strict" || action === "guard") {
         if (state.childBound && action === "guard" && state.baseMode === "strict") { ctx.ui.notify("A Strict native child cannot weaken its supervisor-bound mode.", "error"); return; }
         if (action === "guard" && state.mode === "strict" && (!ctx.hasUI || !await withTimeout(ctx.ui.confirm("Switch to Guard mode?", "This weakens protection for the rest of this session."), false, approvalTimeoutMs))) return;
-        state.mode = action; state.baseMode = action; state.generation += 1; updateStatus(ctx, state); return;
+        state.mode = action; state.baseMode = action; state.generation += 1; state.sessionApprovals.clear(); updateStatus(ctx, state); return;
       }
-      ctx.ui.notify("Usage: /guard [status|guard|strict|off|unlock]", "error");
+      ctx.ui.notify("Usage: /guard [status|guard|strict|off|unlock|clear-approvals]", "error");
     },
   });
 
@@ -230,16 +234,19 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
       if (!validCommandInput(input)) return deny(state, `Malformed ${name} input is denied.`);
       const decision = decideCommand(input.command, { mode: state.mode, shell: name, cwd: ctx.cwd, platform: process.platform, hasUI: ctx.hasUI });
       recordDecision(state, decision);
-      if (decision.action === "deny") { state.criticalRule = decision.ruleIds[0]; const critical = decision.severity === "critical"; const result = deny(state, critical ? `${decision.reason} The session is locked; use /guard status and /guard unlock after review.` : decision.reason, critical); if (critical) updateStatus(ctx, state); return result; }
+      if (decision.action === "deny") { state.criticalRule = decision.ruleIds[0]; const critical = decision.severity === "critical" && !decision.ruleIds.includes("policy.integrity"); const result = deny(state, critical ? `${decision.reason} The session is locked; use /guard status and /guard unlock after review.` : decision.reason, critical); if (critical) updateStatus(ctx, state); return result; }
       if (decision.action === "ask") {
+        const approvalFingerprint = toolFingerprint(name, input, ctx.cwd, state.mode);
+        if (!approvalFingerprint) return deny(state, "Approval input is malformed or exceeds the safety bound.");
+        if (state.sessionApprovals.has(approvalFingerprint)) return;
         if (!ctx.hasUI) return deny(state, decision.reason);
         const affected = decision.leaves.map((leaf: any) => leaf.redactedTarget).filter(Boolean).slice(0, 4).join(", ");
-        const approvalGeneration = state.generation; const approvalFingerprint = toolFingerprint(name, input);
-        if (!approvalFingerprint) return deny(state, "Approval input is malformed or exceeds the safety bound.");
-        const answer = await withTimeout(ctx.ui.select(`Command guard approval — ${decisionPrompt(decision, ctx.cwd, affected)}`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, approvalTimeoutMs);
-        if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; execution is denied.");
+        const approvalGeneration = state.generation;
+        const answer = await withTimeout(ctx.ui.select(`Command guard approval — ${decisionPrompt(decision, ctx.cwd, affected)}`, ["Deny (Recommended)", "Allow once", "Allow exact call for session", "Lock session"]), undefined, approvalTimeoutMs);
+        if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input, ctx.cwd, state.mode) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; execution is denied.");
         if (answer === "Allow once") { state.approvals += 1; state.generation += 1; return; }
-        if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; updateStatus(ctx, state); return deny(state, "The session was locked by command-guard approval."); }
+        if (answer === "Allow exact call for session") { state.approvals += 1; rememberApproval(state, approvalFingerprint); state.generation += 1; return; }
+        if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; state.sessionApprovals.clear(); updateStatus(ctx, state); return deny(state, "The session was locked by command-guard approval."); }
         return deny(state, decision.reason);
       }
       return;
@@ -252,13 +259,16 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
       // session — every later command, including read-only ones — over one blocked file.
       if (decision.action === "deny") { state.criticalRule = decision.ruleIds[0]; const critical = decision.severity === "critical" && name !== "read"; const result = deny(state, critical ? `${decision.reason} The session is locked; use /guard status and /guard unlock after review.` : decision.reason, critical); if (critical) updateStatus(ctx, state); return result; }
       if (decision.action === "ask") {
-        if (!ctx.hasUI) return deny(state, decision.reason);
-        const approvalGeneration = state.generation; const approvalFingerprint = toolFingerprint(name, input);
+        const approvalFingerprint = toolFingerprint(name, input, ctx.cwd, state.mode);
         if (!approvalFingerprint) return deny(state, "Approval input is malformed or exceeds the safety bound.");
-        const answer = await withTimeout(ctx.ui.select(`Path mutation approval — ${decisionPrompt(decision, ctx.cwd, boundedReason(input.path, 180))}`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, approvalTimeoutMs);
-        if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; mutation is denied.");
+        if (state.sessionApprovals.has(approvalFingerprint)) return;
+        if (!ctx.hasUI) return deny(state, decision.reason);
+        const approvalGeneration = state.generation;
+        const answer = await withTimeout(ctx.ui.select(`Path mutation approval — ${decisionPrompt(decision, ctx.cwd, boundedReason(input.path, 180))}`, ["Deny (Recommended)", "Allow once", "Allow exact call for session", "Lock session"]), undefined, approvalTimeoutMs);
+        if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input, ctx.cwd, state.mode) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; mutation is denied.");
         if (answer === "Allow once") { state.approvals += 1; state.generation += 1; return; }
-        if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; updateStatus(ctx, state); return deny(state, "The session was locked by command-guard approval."); }
+        if (answer === "Allow exact call for session") { state.approvals += 1; rememberApproval(state, approvalFingerprint); state.generation += 1; return; }
+        if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; state.sessionApprovals.clear(); updateStatus(ctx, state); return deny(state, "The session was locked by command-guard approval."); }
         return deny(state, decision.reason);
       }
       return;
@@ -266,7 +276,6 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
     if (name === "subagent") {
       if (!validRecord(input)) return deny(state, "Malformed subagent input is denied.");
       const action = typeof input.action === "string" ? input.action.toLowerCase() : "";
-      if (state.mode === "off") return;
       if (action) {
         if (SAFE_SUBAGENT_ACTIONS.has(action)) return;
         return deny(state, "Protected sessions allow only read-only or stop/interrupt subagent administration; launches, workflows, resumes, schedules, steering, and unknown actions are denied.");
@@ -275,29 +284,33 @@ export default function registerCommandGuard(pi: ExtensionAPI, dependencies: { r
         return deny(state, "Protected subagent workflows, file-authored launches, resumes, and schedules are denied because every child cannot be preflighted.");
       }
       let verified;
-      const launchMode = state.mode;
+      const launchMode: "guard" | "strict" = state.mode === "strict" ? "strict" : "guard";
+      const launchStateMode = state.mode;
       const launchNonce = state.nonce;
       const launchGeneration = state.generation;
       const launchInputFingerprint = launchFingerprint(input);
       if (!launchInputFingerprint) return deny(state, "The native child launch input is malformed or exceeds the preflight safety bound.");
       try { verified = await verifySubagentLaunch(input, ctx, launchMode, launchNonce, dependencies.resolveSubagentLaunchContract); }
       catch { return deny(state, "The native child preflight API is unavailable; protected subagents are denied."); }
-      if (state.mode !== launchMode || state.nonce !== launchNonce || state.generation !== launchGeneration) return deny(state, "Command-guard state changed during child preflight; launch is denied.");
+      if (state.mode !== launchStateMode || state.nonce !== launchNonce || state.generation !== launchGeneration) return deny(state, "Command-guard state changed during child preflight; launch is denied.");
       if (launchFingerprint(input) !== launchInputFingerprint) return deny(state, "Native child launch input changed during preflight; launch is denied.");
       if (!verified.ok) return deny(state, verified.reason);
       // Pi requires in-place mutation; replacing event.input is not guaranteed to reach the executor.
       input.extensionBindings = verified.input.extensionBindings;
       return;
     }
-    if (state.mode === "strict" || state.mode === "guard" && (unknownExecutionName(name) || unknownExecutionShape(input))) {
+    if (state.mode === "strict") {
       recordDecision(state, { category: "unknown", ruleIds: ["tool.unknown-capability"] });
-      if (!ctx.hasUI) return deny(state, "Unknown tools requiring policy review are denied without approval UI.");
-      const approvalGeneration = state.generation; const approvalFingerprint = toolFingerprint(name, input);
+      const approvalFingerprint = toolFingerprint(name, input, ctx.cwd, state.mode);
       if (!approvalFingerprint) return deny(state, "Unknown-tool approval input is malformed or exceeds the safety bound.");
-      const answer = await withTimeout(ctx.ui.select(`Unknown tool approval — name: ${boundedReason(name, 96)}; mode: ${state.mode}; capability is not in the reviewed command-guard catalog.`, ["Deny (Recommended)", "Allow once", "Lock session"]), undefined, approvalTimeoutMs);
-      if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; execution is denied.");
+      if (state.sessionApprovals.has(approvalFingerprint)) return;
+      if (!ctx.hasUI) return deny(state, "Unknown tools requiring policy review are denied without approval UI.");
+      const approvalGeneration = state.generation;
+      const answer = await withTimeout(ctx.ui.select(`Unknown tool approval — name: ${boundedReason(name, 96)}; mode: ${state.mode}; capability is not in the reviewed command-guard catalog.`, ["Deny (Recommended)", "Allow once", "Allow exact call for session", "Lock session"]), undefined, approvalTimeoutMs);
+      if (state.generation !== approvalGeneration || state.mode === "locked" || toolFingerprint(name, input, ctx.cwd, state.mode) !== approvalFingerprint) return deny(state, "Command-guard state or input changed during approval; execution is denied.");
       if (answer === "Allow once") { state.approvals += 1; state.generation += 1; return; }
-      if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; updateStatus(ctx, state); }
+      if (answer === "Allow exact call for session") { state.approvals += 1; rememberApproval(state, approvalFingerprint); state.generation += 1; return; }
+      if (answer === "Lock session") { state.mode = "locked"; state.generation += 1; state.sessionApprovals.clear(); updateStatus(ctx, state); }
       return deny(state, "Unknown tool was not approved.");
     }
     } catch { return deny(state, "Command-guard policy or prompting failed; execution is denied."); }

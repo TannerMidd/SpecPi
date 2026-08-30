@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { analyze as analyzeBash, stripHeredocBodies } from "./bash.mjs";
+import { analyze as analyzeBash } from "./bash.mjs";
 import { analyze as analyzeCmd } from "./cmd.mjs";
 import { analyze as analyzePowerShell } from "./powershell.mjs";
 import { evaluateRules, findMutates, POLICY_VERSION, ruleCatalog } from "./rules.mjs";
@@ -49,7 +49,7 @@ export function aggregateDecisions(decisions, options = {}) {
 
 export function analyzeCommand(command, options = {}) {
   const shell = String(options.shell || (options.platform === "win32" ? "powershell" : "bash")).toLowerCase();
-  const cacheKey = typeof command === "string" && Buffer.byteLength(command, "utf8") <= LIMITS.maxInput ? sha256(JSON.stringify({ shell, command, cwd: options.cwd || "", parser: 1, policy: POLICY_VERSION, helper: options.helperPath || "", executable: options.executable || "" })) : "";
+  const cacheKey = options.cache !== false && typeof command === "string" && Buffer.byteLength(command, "utf8") <= LIMITS.maxInput ? sha256(JSON.stringify({ shell, command, cwd: options.cwd || "", parser: 1, policy: POLICY_VERSION, helper: options.helperPath || "", executable: options.executable || "" })) : "";
   if (cacheKey && analysisCache.has(cacheKey)) {
     const cached = analysisCache.get(cacheKey);
     analysisCache.delete(cacheKey); analysisCache.set(cacheKey, cached);
@@ -61,20 +61,40 @@ export function analyzeCommand(command, options = {}) {
     else if (shell === "cmd" || shell === "cmd.exe") result = analyzeCmd(command, options);
     else result = analyzeBash(command, options);
   } catch { result = { shell, leaves: [], redirects: [], dynamicConstructs: [{ kind: "parser-exception" }], parseErrors: [], indeterminate: true }; }
+  try { attachBashHostPayloads(result, options); }
+  catch { result.dynamicConstructs.push({ kind: "parser-exception" }); result.indeterminate = true; }
   if (cacheKey) { analysisCache.set(cacheKey, result); if (analysisCache.size > LIMITS.cacheSize) analysisCache.delete(analysisCache.keys().next().value); }
   return structuredClone(result);
 }
 export function clearAnalysisCache() { analysisCache.clear(); }
 
+const BASH_HOSTS = new Set(["bash", "sh", "zsh", "dash", "ksh", "fish"]);
+function attachBashHostPayloads(analysis, options, depth = options.depth || 0) {
+  for (const leaf of analysis.leaves || []) {
+    if (leaf.nested) { attachBashHostPayloads(leaf.nested, options, depth + 1); continue; }
+    const name = String(leaf.executable || "").toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
+    if (!BASH_HOSTS.has(name)) continue;
+    const flag = (leaf.args || []).findIndex((arg) => /^-[a-z]*c[a-z]*$/i.test(String(arg)));
+    const payload = flag >= 0 ? leaf.args[flag + 1] : undefined;
+    if (typeof payload !== "string" || !payload || /\[dynamic\]|[$`]/.test(payload) || depth >= (options.maxDepth || LIMITS.maxDepth)) {
+      if (flag >= 0) { analysis.dynamicConstructs.push({ kind: "dynamic-nested-bash" }); analysis.indeterminate = true; }
+      continue;
+    }
+    leaf.nested = analyzeBash(payload, { ...options, shell: "bash", depth: depth + 1 });
+    analysis.dynamicConstructs.push({ kind: "nested-bash" }, ...leaf.nested.dynamicConstructs);
+    analysis.indeterminate ||= leaf.nested.indeterminate;
+    attachBashHostPayloads(leaf.nested, options, depth + 1);
+  }
+}
 function flattenLeaves(analysis) {
   return [...(analysis.leaves || []), ...(analysis.leaves || []).flatMap((leaf) => leaf.nested ? flattenLeaves(leaf.nested) : [])];
 }
 function clearlyReadOnly(analysis) {
   const leaves = flattenLeaves(analysis).filter((leaf) => leaf.executable !== "<redirect>");
-  if (!leaves.length || (analysis.redirects || []).length) return false;
+  if (!leaves.length || (analysis.redirects || []).some((redirect) => String(typeof redirect === "string" ? redirect : redirect.operator || "").includes(">"))) return false;
   return leaves.every((leaf) => {
     const name = String(leaf.executable || "").toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
-    if (["pwd", "ls", "printf", "echo", "true", "false", "whoami", "id", "uname", "date", "basename", "dirname", "realpath", "which", "where", "type", "grep", "rg", "head", "tail", "wc"].includes(name)) return true;
+    if (["pwd", "ls", "printf", "echo", "cat", "less", "more", "true", "false", "whoami", "id", "uname", "date", "basename", "dirname", "realpath", "which", "where", "type", "grep", "rg", "head", "tail", "wc"].includes(name)) return true;
     if (name === "find") return !findMutates(leaf.args);
     if (name === "git") return ["status", "diff", "log", "show", "blame"].includes(String(leaf.args?.[0] || "").toLowerCase()) || String(leaf.args?.[0] || "").toLowerCase() === "branch" && (leaf.args || []).some((arg) => ["--list", "-l"].includes(arg));
     if (/^(?:get|test|select|where|measure|compare)-/.test(name)) return true;
@@ -82,41 +102,28 @@ function clearlyReadOnly(analysis) {
   });
 }
 
-function containsUnquotedForkBomb(command, shell) {
-  if (!["bash", "sh", "zsh", "dash", "ksh", "fish"].includes(shell)) return false;
-  command = stripHeredocBodies(command);
-  let visible = "", quote = "", escaped = false, comment = false;
-  for (let index = 0; index < command.length; index += 1) {
-    const character = command[index];
-    if (comment) { if (character === "\n" || character === "\r") { comment = false; visible += character; } else visible += " "; continue; }
-    if (escaped) { visible += " "; escaped = false; continue; }
-    if (character === "\\" && quote !== "'") { escaped = true; visible += " "; continue; }
-    if (quote) { if (character === quote) quote = ""; visible += " "; continue; }
-    if (character === "'" || character === '"') { quote = character; visible += " "; continue; }
-    if (character === "#" && (index === 0 || /[\s;|&()]/.test(command[index - 1]))) { comment = true; visible += " "; continue; }
-    visible += character;
-  }
-  return /:\s*\(\s*\)\s*\{[^}]*:\s*\|\s*:\s*&[^}]*\}\s*;?\s*:/i.test(visible);
-}
-
 export function decideCommand(command, options = {}) {
   const mode = MODES.includes(options.mode) ? options.mode : "guard";
   if (mode === "off") return { ...empty(), reason: "Command guard is off for this session." };
   if (mode === "locked") return { action: "deny", severity: "critical", category: "security", ruleIds: ["session.locked"], leaves: [], reason: "The command guard is locked after a critical attempt.", indeterminate: false };
   if (typeof command !== "string") return malformedDecision();
-  const selectedShell = String(options.shell || (options.platform === "win32" ? "powershell" : "bash")).toLowerCase();
-  if (containsUnquotedForkBomb(command, selectedShell)) return { action: "deny", severity: "critical", category: "process", ruleIds: ["process.fork-bomb"], leaves: [], reason: "Fork-bomb process creation is permanently denied.", indeterminate: false };
-  const analysis = analyzeCommand(command, options);
+  // Enforcement always reparses the complete call. The cache is reserved for explicit analysis-only callers;
+  // an approval must never reuse parser state from an earlier attempt.
+  const analysis = analyzeCommand(command, { ...options, cache: false });
   const fatalKinds = new Set(["helper-unavailable", "helper-failure", "helper-timeout", "invalid-helper-json", "invalid-helper-result", "parser-exception", "input-limit", "output-limit", "token-limit", "command-limit", "element-limit", "redirection-limit", "literal-limit", "leaf-limit", "depth-limit"]);
-  if ((analysis.dynamicConstructs || []).some((entry) => fatalKinds.has(entry.kind)) || (analysis.parseErrors || []).some((error) => /\blimit\b/i.test(typeof error === "string" ? error : error?.message || ""))) return { action: "deny", severity: "critical", category: "security", ruleIds: ["parser.integrity"], leaves: [], reason: "The command parser is unavailable, exceeded a safety limit, or failed; execution is denied.", indeterminate: true };
-  const decisions = evaluateRules(analysis, options);
-  if ((analysis.parseErrors || []).length) decisions.push({ action: "deny", severity: "high", category: "dynamic", ruleIds: ["parser.syntax"], leaves: [], reason: "Malformed shell syntax is denied rather than offered an allow-anyway path." });
-  if (analysis.indeterminate && !decisions.some((item) => item.ruleIds?.includes("parser.indeterminate"))) decisions.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["parser.indeterminate"], leaves: [], reason: "The command could not be completely analyzed and requires one-call approval." });
-  const result = aggregateDecisions(decisions, options);
+  const parserFailure = (analysis.dynamicConstructs || []).some((entry) => fatalKinds.has(entry.kind)) || (analysis.parseErrors || []).some((error) => /\blimit\b/i.test(typeof error === "string" ? error : error?.message || ""));
+  const decisions = evaluateRules(analysis, { ...options, criticalOnly: parserFailure });
+  if (parserFailure) decisions.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["parser.indeterminate"], leaves: [], reason: "The command parser is unavailable, exceeded a safety limit, or failed; approval is required.", indeterminate: true });
+  if ((analysis.parseErrors || []).length) decisions.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["parser.syntax"], leaves: [], reason: "Malformed shell syntax requires approval.", indeterminate: true });
+  if (analysis.indeterminate && !decisions.some((item) => item.ruleIds?.includes("parser.indeterminate"))) decisions.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["parser.indeterminate"], leaves: [], reason: "The command could not be completely analyzed and requires approval.", indeterminate: true });
+  const applicable = mode === "guard"
+    ? decisions.filter((item) => item.action === "deny" || item.severity === "critical" || item.indeterminate)
+    : decisions;
+  const result = aggregateDecisions(applicable, options);
   if (mode === "strict" && result.action === "allow" && !clearlyReadOnly(analysis)) {
     return { ...aggregateDecisions([{ action: "ask", severity: "medium", category: "unknown", ruleIds: ["strict.execution"], leaves: [], reason: "Strict mode requires approval for commands that are not proven read-only." }], options), indeterminate: false };
   }
-  return { ...result, indeterminate: Boolean(analysis.indeterminate) };
+  return { ...result, indeterminate: Boolean(result.indeterminate || analysis.indeterminate) };
 }
 
 export function decidePath(input, operation, options = {}) {
@@ -125,10 +132,8 @@ export function decidePath(input, operation, options = {}) {
   if (mode === "locked") return { action: "deny", severity: "critical", category: "security", ruleIds: ["session.locked"], leaves: [], reason: "The command guard is locked after a critical attempt.", indeterminate: false };
   const classification = classifyPath(input, { ...options, read: operation === "read" });
   const decision = pathDecision(input, { ...options, read: operation === "read" });
-  if (operation !== "read" && !classification.protected && !classification.withinWorkspace && decision.action === "allow") {
-    decision.action = "ask"; decision.severity = "high"; decision.category = "filesystem"; decision.ruleIds = ["filesystem.outside-workspace"]; decision.reason = "Writes outside the current workspace need approval.";
-  } else if (mode === "strict" && operation !== "read" && decision.action === "allow") {
-    decision.action = "ask"; decision.severity = "medium"; decision.category = "filesystem"; decision.ruleIds = ["strict.mutation"]; decision.reason = "Strict mode requires approval for workspace mutation.";
+  if (mode === "strict" && operation !== "read" && decision.action === "allow") {
+    decision.action = "ask"; decision.severity = "medium"; decision.category = "filesystem"; decision.ruleIds = ["strict.mutation"]; decision.reason = "Strict mode requires approval for mutation.";
   }
   return { ...aggregateDecisions([decision], options), indeterminate: Boolean(classification.indeterminate) };
 }

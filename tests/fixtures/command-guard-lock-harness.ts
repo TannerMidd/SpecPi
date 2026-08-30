@@ -26,8 +26,9 @@ const readDenied = await call({ toolName: "read", input: { path: secret } });
 // A safe command afterwards proves the session did not latch the critical lock.
 const safeAfterRead = await call({ toolName: "bash", input: { command: "printf ok" } });
 
-// A critical mutation still latches the lock, and everything after it is refused.
-const writeDenied = await call({ toolName: "write", input: { path: secret, content: "x" } });
+// A host-system mutation still latches the lock, and everything after it is refused.
+const systemTarget = process.platform === "win32" ? "C:\\Windows\\System32\\config\\SAM" : "/etc/passwd";
+const writeDenied = await call({ toolName: "write", input: { path: systemTarget, content: "x" } });
 const safeAfterWrite = await call({ toolName: "bash", input: { command: "printf ok" } });
 
 process.stdout.write(`COMMAND_GUARD_LOCK=${JSON.stringify({

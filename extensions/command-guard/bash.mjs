@@ -1,10 +1,12 @@
 import { redactCommand } from "./redact.mjs";
-import { analyze as analyzeCmd } from "./cmd.mjs";
+import { analyze as analyzeCmd, literalCmdPayload } from "./cmd.mjs";
 import { analyzeHostArguments, HOST_NAMES as POWERSHELL_HOSTS } from "./powershell.mjs";
 
 export const BASH_LIMITS = Object.freeze({ maxInput: 128 * 1024, maxTokens: 4096, maxLeaves: 128, maxDepth: 8 });
 const separators = new Set([";", "&&", "||", "|", "&", "(", ")"]);
 const shells = new Set(["bash", "sh", "zsh", "dash", "ksh", "fish"]);
+const safeSubstitutionConsumers = new Set(["echo", "printf", "pwd", "date", "cat", "head", "tail", "grep", "rg", "wc", "sort", "uniq", "cut", "tr", "basename", "dirname"]);
+const safeExpansionConsumers = new Set(["echo", "printf", "pwd", "date", "cat", "head", "tail", "grep", "rg", "wc", "sort", "uniq", "cut", "tr", "basename", "dirname"]);
 // Runners whose -c argument is a shell command string rather than an argv vector.
 const commandStringRunners = new Set([...shells, "su", "runuser", "script"]);
 // Runners that prefix an argv vector. Every entry must also be resolvable by wrapperCommandIndex.
@@ -33,6 +35,7 @@ function heredocOpeners(line) {
       const value = line[index];
       if (wordEscaped) { delimiter += value; wordEscaped = false; continue; }
       if (value === "$" && !wordQuote && (line[index + 1] === "'" || line[index + 1] === '"')) { wordQuote = line[index + 1]; ansiSingle = wordQuote === "'"; unsupported ||= wordQuote === '"'; index += 1; continue; }
+      if ((value === "$" || value === "`") && !wordQuote) unsupported = true;
       if (value === "\\" && ansiSingle) { unsupported = true; delimiter += value; continue; }
       if (value === "\\" && wordQuote !== "'") { wordEscaped = true; continue; }
       if (wordQuote) { if (value === wordQuote) { wordQuote = ""; ansiSingle = false; } else delimiter += value; continue; }
@@ -40,9 +43,23 @@ function heredocOpeners(line) {
       if (/[\s;|&()<>]/.test(value)) break;
       delimiter += value;
     }
-    if (delimiter && !unsupported) found.push({ delimiter, stripTabs });
+    if (delimiter) found.push({ delimiter, stripTabs, unsupported });
   }
   return found;
+}
+function literalHeredocBodies(input) {
+  const lines = String(input).split(/(?<=\n)/), pending = [], bodies = [];
+  for (const line of lines) {
+    if (pending.length) {
+      let candidate = line.replace(/[\r\n]+$/, "");
+      if (pending[0].stripTabs) candidate = candidate.replace(/^\t+/, "");
+      if (candidate === pending[0].delimiter) { bodies.push({ body: pending[0].body, unsupported: pending[0].unsupported }); pending.shift(); }
+      else pending[0].body += line;
+      continue;
+    }
+    pending.push(...heredocOpeners(line).map((entry) => ({ ...entry, body: "" })));
+  }
+  return { bodies, complete: pending.length === 0 };
 }
 export function stripHeredocBodies(input) {
   const lines = String(input).split(/(?<=\n)/), pending = [], output = [];
@@ -57,39 +74,67 @@ export function stripHeredocBodies(input) {
   }
   return output.join("");
 }
+export function containsUnquotedForkBomb(input) {
+  const command = stripHeredocBodies(input);
+  let visible = "", quote = "", escaped = false, comment = false;
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (comment) { if (character === "\n" || character === "\r") { comment = false; visible += character; } else visible += " "; continue; }
+    if (escaped) { visible += " "; escaped = false; continue; }
+    if (character === "\\" && quote !== "'") { escaped = true; visible += " "; continue; }
+    if (quote) { if (character === quote) quote = ""; visible += " "; continue; }
+    if (character === "'" || character === '"') { quote = character; visible += " "; continue; }
+    if (character === "#" && (index === 0 || /[\s;|&()]/.test(command[index - 1]))) { comment = true; visible += " "; continue; }
+    visible += character;
+  }
+  const definitions = /(?:^|[\s;])(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*|:)\s*(?:\(\s*\))?\s*\{([^}]*)\}/g;
+  let definition;
+  while ((definition = definitions.exec(visible))) {
+    const escaped = definition[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const selfBackground = new RegExp(`(?:^|[\\s;|&()])${escaped}(?:\\s*\\|\\s*${escaped})?\\s*&(?:[\\s;|&()]|$)`).test(definition[2]);
+    const invoked = new RegExp(`(?:^|[\\s;|&()])${escaped}(?:[\\s;|&()]|$)`).test(visible.slice(definitions.lastIndex));
+    if (selfBackground && invoked) return true;
+  }
+  return false;
+}
 
-function token(text, kind = "word") { return { text, kind }; }
+function token(text, kind = "word", raw = text) { return { text, kind, raw }; }
 function scan(input, limits) {
   const tokens = [], redirects = [], dynamicConstructs = [], errors = [];
-  let word = "", quote = "", escaped = false, comment = false, heredoc = false;
-  const flush = () => { if (word) { tokens.push(token(word)); word = ""; } };
+  let word = "", rawWord = "", quote = "", escaped = false, comment = false, heredoc = false;
+  const flush = () => { if (word) { tokens.push(token(word, "word", rawWord || word)); word = ""; rawWord = ""; } };
   const push = (text, kind) => { flush(); tokens.push(token(text, kind)); };
   for (let i = 0; i < input.length; i += 1) {
     const c = input[i], n = input[i + 1];
     if (comment) { if (c === "\n" || c === "\r") comment = false; else continue; }
-    if (escaped) { word += c; escaped = false; continue; }
+    if (escaped) { word += c; rawWord += c; escaped = false; continue; }
     if (c === "\\" && quote !== "'") {
       if (n === "\n") i += 1;
       else if (n === "\r" && input[i + 2] === "\n") i += 2;
-      else if (quote === '"' && !/[\\$`"]/.test(n || "")) word += "\\";
-      else escaped = true;
+      else {
+        rawWord += c;
+        if (quote === '"' && !/[\\$`"]/.test(n || "")) word += "\\";
+        else escaped = true;
+      }
       continue;
     }
     if (quote) {
+      rawWord += c;
       if (c === quote) quote = "";
       else {
-        if (quote === '"' && (c === "`" || c === "$" && (n === "(" || n === "{" || /[A-Za-z_0-9@*#?$!-]/.test(n || "")))) dynamicConstructs.push({ kind: "quoted-expansion", start: i, end: i + 1 });
+        if (quote === '"' && (c === "`" || c === "$" && n === "(")) dynamicConstructs.push({ kind: "quoted-substitution", start: i, end: i + 1 });
+        else if (quote === '"' && c === "$" && (n === "{" || /[A-Za-z_0-9@*#?$!-]/.test(n || ""))) dynamicConstructs.push({ kind: "quoted-expansion", start: i, end: i + 1 });
         word += c;
       }
       continue;
     }
-    if (c === "'" || c === '"') { quote = c; continue; }
+    if (c === "'" || c === '"') { quote = c; rawWord += c; continue; }
     if (c === "#" && !word && (i === 0 || /[\s;|&()]/.test(input[i - 1]))) { comment = true; continue; }
     if (c === "\r" || c === "\n") { if (c === "\r" && n === "\n") i += 1; push(";", "separator"); continue; }
     if (/\s/.test(c)) { flush(); continue; }
     if ((c === "<" || c === ">") && n === "(") {
       dynamicConstructs.push({ kind: "process-substitution", start: i, end: i + 1 });
-      word += `${c}(`; i += 1; continue;
+      word += `${c}(`; rawWord += `${c}(`; i += 1; continue;
     }
     if (c === "<" || c === ">") {
       flush(); let op = c;
@@ -104,15 +149,19 @@ function scan(input, limits) {
       if ((c === "&" || c === "|") && n === c) { op += n; i += 1; }
       push(op, "separator"); continue;
     }
-    if (c === "`" || (c === "$" && (n === "(" || n === "{"))) {
-      dynamicConstructs.push({ kind: c === "`" ? "command-substitution" : "substitution", start: i, end: i + 1 });
-      word += c; continue;
+    if (c === "`" || c === "$" && n === "(") {
+      dynamicConstructs.push({ kind: "command-substitution", start: i, end: i + 1 });
+      word += c; rawWord += c; continue;
+    }
+    if (c === "$" && n === "{") {
+      dynamicConstructs.push({ kind: "environment-expansion", start: i, end: i + 1 });
+      word += c; rawWord += c; continue;
     }
     if (c === "$" && /[A-Za-z_0-9@*#?$!-]/.test(n || "")) {
       dynamicConstructs.push({ kind: "environment-expansion", start: i, end: i + 1 });
-      word += c; continue;
+      word += c; rawWord += c; continue;
     }
-    word += c;
+    word += c; rawWord += c;
   }
   flush();
   if (quote || escaped) errors.push("unterminated quote or escape");
@@ -132,23 +181,23 @@ function leafFrom(words) {
   // is either a filename containing spaces or a command string the runner hands to a shell. Stay indeterminate
   // instead of letting normalized() reduce it to a harmless-looking trailing segment.
   const dynamic = /[$`*?{}]|\s/.test(executable) || executable.startsWith("-");
-  return { shell: "bash", executable, operation: commandWords.slice(1).map((x) => x.text).join(" "), args: commandWords.slice(1).map((x) => x.text), redactedTarget: redactCommand(commandWords.slice(1).map((x) => x.text).join(" ")), dynamic };
+  return { shell: "bash", executable, operation: commandWords.slice(1).map((x) => x.text).join(" "), args: commandWords.slice(1).map((x) => x.text), rawArgs: commandWords.slice(1).map((x) => x.raw ?? x.text), redactedTarget: redactCommand(commandWords.slice(1).map((x) => x.text).join(" ")), dynamic };
 }
 function makeLeaves(tokens, limits) {
   const leaves = [], redirects = [], dynamicConstructs = [];
-  let current = [], pendingRedirect, pendingSeparator;
+  let current = [], pendingRedirect, pendingSeparator, commandId = 0;
   const flush = () => {
     const leaf = leafFrom(current);
-    if (leaf) { leaf.separatorBefore = pendingSeparator; leaves.push(leaf); pendingSeparator = undefined; }
+    if (leaf) { leaf.separatorBefore = pendingSeparator; leaf.commandId = commandId; leaves.push(leaf); pendingSeparator = undefined; commandId += 1; }
     current = [];
   };
   for (const item of tokens) {
     if (item.kind === "separator") { flush(); pendingSeparator = item.text; continue; }
     if (item.kind === "redirect") { pendingRedirect = item.text; continue; }
     if (pendingRedirect) {
-      const detail = { operator: pendingRedirect, target: item.text, separatorBefore: pendingSeparator };
+      const detail = { operator: pendingRedirect, target: item.text, separatorBefore: pendingSeparator, commandId };
       redirects.push(detail);
-      leaves.push({ shell: "bash", executable: "<redirect>", operation: `${pendingRedirect} ${item.text}`, args: [item.text], redactedTarget: redactCommand(item.text), redirect: pendingRedirect, separatorBefore: pendingSeparator });
+      leaves.push({ shell: "bash", executable: "<redirect>", operation: `${pendingRedirect} ${item.text}`, args: [item.text], redactedTarget: redactCommand(item.text), redirect: pendingRedirect, separatorBefore: pendingSeparator, commandId });
       pendingRedirect = undefined;
       continue;
     }
@@ -198,6 +247,96 @@ function wrapperCommandIndex(name, args) {
   }
   return -1;
 }
+const stdinCodeInterpreters = new Set(["powershell", "pwsh", "python", "python3", "py", "node", "deno", "bun", "ruby", "perl", "php", "lua", "rscript", "xargs", "source", "."]);
+function heredocConsumerKind(leaf) {
+  let current = leaf;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    const name = current.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
+    if (shells.has(name)) {
+      if ((current.args || []).some((arg) => /^-[a-z]*c[a-z]*$/i.test(String(arg)))) return "data";
+      const script = (current.args || []).find((arg) => !String(arg).startsWith("-"));
+      return script ? "data" : "bash";
+    }
+    if (name === "cmd") return "cmd";
+    if (stdinCodeInterpreters.has(name)) return "unknown";
+    if (!wrappers.has(name)) return "data";
+    if (name === "env") {
+      const splitIndex = (current.args || []).findIndex((arg) => /^(?:-[sS]|--split-string)(?:=|$)/.test(String(arg)));
+      if (splitIndex >= 0) {
+        const option = String(current.args[splitIndex]);
+        const payload = option.includes("=") ? option.slice(option.indexOf("=") + 1) : current.args[splitIndex + 1];
+        if (typeof payload !== "string" || !payload || /[$`]/.test(payload)) return "unknown";
+        current = leafFrom(payload.trim().split(/\s+/).map((text) => token(text)));
+        continue;
+      }
+    }
+    const commandIndex = wrapperCommandIndex(name, current.args || []);
+    if (commandIndex < 0) return "data";
+    current = leafFrom(current.args.slice(commandIndex).map((text) => token(text)));
+  }
+  return "unknown";
+}
+function sedSubstitutionExecutes(script) {
+  const match = /^\s*s([^A-Za-z0-9\\\s])/.exec(script);
+  if (!match) return false;
+  const delimiter = match[1]; let escaped = false, separators = 0;
+  for (let index = match[0].length; index < script.length; index += 1) {
+    const value = script[index];
+    if (escaped) { escaped = false; continue; }
+    if (value === "\\") { escaped = true; continue; }
+    if (value !== delimiter) continue;
+    separators += 1;
+    if (separators === 2) return /e/i.test(script.slice(index + 1).trim());
+  }
+  return false;
+}
+function sedExecution(args) {
+  const payloads = []; let dynamic = false;
+  for (const raw of args) {
+    const script = String(raw);
+    if (sedSubstitutionExecutes(script)) dynamic = true;
+    const expression = /(?:^|[;\n])\s*(?:(?:\d+|\$|\/[^/\n]*\/)\s*)?e(?:[ \t]+([^\n]*)|(?=\s*(?:[;\n]|$)))/g;
+    let match;
+    while ((match = expression.exec(script))) {
+      if (match[1]?.trim()) payloads.push(match[1].trim());
+      else dynamic = true;
+    }
+  }
+  return { payloads, dynamic };
+}
+function addDecodedPipelines(leaves, options, dynamicConstructs, depth) {
+  if (depth >= options.maxDepth) return;
+  for (let index = 0; index + 2 < leaves.length; index += 1) {
+    const source = leaves[index], decoder = leaves[index + 1], interpreter = leaves[index + 2];
+    if (decoder.separatorBefore !== "|" || interpreter.separatorBefore !== "|") continue;
+    const sourceName = source.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
+    const decoderName = decoder.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
+    const interpreterName = interpreter.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
+    if (sourceName !== "printf" || decoderName !== "base64" || !decoder.args.some((arg) => /^(?:-d|--decode)$/i.test(arg)) || !shells.has(interpreterName) || interpreter.args.length) continue;
+    if (source.args.length !== 1 || !/^[A-Za-z0-9+/]+={0,2}$/.test(source.args[0])) continue;
+    let decoded;
+    try {
+      const buffer = Buffer.from(source.args[0], "base64");
+      if (buffer.toString("base64").replace(/=+$/, "") !== source.args[0].replace(/=+$/, "") || buffer.includes(0)) continue;
+      decoded = buffer.toString("utf8");
+      if (decoded.includes("\uFFFD") || Buffer.byteLength(decoded, "utf8") > options.maxInput) continue;
+    } catch { continue; }
+    interpreter.nested = analyze(decoded, { ...options, depth: depth + 1 });
+    interpreter.decodedInput = true;
+    dynamicConstructs.push({ kind: "decoded-pipeline" }, ...interpreter.nested.dynamicConstructs);
+    if (interpreter.nested.indeterminate) dynamicConstructs.push({ kind: "dynamic-decoded-pipeline" });
+  }
+}
+function cmdEquivalentArgs(leaf) {
+  return (leaf.rawArgs || leaf.args).map((rawValue, index) => {
+    const cooked = String(leaf.args[index] ?? ""), raw = String(rawValue);
+    if (cooked.includes('"')) return "[dynamic]";
+    if (/^(["']).*\1$/s.test(raw)) return `"${cooked}"`;
+    const attached = /^\/(c|k)(["'])(.*)\2$/is.exec(raw);
+    if (attached && /^\/(?:c|k)/i.test(cooked)) return `${cooked.slice(0, 2)}"${cooked.slice(2)}"`;
+    return raw;
+  });
+}
 function addNested(leaves, options, dynamicConstructs, depth) {
   if (depth >= options.maxDepth) { dynamicConstructs.push({ kind: "depth-limit" }); return; }
   // A nested analysis that could not be fully resolved must not be reported as a clean parse upstream.
@@ -208,9 +347,10 @@ function addNested(leaves, options, dynamicConstructs, depth) {
   };
   for (const leaf of [...leaves]) {
     const name = leaf.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop();
-    if ((commandStringRunners.has(name) || name === "cmd") && leaf.args.some((arg) => /^-[a-z]*c[a-z]*$/i.test(arg) || /^\/(?:c|k)$/i.test(arg))) {
-      const flag = leaf.args.findIndex((arg) => /^-[a-z]*c[a-z]*$/i.test(arg) || /^\/(?:c|k)$/i.test(arg));
-      const nested = leaf.args[flag + 1];
+    const cmdPayload = name === "cmd" ? literalCmdPayload(leaf.args, cmdEquivalentArgs(leaf)) : undefined;
+    if (commandStringRunners.has(name) && leaf.args.some((arg) => /^-[a-z]*c[a-z]*$/i.test(arg)) || name === "cmd" && cmdPayload !== undefined) {
+      const flag = leaf.args.findIndex((arg) => /^-[a-z]*c[a-z]*$/i.test(arg));
+      const nested = name === "cmd" ? cmdPayload : leaf.args[flag + 1];
       if (!nested || /[$`]/.test(nested)) { dynamicConstructs.push({ kind: "dynamic-nested-shell" }); continue; }
       adopt(leaf, name === "cmd" ? analyzeCmd(nested, { ...options, depth: depth + 1 }) : analyze(nested, { ...options, depth: depth + 1 }), "nested-shell");
       // A command string is fully described by its nested analysis; never let a later branch replace it.
@@ -225,11 +365,18 @@ function addNested(leaves, options, dynamicConstructs, depth) {
         else adopt(leaf, host.nested, "nested-powershell");
         continue;
       }
+      const file = leaf.args.findIndex((arg) => /^-(?:f|fi|fil|file)$/i.test(String(arg)));
+      const supportedFile = file >= 0 && /\.(?:ps1|psm1|psd1)$/i.test(String(leaf.args[file + 1] || ""));
+      const informational = leaf.args.some((arg) => /^-(?:version|help|\?)$/i.test(String(arg)));
+      const hostOnly = informational && leaf.args.every((arg) => /^-(?:nologo|noprofile|noninteractive|version|help|\?)$/i.test(String(arg)));
+      if (!supportedFile && !hostOnly) dynamicConstructs.push({ kind: "dynamic-nested-powershell" });
+      continue;
     }
     // watch joins its remaining arguments and hands them to a shell, so its tail is a command string in both
     // `watch rm -rf /etc` and `watch 'rm -rf /etc'` form.
     if (name === "eval" || name === "xargs" || name === "watch") {
       dynamicConstructs.push({ kind: `${name}-wrapper` });
+      if (name === "xargs") dynamicConstructs.push({ kind: "dynamic-xargs-input" });
       const start = name === "eval" ? 0 : wrapperCommandIndex(name, leaf.args || []);
       const payload = start >= 0 ? leaf.args.slice(start).join(" ") : "";
       if (!payload || /[$`]/.test(payload)) dynamicConstructs.push({ kind: `dynamic-${name}` });
@@ -238,8 +385,18 @@ function addNested(leaves, options, dynamicConstructs, depth) {
     }
     if (wrappers.has(name)) {
       dynamicConstructs.push({ kind: `${name}-wrapper` });
+      if (name === "env") {
+        const splitIndex = (leaf.args || []).findIndex((arg) => /^(?:-[sS]|--split-string)(?:=|$)/.test(String(arg)));
+        if (splitIndex >= 0) {
+          const option = String(leaf.args[splitIndex]);
+          const payload = option.includes("=") ? option.slice(option.indexOf("=") + 1) : leaf.args[splitIndex + 1];
+          if (!payload || /[$`]/.test(payload)) dynamicConstructs.push({ kind: "dynamic-env-split-string" });
+          else adopt(leaf, analyze(payload, { ...options, depth: depth + 1 }), "env-split-string");
+          continue;
+        }
+      }
       const commandIndex = wrapperCommandIndex(name, leaf.args || []);
-      if (commandIndex < 0) { dynamicConstructs.push({ kind: `dynamic-${name}` }); continue; }
+      if (commandIndex < 0) { if (name !== "env") dynamicConstructs.push({ kind: `dynamic-${name}` }); continue; }
       const childArgs = leaf.args.slice(commandIndex);
       const child = leafFrom(childArgs.map((text) => token(text)));
       if (!child) { dynamicConstructs.push({ kind: `dynamic-${name}` }); continue; }
@@ -248,6 +405,15 @@ function addNested(leaves, options, dynamicConstructs, depth) {
       leaf.nested.indeterminate ||= leaf.nested.leaves.some((entry) => entry.dynamic) || leaf.nested.dynamicConstructs.some((item) => /limit|dynamic/.test(item.kind));
       dynamicConstructs.push(...leaf.nested.dynamicConstructs);
       if (leaf.nested.indeterminate) dynamicConstructs.push({ kind: `dynamic-${name}` });
+    }
+    if (name === "sed") {
+      const execution = sedExecution(leaf.args || []);
+      if (execution.dynamic) dynamicConstructs.push({ kind: "dynamic-sed-exec" });
+      if (execution.payloads.length) {
+        const payload = execution.payloads.join("; ");
+        if (/[$`]/.test(payload)) dynamicConstructs.push({ kind: "dynamic-sed-exec" });
+        else adopt(leaf, analyze(payload, { ...options, depth: depth + 1 }), "sed-exec");
+      }
     }
     const findExec = (arg) => arg === "-exec" || arg === "-execdir" || arg === "-ok" || arg === "-okdir";
     if (name === "find" && leaf.args.some((arg) => findExec(arg) || arg === "-delete")) {
@@ -265,19 +431,63 @@ function addNested(leaves, options, dynamicConstructs, depth) {
 export function analyze(input, options = {}) {
   const limits = { ...BASH_LIMITS, ...options };
   if (typeof input !== "string" || Buffer.byteLength(input, "utf8") > limits.maxInput) return { shell: "bash", leaves: [], redirects: [], dynamicConstructs: [{ kind: "input-limit" }], parseErrors: [], indeterminate: true };
+  if (containsUnquotedForkBomb(input)) return { shell: "bash", leaves: [{ shell: "bash", executable: "fork-bomb", operation: "", args: [], redactedTarget: "", dynamic: false }], redirects: [], dynamicConstructs: [], parseErrors: [], indeterminate: false };
   const parsedInput = stripHeredocBodies(input);
   const scanned = scan(parsedInput, limits);
   const made = makeLeaves(scanned.tokens, limits);
-  const dynamicConstructs = [...scanned.dynamicConstructs, ...made.dynamicConstructs];
+  const outerLeaves = made.leaves.filter((leaf) => leaf.separatorBefore !== "(");
+  let dynamicConstructs = [...scanned.dynamicConstructs, ...made.dynamicConstructs];
   const substitutionPattern = /(?:\$\(|<\(|`)\s*([^`()]*?)(?:\)|`)/g;
+  const resolvedSubstitutions = new Set();
   let substitution;
   while ((substitution = substitutionPattern.exec(parsedInput))) {
     if ((options.depth || 0) >= limits.maxDepth) { dynamicConstructs.push({ kind: "depth-limit" }); break; }
     const nested = analyze(substitution[1], { ...options, depth: (options.depth || 0) + 1 });
     made.leaves.push(...nested.leaves);
-    dynamicConstructs.push({ kind: "substitution-nested" }, ...nested.dynamicConstructs);
+    dynamicConstructs.push(...nested.dynamicConstructs);
+    if (nested.indeterminate) dynamicConstructs.push({ kind: "dynamic-substitution" });
+    else resolvedSubstitutions.add(substitution.index);
   }
+  const substitutionsCannotChangeDangerousArguments = outerLeaves.every((leaf) => safeSubstitutionConsumers.has(leaf.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop()));
+  const expansionsCannotChangeDangerousArguments = outerLeaves.every((leaf) => safeExpansionConsumers.has(leaf.executable.toLowerCase().replace(/\.exe$/, "").split(/[\\/]/).pop()))
+    && !made.redirects.some((redirect) => /[$`]/.test(String(redirect.target || "")));
+  const heredocRedirects = made.redirects.filter((redirect) => String(redirect.operator).includes("<<"));
+  const resolvedHeredocs = [];
+  let resolvedHeredocExecution = false;
+  if (heredocRedirects.length) {
+    const lastInputRedirect = new Map();
+    for (const redirect of made.redirects) if (String(redirect.operator).includes("<")) lastInputRedirect.set(redirect.commandId, redirect);
+    const commandById = new Map(outerLeaves.filter((leaf) => leaf.executable !== "<redirect>").map((leaf) => [leaf.commandId, leaf]));
+    const details = literalHeredocBodies(input);
+    if (details.complete && details.bodies.length === heredocRedirects.length) {
+      for (let index = 0; index < heredocRedirects.length; index += 1) {
+        const redirect = heredocRedirects[index];
+        const body = details.bodies[index];
+        if (body.unsupported) { resolvedHeredocs.push(false); continue; }
+        if (lastInputRedirect.get(redirect.commandId) !== redirect) { resolvedHeredocs.push(true); continue; }
+        const kind = heredocConsumerKind(commandById.get(redirect.commandId));
+        if (kind === "data") { resolvedHeredocs.push(true); continue; }
+        if (kind === "unknown") { resolvedHeredocs.push(false); continue; }
+        const nested = kind === "cmd"
+          ? analyzeCmd(body.body, { ...options, depth: (options.depth || 0) + 1 })
+          : analyze(body.body, { ...options, depth: (options.depth || 0) + 1 });
+        made.leaves.push(...nested.leaves);
+        dynamicConstructs.push(...nested.dynamicConstructs);
+        if (nested.indeterminate) { dynamicConstructs.push({ kind: "dynamic-heredoc" }); resolvedHeredocs.push(false); }
+        else { resolvedHeredocs.push(true); resolvedHeredocExecution = true; }
+      }
+    }
+  }
+  let heredocIndex = 0;
+  dynamicConstructs = dynamicConstructs.filter((entry) => {
+    if (["command-substitution", "quoted-substitution", "process-substitution"].includes(entry.kind)) return !substitutionsCannotChangeDangerousArguments || !resolvedSubstitutions.has(entry.start);
+    if (["environment-expansion", "quoted-expansion"].includes(entry.kind)) return !expansionsCannotChangeDangerousArguments;
+    if (entry.kind === "heredoc") return !resolvedHeredocs[heredocIndex++];
+    return true;
+  });
+  if (resolvedSubstitutions.size && substitutionsCannotChangeDangerousArguments || resolvedHeredocExecution) dynamicConstructs.push({ kind: "resolved-command-execution" });
   addNested(made.leaves, limits, dynamicConstructs, options.depth || 0);
-  return { shell: "bash", leaves: made.leaves, redirects: made.redirects, dynamicConstructs, parseErrors: scanned.parseErrors, indeterminate: scanned.parseErrors.length > 0 || made.leaves.some((leaf) => leaf.dynamic) || dynamicConstructs.some((item) => /(?:input|token|leaf|depth)-limit|dynamic-|heredoc|substitution|expansion|missing-redirect/.test(item.kind)) };
+  addDecodedPipelines(made.leaves, limits, dynamicConstructs, options.depth || 0);
+  return { shell: "bash", leaves: made.leaves, redirects: made.redirects, dynamicConstructs, parseErrors: scanned.parseErrors, indeterminate: scanned.parseErrors.length > 0 || made.leaves.some((leaf) => leaf.dynamic || leaf.nested?.indeterminate) || dynamicConstructs.some((item) => /(?:input|token|leaf|depth)-limit|dynamic-|heredoc|substitution|expansion|missing-redirect/.test(item.kind)) };
 }
 export const analyzeBash = analyze;

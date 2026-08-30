@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { redactCommand } from "./redact.mjs";
-import { analyze as analyzeCmd } from "./cmd.mjs";
+import { analyze as analyzeCmd, literalCmdPayload } from "./cmd.mjs";
 
 export const POWERSHELL_LIMITS = Object.freeze({ maxInput: 128 * 1024, maxCommands: 128, timeoutMs: 3000, maxOutput: 256 * 1024, maxDepth: 8 });
 const aliasMap = new Map(Object.entries({ ac: "add-content", cat: "get-content", clc: "clear-content", cli: "clear-item", clp: "clear-itemproperty", copy: "copy-item", cp: "copy-item", cpi: "copy-item", cpp: "copy-itemproperty", del: "remove-item", epal: "export-alias", epcsv: "export-csv", epsn: "export-pssession", erase: "remove-item", gc: "get-content", gci: "get-childitem", gi: "get-item", gps: "get-process", iex: "invoke-expression", irm: "invoke-restmethod", iwr: "invoke-webrequest", kill: "stop-process", mi: "move-item", move: "move-item", mp: "move-itemproperty", mv: "move-item", nal: "new-alias", ni: "new-item", np: "new-itemproperty", rd: "remove-item", ren: "rename-item", ri: "remove-item", rm: "remove-item", rmdir: "remove-item", rni: "rename-item", rnp: "rename-itemproperty", rp: "remove-itemproperty", sal: "set-alias", saps: "start-process", sc: "set-content", si: "set-item", sp: "set-itemproperty", spps: "stop-process", spsv: "stop-service", start: "start-process", tee: "tee-object", type: "get-content", wget: "invoke-webrequest", curl: "invoke-webrequest" }));
@@ -27,7 +27,7 @@ function validate(data, limits) {
   if (!data || data.schema !== 1 || typeof data.ok !== "boolean" || !data.parser || typeof data.parser.version !== "string" || !Array.isArray(data.commands) || !Array.isArray(data.errors)) return undefined;
   if (!Array.isArray(data.dynamicConstructs) || !Array.isArray(data.stopParsingTokens) || data.commands.length > limits.maxCommands || data.errors.length > 32 || data.dynamicConstructs.length > 256 || data.stopParsingTokens.length > 128) return undefined;
   if (data.limitExceeded !== undefined && !["tokens", "commands", "elements", "redirections"].includes(data.limitExceeded)) return undefined;
-  if (!data.commands.every((command) => command && typeof command === "object" && (typeof command.commandName === "string" || command.commandName === null) && Array.isArray(command.elements) && command.elements.length <= 256 && Array.isArray(command.redirections) && command.redirections.length <= 128)) return undefined;
+  if (!data.commands.every((command) => command && typeof command === "object" && (typeof command.commandName === "string" || command.commandName === null) && Array.isArray(command.elements) && command.elements.length <= 256 && command.elements.every((element) => element && (element.literal === null || element.literal === undefined || typeof element.literal === "string" && Buffer.byteLength(element.literal, "utf8") <= 65536) && (element.raw === undefined || typeof element.raw === "string" && Buffer.byteLength(element.raw, "utf8") <= 65536)) && Array.isArray(command.redirections) && command.redirections.length <= 128)) return undefined;
   return data;
 }
 function parameterValue(args, name) {
@@ -85,15 +85,25 @@ function resolveLiteralAliases(leaves, dynamicConstructs) {
   }
   leaves.push(...alternatives);
 }
+function cmdEquivalentArg(element, cooked) {
+  const raw = typeof element?.raw === "string" ? element.raw : cooked;
+  if (typeof cooked !== "string" || cooked === "[dynamic]") return cooked;
+  if (cooked.includes('"')) return "[dynamic]";
+  if (/^["'].*["']$/s.test(raw)) return `"${cooked}"`;
+  const attached = /^\/(c|k)(["'])(.*)\2$/is.exec(raw);
+  if (attached && /^\/(?:c|k)/i.test(cooked)) return `${cooked.slice(0, 2)}"${cooked.slice(2)}"`;
+  return raw;
+}
 function map(data) {
   const leaves = data.commands.map((command) => {
     const name = typeof command.commandName === "string" ? canonicalName(command.commandName) : "";
     const args = Array.isArray(command.elements) ? command.elements.slice(1).map((element) => typeof element.literal === "string" ? element.literal : "[dynamic]") : [];
-    return { shell: "powershell", executable: name || "<dynamic>", operation: args.join(" "), args, redactedTarget: redactCommand(args.join(" ")), dynamic: !name || args.includes("[dynamic]"), pipelineGroup: Number.isInteger(command.pipelineStart) ? command.pipelineStart : undefined, redirections: command.redirections || [] };
+    const rawArgs = Array.isArray(command.elements) ? command.elements.slice(1).map((element, index) => cmdEquivalentArg(element, args[index])) : [];
+    return { shell: "powershell", executable: name || "<dynamic>", operation: args.join(" "), args, rawArgs, redactedTarget: redactCommand(args.join(" ")), dynamic: !name || args.includes("[dynamic]"), pipelineGroup: Number.isInteger(command.pipelineStart) ? command.pipelineStart : undefined, redirections: command.redirections || [] };
   });
   const localDynamicConstructs = [...data.dynamicConstructs];
   resolveLiteralAliases(leaves, localDynamicConstructs);
-  const literalTruncated = data.commands.some((command) => command.elements.some((element) => element?.literalTruncated === true) || command.redirections.some((redirection) => redirection?.targetTruncated === true));
+  const literalTruncated = data.commands.some((command) => command.elements.some((element) => element?.literalTruncated === true || element?.rawTruncated === true) || command.redirections.some((redirection) => redirection?.targetTruncated === true));
   const limitConstructs = [...(typeof data.limitExceeded === "string" ? [{ kind: `${data.limitExceeded.replace(/s$/, "")}-limit` }] : []), ...(literalTruncated ? [{ kind: "literal-limit" }] : [])];
   const stopParsing = data.stopParsingTokens.length > 0 || leaves.some((leaf) => leaf.args.some((arg) => arg === "--%"));
   if (stopParsing && !localDynamicConstructs.some((entry) => entry.kind === "stop-parsing")) localDynamicConstructs.push({ kind: "stop-parsing" });
@@ -124,8 +134,7 @@ function attachNested(parsed, options, limits) {
       }
     }
     if (name === "cmd") {
-      const flag = leaf.args.findIndex((arg) => /^\/(?:c|k)$/i.test(arg));
-      const payload = flag >= 0 ? leaf.args.slice(flag + 1).join(" ") : "";
+      const payload = literalCmdPayload(leaf.args, leaf.rawArgs);
       if (!payload || payload.includes("[dynamic]") || depth >= limits.maxDepth) {
         parsed.dynamicConstructs.push({ kind: "dynamic-nested-cmd" });
         parsed.indeterminate = true;

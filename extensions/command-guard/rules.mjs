@@ -111,12 +111,14 @@ function criticalLeaf(leaf, options) {
   const name = normalized(leaf.executable);
   const args = leaf.args || [];
   const joined = args.join(" ").toLowerCase();
-  const targets = targetState(args, options);
+  let targetsCache;
+  const targets = () => targetsCache ||= targetState(args, options);
 
-  if (deletesFiles(name, args) && (hasRecursiveFlag(args) || name === "find") && (targets.protectedTarget || targets.rootTarget)) {
+  if (name === "fork-bomb") return match("process.fork-bomb", "critical", "process", "Fork-bomb process creation is permanently denied.", leaf);
+  if (deletesFiles(name, args) && (hasRecursiveFlag(args) || name === "find") && (targets().protectedTarget || targets().rootTarget)) {
     return match("fs.root-recursive-delete", "critical", "filesystem", "Recursive deletion can encompass a protected system, profile, or filesystem root.", leaf, "Delete one specific reviewed workspace path instead.");
   }
-  if (deletesFiles(name, args) && targets.protectedTarget) {
+  if (deletesFiles(name, args) && targets().protectedTarget) {
     return match("path.protected-mutation", "critical", "protected-path", "The command mutates a protected path.", leaf);
   }
   if (["remove-item", "ri", "del", "erase", "rd"].includes(name) && /(?:registry::|cert:\\?)/i.test(joined)) {
@@ -127,9 +129,9 @@ function criticalLeaf(leaf, options) {
   const ddTarget = ddOutput ? ddOutput.slice(ddOutput.indexOf("=") + 1) : undefined;
   const destructiveDisk = /\bof=\/dev\/(?:sd|nvme|disk|mapper|md)/i.test(joined)
     || name === "dd" && ddTarget && (classifyPath(ddTarget, options).device || /^(?:\\\\[.?]\\|\\\\device\\)/i.test(ddTarget))
-    || /^mkfs(?:\.|$)/i.test(name) && targets.targets.length > 0
+    || /^mkfs(?:\.|$)/i.test(name) && targets().targets.length > 0
     || name === "wipefs" && /(?:^|\s)(?:-a|--all|-o|--offset)(?:\s|$)/i.test(joined)
-    || name === "fdisk" && !/(?:^|\s)(?:-l|--list)(?:\s|$)/i.test(joined) && targets.targets.length > 0
+    || name === "fdisk" && !/(?:^|\s)(?:-l|--list)(?:\s|$)/i.test(joined) && targets().targets.length > 0
     || name === "parted" && /\b(?:mklabel|mkpart|rm|resizepart|set)\b/i.test(joined)
     || ["diskpart", "format", "clear-disk", "initialize-disk", "format-volume", "remove-partition"].includes(name) && !helpOnly
     || name === "cipher" && /(?:^|\s)\/w(?::|\s|$)/i.test(` ${joined}`);
@@ -151,11 +153,11 @@ function criticalLeaf(leaf, options) {
   if ([...SERVICE_NAMES, "net"].includes(name) && /\b(?:stop|disable|delete|remove|unload)\b/i.test(joined) && /(?:windefend|securityhealth|sense|defender|auditd|firewall|crowdstrike|falcon|sentinel|endpoint)/i.test(joined)) return match("security.disable", "critical", "security", "Stopping or removing endpoint, audit, or firewall services is permanently denied.", leaf);
   if ((name === "reg" || REGISTRY_PROPERTY_NAMES.has(name)) && /(?:defender|windows defender|securityhealth)/i.test(joined) && /(?:disable|exclusion|tamper|realtime)/i.test(joined)) return match("security.disable", "critical", "security", "Weakening endpoint security through registry or policy state is permanently denied.", leaf);
   if (name === "set-executionpolicy" && /(?:bypass|unrestricted)/i.test(joined)) return match("security.disable", "critical", "security", "Weakening script execution policy is permanently denied.", leaf);
-  if (ENVIRONMENT_DUMP_NAMES.has(name) && name !== "env" && (dumpsEnvironment(name, args, helpOnly) || args.some((arg) => SECRET_VARIABLE.test(String(arg))))) return match("credential.environment-read", "critical", "security", "Reading secret-bearing or complete environment state through a shell is permanently denied.", leaf);
-  if (name === "env" && !leaf.nested && !helpOnly) return match("credential.environment-read", "critical", "security", "Dumping the complete process environment can expose credentials and is permanently denied.", leaf);
-  if (["get-childitem", "gci", "dir", "get-item", "gi"].includes(name) && args.some((arg) => /^env:/i.test(arg))) return match("credential.environment-read", "critical", "security", "Reading the PowerShell environment provider can expose credentials and is permanently denied.", leaf);
-  if (name === "security" && /\b(?:find-(?:generic|internet)-password.*\s-w\b|export)\b/i.test(joined) || name === "secret-tool" && /\b(?:lookup|get|show)\b/i.test(joined) || name === "get-storedcredential" || name === "vaultcmd" && /\/listcreds/i.test(joined)) return match("credential.store-read", "critical", "security", "Reading operating-system credential stores through a shell is permanently denied.", leaf);
-  if (name === "git" && /^credential\s+(?:fill|get)\b/i.test(joined) || name === "gh" && /^auth\s+token\b/i.test(joined) || name === "aws" && /^configure\s+export-credentials\b/i.test(joined) || name === "az" && /^account\s+get-access-token\b/i.test(joined) || name === "gcloud" && /^auth\s+(?:print-access-token|application-default\s+print-access-token)\b/i.test(joined) || name === "kubectl" && /^config\s+view\b.*\s--raw\b/i.test(joined)) return match("credential.store-read", "critical", "security", "Printing stored access credentials through a shell is permanently denied.", leaf);
+  if (ENVIRONMENT_DUMP_NAMES.has(name) && name !== "env" && (dumpsEnvironment(name, args, helpOnly) || args.some((arg) => SECRET_VARIABLE.test(String(arg))))) return match("credential.environment-read", "high", "security", "Reading secret-bearing or complete environment state needs approval in Strict mode.", leaf);
+  if (name === "env" && !leaf.nested && !helpOnly) return match("credential.environment-read", "high", "security", "Dumping the complete process environment needs approval in Strict mode.", leaf);
+  if (["get-childitem", "gci", "dir", "get-item", "gi"].includes(name) && args.some((arg) => /^env:/i.test(arg))) return match("credential.environment-read", "high", "security", "Reading the PowerShell environment provider needs approval in Strict mode.", leaf);
+  if (name === "security" && /\b(?:find-(?:generic|internet)-password.*\s-w\b|export)\b/i.test(joined) || name === "secret-tool" && /\b(?:lookup|get|show)\b/i.test(joined) || name === "get-storedcredential" || name === "vaultcmd" && /\/listcreds/i.test(joined)) return match("credential.store-read", "high", "security", "Reading operating-system credential stores needs approval in Strict mode.", leaf);
+  if (name === "git" && /^credential\s+(?:fill|get)\b/i.test(joined) || name === "gh" && /^auth\s+token\b/i.test(joined) || name === "aws" && /^configure\s+export-credentials\b/i.test(joined) || name === "az" && /^account\s+get-access-token\b/i.test(joined) || name === "gcloud" && /^auth\s+(?:print-access-token|application-default\s+print-access-token)\b/i.test(joined) || name === "kubectl" && /^config\s+view\b.*\s--raw\b/i.test(joined)) return match("credential.store-read", "high", "security", "Printing stored access credentials needs approval in Strict mode.", leaf);
   if (name === "reg" && /^delete\b/i.test(joined) && /(?:hklm|security|sam|system|bcd|defender)/i.test(joined)) {
     return match("registry.system-delete", "critical", "security", "Deleting system or security registry state is permanently denied.", leaf);
   }
@@ -163,7 +165,7 @@ function criticalLeaf(leaf, options) {
   if (["kill", "killall", "pkill", "taskkill", "stop-process"].includes(name) && criticalProcess) {
     return match("process.broad-kill", "critical", "process", "Broad or critical host process termination is permanently denied.", leaf);
   }
-  if (PERMISSION_NAMES.has(name) && targets.protectedTarget && hasRecursiveFlag(args)) {
+  if (PERMISSION_NAMES.has(name) && targets().protectedTarget && hasRecursiveFlag(args)) {
     return match("security.protected-permissions", "critical", "security", "Recursive permission or ownership changes to protected paths are permanently denied.", leaf);
   }
   const mutationIntent = deletesFiles(name, args) || PERMISSION_NAMES.has(name) || POWERSHELL_WRITE_NAMES.has(name) || ["<redirect>", "cp", "copy", "copy-item", "mv", "move", "move-item", "rename-item", "set-item", "set-content", "add-content", "out-file", "tee", "touch", "mkdir", "new-item", "sed", "dd", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za", "expand-archive", ...DOWNLOAD_NAMES].includes(name) || ["npm", "pnpm", "yarn"].includes(name) && /\b(?:remove|uninstall|unlink)\b/i.test(joined);
@@ -176,24 +178,24 @@ function criticalLeaf(leaf, options) {
               : DOWNLOAD_NAMES.has(name) ? ["-o", "--output", "--output-document", "-outfile", "--outfile", "-destination"]
                 : POWERSHELL_WRITE_NAMES.has(name) ? ["-path", "-literalpath"] : [];
   const explicitDestination = optionTargets(args, destinationOptions);
-  const protectedMutationTargets = ["cp", "copy", "copy-item", "install", "ln"].includes(name) ? (explicitDestination.length ? explicitDestination : targets.targets.slice(-1))
-    : ["rsync", "scp"].includes(name) ? targets.targets.slice(-1)
-    : ["mv", "move", "move-item", "rename-item"].includes(name) ? [...targets.targets, ...explicitDestination]
-      : POWERSHELL_WRITE_NAMES.has(name) ? (explicitDestination.length ? explicitDestination : targets.targets)
-      : ["set-content", "add-content", "out-file", "tee", "touch", "mkdir", "new-item"].includes(name) ? targets.targets
+  const protectedMutationTargets = ["cp", "copy", "copy-item", "install", "ln"].includes(name) ? (explicitDestination.length ? explicitDestination : targets().targets.slice(-1))
+    : ["rsync", "scp"].includes(name) ? targets().targets.slice(-1)
+    : ["mv", "move", "move-item", "rename-item"].includes(name) ? [...targets().targets, ...explicitDestination]
+      : POWERSHELL_WRITE_NAMES.has(name) ? (explicitDestination.length ? explicitDestination : targets().targets)
+      : ["set-content", "add-content", "out-file", "tee", "touch", "mkdir", "new-item"].includes(name) ? targets().targets
       : name === "expand-archive" ? optionTargets(args, ["-destinationpath", "-destination"])
-        : DOWNLOAD_NAMES.has(name) ? (explicitDestination.length ? explicitDestination : ["start-bitstransfer", "bitsadmin", "certutil"].includes(name) ? targets.targets.slice(-1) : [])
+        : DOWNLOAD_NAMES.has(name) ? (explicitDestination.length ? explicitDestination : ["start-bitstransfer", "bitsadmin", "certutil"].includes(name) ? targets().targets.slice(-1) : [])
         : name === "tar" ? optionTargets(args, ["-c", "--directory"])
           : name === "unzip" ? optionTargets(args, ["-d"])
             : name === "7z" || name === "7za" ? optionTargets(args, ["-o"])
-      : name === "sed" && args.some((arg) => /^-[a-z]*i/i.test(arg)) ? targets.targets
+      : name === "sed" && args.some((arg) => /^-[a-z]*i/i.test(arg)) ? targets().targets
         : name === "dd" && ddTarget ? [ddTarget] : [];
   if (mutationIntent && protectedMutationTargets.some((target) => classifyPath(target, options).protected)) {
     return match("path.protected-mutation", "critical", "protected-path", "The command writes, moves, or mutates a protected path.", leaf);
   }
   // Keyed on where the target resolves, not on "zenpi" or "command-guard" appearing anywhere in the arguments:
   // that substring test made `mkdir zenpi-experiment` a critical, session-locking denial in any checkout.
-  if (mutationIntent && [...targets.targets, ...protectedMutationTargets].some((target) => isAgentPath(target, options))) {
+  if (mutationIntent && [...targets().targets, ...protectedMutationTargets].some((target) => isAgentPath(target, options))) {
     return match("guard.self-tamper", "critical", "protected-path", "The command targets ZenPi guard, configuration, or private state.", leaf);
   }
   return undefined;
@@ -203,10 +205,8 @@ function ordinaryLeaf(leaf, options) {
   const name = normalized(leaf.executable);
   const args = leaf.args || [];
   const joined = args.join(" ").toLowerCase();
-  // Guard gates what is irreversible or reaches beyond the workspace. Creating and editing files inside the
-  // workspace, and running the project's own scripts, are ordinary agent work that only Strict asks about;
-  // every critical rule above still applies, and anything touching a protected or out-of-workspace path
-  // keeps its approval. Mirrors decidePath, which already allows in-workspace writes in Guard mode.
+  // These ordinary findings feed Strict's broader approval layer. Core filters determinate noncritical
+  // findings in Guard after all critical and indeterminate results have been aggregated.
   const guard = options.mode === "guard";
   const classifiedTargets = pathArguments(args, options).map((target) => classifyPath(target, options));
   const escapesWorkspace = classifiedTargets.some((result) => result.protected || !result.withinWorkspace);
@@ -231,7 +231,7 @@ function ordinaryLeaf(leaf, options) {
   if (name === "find" && findMutates(args)) return match("filesystem.find-mutation", "high", "filesystem", "Find execution or deletion needs approval.", leaf);
   if (deletesFiles(name, args)) return !hasRecursiveFlag(args) && workspaceFileOperation ? undefined : match(hasRecursiveFlag(args) ? "filesystem.recursive-delete" : "filesystem.mutation", "high", "filesystem", hasRecursiveFlag(args) ? "Recursive deletion needs approval." : "File deletion or truncation needs approval.", leaf, "Use a bounded, explicitly reviewed workspace target.");
   if (POWERSHELL_WRITE_NAMES.has(name) || ["cp", "copy", "mv", "move", "tee", "touch", "mkdir", "install", "ln", "rsync", "scp", "tar", "unzip", "7z", "7za"].includes(name) || name === "dd" && !args.every((arg) => /^(?:--?h(?:elp)?|--version|-v)$/i.test(arg)) || name === "sed" && args.some((arg) => /^-[a-z]*i/i.test(arg))) return workspaceFileOperation ? undefined : match("filesystem.write", "high", "filesystem", "Filesystem creation, overwrite, or movement needs approval.", leaf);
-  if (AWK_NAMES.has(name) && args.some((arg) => AWK_ESCAPE.test(String(arg)) || AWK_PROGRAM_SOURCE.test(String(arg)))) return match("dynamic.inline-code", "high", "dynamic", "An awk program that can spawn shells, read the environment, load modules, or write files needs approval.", leaf);
+  if (AWK_NAMES.has(name) && args.some((arg) => AWK_ESCAPE.test(String(arg)) || AWK_PROGRAM_SOURCE.test(String(arg)))) return { ...match("dynamic.inline-code", "high", "dynamic", "An awk program that can spawn shells, read the environment, load modules, or write files needs approval.", leaf), indeterminate: true };
   if (["xargs", "eval", "invoke-expression", "iex"].includes(name)) return match("dynamic.generated-code", "high", "dynamic", "Generated or indirectly invoked code needs approval.", leaf);
   if (SERVICE_NAMES.has(name) && /\b(?:stop|restart|disable|delete|remove|create|start)\b/i.test(joined)) return match("service.mutation", "high", "system", "Service mutation needs approval.", leaf);
   if (PERMISSION_NAMES.has(name) || ACCOUNT_NAMES.has(name)) return match("security.identity-or-permission", "high", "security", "Account, group, ACL, permission, or ownership mutation needs approval.", leaf);
@@ -243,7 +243,7 @@ function ordinaryLeaf(leaf, options) {
   if ((name === "robocopy" && /\/mir\b/i.test(joined)) || name === "clear-winevent" || (name === "wevtutil" && /^cl\b/i.test(joined))) return match("filesystem.broad-mutation", "high", "filesystem", "Mirroring or clearing host data needs approval.", leaf);
   if (["psql", "mysql", "sqlcmd", "sqlite3", "mongosh", "mongo", "redis-cli"].includes(name) && /\b(?:drop|truncate|delete\s+from|flushall|flushdb)\b/i.test(joined)) return match("database.destructive", "high", "database", "Destructive database statements need approval.", leaf);
   if (["prisma", "knex", "sequelize", "alembic", "rails", "rake", "dotnet"].includes(name) && /\b(?:migrate\s+reset|migrate:rollback|migrate:undo|downgrade|db:rollback|database\s+drop)\b/i.test(joined)) return match("database.migration-rollback", "high", "database", "Database reset, drop, or migration rollback needs approval.", leaf);
-  if (SHELL_NAMES.has(name) && args.some((arg) => inlineCodeFlag(name, arg))) return match("dynamic.inline-code", "high", "dynamic", "Inline interpreter code needs approval.", leaf);
+  if (SHELL_NAMES.has(name) && args.some((arg) => inlineCodeFlag(name, arg))) return { ...match("dynamic.inline-code", "high", "dynamic", "Inline interpreter code that could not be recursively analyzed needs approval.", leaf), indeterminate: !leaf.nested };
   if ((SHELL_NAMES.has(name) && args.some((arg) => /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)(?:$|[?#])/i.test(arg))) || /\.(?:sh|bash|zsh|fish|ps1|bat|cmd|js|mjs|cjs|ts|py|rb|pl|php|lua|r|awk|tcl|scpt|applescript)$/i.test(String(leaf.executable || ""))) return workspaceExecution ? undefined : match("dynamic.local-script", "high", "dynamic", "Executing a local script that was not statically inspected needs approval.", leaf);
   return undefined;
 }
@@ -275,8 +275,10 @@ function pipelineGroups(analysis) {
 export function evaluateRules(analysis, options = {}) {
   const findings = [];
   const allLeaves = flatten(analysis);
+  const criticalOnly = options.criticalOnly === true;
+  if (!criticalOnly) {
   const readsProtectedInput = allLeaves.some((leaf) => READ_NAMES.has(normalized(leaf.executable)) && (leaf.args || []).some((arg) => classifyPath(arg, { ...leafOptions(leaf, options), read: true }).protected));
-  if (readsProtectedInput) findings.push({ action: "deny", severity: "critical", category: "security", ruleIds: ["credential.protected-read"], leaves: [], reason: "Reading credential or Pi private-state paths through a shell is permanently denied." });
+  if (readsProtectedInput) findings.push({ action: "ask", severity: "high", category: "security", ruleIds: ["credential.protected-read"], leaves: [], reason: "Reading credential or Pi private-state paths needs approval in Strict mode." });
   if (allLeaves.some((leaf) => {
     const name = normalized(leaf.executable); if (!SHELL_NAMES.has(name)) return false;
     const semanticShell = ["cmd", "cmd.exe"].includes(name) ? "cmd" : ["powershell", "pwsh"].includes(name) ? "powershell" : leaf.shell;
@@ -285,20 +287,21 @@ export function evaluateRules(analysis, options = {}) {
     const inline = args.findIndex((arg) => inlineCodeFlag(name, arg));
     const candidateArgs = inline >= 0 ? args.slice(0, inline) : args;
     return pathArguments(candidateArgs, scoped).some((arg) => classifyPath(arg, scoped).protected);
-  })) findings.push({ action: "deny", severity: "critical", category: "security", ruleIds: ["credential.execution"], leaves: [], reason: "Credential or private-state content connected to an interpreter is permanently denied." });
+  })) findings.push({ action: "ask", severity: "high", category: "security", ruleIds: ["credential.execution"], leaves: [], reason: "Credential or private-state content connected to an interpreter needs approval in Strict mode." });
   for (const group of pipelineGroups(analysis)) {
     const names = group.map((leaf) => nestedNames(leaf)).flat();
     const protectedStage = group.some((leaf) => READ_NAMES.has(normalized(leaf.executable)) && (leaf.args || []).some((arg) => classifyPath(arg, { ...leafOptions(leaf, options), read: true }).protected));
-    if (names.some((name) => DOWNLOAD_NAMES.has(name)) && names.some((name) => SHELL_NAMES.has(name))) findings.push({ action: "deny", severity: "critical", category: "security", ruleIds: ["exec.download-pipe"], leaves: [], reason: "Downloaded content connected to an interpreter is permanently denied." });
-    if (names.some((name) => DECODER_NAMES.has(name)) && names.some((name) => SHELL_NAMES.has(name))) findings.push({ action: "deny", severity: "critical", category: "security", ruleIds: ["exec.generated-pipe"], leaves: [], reason: "Decoded or generated content connected to an interpreter is permanently denied." });
-    if (protectedStage && names.some((name) => NETWORK_NAMES.has(name))) findings.push({ action: "deny", severity: "critical", category: "security", ruleIds: ["credential.exfiltration"], leaves: [], reason: "Credential or private-key data connected to network transfer is permanently denied." });
+    if (names.some((name) => DOWNLOAD_NAMES.has(name)) && names.some((name) => SHELL_NAMES.has(name))) findings.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["exec.download-pipe"], leaves: [], reason: "Downloaded content connected to an interpreter could not be inspected.", indeterminate: true });
+    if (names.some((name) => DECODER_NAMES.has(name)) && names.some((name) => SHELL_NAMES.has(name)) && !group.some((leaf) => leaf.decodedInput)) findings.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["exec.generated-pipe"], leaves: [], reason: "Decoded or generated content connected to an interpreter could not be inspected.", indeterminate: true });
+    if (protectedStage && names.some((name) => NETWORK_NAMES.has(name))) findings.push({ action: "ask", severity: "high", category: "security", ruleIds: ["credential.exfiltration"], leaves: [], reason: "Credential or private-key data connected to network transfer needs approval in Strict mode." });
   }
-  if (allLeaves.some((leaf) => NETWORK_NAMES.has(normalized(leaf.executable)) && (leaf.args || []).some((arg) => classifyPath(String(arg).replace(/^@/, ""), { ...leafOptions(leaf, options), read: true }).protected))) findings.push({ action: "deny", severity: "critical", category: "security", ruleIds: ["credential.exfiltration"], leaves: [], reason: "A network command targets credential or private-key data." });
+  if (allLeaves.some((leaf) => NETWORK_NAMES.has(normalized(leaf.executable)) && (leaf.args || []).some((arg) => classifyPath(String(arg).replace(/^@/, ""), { ...leafOptions(leaf, options), read: true }).protected))) findings.push({ action: "ask", severity: "high", category: "security", ruleIds: ["credential.exfiltration"], leaves: [], reason: "A network command targeting credential or private-key data needs approval in Strict mode." });
+  }
   for (const leaf of allLeaves) {
     const optionsForLeaf = leafOptions(leaf, options);
     const criticalFinding = criticalLeaf(leaf, optionsForLeaf);
     if (criticalFinding) findings.push(criticalFinding);
-    else {
+    else if (!criticalOnly) {
       const finding = ordinaryLeaf(leaf, optionsForLeaf);
       if (finding) findings.push(finding);
     }
@@ -308,8 +311,11 @@ export function evaluateRules(analysis, options = {}) {
     const redirectOptions = { ...options, shell: entry.shell || options.shell };
     const target = typeof redirect === "string" ? undefined : redirect.target || redirect.targetLiteral;
     const output = typeof redirect === "string" ? redirect.includes(">") : redirect.operator ? String(redirect.operator).includes(">") : true;
-    if (target && classifyPath(target, { ...redirectOptions, read: !output }).protected) findings.push({ action: "deny", severity: "critical", category: output ? "protected-path" : "security", ruleIds: [output ? "guard.redirect-tamper" : "credential.protected-read"], leaves: [], reason: output ? "A shell redirect targets a protected path." : "A shell redirect reads credential or private-state data." });
-    else if (output) {
+    if (criticalOnly && !output) continue;
+    if (target && classifyPath(target, { ...redirectOptions, read: !output }).protected) findings.push(output
+      ? { action: "deny", severity: "critical", category: "protected-path", ruleIds: ["guard.redirect-tamper"], leaves: [], reason: "A shell redirect targets a protected path." }
+      : { action: "ask", severity: "high", category: "security", ruleIds: ["credential.protected-read"], leaves: [], reason: "A shell redirect reads credential or private-state data and needs approval in Strict mode." });
+    else if (output && !criticalOnly) {
       // A redirect into the workspace is ordinary file writing; one that escapes it, or whose target could not
       // be resolved, still needs approval.
       const resolved = target ? classifyPath(target, redirectOptions) : undefined;
@@ -317,7 +323,8 @@ export function evaluateRules(analysis, options = {}) {
       if (!inWorkspace) findings.push({ action: "ask", severity: "high", category: "filesystem", ruleIds: ["filesystem.redirect"], leaves: [], reason: "A shell redirect may mutate a file and needs approval." });
     }
   }
-  if (analysis.indeterminate || (analysis.dynamicConstructs || []).some((entry) => /substitution|environment-expansion|dynamic|depth|limit|batch|nested|heredoc|stopparsing/i.test(entry.kind))) findings.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["parser.indeterminate"], leaves: [], reason: "The command could not be completely analyzed; it will not be treated as safe." });
+  if (!criticalOnly && (analysis.dynamicConstructs || []).some((entry) => entry.kind === "resolved-command-execution")) findings.push({ action: "ask", severity: "medium", category: "dynamic", ruleIds: ["dynamic.generated-code"], leaves: [], reason: "Strict mode requires approval for nested command execution.", indeterminate: false });
+  if (!criticalOnly && (analysis.indeterminate || (analysis.dynamicConstructs || []).some((entry) => /substitution|environment-expansion|dynamic|depth|limit|batch|heredoc|stopparsing/i.test(entry.kind)))) findings.push({ action: "ask", severity: "high", category: "dynamic", ruleIds: ["parser.indeterminate"], leaves: [], reason: "The command could not be completely analyzed; approval is required.", indeterminate: true });
   return findings;
 }
 

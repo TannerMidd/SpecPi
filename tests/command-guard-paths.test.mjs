@@ -100,12 +100,34 @@ test("read protection is limited to credential/private state", () => {
   assert.equal(classifyPath("/home/alice/.ssh/id_ed25519", { platform: "linux", cwd: "/tmp", read: true }).protected, true);
   assert.equal(pathDecision("/home/alice/.ssh/id_ed25519", "read", { platform: "linux", cwd: "/tmp" }).action, "deny");
 });
+
+test("Guard protects host and enforcement mutation, not ordinary private files", () => {
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = "/tmp/agent";
+  const guard = { platform: "linux", cwd: "/work", mode: "guard" };
+  try {
+    assert.equal(classifyPath("/home/alice/.ssh/id_ed25519", guard).protected, false);
+    assert.equal(classifyPath("/home/alice/.ssh/id_ed25519", { ...guard, mode: "strict" }).protected, false);
+    assert.equal(classifyPath("/etc/passwd", guard).protected, true);
+    assert.equal(classifyPath("/etc/unused-review-note", guard).protected, false);
+    assert.equal(classifyPath("/opt/myapp/config.json", guard).protected, false);
+    assert.equal(classifyPath("/opt/myapp/config.json", { ...guard, mode: "strict" }).protected, false);
+    assert.equal(classifyPath("/tmp/agent/settings.json", guard).protected, true);
+    assert.equal(classifyPath("/tmp/agent/extensions/command-guard/index.ts", guard).protected, true);
+    assert.equal(classifyPath("/tmp/agent/auth.json", guard).protected, false);
+  } finally {
+    if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previous;
+  }
+});
 test("Windows roots, device paths, and ADS are protected", () => {
   assert.equal(classifyPath("C:\\", { platform: "win32", cwd: "C:\\work" }).protected, true);
   assert.equal(classifyPath("C:\\Windows\\System32", { platform: "win32", cwd: "C:\\work" }).protected, true);
   assert.equal(classifyPath("c:/wInDoWs/system32", { platform: "win32", cwd: "C:\\work" }).protected, true);
   assert.equal(classifyPath("\\\\?\\C:\\Windows", { platform: "win32", cwd: "C:\\work" }).device, true);
   assert.equal(classifyPath("C:\\work\\file.txt", { platform: "win32", cwd: "C:\\work" }).protected, false);
+  assert.equal(classifyPath("C:\\Windows\\unused-review-note", { platform: "win32", cwd: "C:\\work", mode: "guard" }).protected, false);
+  assert.equal(classifyPath("C:\\Windows\\System32\\config\\SAM", { platform: "win32", cwd: "C:\\work", mode: "guard" }).protected, true);
   assert.equal(classifyPath("C:\\work\\file.txt:secret", { platform: "win32", cwd: "C:\\work" }).ads, true);
   assert.equal(classifyPath("\\\\server\\share", { platform: "win32", cwd: "C:\\work" }).protected, true);
 });

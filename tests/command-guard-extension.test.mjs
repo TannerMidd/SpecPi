@@ -29,6 +29,7 @@ test("extension blocks before executor and latches critical lock", () => {
   assert.equal(value.spoofedLaunchBlocked, true);
   assert.equal(value.mutatedPreflightBlocked, true);
   assert.equal(value.unprotectedLaunchBlocked, true);
+  assert.equal(value.guardUnknownAllowed, true);
   assert.equal(value.unknownTerminalBlocked, true);
   assert.equal(value.promptTimeoutBlocked, true);
   assert.equal(value.promptFailureBlocked, true);
@@ -37,6 +38,7 @@ test("extension blocks before executor and latches critical lock", () => {
   assert.equal(value.sessionResetGuard, true);
   assert.equal(value.nonceReset, true);
   assert.equal(value.confirmedOffAllows, true);
+  assert.equal(value.offChildGuarded, true);
   assert.equal(value.startOnlyReset, true);
 });
 
@@ -50,6 +52,56 @@ test("approval prompts wait on the person while startup falls back on its own bo
   assert.equal(value.slowApprovalAllowed, true, "an approval slower than the startup bound must not be auto-denied");
   assert.equal(value.shortApprovalBlocked, true, "an approval past its own bound must still fail closed");
   assert.equal(value.legacyAliasBlocked, true, "promptTimeoutMs must keep bounding both prompt kinds");
+});
+
+test("exact-call approvals last for the session and never override catastrophe", () => {
+  const fixture = path.resolve("tests/fixtures/command-guard-session-approval-harness.ts");
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], { encoding: "utf8", env: { ...process.env, PI_SUBAGENT_CHILD: "" } });
+  assert.equal(result.status, 0, result.stderr);
+  const line = result.stdout.split("\n").find((entry) => entry.startsWith("COMMAND_GUARD_SESSION_APPROVAL="));
+  assert.ok(line, result.stdout);
+  const value = JSON.parse(line.slice("COMMAND_GUARD_SESSION_APPROVAL=".length));
+  assert.equal(value.firstAllowed, true);
+  assert.equal(value.repeatAllowed, true);
+  assert.equal(value.repeatSkippedPrompt, true);
+  assert.equal(value.changedCwdBlocked, true);
+  assert.equal(value.changedBlocked, true);
+  assert.equal(value.statusCountedApproval, true);
+  assert.equal(value.afterClearBlocked, true);
+  assert.equal(value.writeFirstAllowed, true);
+  assert.equal(value.writeRepeatAllowed, true);
+  assert.equal(value.writeChangedBlocked, true);
+  assert.equal(value.modeChangeCleared, true);
+  assert.equal(value.largeWriteApprovable, true);
+  assert.equal(value.criticalBlocked, true);
+  assert.equal(value.criticalWasNotPrompted, true);
+});
+
+test("approval scope clears across lifecycle boundaries and stays isolated", () => {
+  const fixture = path.resolve("tests/fixtures/command-guard-approval-lifecycle-harness.ts");
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], { encoding: "utf8", env: { ...process.env, PI_SUBAGENT_CHILD: "" } });
+  assert.equal(result.status, 0, result.stderr);
+  const line = result.stdout.split("\n").find((entry) => entry.startsWith("COMMAND_GUARD_APPROVAL_LIFECYCLE="));
+  assert.ok(line, result.stdout);
+  const value = JSON.parse(line.slice("COMMAND_GUARD_APPROVAL_LIFECYCLE=".length));
+  assert.equal(value.allowOnceDoesNotRepeat, true);
+  assert.equal(value.restartClears, true);
+  assert.equal(value.offClears, true);
+  assert.equal(value.lockAndUnlockClear, true);
+  assert.equal(value.childIsolated, true);
+  assert.equal(value.concurrentIsolated, true);
+});
+
+test("session approvals are bounded with deterministic oldest-entry eviction", () => {
+  const fixture = path.resolve("tests/fixtures/command-guard-approval-bound-harness.ts");
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], { encoding: "utf8", env: { ...process.env, PI_SUBAGENT_CHILD: "" } });
+  assert.equal(result.status, 0, result.stderr);
+  const line = result.stdout.split("\n").find((entry) => entry.startsWith("COMMAND_GUARD_APPROVAL_BOUND="));
+  assert.ok(line, result.stdout);
+  const value = JSON.parse(line.slice("COMMAND_GUARD_APPROVAL_BOUND=".length));
+  assert.equal(value.bounded, true);
+  assert.equal(value.oldestEvicted, true);
+  assert.equal(value.promptedAgain, true);
 });
 
 test("a refused read does not strand the session, a refused mutation still locks it", () => {

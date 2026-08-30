@@ -4,9 +4,10 @@ import registerCommandGuard from "../../extensions/command-guard/index.ts";
 // human-paced approval can be told apart by which timeout each call site uses.
 async function decide(dependencies: any, selectDelayMs: number) {
   const events = new Map<string, any[]>();
+  const commands = new Map<string, any>();
   const pi: any = {
     on(name: string, handler: any) { events.set(name, [...(events.get(name) || []), handler]); },
-    registerCommand() {},
+    registerCommand(name: string, command: any) { commands.set(name, command); },
   };
   registerCommandGuard(pi, dependencies);
   const ctx: any = {
@@ -21,6 +22,7 @@ async function decide(dependencies: any, selectDelayMs: number) {
     },
   };
   for (const handler of events.get("session_start") || []) await handler({ reason: "startup" }, ctx);
+  await commands.get("guard").handler("strict", ctx);
   let result: any;
   for (const handler of events.get("tool_call") || []) result = await handler({ toolName: "bash", input: { command: "git push --force" } }, ctx);
   return result;

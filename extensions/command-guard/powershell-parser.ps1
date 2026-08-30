@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 $maxInput = 131072
 $maxTokens = 4096
 $maxCommands = 128
+$maxLiteral = 65536
 $text = [Console]::In.ReadToEnd()
 $edition = if ($PSVersionTable.PSEdition -eq 'Desktop') { 'Desktop' } else { 'Core' }
 function Clip([string]$s, [int]$n = 512) { if ($null -eq $s) { return $null }; if ($s.Length -gt $n) { return $s.Substring(0, $n) }; return $s }
@@ -25,9 +26,10 @@ try {
           if ($_.Argument -is [System.Management.Automation.Language.StringConstantExpressionAst] -or $_.Argument -is [System.Management.Automation.Language.ConstantExpressionAst]) { $rawLiteral += ':' + [string]$_.Argument.Value }
           else { $elementDynamic = $true }
         }
-        $literalTruncated = $rawLiteral.Length -gt 4096; $literal = Clip $rawLiteral 4096
-      } elseif ($_ -is [System.Management.Automation.Language.StringConstantExpressionAst] -or $_ -is [System.Management.Automation.Language.ConstantExpressionAst]) { $rawLiteral = [string]$_.Value; $literalTruncated = $rawLiteral.Length -gt 4096; $literal = Clip $rawLiteral 4096 }
-      @{ astType = $_.GetType().Name; start = $ep.start; end = $ep.end; literal = $literal; literalTruncated = $literalTruncated; dynamic = $elementDynamic }
+        $literalTruncated = $rawLiteral.Length -gt $maxLiteral; $literal = Clip $rawLiteral $maxLiteral
+      } elseif ($_ -is [System.Management.Automation.Language.StringConstantExpressionAst] -or $_ -is [System.Management.Automation.Language.ConstantExpressionAst]) { $rawLiteral = [string]$_.Value; $literalTruncated = $rawLiteral.Length -gt $maxLiteral; $literal = Clip $rawLiteral $maxLiteral }
+      $rawExtent = [string]$_.Extent.Text; $rawTruncated = $rawExtent.Length -gt $maxLiteral
+      @{ astType = $_.GetType().Name; start = $ep.start; end = $ep.end; literal = $literal; literalTruncated = $literalTruncated; raw = (Clip $rawExtent $maxLiteral); rawTruncated = $rawTruncated; dynamic = $elementDynamic }
     })
     $reds = @($command.Redirections | Select-Object -First 128 | ForEach-Object { $rp = Pos $_.Extent; $target = $null; $targetTruncated = $false; if ($_.Location -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $rawTarget = [string]$_.Location.Value; $target = Clip $rawTarget 4096; $targetTruncated = $rawTarget.Length -gt 4096 }; @{ astType = $_.GetType().Name; start = $rp.start; end = $rp.end; targetLiteral = $target; targetTruncated = [bool]$targetTruncated; dynamic = $null -eq $target } })
     @{ start = $p.start; end = $p.end; pipelineStart = $pipelineStart; commandName = $name; invocationOperator = ([string]$command.InvocationOperator); elements = $elements; elementsTruncated = ($command.CommandElements.Count -gt 256); redirections = $reds; redirectionsTruncated = ($command.Redirections.Count -gt 128) }
