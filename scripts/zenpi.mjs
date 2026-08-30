@@ -22,7 +22,8 @@ import {
   sha256,
   upsertManagedBlock,
 } from "./lib.mjs";
-import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
+import { validateCapabilityRegistry, isValidValidatorName } from "../extensions/tool-wishlist/registry.mjs";
+import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireZenPiLock, readProviderProfiles, readProviderLeases } from "../extensions/subagents/core.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -667,6 +668,11 @@ function managedFiles(includeShell) {
       0o644,
     ],
     [
+      path.join(repoRoot, "extensions", "tool-wishlist", "validators.mjs"),
+      path.join(agentDir, "extensions", "tool-wishlist", "validators.mjs"),
+      0o644,
+    ],
+    [
       path.join(repoRoot, "extensions", "tool-wishlist", "capabilities.json"),
       path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json"),
       0o644,
@@ -884,6 +890,7 @@ function assertSources() {
     "extensions/tool-wishlist/index.ts",
     "extensions/tool-wishlist/core.mjs",
     "extensions/tool-wishlist/registry.mjs",
+    "extensions/tool-wishlist/validators.mjs",
     "extensions/tool-wishlist/capabilities.json",
     "extensions/subagents/index.ts",
     "extensions/subagents/core.mjs",
@@ -1469,12 +1476,37 @@ function doctor() {
   console.log(`ZenPi ${manifest.version} doctor`);
   console.log(`Agent directory: ${agentDir}`);
   if (browserSmoke) console.log(`BROWSER ${browserSmoke}`);
+  const validatorOutcomes = new Map();
   for (const capability of capabilityRegistry?.capabilities || []) {
-    for (const validator of capability.validations) {
-      if (validator === "browser-runtime-smoke" && browserSmoke) {
+    for (const validator of capability.validations || []) {
+      if (!isValidValidatorName(validator)) {
+        errors.push(`Capability ${capability.id} links unknown validator ${validator}`);
+        continue;
+      }
+      if (validatorOutcomes.has(validator)) continue;
+      if (validator === "browser-runtime-smoke") {
+        // The browser smoke already ran above; reuse its outcome instead of launching Chromium twice.
+        validatorOutcomes.set(validator, browserSmoke
+          ? { status: "pass" }
+          : { status: manifest.browserRuntime?.installed === false ? "skipped" : "fail" });
+        continue;
+      }
+      const run = runValidator(validator, { cwd: repoRoot });
+      validatorOutcomes.set(validator, run.code === 0
+        ? { status: "pass" }
+        : { status: "fail", detail: `${(run.stderr || run.stdout || "").trim().slice(0, 300)}` });
+    }
+  }
+  for (const capability of capabilityRegistry?.capabilities || []) {
+    for (const validator of capability.validations || []) {
+      const outcome = validatorOutcomes.get(validator);
+      if (!outcome) continue;
+      if (outcome.status === "pass") {
         console.log(`CAPABILITY ${capability.id} verified by ${validator}`);
-      } else if (validator === "browser-runtime-smoke" && manifest.browserRuntime?.installed === false) {
+      } else if (validator === "browser-runtime-smoke" && outcome.status === "skipped") {
         warnings.push(`Capability ${capability.id} could not be verified because browser runtime installation was skipped`);
+      } else {
+        errors.push(`Capability ${capability.id} validator ${validator} failed${outcome.detail ? `: ${outcome.detail}` : ""}`);
       }
     }
   }

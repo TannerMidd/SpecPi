@@ -16,12 +16,17 @@ import { Type } from "typebox";
 import {
 	appendWishlistDecision,
 	archiveWishlist,
+	collectChangedFilePaths,
 	createIssueDraft,
+	latestRetirementDecision,
 	readCollectionMode,
 	recordCapabilityGap,
 	refreshWishlist,
+	renderWishlistHistory,
+	sanitizeWishlistText,
 	setCollectionMode,
 } from "./core.mjs";
+import { VALIDATOR_CATALOG } from "./validators.mjs";
 
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
 const stateDir = path.join(agentDir, "zenpi");
@@ -29,6 +34,13 @@ const WISHLIST_REPORT_ENTRY = "zenpi-wishlist-report";
 const HARNESS_IMPROVEMENT_ENTRY = "zenpi-harness-improvement";
 const MAX_REPORT_DISPLAY_BYTES = 50 * 1024;
 const MAX_REPORT_DISPLAY_LINES = 2000;
+const MAX_JOURNAL_CHANGED_FILES = 40;
+
+interface ImprovementContext {
+	originalEvidence?: string[];
+	changedFiles?: string[];
+	changedSince?: string[];
+}
 
 interface WishlistReportEntry {
 	markdown: string;
@@ -44,14 +56,15 @@ interface ActiveImprovement {
 function sourceCheckout(cwd: string) {
 	const packageFile = path.join(cwd, "package.json");
 	const registryFile = path.join(cwd, "extensions", "tool-wishlist", "capabilities.json");
-	if (!fs.existsSync(packageFile) || !fs.existsSync(registryFile)) {
-		throw new Error("Run /harness-improvement from a ZenPi source checkout");
+	const validatorsFile = path.join(cwd, "extensions", "tool-wishlist", "validators.mjs");
+	if (!fs.existsSync(packageFile) || !fs.existsSync(registryFile) || !fs.existsSync(validatorsFile)) {
+		throw new Error("Run /harness-improvement from a complete ZenPi source checkout");
 	}
 	const manifest = JSON.parse(fs.readFileSync(packageFile, "utf8"));
 	if (manifest?.name !== "zenpi" || typeof manifest?.scripts?.check !== "string") {
 		throw new Error("The current directory is not a verifiable ZenPi source checkout");
 	}
-	return { registryFile };
+	return { registryFile, validatorsFile, version: String(manifest.version ?? "unknown") };
 }
 
 function sourceCapability(cwd: string, gapId: string) {
@@ -73,6 +86,40 @@ function reportBullets(body: string, heading: string) {
 	const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	const block = body.match(new RegExp(`\\*\\*${escaped}\\*\\*\\n((?:- .*(?:\\n|$))*)`))?.[1] ?? "";
 	return block.split("\n").filter((line) => line.startsWith("- ")).map((line) => line.slice(2).trim());
+}
+
+function validatorArgs(validator: string, cwd: string) {
+	return [
+		sourceCheckout(cwd).validatorsFile,
+		validator,
+		"--state-dir", stateDir,
+		"--cwd", cwd,
+		"--browser-runtime", path.join(stateDir, "browser-runtime"),
+	];
+}
+
+async function gitChangedFiles(pi: any, cwd: string, signal: any) {
+	try {
+		const result = await pi.exec("git", ["status", "--porcelain"], { cwd, signal, timeout: 30_000 });
+		if (result.code !== 0 || typeof result.stdout !== "string") return undefined;
+		const files = collectChangedFilePaths(result.stdout);
+		return { files: files.slice(0, MAX_JOURNAL_CHANGED_FILES), truncated: files.length > MAX_JOURNAL_CHANGED_FILES };
+	} catch {
+		return undefined;
+	}
+}
+
+async function gitLogSince(pi: any, cwd: string, sinceIso: string) {
+	try {
+		const result = await pi.exec("git", ["log", `--since=${sinceIso}`, "--format=%h %s", "-8"], { cwd, timeout: 30_000 });
+		if (result.code !== 0 || typeof result.stdout !== "string") return undefined;
+		return result.stdout.split("\n")
+			.map((line: string) => sanitizeWishlistText(line, 240))
+			.filter(Boolean)
+			.slice(0, 8);
+	} catch {
+		return undefined;
+	}
 }
 
 export function improvementCandidatesFromRefresh(refreshed: any) {
@@ -105,19 +152,31 @@ export function improvementCandidatesFromRefresh(refreshed: any) {
 	return candidates.filter((item) => item.state === "selected" || item.reviewNeeded || (item.state === "open" && item.qualified)).sort((a, b) => rank(a) - rank(b));
 }
 
-function improvementPrompt(group: any) {
+function improvementPrompt(group: any, context: ImprovementContext = {}) {
 	const observed = group.scenarios?.[0] ?? "No representative need was recorded.";
 	const limitation = group.limitations?.[0] ?? "No representative limitation was recorded.";
-	return [
+	const lines = [
 		`Begin the selected ZenPi harness improvement: ${group.canonicalKey}.`,
 		"",
 		`Observed need: ${observed}`,
 		`Current limitation: ${limitation}`,
 		`Evidence: ${group.occurrences} unique task(s), ${group.projects} project(s), ${group.sessions} session(s); impact ${group.impact}.`,
+	];
+	if (context.originalEvidence?.length) {
+		lines.push("", "Original proof from the improvement journal:", ...context.originalEvidence.slice(0, 5).map((item) => `- ${item}`));
+	}
+	if (context.changedFiles?.length) {
+		lines.push("", "Files touched by the original change:", ...context.changedFiles.slice(0, 10).map((file) => `- ${file}`));
+	}
+	if (context.changedSince?.length) {
+		lines.push("", "Changed since the retirement (untrusted, sanitized Git metadata):", ...context.changedSince.map((item) => `- ${item}`));
+	}
+	lines.push(
 		"",
 		"This exact menu selection authorizes implementation of the smallest sufficient intervention in the current ZenPi source checkout. Load and follow the zenpi-improve skill. Treat the wishlist evidence as a lead, inspect current behavior, keep scope minimal, and do not ask for another approval unless scope expands or external/remote state would change.",
 		"Run direct acceptance checks and focused tests. At the end, call finish_harness_improvement with the gap ID, concise acceptance evidence, and a validation note. That tool must run the repository gate, verify registry integration, run supported capability validators, and retire the item. If any check fails, do not retire it; leave it selected and report the blocker.",
-	].join("\n");
+	);
+	return lines.join("\n");
 }
 
 function truncateReportDisplay(markdown: string) {
@@ -271,21 +330,34 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
 			const verifiedBy = ["npm run check"];
 			for (const validator of capability.validations) {
-				if (validator !== "browser-runtime-smoke") continue;
-				const smoke = path.join(ctx.cwd, "extensions", "browser", "smoke.mjs");
-				const runtime = path.join(stateDir, "browser-runtime");
-				const result = await pi.exec(process.execPath, [smoke, runtime], { cwd: ctx.cwd, signal, timeout: 2 * 60 * 1000 });
-				if (result.code !== 0) throw new Error(`Capability validator ${validator} failed with exit code ${result.code}`);
+				const timeout = VALIDATOR_CATALOG[validator]?.timeoutMs ?? 3 * 60 * 1000;
+				const result = await pi.exec(process.execPath, validatorArgs(validator, ctx.cwd), { cwd: ctx.cwd, signal, timeout });
+				if (result.code !== 0) {
+					const detail = `${result.stderr || result.stdout || ""}`.trim().slice(0, 300);
+					throw new Error(`Capability validator ${validator} failed with exit code ${result.code}${detail ? `: ${detail}` : ""}`);
+				}
 				verifiedBy.push(validator);
 			}
 
+			const changed = await gitChangedFiles(pi, ctx.cwd, signal);
+			const journal: Record<string, unknown> = {
+				schema: 1,
+				evidence: params.acceptanceEvidence,
+				gates: verifiedBy,
+				changedFilesTruncated: false,
+				version: sourceCheckout(ctx.cwd).version,
+			};
+			if (changed) {
+				journal.changedFiles = changed.files;
+				journal.changedFilesTruncated = changed.truncated;
+			}
 			const note = `${params.validationNote}; ${verifiedBy.join(", ")} passed`;
-			await appendWishlistDecision({ stateDir, action: "retire", canonicalKey: params.gapId, note, signal });
+			await appendWishlistDecision({ stateDir, action: "retire", canonicalKey: params.gapId, note, signal, journal });
 			pi.appendEntry(HARNESS_IMPROVEMENT_ENTRY, { gapId: params.gapId, status: "finished" });
 			activeImprovement = undefined;
 			return {
-				content: [{ type: "text", text: `Harness improvement verified and retired: ${params.gapId}. Gates: ${verifiedBy.join(", ")}.` }],
-				details: { gapId: params.gapId, state: "retired", verifiedBy, acceptanceEvidence: params.acceptanceEvidence },
+				content: [{ type: "text", text: `Harness improvement verified and retired: ${params.gapId}. Gates: ${verifiedBy.join(", ")}. Proof recorded in the improvement journal.` }],
+				details: { gapId: params.gapId, state: "retired", verifiedBy, acceptanceEvidence: params.acceptanceEvidence, journal },
 			};
 		},
 	});
@@ -332,24 +404,46 @@ export default function toolWishlist(pi: ExtensionAPI) {
 			if (!chosen) return;
 			const group = improvements[labels.indexOf(chosen)];
 			if (!group) return;
+			let promptContext: ImprovementContext = {};
 			if (group.reviewNeeded && group.state === "retired") {
-				await appendWishlistDecision({ stateDir, action: "reopen", canonicalKey: group.canonicalKey, note: "Chosen for harness review" });
+				const signals = typeof group.reviewSignalCount === "number" ? group.reviewSignalCount : 0;
+				const evidence = [
+					`${signals} post-retirement signal(s) recorded after the retirement`,
+					...(group.reviewFirstSeen && group.reviewLastSeen
+						? [`Signal window: ${String(group.reviewFirstSeen).slice(0, 10)} to ${String(group.reviewLastSeen).slice(0, 10)}`]
+						: []),
+					...(group.limitations?.[0] ? [`Latest limitation: ${group.limitations[0]}`] : []),
+					...(group.scenarios?.[0] ? [`Latest need: ${group.scenarios[0]}`] : []),
+				].slice(0, 5);
+				await appendWishlistDecision({
+					stateDir,
+					action: "reopen",
+					canonicalKey: group.canonicalKey,
+					note: `Reopened for review: ${signals} post-retirement signal(s)`,
+					evidence,
+				});
 				await appendWishlistDecision({ stateDir, action: "select", canonicalKey: group.canonicalKey, note: "Chosen through harness improvement menu" });
+				const retirement = latestRetirementDecision(refreshed.decisions ?? [], group.canonicalKey);
+				if (retirement?.journal) {
+					promptContext.originalEvidence = retirement.journal.evidence ?? [];
+					promptContext.changedFiles = retirement.journal.changedFiles ?? [];
+					promptContext.changedSince = await gitLogSince(pi, ctx.cwd, retirement.timestamp) ?? undefined;
+				}
 			} else if (group.state === "open") {
 				await appendWishlistDecision({ stateDir, action: "select", canonicalKey: group.canonicalKey, note: "Chosen through harness improvement menu" });
 			}
 			const sessionId = ctx.sessionManager.getSessionId();
 			activeImprovement = { gapId: group.canonicalKey, sessionId };
 			pi.appendEntry(HARNESS_IMPROVEMENT_ENTRY, { gapId: group.canonicalKey, status: "active" });
-			pi.sendUserMessage(improvementPrompt(group));
+			pi.sendUserMessage(improvementPrompt(group, promptContext));
 		},
 	});
 
-	const usage = "Usage: /wishlist [status|on|off|decline <id>|merge <from> <to>|unmerge <merge-decision-id>|draft <id>|archive|reset]";
+	const usage = "Usage: /wishlist [status|on|off|history [id]|decline <id>|merge <from> <to>|unmerge <merge-decision-id>|draft <id>|archive|reset]";
 	pi.registerCommand("wishlist", {
 		description: "View and curate ZenPi's local capability evidence",
 		getArgumentCompletions: (prefix: string) => {
-			const options = ["status", "on", "off", "decline", "merge", "unmerge", "draft", "archive", "reset"];
+			const options = ["status", "on", "off", "history", "decline", "merge", "unmerge", "draft", "archive", "reset"];
 			const first = prefix.trim().split(/\s+/, 1)[0] ?? "";
 			const matches = options.filter((option) => option.startsWith(first));
 			return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
@@ -360,7 +454,11 @@ export default function toolWishlist(pi: ExtensionAPI) {
 			if (action === "status") {
 				const mode = readCollectionMode(stateDir);
 				const result = await refreshWishlist({ stateDir });
-				ctx.ui.notify(`Wishlist collection: ${mode}; ${result.uniqueGaps} queued gap${result.uniqueGaps === 1 ? "" : "s"}. ${cleanDisplayPath(result.reportPath)}`, "info");
+				const metrics = result.metrics;
+				ctx.ui.notify(
+					`Wishlist collection: ${mode}; ${result.uniqueGaps} queued gap${result.uniqueGaps === 1 ? "" : "s"}; retirements ${metrics.retirements}, reopen rate ${metrics.reopenRate}%, open reviews ${metrics.openReviews}. ${cleanDisplayPath(result.reportPath)}`,
+					"info",
+				);
 				return;
 			}
 			if (action === "on" || action === "off") {
@@ -384,6 +482,22 @@ export default function toolWishlist(pi: ExtensionAPI) {
 			}
 			if (["next", "select", "retire", "reopen"].includes(action)) {
 				ctx.ui.notify("Start or resume implementation with /harness-improvement; verification retires the selected item automatically.", "info");
+				return;
+			}
+			if (action === "history") {
+				if (parts.length > 1) {
+					ctx.ui.notify(usage, "error");
+					return;
+				}
+				const refreshed = await refreshWishlist({ stateDir });
+				let markdown: string;
+				try {
+					markdown = renderWishlistHistory(refreshed.events, refreshed.decisions, parts[0]);
+				} catch (error) {
+					ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+					return;
+				}
+				await displayMarkdown(markdown, refreshed.reportPath, ctx);
 				return;
 			}
 			if (action === "draft") {

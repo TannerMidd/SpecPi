@@ -9,6 +9,13 @@ export { normalizeCapability } from "./registry.mjs";
 const MAX_EVENT_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_DECISION_FILE_BYTES = 1024 * 1024;
 const IMPACT_WEIGHT = { minor: 1, degraded: 2, blocked: 4 };
+const REOPEN_EVIDENCE_LIMIT = 5;
+const JOURNAL_EVIDENCE_LIMIT = 8;
+const JOURNAL_GATE_LIMIT = 8;
+const JOURNAL_CHANGED_FILE_LIMIT = 40;
+const JOURNAL_HISTORY_LIMIT = 20;
+const GATE_PATTERN = /^(?=.*[A-Za-z0-9])[A-Za-z0-9 ._-]{1,60}$/;
+const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,39}$/;
 const COLLECTION_MODES = new Set(["on", "off"]);
 const STATE_ACTIONS = new Set(["select", "decline", "retire", "reopen"]);
 const DECISION_ACTIONS = new Set([...STATE_ACTIONS, "merge", "unmerge"]);
@@ -193,13 +200,54 @@ function isStoredEvent(event) {
   );
 }
 
+export function isValidChangedFilePath(value) {
+  return typeof value === "string" && value.length >= 1 && value.length <= 200 &&
+    !value.startsWith("/") && /^[A-Za-z0-9._/-]{1,200}$/.test(value) && !value.includes("..");
+}
+
+export function collectChangedFilePaths(entries) {
+  const paths = new Set();
+  for (const line of String(entries ?? "").split("\n")) {
+    // `git status --porcelain` emits "XY <path>": the path starts at column 4 of
+    // the raw line. Never trim the leading status column before slicing.
+    const raw = line.trimEnd();
+    if (raw.length < 4) continue;
+    const staged = raw.slice(3);
+    const renamed = staged.includes(" -> ") ? staged.split(" -> ").pop() : staged;
+    if (isValidChangedFilePath(renamed)) paths.add(renamed);
+  }
+  return [...paths].sort();
+}
+
+function isValidEvidenceList(value, maxItems) {
+  return Array.isArray(value) && value.length >= 1 && value.length <= maxItems &&
+    value.every((item) => typeof item === "string" && item.length >= 1 && item.length <= 240);
+}
+
+function isValidJournal(journal) {
+  return (
+    typeof journal === "object" && journal !== null && journal.schema === 1 &&
+    isValidEvidenceList(journal.evidence, JOURNAL_EVIDENCE_LIMIT) &&
+    Array.isArray(journal.gates) && journal.gates.length >= 1 && journal.gates.length <= JOURNAL_GATE_LIMIT &&
+    journal.gates.every((gate) => typeof gate === "string" && GATE_PATTERN.test(gate)) &&
+    (journal.changedFiles === undefined || (
+      Array.isArray(journal.changedFiles) && journal.changedFiles.length <= JOURNAL_CHANGED_FILE_LIMIT &&
+      journal.changedFiles.every(isValidChangedFilePath)
+    )) &&
+    (journal.changedFilesTruncated === undefined || typeof journal.changedFilesTruncated === "boolean") &&
+    typeof journal.version === "string" && VERSION_PATTERN.test(journal.version)
+  );
+}
+
 function isStoredDecision(event) {
   return (
     event?.schema === 1 && typeof event.id === "string" &&
     typeof event.timestamp === "string" && Number.isFinite(Date.parse(event.timestamp)) &&
     DECISION_ACTIONS.has(event.action) && typeof event.canonicalKey === "string" &&
     typeof event.targetKey === "string" && typeof event.reverses === "string" &&
-    typeof event.note === "string"
+    typeof event.note === "string" &&
+    (!Object.hasOwn(event, "evidence") || (event.action === "reopen" && isValidEvidenceList(event.evidence, REOPEN_EVIDENCE_LIMIT))) &&
+    (!Object.hasOwn(event, "journal") || (event.action === "retire" && isValidJournal(event.journal)))
   );
 }
 
@@ -273,6 +321,10 @@ function sanitizeReportText(value, maxLength) {
   return sanitized;
 }
 
+export function sanitizeWishlistText(value, maxLength = 240) {
+  return sanitizeReportText(value, maxLength);
+}
+
 function sanitizeGap(gap) {
   const impact = Object.hasOwn(IMPACT_WEIGHT, gap.impact) ? gap.impact : "degraded";
   const allowedFixes = new Set(["tool", "skill", "prompt", "config", "bug", "unknown"]);
@@ -284,6 +336,40 @@ function sanitizeGap(gap) {
     workaround: sanitizeReportText(gap.workaround, 240),
     suggestedFix: allowedFixes.has(gap.suggestedFix) ? gap.suggestedFix : "unknown",
   };
+}
+
+function sanitizeEvidenceList(value, maxItems, label) {
+  if (!isValidEvidenceList(value, maxItems)) {
+    throw new Error(`${label} must contain 1 to ${maxItems} strings of at most 240 characters`);
+  }
+  const sanitized = value.map((item) => sanitizeReportText(item, 240));
+  if (!isValidEvidenceList(sanitized, maxItems)) {
+    throw new Error(`${label} is invalid after sanitization: no item may redact to empty`);
+  }
+  return sanitized;
+}
+
+function sanitizeJournal(journal) {
+  if (typeof journal !== "object" || journal === null || journal.schema !== 1) {
+    throw new Error("Retirement journal schema must be 1");
+  }
+  if (!isValidJournal(journal)) {
+    throw new Error("Retirement journal is invalid: evidence (1-8 items of at most 240 chars), gates (1-8 non-empty safe labels), changed files (at most 40 repo-relative paths), and a safe version label (at most 40 chars) are bounded");
+  }
+  const sanitized = {
+    schema: 1,
+    evidence: journal.evidence.map((item) => sanitizeReportText(item, 240)),
+    gates: journal.gates.map((gate) => compactText(gate, 60)),
+    ...(journal.changedFiles === undefined ? {} : { changedFiles: [...journal.changedFiles] }),
+    changedFilesTruncated: journal.changedFilesTruncated === true,
+    version: sanitizeReportText(journal.version, 40),
+  };
+  // Redaction can empty a value; the sanitized journal must survive its own
+  // reader validation or the whole decision would silently turn invalid.
+  if (!isValidJournal(sanitized)) {
+    throw new Error("Retirement journal is invalid after sanitization: evidence, gates, and version must remain non-empty safe values");
+  }
+  return sanitized;
 }
 
 function resolveAlias(key, aliases) {
@@ -403,33 +489,65 @@ export function aggregateEvents(events, options = {}) {
       a.canonicalKey.localeCompare(b.canonicalKey));
 }
 
-function latestRetirementTime(canonicalKey, decisions) {
-  const aliases = buildAliasMap(decisions);
+export function latestRetirementDecision(decisions, canonicalKey, aliases = buildAliasMap(decisions)) {
   let latest;
   for (const decision of decisions) {
     if (decision.action !== "retire" || resolveAlias(decision.canonicalKey, aliases) !== canonicalKey) continue;
-    if (latest === undefined || timestampMs(decision.timestamp) > latest) latest = timestampMs(decision.timestamp);
+    if (latest === undefined || timestampMs(decision.timestamp) > timestampMs(latest.timestamp)) latest = decision;
   }
   return latest;
 }
 
-function reviewSignalCount(canonicalKey, events, decisions, state) {
-  if (state !== "retired") return 0;
+export function linkReopenToRetirement(decisions, reopenDecision) {
+  if (reopenDecision?.action !== "reopen") return undefined;
+  const aliases = buildAliasMap(decisions);
+  const key = resolveAlias(reopenDecision.canonicalKey, aliases);
+  if (reopenDecision.targetKey) {
+    const linked = decisions.find((decision) => decision.id === reopenDecision.targetKey && decision.action === "retire");
+    if (linked && resolveAlias(linked.canonicalKey, aliases) === key) return linked;
+  }
+  return latestRetirementDecision(decisions, key, aliases);
+}
+
+function latestRetirementTime(canonicalKey, decisions) {
+  const latest = latestRetirementDecision(decisions, canonicalKey);
+  return latest === undefined ? undefined : timestampMs(latest.timestamp);
+}
+
+function resolveReopenRetirementLink(decisions, key, aliases, linkedRetirementId) {
+  if (linkedRetirementId === undefined) return latestRetirementDecision(decisions, key, aliases);
+  const linked = decisions.find((decision) => decision.id === linkedRetirementId);
+  if (!linked || linked.action !== "retire" || resolveAlias(linked.canonicalKey, aliases) !== key) {
+    throw new Error(`Linked retirement ${linkedRetirementId} is not a retire decision for ${key}`);
+  }
+  return linked;
+}
+
+function reviewSignals(canonicalKey, events, decisions, state) {
+  if (state !== "retired") return [];
   const retirement = latestRetirementTime(canonicalKey, decisions);
   const projected = uniqueByRun(canonicalizeEvents(events, decisions)).filter((event) => event.canonicalKey === canonicalKey);
-  if (retirement !== undefined) return projected.filter((event) => timestampMs(event.timestamp) > retirement).length;
+  if (retirement !== undefined) return projected.filter((event) => timestampMs(event.timestamp) > retirement);
   const registered = registryCapability(canonicalKey);
   return registered
-    ? projected.filter((event) => timestampMs(event.timestamp) > timestampMs(registered.shippedAt)).length
-    : 0;
+    ? projected.filter((event) => timestampMs(event.timestamp) > timestampMs(registered.shippedAt))
+    : [];
 }
 
 function groupsWithState(events, decisions) {
   const states = lifecycleStates(decisions);
   return aggregateEvents(events, { decisions }).map((group) => {
     const state = states.get(group.canonicalKey) ?? "open";
-    const signals = reviewSignalCount(group.canonicalKey, events, decisions, state);
-    return { ...group, state, reviewNeeded: signals > 0, reviewSignalCount: signals };
+    const signals = reviewSignals(group.canonicalKey, events, decisions, state)
+      .sort((a, b) => timestampMs(a.timestamp) - timestampMs(b.timestamp));
+    return {
+      ...group,
+      state,
+      reviewNeeded: signals.length > 0,
+      reviewSignalCount: signals.length,
+      reviewFirstSeen: signals[0]?.timestamp,
+      reviewLastSeen: signals.at(-1)?.timestamp,
+    };
   });
 }
 
@@ -522,7 +640,118 @@ export function renderWishlist(events, options = {}) {
   }
   const retired = groups.filter((group) => group.state === "retired" && !group.reviewNeeded);
   if (retired.length > 0) {
-    lines.push("", "# Retired", "", ...retired.map((group) => `- \`${group.canonicalKey}\` — ${markdownText(group.title)}`));
+    lines.push("", "# Retired", "", ...retired.map((group) => {
+      const retirement = latestRetirementDecision(decisions, group.canonicalKey);
+      const proof = retirement?.journal ? ` (verified ${day(retirement.timestamp)} via ${retirement.journal.gates.join(", ")})` : "";
+      return `- \`${group.canonicalKey}\` — ${markdownText(group.title)}${proof}`;
+    }));
+  }
+  const metrics = loopMetrics(events, decisions);
+  lines.push("", "# Loop health", "",
+    `- Retirements: ${metrics.retirements} | Reopen rate: ${metrics.reopenRate}% | Open reviews: ${metrics.openReviews}`,
+    metrics.medianDaysToRetire === undefined
+      ? `- Qualification rate: ${metrics.qualificationRate}% of ${metrics.observedGroups} observed gap(s)`
+      : `- Median time to retire: ${metrics.medianDaysToRetire} day(s) | Qualification rate: ${metrics.qualificationRate}% of ${metrics.observedGroups} observed gap(s)`);
+  lines.push("");
+  return lines.join("\n");
+}
+
+export function loopMetrics(events, decisions = []) {
+  const groups = groupsWithState(events, decisions);
+  const aliases = buildAliasMap(decisions);
+  const retirements = decisions.filter((decision) => decision.action === "retire");
+  const retiredGroups = groups.filter((group) => group.state === "retired");
+  // Replays the lifecycle to count only reopens that left the retired state,
+  // so reopen-from-declined does not inflate the rate.
+  const states = new Map();
+  let reopens = 0;
+  for (const decision of decisions) {
+    if (!STATE_ACTIONS.has(decision.action)) continue;
+    const key = resolveAlias(decision.canonicalKey, aliases);
+    const current = states.get(key) ?? (registryCapability(key) ? "retired" : "open");
+    if (decision.action === "reopen" && current === "retired") reopens += 1;
+    states.set(key, decision.action === "select" ? "selected" : decision.action === "reopen" ? "open" : `${decision.action}d`);
+  }
+  const firstSeenMs = new Map();
+  for (const event of canonicalizeEvents(events, decisions)) {
+    const value = timestampMs(event.timestamp);
+    const existing = firstSeenMs.get(event.canonicalKey);
+    if (existing === undefined || value < existing) firstSeenMs.set(event.canonicalKey, value);
+  }
+  const durations = [];
+  for (const decision of retirements) {
+    const first = firstSeenMs.get(resolveAlias(decision.canonicalKey, aliases));
+    if (first !== undefined) durations.push(Math.max(0, (timestampMs(decision.timestamp) - first) / 86400000));
+  }
+  durations.sort((a, b) => a - b);
+  const median = durations.length === 0 ? undefined
+    : durations.length % 2 === 1
+      ? durations[(durations.length - 1) / 2]
+      : (durations[durations.length / 2 - 1] + durations[durations.length / 2]) / 2;
+  const qualified = groups.filter((group) => group.qualified || group.state === "selected" || group.state === "retired").length;
+  return {
+    observedGroups: groups.length,
+    retirements: retirements.length,
+    reopens,
+    reopenRate: retirements.length === 0 ? 0 : Math.round((100 * reopens) / retirements.length),
+    openReviews: retiredGroups.filter((group) => group.reviewNeeded).length,
+    medianDaysToRetire: median === undefined ? undefined : Math.round(median * 10) / 10,
+    qualificationRate: groups.length === 0 ? 0 : Math.round((100 * qualified) / groups.length),
+  };
+}
+
+function renderJournalDecision(lines, decisions, decision, options = {}) {
+  const stamp = day(decision.timestamp);
+  if (options.compact) {
+    const journal = decision.journal;
+    const proof = journal ? ` · gates: ${journal.gates.join(", ")} · v${journal.version}` : "";
+    lines.push(`- ${stamp} ${decision.action} \`${decision.canonicalKey}\` — ${markdownText(decision.note)}${proof}`);
+    return;
+  }
+  lines.push(`### ${decision.action === "retire" ? "Retired" : "Reopened"} ${stamp}`, `- Decision: \`${decision.id.slice(0, 8)}\``);
+  if (decision.action === "retire") {
+    const journal = decision.journal;
+    if (journal) {
+      lines.push(`- Gates: ${journal.gates.join(", ")}`, `- ZenPi version: ${journal.version}`);
+      lines.push("- Evidence:", ...journal.evidence.map((item) => `  - ${markdownText(item)}`));
+      lines.push(journal.changedFiles?.length
+        ? `- Changed files: ${journal.changedFiles.map((file) => `\`${file}\``).join(", ")}${journal.changedFilesTruncated ? " (list truncated)" : ""}`
+        : "- Changed files: not recorded");
+      lines.push("- Rollback: revert the changed files above, then re-run the linked validators through `npm run check`.");
+    } else {
+      lines.push(`- Note: ${markdownText(decision.note)}`);
+    }
+  } else {
+    const linked = linkReopenToRetirement(decisions, decision);
+    if (linked) lines.push(`- Linked retirement: \`${linked.id.slice(0, 8)}\` (${day(linked.timestamp)})`);
+    if (decision.evidence?.length) lines.push("- Post-retirement signals:", ...decision.evidence.map((item) => `  - ${markdownText(item)}`));
+    lines.push(`- Note: ${markdownText(decision.note)}`);
+  }
+  lines.push("");
+}
+
+export function renderWishlistHistory(events, decisions = [], requestedKey) {
+  const aliases = buildAliasMap(decisions);
+  const timeline = decisions.filter((decision) => decision.action === "retire" || decision.action === "reopen");
+  const lines = [
+    "# Improvement journal", "",
+    "> Local history of harness retirements and reopens. Sanitized summaries only; nothing leaves this machine.", "",
+  ];
+  if (timeline.length === 0) {
+    lines.push("No retirements or reopens recorded yet.", "");
+    return lines.join("\n");
+  }
+  if (requestedKey !== undefined) {
+    const key = resolveAlias(normalizeCapability(requestedKey), aliases);
+    const scoped = timeline.filter((decision) => resolveAlias(decision.canonicalKey, aliases) === key);
+    if (scoped.length === 0) throw new Error(`No retirement history exists for wishlist gap: ${key}`);
+    const groups = aggregateEvents(events, { decisions });
+    const title = groups.find((group) => group.canonicalKey === key)?.title ?? key;
+    lines.push(`## ${markdownText(title)}`, "", `\`${key}\` — ${scoped.length} lifecycle decision(s), oldest first.`, "");
+    for (const decision of scoped) renderJournalDecision(lines, decisions, decision);
+  } else {
+    lines.push(`Last ${Math.min(JOURNAL_HISTORY_LIMIT, timeline.length)} of ${timeline.length} lifecycle decision(s), oldest first.`, "");
+    for (const decision of timeline.slice(-JOURNAL_HISTORY_LIMIT)) renderJournalDecision(lines, decisions, decision, { compact: true });
   }
   lines.push("");
   return lines.join("\n");
@@ -668,8 +897,12 @@ function validateStateTransition(action, current) {
 }
 
 export async function appendWishlistDecision(options) {
-  const { stateDir, action, canonicalKey, targetKey = "", note = "", signal, now = new Date().toISOString(), maxDecisionFileBytes = MAX_DECISION_FILE_BYTES } = options;
+  const { stateDir, action, canonicalKey, targetKey = "", note = "", evidence, journal, linkedRetirementId, signal, now = new Date().toISOString(), maxDecisionFileBytes = MAX_DECISION_FILE_BYTES } = options;
   if (!DECISION_ACTIONS.has(action)) throw new Error(`Unknown wishlist action: ${action}`);
+  if (journal !== undefined && action !== "retire") throw new Error("A retirement journal is only valid on retire decisions");
+  if (evidence !== undefined && action !== "reopen") throw new Error("Decision evidence is only valid on reopen decisions; retirement evidence belongs in the journal");
+  const journalValue = journal !== undefined ? sanitizeJournal(journal) : undefined;
+  const evidenceValue = evidence !== undefined ? sanitizeEvidenceList(evidence, REOPEN_EVIDENCE_LIMIT, "Reopen evidence") : undefined;
   return withStateLock(stateDir, signal, async () => {
     if (!Number.isFinite(timestampMs(now))) throw new Error("Decision timestamp is invalid");
     const files = pathsFor(stateDir);
@@ -688,6 +921,9 @@ export async function appendWishlistDecision(options) {
       if (!validateStateTransition(action, current)) throw new Error(`Cannot ${action} ${key} while its state is ${current}`);
       if (action === "retire" && sanitizeReportText(note, 240).length < 5) {
         throw new Error("Retirement requires a short sanitized validation note");
+      }
+      if (action === "reopen") {
+        target = resolveReopenRetirementLink(decisionData.decisions, key, aliases, linkedRetirementId)?.id ?? "";
       }
     } else if (action === "merge") {
       if (!known.has(target)) throw new Error(`Unknown merge target: ${target}`);
@@ -713,6 +949,8 @@ export async function appendWishlistDecision(options) {
       targetKey: target,
       reverses: reversedMerge?.id ?? "",
       note: sanitizeReportText(note, 240),
+      ...(evidenceValue ? { evidence: evidenceValue } : {}),
+      ...(journalValue ? { journal: journalValue } : {}),
     };
     appendBounded(files.decisions, decision, decisionData.bytes ?? 0, maxDecisionFileBytes, "Tool wishlist decision log");
     decisionData.decisions.push(decision);
@@ -736,6 +974,7 @@ export async function refreshWishlist(options) {
       uniqueGaps: groups.length,
       occurrences: groups.reduce((total, group) => total + group.occurrences, 0),
       invalidLines: parsed.invalidLines + decisionData.invalidLines,
+      metrics: loopMetrics(parsed.events, decisionData.decisions),
       events: parsed.events,
       decisions: decisionData.decisions,
     };

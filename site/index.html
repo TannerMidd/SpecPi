@@ -175,7 +175,7 @@
         <article>
           <span>03 / outcome</span>
           <h3>Verify and finish</h3>
-          <p>The harness runs the repository gate and supported validators, then retires only on success. Failures stay selected; later friction returns to the menu.</p>
+          <p>The harness runs the repository gate and closed validators, then retires only on success. The journal keeps the evidence, gates, changed files, and version; loop-health metrics show whether improvements stick.</p>
         </article>
       </div>
     </section>
@@ -219,8 +219,8 @@
         <h2 id="belief-title">Let the environment learn from the work—without taking control from the human.</h2>
       </div>
       <div class="belief-copy">
-        <p>ZenPi makes friction legible, preserves the evidence, and asks for the smallest intervention that can be proved and reversed.</p>
-        <p>Use becomes signal. Human judgment turns signal into care. The system gets better without getting noisier.</p>
+        <p>ZenPi makes friction legible, preserves each retirement's proof, and asks for the smallest intervention that can be proved and reversed.</p>
+        <p>Later friction links back to that journal, carries bounded context into human review, and updates local loop-health metrics without restarting work on its own.</p>
       </div>
     </section>
 
@@ -255,6 +255,8 @@
         <li>themed /files review</li>
         <li>provider-safe delegation</li>
         <li>isolated browser QA</li>
+        <li>durable validators</li>
+        <li>improvement journal</li>
         <li>reversible changes</li>
       </ul>
     </section>
@@ -263,13 +265,13 @@
       <div>
         <p class="eyebrow">Begin deliberately</p>
         <h2 id="install-title">Review the plan.<br>Then build.</h2>
-        <p class="release-note">Stable <code>v0.6.1</code> fixes prompt rendering and refreshes the visual self-improvement loop.</p>
+        <p class="release-note">Stable <code>v0.7.0</code> adds durable proofs, an improvement journal, loop-health metrics, and context-rich reopens.</p>
         <p class="release-note">Requires Node.js, npm, and Git. If Pi is missing, the confirmed install adds the reviewed pinned Pi package globally; ZenPi uninstall leaves it in place.</p>
       </div>
       <div class="install-terminal" role="region" aria-label="ZenPi installation commands">
         <div class="terminal-bar"><span>terminal</span><span>nothing hidden</span></div>
         <pre><code><span># clone a release you have reviewed</span>
-git clone --branch v0.6.1 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.7.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 
 <span># Windows PowerShell / Command Prompt</span>
