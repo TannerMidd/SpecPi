@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Reformat all tracked JavaScript and TypeScript for readability with four-space indentation, explicit braced control flow, one statement per line, and consistent spacing around blocks and returns. Add pinned project-local Prettier and ESLint checks so future changes preserve the style.
+- Guide agents to prefer simple, explicit commands while Command Guard is active, reducing avoidable parser-uncertainty approvals without weakening or bypassing protection.
 - Add a first-party, session-scoped command guard with Guard, Strict, Off, and Locked states. Guard is a narrow catastrophe backstop: confirmed host-wide destruction and enforcement tampering are immutable denials, analysis uncertainty asks with UI and denies headlessly, and determinate non-catastrophic work runs without routine prompts. Strict retains broad approval behavior.
 - Add bounded shell-specific analyzers, native PowerShell AST parsing without evaluation, protected-path canonicalization, display redaction, deterministic policy smoke validation, and Linux/Windows regression coverage across PowerShell 5.1, PowerShell 7, cmd, and inert adversarial corpora.
 - Propagate protected modes to supported native subagents through the pinned public preflight contract, a managed child extension, and a reserved binding; preserve unrelated child extensions, block unverifiable launch forms, and exercise a real inert native-child process in CI.
