@@ -939,7 +939,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /id="install"/);
     assert.match(
         html,
-        /Stable <code>v0\.7\.0<\/code> adds durable proofs, an improvement journal, loop-health metrics, and context-rich reopens/,
+        /Stable <code>v0\.8\.0<\/code> adds a session command guard that blocks catastrophic model commands before execution/,
     );
     assert.match(html, /The journal keeps the evidence, gates, changed files, and version/);
     assert.match(html, /Later friction links back to that journal/);
