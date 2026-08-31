@@ -1379,11 +1379,57 @@ function pipelineGroups(analysis) {
     return groups;
 }
 
-// Verbs whose presence beside a catastrophic target is destruction however the surrounding syntax is spelled.
+// Verbs in COMMAND POSITION — the start of the text or just past a command separator. Accepting them after any
+// whitespace made `echo rd /s /q C:\Windows` a match, and the scan runs on text nobody could parse, so a false
+// critical here is a session lock over a command that only printed a string.
 const TEXT_DESTRUCTIVE_VERB =
-    /(?:^|[\s;&|(])(?:rm|rmdir|shred|srm|del|erase|rd|remove-item|ri|clear-item|mkfs(?:\.[a-z0-9]+)?|dd|wipefs|diskpart|format|takeown|mv|move|move-item)(?:[\s;&|)]|$)/i;
+    /(?:^|[;&|(\n\r]|&&|\|\|)\s*(?:rm|rmdir|shred|srm|del|erase|rd|remove-item|ri|clear-item|mkfs(?:\.[a-z0-9]+)?|dd|wipefs|diskpart|format|takeown|move-item)(?:[\s;&|)]|$)/i;
 const TEXT_STANDALONE_CATASTROPHE =
-    /(?:^|[\s;&|(])(?:shutdown|reboot|halt|poweroff|stop-computer|restart-computer)(?:[\s;&|)]|$)|:\s*\(\s*\)\s*\{[^}]*\|[^}]*&[^}]*\}\s*;\s*:/i;
+    /(?:^|[;&|(\n\r]|&&|\|\|)\s*(?:shutdown|reboot|halt|poweroff|stop-computer|restart-computer)(?:[\s;&|)]|$)|:\s*\(\s*\)\s*\{[^}]*\|[^}]*&[^}]*\}\s*;\s*:/i;
+
+// Blanks quoted spans so the scan reads only text the shell would treat as syntax. Without this the scan is
+// quote-blind: `cmd /c echo 'safe & rd /s /q C:\Windows'` prints a string, but its inert quoted argument looked
+// exactly like a catastrophic command and produced a critical, session-locking denial.
+function unquotedProjection(text, shell) {
+    // Backslash escapes the next character in POSIX shells, but in PowerShell and cmd it is a path separator:
+    // blanking it there would turn C:\Windows into an unrecognizable C: indows and silently disarm the scan.
+    const backslashEscapes = !/^(?:powershell|pwsh|cmd|cmd\.exe)$/i.test(String(shell || ""));
+    let output = "",
+        quote = "",
+        escaped = false;
+    for (const character of text) {
+        if (escaped) {
+            output += " ";
+            escaped = false;
+            continue;
+        }
+
+        if (backslashEscapes && character === "\\" && quote !== "'") {
+            escaped = true;
+            output += " ";
+            continue;
+        }
+
+        if (quote) {
+            if (character === quote) {
+                quote = "";
+            }
+
+            output += " ";
+            continue;
+        }
+
+        if (character === "'" || character === '"' || character === "`") {
+            quote = character;
+            output += " ";
+            continue;
+        }
+
+        output += character;
+    }
+
+    return output;
+}
 
 // Pulls the path-shaped tokens out of raw command text without needing a successful parse.
 function textPathTokens(text) {
@@ -1403,11 +1449,13 @@ function textPathTokens(text) {
 // silently converts an immutable catastrophic denial into a prompt a person can approve, which is precisely the
 // case where the guard has the least information and should yield the least ground.
 export function catastrophicTextScan(command, options = {}) {
-    const text = String(command || "");
-    if (!text || Buffer.byteLength(text, "utf8") > 128 * 1024) {
+    const raw = String(command || "");
+    if (!raw || Buffer.byteLength(raw, "utf8") > 128 * 1024) {
         return undefined;
     }
 
+    // Only text the shell would execute as syntax can escalate; quoted arguments are data.
+    const text = unquotedProjection(raw, options.shell);
     if (TEXT_STANDALONE_CATASTROPHE.test(text)) {
         return {
             action: "deny",

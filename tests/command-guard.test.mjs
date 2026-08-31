@@ -582,11 +582,14 @@ test("powerShell parser failure asks and denies without UI", () => {
         assert.ok(parsePowerShellResult(output).parseErrors.length > 0);
     }
 
+    // Windows path spellings only classify as Windows paths under Windows semantics, so the fixture has to pin
+    // the platform rather than inherit the runner's.
     const options = {
         shell: "powershell",
         mode: "guard",
         helperPath: "/not/a/helper",
-        cwd: process.cwd(),
+        cwd: "C:\\work",
+        platform: "win32",
         hasUI: true,
     };
     // A command the parser cannot analyze, whose text carries no catastrophe, is the uncertainty case: ask.
@@ -1180,6 +1183,13 @@ test("bounded deterministic adversarial corpus never allows critical templates",
 // previously reported as a determinate, clean allow, together with a benign near-miss that must stay allowed so
 // the fix cannot be satisfied by simply widening the rule until ordinary work breaks.
 const windowsHost = { shell: "powershell", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
+// `~` resolves through the REAL os.homedir(), so a case about tilde expansion has to run with the platform that
+// actually owns that home directory. Simulating win32 on a POSIX runner asks the guard to classify `/home/runner`
+// under Windows rules, which is a contradiction in the fixture rather than a property of the guard.
+const tildeHost =
+    process.platform === "win32"
+        ? windowsHost
+        : { shell: "powershell", mode: "guard", cwd: process.cwd(), platform: "linux", hasUI: true };
 const reviewBypassCases = [
     [
         "shell keyword swallows the body",
@@ -1203,7 +1213,7 @@ const reviewBypassCases = [
     ["base32 decode into a shell", "ask", posix, "printf x | base32 -d | sh"],
     ["hex decode into a shell", "ask", posix, "printf x | xxd -r -p | sh"],
     ["cmd if conditional", "deny", { ...windowsHost, shell: "cmd" }, String.raw`if 1==1 rd /s /q C:\Windows`],
-    ["powershell tilde is the profile", "deny", windowsHost, "Remove-Item -Recurse -Force ~"],
+    ["powershell tilde is the profile", "deny", tildeHost, "Remove-Item -Recurse -Force ~"],
     ["win32 trailing dot", "deny", { ...windowsHost, shell: "bash" }, "rm -rf C:/Windows."],
     ["windows boot partition", "deny", { ...windowsHost, shell: "bash" }, "rm -rf C:/EFI"],
     ["core windows service", "deny", { ...windowsHost, shell: "cmd" }, "taskkill /f /im svchost.exe"],
@@ -1241,7 +1251,7 @@ const reviewBypassCases = [
         windowsHost,
         String.raw`Push-Location C:\ ; Remove-Item -Recurse -Force Windows`,
     ],
-    ["powershell cd to profile", "deny", windowsHost, String.raw`cd ~ ; Remove-Item -Recurse -Force .`],
+    ["powershell cd to profile", "deny", tildeHost, String.raw`cd ~ ; Remove-Item -Recurse -Force .`],
 ];
 test("every catastrophic bypass confirmed in review stays closed", () => {
     for (const [label, expected, options, command] of reviewBypassCases) {
