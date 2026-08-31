@@ -250,12 +250,15 @@ test("every PowerShell parameter prefix is gated, not just the full spelling", (
     );
     gated("cmd /c'rd /s /q C:/Windows'", powershell);
     gated(`cmd /c"powershell.exe -EncodedCommand ${payload}"`, powershell);
+    // An inline-code argument is program text, so the raw-text backstop reads inside it even with no parser:
+    // the classic fork bomb and a root delete are denied on every host.
     const nestedFork = decideCommand("bash -c ':(){ :|:& };:'", powershell);
-    assert.equal(nestedFork.action, parserAvailable ? "deny" : "ask");
+    assert.equal(nestedFork.action, "deny", JSON.stringify(nestedFork));
+    const nestedDelete = decideCommand("bash -c 'rm -rf /'", powershell);
+    assert.equal(nestedDelete.action, "deny", JSON.stringify(nestedDelete));
+    // A fork bomb spelled with a named function is only recognized structurally, so it still needs a parser.
     const namedNestedFork = decideCommand("bash -c 'f(){ f|f& };f'", powershell);
     assert.equal(namedNestedFork.action, parserAvailable ? "deny" : "ask");
-    const nestedDelete = decideCommand("bash -c 'rm -rf /'", powershell);
-    assert.equal(nestedDelete.action, parserAvailable ? "deny" : "ask");
     assert.equal(decideCommand("bash -c 'printf safe'", powershell).action, parserAvailable ? "allow" : "ask");
 });
 

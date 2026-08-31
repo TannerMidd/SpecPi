@@ -24,7 +24,7 @@ for (const [index, input] of samples.entries()) {
     const result = spawnSync(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper], {
         input,
         encoding: "utf8",
-        timeout: 60000,
+        timeout: 20000,
         maxBuffer: 256 * 1024,
         shell: false,
         windowsHide: true,
@@ -48,7 +48,7 @@ for (const [index, input] of samples.entries()) {
     const result = spawnSync(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper], {
         input,
         encoding: "utf8",
-        timeout: 60000,
+        timeout: 20000,
         maxBuffer: 256 * 1024,
         shell: false,
         windowsHide: true,
