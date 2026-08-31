@@ -69,7 +69,7 @@ Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
 You need Node.js 22.19+, npm, and Git. If Pi (0.84.4+) isn't installed yet, the installer sets it up for you.
 
 ```bash
-git clone --branch v0.7.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.8.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ./zenpi plan      # preview what will change (changes nothing)
 ./zenpi install   # asks for confirmation first
@@ -79,6 +79,8 @@ cd ZenPi
 On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible — see [SECURITY.md](SECURITY.md) for details.
 
 At each interactive top-level session start, choose **Guard** (recommended), **Strict**, or **Off for this session**. For command and mutation calls, Guard is deliberately narrow: it permanently blocks confirmed host-wide catastrophe and command-guard tampering, asks only when analysis cannot rule out that outcome, and otherwise stays out of the way. Determinate project deletion, force push, publication, installation, network, process, service, and other non-catastrophic work therefore runs without routine Guard prompts. Strict retains broad approval prompts for mutation, execution, sensitive reads, elevated/network activity, and uncatalogued tools. Approval prompts can allow once or allow the exact full tool call for this session; use `/guard clear-approvals` to clear those bounded in-memory approvals. Confirmed critical calls are never approvable. Use `/guard status`, `/guard guard`, `/guard strict`, `/guard off`, or `/guard unlock` to inspect or change state. Off requires direct user confirmation, applies only to the top-level session, and is never inherited by children. Print/JSON sessions default to Guard and deny decisions that need a prompt.
+
+Bash and cmd are read at the statement level, so a command hidden behind a conditional, a loop body, a negation or builtin prefix, a `trap` handler, or a heredoc fed to an interpreter is still classified. Working directories are threaded through a sequence, so `cd / && rm -rf usr` is judged against the directory it actually runs in. Protection keys on where a path resolves rather than on words in a command, so a project directory named `token/` or `credentials/` stays ordinary work.
 
 ## Boundaries
 

@@ -40,7 +40,7 @@
       <div class="sidebar-heading">
         <p>Documentation</p>
         <strong>ZenPi Wiki</strong>
-        <span>v0.7.0</span>
+        <span>v0.8.0</span>
       </div>
       <nav aria-label="Wiki sections">
         <div class="sidebar-group">
@@ -92,7 +92,7 @@
       </details>
 
       <header class="wiki-hero" id="overview">
-        <p class="eyebrow">Documentation / v0.7.0</p>
+        <p class="eyebrow">Documentation / v0.8.0</p>
         <h1>Build with care,<br><em>work with proof.</em></h1>
         <p>Everything you need to install ZenPi, understand its human-directed improvement loop, and use its focused review, delegation, and browser tools.</p>
         <div class="wiki-hero-actions">
@@ -132,8 +132,8 @@
 
           <h3>1. Clone a reviewed release</h3>
           <div class="code-block">
-            <div><span>terminal</span><span>release v0.7.0</span></div>
-            <pre><code>git clone --branch v0.7.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+            <div><span>terminal</span><span>release v0.8.0</span></div>
+            <pre><code>git clone --branch v0.8.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi</code></pre>
           </div>
 
@@ -285,6 +285,8 @@ cd ZenPi</code></pre>
             <div><code>/guard unlock</code><span>Review and clear a lock created by a critical attempt.</span></div>
           </div>
           <p>The guard analyzes model calls to Bash and PowerShell, recursively inspects literal cmd-to-PowerShell payloads, protects enforcement-critical reads/writes/edits, and verifies supported direct native child launches through the pinned public <code>pi-subagents/preflight</code> contract. Approval prompts offer <strong>Deny</strong>, <strong>Allow once</strong>, <strong>Allow exact call for session</strong>, and <strong>Lock session</strong>. Lock clears session approvals and blocks protected tools until <code>/guard unlock</code>; every call is reanalyzed and a critical denial is never approvable. Print and JSON sessions default to Guard, and any decision needing a prompt is denied when no UI exists. Direct private-path reads receive narrow protection, but arbitrary shell and script credential reads are not comprehensively detected.</p>
+          <p>Bash and cmd are read at the statement level, so a command guarded by a conditional, a loop body, a negation or builtin prefix, a <code>trap</code> handler, or a heredoc fed to an interpreter is classified rather than absorbed as argument text. Working directories are threaded through a command sequence, so <code>cd / &amp;&amp; rm -rf usr</code> is resolved against the directory in effect where it runs rather than the session directory, and a directory change the analyzer cannot resolve makes later targets uncertain instead of clean. When the structural parser is unavailable, the raw command text — including the payload of an inline-code flag such as <code>-Command</code> or <code>-c</code> — is still scanned for confirmed catastrophe, so an infrastructure failure can never downgrade an immutable denial into an approvable prompt.</p>
+          <p>Protection keys on where a path resolves, not on words inside a command. Credential paths are recognized by shape — dot-prefixed credential files, known credential directories, key and certificate extensions, system locations — so a project directory named <code>token/</code>, <code>secret/</code> or <code>credentials/</code> stays ordinary work. Endpoint-protection services are matched as complete unit names, so units such as <code>redis-sentinel</code> are not mistaken for security controls.</p>
           <aside class="callout callout-boundary">
             <strong>Defense-in-depth boundary</strong>
             <p>This is not an OS sandbox. Direct human shell escapes, malicious extensions, unclassified custom tools, approved or changing scripts, and external processes remain outside its hard boundary. Use least privilege, containers, or VMs for hostile code.</p>
