@@ -3,6 +3,12 @@ import { COMMAND_FLAG, ENCODED_COMMAND_FLAG, HOST_NAMES as POWERSHELL_HOSTS } fr
 
 export const POLICY_VERSION = 1;
 
+// Determinate, noncritical findings are normally filtered out in Guard so routine work stays quiet. These
+// rules are the exception: Guard still asks, because the operation discards or rewrites work — local or
+// remote — that no undo can restore. Critical findings are immutable denials in every mode and do not
+// belong here.
+export const GUARD_APPROVAL_RULES = new Set(["git.destructive", "git.force-push"]);
+
 const DELETE_NAMES = new Set([
     "rm",
     "rmdir",
@@ -836,12 +842,29 @@ function ordinaryLeaf(leaf, options) {
     const args = leaf.args || [];
     const joined = args.join(" ").toLowerCase();
     // These ordinary findings feed Strict's broader approval layer. Core filters determinate noncritical
-    // findings in Guard after all critical and indeterminate results have been aggregated.
+    // findings in Guard after all critical and indeterminate results have been aggregated, except the work-
+    // destroying rules in GUARD_APPROVAL_RULES, which Guard still surfaces.
     const guard = options.mode === "guard";
     const classifiedTargets = pathArguments(args, options).map((target) => classifyPath(target, options));
     const escapesWorkspace = classifiedTargets.some((result) => result.protected || !result.withinWorkspace);
     const workspaceFileOperation = guard && classifiedTargets.length > 0 && !escapesWorkspace;
     const workspaceExecution = guard && !escapesWorkspace;
+
+    // Force pushes and the destructive Git family below are the determinate, noncritical operations Guard
+    // still surfaces: they discard or rewrite work no undo can restore. A force push gets its own rule id
+    // because it rewrites remote history collaborators may already hold; --force-with-lease narrows the race
+    // but still overwrites the remote ref, so it asks as well. Ordered ahead of the general git.destructive
+    // rule so a force push reports its own id.
+    if (name === "git" && /(?:^|\s)push(?:\s|$)/i.test(joined) && /(?:^|\s)(?:--force|-f)\b/i.test(joined)) {
+        return match(
+            "git.force-push",
+            "high",
+            "git",
+            "A force push rewrites remote history and needs approval.",
+            leaf,
+            "Push without force, or confirm the remote ref and use --force-with-lease.",
+        );
+    }
 
     if (
         name === "git" &&
@@ -1800,6 +1823,7 @@ export const ruleCatalog = Object.freeze({
         "filesystem.write",
         "fs.root-recursive-delete",
         "git.destructive",
+        "git.force-push",
         "guard.redirect-tamper",
         "guard.self-tamper",
         "network.or.remote",

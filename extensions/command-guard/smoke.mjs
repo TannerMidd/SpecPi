@@ -167,6 +167,61 @@ export async function runCommandGuardSmoke() {
             "ask",
         ],
         [
+            "guard force push",
+            decideCommand("git push --force", {
+                shell: "bash",
+                mode: "guard",
+                cwd: process.cwd(),
+                platform: "linux",
+                hasUI: true,
+            }),
+            "ask",
+        ],
+        [
+            "strict force push",
+            decideCommand("git push --force", {
+                shell: "bash",
+                mode: "strict",
+                cwd: process.cwd(),
+                platform: "linux",
+                hasUI: true,
+            }),
+            "ask",
+        ],
+        [
+            "guard ordinary push",
+            decideCommand("git push origin main", {
+                shell: "bash",
+                mode: "guard",
+                cwd: process.cwd(),
+                platform: "linux",
+                hasUI: true,
+            }),
+            "allow",
+        ],
+        [
+            "guard destructive git",
+            decideCommand("git reset --hard", {
+                shell: "bash",
+                mode: "guard",
+                cwd: process.cwd(),
+                platform: "linux",
+                hasUI: true,
+            }),
+            "ask",
+        ],
+        [
+            "guard remote ref deletion",
+            decideCommand("git push --delete origin topic", {
+                shell: "bash",
+                mode: "guard",
+                cwd: process.cwd(),
+                platform: "linux",
+                hasUI: true,
+            }),
+            "ask",
+        ],
+        [
             "guard bounded system-tree write",
             decidePath("/etc/unused-review-note", "write", {
                 mode: "guard",

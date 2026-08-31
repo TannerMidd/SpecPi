@@ -293,7 +293,6 @@ test("guard allows determinate non-catastrophic work while Strict asks", () => {
     for (const command of [
         "rm -rf node_modules",
         "echo x > ../outside.txt",
-        "git push --force",
         "npm publish",
         "npm install lodash",
         "curl -O https://example.invalid/y",
@@ -317,6 +316,53 @@ test("guard allows determinate non-catastrophic work while Strict asks", () => {
         const decision = decideCommand(command, posix);
         assert.equal(decision.action, "deny", command);
         assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
+    }
+});
+
+test("guard asks before Git discards or rewrites work", () => {
+    const strict = { ...posix, mode: "strict" };
+    // A force push rewrites remote history no local undo can restore, so Guard surfaces it for approval
+    // instead of treating it as routine work. --force-with-lease narrows the race but still overwrites.
+    for (const command of [
+        "git push --force",
+        "git push -f",
+        "git push origin main --force",
+        "git push --force-with-lease",
+        "git push --force-if-includes",
+        "git -C src push --force",
+    ]) {
+        const decision = decideCommand(command, posix);
+        assert.equal(decision.action, "ask", command);
+        assert.ok(decision.ruleIds.includes("git.force-push"), `${command}: ${JSON.stringify(decision)}`);
+        assert.equal(decideCommand(command, strict).action, "ask", `strict: ${command}`);
+    }
+
+    // The wider destructive family deletes repo or remote work outright, so Guard asks before any of it.
+    for (const command of [
+        "git push --delete origin topic",
+        "git reset --hard",
+        "git clean -fd",
+        "git clean -xfd",
+        "git -C packages/app clean -xfd",
+        "git branch -D topic",
+        "git tag -d v1.0",
+        "git checkout -- src/x.ts",
+        "git restore --staged src/x.ts",
+        "git stash drop",
+        "git rebase main",
+        "git reflog expire --expire=now --all",
+        "git gc --prune=now",
+    ]) {
+        const decision = decideCommand(command, posix);
+        assert.equal(decision.action, "ask", command);
+        assert.ok(decision.ruleIds.includes("git.destructive"), `${command}: ${JSON.stringify(decision)}`);
+        assert.equal(decideCommand(command, strict).action, "ask", `strict: ${command}`);
+    }
+
+    // Ordinary remote updates stay quiet in Guard.
+    for (const command of ["git push", "git push origin main", "git pull", "git fetch origin"]) {
+        assert.equal(decideCommand(command, posix).action, "allow", command);
+        assert.equal(decideCommand(command, strict).action, "ask", `strict: ${command}`);
     }
 });
 
@@ -1298,8 +1344,6 @@ test("closing the bypasses does not capture ordinary work", () => {
         [posix, "cd packages/app && npm run build"],
         [posix, "cd build && rm -rf out"],
         [posix, "rm -rf node_modules"],
-        [posix, "git clean -xfd"],
-        [posix, "git -C packages/app clean -xfd"],
         [posix, "git -c user.name=x commit -m y"],
         [posix, "cat file | tr a b"],
         // Endpoint-protection matching keys on complete unit tokens; these merely contain a scary substring.

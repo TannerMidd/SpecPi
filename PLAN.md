@@ -101,7 +101,7 @@ Once analysis is determinate and no immutable rule matches, Guard allows the cal
 - local scripts, project hooks, plugins, tests, builds, and package scripts;
 - package installation, update, removal, publication, and registry operations;
 - network transfer, remote execution, and downloads not piped unresolved into an interpreter;
-- Git reset, clean, rebase, branch/tag deletion, and force push;
+- ordinary Git pushes, pulls, fetches, and history inspection (destructive Git operations — force push, remote ref deletion, hard reset, clean, branch/tag deletion, stash drop, discarding checkout/restore, and history rewrites — ask in Guard because they destroy work no undo restores);
 - workspace and out-of-workspace file creation, overwrite, movement, and bounded deletion;
 - recursive deletion that does not encompass a protected system/root/profile target;
 - database drops, migration rollback, container prune, Kubernetes mutation, and cloud/IaC destruction;
@@ -295,7 +295,8 @@ Verify representative operations in both modes:
 
 - package install: Guard allow, Strict ask;
 - network transfer: Guard allow, Strict ask;
-- force push: Guard allow, Strict ask;
+- destructive Git (force push, remote deletion, reset --hard, clean, branch/tag deletion, stash drop, rebase): Guard ask, Strict ask;
+- ordinary push, pull, fetch: Guard allow, Strict ask;
 - bounded recursive workspace deletion: Guard allow, Strict ask;
 - out-of-workspace write: Guard allow, Strict ask;
 - inline interpreter code: Guard allow, Strict ask;
