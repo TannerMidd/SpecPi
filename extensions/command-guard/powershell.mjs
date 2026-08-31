@@ -8,14 +8,18 @@ import { analyze as analyzeCmd, literalCmdPayload } from "./cmd.mjs";
 export const POWERSHELL_LIMITS = Object.freeze({
     maxInput: 128 * 1024,
     maxCommands: 128,
-    // A cold Windows PowerShell 5.1 start on a loaded CI runner or a first call on a slow disk routinely passes
-    // three seconds. That bound made the FIRST analysis of a session time out, and an infrastructure timeout
-    // downgrades a catastrophic denial to an approvable prompt, so the tight bound was itself the safety problem.
-    // Subsequent calls run in well under half a second; this only has to cover interpreter startup.
-    timeoutMs: 20000,
+    // Deliberately short. A cold Windows PowerShell 5.1 start can exceed this, but the raw-text backstop in
+    // rules.mjs means a timeout can no longer downgrade a catastrophe into an approvable prompt, so waiting
+    // longer buys no safety and costs it elsewhere: every timed-out parse pays the full bound, and a host that
+    // is timing out repeatedly turns a fast failure into minutes of dead wall-clock time.
+    timeoutMs: 3000,
+    // Interpreter startup is paid once per process, not per analysis, so only the first spawn gets this budget.
+    // Applying it to every call is what turned a handful of slow parses into minutes of CI wall-clock time.
+    coldStartTimeoutMs: 15000,
     maxOutput: 256 * 1024,
     maxDepth: 8,
 });
+let parserWarmed = false;
 const aliasMap = new Map(
     Object.entries({
         ac: "add-content",
@@ -536,10 +540,14 @@ function runParser(executable, helper, input, limits) {
         PATH: process.env.PATH || "",
         TEMP: process.env.TEMP || "",
     };
+    const timeout = parserWarmed
+        ? limits.timeoutMs
+        : Math.max(limits.timeoutMs, limits.coldStartTimeoutMs || limits.timeoutMs);
+    parserWarmed = true;
     const result = spawnSync(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper], {
         input,
         encoding: "utf8",
-        timeout: limits.timeoutMs,
+        timeout,
         maxBuffer: limits.maxOutput,
         shell: false,
         windowsHide: true,
