@@ -254,7 +254,9 @@ test("every PowerShell parameter prefix is gated, not just the full spelling", (
     // the classic fork bomb and a root delete are denied on every host.
     const nestedFork = decideCommand("bash -c ':(){ :|:& };:'", powershell);
     assert.equal(nestedFork.action, "deny", JSON.stringify(nestedFork));
-    const nestedDelete = decideCommand("bash -c 'rm -rf /'", powershell);
+    // The target is spelled for the fixture's platform so it classifies lexically: a bare POSIX "/" under win32
+    // semantics only resolves through the host filesystem, which makes the expectation depend on the runner.
+    const nestedDelete = decideCommand("bash -c 'rm -rf C:/Windows'", powershell);
     assert.equal(nestedDelete.action, "deny", JSON.stringify(nestedDelete));
     // A fork bomb spelled with a named function is only recognized structurally, so it still needs a parser.
     const namedNestedFork = decideCommand("bash -c 'f(){ f|f& };f'", powershell);
