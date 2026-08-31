@@ -54,6 +54,7 @@ jobs:
           $env:ZENPI_TEST_GIT_BASH = Join-Path $env:ProgramFiles "Git\bin\bash.exe"
           if (-not (Test-Path $env:ZENPI_TEST_GIT_BASH)) { throw "Git Bash is required for the Windows command-guard matrix" }
           $env:ZENPI_TEST_POWERSHELL_EXE = (Get-Command powershell.exe).Source
+          node tests/fixtures/command-guard-parser-timing.mjs
           node tests/fixtures/command-guard-windows-runtime.mjs
           $env:ZENPI_TEST_POWERSHELL_EXE = (Get-Command pwsh.exe).Source
           node tests/fixtures/command-guard-windows-runtime.mjs

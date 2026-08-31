@@ -14,14 +14,10 @@ export const POWERSHELL_LIMITS = Object.freeze({
     timeoutMs: 8000,
     // Interpreter startup is paid once per process, not per analysis, so only the first spawn gets this budget.
     coldStartTimeoutMs: 15000,
-    // A host that times out this many times in a row is treated as unavailable for the rest of the process. The
-    // raw-text backstop still classifies the command, so this trades no safety for a bounded worst case.
-    consecutiveTimeoutLimit: 3,
     maxOutput: 256 * 1024,
     maxDepth: 8,
 });
 let parserWarmed = false;
-const parserTimeouts = new Map();
 const aliasMap = new Map(
     Object.entries({
         ac: "add-content",
@@ -542,11 +538,6 @@ function runParser(executable, helper, input, limits) {
         PATH: process.env.PATH || "",
         TEMP: process.env.TEMP || "",
     };
-    const limit = limits.consecutiveTimeoutLimit || POWERSHELL_LIMITS.consecutiveTimeoutLimit;
-    if ((parserTimeouts.get(executable) || 0) >= limit) {
-        return unavailable("helper-timeout");
-    }
-
     const timeout = parserWarmed
         ? limits.timeoutMs
         : Math.max(limits.timeoutMs, limits.coldStartTimeoutMs || limits.timeoutMs);
@@ -561,13 +552,8 @@ function runParser(executable, helper, input, limits) {
         env,
     });
     if (result.error) {
-        const timedOut = result.error.code === "ETIMEDOUT";
-        parserTimeouts.set(executable, timedOut ? (parserTimeouts.get(executable) || 0) + 1 : 0);
-
-        return unavailable(timedOut ? "helper-timeout" : "helper-failure");
+        return unavailable(result.error.code === "ETIMEDOUT" ? "helper-timeout" : "helper-failure");
     }
-
-    parserTimeouts.set(executable, 0);
 
     if (result.status !== 0 || typeof result.stdout !== "string" || result.stderr) {
         return unavailable("helper-failure");
