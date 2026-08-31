@@ -8,12 +8,11 @@ import { analyze as analyzeCmd, literalCmdPayload } from "./cmd.mjs";
 export const POWERSHELL_LIMITS = Object.freeze({
     maxInput: 128 * 1024,
     maxCommands: 128,
-    // Sized so a loaded CI runner completes a normal parse, without letting a pathological host burn minutes:
-    // every timed-out parse pays this bound in full, so a large value multiplied by the parses one session makes
-    // is what turned an eight-minute job into a seventeen-minute one.
-    timeoutMs: 8000,
+    // A healthy parse is ~400ms warm and ~1.4s cold on a CI runner, so this is generous headroom. It is kept
+    // small deliberately: every timed-out parse pays the bound in full, and a session makes many of them.
+    timeoutMs: 5000,
     // Interpreter startup is paid once per process, not per analysis, so only the first spawn gets this budget.
-    coldStartTimeoutMs: 15000,
+    coldStartTimeoutMs: 10000,
     maxOutput: 256 * 1024,
     maxDepth: 8,
 });
@@ -532,12 +531,40 @@ export function preferParserResult(previous, candidate) {
     return infrastructureFailure(previous) && !infrastructureFailure(candidate) ? candidate : previous;
 }
 
+// The helper runs with a reduced environment so no credential-bearing variable reaches it. The allowlist below
+// is the set Windows PowerShell 5.1 needs in order to START: measured on a Windows Server 2025 runner, omitting
+// PSModulePath/APPDATA made every 5.1 spawn hang until it was killed — zero output, no error — while the same
+// spawn with these present completed in ~380ms. PowerShell 7 was unaffected either way. None of these carry
+// secrets; tokens, keys and profile-specific credentials are still withheld.
+const PARSER_ENVIRONMENT = [
+    "SystemRoot",
+    "SystemDrive",
+    "windir",
+    "PATH",
+    "PATHEXT",
+    "TEMP",
+    "TMP",
+    "ComSpec",
+    "PSModulePath",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "USERPROFILE",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "ProgramFiles",
+    "ProgramFiles(x86)",
+    "ProgramData",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+];
 function runParser(executable, helper, input, limits) {
-    const env = {
-        SystemRoot: process.env.SystemRoot || "C:\\Windows",
-        PATH: process.env.PATH || "",
-        TEMP: process.env.TEMP || "",
-    };
+    const env = { SystemRoot: process.env.SystemRoot || "C:\\Windows", PATH: process.env.PATH || "", TEMP: "" };
+    for (const name of PARSER_ENVIRONMENT) {
+        if (typeof process.env[name] === "string") {
+            env[name] = process.env[name];
+        }
+    }
+
     const timeout = parserWarmed
         ? limits.timeoutMs
         : Math.max(limits.timeoutMs, limits.coldStartTimeoutMs || limits.timeoutMs);
