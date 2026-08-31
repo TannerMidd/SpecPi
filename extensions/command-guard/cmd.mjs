@@ -296,6 +296,16 @@ export function analyze(input, options = {}) {
             attachPowerShellPayload(leaf, leaf.args, options, limits, dynamicConstructs);
         } else if (n === "for") {
             dynamicConstructs.push({ kind: "dynamic-for" });
+        } else if (n === "if" || n === "else") {
+            // `if 1==1 rd /s /q C:\Windows` runs the delete. Only `for` was flagged, so the guarded command
+            // behind an `if` was parsed as argument text of a program named "if" and never classified.
+            const tail = conditionalTail(n, leaf.rawArgs || leaf.args || []);
+            if (tail === undefined || (options.depth || 0) >= limits.maxDepth) {
+                dynamicConstructs.push({ kind: `dynamic-${n}` });
+            } else {
+                leaf.nested = analyze(tail, { ...options, depth: (options.depth || 0) + 1 });
+                dynamicConstructs.push({ kind: `nested-${n}` }, ...leaf.nested.dynamicConstructs);
+            }
         } else if (["wmic", "mshta", "rundll32", "regsvr32"].includes(n)) {
             dynamicConstructs.push({ kind: `dynamic-${n}` });
         }
@@ -320,6 +330,40 @@ export function analyze(input, options = {}) {
             dynamicConstructs.some((item) => /dynamic|batch|limit|missing|expansion/.test(item.kind)) ||
             leaves.some((leaf) => leaf.dynamic || leaf.nested?.indeterminate),
     };
+}
+
+// Strips a cmd conditional header and returns the command it guards, or undefined when the shape is not one of
+// the documented forms. Block bodies `( … )` and delayed expansion stay unresolved so the caller asks.
+function conditionalTail(name, args) {
+    const list = args.map((arg) => String(arg));
+    let index = 0;
+    if (name === "if") {
+        while (index < list.length && /^(?:\/i|not)$/i.test(list[index])) {
+            index += 1;
+        }
+
+        const head = list[index];
+        if (head === undefined) {
+            return undefined;
+        }
+
+        if (/^(?:errorlevel|exist|defined)$/i.test(head)) {
+            index += 2;
+        } else if (/==/.test(head)) {
+            index += 1;
+        } else if (/^(?:equ|neq|lss|leq|gtr|geq)$/i.test(list[index + 1] || "")) {
+            index += 3;
+        } else {
+            return undefined;
+        }
+    }
+
+    const tail = list.slice(index);
+    if (!tail.length || tail[0].startsWith("(") || tail.some((arg) => /[%!]/.test(arg))) {
+        return undefined;
+    }
+
+    return tail.join(" ");
 }
 
 export const analyzeCmd = analyze;

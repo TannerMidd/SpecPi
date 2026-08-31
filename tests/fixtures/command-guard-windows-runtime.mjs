@@ -165,9 +165,13 @@ assert.equal(decideCommand("cmd /c start powershell.exe -Command Write-Output sa
 assert.equal(decideCommand('cmd /c start "cmd" powershell.exe -Command Write-Output safe', cmd).action, "allow");
 assert.equal(decideCommand("cmd /c powershell.exe -Unsupported payload", cmd).action, "ask");
 const cmdPayload = "echo CMD_FIRST&echo CMD_SECOND";
+// Node re-quotes arguments before handing them to CreateProcess, which turns the already-quoted `/c "…"` form
+// into a single unrecognized token. windowsVerbatimArguments passes the command line through untouched, which is
+// the whole point here: this assertion exists to prove the real cmd.exe accepts the exact text being classified.
 const cmdRun = spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", `"${cmdPayload}"`], {
     encoding: "utf8",
     windowsHide: true,
+    windowsVerbatimArguments: true,
 });
 assert.equal(cmdRun.status, 0, cmdRun.stderr);
 assert.match(cmdRun.stdout, /CMD_FIRST/);

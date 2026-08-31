@@ -501,6 +501,32 @@ function scan(input, limits) {
     return { tokens, redirects, dynamicConstructs, parseErrors: errors };
 }
 
+// Shell reserved words are STRUCTURE, not programs. They were being taken as the leaf executable, so in
+// `if true; then rm -rf /; fi` the real command survived only as an argument list hanging off a leaf named
+// `then` — and every rule keys on the executable, so the delete was never classified at all.
+// Stripping them in command position puts the actual program back in command position.
+const structuralKeywords = new Set([
+    "!",
+    "then",
+    "else",
+    "elif",
+    "do",
+    "time",
+    "{",
+    "}",
+    "(",
+    ")",
+    "coproc",
+    "builtin",
+    "command",
+    "nocorrect",
+    "if",
+    "while",
+    "until",
+]);
+// Words that only ever close a block, and loop/case headers whose remainder is a word list rather than a command.
+const terminatorKeywords = new Set(["fi", "done", "esac", "in", "]]", "[["]);
+const headerKeywords = new Set(["for", "select", "case", "function"]);
 function leafFrom(words) {
     if (!words.length) {
         return undefined;
@@ -509,6 +535,21 @@ function leafFrom(words) {
     let start = 0;
     while (start < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[start].text)) {
         start += 1;
+    }
+
+    // A quoted word is a literal filename, never a reserved word, so `raw` must still match the bare text.
+    const bare = (word) => word && (word.raw ?? word.text) === word.text;
+    // `if`/`while`/`until` are stripped too: what follows them is the condition, which is itself a real command.
+    while (start < words.length && bare(words[start]) && structuralKeywords.has(words[start].text)) {
+        start += 1;
+        while (start < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[start].text)) {
+            start += 1;
+        }
+    }
+
+    const head = words[start];
+    if (head && bare(head) && (terminatorKeywords.has(head.text) || headerKeywords.has(head.text))) {
+        return undefined;
     }
 
     const commandWords = words.slice(start);
@@ -789,9 +830,36 @@ function heredocConsumerKind(leaf) {
             .replace(/\.exe$/, "")
             .split(/[\\/]/)
             .pop();
-        if (shells.has(name)) {
-            if ((current.args || []).some((arg) => /^-[a-z]*c[a-z]*$/i.test(String(arg)))) {
-                return "data";
+        // `su`/`runuser` with no -c start a shell that reads stdin as commands, exactly like a bare `sh`.
+        if (shells.has(name) || name === "su" || name === "runuser") {
+            const flag = (current.args || []).findIndex((arg) => /^-[a-z]*c[a-z]*$/i.test(String(arg)));
+            if (flag >= 0) {
+                // `bash -c 'sh'` runs `sh`, and THAT process still inherits the heredoc on stdin. Treating the
+                // body as inert data on the mere presence of -c let `bash -c 'sh' <<EOF … EOF` execute it
+                // completely unanalyzed. Resolve what -c actually launches and ask again.
+                const payload = current.args[flag + 1];
+                if (typeof payload !== "string" || !payload || /[$`]/.test(payload)) {
+                    return "unknown";
+                }
+
+                const inner = leafFrom(
+                    payload
+                        .trim()
+                        .split(/\s+/)
+                        .map((text) => token(text)),
+                );
+                if (!inner) {
+                    return "unknown";
+                }
+
+                current = inner;
+                continue;
+            }
+
+            // For su/runuser the positional argument is the target USER, not a script, so stdin is still the
+            // command source: `su root <<EOF … EOF` runs the body as root.
+            if (name === "su" || name === "runuser") {
+                return "bash";
             }
 
             const script = (current.args || []).find((arg) => !String(arg).startsWith("-"));
@@ -1066,6 +1134,22 @@ function addNested(leaves, options, dynamicConstructs, depth) {
 
         // watch joins its remaining arguments and hands them to a shell, so its tail is a command string in both
         // `watch rm -rf /etc` and `watch 'rm -rf /etc'` form.
+        // `trap 'rm -rf /' EXIT` registers a command string that the shell runs later. It reached the analyzer as
+        // an ordinary quoted argument to a command named `trap`, so the payload was never classified.
+        if (name === "trap") {
+            dynamicConstructs.push({ kind: "trap-wrapper" });
+            const handler = (leaf.args || []).find((arg) => !String(arg).startsWith("-"));
+            if (typeof handler !== "string" || !handler || /[$`]/.test(handler) || handler === "-") {
+                if (handler !== "-" && handler !== "") {
+                    dynamicConstructs.push({ kind: "dynamic-trap" });
+                }
+            } else {
+                adopt(leaf, analyze(handler, { ...options, depth: depth + 1 }), "trap");
+            }
+
+            continue;
+        }
+
         if (name === "eval" || name === "xargs" || name === "watch") {
             dynamicConstructs.push({ kind: `${name}-wrapper` });
             if (name === "xargs") {

@@ -589,10 +589,24 @@ test("powerShell parser failure asks and denies without UI", () => {
         cwd: process.cwd(),
         hasUI: true,
     };
-    const result = decideCommand("Remove-Item C:\\Windows\\System32", options);
+    // A command the parser cannot analyze, whose text carries no catastrophe, is the uncertainty case: ask.
+    const result = decideCommand("Get-Content .\\notes.txt", options);
     assert.equal(result.action, "ask");
     assert.equal(result.indeterminate, true);
-    assert.equal(decideCommand("Remove-Item C:\\Windows\\System32", { ...options, hasUI: false }).action, "deny");
+    assert.equal(decideCommand("Get-Content .\\notes.txt", { ...options, hasUI: false }).action, "deny");
+
+    // But an unavailable parser must never DOWNGRADE a catastrophe into something a person can approve. The
+    // raw-text backstop keeps the denial immutable in exactly the case where the guard knows the least.
+    for (const command of [
+        "Remove-Item -Recurse -Force C:\\Windows",
+        "Remove-Item C:\\Windows\\System32",
+        "Stop-Computer",
+    ]) {
+        const denied = decideCommand(command, options);
+        assert.equal(denied.action, "deny", `${command}: ${JSON.stringify(denied)}`);
+        assert.equal(denied.severity, "critical", `${command}: ${JSON.stringify(denied)}`);
+        assert.equal(decideCommand(command, { ...options, hasUI: false }).action, "deny", command);
+    }
 });
 
 const recoveryParser = parserHosts({ shell: "powershell" }).find((entry) => fs.existsSync(entry));
@@ -610,8 +624,12 @@ test("enforcement reparses after a transient PowerShell parser failure", { skip:
     };
     try {
         fs.writeFileSync(helperPath, "[Console]::Out.Write('not json')\n", "utf8");
-        assert.equal(decideCommand("Remove-Item -Recurse -Force C:\\Windows", options).action, "ask");
+        // A benign command proves the reparse: it can only become allowable once the helper works again.
+        assert.equal(decideCommand("Get-ChildItem C:\\work", options).action, "ask");
+        // A catastrophic one proves the failure never buys an approval prompt in either state.
+        assert.equal(decideCommand("Remove-Item -Recurse -Force C:\\Windows", options).action, "deny");
         fs.copyFileSync(path.resolve("extensions/command-guard/powershell-parser.ps1"), helperPath);
+        assert.equal(decideCommand("Get-ChildItem C:\\work", options).action, "allow");
         assert.equal(decideCommand("Remove-Item -Recurse -Force C:\\Windows", options).action, "deny");
     } finally {
         fs.rmSync(directory, { recursive: true, force: true });
@@ -1156,4 +1174,188 @@ test("bounded deterministic adversarial corpus never allows critical templates",
     }
 
     assert.equal(cases, 27);
+});
+
+// One regression case per catastrophic→allow class confirmed during review. Each entry is a payload the guard
+// previously reported as a determinate, clean allow, together with a benign near-miss that must stay allowed so
+// the fix cannot be satisfied by simply widening the rule until ordinary work breaks.
+const windowsHost = { shell: "powershell", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
+const reviewBypassCases = [
+    [
+        "shell keyword swallows the body",
+        "deny",
+        { ...windowsHost, shell: "bash" },
+        "if true; then rm -rf C:/Windows; fi",
+    ],
+    ["while loop body", "deny", posix, "while true; do rm -rf /; done"],
+    ["for loop body", "deny", posix, "for f in x; do rm -rf /; done"],
+    ["negation prefix", "deny", { ...windowsHost, shell: "bash" }, "! rm -rf C:/Windows"],
+    ["builtin prefix", "deny", posix, "builtin rm -rf /"],
+    ["trap handler string", "deny", posix, "trap 'rm -rf /' EXIT"],
+    ["coproc prefix", "deny", posix, "coproc rm -rf /"],
+    [
+        "heredoc consumer behind -c",
+        "deny",
+        { ...windowsHost, shell: "bash" },
+        "bash -c 'sh' <<EOF\nrm -rf C:/Windows\nEOF",
+    ],
+    ["heredoc consumed by su", "deny", posix, "su root <<EOF\nrm -rf /\nEOF"],
+    ["base32 decode into a shell", "ask", posix, "printf x | base32 -d | sh"],
+    ["hex decode into a shell", "ask", posix, "printf x | xxd -r -p | sh"],
+    ["cmd if conditional", "deny", { ...windowsHost, shell: "cmd" }, String.raw`if 1==1 rd /s /q C:\Windows`],
+    ["powershell tilde is the profile", "deny", windowsHost, "Remove-Item -Recurse -Force ~"],
+    ["win32 trailing dot", "deny", { ...windowsHost, shell: "bash" }, "rm -rf C:/Windows."],
+    ["windows boot partition", "deny", { ...windowsHost, shell: "bash" }, "rm -rf C:/EFI"],
+    ["core windows service", "deny", { ...windowsHost, shell: "cmd" }, "taskkill /f /im svchost.exe"],
+    ["cd then relative delete", "deny", posix, "cd / && rm -rf usr"],
+    ["cd then wildcard delete", "deny", posix, "cd /etc && rm -rf *"],
+    [
+        "set-location then relative",
+        "deny",
+        windowsHost,
+        String.raw`Set-Location C:\ ; Remove-Item -Recurse -Force Windows`,
+    ],
+    ["cmd cd /d then relative", "deny", { ...windowsHost, shell: "cmd" }, String.raw`cd /d C:\ && rmdir /s /q Windows`],
+    ["wrapper --chdir then relative", "deny", posix, "env --chdir=/ rm -rf usr"],
+    ["macos firmlinked system tree", "deny", { ...posix, platform: "darwin" }, "rm -rf /private/etc"],
+    ["macos firmlinked var tree", "deny", { ...posix, platform: "darwin" }, "rm -rf /private/var"],
+    // The fixes are structural, so every other spelling of the same construct has to close with them.
+    ["else branch", "deny", posix, "if false; then :; else rm -rf /; fi"],
+    ["elif branch", "deny", posix, "if false; then :; elif true; then rm -rf /; fi"],
+    ["case branch", "deny", posix, "case x in y) rm -rf / ;; esac"],
+    ["brace group", "deny", posix, "{ rm -rf /; }"],
+    ["nested conditionals", "deny", posix, "if true; then if true; then rm -rf /; fi; fi"],
+    ["select loop body", "deny", posix, "select f in a; do rm -rf /; done"],
+    ["stacked prefixes", "deny", posix, "time builtin rm -rf /"],
+    ["repeated negation", "deny", posix, "! ! rm -rf /"],
+    ["condition position", "deny", posix, "if ! rm -rf /; then :; fi"],
+    ["cd inside a loop body", "deny", posix, "while :; do cd / && rm -rf usr; done"],
+    ["bare shell heredoc", "deny", posix, "sh <<EOF\nrm -rf /\nEOF"],
+    ["quoted-delimiter heredoc", "deny", posix, "bash <<'EOF'\nrm -rf /\nEOF"],
+    ["heredoc through sudo su", "deny", posix, "sudo su <<EOF\nrm -rf /\nEOF"],
+    ["cmd block body", "deny", { ...windowsHost, shell: "cmd" }, String.raw`if 1==1 (rd /s /q C:\Windows)`],
+    ["cmd comparison operator", "deny", { ...windowsHost, shell: "cmd" }, String.raw`if 1 equ 1 rd /s /q C:\Windows`],
+    [
+        "powershell push-location",
+        "deny",
+        windowsHost,
+        String.raw`Push-Location C:\ ; Remove-Item -Recurse -Force Windows`,
+    ],
+    ["powershell cd to profile", "deny", windowsHost, String.raw`cd ~ ; Remove-Item -Recurse -Force .`],
+];
+test("every catastrophic bypass confirmed in review stays closed", () => {
+    for (const [label, expected, options, command] of reviewBypassCases) {
+        const decision = decideCommand(command, options);
+        assert.equal(decision.action, expected, `${label}: ${JSON.stringify(decision)}`);
+        if (expected === "deny") {
+            assert.equal(decision.severity, "critical", `${label}: ${JSON.stringify(decision)}`);
+        }
+    }
+
+    assert.equal(reviewBypassCases.length, 40);
+});
+
+test("closing the bypasses does not capture ordinary work", () => {
+    const allowed = [
+        [posix, "if [ -f package.json ]; then npm test; fi"],
+        [posix, "for f in *.ts; do echo hello; done"],
+        [posix, "while true; do echo tick; done"],
+        [posix, "trap - EXIT"],
+        [posix, "cat <<EOF\nrm -rf /\nEOF"],
+        [posix, "cd packages/app && npm run build"],
+        [posix, "cd build && rm -rf out"],
+        [posix, "rm -rf node_modules"],
+        [posix, "git clean -xfd"],
+        [posix, "git -C packages/app clean -xfd"],
+        [posix, "git -c user.name=x commit -m y"],
+        [posix, "cat file | tr a b"],
+        // Endpoint-protection matching keys on complete unit tokens; these merely contain a scary substring.
+        [posix, "systemctl stop redis-sentinel"],
+        [posix, "systemctl stop security-scanner.service"],
+        [posix, "systemctl restart my-firewall-ui"],
+        [posix, "systemctl stop nginx"],
+        [{ ...windowsHost, shell: "cmd" }, "taskkill /f /im node.exe"],
+        [{ ...windowsHost, shell: "cmd" }, "if 1==1 echo hello"],
+        [{ ...windowsHost, shell: "cmd" }, "if exist package.json npm test"],
+    ];
+    for (const [options, command] of allowed) {
+        const decision = decideCommand(command, options);
+        assert.equal(decision.action, "allow", `${command}: ${JSON.stringify(decision)}`);
+    }
+});
+
+test("guard self-protection covers ancestors that contain enforcement state", () => {
+    const previous = process.env.PI_CODING_AGENT_DIR;
+    process.env.PI_CODING_AGENT_DIR = "/tmp/zenpi-agent";
+    const options = { ...posix, cwd: "/work" };
+    try {
+        // Deleting the directory that CONTAINS the guard reaches the same state as deleting the guard itself.
+        for (const target of [
+            "/tmp/zenpi-agent",
+            "/tmp/zenpi-agent/extensions",
+            "/tmp/zenpi-agent/extensions/command-guard",
+            "/tmp/zenpi-agent/extensions/command-guard/rules.mjs",
+            "/tmp/zenpi-agent/zenpi",
+            "/tmp/zenpi-agent/settings.json",
+        ]) {
+            const decision = decideCommand(`rm -rf ${target}`, options);
+            assert.equal(decision.action, "deny", `${target}: ${JSON.stringify(decision)}`);
+            assert.equal(decision.severity, "critical", target);
+        }
+
+        // A destructive Git operation run inside that tree reverts the guard just as effectively.
+        const reverted = decideCommand(
+            "git -C /tmp/zenpi-agent checkout -- extensions/command-guard/rules.mjs",
+            options,
+        );
+        assert.equal(reverted.action, "deny", JSON.stringify(reverted));
+        assert.equal(reverted.severity, "critical");
+
+        // Unrelated siblings inside the agent directory remain ordinary work.
+        assert.equal(decideCommand("rm -rf /tmp/zenpi-agent/extensions/browser", options).action, "allow");
+        assert.equal(decideCommand("rm -rf /tmp/zenpi-agent-scratch", options).action, "allow");
+    } finally {
+        if (previous === undefined) {
+            delete process.env.PI_CODING_AGENT_DIR;
+        } else {
+            process.env.PI_CODING_AGENT_DIR = previous;
+        }
+    }
+});
+
+test("an unresolvable directory change makes later targets uncertain rather than clean", () => {
+    const dynamic = decideCommand("cd $TARGET && rm -rf usr", posix);
+    assert.equal(dynamic.action, "ask");
+    assert.equal(dynamic.indeterminate, true);
+    assert.equal(decideCommand("cd $TARGET && rm -rf usr", { ...posix, hasUI: false }).action, "deny");
+    const popped = decideCommand("pushd /etc; popd; rm -rf usr", posix);
+    assert.equal(popped.action, "ask", JSON.stringify(popped));
+});
+
+test("credential paths are matched by shape, not by ordinary directory names", () => {
+    const options = { mode: "guard", cwd: "/home/dev/project", platform: "linux", hasUI: true };
+    // A monorepo package named token/ or secret/ is source code, not a credential store.
+    for (const ordinary of [
+        "src/token/index.ts",
+        "packages/token/src/api.ts",
+        "src/secret/index.ts",
+        "app/credentials/list.tsx",
+        "docs/passwd",
+        "src/api/session.ts",
+        "README.md",
+    ]) {
+        assert.equal(decidePath(ordinary, "read", options).action, "allow", ordinary);
+    }
+
+    for (const credential of [
+        "/etc/passwd",
+        "config/credentials.json",
+        "certs/dev.key",
+        "deploy/server.pem",
+        "~/.aws/credentials",
+        "~/.ssh/id_ed25519",
+        "~/.npmrc",
+    ]) {
+        assert.equal(decidePath(credential, "read", options).action, "deny", credential);
+    }
 });

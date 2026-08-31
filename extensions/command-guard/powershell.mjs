@@ -8,7 +8,11 @@ import { analyze as analyzeCmd, literalCmdPayload } from "./cmd.mjs";
 export const POWERSHELL_LIMITS = Object.freeze({
     maxInput: 128 * 1024,
     maxCommands: 128,
-    timeoutMs: 3000,
+    // A cold Windows PowerShell 5.1 start on a loaded CI runner or a first call on a slow disk routinely passes
+    // three seconds. That bound made the FIRST analysis of a session time out, and an infrastructure timeout
+    // downgrades a catastrophic denial to an approvable prompt, so the tight bound was itself the safety problem.
+    // Subsequent calls run in well under half a second; this only has to cover interpreter startup.
+    timeoutMs: 20000,
     maxOutput: 256 * 1024,
     maxDepth: 8,
 });

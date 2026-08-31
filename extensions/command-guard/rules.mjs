@@ -132,7 +132,21 @@ const DOWNLOAD_NAMES = new Set([
     "bitsadmin",
     "certutil",
 ]);
-const DECODER_NAMES = new Set(["base64", "openssl", "certutil", "uudecode"]);
+// Every one of these turns opaque bytes back into runnable text, so limiting the decode-to-interpreter rule to
+// base64 left base32, hex and uuencode as equivalent uninspected channels into the same shell.
+const DECODER_NAMES = new Set([
+    "base64",
+    "base32",
+    "basenc",
+    "openssl",
+    "certutil",
+    "uudecode",
+    "xxd",
+    "hexdump",
+    "od",
+    "tr",
+    "rev",
+]);
 const NETWORK_NAMES = new Set([
     ...DOWNLOAD_NAMES,
     "scp",
@@ -172,6 +186,11 @@ const SERVICE_NAMES = new Set([
     "new-service",
     "remove-service",
 ]);
+// Endpoint-protection services matched as COMPLETE tokens. Substring matching on words such as "security",
+// "firewall" and "sentinel" turned ordinary units — `redis-sentinel`, `security-scanner.service`, an in-house
+// `firewall-ui` — into critical denials that locked the session, the opposite of a catastrophe backstop.
+const SECURITY_SERVICE_TOKEN =
+    /(?:^|[\s"'=/\\])(?:windefend|windefendsvc|securityhealthservice|sense|mpssvc|auditd|firewalld|ufw|apparmor|selinux|clamav(?:-[a-z]+)?|falcon[-_]?sensor|crowdstrike[a-z-]*|sentinelone|sentinelagent|wazuh[a-z-]*|osqueryd|carbonblack|cbdaemon|defender|windowsdefender)(?:\.(?:service|exe))?(?:$|[\s"'/\\;,])/i;
 const PERMISSION_NAMES = new Set(["chmod", "chown", "chgrp", "setfacl", "icacls", "takeown", "set-acl"]);
 const ACCOUNT_NAMES = new Set([
     "useradd",
@@ -481,8 +500,7 @@ function criticalLeaf(leaf, options) {
 
     if (
         (name === "auditctl" && /(?:^|\s)-e\s*0(?:\s|$)/i.test(` ${joined}`)) ||
-        (name === "systemctl" &&
-            /\b(?:stop|disable|mask)\b.*\b(?:auditd|firewalld|ufw|defender|security)\b/i.test(joined))
+        (name === "systemctl" && /\b(?:stop|disable|mask)\b/i.test(joined) && SECURITY_SERVICE_TOKEN.test(joined))
     ) {
         return match(
             "security.disable",
@@ -535,7 +553,7 @@ function criticalLeaf(leaf, options) {
     if (
         [...SERVICE_NAMES, "net"].includes(name) &&
         /\b(?:stop|disable|delete|remove|unload)\b/i.test(joined) &&
-        /(?:windefend|securityhealth|sense|defender|auditd|firewall|crowdstrike|falcon|sentinel|endpoint)/i.test(joined)
+        SECURITY_SERVICE_TOKEN.test(joined)
     ) {
         return match(
             "security.disable",
@@ -650,7 +668,10 @@ function criticalLeaf(leaf, options) {
     const criticalProcess =
         args.some((arg) => ["0", "1", "*"].includes(String(arg))) ||
         String(args.at(-1)) === "-1" ||
-        /\b(?:system|systemd|init|wininit|csrss|lsass)\b/i.test(joined) ||
+        // Killing any of these takes the host down as surely as killing init does.
+        /\b(?:system|systemd|init|wininit|csrss|lsass|svchost|services|smss|winlogon|lsm|launchd|kernel_task)(?:\.exe)?\b/i.test(
+            joined,
+        ) ||
         /(?:^|\s)-(?:u|U|G|P)\s+(?:root|0|1)(?:\s|$)|(?:^|\s)-f\s+[.*+](?:\s|$)/i.test(` ${joined}`) ||
         (args.includes("--") && args.slice(args.indexOf("--") + 1).includes("-1"));
     if (["kill", "killall", "pkill", "taskkill", "stop-process"].includes(name) && criticalProcess) {
@@ -765,6 +786,29 @@ function criticalLeaf(leaf, options) {
             "critical",
             "protected-path",
             "The command writes, moves, or mutates a protected path.",
+            leaf,
+        );
+    }
+
+    // A destructive Git operation rewrites or discards whatever tree it runs in, so when that tree IS protected
+    // host or enforcement state it is the same tampering as deleting the files directly. `git -C <agent-dir>
+    // checkout -- extensions/command-guard/rules.mjs` silently reverted the guard's own sources.
+    const gitDestructive =
+        name === "git" &&
+        /(?:^|\s)(?:reset\s+--hard|clean\s+-[a-z]*f|checkout\s+--|restore\b|stash\s+(?:drop|clear)|filter-(?:branch|repo))/i.test(
+            joined,
+        );
+    if (
+        gitDestructive &&
+        (classifyPath(options.cwd || ".", options).protected ||
+            isAgentPath(options.cwd || ".", options) ||
+            targets().targets.some((target) => isAgentPath(target, options) || classifyPath(target, options).protected))
+    ) {
+        return match(
+            "guard.self-tamper",
+            "critical",
+            "protected-path",
+            "A destructive Git operation targets protected host or ZenPi enforcement state.",
             leaf,
         );
     }
@@ -1179,7 +1223,110 @@ function redirectsWithShell(analysis) {
 }
 
 function leafOptions(leaf, options) {
-    return { ...options, shell: leaf.shell || options.shell };
+    return {
+        ...options,
+        shell: leaf.shell || options.shell,
+        cwd: typeof leaf.cwd === "string" && leaf.cwd ? leaf.cwd : options.cwd,
+    };
+}
+
+const CHDIR_NAMES = new Set(["cd", "chdir", "pushd", "popd", "set-location", "sl", "push-location", "pop-location"]);
+// Wrappers that run their payload from a different directory. `-C` is matched case-sensitively because
+// `git -c key=value` is configuration, not a directory change.
+function runnerWorkingDirectory(name, args) {
+    const flags = ["git", "tar", "make", "gmake"].includes(name)
+        ? ["-C", "--directory"]
+        : name === "env"
+          ? ["--chdir"]
+          : [];
+    if (!flags.length) {
+        return undefined;
+    }
+
+    const list = (args || []).map((arg) => String(arg));
+    for (let index = 0; index < list.length; index += 1) {
+        const arg = list[index];
+        for (const flag of flags) {
+            if (arg === flag) {
+                return list[index + 1];
+            }
+
+            if (arg.startsWith(`${flag}=`)) {
+                return arg.slice(flag.length + 1);
+            }
+
+            if (/^-[A-Za-z]$/.test(flag) && arg.startsWith(flag) && arg.length > flag.length) {
+                return arg.slice(flag.length);
+            }
+        }
+    }
+
+    return undefined;
+}
+
+// Threads the working directory through a command sequence. Every relative target used to resolve against the
+// SESSION cwd no matter what ran before it, so `cd / && rm -rf usr` was reported as a determinate, clean delete
+// of <session>/usr while it actually removed /usr — and the same held for `Set-Location C:\` and `cd /d C:\`.
+// A directory change the analyzer cannot resolve poisons every later leaf rather than being ignored.
+function applyWorkingDirectories(analysis, options) {
+    let anyUnresolved = false;
+    const resolve = (target, base) => {
+        if (base === undefined) {
+            return undefined;
+        }
+
+        const result = classifyPath(target, { ...options, cwd: base });
+
+        return typeof result.lexical === "string" && result.lexical ? result.lexical : undefined;
+    };
+
+    // Each nested block keeps its own directory state: a `cd` inside `bash -c '…'` or behind an argv-prefix
+    // runner must not leak back out into the enclosing sequence.
+    const walk = (node, inherited, inheritedUnresolved) => {
+        let current = inherited,
+            unresolved = inheritedUnresolved;
+        for (const leaf of node.leaves || []) {
+            const name = normalized(leaf.executable);
+            const runner = runnerWorkingDirectory(name, leaf.args);
+            let leafCwd = unresolved ? undefined : current;
+            let leafUnresolved = unresolved;
+            if (runner !== undefined) {
+                leafCwd = runner === "[dynamic]" ? undefined : resolve(runner, current);
+                leafUnresolved = unresolved || leafCwd === undefined;
+            }
+
+            leaf.cwd = leafCwd;
+            leaf.unresolvedCwd = leafUnresolved;
+            anyUnresolved = anyUnresolved || leafUnresolved;
+            if (leaf.nested) {
+                walk(leaf.nested, leafCwd, leafUnresolved);
+            }
+
+            if (!CHDIR_NAMES.has(name)) {
+                continue;
+            }
+
+            const targets = pathArguments(leaf.args || [], { ...options, shell: leaf.shell || options.shell });
+            if (name === "popd" || targets.length > 1 || (!targets.length && (leaf.args || []).length)) {
+                unresolved = true;
+            } else if (!targets.length) {
+                // A bare `cd` returns to the home directory in every shell that treats it as a directory change.
+                current = /^(?:cmd|cmd\.exe)$/i.test(String(leaf.shell || options.shell || ""))
+                    ? current
+                    : resolve("~", current);
+                unresolved = unresolved || current === undefined;
+            } else {
+                current = resolve(targets[0], current);
+                unresolved = unresolved || current === undefined;
+            }
+
+            anyUnresolved = anyUnresolved || unresolved;
+        }
+    };
+
+    walk(analysis, typeof options.cwd === "string" ? options.cwd : undefined, false);
+
+    return anyUnresolved;
 }
 
 function nestedNames(leaf) {
@@ -1232,10 +1379,90 @@ function pipelineGroups(analysis) {
     return groups;
 }
 
+// Verbs whose presence beside a catastrophic target is destruction however the surrounding syntax is spelled.
+const TEXT_DESTRUCTIVE_VERB =
+    /(?:^|[\s;&|(])(?:rm|rmdir|shred|srm|del|erase|rd|remove-item|ri|clear-item|mkfs(?:\.[a-z0-9]+)?|dd|wipefs|diskpart|format|takeown|mv|move|move-item)(?:[\s;&|)]|$)/i;
+const TEXT_STANDALONE_CATASTROPHE =
+    /(?:^|[\s;&|(])(?:shutdown|reboot|halt|poweroff|stop-computer|restart-computer)(?:[\s;&|)]|$)|:\s*\(\s*\)\s*\{[^}]*\|[^}]*&[^}]*\}\s*;\s*:/i;
+
+// Pulls the path-shaped tokens out of raw command text without needing a successful parse.
+function textPathTokens(text) {
+    return text
+        .split(/[\s;&|<>()`]+/)
+        .map((token) => {
+            const unquoted = token.replace(/^["']+/, "").replace(/["']+$/, "");
+            const assigned = unquoted.includes("=") ? unquoted.slice(unquoted.lastIndexOf("=") + 1) : unquoted;
+
+            return assigned.replace(/[,]+$/, "");
+        })
+        .filter((token) => token && (/[\\/]/.test(token) || token === "~" || /^[a-z]:$/i.test(token)));
+}
+
+// A last-resort scan of the RAW command text, used only when the structural parser could not produce a usable
+// analysis. Without it an infrastructure failure — a helper timeout, a missing interpreter, a blown limit —
+// silently converts an immutable catastrophic denial into a prompt a person can approve, which is precisely the
+// case where the guard has the least information and should yield the least ground.
+export function catastrophicTextScan(command, options = {}) {
+    const text = String(command || "");
+    if (!text || Buffer.byteLength(text, "utf8") > 128 * 1024) {
+        return undefined;
+    }
+
+    if (TEXT_STANDALONE_CATASTROPHE.test(text)) {
+        return {
+            action: "deny",
+            severity: "critical",
+            category: "system",
+            ruleIds: ["parser.unanalyzed-catastrophe"],
+            leaves: [],
+            reason: "The command could not be parsed and its text carries a host-destroying operation.",
+            indeterminate: true,
+        };
+    }
+
+    if (!TEXT_DESTRUCTIVE_VERB.test(text)) {
+        return undefined;
+    }
+
+    const scanOptions = { ...options, mode: "guard", read: false };
+    const reaches = textPathTokens(text).some((token) => {
+        try {
+            return classifyPath(token, scanOptions).protected || isAgentPath(token, scanOptions);
+        } catch {
+            return false;
+        }
+    });
+
+    return reaches
+        ? {
+              action: "deny",
+              severity: "critical",
+              category: "filesystem",
+              ruleIds: ["parser.unanalyzed-catastrophe"],
+              leaves: [],
+              reason: "The command could not be parsed and its text targets a protected host or enforcement path.",
+              indeterminate: true,
+          }
+        : undefined;
+}
+
 export function evaluateRules(analysis, options = {}) {
     const findings = [];
+    const unresolvedWorkingDirectory = applyWorkingDirectories(analysis, options);
     const allLeaves = flatten(analysis);
     const criticalOnly = options.criticalOnly === true;
+    if (unresolvedWorkingDirectory) {
+        findings.push({
+            action: "ask",
+            severity: "high",
+            category: "dynamic",
+            ruleIds: ["parser.indeterminate"],
+            leaves: [],
+            reason: "A directory change could not be resolved, so later targets are ambiguous; approval is required.",
+            indeterminate: true,
+        });
+    }
+
     if (!criticalOnly) {
         const readsProtectedInput = allLeaves.some(
             (leaf) =>
@@ -1496,6 +1723,7 @@ export const ruleCatalog = Object.freeze({
         "package.mutation",
         "package.registry-mutation",
         "parser.indeterminate",
+        "parser.unanalyzed-catastrophe",
         "path.protected-mutation",
         "parser.integrity",
         "parser.syntax",

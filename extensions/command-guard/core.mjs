@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { analyze as analyzeBash } from "./bash.mjs";
 import { analyze as analyzeCmd } from "./cmd.mjs";
 import { analyze as analyzePowerShell } from "./powershell.mjs";
-import { evaluateRules, findMutates, POLICY_VERSION, ruleCatalog } from "./rules.mjs";
+import { catastrophicTextScan, evaluateRules, findMutates, POLICY_VERSION, ruleCatalog } from "./rules.mjs";
 import { classifyPath, pathDecision } from "./paths.mjs";
 import { boundedReason, redactCommand } from "./redact.mjs";
 
@@ -373,6 +373,12 @@ export function decideCommand(command, options = {}) {
         );
     const decisions = evaluateRules(analysis, { ...options, criticalOnly: parserFailure });
     if (parserFailure) {
+        // The structural analysis is unusable, so fall back to reading the raw text before settling for an ask.
+        const unparsed = catastrophicTextScan(command, options);
+        if (unparsed) {
+            decisions.push(unparsed);
+        }
+
         decisions.push({
             action: "ask",
             severity: "high",
