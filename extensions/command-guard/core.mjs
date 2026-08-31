@@ -2,7 +2,14 @@ import crypto from "node:crypto";
 import { analyze as analyzeBash } from "./bash.mjs";
 import { analyze as analyzeCmd } from "./cmd.mjs";
 import { analyze as analyzePowerShell } from "./powershell.mjs";
-import { catastrophicTextScan, evaluateRules, findMutates, POLICY_VERSION, ruleCatalog } from "./rules.mjs";
+import {
+    catastrophicTextScan,
+    evaluateRules,
+    findMutates,
+    GUARD_APPROVAL_RULES,
+    POLICY_VERSION,
+    ruleCatalog,
+} from "./rules.mjs";
 import { classifyPath, pathDecision } from "./paths.mjs";
 import { boundedReason, redactCommand } from "./redact.mjs";
 
@@ -414,9 +421,18 @@ export function decideCommand(command, options = {}) {
         });
     }
 
+    // Guard stays quiet for determinate noncritical work, with one explicit exception set: rules such as
+    // git.force-push and git.destructive that discard or rewrite work still surface as approvals rather than
+    // running silently.
     const applicable =
         mode === "guard"
-            ? decisions.filter((item) => item.action === "deny" || item.severity === "critical" || item.indeterminate)
+            ? decisions.filter(
+                  (item) =>
+                      item.action === "deny" ||
+                      item.severity === "critical" ||
+                      item.indeterminate ||
+                      (item.ruleIds || []).some((id) => GUARD_APPROVAL_RULES.has(id)),
+              )
             : decisions;
     const result = aggregateDecisions(applicable, options);
     if (mode === "strict" && result.action === "allow" && !clearlyReadOnly(analysis)) {

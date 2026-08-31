@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1 - 2026-08-30
+
+- Ask for Guard approval before Git destroys work. Force pushes (`--force`, `-f`, `--force-with-lease`, `--force-if-includes`) and the wider destructive Git family — remote ref deletion, hard resets, cleans, branch and tag deletion, stash drops, discarding checkouts and restores, rebases, and history rewrites — now surface an approval in Guard instead of running silently, because they discard or rewrite work no local undo restores. Ordinary pushes, pulls, and fetches stay quiet in Guard; all of it still asks in Strict.
+
 ## 0.8.0 - 2026-08-31
 
 - Parse Bash and cmd at the statement level instead of treating every word in command position as a program. Shell reserved words (`if`/`then`/`while`/`until`/`for`/`do`), the `!` negation prefix, and the `builtin`/`command`/`coproc`/`time` prefixes were taken as leaf executables, so in `if true; then rm -rf /; fi` the real command survived only as an argument list on a leaf named `then` and matched no rule at all. `trap 'rm -rf /' EXIT` now analyzes its handler string, and cmd `if` conditionals are unwrapped the way `for` already was.

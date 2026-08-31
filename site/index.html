@@ -29,6 +29,7 @@
       <a href="#wishlist">The loop</a>
       <a href="#workings">How it works</a>
       <a href="#delegation">Delegation</a>
+      <a href="#guard">Guard</a>
       <a href="#goal">The goal</a>
       <a href="#install">Install</a>
       <a class="wiki-link" href="wiki/">Wiki</a>
@@ -212,6 +213,28 @@
       </div>
     </section>
 
+    <section class="guard" id="guard" aria-labelledby="guard-title">
+      <div class="section-intro compact">
+        <p class="eyebrow">Session command guard</p>
+        <h2 id="guard-title">Dangerous commands<br>stop at the door.</h2>
+        <p>Every model-initiated command is analyzed before it runs. Confirmed catastrophe is denied outright, what the analysis cannot settle asks first, and ordinary work runs quietly.</p>
+      </div>
+
+      <div class="guard-console" role="region" aria-label="Command guard modes and example decisions">
+        <div class="guard-modes" aria-label="Session modes">
+          <div><span>guard</span><strong>Recommended</strong><em class="active">active backstop</em></div>
+          <div><span>strict</span><strong>Approve broadly</strong><em>mutation · execution · network</em></div>
+          <div><span>off</span><strong>Session-only</strong><em>confirmed · never inherited</em></div>
+        </div>
+        <ul class="guard-decisions" aria-label="How Guard decides">
+          <li><code>rm -rf /</code><span>confirmed catastrophe</span><em class="blocked">denied · never approvable</em></li>
+          <li><code>git push --force</code><span>destroys shared work</span><em class="asked">asks first</em></li>
+          <li><code>npm test</code><span>ordinary project work</span><em class="allowed">runs quietly</em></li>
+        </ul>
+        <p class="guard-note"><strong>Boundary:</strong> defense in depth, not an OS sandbox — use least privilege, containers, or VMs for hostile code. Inspect or change the mode any time with <code>/guard</code>.</p>
+      </div>
+    </section>
+
     <section class="belief" id="goal" aria-labelledby="belief-title">
       <div class="belief-mark" aria-hidden="true">π</div>
       <div>
@@ -266,13 +289,13 @@
       <div>
         <p class="eyebrow">Begin deliberately</p>
         <h2 id="install-title">Review the plan.<br>Then build.</h2>
-        <p class="release-note">Stable <code>v0.8.0</code> adds a session command guard that blocks catastrophic model commands before execution, with Guard, Strict, and Off modes.</p>
+        <p class="release-note">Stable <code>v0.8.1</code> adds a session command guard that blocks catastrophic model commands before execution and asks before Git destroys work.</p>
         <p class="release-note">Requires Node.js, npm, and Git. If Pi is missing, the confirmed install adds the reviewed pinned Pi package globally; ZenPi uninstall leaves it in place.</p>
       </div>
       <div class="install-terminal" role="region" aria-label="ZenPi installation commands">
         <div class="terminal-bar"><span>terminal</span><span>nothing hidden</span></div>
         <pre><code><span># clone a release you have reviewed</span>
-git clone --branch v0.8.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.8.1 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 
 <span># Windows PowerShell / Command Prompt</span>

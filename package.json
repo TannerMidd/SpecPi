@@ -1,6 +1,6 @@
 {
   "name": "zenpi",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "An explicit, provider-safe, self-improving harness for the Pi coding agent",
   "author": "Tanner Middleton",
   "repository": {
