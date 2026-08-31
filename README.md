@@ -58,7 +58,8 @@ The goal is not autonomous self-modification. It is to make the next justified c
 - **Loop health** — `/wishlist status` and the report show retirements, reopen rate, open reviews, time-to-retire, and qualification rate
 - **`/harness-improvement`** — pick one item and let ZenPi fix and verify it
 - **`/zen-subagents`** — remember how you like your subagents set up
-- **Isolated browser** — check your web UI with screenshots, safely sandboxed
+- **Command guard** — choose Guard, Strict, or Off at session start; known catastrophic commands are blocked before execution
+- **Isolated browser** — check your web UI with screenshots in a fresh browser context
 - **Careful installs** — everything is backed up and can be rolled back
 
 Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
@@ -68,7 +69,7 @@ Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
 You need Node.js 22.19+, npm, and Git. If Pi (0.84.4+) isn't installed yet, the installer sets it up for you.
 
 ```bash
-git clone --branch v0.7.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.8.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ./zenpi plan      # preview what will change (changes nothing)
 ./zenpi install   # asks for confirmation first
@@ -77,18 +78,26 @@ cd ZenPi
 
 On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible — see [SECURITY.md](SECURITY.md) for details.
 
+At each interactive top-level session start, choose **Guard** (recommended), **Strict**, or **Off for this session**. For command and mutation calls, Guard is deliberately narrow: it permanently blocks confirmed host-wide catastrophe and command-guard tampering, asks only when analysis cannot rule out that outcome, and otherwise stays out of the way. Determinate project deletion, force push, publication, installation, network, process, service, and other non-catastrophic work therefore runs without routine Guard prompts. Strict retains broad approval prompts for mutation, execution, sensitive reads, elevated/network activity, and uncatalogued tools. Approval prompts can allow once or allow the exact full tool call for this session; use `/guard clear-approvals` to clear those bounded in-memory approvals. Confirmed critical calls are never approvable. Use `/guard status`, `/guard guard`, `/guard strict`, `/guard off`, or `/guard unlock` to inspect or change state. Off requires direct user confirmation, applies only to the top-level session, and is never inherited by children. Print/JSON sessions default to Guard and deny decisions that need a prompt.
+
+Bash and cmd are read at the statement level, so a command hidden behind a conditional, a loop body, a negation or builtin prefix, a `trap` handler, or a heredoc fed to an interpreter is still classified. Working directories are threaded through a sequence, so `cd / && rm -rf usr` is judged against the directory it actually runs in. Protection keys on where a path resolves rather than on words in a command, so a project directory named `token/` or `credentials/` stays ordinary work.
+
 ## Boundaries
 
-ZenPi never touches your credentials, sessions, or history, and nothing is ever uploaded. Wishlist reports are stored locally only — skim them before sharing. Nothing happens without your say-so: improving ZenPi, installing, or publishing all need your explicit approval.
+ZenPi never persists command text and does not read Pi credentials, sessions, or history. Wishlist reports are stored locally only — skim them before sharing. Nothing happens without your say-so: improving ZenPi, installing, or publishing all need your explicit approval.
+
+The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, `edit`, and native-subagent seams. It is defense in depth, not an OS sandbox: direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its hard boundary. Direct recognized private-path reads receive narrow protection, but the guard does not comprehensively detect credentials read through arbitrary shell syntax or scripts. Use OS permissions, a least-privilege account, container, or VM when code or data is hostile.
 
 See [SECURITY.md](SECURITY.md) for the full picture.
 
 ## Development
 
 ```bash
+npm install --ignore-scripts --omit=peer --no-package-lock
+npm run format
 npm run check
 ```
 
-The repository check validates syntax, runs the complete Node test suite, and executes every validator linked from the capability registry with isolated prerequisites.
+JavaScript and TypeScript use four-space indentation, explicit braced control-flow blocks, one statement per line, and breathing room after blocks and before returns. `npm run format` applies the project-local Prettier and ESLint rules. The repository check enforces that formatting before validating syntax and running the complete Node test suite. It also executes every validator linked from the capability registry with isolated prerequisites.
 
 MIT licensed.

@@ -10,7 +10,9 @@
   ],
   "subagents": {
     "defaultThinking": "medium",
-    "defaultExtensions": [],
+    "defaultExtensions": [
+      "__ZENPI_COMMAND_GUARD_EXTENSION__"
+    ],
     "maxThinking": "high",
     "modelScope": {
       "enforce": true,
@@ -34,7 +36,8 @@
         "model": "inherit",
         "thinking": "medium",
         "extensions": [
-          "__PI_WEB_ACCESS_EXTENSION__"
+          "__PI_WEB_ACCESS_EXTENSION__",
+          "__ZENPI_COMMAND_GUARD_EXTENSION__"
         ]
       },
       "worker": {

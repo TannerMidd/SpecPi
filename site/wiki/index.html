@@ -40,7 +40,7 @@
       <div class="sidebar-heading">
         <p>Documentation</p>
         <strong>ZenPi Wiki</strong>
-        <span>v0.7.0</span>
+        <span>v0.8.0</span>
       </div>
       <nav aria-label="Wiki sections">
         <div class="sidebar-group">
@@ -54,6 +54,7 @@
           <a href="#workflows">Improvement loop</a>
           <a href="#file-review">Review files</a>
           <a href="#delegation">Delegate safely</a>
+          <a href="#command-guard">Command guard</a>
           <a href="#browser-qa">Browser QA</a>
         </div>
         <div class="sidebar-group">
@@ -81,6 +82,7 @@
           <a href="#workflows">Improvement loop</a>
           <a href="#file-review">File review</a>
           <a href="#delegation">Delegation</a>
+          <a href="#command-guard">Command guard</a>
           <a href="#browser-qa">Browser QA</a>
           <a href="#reference">Commands</a>
           <a href="#configuration">Configuration</a>
@@ -90,7 +92,7 @@
       </details>
 
       <header class="wiki-hero" id="overview">
-        <p class="eyebrow">Documentation / v0.7.0</p>
+        <p class="eyebrow">Documentation / v0.8.0</p>
         <h1>Build with care,<br><em>work with proof.</em></h1>
         <p>Everything you need to install ZenPi, understand its human-directed improvement loop, and use its focused review, delegation, and browser tools.</p>
         <div class="wiki-hero-actions">
@@ -130,8 +132,8 @@
 
           <h3>1. Clone a reviewed release</h3>
           <div class="code-block">
-            <div><span>terminal</span><span>release v0.7.0</span></div>
-            <pre><code>git clone --branch v0.7.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
+            <div><span>terminal</span><span>release v0.8.0</span></div>
+            <pre><code>git clone --branch v0.8.0 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi</code></pre>
           </div>
 
@@ -269,8 +271,31 @@ cd ZenPi</code></pre>
         </div>
       </section>
 
+      <section class="wiki-section" id="command-guard" aria-labelledby="command-guard-title">
+        <div class="section-label"><span>06</span><p>Command guard</p></div>
+        <div class="doc-content">
+          <h2 id="command-guard-title">Stop dangerous model commands before execution.</h2>
+          <p>Interactive top-level sessions start with a choice. For command and mutation calls, <strong>Guard</strong> permanently blocks confirmed host-wide catastrophe and guard tampering, asks only when analysis cannot rule out that outcome, and otherwise stays out of the way — even for destructive project work, force push, publication, installation, network, process, and service changes; <strong>Strict</strong> retains broad approval prompts for mutation, execution, sensitive reads, elevated or network activity, and uncatalogued tools; <strong>Off</strong> requires direct user confirmation, lasts only for that top-level session, and is never inherited by children.</p>
+          <div class="command-stack">
+            <div><code>/guard status</code><span>Show mode, lock state, policy version, approval count, and in-memory counters.</span></div>
+            <div><code>/guard guard</code><span>Use the recommended catastrophe-only backstop.</span></div>
+            <div><code>/guard strict</code><span>Require approval for the broader mutation and execution surface.</span></div>
+            <div><code>/guard clear-approvals</code><span>Clear exact-call approvals retained for this session.</span></div>
+            <div><code>/guard off</code><span>Explicitly disable protection for this top-level session.</span></div>
+            <div><code>/guard unlock</code><span>Review and clear a lock created by a critical attempt.</span></div>
+          </div>
+          <p>The guard analyzes model calls to Bash and PowerShell, recursively inspects literal cmd-to-PowerShell payloads, protects enforcement-critical reads/writes/edits, and verifies supported direct native child launches through the pinned public <code>pi-subagents/preflight</code> contract. Approval prompts offer <strong>Deny</strong>, <strong>Allow once</strong>, <strong>Allow exact call for session</strong>, and <strong>Lock session</strong>. Lock clears session approvals and blocks protected tools until <code>/guard unlock</code>; every call is reanalyzed and a critical denial is never approvable. Print and JSON sessions default to Guard, and any decision needing a prompt is denied when no UI exists. Direct private-path reads receive narrow protection, but arbitrary shell and script credential reads are not comprehensively detected.</p>
+          <p>Bash and cmd are read at the statement level, so a command guarded by a conditional, a loop body, a negation or builtin prefix, a <code>trap</code> handler, or a heredoc fed to an interpreter is classified rather than absorbed as argument text. Working directories are threaded through a command sequence, so <code>cd / &amp;&amp; rm -rf usr</code> is resolved against the directory in effect where it runs rather than the session directory, and a directory change the analyzer cannot resolve makes later targets uncertain instead of clean. When the structural parser is unavailable, the raw command text — including the payload of an inline-code flag such as <code>-Command</code> or <code>-c</code> — is still scanned for confirmed catastrophe, so an infrastructure failure can never downgrade an immutable denial into an approvable prompt.</p>
+          <p>Protection keys on where a path resolves, not on words inside a command. Credential paths are recognized by shape — dot-prefixed credential files, known credential directories, key and certificate extensions, system locations — so a project directory named <code>token/</code>, <code>secret/</code> or <code>credentials/</code> stays ordinary work. Endpoint-protection services are matched as complete unit names, so units such as <code>redis-sentinel</code> are not mistaken for security controls.</p>
+          <aside class="callout callout-boundary">
+            <strong>Defense-in-depth boundary</strong>
+            <p>This is not an OS sandbox. Direct human shell escapes, malicious extensions, unclassified custom tools, approved or changing scripts, and external processes remain outside its hard boundary. Use least privilege, containers, or VMs for hostile code.</p>
+          </aside>
+        </div>
+      </section>
+
       <section class="wiki-section" id="browser-qa" aria-labelledby="browser-qa-title">
-        <div class="section-label"><span>06</span><p>Browser QA</p></div>
+        <div class="section-label"><span>07</span><p>Browser QA</p></div>
         <div class="doc-content">
           <h2 id="browser-qa-title">Inspect what users actually see.</h2>
           <p>ZenPi's browser tools open pages in a fresh isolated Chromium context. Use rendered snapshots and screenshots at relevant desktop, tablet, and mobile viewports; source inspection alone is not visual proof.</p>
@@ -288,7 +313,7 @@ cd ZenPi</code></pre>
       </section>
 
       <section class="wiki-section" id="reference" aria-labelledby="reference-title">
-        <div class="section-label"><span>07</span><p>Reference</p></div>
+        <div class="section-label"><span>08</span><p>Reference</p></div>
         <div class="doc-content">
           <h2 id="reference-title">Command reference.</h2>
           <div class="reference-table" role="region" aria-label="ZenPi command reference" tabindex="0">
@@ -305,6 +330,7 @@ cd ZenPi</code></pre>
                 <tr><th scope="row"><code>/zen-subagents</code></th><td>Configure role defaults for the active exact provider.</td></tr>
                 <tr><th scope="row"><code>/zen-subagents status</code></th><td>Inspect profile, scope, stale roles, and global capacity.</td></tr>
                 <tr><th scope="row"><code>/zen-subagents reset</code></th><td>Reset the active provider's role profile.</td></tr>
+                <tr><th scope="row"><code>/guard [status|guard|strict|off|unlock|clear-approvals]</code></th><td>Inspect or change session-only command protection.</td></tr>
                 <tr><th scope="row"><code>/reload</code></th><td>Reload Pi after installation or a startup-loaded configuration change.</td></tr>
               </tbody>
             </table>
@@ -313,7 +339,7 @@ cd ZenPi</code></pre>
       </section>
 
       <section class="wiki-section" id="configuration" aria-labelledby="configuration-title">
-        <div class="section-label"><span>08</span><p>Configuration</p></div>
+        <div class="section-label"><span>09</span><p>Configuration</p></div>
         <div class="doc-content">
           <h2 id="configuration-title">Know what ZenPi owns.</h2>
           <p>ZenPi merges documented leaves and preserves unrelated packages and configuration. Managed state lives under the Pi agent directory; setting <code>PI_CODING_AGENT_DIR</code> relocates the equivalent paths.</p>
@@ -328,14 +354,14 @@ cd ZenPi</code></pre>
       </section>
 
       <section class="wiki-section" id="security" aria-labelledby="security-title">
-        <div class="section-label"><span>09</span><p>Security</p></div>
+        <div class="section-label"><span>10</span><p>Security</p></div>
         <div class="doc-content">
           <h2 id="security-title">Trust is explicit.</h2>
           <div class="boundary-grid">
             <article><span>Local</span><h3>Evidence stays here</h3><p>Wishlist reports and journals are bounded, sanitized, archive-safe, and never uploaded by ZenPi.</p></article>
             <article><span>Human</span><h3>Choice grants authority</h3><p>Qualification recommends work; one explicit selection starts it.</p></article>
             <article><span>Exact</span><h3>Providers do not blur</h3><p>Different-provider child execution is blocked, even for similarly named models.</p></article>
-            <article><span>Reversible</span><h3>Mutation has a way back</h3><p>Installer changes are confirmed, backed up, atomic, and rolled back on failure.</p></article>
+            <article><span>Guarded</span><h3>Critical calls stop first</h3><p>Known catastrophic model commands are blocked; parser uncertainty requires approval and is denied without UI.</p></article>
           </div>
           <p>Pi extensions run with your user permissions. Trusted project settings and dynamically constructed workflow code remain user-controlled boundaries rather than claims ZenPi can sandbox.</p>
           <p><a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Read the complete security model <span aria-hidden="true">↗</span></a></p>
@@ -343,7 +369,7 @@ cd ZenPi</code></pre>
       </section>
 
       <section class="wiki-section" id="development" aria-labelledby="development-title">
-        <div class="section-label"><span>10</span><p>Development</p></div>
+        <div class="section-label"><span>11</span><p>Development</p></div>
         <div class="doc-content">
           <h2 id="development-title">Contribute with evidence.</h2>
           <p>Inspect repository guidance before editing, keep changes surgical, and use project-native dependencies. The standard check validates syntax, runs the complete Node test suite, and executes every registry-linked capability validator with isolated prerequisites.</p>
