@@ -600,15 +600,33 @@ test("powerShell parser failure asks and denies without UI", () => {
 
     // But an unavailable parser must never DOWNGRADE a catastrophe into something a person can approve. The
     // raw-text backstop keeps the denial immutable in exactly the case where the guard knows the least.
+    const encodedPayload = Buffer.from("Remove-Item -Recurse -Force C:\\Windows", "utf16le").toString("base64");
     for (const command of [
         "Remove-Item -Recurse -Force C:\\Windows",
         "Remove-Item C:\\Windows\\System32",
         "Stop-Computer",
+        // An inline-code argument is program text, not data, so the backstop has to read inside the quotes.
+        "powershell.exe -Command 'Remove-Item -Recurse -Force C:\\Windows'",
+        'powershell.exe -Command "Remove-Item -Recurse -Force C:\\Windows"',
+        `powershell.exe -EncodedCommand ${encodedPayload}`,
+        `powershell.exe -enc ${encodedPayload}`,
     ]) {
         const denied = decideCommand(command, options);
         assert.equal(denied.action, "deny", `${command}: ${JSON.stringify(denied)}`);
         assert.equal(denied.severity, "critical", `${command}: ${JSON.stringify(denied)}`);
         assert.equal(decideCommand(command, { ...options, hasUI: false }).action, "deny", command);
+    }
+
+    // Quoted text that is NOT an inline-code payload is data. Escalating on it would make a command that only
+    // prints a string a critical, session-locking denial — and the scan runs precisely when nothing could parse
+    // it, so there is no structural evidence to correct a false match.
+    for (const command of [
+        "cmd /c echo 'safe & rd /s /q C:\\Windows'",
+        "Write-Output 'Remove-Item -Recurse -Force C:\\Windows'",
+        "powershell.exe -Command 'Get-ChildItem C:\\work'",
+        "Get-Content .\\notes.txt",
+    ]) {
+        assert.equal(decideCommand(command, options).action, "ask", `${command}`);
     }
 });
 

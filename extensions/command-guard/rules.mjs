@@ -1431,6 +1431,38 @@ function unquotedProjection(text, shell) {
     return output;
 }
 
+// Returns the payloads of inline-code flags, unquoted and joined, plus anything a base64 -EncodedCommand
+// carries. These are program text, so the scan must read them even though they arrive inside quotes.
+const INLINE_CODE_TEXT_FLAG = /(?:^|\s)(?:-c|--command|-command|-com|-comm|-comma|-comman|\/c|\/k|-e|--eval)\s+/gi;
+function inlineCodePayloads(raw, shell) {
+    const found = [];
+    for (const match of raw.matchAll(INLINE_CODE_TEXT_FLAG)) {
+        const rest = raw.slice(match.index + match[0].length);
+        const quote = rest[0] === "'" || rest[0] === '"' ? rest[0] : "";
+        const end = quote ? rest.indexOf(quote, 1) : -1;
+        found.push(quote ? (end > 0 ? rest.slice(1, end) : rest.slice(1)) : rest);
+    }
+
+    for (const match of raw.matchAll(
+        /(?:^|\s)-(?:e|en|enc|enco|encod|encode|encoded|encodedcommand)\s+([A-Za-z0-9+/=]{8,})/gi,
+    )) {
+        try {
+            const decoded = Buffer.from(match[1], "base64");
+            if (decoded.length && decoded.length <= 64 * 1024) {
+                found.push(decoded.toString("utf16le"), decoded.toString("utf8"));
+            }
+        } catch {
+            /* an undecodable argument carries nothing to read */
+        }
+    }
+
+    // The payload is code, but quoting still applies inside it: `cmd /c echo 'rd /s /q ...'` only runs echo.
+    return found
+        .map((payload) => unquotedProjection(payload, shell))
+        .join("\n")
+        .slice(0, 64 * 1024);
+}
+
 // Pulls the path-shaped tokens out of raw command text without needing a successful parse.
 function textPathTokens(text) {
     return text
@@ -1454,8 +1486,11 @@ export function catastrophicTextScan(command, options = {}) {
         return undefined;
     }
 
-    // Only text the shell would execute as syntax can escalate; quoted arguments are data.
-    const text = unquotedProjection(raw, options.shell);
+    // Only text the shell would execute as syntax can escalate; quoted arguments are data — EXCEPT the argument
+    // of an inline-code flag, which is code by definition. `powershell -Command '<payload>'` and `bash -c
+    // '<payload>'` carry their whole program inside one quoted token, so blanking it would hide the very thing
+    // worth reading when no parser was able to look inside.
+    const text = `${unquotedProjection(raw, options.shell)}\n${inlineCodePayloads(raw, options.shell)}`;
     if (TEXT_STANDALONE_CATASTROPHE.test(text)) {
         return {
             action: "deny",

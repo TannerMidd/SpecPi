@@ -8,18 +8,20 @@ import { analyze as analyzeCmd, literalCmdPayload } from "./cmd.mjs";
 export const POWERSHELL_LIMITS = Object.freeze({
     maxInput: 128 * 1024,
     maxCommands: 128,
-    // Deliberately short. A cold Windows PowerShell 5.1 start can exceed this, but the raw-text backstop in
-    // rules.mjs means a timeout can no longer downgrade a catastrophe into an approvable prompt, so waiting
-    // longer buys no safety and costs it elsewhere: every timed-out parse pays the full bound, and a host that
-    // is timing out repeatedly turns a fast failure into minutes of dead wall-clock time.
-    timeoutMs: 3000,
+    // Sized so a loaded CI runner completes a normal parse, without letting a pathological host burn minutes:
+    // every timed-out parse pays this bound in full, so a large value multiplied by the parses one session makes
+    // is what turned an eight-minute job into a seventeen-minute one.
+    timeoutMs: 8000,
     // Interpreter startup is paid once per process, not per analysis, so only the first spawn gets this budget.
-    // Applying it to every call is what turned a handful of slow parses into minutes of CI wall-clock time.
     coldStartTimeoutMs: 15000,
+    // A host that times out this many times in a row is treated as unavailable for the rest of the process. The
+    // raw-text backstop still classifies the command, so this trades no safety for a bounded worst case.
+    consecutiveTimeoutLimit: 3,
     maxOutput: 256 * 1024,
     maxDepth: 8,
 });
 let parserWarmed = false;
+const parserTimeouts = new Map();
 const aliasMap = new Map(
     Object.entries({
         ac: "add-content",
@@ -540,6 +542,11 @@ function runParser(executable, helper, input, limits) {
         PATH: process.env.PATH || "",
         TEMP: process.env.TEMP || "",
     };
+    const limit = limits.consecutiveTimeoutLimit || POWERSHELL_LIMITS.consecutiveTimeoutLimit;
+    if ((parserTimeouts.get(executable) || 0) >= limit) {
+        return unavailable("helper-timeout");
+    }
+
     const timeout = parserWarmed
         ? limits.timeoutMs
         : Math.max(limits.timeoutMs, limits.coldStartTimeoutMs || limits.timeoutMs);
@@ -554,8 +561,13 @@ function runParser(executable, helper, input, limits) {
         env,
     });
     if (result.error) {
-        return unavailable(result.error.code === "ETIMEDOUT" ? "helper-timeout" : "helper-failure");
+        const timedOut = result.error.code === "ETIMEDOUT";
+        parserTimeouts.set(executable, timedOut ? (parserTimeouts.get(executable) || 0) + 1 : 0);
+
+        return unavailable(timedOut ? "helper-timeout" : "helper-failure");
     }
+
+    parserTimeouts.set(executable, 0);
 
     if (result.status !== 0 || typeof result.stdout !== "string" || result.stderr) {
         return unavailable("helper-failure");
