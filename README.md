@@ -31,14 +31,14 @@ When a real, reusable capability gap gets in the way, ZenPi records a privacy-mi
 </p>
 <p align="center"><a href="https://tannermidd.github.io/ZenPi/#wishlist">Walk one example through the loop</a></p>
 
-The goal is not autonomous self-modification. It is to make the next justified change obvious, testable, reversible, and explicitly approved.
+The goal is to make each justified change obvious, testable, reversible, and explicitly approved while keeping self-modification under human control.
 
 ## How the loop works
 
 1. **Observe locally.** Collection is off until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded.
 2. **Choose once.** Run `/harness-improvement`. One menu shows qualified and review-needed items; choosing one explicitly authorizes that exact smallest-sufficient improvement and starts the agent workflow.
 3. **Change minimally.** The `zenpi-improve` skill inspects the evidence, implements the narrowest intervention, and runs direct acceptance checks.
-4. **Verify and retire.** The completion gate verifies registry integration, runs `npm run check` and supported closed validators, then retires the item only when everything passes. Every retirement keeps its proof — evidence, gates, changed files — and every check and `zenpi doctor` run re-proves retired capabilities through their validators. Failed checks leave it selected. Later friction returns it to the same review menu.
+4. **Verify and retire.** The completion gate verifies registry integration, runs `npm run check` and supported closed validators, then retires the item only when everything passes. Every retirement keeps its evidence, gates, and changed files. Each check and `zenpi doctor` run re-proves retired capabilities through their validators. Failed checks leave the item selected. Later friction returns it to the same review menu.
 
 ```text
 /harness-improvement
@@ -50,17 +50,17 @@ The goal is not autonomous self-modification. It is to make the next justified c
 
 ## What ZenPi adds
 
-- **`/zen`** — a focused execution mode
-- **`/files`** — browse files, view diffs, and leave review comments
-- **Wishlist** — a private log of friction, ready to act on
-- **Durable capability proofs** — closed offline validators run during completion, `npm run check`, and `zenpi doctor`
-- **Improvement journal** — every retirement keeps its evidence, gates, changed files, and version; `/wishlist history [gap-id]` shows it
-- **Loop health** — `/wishlist status` and the report show retirements, reopen rate, open reviews, time-to-retire, and qualification rate
-- **`/harness-improvement`** — pick one item and let ZenPi fix and verify it
-- **`/zen-subagents`** — remember how you like your subagents set up
-- **Command guard** — blocks catastrophic model commands before execution and asks before Git destroys work
-- **Isolated browser** — check your web UI with screenshots in a fresh browser context
-- **Careful installs** — everything is backed up and can be rolled back
+- **`/zen`:** a focused execution mode
+- **`/files`:** browse files, view diffs, and leave review comments
+- **Wishlist:** a private log of friction, ready to act on
+- **Durable capability proofs:** closed offline validators run during completion, `npm run check`, and `zenpi doctor`
+- **Improvement journal:** every retirement keeps its evidence, gates, changed files, and version; `/wishlist history [gap-id]` shows it
+- **Loop health:** `/wishlist status` and the report show retirements, reopen rate, open reviews, time-to-retire, and qualification rate
+- **`/harness-improvement`:** pick one item and let ZenPi fix and verify it
+- **`/zen-subagents`:** remember how you like your subagents set up
+- **Command guard:** blocks catastrophic model commands before execution and asks before Git destroys work
+- **Isolated browser:** check your web UI with screenshots in a fresh browser context
+- **Careful installs:** everything is backed up and can be rolled back
 
 Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
 
@@ -69,30 +69,30 @@ Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
 You need Node.js 22.19+, npm, and Git. If Pi (0.84.4+) isn't installed yet, the installer sets it up for you.
 
 ```bash
-git clone --branch v0.8.1 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.8.2 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ./zenpi plan      # preview what will change (changes nothing)
 ./zenpi install   # asks for confirmation first
 ./zenpi doctor    # verify managed state and re-run capability validators
 ```
 
-On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible — see [SECURITY.md](SECURITY.md) for details.
+On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible. See [SECURITY.md](SECURITY.md) for details.
 
 ## Command guard
 
 Every model-initiated command is analyzed before it runs. Choose one mode at session start:
 
-- **Guard** (recommended) — denies confirmed host-wide catastrophe outright, asks before Git destroys work, stays quiet otherwise
-- **Strict** — also asks for mutation, execution, sensitive reads, and network activity
-- **Off** — confirmed, session-only, never inherited by subagents
+- **Guard** (recommended): denies confirmed host-wide catastrophe outright, asks before Git destroys work, and stays quiet otherwise
+- **Strict:** also asks for mutation, execution, sensitive reads, and network activity
+- **Off:** confirmed, session-only, and never inherited by subagents
 
-Approvals are exact-call and session-scoped; a critical attempt locks the session until you review it. Inspect or change the mode any time with `/guard`.
+Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Inspect or change the mode any time with `/guard`. For temporary cleanup in the Bash tool, use `rm -rf -- F:/Temp/case`; use `Remove-Item -LiteralPath ... -Recurse -Force` with the PowerShell tool.
 
 ## Boundaries
 
-ZenPi never persists command text and does not read Pi credentials, sessions, or history. Wishlist reports are stored locally only — skim them before sharing. Nothing happens without your say-so: improving ZenPi, installing, or publishing all need your explicit approval.
+ZenPi never persists command text and does not read Pi credentials, sessions, or history. Wishlist reports are stored locally only. Review them before sharing. Improving ZenPi, installing, and publishing all require your explicit approval.
 
-The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, `edit`, and native-subagent seams. It is defense in depth, not an OS sandbox: direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its hard boundary. Direct recognized private-path reads receive narrow protection, but the guard does not comprehensively detect credentials read through arbitrary shell syntax or scripts. Use OS permissions, a least-privilege account, container, or VM when code or data is hostile.
+The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, `edit`, and native-subagent seams. It provides defense in depth within that boundary. Direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its scope. Direct recognized private-path reads receive narrow protection. The guard does not comprehensively detect credentials read through arbitrary shell syntax or scripts. Use OS permissions, a least-privilege account, container, or VM when code or data is hostile.
 
 See [SECURITY.md](SECURITY.md) for the full picture.
 

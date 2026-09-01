@@ -86,6 +86,28 @@ export async function runCommandGuardSmoke() {
             "ask",
         ],
         [
+            "Bash cmd cleanup syntax mismatch",
+            decideCommand("rmdir /s /q F:\\Temp\\case", {
+                shell: "bash",
+                mode: "guard",
+                cwd: "C:\\work",
+                platform: "win32",
+                hasUI: true,
+            }),
+            "deny",
+        ],
+        [
+            "Bash ordinary temporary cleanup",
+            decideCommand("rm -rf -- F:/Temp/case", {
+                shell: "bash",
+                mode: "guard",
+                cwd: "C:\\work",
+                platform: "win32",
+                hasUI: true,
+            }),
+            "allow",
+        ],
+        [
             "nested cmd deletion",
             decideCommand('cmd /c "cmd /c rd /s /q C:\\\\Windows"', {
                 shell: "cmd",

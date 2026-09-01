@@ -113,6 +113,21 @@ for (const handler of events.get("session_start") || []) {
     await handler({ reason: "startup" }, ctx);
 }
 
+const nonLatchingCleanup: any =
+    process.platform === "win32"
+        ? { toolName: "bash", input: { command: "rmdir /s /q F:\\Temp\\zenpi-test-123" } }
+        : { toolName: "powershell", input: { command: "rm -rf /" } };
+let nonLatchingCleanupResult: any;
+for (const handler of events.get("tool_call") || []) {
+    nonLatchingCleanupResult = await handler(nonLatchingCleanup, ctx);
+}
+
+const safeAfterNonLatchingCleanup: any = { toolName: "bash", input: { command: "printf cleanup-safe" } };
+let safeAfterNonLatchingCleanupResult: any;
+for (const handler of events.get("tool_call") || []) {
+    safeAfterNonLatchingCleanupResult = await handler(safeAfterNonLatchingCleanup, ctx);
+}
+
 const executorCalls: any[] = [];
 const launch: any = {
     toolName: "subagent",
@@ -274,5 +289,5 @@ for (const handler of events.get("session_start") || []) {
 
 const startOnlyReset = statuses.get("zenpi-command-guard") === "🛡 Guard";
 process.stdout.write(
-    `COMMAND_GUARD_HARNESS=${JSON.stringify({ dangerousBlocked: dangerousResult?.block === true, mutatedApprovalBlocked, lockedApprovalBlocked, racedPreflightBlocked, lockedLaunchBlocked: lockedLaunchResult?.block === true, safeBlockedAfterLock: safeResult?.block === true, directLaunchAllowed: !launchResult?.block, workflowBlocked: workflowResult?.block === true, bindingInjected: Boolean(launch.input?.extensionBindings?.["zenpi.command-guard/1"]), bindingMode: launch.input?.extensionBindings?.["zenpi.command-guard/1"]?.mode, unrelatedBindingKept: launch.input?.extensionBindings?.["other.extension/1"]?.kept === true, spoofedLaunchBlocked: spoofedLaunchResult?.block === true, mutatedPreflightBlocked: mutatingLaunchResult?.block === true, unprotectedLaunchBlocked: unprotectedLaunchResult?.block === true, guardUnknownAllowed: !guardUnknownResult?.block, unknownTerminalBlocked: unknownTerminalResult?.block === true, promptTimeoutBlocked: timedPathResult?.block === true, promptFailureBlocked: promptFailureResult?.block === true, promptHasContext: approvalTitles.some((title) => title.includes("Severity:") && title.includes("category:") && title.includes("cwd:") && title.includes("reason:") && title.includes("safer:")), executorCalls: executorCalls.length, commandRegistered: commands.has("guard"), statusInspectable, unlockRestoredStrict, sessionResetGuard, nonceReset, confirmedOffAllows, offChildGuarded, startOnlyReset, status: statuses.get("zenpi-command-guard"), notificationCount: notifications.length })}\n`,
+    `COMMAND_GUARD_HARNESS=${JSON.stringify({ dangerousBlocked: dangerousResult?.block === true, mutatedApprovalBlocked, lockedApprovalBlocked, racedPreflightBlocked, lockedLaunchBlocked: lockedLaunchResult?.block === true, safeBlockedAfterLock: safeResult?.block === true, nonLatchingCleanupBlocked: nonLatchingCleanupResult?.block === true, nonLatchingCleanupDidNotLock: !safeAfterNonLatchingCleanupResult?.block, directLaunchAllowed: !launchResult?.block, workflowBlocked: workflowResult?.block === true, bindingInjected: Boolean(launch.input?.extensionBindings?.["zenpi.command-guard/1"]), bindingMode: launch.input?.extensionBindings?.["zenpi.command-guard/1"]?.mode, unrelatedBindingKept: launch.input?.extensionBindings?.["other.extension/1"]?.kept === true, spoofedLaunchBlocked: spoofedLaunchResult?.block === true, mutatedPreflightBlocked: mutatingLaunchResult?.block === true, unprotectedLaunchBlocked: unprotectedLaunchResult?.block === true, guardUnknownAllowed: !guardUnknownResult?.block, unknownTerminalBlocked: unknownTerminalResult?.block === true, promptTimeoutBlocked: timedPathResult?.block === true, promptFailureBlocked: promptFailureResult?.block === true, promptHasContext: approvalTitles.some((title) => title.includes("Severity:") && title.includes("category:") && title.includes("cwd:") && title.includes("reason:") && title.includes("safer:")), executorCalls: executorCalls.length, commandRegistered: commands.has("guard"), statusInspectable, unlockRestoredStrict, sessionResetGuard, nonceReset, confirmedOffAllows, offChildGuarded, startOnlyReset, status: statuses.get("zenpi-command-guard"), notificationCount: notifications.length })}\n`,
 );

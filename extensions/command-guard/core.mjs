@@ -60,6 +60,7 @@ function empty() {
         leaves: [],
         reason: "No protected operation was detected.",
         indeterminate: false,
+        lockSession: false,
     };
 }
 
@@ -72,6 +73,7 @@ function malformedDecision() {
         leaves: [],
         reason: "The command policy returned malformed decision data; execution is denied.",
         indeterminate: true,
+        lockSession: false,
     };
 }
 
@@ -106,7 +108,8 @@ function validDecision(value) {
         Buffer.byteLength(value.reason, "utf8") <= 512 &&
         (!Object.hasOwn(value, "saferAlternative") ||
             (typeof value.saferAlternative === "string" && Buffer.byteLength(value.saferAlternative, "utf8") <= 512)) &&
-        (!Object.hasOwn(value, "indeterminate") || typeof value.indeterminate === "boolean")
+        (!Object.hasOwn(value, "indeterminate") || typeof value.indeterminate === "boolean") &&
+        (!Object.hasOwn(value, "lockSession") || typeof value.lockSession === "boolean")
     );
 }
 
@@ -135,8 +138,11 @@ export function aggregateDecisions(decisions, options = {}) {
             reason: boundedReason(item.reason),
         };
     }, empty());
+    const lockSession = list.some(
+        (item) => item.lockSession === true && item.action === "deny" && item.severity === "critical",
+    );
     if (result.action === "deny" || result.severity === "critical") {
-        return { ...result, action: "deny", indeterminate: Boolean(result.indeterminate) };
+        return { ...result, action: "deny", indeterminate: Boolean(result.indeterminate), lockSession };
     }
 
     if (result.action === "ask" && options.hasUI === false) {
@@ -145,10 +151,11 @@ export function aggregateDecisions(decisions, options = {}) {
             action: "deny",
             reason: "Approval is unavailable in this non-interactive session.",
             indeterminate: Boolean(result.indeterminate),
+            lockSession: false,
         };
     }
 
-    return { ...result, indeterminate: Boolean(result.indeterminate) };
+    return { ...result, indeterminate: Boolean(result.indeterminate), lockSession: false };
 }
 
 export function analyzeCommand(command, options = {}) {
@@ -346,6 +353,7 @@ export function decideCommand(command, options = {}) {
             leaves: [],
             reason: "The command guard is locked after a critical attempt.",
             indeterminate: false,
+            lockSession: false,
         };
     }
 
@@ -454,7 +462,11 @@ export function decideCommand(command, options = {}) {
         };
     }
 
-    return { ...result, indeterminate: Boolean(result.indeterminate || analysis.indeterminate) };
+    return {
+        ...result,
+        indeterminate: Boolean(result.indeterminate || analysis.indeterminate),
+        lockSession: Boolean(result.lockSession),
+    };
 }
 
 export function decidePath(input, operation, options = {}) {
@@ -472,6 +484,7 @@ export function decidePath(input, operation, options = {}) {
             leaves: [],
             reason: "The command guard is locked after a critical attempt.",
             indeterminate: false,
+            lockSession: false,
         };
     }
 
@@ -485,7 +498,11 @@ export function decidePath(input, operation, options = {}) {
         decision.reason = "Strict mode requires approval for mutation.";
     }
 
-    return { ...aggregateDecisions([decision], options), indeterminate: Boolean(classification.indeterminate) };
+    return {
+        ...aggregateDecisions([decision], options),
+        indeterminate: Boolean(classification.indeterminate),
+        lockSession: Boolean(decision.lockSession && operation !== "read"),
+    };
 }
 
 export function sha256(value) {

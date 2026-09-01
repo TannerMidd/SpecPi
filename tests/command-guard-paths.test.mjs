@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { classifyPath, isAgentPath, pathDecision } from "../extensions/command-guard/paths.mjs";
+import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 
 test("Unix protected mutation paths are lexical and do not require enumeration", () => {
     assert.equal(classifyPath("/", { platform: "linux", cwd: "/tmp" }).protected, true);
@@ -180,7 +181,15 @@ test("Guard protects host and enforcement mutation, not ordinary private files",
         assert.equal(classifyPath("/opt/myapp/config.json", guard).protected, false);
         assert.equal(classifyPath("/opt/myapp/config.json", { ...guard, mode: "strict" }).protected, false);
         assert.equal(classifyPath("/tmp/agent/settings.json", guard).protected, true);
-        assert.equal(classifyPath("/tmp/agent/extensions/command-guard/index.ts", guard).protected, true);
+        for (const name of COMMAND_GUARD_MANAGED_FILES) {
+            assert.equal(classifyPath(`/tmp/agent/extensions/command-guard/${name}`, guard).protected, true, name);
+        }
+
+        assert.equal(classifyPath("/tmp/agent/extensions/command-guard/.test-tmp-123", guard).protected, false);
+        assert.equal(
+            classifyPath("/tmp/agent/extensions/command-guard/generated-fixtures/case-1", guard).protected,
+            false,
+        );
         assert.equal(classifyPath("/tmp/agent/auth.json", guard).protected, false);
     } finally {
         if (previous === undefined) {
@@ -190,6 +199,42 @@ test("Guard protects host and enforcement mutation, not ordinary private files",
         }
     }
 });
+
+test("canonical agent roots and managed-file aliases remain protected", () => {
+    const previous = process.env.PI_CODING_AGENT_DIR;
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "guard-agent-root-alias-"));
+    try {
+        const realAgent = path.join(root, "agent-real");
+        const linkedAgent = path.join(root, "agent-link");
+        const guardDirectory = path.join(realAgent, "extensions", "command-guard");
+        const managedFile = path.join(guardDirectory, "rules.mjs");
+        const managedAlias = path.join(root, "rules-alias.mjs");
+        fs.mkdirSync(guardDirectory, { recursive: true });
+        fs.writeFileSync(managedFile, "export {};\n");
+        fs.symlinkSync(realAgent, linkedAgent, process.platform === "win32" ? "junction" : "dir");
+        fs.symlinkSync(managedFile, managedAlias, "file");
+        process.env.PI_CODING_AGENT_DIR = linkedAgent;
+        const options = { platform: process.platform, cwd: root, mode: "guard" };
+
+        assert.equal(
+            classifyPath(path.join(linkedAgent, "extensions", "command-guard", "rules.mjs"), options).protected,
+            true,
+        );
+        assert.equal(classifyPath(managedFile, options).protected, true);
+        assert.equal(classifyPath(realAgent, options).protected, true);
+        assert.equal(classifyPath(managedAlias, options).protected, true);
+        assert.equal(classifyPath(path.join(guardDirectory, ".test-tmp-123"), options).protected, false);
+    } finally {
+        if (previous === undefined) {
+            delete process.env.PI_CODING_AGENT_DIR;
+        } else {
+            process.env.PI_CODING_AGENT_DIR = previous;
+        }
+
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test("Windows roots, device paths, and ADS are protected", () => {
     assert.equal(classifyPath("C:\\", { platform: "win32", cwd: "C:\\work" }).protected, true);
     assert.equal(classifyPath("C:\\Windows\\System32", { platform: "win32", cwd: "C:\\work" }).protected, true);

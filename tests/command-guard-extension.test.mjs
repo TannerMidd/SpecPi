@@ -21,6 +21,8 @@ test("extension blocks before executor and latches critical lock", () => {
     assert.equal(value.racedPreflightBlocked, true);
     assert.equal(value.lockedLaunchBlocked, true);
     assert.equal(value.safeBlockedAfterLock, true);
+    assert.equal(value.nonLatchingCleanupBlocked, true);
+    assert.equal(value.nonLatchingCleanupDidNotLock, true);
     assert.equal(value.executorCalls, 0);
     assert.equal(value.commandRegistered, true);
     assert.equal(value.statusInspectable, true);
@@ -173,7 +175,7 @@ test("child requires a supervisor binding and blocks dangerous calls", () => {
         ...process.env,
         PI_SUBAGENT_CHILD: "1",
         PI_SUBAGENT_EXTENSION_BINDINGS: JSON.stringify({
-            "zenpi.command-guard/1": { mode: "strict", policyVersion: 1, parentLocked: false, nonce: "abcdef12" },
+            "zenpi.command-guard/1": { mode: "strict", policyVersion: 2, parentLocked: false, nonce: "abcdef12" },
         }),
     };
     const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], { encoding: "utf8", env });
@@ -187,7 +189,7 @@ test("child requires a supervisor binding and blocks dangerous calls", () => {
     assert.equal(value.strictUnknownBlocked, true);
     for (const bindings of [
         undefined,
-        { "zenpi.command-guard/1": { mode: "off", policyVersion: 1, parentLocked: false, nonce: "abcdef12" } },
+        { "zenpi.command-guard/1": { mode: "off", policyVersion: 2, parentLocked: false, nonce: "abcdef12" } },
     ]) {
         const invalidEnv = {
             ...process.env,
@@ -304,7 +306,7 @@ test("real pi-subagents child receives the guard and blocks before execution", {
         const childProof = JSON.parse(fs.readFileSync(childStarted, "utf8"));
         assert.equal(childProof.child, true);
         assert.equal(childProof.binding?.mode, "guard");
-        assert.equal(childProof.binding?.policyVersion, 1);
+        assert.equal(childProof.binding?.policyVersion, 2);
         assert.equal(fs.readFileSync(unrelatedLoaded, "utf8"), "loaded");
         assert.equal(fs.existsSync(canary), false, `guarded child executed the canary command: ${canary}`);
     } finally {

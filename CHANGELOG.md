@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2 - 2026-09-01
+
+- Keep command-guard denials fail-closed without making every uncertain or wrong-shell cleanup attempt strand the session: only structurally proven lock-worthy critical mutations latch `locked`, while parser fallback, shell-syntax mismatches, and refused reads remain non-latching denials.
+- Protect installed command-guard files as managed enforcement nodes rather than treating the whole command-guard directory as protected, allowing unrelated temporary descendants while preserving ancestor and canonical-path protection. Share the managed-file inventory with installer resources and checksums.
+- Classify cmd-style `rd`/`rmdir /s /q` sent directly to the Windows Bash tool as a corrective non-latching denial, and keep parser-fallback protected-path matching local to the destructive statement so unrelated scratch cleanup cannot inherit a critical result.
+
 ## 0.8.1 - 2026-08-30
 
 - Ask for Guard approval before Git destroys work. Force pushes (`--force`, `-f`, `--force-with-lease`, `--force-if-includes`) and the wider destructive Git family — remote ref deletion, hard resets, cleans, branch and tag deletion, stash drops, discarding checkouts and restores, rebases, and history rewrites — now surface an approval in Guard instead of running silently, because they discard or rewrite work no local undo restores. Ordinary pushes, pulls, and fetches stay quiet in Guard; all of it still asks in Strict.
