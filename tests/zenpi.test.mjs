@@ -1631,7 +1631,10 @@ test("bootstrap fails actionably when npm global bin is not persistently on PATH
         );
         assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
 
-        const persistentEnv = { ...baseEnv, PATH: `${globalBin}${path.delimiter}${fakeBin}` };
+        const persistentEnv = {
+            ...baseEnv,
+            PATH: [globalBin, fakeBin, process.env.PATH].filter(Boolean).join(path.delimiter),
+        };
         const second = invokeCli(
             agentDir,
             ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],

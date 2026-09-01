@@ -78,7 +78,8 @@ jobs:
           '@ | Set-Content (Join-Path $fakeBin "npm.cmd") -Encoding ascii
           "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "npm") -Encoding ascii
           $nodeDir = Split-Path (Get-Command node).Source
-          $env:PATH = "$fakeBin;$nodeDir;$env:SystemRoot\System32;$env:SystemRoot"
+          $gitDir = Split-Path (Get-Command git).Source
+          $env:PATH = "$fakeBin;$nodeDir;$gitDir;$env:SystemRoot\System32;$env:SystemRoot"
           $env:PI_CODING_AGENT_DIR = $agentDir
           $env:ZENPI_FAKE_BIN = $fakeBin
           $env:ZENPI_FAKE_LOG = $log
