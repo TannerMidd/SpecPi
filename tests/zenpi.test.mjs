@@ -312,7 +312,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /id="install"/);
     assert.match(
         html,
-        /Version <code>v0\.8\.3<\/code> removes native-subagent integration so context handoffs stay explicit/,
+        /Version <code>v0\.8\.4<\/code> adds human-led scope monitoring, detached worktree experiments, and structured completion challenges\./,
     );
     assert.match(html, /The journal keeps the evidence, gates, changed files, and version/);
     assert.match(html, /Later friction links back to that journal/);

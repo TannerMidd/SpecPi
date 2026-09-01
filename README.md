@@ -77,7 +77,7 @@ Gather context deliberately, leave a reviewable artifact, and begin implementati
 You need Node.js 22.19+, npm, and Git. If Pi (0.84.4+) isn't installed yet, the installer sets it up for you.
 
 ```bash
-git clone --branch v0.8.3 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ./zenpi plan      # preview what will change (changes nothing)
 ./zenpi install   # asks for confirmation first

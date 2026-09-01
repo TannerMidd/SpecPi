@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.4 - Unreleased
+## 0.8.4 - 2026-09-01
 
 - Add opt-in workflow controls: `/scope` declares project-relative change boundaries and surfaces direct or observed drift without silently expanding scope; `/experiment` creates detached, private-state Git worktrees with complete patch export and explicitly confirmed discard; `/challenge` produces a structured adversarial readiness card whose deterministic gate rejects unresolved evidence.
 - Keep the new controls human-led and local: no child process or agent launch, automatic commit/merge/apply, remote operation, raw command log, unrelated session scan, or mandatory completion interception. Add branch-local scope/challenge state, a private recoverable experiment registry, direct closed validators, installer lifecycle coverage, and security-boundary documentation.
