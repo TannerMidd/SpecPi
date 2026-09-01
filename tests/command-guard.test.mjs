@@ -9,9 +9,6 @@ import {
     decideCommand,
     decidePath,
     MODES,
-    bindingForChild,
-    validateBinding,
-    injectBinding,
 } from "../extensions/command-guard/core.mjs";
 import { redactCommand } from "../extensions/command-guard/redact.mjs";
 import { catastrophicTextScan, evaluateRules, ruleCatalog } from "../extensions/command-guard/rules.mjs";
@@ -809,28 +806,6 @@ test("redaction is display-only and bounded", () => {
     assert.doesNotMatch(redactCommand(original), /super-secret|password@example/);
     assert.ok(Buffer.byteLength(redactCommand("x".repeat(1000)), "utf8") <= 512);
     assert.ok(Buffer.byteLength(redactCommand("🙂".repeat(1000)), "utf8") <= 512);
-});
-test("child bindings are reserved, bounded, and never weaken strict", () => {
-    const binding = bindingForChild("strict", "abcdef12");
-    assert.equal(validateBinding(binding, "strict"), true);
-    assert.equal(validateBinding({ ...binding, policyVersion: 1 }, "strict"), false);
-    assert.equal(validateBinding({ ...binding, mode: "guard" }, "strict"), false);
-    const input = injectBinding(
-        { agent: "worker", extensionBindings: { "other/1": { ok: true } } },
-        "strict",
-        "abcdef12",
-    );
-    assert.equal(input.extensionBindings["zenpi.command-guard/1"].mode, "strict");
-    assert.deepEqual(input.extensionBindings["other/1"], { ok: true });
-    assert.throws(
-        () =>
-            injectBinding(
-                { agent: "worker", extensionBindings: { "zenpi.command-guard/1": { mode: "off" } } },
-                "guard",
-                "abcdef12",
-            ),
-        /supervisor-owned/,
-    );
 });
 test("bash recognizes nested shell and redirects without execution", () => {
     const parsed = analyzeCommand("bash -c 'printf safe' > output.txt", { shell: "bash", cwd: process.cwd() });

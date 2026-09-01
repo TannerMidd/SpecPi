@@ -17,20 +17,8 @@ jobs:
           node-version: "22"
       - name: Install pinned repository development tools
         run: npm install --ignore-scripts --omit=peer --no-package-lock
-      - name: Install pinned native-child test runtime
-        run: npm install --prefix "$RUNNER_TEMP/zenpi-subagents-runtime" --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 pi-subagents@0.58.0
       - run: npm test
-        env:
-          ZENPI_SUBAGENTS_NPM_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime
-          ZENPI_PI_CLI: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
-          ZENPI_PI_PACKAGE_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent
-          ZENPI_REQUIRE_NATIVE_CHILD_TEST: "1"
       - run: npm run check
-        env:
-          ZENPI_SUBAGENTS_NPM_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime
-          ZENPI_PI_CLI: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js
-          ZENPI_PI_PACKAGE_ROOT: ${{ runner.temp }}/zenpi-subagents-runtime/node_modules/@earendil-works/pi-coding-agent
-          ZENPI_REQUIRE_NATIVE_CHILD_TEST: "1"
       - run: git diff --check
 
   windows-smoke:
@@ -40,17 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install pinned Windows validation runtime
-        shell: pwsh
-        run: npm install --prefix "$env:RUNNER_TEMP\zenpi-subagents-runtime" --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 pi-subagents@0.58.0
-      - name: Exercise PowerShell 5.1, PowerShell 7, cmd, policy, and real child propagation
+      - name: Exercise PowerShell 5.1, PowerShell 7, cmd, and policy
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $env:ZENPI_SUBAGENTS_NPM_ROOT = "$env:RUNNER_TEMP\zenpi-subagents-runtime"
-          $env:ZENPI_PI_CLI = "$env:RUNNER_TEMP\zenpi-subagents-runtime\node_modules\@earendil-works\pi-coding-agent\dist\bundle\cli.js"
-          $env:ZENPI_PI_PACKAGE_ROOT = "$env:RUNNER_TEMP\zenpi-subagents-runtime\node_modules\@earendil-works\pi-coding-agent"
-          $env:ZENPI_REQUIRE_NATIVE_CHILD_TEST = "1"
           $env:ZENPI_TEST_GIT_BASH = Join-Path $env:ProgramFiles "Git\bin\bash.exe"
           if (-not (Test-Path $env:ZENPI_TEST_GIT_BASH)) { throw "Git Bash is required for the Windows command-guard matrix" }
           $env:ZENPI_TEST_POWERSHELL_EXE = (Get-Command powershell.exe).Source

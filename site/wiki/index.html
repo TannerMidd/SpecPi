@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171310">
-  <meta name="description" content="ZenPi wiki: installation, workflows, commands, provider-safe delegation, browser QA, and security boundaries.">
+  <meta name="description" content="ZenPi wiki: installation, workflows, commands, browser QA, and security boundaries.">
   <meta property="og:title" content="ZenPi Wiki: Build deliberately">
   <meta property="og:description" content="Practical guides and reference documentation for the ZenPi coding-agent harness.">
   <meta property="og:type" content="website">
@@ -40,7 +40,7 @@
       <div class="sidebar-heading">
         <p>Documentation</p>
         <strong>ZenPi Wiki</strong>
-        <span>v0.8.2</span>
+        <span>v0.8.3</span>
       </div>
       <nav aria-label="Wiki sections">
         <div class="sidebar-group">
@@ -53,7 +53,6 @@
           <p>Guides</p>
           <a href="#workflows">Improvement loop</a>
           <a href="#file-review">Review files</a>
-          <a href="#delegation">Delegate safely</a>
           <a href="#command-guard">Command guard</a>
           <a href="#browser-qa">Browser QA</a>
         </div>
@@ -81,7 +80,6 @@
           <a href="#first-session">First session</a>
           <a href="#workflows">Improvement loop</a>
           <a href="#file-review">File review</a>
-          <a href="#delegation">Delegation</a>
           <a href="#command-guard">Command guard</a>
           <a href="#browser-qa">Browser QA</a>
           <a href="#reference">Commands</a>
@@ -92,9 +90,9 @@
       </details>
 
       <header class="wiki-hero" id="overview">
-        <p class="eyebrow">Documentation / v0.8.2</p>
+        <p class="eyebrow">Documentation / v0.8.3</p>
         <h1>Build with care,<br><em>work with proof.</em></h1>
-        <p>Everything you need to install ZenPi, understand its human-directed improvement loop, and use its focused review, delegation, and browser tools.</p>
+        <p>Everything you need to install ZenPi, understand its human-directed improvement loop, and use its focused review and browser tools.</p>
         <div class="wiki-hero-actions">
           <a class="button button-primary" href="#getting-started">Get started</a>
           <a class="button button-secondary" href="#reference">Command reference</a>
@@ -112,11 +110,6 @@
           <strong>Follow the loop</strong>
           <small>Turn recurring friction into verified work.</small>
         </a>
-        <a href="#delegation">
-          <span>03 / delegate</span>
-          <strong>Keep providers exact</strong>
-          <small>Configure role profiles without crossing boundaries.</small>
-        </a>
       </section>
 
       <section class="wiki-section" id="getting-started" aria-labelledby="getting-started-title">
@@ -132,8 +125,8 @@
 
           <h3>1. Clone a reviewed release</h3>
           <div class="code-block">
-            <div><span>terminal</span><span>release v0.8.2</span></div>
-            <pre><code>git clone --branch v0.8.2 --depth 1 https://github.com/TannerMidd/ZenPi.git
+            <div><span>terminal</span><span>release v0.8.3</span></div>
+            <pre><code>git clone --branch v0.8.3 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi</code></pre>
           </div>
 
@@ -242,35 +235,6 @@ cd ZenPi</code></pre>
         </div>
       </section>
 
-      <section class="wiki-section" id="delegation" aria-labelledby="delegation-title">
-        <div class="section-label"><span>05</span><p>Delegation</p></div>
-        <div class="doc-content">
-          <h2 id="delegation-title">Different model.<br>Same exact provider.</h2>
-          <p class="doc-lede">ZenPi can give built-in roles their own model and thinking level, but every explicit child model must remain inside the parent session's exact Pi provider.</p>
-
-          <div class="command-stack">
-            <div><code>/zen-subagents</code><span>Configure the active provider's role profile and optional global capacity.</span></div>
-            <div><code>/zen-subagents status</code><span>Inspect active roles, strict scope, saved providers, stale models, and capacity.</span></div>
-            <div><code>/zen-subagents reset</code><span>Reset only the active provider profile; other profiles and capacity stay unchanged.</span></div>
-          </div>
-
-          <h3>Provider profile rules</h3>
-          <ul class="check-list">
-            <li>Configure each exact provider once; ZenPi restores its profile automatically in later sessions.</li>
-            <li><code>openai</code>, <code>openai-codex</code>, <code>openrouter</code>, and other provider IDs are separate boundaries.</li>
-            <li><code>inherit</code> remains portable and follows the parent model.</li>
-            <li>Unavailable saved models become stale and are never silently replaced.</li>
-            <li>Role profiles are provider-specific; child budgets and active async capacity remain global.</li>
-            <li>Live processes on different providers fail closed to prevent races over the shared settings mirror.</li>
-          </ul>
-
-          <aside class="callout callout-note">
-            <strong>When Pi asks for a reload</strong>
-            <p>If ZenPi restores a startup-loaded mapping, run <code>/reload</code>. Native launches stay blocked until the runtime and saved profile are aligned.</p>
-          </aside>
-        </div>
-      </section>
-
       <section class="wiki-section" id="command-guard" aria-labelledby="command-guard-title">
         <div class="section-label"><span>06</span><p>Command guard</p></div>
         <div class="doc-content">
@@ -279,7 +243,7 @@ cd ZenPi</code></pre>
           <div class="command-stack">
             <div><code>Guard</code><span>The recommended default. Denies host-wide catastrophe and guard tampering, asks before Git destroys work, and stays quiet otherwise.</span></div>
             <div><code>Strict</code><span>Adds approvals for mutation, execution, sensitive reads, and network activity.</span></div>
-            <div><code>Off</code><span>Confirmed twice, lasts one session, and is never inherited by subagents.</span></div>
+            <div><code>Off</code><span>Confirmed twice and limited to one session.</span></div>
           </div>
           <p>Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Manage everything with <code>/guard</code>: <code>status</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, <code>clear-approvals</code>.</p>
           <aside class="callout callout-boundary">
@@ -322,9 +286,6 @@ cd ZenPi</code></pre>
                 <tr><th scope="row"><code>/wishlist history [gap-id]</code></th><td>Review the bounded local improvement journal globally or for one gap.</td></tr>
                 <tr><th scope="row"><code>/wishlist off</code></th><td>Disable local capability-gap collection.</td></tr>
                 <tr><th scope="row"><code>/harness-improvement</code></th><td>Select and begin one qualified or review-needed improvement.</td></tr>
-                <tr><th scope="row"><code>/zen-subagents</code></th><td>Configure role defaults for the active exact provider.</td></tr>
-                <tr><th scope="row"><code>/zen-subagents status</code></th><td>Inspect profile, scope, stale roles, and global capacity.</td></tr>
-                <tr><th scope="row"><code>/zen-subagents reset</code></th><td>Reset the active provider's role profile.</td></tr>
                 <tr><th scope="row"><code>/guard [status|guard|strict|off|unlock|clear-approvals]</code></th><td>Inspect or change session-only command protection.</td></tr>
                 <tr><th scope="row"><code>/reload</code></th><td>Reload Pi after installation or a startup-loaded configuration change.</td></tr>
               </tbody>
@@ -339,12 +300,9 @@ cd ZenPi</code></pre>
           <h2 id="configuration-title">Know what ZenPi owns.</h2>
           <p>ZenPi merges documented leaves and preserves unrelated packages and configuration. Managed state lives under the Pi agent directory; setting <code>PI_CODING_AGENT_DIR</code> relocates the equivalent paths.</p>
           <div class="path-list">
-            <div><code>settings.json</code><p>Active provider-safe subagent mirror and package settings. Unrelated values are preserved.</p></div>
-            <div><code>zenpi/subagent-provider-profiles.json</code><p>Exact provider/model IDs, thinking levels, timestamps, and schema metadata. Retained on uninstall.</p></div>
-            <div><code>zenpi/subagent-provider-leases.json</code><p>Ephemeral tokens, process IDs, providers, and timestamps used to prevent cross-process races.</p></div>
+            <div><code>settings.json</code><p>Theme and package settings. Unrelated values are preserved.</p></div>
             <div><code>zenpi/</code><p>Private wishlist evidence, retirement journals, loop-health source data, checksummed archives, browser artifacts, and bounded managed state.</p></div>
           </div>
-          <p>No profile contains credentials, authentication data, prompts, sessions, history, or a complete settings snapshot. Stop Pi before manually removing retained state.</p>
         </div>
       </section>
 

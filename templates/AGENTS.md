@@ -8,7 +8,6 @@
 - Use visible `PLAN.md`, `TODO.md`, `DECISIONS.md`, or `HANDOFF.md` artifacts only when they improve continuity.
 - Delegate only when fresh context, parallel independent investigation, specialist judgment, or review justifies the overhead.
 - Keep one writer per shared working directory. Use isolated worktrees for intentional parallel writers.
-- Native subagents may use a different model only within the parent session's exact Pi provider. Configure each exact provider once with `/zen-subagents`; its saved profile restores automatically. `inherit` is portable, while capacity remains global rather than profile-specific.
 - Never launch `codex-exec` or `codex-exec-writer`; ZenPi disables these external subscription runners.
 - Use cheaper role models only through an explicitly configured same-provider choice.
 - Treat command-guard denials as hard runtime constraints: use the stated safer alternative or ask the user; never obfuscate, split, encode, or reroute a denied operation to evade protection.

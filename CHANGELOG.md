@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.3 - 2026-09-01
+
+- Remove the `pi-subagents` package and ZenPi's native-subagent configuration, runtime integration, and installation defaults.
+
 ## 0.8.2 - 2026-09-01
 
 - Keep command-guard denials fail-closed without making every uncertain or wrong-shell cleanup attempt strand the session: only structurally proven lock-worthy critical mutations latch `locked`, while parser fallback, shell-syntax mismatches, and refused reads remain non-latching denials.

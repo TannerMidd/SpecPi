@@ -84,8 +84,7 @@ const dotPi = /(?:^|[\\/])\.pi(?:[\\/]|$)/i;
 // protected every repository that merely contained a zenpi/ or extensions/command-guard/ path — ZenPi's own
 // source tree included — and the unanchored POSIX variant matched ordinary project files such as
 // src/api/session.ts ("pi" inside "api", then "session"), denying them critically and locking the session.
-const agentPrivateState =
-    /^(?:zenpi[\\/](?:manifest\.json|backups|wishlist|subagent-provider-(?:profiles|leases)\.json))(?:[\\/]|$)/i;
+const agentPrivateState = /^(?:zenpi[\\/](?:manifest\.json|backups|wishlist))(?:[\\/]|$)/i;
 const agentPrivateName = /^(?:auth|sessions?|history|missions?|trust|private)[^\\/]*(?:[\\/]|$)/i;
 const agentGuardSource = /^extensions[\\/]command-guard(?:[\\/]|$)/i;
 // The installed state Guard must keep intact to keep enforcing, expressed as path segments so containment can be
