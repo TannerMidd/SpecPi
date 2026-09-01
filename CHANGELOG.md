@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.2 - Unreleased
+## 0.8.2 - 2026-09-01
 
 - Keep command-guard denials fail-closed without making every uncertain or wrong-shell cleanup attempt strand the session: only structurally proven lock-worthy critical mutations latch `locked`, while parser fallback, shell-syntax mismatches, and refused reads remain non-latching denials.
 - Protect installed command-guard files as managed enforcement nodes rather than treating the whole command-guard directory as protected, allowing unrelated temporary descendants while preserving ancestor and canonical-path protection. Share the managed-file inventory with installer resources and checksums.
