@@ -277,7 +277,10 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.doesNotMatch(html, /cycle-charts|cycle-orbit|gate-outcomes/);
     assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
     assert.match(html, /id="install"/);
-    assert.match(html, /Version <code>v0\.8\.3<\/code> removes native-subagent installation and integration/);
+    assert.match(
+        html,
+        /Version <code>v0\.8\.3<\/code> removes native-subagent integration so context handoffs stay explicit/,
+    );
     assert.match(html, /The journal keeps the evidence, gates, changed files, and version/);
     assert.match(html, /Later friction links back to that journal/);
     assert.match(html, /durable validators/);

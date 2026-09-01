@@ -63,6 +63,12 @@ The goal is to make each justified change obvious, testable, reversible, and exp
 
 Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
 
+## Why ZenPi does not install subagents
+
+ZenPi keeps implementation inside one accountable working context instead of installing an orchestration layer. A parent agent must choose what context a child receives and compress what comes back; either handoff can silently omit the constraint that mattered and make a bad result difficult to reconstruct. Parallel agents writing the same codebase also trade apparent speed for fragmented decisions, conflicting assumptions, and a larger review burden.
+
+Gather context deliberately, leave a reviewable artifact, and begin implementation with that shared record. Keep one writer per working directory; use an isolated worktree and an explicit separate session when an independent review or experiment is worth the coordination cost. This is not a claim that independent agents are never useful. It is a choice to keep context ownership, authorship, and verification visible.
+
 ## Install
 
 You need Node.js 22.19+, npm, and Git. If Pi (0.84.4+) isn't installed yet, the installer sets it up for you.

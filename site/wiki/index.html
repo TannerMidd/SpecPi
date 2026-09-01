@@ -53,6 +53,7 @@
           <p>Guides</p>
           <a href="#workflows">Improvement loop</a>
           <a href="#file-review">Review files</a>
+          <a href="#work-ownership">Work ownership</a>
           <a href="#command-guard">Command guard</a>
           <a href="#browser-qa">Browser QA</a>
         </div>
@@ -80,6 +81,7 @@
           <a href="#first-session">First session</a>
           <a href="#workflows">Improvement loop</a>
           <a href="#file-review">File review</a>
+          <a href="#work-ownership">Work ownership</a>
           <a href="#command-guard">Command guard</a>
           <a href="#browser-qa">Browser QA</a>
           <a href="#reference">Commands</a>
@@ -232,6 +234,23 @@ cd ZenPi</code></pre>
             <div><kbd>c</kbd><span>Comment</span></div>
             <div><kbd>Ctrl</kbd><kbd>Enter</kbd><span>Submit</span></div>
           </div>
+        </div>
+      </section>
+
+      <section class="wiki-section" id="work-ownership" aria-labelledby="work-ownership-title">
+        <div class="section-label"><span>05</span><p>Work ownership</p></div>
+        <div class="doc-content">
+          <h2 id="work-ownership-title">Keep context and authorship visible.</h2>
+          <p class="doc-lede">ZenPi does not install subagent orchestration. The apparent speed of hidden delegation is not worth losing track of what each worker knew, assumed, changed, or left unsaid.</p>
+          <div class="definition-list">
+            <div><strong>Own the context handoff</strong><p>A parent chooses what a child sees and reduces what comes back. Either boundary can omit the decisive constraint, leaving a result that is difficult to explain or reproduce.</p></div>
+            <div><strong>Keep one writer</strong><p>Parallel writers accumulate conflicting assumptions and fragmented decisions faster than reviewers can reconcile them. Use one writer per working directory and isolate intentional experiments in separate worktrees.</p></div>
+            <div><strong>Leave durable evidence</strong><p>Gather context deliberately and record it in a reviewable artifact before implementation. An explicit separate session remains useful for independent review or a bounded experiment when its coordination cost is justified.</p></div>
+          </div>
+          <aside class="callout callout-note">
+            <strong>A workflow choice, not a universal ban</strong>
+            <p>Independent agents can provide a valuable second opinion. ZenPi simply keeps their context, ownership, and output explicit instead of making delegation a default hidden layer.</p>
+          </aside>
         </div>
       </section>
 

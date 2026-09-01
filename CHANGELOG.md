@@ -3,6 +3,7 @@
 ## 0.8.3 - 2026-09-01
 
 - Remove the `pi-subagents` package and ZenPi's native-subagent configuration, runtime integration, and installation defaults.
+- Make the workflow rationale explicit: automated parent/child handoffs can silently omit decisive context, while parallel writers fragment assumptions and ownership. Prefer deliberate context gathering, reviewable artifacts, explicit second-opinion sessions, and one writer per working directory or isolated worktree.
 - Split the public security policy from the technical security model. Document latest-release support, private vulnerability reporting, best-effort response expectations, reporting scope, secure operation, and supply-chain assumptions while keeping implementation boundaries in a shipped `SECURITY_MODEL.md`.
 
 ## 0.8.2 - 2026-09-01
