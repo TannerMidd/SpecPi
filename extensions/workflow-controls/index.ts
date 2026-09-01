@@ -388,7 +388,7 @@ export default function workflowControls(pi: ExtensionAPI) {
 
         let relativePath;
         try {
-            relativePath = relativeMutationPath(scope.root, event.input.path);
+            relativePath = relativeMutationPath(scope.root, event.input.path, { cwd: ctx.cwd });
         } catch (error) {
             return { block: true, reason: `Scope path rejected: ${safeMessage(error)}` };
         }

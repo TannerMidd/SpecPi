@@ -15,6 +15,7 @@
 - Re-derive worktree presence inside the registry lock during `/experiment recover`, so a Git operation performed while a recovery prompt is open cannot drop a live record or adopt a replaced directory.
 - Measure experiment status and patch export from the recorded base commit instead of the worktree's current HEAD. Work committed inside an experiment previously reported as clean, exported to an empty patch, and could be discarded without the dirty-work confirmation.
 - Keep Git-reported paths canonical in workflow state and percent-escape controls only at presentation boundaries, so filenames containing `%`, newlines, Unicode separators, or directionality controls remain matchable without forging system guidance or UI text.
+- Resolve relative direct write and edit paths from the active session directory before comparing them with project-relative scope, so sessions opened below the Git root neither allow outside-scope mutations nor reject matching nested paths.
 - Claim a patch output exclusively instead of checking then renaming, so a destination created in the gap is never replaced without explicit overwrite approval.
 - Require a ready completion verdict to disclose residual risk when the change snapshot was indeterminate, instead of ignoring that signal.
 

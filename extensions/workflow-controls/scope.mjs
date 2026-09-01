@@ -254,12 +254,11 @@ export function relativeMutationPath(root, input, options = {}) {
         throw new Error("Mutation path must be non-empty text without control characters");
     }
 
-    if (!path.isAbsolute(input) && !/^[A-Za-z]:[\\/]/u.test(input)) {
-        return resolveScopedPath(root, input, options).path;
-    }
-
+    const relative = !path.isAbsolute(input) && !/^[A-Za-z]:[\\/]/u.test(input);
+    const requested = relative ? input.trim() : input;
     const resolvedRoot = canonicalRoot(root);
-    const candidate = path.resolve(input);
+    const cwd = typeof options.cwd === "string" && options.cwd ? options.cwd : resolvedRoot;
+    const candidate = relative ? path.resolve(cwd, requested) : path.resolve(requested);
     if (!isInside(resolvedRoot, candidate, options.platform)) {
         throw new Error("Mutation path escapes the project root");
     }

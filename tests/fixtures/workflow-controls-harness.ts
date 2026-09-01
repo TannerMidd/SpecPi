@@ -18,7 +18,10 @@ git("init");
 git("config", "user.email", "harness@example.invalid");
 git("config", "user.name", "Workflow Harness");
 fs.mkdirSync(path.join(repository, "src"));
+const nestedCwd = path.join(repository, "packages", "app");
+fs.mkdirSync(path.join(nestedCwd, "src"), { recursive: true });
 fs.writeFileSync(path.join(repository, "src", "inside.txt"), "inside\n");
+fs.writeFileSync(path.join(nestedCwd, "src", "inside.txt"), "nested inside\n");
 fs.writeFileSync(path.join(repository, "outside.txt"), "outside\n");
 git("add", ".");
 git("commit", "-m", "base");
@@ -74,7 +77,7 @@ registerWorkflowControls(pi);
 
 const branch: any[] = [];
 const ctx: any = {
-    cwd: repository,
+    cwd: nestedCwd,
     mode: "tui",
     hasUI: true,
     isIdle: () => true,
@@ -112,6 +115,27 @@ for (const handler of events.get("session_start") || []) {
     await handler({}, ctx);
 }
 
+await commands.get("scope").handler("set", ctx);
+
+// Tool paths are relative to the session cwd, while declared scope remains relative to the Git root. Exercise both
+// directions so a nested session cannot silently allow root scope or reject the matching nested scope.
+const nestedCall = { toolName: "write", toolCallId: "nested-cwd", input: { path: "src/new.ts", content: "x" } };
+let nestedCwdOutOfScopeDenied = false;
+for (const handler of events.get("tool_call") || []) {
+    const outcome = await handler(nestedCall, ctx);
+    nestedCwdOutOfScopeDenied ||= outcome?.block === true;
+}
+
+editorValue = "packages/app/src/";
+await commands.get("scope").handler("set", ctx);
+let nestedCwdInScopeAllowed = true;
+for (const handler of events.get("tool_call") || []) {
+    const outcome = await handler(nestedCall, ctx);
+    nestedCwdInScopeAllowed &&= outcome?.block !== true;
+}
+
+ctx.cwd = repository;
+editorValue = "src/";
 await commands.get("scope").handler("set", ctx);
 
 const outsideCall = { toolName: "write", toolCallId: "outside-deny", input: { path: "outside.txt", content: "x" } };
@@ -298,6 +322,8 @@ process.stdout.write(
     `WORKFLOW_CONTROLS_HARNESS=${JSON.stringify({
         commands: [...commands.keys()].sort(),
         toolRegistered: tools.has("submit_completion_challenge"),
+        nestedCwdOutOfScopeDenied,
+        nestedCwdInScopeAllowed,
         denied,
         allowed,
         pendingRecorded: scopeState?.pending?.includes("outside.txt") === true,

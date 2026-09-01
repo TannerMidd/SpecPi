@@ -88,6 +88,14 @@ test("scope entries are bounded project-relative exact files and directory prefi
         assert.equal(scopeMatches(entries, "src-namesake/file.txt"), false);
         assert.equal(scopeMatches(entries, "outside.txt"), true);
         assert.equal(relativeMutationPath(root, path.join(root, "src", "inside.txt")), "src/inside.txt");
+
+        const nestedCwd = path.join(root, "packages", "app");
+        fs.mkdirSync(path.join(nestedCwd, "src"), { recursive: true });
+        const nestedMutation = relativeMutationPath(root, "src/new.ts", { cwd: nestedCwd });
+        assert.equal(nestedMutation, "packages/app/src/new.ts");
+        assert.equal(scopeMatches(entries, nestedMutation), false);
+        assert.equal(scopeMatches(normalizeScopeEntries(root, ["packages/app/src/"]), nestedMutation), true);
+
         assert.throws(() => relativeMutationPath(root, path.resolve(root, "..", "escape.txt")), /escapes/);
         assert.throws(() => normalizeScopeEntries(root, ["../escape.txt"]), /escapes/);
         assert.throws(() => normalizeScopeEntries(root, [path.resolve(root, "src")]), /project-relative/);
