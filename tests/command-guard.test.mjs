@@ -14,7 +14,7 @@ import {
     injectBinding,
 } from "../extensions/command-guard/core.mjs";
 import { redactCommand } from "../extensions/command-guard/redact.mjs";
-import { evaluateRules, ruleCatalog } from "../extensions/command-guard/rules.mjs";
+import { catastrophicTextScan, evaluateRules, ruleCatalog } from "../extensions/command-guard/rules.mjs";
 import { parsePowerShellResult, parserHosts, preferParserResult } from "../extensions/command-guard/powershell.mjs";
 
 const posix = { shell: "bash", mode: "guard", cwd: "/home/tanner/work", platform: "linux", hasUI: true };
@@ -537,10 +537,226 @@ test("policy catalog has stable unique bounded rule IDs and malformed decisions 
             leaves: [],
             reason: "🙂".repeat(200),
         },
+        {
+            action: "deny",
+            severity: "critical",
+            category: "system",
+            ruleIds: ["system.critical"],
+            leaves: [],
+            reason: "bad lock metadata",
+            lockSession: "yes",
+        },
     ]) {
         const malformed = aggregateDecisions([invalid]);
         assert.equal(malformed.action, "deny");
         assert.equal(malformed.ruleIds[0], "policy.integrity");
+    }
+});
+
+test("critical metadata controls latching independently from denial", () => {
+    const critical = decideCommand("rm -rf /", posix);
+    assert.equal(critical.action, "deny");
+    assert.equal(critical.severity, "critical");
+    assert.equal(critical.lockSession, true);
+
+    const fallback = decideCommand("Remove-Item -Recurse -Force C:\\Windows", {
+        shell: "powershell",
+        mode: "guard",
+        cwd: "C:\\work",
+        platform: "win32",
+        hasUI: true,
+        helperPath: "C:\\missing\\parser.ps1",
+    });
+    assert.equal(fallback.action, "deny");
+    assert.equal(fallback.lockSession, false);
+
+    const proven = {
+        action: "deny",
+        severity: "critical",
+        category: "system",
+        ruleIds: ["system.critical"],
+        leaves: [],
+        reason: "proven catastrophe",
+        lockSession: true,
+    };
+    const ordinary = {
+        action: "ask",
+        severity: "high",
+        category: "filesystem",
+        ruleIds: ["filesystem.mutation"],
+        leaves: [],
+        reason: "ordinary mutation",
+        lockSession: false,
+    };
+    assert.equal(aggregateDecisions([proven, ordinary]).lockSession, true);
+    assert.equal(aggregateDecisions([ordinary, proven]).lockSession, true);
+    assert.equal(
+        aggregateDecisions([
+            {
+                action: "deny",
+                severity: "critical",
+                category: "system",
+                ruleIds: ["system.critical"],
+                leaves: [],
+                reason: "uncertain catastrophe",
+                lockSession: false,
+            },
+        ]).lockSession,
+        false,
+    );
+});
+
+test("Bash rejects cmd cleanup switches without latching", () => {
+    const options = { shell: "bash", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true };
+    for (const command of ["rmdir /s /q F:\\Temp\\case", "rd /s /q F:\\Temp\\case"]) {
+        const decision = decideCommand(command, options);
+        assert.equal(decision.action, "deny", command);
+        assert.equal(decision.severity, "high", command);
+        assert.deepEqual(decision.ruleIds, ["shell.syntax-mismatch"]);
+        assert.equal(decision.lockSession, false);
+    }
+
+    assert.equal(decideCommand("rm -rf -- F:/Temp/case", options).action, "allow");
+    assert.equal(decideCommand("rm -rf -- F:/Temp/case", { ...options, mode: "strict" }).action, "ask");
+    assert.equal(decideCommand("cmd /c rmdir /s /q C:\\Windows", options).lockSession, true);
+});
+
+test("fallback catastrophic paths stay within their statement", () => {
+    const options = {
+        shell: "powershell",
+        mode: "guard",
+        cwd: "C:\\work",
+        platform: "win32",
+        hasUI: true,
+    };
+    const unrelated = catastrophicTextScan(
+        "Write-Output C:\\Windows; Remove-Item -Recurse -Force C:\\Temp\\scratch",
+        options,
+    );
+    assert.equal(unrelated, undefined);
+
+    for (const command of [
+        "Remove-Item -Recurse -Force C:\\Windows",
+        'Remove-Item -Recurse -Force "C:\\Windows"',
+        "powershell.exe -Command \"Remove-Item -Recurse -Force 'C:\\Windows'\"",
+    ]) {
+        const sameStatement = catastrophicTextScan(command, options);
+        assert.equal(sameStatement.action, "deny", command);
+        assert.equal(sameStatement.severity, "critical", command);
+        assert.equal(sameStatement.lockSession, false, command);
+    }
+
+    for (const command of [
+        'Write-Output "-Command Remove-Item -Recurse -Force C:\\Windows"',
+        'Write-Output "powershell.exe -Command Remove-Item -Recurse -Force C:\\Windows"',
+    ]) {
+        assert.equal(catastrophicTextScan(command, options), undefined, command);
+    }
+
+    const escapedCommand = "Remove-`Item -Recurse -Force C:\\Windows";
+    const escapedFallback = catastrophicTextScan(escapedCommand, options);
+    assert.equal(escapedFallback.action, "deny");
+    assert.equal(escapedFallback.lockSession, false);
+    assert.equal(
+        catastrophicTextScan(
+            'Write-Output "safe `"; powershell.exe -Command \'Remove-Item -Recurse -Force C:\\Windows\'"',
+            options,
+        ),
+        undefined,
+    );
+
+    const bashOptions = { ...options, shell: "bash" };
+    for (const command of ['rm -rf "C:\\Windows"', "bash -c 'rm -rf C:/Windows'"]) {
+        const decision = catastrophicTextScan(command, bashOptions);
+        assert.equal(decision.action, "deny", command);
+        assert.equal(decision.lockSession, false, command);
+    }
+
+    assert.equal(
+        catastrophicTextScan("printf '%s\\n' 'safe; bash -c \\\"rm -rf C:/Windows\\\"'", bashOptions),
+        undefined,
+    );
+
+    for (const command of [
+        'Write-Output "$(Remove-Item -Recurse -Force C:\\Windows)"',
+        "Remove-`\nItem -Recurse -Force C:\\Windows",
+        "powershell.exe -Command 'Remove-`Item -Recurse -Force C:\\Windows'",
+    ]) {
+        const decision = catastrophicTextScan(command, command.startsWith("powershell.exe") ? bashOptions : options);
+        assert.equal(decision.action, "deny", command);
+        assert.equal(decision.lockSession, false, command);
+    }
+
+    for (const command of [
+        'printf "%s" "$(rm -rf C:/Windows)"',
+        'printf "%s" "`rm -rf C:/Windows`"',
+        "r\\\nm -rf C:/Windows",
+        "bash -c 'r\\\nm -rf C:/Windows'",
+    ]) {
+        const decision = catastrophicTextScan(command, command.startsWith("bash") ? options : bashOptions);
+        assert.equal(decision.action, "deny", command);
+        assert.equal(decision.lockSession, false, command);
+    }
+
+    assert.equal(
+        catastrophicTextScan("Write-Output C:\\Windows `; Remove-Item -Recurse -Force C:\\Temp", options),
+        undefined,
+    );
+    assert.equal(
+        catastrophicTextScan(
+            'powershell.exe -File build.ps1 "safe -Command Remove-Item -Recurse -Force C:\\Windows"',
+            options,
+        ),
+        undefined,
+    );
+
+    for (const [command, commandOptions] of [
+        ['printf "%s" "$(echo "$(rm -rf C:/Windows)")"', bashOptions],
+        ["bash -c rm\\ -rf\\ C:/Windows", bashOptions],
+        ['cmd /c "rd /s /q C:\\Windows"', options],
+        ["bash -lc 'rm -rf C:/Windows'", bashOptions],
+        ["/bin/bash -c 'rm -rf C:/Windows'", bashOptions],
+        ["& { Remove-Item -Recurse -Force C:\\Windows }", options],
+    ]) {
+        const decision = catastrophicTextScan(command, commandOptions);
+        assert.equal(decision.action, "deny", command);
+        assert.equal(decision.lockSession, false, command);
+    }
+
+    for (const command of [
+        "bash -e 'rm -rf C:/Windows'",
+        "bash -- /dev/null -c 'rm -rf C:/Windows'",
+        "sudo -u bash printf '%s' '-c' 'rm -rf C:/Windows'",
+        "sudo --chdir bash -- -c 'rm -rf C:/Windows'",
+        "printf ok;# ; rm -rf C:/Windows",
+        "printf ok;# $(rm -rf C:/Windows)",
+    ]) {
+        assert.equal(catastrophicTextScan(command, bashOptions), undefined, command);
+    }
+
+    assert.equal(
+        catastrophicTextScan("Write-Output ok # ; Remove-Item -Recurse -Force C:\\Windows", options),
+        undefined,
+    );
+    assert.equal(catastrophicTextScan("echo safe ^& rd /s /q C:\\Windows", { ...options, shell: "cmd" }), undefined);
+
+    let deeplyNested = "rm -rf C:/Windows";
+    for (let depth = 0; depth < 9; depth += 1) {
+        deeplyNested = `echo "$(${deeplyNested})"`;
+    }
+
+    const boundedFallback = catastrophicTextScan(deeplyNested, bashOptions);
+    assert.equal(boundedFallback.action, "deny");
+    assert.equal(boundedFallback.lockSession, false);
+
+    for (const command of ['Remove-Item -Recurse -Force "C:\\Windows"', escapedCommand]) {
+        const quotedFallback = decideCommand(command, {
+            ...options,
+            helperPath: "C:\\missing\\parser.ps1",
+        });
+        assert.equal(quotedFallback.action, "deny", command);
+        assert.equal(quotedFallback.severity, "critical", command);
+        assert.equal(quotedFallback.lockSession, false, command);
     }
 });
 
@@ -595,6 +811,7 @@ test("redaction is display-only and bounded", () => {
 test("child bindings are reserved, bounded, and never weaken strict", () => {
     const binding = bindingForChild("strict", "abcdef12");
     assert.equal(validateBinding(binding, "strict"), true);
+    assert.equal(validateBinding({ ...binding, policyVersion: 1 }, "strict"), false);
     assert.equal(validateBinding({ ...binding, mode: "guard" }, "strict"), false);
     const input = injectBinding(
         { agent: "worker", extensionBindings: { "other/1": { ok: true } } },
@@ -1390,6 +1607,14 @@ test("guard self-protection covers ancestors that contain enforcement state", ()
 
         // Unrelated siblings inside the agent directory remain ordinary work.
         assert.equal(decideCommand("rm -rf /tmp/zenpi-agent/extensions/browser", options).action, "allow");
+        assert.equal(
+            decideCommand("rm -rf /tmp/zenpi-agent/extensions/command-guard/.test-tmp-123", options).action,
+            "allow",
+        );
+        assert.equal(
+            decideCommand("rm -rf /tmp/zenpi-agent/extensions/command-guard/generated-fixtures/case-1", options).action,
+            "allow",
+        );
         assert.equal(decideCommand("rm -rf /tmp/zenpi-agent-scratch", options).action, "allow");
     } finally {
         if (previous === undefined) {

@@ -1,7 +1,7 @@
 import { classifyPath, isAgentPath } from "./paths.mjs";
 import { COMMAND_FLAG, ENCODED_COMMAND_FLAG, HOST_NAMES as POWERSHELL_HOSTS } from "./powershell.mjs";
 
-export const POLICY_VERSION = 1;
+export const POLICY_VERSION = 2;
 
 // Determinate, noncritical findings are normally filtered out in Guard so routine work stays quiet. These
 // rules are the exception: Guard still asks, because the operation discards or rewrites work — local or
@@ -244,6 +244,7 @@ function match(id, severity, category, reason, leaf, saferAlternative) {
         leaves: [{ executable: leaf.executable, operation: leaf.operation, redactedTarget: leaf.redactedTarget }],
         reason,
         ...(saferAlternative ? { saferAlternative } : {}),
+        lockSession: severity === "critical",
     };
 }
 
@@ -346,6 +347,14 @@ function deletesFiles(name, args) {
     return DELETE_NAMES.has(name) && (name !== "find" || findMutates(args));
 }
 
+function bashCmdSyntaxMismatch(name, args, options) {
+    const windows = options.platform === "win32" || options.platform === "windows";
+    const bash = /^(?:bash|sh|zsh|dash|ksh|fish)$/i.test(String(options.shell || ""));
+    const cmdDelete = ["rd", "rmdir", "del", "erase"].includes(name);
+
+    return windows && bash && cmdDelete && args.some((arg) => /^(?:\/s|\/q|\/f|\/a(?::[a-z])?)$/i.test(String(arg)));
+}
+
 // True when the invocation prints or enumerates the whole environment rather than one named variable.
 function dumpsEnvironment(name, args, helpOnly) {
     // compgen -v lists variables; the shared helpOnly heuristic would misread it as --version.
@@ -386,6 +395,19 @@ function criticalLeaf(leaf, options) {
     const joined = args.join(" ").toLowerCase();
     let targetsCache;
     const targets = () => (targetsCache ||= targetState(args, options));
+
+    if (bashCmdSyntaxMismatch(name, args, options)) {
+        return {
+            action: "deny",
+            severity: "high",
+            category: "filesystem",
+            ruleIds: ["shell.syntax-mismatch"],
+            leaves: [{ executable: leaf.executable, operation: leaf.operation, redactedTarget: leaf.redactedTarget }],
+            reason: "This is cmd deletion syntax sent to the Bash tool and will not clean the intended Windows path.",
+            saferAlternative: "Use Bash `rm -rf -- <forward-slash-path>` or the PowerShell tool.",
+            lockSession: false,
+        };
+    }
 
     if (name === "fork-bomb") {
         return match(
@@ -1404,94 +1426,617 @@ function pipelineGroups(analysis) {
 
 // Verbs in COMMAND POSITION — the start of the text or just past a command separator. Accepting them after any
 // whitespace made `echo rd /s /q C:\Windows` a match, and the scan runs on text nobody could parse, so a false
-// critical here is a session lock over a command that only printed a string.
+// critical here is an immutable denial over a command that only printed a string.
 const TEXT_DESTRUCTIVE_VERB =
-    /(?:^|[;&|(\n\r]|&&|\|\|)\s*(?:rm|rmdir|shred|srm|del|erase|rd|remove-item|ri|clear-item|mkfs(?:\.[a-z0-9]+)?|dd|wipefs|diskpart|format|takeown|move-item)(?:[\s;&|)]|$)/i;
+    /(?:^|[;&|({\n\r]|&&|\|\|)\s*(?:rm|rmdir|shred|srm|del|erase|rd|remove-item|ri|clear-item|mkfs(?:\.[a-z0-9]+)?|dd|wipefs|diskpart|format|takeown|move-item)(?:[\s;&|)}]|$)/i;
 const TEXT_STANDALONE_CATASTROPHE =
-    /(?:^|[;&|(\n\r]|&&|\|\|)\s*(?:shutdown|reboot|halt|poweroff|stop-computer|restart-computer)(?:[\s;&|)]|$)|:\s*\(\s*\)\s*\{[^}]*\|[^}]*&[^}]*\}\s*;\s*:/i;
+    /(?:^|[;&|({\n\r]|&&|\|\|)\s*(?:shutdown|reboot|halt|poweroff|stop-computer|restart-computer)(?:[\s;&|)}]|$)|:\s*\(\s*\)\s*\{[^}]*\|[^}]*&[^}]*\}\s*;\s*:/i;
+const ESCAPED_WHITESPACE = "\u0000";
 
-// Blanks quoted spans so the scan reads only text the shell would treat as syntax. Without this the scan is
-// quote-blind: `cmd /c echo 'safe & rd /s /q C:\Windows'` prints a string, but its inert quoted argument looked
-// exactly like a catastrophic command and produced a critical, session-locking denial.
-function unquotedProjection(text, shell) {
-    // Backslash escapes the next character in POSIX shells, but in PowerShell and cmd it is a path separator:
-    // blanking it there would turn C:\Windows into an unrecognizable C: indows and silently disarm the scan.
-    const backslashEscapes = !/^(?:powershell|pwsh|cmd|cmd\.exe)$/i.test(String(shell || ""));
-    let output = "",
-        quote = "",
-        escaped = false;
-    for (const character of text) {
-        if (escaped) {
-            output += " ";
-            escaped = false;
-            continue;
-        }
-
-        if (backslashEscapes && character === "\\" && quote !== "'") {
-            escaped = true;
-            output += " ";
-            continue;
-        }
-
+function substitutionEnd(text, start, shell, delimiter) {
+    const powershell = /^(?:powershell|pwsh)$/.test(shell);
+    const bash = /^(?:bash|sh|zsh|dash|ksh|fish)$/.test(shell);
+    let depth = delimiter === ")" ? 1 : 0;
+    let quote = "";
+    for (let index = start; index < text.length; index += 1) {
+        const character = text[index];
+        const next = text[index + 1];
         if (quote) {
+            if (powershell && quote === "'" && character === "'" && next === "'") {
+                index += 1;
+                continue;
+            }
+
+            if (powershell && quote === '"' && character === "`" && next !== undefined) {
+                index += 1;
+                continue;
+            }
+
+            if (bash && quote === '"' && character === "\\" && /[$`"\\\n]/.test(next || "")) {
+                index += 1;
+                continue;
+            }
+
             if (character === quote) {
                 quote = "";
             }
 
-            output += " ";
             continue;
         }
 
-        if (character === "'" || character === '"' || character === "`") {
-            quote = character;
-            output += " ";
-            continue;
-        }
-
-        output += character;
-    }
-
-    return output;
-}
-
-// Returns the payloads of inline-code flags, unquoted and joined, plus anything a base64 -EncodedCommand
-// carries. These are program text, so the scan must read them even though they arrive inside quotes.
-const INLINE_CODE_TEXT_FLAG = /(?:^|\s)(?:-c|--command|-command|-com|-comm|-comma|-comman|\/c|\/k|-e|--eval)\s+/gi;
-function inlineCodePayloads(raw, shell) {
-    const found = [];
-    for (const match of raw.matchAll(INLINE_CODE_TEXT_FLAG)) {
-        const rest = raw.slice(match.index + match[0].length);
-        const quote = rest[0] === "'" || rest[0] === '"' ? rest[0] : "";
-        const end = quote ? rest.indexOf(quote, 1) : -1;
-        found.push(quote ? (end > 0 ? rest.slice(1, end) : rest.slice(1)) : rest);
-    }
-
-    for (const match of raw.matchAll(
-        /(?:^|\s)-(?:e|en|enc|enco|encod|encode|encoded|encodedcommand)\s+([A-Za-z0-9+/=]{8,})/gi,
-    )) {
-        try {
-            const decoded = Buffer.from(match[1], "base64");
-            if (decoded.length && decoded.length <= 64 * 1024) {
-                found.push(decoded.toString("utf16le"), decoded.toString("utf8"));
+        if ((powershell && character === "`") || (bash && character === "\\")) {
+            if (next !== undefined) {
+                index += 1;
             }
-        } catch {
-            /* an undecodable argument carries nothing to read */
+
+            continue;
+        }
+
+        if (character === "'" || character === '"') {
+            quote = character;
+            continue;
+        }
+
+        if (delimiter === "`" && character === "`") {
+            return index;
+        }
+
+        if (delimiter === ")") {
+            if (character === "(") {
+                depth += 1;
+            } else if (character === ")") {
+                depth -= 1;
+                if (depth === 0) {
+                    return index;
+                }
+            }
         }
     }
 
-    // The payload is code, but quoting still applies inside it: `cmd /c echo 'rd /s /q ...'` only runs echo.
-    return found
-        .map((payload) => unquotedProjection(payload, shell))
-        .join("\n")
-        .slice(0, 64 * 1024);
+    return text.length - 1;
 }
 
-// Pulls the path-shaped tokens out of raw command text without needing a successful parse.
+function executableSubstitutions(text, shell) {
+    const powershell = /^(?:powershell|pwsh)$/.test(shell);
+    const bash = /^(?:bash|sh|zsh|dash|ksh|fish)$/.test(shell);
+    const found = [];
+    let quote = "";
+    for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        const next = text[index + 1];
+        if (quote === "'") {
+            if (powershell && character === "'" && next === "'") {
+                index += 1;
+            } else if (character === "'") {
+                quote = "";
+            }
+
+            continue;
+        }
+
+        if (!quote && powershell && character === "<" && next === "#") {
+            const end = text.indexOf("#>", index + 2);
+            index = end < 0 ? text.length : end + 1;
+            continue;
+        }
+
+        const lineComment =
+            !quote && character === "#" && (powershell || (bash && (index === 0 || /[\s;&|()]/.test(text[index - 1]))));
+        if (lineComment) {
+            const end = text.indexOf("\n", index + 1);
+            index = end < 0 ? text.length : end;
+            continue;
+        }
+
+        if (powershell && character === "`" && next !== undefined) {
+            index += 1;
+            continue;
+        }
+
+        if (bash && character === "\\" && next !== undefined && quote !== "'") {
+            index += 1;
+            continue;
+        }
+
+        if (character === "'") {
+            quote = "'";
+            continue;
+        }
+
+        if (character === '"') {
+            quote = quote === '"' ? "" : '"';
+            continue;
+        }
+
+        if ((powershell || bash) && character === "$" && next === "(") {
+            const end = substitutionEnd(text, index + 2, shell, ")");
+            found.push({ start: index, end, payload: text.slice(index + 2, end) });
+            index = end;
+            continue;
+        }
+
+        if (bash && character === "`") {
+            const end = substitutionEnd(text, index + 1, shell, "`");
+            found.push({ start: index, end, payload: text.slice(index + 1, end) });
+            index = end;
+        }
+    }
+
+    return found;
+}
+
+// Produces cooked statement views without executing or expanding input. `syntax` blanks quoted argument content
+// so inert data cannot invent command-position verbs or separators. `arguments` retains cooked quoted values so
+// a real destructive command still carries paths such as `Remove-Item "C:\Windows"` into target classification.
+function fallbackProjection(text, shell) {
+    const shellName = String(shell || "").toLowerCase();
+    const powershell = /^(?:powershell|pwsh)$/.test(shellName);
+    const bash = /^(?:bash|sh|zsh|dash|ksh|fish)$/.test(shellName);
+    const cmd = /^(?:cmd|cmd\.exe)$/.test(shellName);
+    const statements = [];
+    const substitutions = executableSubstitutions(text, shellName);
+    const substitutionAt = new Map(substitutions.map((item) => [item.start, item]));
+    let syntax = "",
+        argumentsText = "",
+        quote = "";
+    const append = (syntaxText, argumentText = syntaxText) => {
+        syntax += syntaxText;
+        argumentsText += argumentText;
+    };
+
+    const flush = () => {
+        if (syntax.trim() || argumentsText.trim()) {
+            statements.push({ syntax, arguments: argumentsText });
+        }
+
+        syntax = "";
+        argumentsText = "";
+    };
+
+    for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        const next = text[index + 1];
+        const substitution = substitutionAt.get(index);
+        if (substitution) {
+            const blanks = " ".repeat(substitution.end - substitution.start + 1);
+            append(blanks, blanks);
+            index = substitution.end;
+            continue;
+        }
+
+        if (quote) {
+            if (powershell && quote === "'" && character === "'" && next === "'") {
+                append("  ", "''");
+                index += 1;
+                continue;
+            }
+
+            if (powershell && quote === '"' && character === "`" && next !== undefined) {
+                append("  ", character + next);
+                index += 1;
+                continue;
+            }
+
+            if (bash && quote === '"' && character === "\\" && /[$`"\\\n]/.test(next || "")) {
+                append("  ", character + next);
+                index += 1;
+                continue;
+            }
+
+            if (character === quote) {
+                quote = "";
+                append(" ", character);
+            } else {
+                append(" ", character);
+            }
+
+            continue;
+        }
+
+        if (powershell && character === "`" && next !== undefined) {
+            if (next === "\n" || (next === "\r" && text[index + 2] === "\n")) {
+                index += next === "\r" ? 2 : 1;
+            } else {
+                append(
+                    /[;&|\s]/.test(next) ? " " : next,
+                    /\s/.test(next) ? ESCAPED_WHITESPACE : /[;&|]/.test(next) ? character + next : next,
+                );
+                index += 1;
+            }
+
+            continue;
+        }
+
+        if (bash && character === "\\" && next !== undefined) {
+            if (next === "\n") {
+                index += 1;
+            } else {
+                append(
+                    /[;&|\s]/.test(next) ? " " : next,
+                    /\s/.test(next) ? ESCAPED_WHITESPACE : /[;&|]/.test(next) ? character + next : next,
+                );
+                index += 1;
+            }
+
+            continue;
+        }
+
+        if (cmd && character === "^" && next !== undefined) {
+            if (next === "\n" || (next === "\r" && text[index + 2] === "\n")) {
+                index += next === "\r" ? 2 : 1;
+            } else {
+                append(/[;&|\s]/.test(next) ? " " : next, /\s/.test(next) ? ESCAPED_WHITESPACE : character + next);
+                index += 1;
+            }
+
+            continue;
+        }
+
+        if (powershell && character === "<" && next === "#") {
+            const end = text.indexOf("#>", index + 2);
+            index = end < 0 ? text.length : end + 1;
+            continue;
+        }
+
+        const lineComment =
+            character === "#" && (powershell || (bash && (index === 0 || /[\s;&|()]/.test(text[index - 1]))));
+        if (lineComment) {
+            const end = text.indexOf("\n", index + 1);
+            flush();
+            index = end < 0 ? text.length : end;
+            continue;
+        }
+
+        if (character === "'" || character === '"') {
+            quote = character;
+            append(" ", character);
+            continue;
+        }
+
+        if ([";", "&", "|", "\n", "\r"].includes(character)) {
+            flush();
+            if ((character === "&" || character === "|") && next === character) {
+                index += 1;
+            }
+
+            continue;
+        }
+
+        append(character);
+    }
+
+    flush();
+
+    return {
+        statements,
+        embeddedPayloads: substitutions.map((item) => ({ payload: item.payload, shell: shellName })),
+        shell: shellName,
+    };
+}
+
+const POWERSHELL_COMMAND_FLAGS = new Set(["-c", "-co", "-com", "-comm", "-comma", "-comman", "-command"]);
+const POWERSHELL_FILE_FLAGS = new Set(["-f", "-fi", "-fil", "-file"]);
+const POWERSHELL_ENCODED_FLAGS = new Set([
+    "-e",
+    "-en",
+    "-enc",
+    "-enco",
+    "-encod",
+    "-encode",
+    "-encoded",
+    "-encodedc",
+    "-encodedco",
+    "-encodedcom",
+    "-encodedcomm",
+    "-encodedcomma",
+    "-encodedcomman",
+    "-encodedcommand",
+]);
+const INLINE_HOST_NAMES = new Set([
+    "powershell",
+    "pwsh",
+    "cmd",
+    "bash",
+    "sh",
+    "zsh",
+    "dash",
+    "ksh",
+    "fish",
+    "node",
+    "python",
+    "python3",
+    "py",
+    "deno",
+    "bun",
+    "ruby",
+    "perl",
+    "php",
+    "lua",
+    "rscript",
+    "osascript",
+    "tclsh",
+    "expect",
+]);
+
+function fallbackWords(text, shell) {
+    const powershell = /^(?:powershell|pwsh)$/.test(shell);
+    const bash = /^(?:bash|sh|zsh|dash|ksh|fish)$/.test(shell);
+    const words = [];
+    let word = "",
+        quote = "",
+        quoted = false;
+    const flush = () => {
+        if (word || quoted) {
+            words.push({ value: word.replaceAll(ESCAPED_WHITESPACE, " "), quoted });
+            word = "";
+            quoted = false;
+        }
+    };
+
+    for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        const next = text[index + 1];
+        if (quote) {
+            if (powershell && quote === "'" && character === "'" && next === "'") {
+                word += "'";
+                index += 1;
+                continue;
+            }
+
+            if (powershell && quote === '"' && character === "`" && next !== undefined) {
+                if (next === "\n" || (next === "\r" && text[index + 2] === "\n")) {
+                    index += next === "\r" ? 2 : 1;
+                } else {
+                    word += next;
+                    index += 1;
+                }
+
+                continue;
+            }
+
+            if (bash && quote === '"' && character === "\\" && /[$`"\\\n]/.test(next || "")) {
+                if (next !== "\n") {
+                    word += next;
+                }
+
+                index += 1;
+                continue;
+            }
+
+            if (character === quote) {
+                quote = "";
+            } else {
+                word += character;
+            }
+
+            continue;
+        }
+
+        if (character === "'" || character === '"') {
+            quote = character;
+            quoted = true;
+            continue;
+        }
+
+        if (/\s/.test(character)) {
+            flush();
+        } else {
+            word += character;
+        }
+    }
+
+    flush();
+
+    return words;
+}
+
+function executableBase(value) {
+    return value
+        .split(/[\\/]/)
+        .pop()
+        .toLowerCase()
+        .replace(/\.exe$/i, "");
+}
+
+function inlineHost(words) {
+    let index = 0;
+    while (index < words.length) {
+        const wrapper = executableBase(words[index].value);
+        if (!["sudo", "doas", "env", "command", "exec", "nohup"].includes(wrapper)) {
+            break;
+        }
+
+        index += 1;
+        while (index < words.length) {
+            const option = words[index].value;
+            if (option === "--") {
+                index += 1;
+                break;
+            }
+
+            if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(option)) {
+                index += 1;
+                continue;
+            }
+
+            if (!option.startsWith("-")) {
+                break;
+            }
+
+            const separateValue =
+                ((wrapper === "sudo" || wrapper === "doas") &&
+                    [
+                        "-u",
+                        "--user",
+                        "-g",
+                        "--group",
+                        "-h",
+                        "--host",
+                        "-p",
+                        "--prompt",
+                        "-C",
+                        "--close-from",
+                        "-D",
+                        "--chdir",
+                        "-R",
+                        "--chroot",
+                        "-T",
+                        "--command-timeout",
+                    ].includes(option)) ||
+                (wrapper === "env" && ["-u", "--unset", "-C", "--chdir"].includes(option)) ||
+                (wrapper === "exec" && option === "-a");
+            index += separateValue ? 2 : 1;
+        }
+    }
+
+    if (index >= words.length) {
+        return undefined;
+    }
+
+    const host = executableBase(words[index].value);
+
+    return INLINE_HOST_NAMES.has(host) ? { host, index } : undefined;
+}
+
+function inlineHostShell(host) {
+    if (["powershell", "pwsh"].includes(host)) {
+        return "powershell";
+    }
+
+    if (host === "cmd") {
+        return "cmd";
+    }
+
+    if (["bash", "sh", "zsh", "dash", "ksh", "fish"].includes(host)) {
+        return "bash";
+    }
+
+    return host;
+}
+
+function decodeInlinePayload(found, encoded, shell) {
+    try {
+        const decoded = Buffer.from(encoded, "base64");
+        if (decoded.length && decoded.length <= 64 * 1024) {
+            found.push({ payload: decoded.toString("utf16le"), shell }, { payload: decoded.toString("utf8"), shell });
+        }
+    } catch {
+        /* an undecodable argument carries nothing to read */
+    }
+}
+
+// Returns only payloads selected by the invoked host's positional mode flag. This avoids treating quoted script
+// data after `powershell -File` as code and preserves the invoked shell family for recursive fallback scanning.
+function inlineCodePayloads(projection) {
+    const found = [...projection.embeddedPayloads];
+    for (const statement of projection.statements) {
+        const words = fallbackWords(statement.arguments, projection.shell);
+        const invocation = inlineHost(words);
+        if (!invocation) {
+            continue;
+        }
+
+        const { host } = invocation;
+        const payloadShell = inlineHostShell(host);
+        const args = words.slice(invocation.index + 1);
+        if (["powershell", "pwsh"].includes(host)) {
+            for (let index = 0; index < args.length; index += 1) {
+                const flag = args[index].value.toLowerCase();
+                if (POWERSHELL_FILE_FLAGS.has(flag)) {
+                    break;
+                }
+
+                if (POWERSHELL_COMMAND_FLAGS.has(flag)) {
+                    if (args[index + 1]) {
+                        found.push({
+                            payload: args
+                                .slice(index + 1)
+                                .map((word) => word.value)
+                                .join(" "),
+                            shell: payloadShell,
+                        });
+                    }
+
+                    break;
+                }
+
+                if (POWERSHELL_ENCODED_FLAGS.has(flag)) {
+                    if (args[index + 1]) {
+                        decodeInlinePayload(found, args[index + 1].value, payloadShell);
+                    }
+
+                    break;
+                }
+            }
+        } else {
+            const shellHost = ["bash", "sh", "zsh", "dash", "ksh", "fish"].includes(host);
+            const codeFlag = (value) => {
+                const flag = value.toLowerCase();
+                if (host === "cmd") {
+                    return flag === "/c" || flag === "/k";
+                }
+
+                if (shellHost) {
+                    return flag === "--command" || /^-[a-z]*c[a-z]*$/i.test(flag);
+                }
+
+                return flag === "-e" || flag === "--eval" || flag === "-c" || flag === "--command";
+            };
+
+            let flagIndex = -1;
+            if (shellHost || host === "cmd") {
+                for (let index = 0; index < args.length; index += 1) {
+                    const value = args[index].value;
+                    if (value === "--") {
+                        break;
+                    }
+
+                    if (codeFlag(value)) {
+                        flagIndex = index;
+                        break;
+                    }
+
+                    const option = shellHost ? value.startsWith("-") : value.startsWith("/");
+                    if (!option) {
+                        break;
+                    }
+                }
+            } else {
+                flagIndex = args.findIndex((arg) => codeFlag(arg.value));
+            }
+
+            if (flagIndex >= 0 && args[flagIndex + 1]) {
+                const codeWords = args.slice(flagIndex + 1);
+                let payload = codeWords[0].value;
+                if (host === "cmd" && codeWords.length > 1) {
+                    payload = codeWords
+                        .map((word) => (word.quoted ? `"${word.value.replaceAll('"', '\\"')}"` : word.value))
+                        .join(" ");
+                }
+
+                found.push({ payload, shell: payloadShell });
+            }
+        }
+    }
+
+    let size = 0;
+
+    return found.filter((item) => {
+        size += Buffer.byteLength(item.payload, "utf8");
+
+        return size <= 64 * 1024;
+    });
+}
+
+// Pulls the path-shaped tokens out of one cooked fallback statement without needing a successful parse.
 function textPathTokens(text) {
     return text
-        .split(/[\s;&|<>()`]+/)
+        .split(/[\s;&|<>(){}`]+/)
         .map((token) => {
-            const unquoted = token.replace(/^["']+/, "").replace(/["']+$/, "");
+            const unquoted = token
+                .replaceAll(ESCAPED_WHITESPACE, " ")
+                .replace(/^["']+/, "")
+                .replace(/["']+$/, "");
             const assigned = unquoted.includes("=") ? unquoted.slice(unquoted.lastIndexOf("=") + 1) : unquoted;
 
             return assigned.replace(/[,]+$/, "");
@@ -1509,12 +2054,56 @@ export function catastrophicTextScan(command, options = {}) {
         return undefined;
     }
 
-    // Only text the shell would execute as syntax can escalate; quoted arguments are data — EXCEPT the argument
-    // of an inline-code flag, which is code by definition. `powershell -Command '<payload>'` and `bash -c
-    // '<payload>'` carry their whole program inside one quoted token, so blanking it would hide the very thing
-    // worth reading when no parser was able to look inside.
-    const text = `${unquotedProjection(raw, options.shell)}\n${inlineCodePayloads(raw, options.shell)}`;
-    if (TEXT_STANDALONE_CATASTROPHE.test(text)) {
+    // Quoted values are inert for command-position detection but remain arguments of a real destructive command.
+    // Inline-code payloads are scanned separately only when their flag belongs to a host invocation.
+    const projections = [];
+    const queue = [{ payload: raw, shell: options.shell, depth: 0 }];
+    const seen = new Set();
+    let scannedBytes = 0;
+    let truncated = false;
+    while (queue.length && projections.length < 64) {
+        const item = queue.shift();
+        const key = `${item.shell}\u0000${item.payload}`;
+        if (seen.has(key)) {
+            continue;
+        }
+
+        seen.add(key);
+        scannedBytes += Buffer.byteLength(item.payload, "utf8");
+        if (scannedBytes > 128 * 1024) {
+            truncated = true;
+            break;
+        }
+
+        const projection = fallbackProjection(item.payload, item.shell);
+        projections.push(projection);
+        const payloads = inlineCodePayloads(projection);
+        if (item.depth < 8) {
+            queue.push(...payloads.map((payload) => ({ ...payload, depth: item.depth + 1 })));
+        } else if (payloads.some((payload) => !seen.has(`${payload.shell}\u0000${payload.payload}`))) {
+            truncated = true;
+        }
+    }
+
+    truncated ||= queue.length > 0;
+    if (truncated) {
+        return {
+            action: "deny",
+            severity: "critical",
+            category: "dynamic",
+            ruleIds: ["parser.unanalyzed-catastrophe"],
+            leaves: [],
+            reason: "The unparsed command contains executable payload nesting beyond the fallback safety limit.",
+            indeterminate: true,
+            lockSession: false,
+        };
+    }
+
+    if (
+        projections.some((projection) =>
+            projection.statements.some((statement) => TEXT_STANDALONE_CATASTROPHE.test(statement.syntax)),
+        )
+    ) {
         return {
             action: "deny",
             severity: "critical",
@@ -1523,21 +2112,26 @@ export function catastrophicTextScan(command, options = {}) {
             leaves: [],
             reason: "The command could not be parsed and its text carries a host-destroying operation.",
             indeterminate: true,
+            lockSession: false,
         };
     }
 
-    if (!TEXT_DESTRUCTIVE_VERB.test(text)) {
-        return undefined;
-    }
-
     const scanOptions = { ...options, mode: "guard", read: false };
-    const reaches = textPathTokens(text).some((token) => {
-        try {
-            return classifyPath(token, scanOptions).protected || isAgentPath(token, scanOptions);
-        } catch {
-            return false;
-        }
-    });
+    const reaches = projections.some((projection) =>
+        projection.statements.some((statement) => {
+            if (!TEXT_DESTRUCTIVE_VERB.test(statement.syntax)) {
+                return false;
+            }
+
+            return textPathTokens(statement.arguments).some((token) => {
+                try {
+                    return classifyPath(token, scanOptions).protected || isAgentPath(token, scanOptions);
+                } catch {
+                    return false;
+                }
+            });
+        }),
+    );
 
     return reaches
         ? {
@@ -1548,6 +2142,7 @@ export function catastrophicTextScan(command, options = {}) {
               leaves: [],
               reason: "The command could not be parsed and its text targets a protected host or enforcement path.",
               indeterminate: true,
+              lockSession: false,
           }
         : undefined;
 }
@@ -1726,6 +2321,7 @@ export function evaluateRules(analysis, options = {}) {
                           ruleIds: ["guard.redirect-tamper"],
                           leaves: [],
                           reason: "A shell redirect targets a protected path.",
+                          lockSession: true,
                       }
                     : {
                           action: "ask",
@@ -1850,6 +2446,7 @@ export const ruleCatalog = Object.freeze({
         "system.critical",
         "system.registration-delete",
         "session.locked",
+        "shell.syntax-mismatch",
         "strict.execution",
         "strict.mutation",
         "tool.unknown-capability",

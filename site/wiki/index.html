@@ -281,7 +281,7 @@ cd ZenPi</code></pre>
             <div><code>Strict</code><span>Adds approvals for mutation, execution, sensitive reads, and network activity.</span></div>
             <div><code>Off</code><span>Confirmed twice, lasts one session, and is never inherited by subagents.</span></div>
           </div>
-          <p>Approvals are exact-call and session-scoped; a critical attempt locks the session until you review it. Manage everything with <code>/guard</code> — <code>status</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, <code>clear-approvals</code>.</p>
+          <p>Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Manage everything with <code>/guard</code> — <code>status</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, <code>clear-approvals</code>.</p>
           <aside class="callout callout-boundary">
             <strong>Defense in depth, not a sandbox</strong>
             <p>Direct shell escapes, malicious extensions, and running processes stay outside the boundary. Use least privilege, containers, or VMs for hostile code — the full model lives in <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">SECURITY.md</a>.</p>

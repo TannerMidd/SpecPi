@@ -206,5 +206,14 @@ for (const command of ["rm -rf /c/Windows", "rm -rf /c", "rm -rf /cygdrive/c", '
     assert.equal(decideCommand(command, bash).action, "deny", command);
 }
 
+for (const command of ["rmdir /s /q F:\\Temp\\case", "rd /s /q F:\\Temp\\case"]) {
+    const mismatch = decideCommand(command, bash);
+    assert.equal(mismatch.action, "deny", command);
+    assert.equal(mismatch.severity, "high", command);
+    assert.equal(mismatch.lockSession, false, command);
+}
+
+assert.equal(decideCommand("rm -rf -- F:/Temp/case", bash).action, "allow");
+assert.equal(decideCommand("cmd /c rmdir /s /q C:\\work\\tmp", bash).action, "allow");
 assert.equal(decideCommand('cmd /c echo "safe & rd /s /q C:/Windows"', bash).action, "allow");
 console.log(`command-guard Windows runtime passed with ${executable}`);

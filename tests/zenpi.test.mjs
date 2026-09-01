@@ -18,6 +18,7 @@ import {
     setCollectionMode,
 } from "../extensions/tool-wishlist/core.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
+import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
 import {
     applySubagentConfiguration,
@@ -2545,23 +2546,20 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(installedRegistryImport.status, 0, installedRegistryImport.stderr);
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "index.ts")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen-subagents", "core.mjs")));
-        for (const file of [
-            "index.ts",
-            "core.mjs",
-            "rules.mjs",
-            "bash.mjs",
-            "powershell.mjs",
-            "powershell-parser.ps1",
-            "cmd.mjs",
-            "paths.mjs",
-            "redact.mjs",
-            "smoke.mjs",
-        ]) {
+        for (const file of COMMAND_GUARD_MANAGED_FILES) {
             assert.ok(
                 fs.existsSync(path.join(agentDir, "extensions", "command-guard", file)),
                 `missing installed command guard file ${file}`,
             );
         }
+
+        const installedManifest = JSON.parse(fs.readFileSync(path.join(agentDir, "zenpi", "manifest.json"), "utf8"));
+        const installedGuardDirectory = path.join(agentDir, "extensions", "command-guard");
+        const manifestGuardFiles = Object.keys(installedManifest.files || {})
+            .filter((target) => path.dirname(target) === installedGuardDirectory)
+            .map((target) => path.basename(target))
+            .sort();
+        assert.deepEqual(manifestGuardFiles, [...COMMAND_GUARD_MANAGED_FILES].sort());
 
         assert.ok(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));

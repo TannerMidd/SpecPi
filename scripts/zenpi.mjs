@@ -25,6 +25,7 @@ import {
 import { validateCapabilityRegistry, isValidValidatorName } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireZenPiLock, readProviderProfiles, readProviderLeases } from "../extensions/subagents/core.mjs";
+import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -958,18 +959,7 @@ function managedFiles(includeShell) {
             path.join(agentDir, "extensions", "zen-subagents", "core.mjs"),
             0o644,
         ],
-        ...[
-            "index.ts",
-            "core.mjs",
-            "rules.mjs",
-            "bash.mjs",
-            "powershell.mjs",
-            "powershell-parser.ps1",
-            "cmd.mjs",
-            "paths.mjs",
-            "redact.mjs",
-            "smoke.mjs",
-        ].map((name) => [
+        ...COMMAND_GUARD_MANAGED_FILES.map((name) => [
             path.join(repoRoot, "extensions", "command-guard", name),
             path.join(agentDir, "extensions", "command-guard", name),
             0o644,
@@ -1250,16 +1240,7 @@ function assertSources() {
         "extensions/tool-wishlist/capabilities.json",
         "extensions/subagents/index.ts",
         "extensions/subagents/core.mjs",
-        "extensions/command-guard/index.ts",
-        "extensions/command-guard/core.mjs",
-        "extensions/command-guard/rules.mjs",
-        "extensions/command-guard/bash.mjs",
-        "extensions/command-guard/powershell.mjs",
-        "extensions/command-guard/powershell-parser.ps1",
-        "extensions/command-guard/cmd.mjs",
-        "extensions/command-guard/paths.mjs",
-        "extensions/command-guard/redact.mjs",
-        "extensions/command-guard/smoke.mjs",
+        ...COMMAND_GUARD_MANAGED_FILES.map((name) => `extensions/command-guard/${name}`),
         "skills/zenpi-improve/SKILL.md",
         "skills/donsetch/SKILL.md",
         "themes/tea-house.json",

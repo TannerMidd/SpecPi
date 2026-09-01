@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { COMMAND_GUARD_MANAGED_FILES } from "./managed-files.mjs";
 
 export const PATH_LIMIT = 4096;
 const unixProtected = [
@@ -90,37 +91,47 @@ const agentGuardSource = /^extensions[\\/]command-guard(?:[\\/]|$)/i;
 // The installed state Guard must keep intact to keep enforcing, expressed as path segments so containment can be
 // tested in BOTH directions. A regex prefix test only answers "is the target inside this subtree"; deleting an
 // ancestor that CONTAINS the subtree reaches the same state and must weigh the same.
-const enforcementSubtrees = [["settings.json"], ["zenpi", "manifest.json"], ["extensions", "command-guard"]];
-function agentDirectory(windows) {
+const enforcementNodes = [
+    ["settings.json"],
+    ["zenpi", "manifest.json"],
+    ...COMMAND_GUARD_MANAGED_FILES.map((name) => ["extensions", "command-guard", name]),
+];
+function agentDirectories(windows) {
     const api = windows ? path.win32 : path.posix;
     const configured = process.env.PI_CODING_AGENT_DIR;
     const fallback = api.join(slash(os.homedir(), windows), ".pi", "agent");
+    const lexical = api.resolve(configured ? slash(configured, windows) : fallback);
+    const canonical = canonicalNearest(lexical, windows);
+    const compare = (entry) => (windows ? entry.toLowerCase() : entry);
+    const roots = canonical ? [lexical, slash(canonical, windows)] : [lexical];
 
-    return api.resolve(configured ? slash(configured, windows) : fallback);
+    return roots.filter((root, index) => roots.findIndex((entry) => compare(entry) === compare(root)) === index);
 }
 
-// Returns the path's location relative to the resolved agent directory, or undefined when it is outside it.
+// Returns the path's location relative to either the lexical or canonical agent directory, or undefined when it
+// is outside both. Comparing both roots prevents a configured symlink or junction from creating an alternate
+// spelling that bypasses enforcement-node protection.
 function agentRelative(value, windows) {
-    const root = slash(agentDirectory(windows), windows);
     const compare = (entry) => (windows ? entry.toLowerCase() : entry);
     const separator = windows ? "\\" : "/";
-    const candidate = compare(value),
-        base = compare(root);
-    if (candidate === base) {
-        return "";
+    const candidate = compare(value);
+    for (const root of agentDirectories(windows)) {
+        const base = compare(root);
+        if (candidate === base) {
+            return "";
+        }
+
+        if (candidate.startsWith(`${base}${separator}`)) {
+            return value.slice(root.length + 1);
+        }
     }
 
-    if (!candidate.startsWith(`${base}${separator}`)) {
-        return undefined;
-    }
-
-    return value.slice(root.length + 1);
+    return undefined;
 }
 
-// True when mutating `value` would reach guard-enforcement state, whether the target is inside an enforcement
-// subtree, IS the agent directory, or is an ancestor that contains one. The one-directional prefix test this
-// replaces denied `<agent>/extensions/command-guard` while allowing `<agent>/extensions` and `<agent>` itself,
-// so the broadest spelling of the same tampering was the one that passed.
+// True when mutating `value` would reach guard-enforcement state, whether the target is a managed node, IS the
+// agent directory, or is an ancestor that contains one. Managed files are checked as nodes rather than protecting
+// the whole command-guard directory, so unrelated test descendants remain ordinary work.
 function reachesEnforcementState(value, windows) {
     const relative = agentRelative(value, windows);
     if (relative === undefined) {
@@ -134,10 +145,12 @@ function reachesEnforcementState(value, windows) {
     const compare = (entry) => (windows ? entry.toLowerCase() : entry);
     const parts = relative.split(/[\\/]/).filter(Boolean);
 
-    return enforcementSubtrees.some((subtree) => {
-        const shared = Math.min(parts.length, subtree.length);
+    return enforcementNodes.some((node) => {
+        if (parts.length > node.length) {
+            return false;
+        }
 
-        return parts.slice(0, shared).every((part, index) => compare(part) === compare(subtree[index]));
+        return parts.every((part, index) => compare(part) === compare(node[index]));
     });
 }
 
@@ -208,18 +221,26 @@ function canonicalNearest(value, windows) {
 }
 
 function isProtected(value, windows, read, mode) {
-    const relative = agentRelative(value, windows);
-    const agentPrivate =
-        relative !== undefined && (agentPrivateState.test(relative) || agentPrivateName.test(relative));
-    if (read) {
-        return privatePath.test(value) || dotPi.test(value) || agentPrivate;
+    if (read && (privatePath.test(value) || dotPi.test(value))) {
+        return true;
     }
 
     const system = (windows ? windowsProtected : unixProtected).some((pattern) => pattern.test(value));
     const catastrophic = (windows ? windowsCatastrophic : unixCatastrophic).some((pattern) => pattern.test(value));
-    const enforcement = reachesEnforcementState(value, windows);
-    if (mode === "guard" || mode === "strict") {
-        return catastrophic || enforcement;
+    if (!read && (mode === "guard" || mode === "strict") && catastrophic) {
+        return true;
+    }
+
+    const enforcement = !read && reachesEnforcementState(value, windows);
+    if (!read && (mode === "guard" || mode === "strict")) {
+        return enforcement;
+    }
+
+    const relative = agentRelative(value, windows);
+    const agentPrivate =
+        relative !== undefined && (agentPrivateState.test(relative) || agentPrivateName.test(relative));
+    if (read) {
+        return agentPrivate;
     }
 
     const sensitive = (windows ? windowsSensitive : unixSensitive).some((pattern) => pattern.test(value));
@@ -354,6 +375,7 @@ export function pathDecision(input, options = {}) {
               ruleIds: ["path.protected"],
               leaves: [],
               reason: "The requested path is protected.",
+              lockSession: !options.read,
           }
         : result.indeterminate
           ? {
@@ -363,6 +385,7 @@ export function pathDecision(input, options = {}) {
                 ruleIds: ["path.canonicalization"],
                 leaves: [],
                 reason: "The requested path could not be safely canonicalized.",
+                lockSession: false,
             }
           : {
                 action: "allow",
@@ -371,5 +394,6 @@ export function pathDecision(input, options = {}) {
                 ruleIds: [],
                 leaves: [],
                 reason: "The path is outside protected locations.",
+                lockSession: false,
             };
 }

@@ -86,7 +86,7 @@ Every model-initiated command is analyzed before it runs. Choose one mode at ses
 - **Strict** — also asks for mutation, execution, sensitive reads, and network activity
 - **Off** — confirmed, session-only, never inherited by subagents
 
-Approvals are exact-call and session-scoped; a critical attempt locks the session until you review it. Inspect or change the mode any time with `/guard`.
+Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Inspect or change the mode any time with `/guard`. For temporary cleanup in the Bash tool, use `rm -rf -- F:/Temp/case`; use `Remove-Item -LiteralPath ... -Recurse -Force` with the PowerShell tool.
 
 ## Boundaries
 

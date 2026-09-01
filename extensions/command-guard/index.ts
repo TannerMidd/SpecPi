@@ -616,8 +616,11 @@ export default function registerCommandGuard(
                 });
                 recordDecision(state, decision);
                 if (decision.action === "deny") {
-                    state.criticalRule = decision.ruleIds[0];
-                    const critical = decision.severity === "critical" && !decision.ruleIds.includes("policy.integrity");
+                    const critical = decision.lockSession === true;
+                    if (critical) {
+                        state.criticalRule = decision.ruleIds[0];
+                    }
+
                     const result = deny(
                         state,
                         critical
@@ -718,8 +721,11 @@ export default function registerCommandGuard(
                 // Refusing a read is enough on its own: nothing was changed, so latching the lock would strand the whole
                 // session — every later command, including read-only ones — over one blocked file.
                 if (decision.action === "deny") {
-                    state.criticalRule = decision.ruleIds[0];
-                    const critical = decision.severity === "critical" && name !== "read";
+                    const critical = decision.lockSession === true && name !== "read";
+                    if (critical) {
+                        state.criticalRule = decision.ruleIds[0];
+                    }
+
                     const result = deny(
                         state,
                         critical
