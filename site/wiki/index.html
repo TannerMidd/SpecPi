@@ -244,8 +244,10 @@ cd ZenPi</code></pre>
           <p class="doc-lede">ZenPi does not install subagent orchestration. The apparent speed of hidden delegation is not worth losing track of what each worker knew, assumed, changed, or left unsaid.</p>
           <div class="definition-list">
             <div><strong>Own the context handoff</strong><p>A parent chooses what a child sees and reduces what comes back. Either boundary can omit the decisive constraint, leaving a result that is difficult to explain or reproduce.</p></div>
-            <div><strong>Keep one writer</strong><p>Parallel writers accumulate conflicting assumptions and fragmented decisions faster than reviewers can reconcile them. Use one writer per working directory and isolate intentional experiments in separate worktrees.</p></div>
-            <div><strong>Leave durable evidence</strong><p>Gather context deliberately and record it in a reviewable artifact before implementation. An explicit separate session remains useful for independent review or a bounded experiment when its coordination cost is justified.</p></div>
+            <div><strong>Keep one writer</strong><p>Parallel writers accumulate conflicting assumptions and fragmented decisions faster than reviewers can reconcile them. Use <code>/experiment start</code> to create a detached worktree, then open that path yourself in a separate Pi session.</p></div>
+            <div><strong>Make scope visible</strong><p><code>/scope set</code> declares expected project paths. Direct and Git-observed drift remains visible and pending until you explicitly allow once, acknowledge it with <code>/scope accept</code>, expand the contract with <code>/scope add</code>, or clear it.</p></div>
+            <div><strong>Challenge completion</strong><p><code>/challenge</code> asks for structured requirement evidence, contradictions, possible false-positive checks, missing validation, and residual risk. Its card supports human review; it is not independent proof.</p></div>
+            <div><strong>Leave durable evidence</strong><p>Gather context deliberately and record it in a reviewable artifact before implementation. <code>/experiment close</code> keeps the worktree, exports a byte-exact patch, or explicitly discards it without merging or committing. Ignored files cannot travel in a patch, so they are named before you export or discard.</p></div>
           </div>
           <aside class="callout callout-note">
             <strong>A workflow choice, not a universal ban</strong>
@@ -300,6 +302,9 @@ cd ZenPi</code></pre>
               <tbody>
                 <tr><th scope="row"><code>/zen [on|off|status]</code></th><td>Toggle or inspect focused Zen execution mode.</td></tr>
                 <tr><th scope="row"><code>/files [path]</code></th><td>Browse, render, diff, and review project files.</td></tr>
+                <tr><th scope="row"><code>/scope [set|add|remove|accept|recheck|status|clear]</code></th><td>Declare expected paths and review unacknowledged scope drift. <code>accept</code> acknowledges a finding, <code>add</code> widens the contract.</td></tr>
+                <tr><th scope="row"><code>/experiment [start|status|close|recover]</code></th><td>Manage detached, human-opened Git worktree experiments.</td></tr>
+                <tr><th scope="row"><code>/challenge [status|clear]</code></th><td>Run or inspect a structured adversarial completion-readiness review.</td></tr>
                 <tr><th scope="row"><code>/wishlist</code></th><td>Inspect and curate the local capability wishlist.</td></tr>
                 <tr><th scope="row"><code>/wishlist status</code></th><td>Show collection mode, queue size, retirements, reopen rate, and open reviews.</td></tr>
                 <tr><th scope="row"><code>/wishlist history [gap-id]</code></th><td>Review the bounded local improvement journal globally or for one gap.</td></tr>
@@ -320,7 +325,7 @@ cd ZenPi</code></pre>
           <p>ZenPi merges documented leaves and preserves unrelated packages and configuration. Managed state lives under the Pi agent directory; setting <code>PI_CODING_AGENT_DIR</code> relocates the equivalent paths.</p>
           <div class="path-list">
             <div><code>settings.json</code><p>Theme and package settings. Unrelated values are preserved.</p></div>
-            <div><code>zenpi/</code><p>Private wishlist evidence, retirement journals, loop-health source data, checksummed archives, browser artifacts, and bounded managed state.</p></div>
+            <div><code>zenpi/</code><p>Private wishlist evidence, experiment metadata and patches, retirement journals, loop-health source data, checksummed archives, browser artifacts, and bounded managed state.</p></div>
           </div>
         </div>
       </section>

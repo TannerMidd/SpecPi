@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.4 - Unreleased
+
+- Add opt-in workflow controls: `/scope` declares project-relative change boundaries and surfaces direct or observed drift without silently expanding scope; `/experiment` creates detached, private-state Git worktrees with complete patch export and explicitly confirmed discard; `/challenge` produces a structured adversarial readiness card whose deterministic gate rejects unresolved evidence.
+- Keep the new controls human-led and local: no child process or agent launch, automatic commit/merge/apply, remote operation, raw command log, unrelated session scan, or mandatory completion interception. Add branch-local scope/challenge state, a private recoverable experiment registry, direct closed validators, installer lifecycle coverage, and security-boundary documentation.
+- Separate `/scope accept` from `/scope add`: accepting acknowledges one observed finding and leaves the declared contract untouched, so a later change to the same path is reported again. Add `/scope recheck` to re-baseline the worktree and deliberately clear snapshot uncertainty, and report removals and no-op verbs explicitly.
+- Export experiment patches as the exact bytes Git produces. A text file that is not valid UTF-8 previously lost its original bytes on export and produced a patch that no longer applied.
+- Disclose ignored files in `/experiment status` and `/experiment close`. Ignored work is invisible to Git status and cannot travel in a patch, so a worktree holding only ignored work no longer looks empty at discard time.
+- Expire a completion challenge that the agent turn ends without answering, instead of leaving its "do not implement" instruction attached to every later turn.
+- Offer a working recovery action for an experiment directory Git no longer tracks: the record can be released while the files are left in place for the human.
+- Snapshot the worktree once per tool instead of twice, skip snapshots for read-only calls, and copy scope entries both when appending and when restoring them so a branch record cannot be rewritten by later mutation.
+- Record an expired challenge distinctly from a cleared one, so a challenge that goes unanswered no longer discards the last completed readiness card after a restart.
+- Report ignored paths from `/experiment status` with no ID, the form used from inside an experiment worktree.
+- Re-derive worktree presence inside the registry lock during `/experiment recover`, so a Git operation performed while a recovery prompt is open cannot drop a live record or adopt a replaced directory.
+- Measure experiment status and patch export from the recorded base commit instead of the worktree's current HEAD. Work committed inside an experiment previously reported as clean, exported to an empty patch, and could be discarded without the dirty-work confirmation.
+- Keep Git-reported paths canonical in workflow state and percent-escape controls only at presentation boundaries, so filenames containing `%`, newlines, Unicode separators, or directionality controls remain matchable without forging system guidance or UI text.
+- Claim a patch output exclusively instead of checking then renaming, so a destination created in the gap is never replaced without explicit overwrite approval.
+- Require a ready completion verdict to disclose residual risk when the change snapshot was indeterminate, instead of ignoring that signal.
+
 ## 0.8.3 - 2026-09-01
 
 - Remove the `pi-subagents` package and ZenPi's native-subagent configuration, runtime integration, and installation defaults.

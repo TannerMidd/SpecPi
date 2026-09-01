@@ -1812,6 +1812,13 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(installed.customSetting, true);
         assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")));
+        for (const file of ["index.ts", "scope.mjs", "experiments.mjs", "challenge.mjs", "smoke.mjs"]) {
+            assert.ok(
+                fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", file)),
+                `missing installed workflow-controls file ${file}`,
+            );
+        }
+
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
@@ -1968,10 +1975,15 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(validCustomizedDoctor.status, 0, validCustomizedDoctor.stderr);
 
         const retainedWishlist = path.join(agentDir, "zenpi", "tool-wishlist-events.jsonl");
+        const retainedExperiment = path.join(agentDir, "zenpi", "experiments", "registry.json");
+        fs.mkdirSync(path.dirname(retainedExperiment), { recursive: true });
         fs.writeFileSync(retainedWishlist, '{"local":"evidence"}\n', { mode: 0o600 });
+        fs.writeFileSync(retainedExperiment, '{"schema":1,"experiments":[]}\n', { mode: 0o600 });
         const uninstall = runCli(agentDir, "uninstall", "--yes");
         assert.match(uninstall.stdout, /local wishlist state\/archives were preserved/);
+        assert.match(uninstall.stdout, /Experiment metadata and exported patches were also preserved/);
         assert.equal(fs.readFileSync(retainedWishlist, "utf8"), '{"local":"evidence"}\n');
+        assert.equal(fs.readFileSync(retainedExperiment, "utf8"), '{"schema":1,"experiments":[]}\n');
 
         const restored = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
         assert.equal(restored.defaultProvider, originalSettings.defaultProvider);
@@ -1982,6 +1994,11 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), "# Personal instructions\n");
         assert.equal(fs.readFileSync(path.join(agentDir, "extensions", "zen.ts"), "utf8"), "// personal prior zen\n");
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "index.ts")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "scope.mjs")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "experiments.mjs")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "challenge.mjs")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "smoke.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);

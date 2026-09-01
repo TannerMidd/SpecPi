@@ -31,6 +31,20 @@ export const VALIDATOR_CATALOG = Object.freeze({
             "Classifies safe, destructive, malformed, protected-path, and nested-shell fixtures with the real command-guard policy",
         timeoutMs: 2 * 60 * 1000,
     }),
+    "scope-drift-monitor-smoke": Object.freeze({
+        description:
+            "Proves bounded scope paths and observed outside-scope mutation detection in a temporary repository",
+        timeoutMs: 2 * 60 * 1000,
+    }),
+    "guided-experiment-worktrees-smoke": Object.freeze({
+        description:
+            "Proves detached experiment creation, byte-exact appliable export of committed and uncommitted work measured from the recorded base commit, disclosure of ignored work a patch cannot carry, base isolation, and explicit discard",
+        timeoutMs: 2 * 60 * 1000,
+    }),
+    "completion-challenge-smoke": Object.freeze({
+        description: "Proves structured readiness validation and deterministic unresolved-evidence rejection",
+        timeoutMs: 2 * 60 * 1000,
+    }),
 });
 
 export function validatorNames() {
@@ -211,6 +225,15 @@ async function runCommandGuardSmoke() {
     return smoke.runCommandGuardSmoke();
 }
 
+async function runWorkflowControlsSmoke(validator) {
+    const smoke = await import("../workflow-controls/smoke.mjs");
+    if (typeof smoke.runWorkflowControlsSmoke !== "function") {
+        throw new Error("workflow-controls smoke export is unavailable");
+    }
+
+    return smoke.runWorkflowControlsSmoke(validator);
+}
+
 async function runValidatorInProcess(validator, environment) {
     if (validator === "browser-runtime-smoke") {
         return runBrowserRuntimeSmoke(environment);
@@ -222,6 +245,14 @@ async function runValidatorInProcess(validator, environment) {
 
     if (validator === "command-guard-smoke") {
         return runCommandGuardSmoke();
+    }
+
+    if (
+        validator === "scope-drift-monitor-smoke" ||
+        validator === "guided-experiment-worktrees-smoke" ||
+        validator === "completion-challenge-smoke"
+    ) {
+        return runWorkflowControlsSmoke(validator);
     }
 
     throw new Error(`Unknown validator: ${validator}`);

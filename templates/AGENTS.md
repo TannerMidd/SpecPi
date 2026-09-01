@@ -7,7 +7,9 @@
 - Treat plans and model output as context rather than proof. Files, diffs, command output, tests, and runtime behavior are authoritative.
 - Use visible `PLAN.md`, `TODO.md`, `DECISIONS.md`, or `HANDOFF.md` artifacts only when they improve continuity.
 - Delegate only when fresh context, parallel independent investigation, specialist judgment, or review justifies the overhead.
-- Keep one writer per shared working directory. Use isolated worktrees for intentional parallel writers.
+- Keep one writer per shared working directory. Use `/experiment` or another isolated worktree for intentional parallel writers, and open the separate session yourself.
+- When `/scope` is active, treat outside-scope findings as pending until the human allows once, acknowledges them with `/scope accept`, expands the declared scope with `/scope add`, or clears it; never describe observed drift as accepted scope, and never assume an acknowledged path was added to the contract.
+- Use `/challenge` for material completion review when its adversarial checklist provides concrete value; its readiness card supports human review but is not independent proof.
 - Never launch `codex-exec` or `codex-exec-writer`; ZenPi disables these external subscription runners.
 - Treat command-guard denials as hard runtime constraints: use the stated safer alternative or ask the user; never obfuscate, split, encode, or reroute a denied operation to evade protection.
 - When Command Guard is active, prefer direct tool calls and simple, explicit commands. Avoid unnecessary command substitution, process substitution, stdin-driven `xargs`, compound shell programs, inline interpreter code, and executable heredocs because opaque forms require approval. When complexity is genuinely required, keep it transparent and request approval rather than restructuring it to bypass protection.

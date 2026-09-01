@@ -52,6 +52,9 @@ The goal is to make each justified change obvious, testable, reversible, and exp
 
 - **`/zen`:** a focused execution mode
 - **`/files`:** browse files, view diffs, and leave review comments
+- **`/scope`:** declare expected paths and surface unacknowledged scope drift
+- **`/experiment`:** create detached worktree experiments with keep, patch-export, and explicit discard outcomes
+- **`/challenge`:** run a structured adversarial completion-readiness review
 - **Wishlist:** a private log of friction, ready to act on
 - **Durable capability proofs:** closed offline validators run during completion, `npm run check`, and `zenpi doctor`
 - **Improvement journal:** every retirement keeps its evidence, gates, changed files, and version; `/wishlist history [gap-id]` shows it
@@ -93,9 +96,17 @@ Every supported model-initiated Pi tool call is analyzed before it runs. Choose 
 
 Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Inspect or change the mode any time with `/guard`. For temporary cleanup in the Bash tool, use `rm -rf -- F:/Temp/case`; use `Remove-Item -LiteralPath ... -Recurse -Force` with the PowerShell tool.
 
+## Workflow controls
+
+Use `/scope set` to declare the files or directories expected to change. Direct edits outside that contract require an interactive choice; headless and shell-detected drift stays advisory and pending until you acknowledge it. `/scope accept <path>` acknowledges one finding and leaves the declared contract alone, so a later change there is reported again; `/scope add <path>` is the separate verb that widens scope. `/scope recheck` re-baselines the worktree when a snapshot has become uncertain. Scope state belongs to the active Pi session branch and stores paths, not source or raw commands.
+
+Use `/experiment start` for an intentional trial. ZenPi creates a detached worktree from `HEAD` under private local state and never copies dirty base changes, launches another agent, commits, merges, or touches remotes. `/experiment close` can keep it, export tracked and untracked changes as a byte-exact binary patch, or explicitly discard it. Ignored files cannot travel in a patch, so they are counted and named before an export or a discard. Open the reported directory yourself in a separate Pi session so each worktree has one accountable writer.
+
+Use `/challenge` when a material task appears ready. The challenge requires structured requirement evidence, checks for contradictions, possible false-positive validation, pending scope drift, missing runtime or visual checks, and residual risk. `ready-for-human-review` is rejected while recorded gaps remain, but it is still a model-authored review—not independent proof or completion authority. A challenge the agent turn ends without answering expires instead of carrying into later turns.
+
 ## Boundaries
 
-ZenPi never persists command text and does not read Pi credentials, sessions, or history. Wishlist reports are stored locally only. Review them before sharing. Improving ZenPi, installing, and publishing all require your explicit approval.
+ZenPi never persists command text and does not read Pi credentials or unrelated sessions or history. Scope and challenge records are bounded entries in the current Pi session. Experiment metadata and exported patches remain in private local ZenPi state and can survive uninstall. Wishlist reports are stored locally only. Review all local artifacts before sharing. Improving ZenPi, installing, and publishing all require your explicit approval.
 
 The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, and `edit` seams. It provides defense in depth within that boundary. Direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its scope. Direct recognized private-path reads receive narrow protection. The guard does not comprehensively detect credentials read through arbitrary shell syntax or scripts. Use OS permissions, a least-privilege account, container, or VM when code or data is hostile.
 
