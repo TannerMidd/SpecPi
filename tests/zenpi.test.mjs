@@ -85,6 +85,40 @@ function writeExecutable(file, content) {
     fs.writeFileSync(file, content, { mode: 0o755 });
 }
 
+function prependPath(directory) {
+    return [directory, process.env.PATH].filter(Boolean).join(path.delimiter);
+}
+
+function writeNodeCommand(directory, name, source) {
+    fs.mkdirSync(directory, { recursive: true });
+    if (process.platform === "win32") {
+        const script = path.join(directory, `${name}.mjs`);
+        fs.writeFileSync(script, `${source}\n`);
+        fs.writeFileSync(
+            path.join(directory, `${name}.cmd`),
+            `@echo off\r\n"${process.execPath}" "%~dp0${name}.mjs" %*\r\n`,
+        );
+
+        return;
+    }
+
+    writeExecutable(path.join(directory, name), `#!/usr/bin/env node\n${source}\n`);
+}
+
+function installFakePi(fakeBin) {
+    writeNodeCommand(
+        fakeBin,
+        "pi",
+        [
+            'import fs from "node:fs";',
+            "const args = process.argv.slice(2);",
+            'if (args[0] === "--version") { console.log(process.env.ZENPI_FAKE_PI_VERSION || "0.84.4"); process.exit(0); }',
+            'if (process.env.ZENPI_FAKE_LOG) { fs.appendFileSync(process.env.ZENPI_FAKE_LOG, `${args.join(" ")}\\n`); }',
+            'if (process.env.ZENPI_FAKE_PI_FAIL_PATTERN && args.join(" ").includes(process.env.ZENPI_FAKE_PI_FAIL_PATTERN)) { process.exit(9); }',
+        ].join("\n"),
+    );
+}
+
 function quoteWindowsCommandArg(value) {
     return `"${String(value).replaceAll("%", "%%").replaceAll('"', '""')}"`;
 }
@@ -143,9 +177,8 @@ function runUiRefreshHarness() {
 }
 
 function installFakeBrowserNpm(fakeBin) {
-    fs.mkdirSync(fakeBin, { recursive: true });
-    fs.copyFileSync(path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs"), path.join(fakeBin, "npm"));
-    fs.chmodSync(path.join(fakeBin, "npm"), 0o755);
+    const source = fs.readFileSync(path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs"), "utf8");
+    writeNodeCommand(fakeBin, "npm", source.replace(/^#!.*\n/u, ""));
 }
 
 test("npm package identities ignore pinned versions", () => {
@@ -501,7 +534,11 @@ test("browser inputs normalize local URLs, viewports, and project paths", () => 
     assert.deepEqual(resolveViewport({ width: 1024, height: 768 }), { width: 1024, height: 768 });
     assert.throws(() => resolveViewport({ width: 100, height: 768 }), /200 to 4096/);
     assert.throws(() => resolveViewport({ width: 4096, height: 4096 }), /pixel limit/);
-    assert.equal(resolveUserPath("/tmp/project", "@screenshots/base.png"), "/tmp/project/screenshots/base.png");
+    const projectRoot = path.resolve("/tmp/project");
+    assert.equal(
+        resolveUserPath(projectRoot, "@screenshots/base.png"),
+        path.join(projectRoot, "screenshots", "base.png"),
+    );
 });
 
 test("browser PNG comparison reports exact pass and dimension mismatch", () => {
@@ -1675,7 +1712,7 @@ test("installer rejects an incompatible Pi even when package installation is ski
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(path.join(agentDir, "settings.json"), '{"kept":true}\n');
-    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.3\n");
+    installFakePi(fakeBin);
 
     try {
         const result = invokeCli(
@@ -1688,7 +1725,7 @@ test("installer rejects an incompatible Pi even when package installation is ski
                 "--skip-tool-install",
                 "--skip-shell",
             ],
-            { PATH: `${fakeBin}:${process.env.PATH}` },
+            { PATH: prependPath(fakeBin), ZENPI_FAKE_PI_VERSION: "0.84.3" },
         );
         assert.notEqual(result.status, 0);
         assert.match(result.stderr, /Pi 0\.84\.4 or newer is required; found 0\.84\.3/);
@@ -1704,8 +1741,8 @@ test("command guard install and update failures roll back settings, files, and m
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(agentDir, { recursive: true });
-    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.4\nexit 0\n");
-    const env = { PATH: `${fakeBin}:${process.env.PATH}`, ZENPI_TESTING: "1" };
+    installFakePi(fakeBin);
+    const env = { PATH: prependPath(fakeBin), ZENPI_TESTING: "1" };
     const settingsPath = path.join(agentDir, "settings.json");
     const originalSettings = Buffer.from('{"kept":true}\n');
     fs.writeFileSync(settingsPath, originalSettings);
@@ -1859,9 +1896,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
         const fakeBin = path.join(root, "bin");
-        writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.4\nexit 0\n");
+        installFakePi(fakeBin);
         const doctor = invokeCli(agentDir, ["doctor"], {
-            PATH: `${fakeBin}:${process.env.PATH}`,
+            PATH: prependPath(fakeBin),
         });
         assert.equal(doctor.status, 0, doctor.stderr);
         assert.match(doctor.stdout, /CAPABILITY command-guard verified by command-guard-smoke/);
@@ -1870,7 +1907,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         const installedGuardCore = path.join(agentDir, "extensions", "command-guard", "core.mjs");
         const installedGuardCoreBytes = fs.readFileSync(installedGuardCore);
         fs.appendFileSync(installedGuardCore, "\n// injected doctor drift\n");
-        const driftDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+        const driftDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
         assert.notEqual(driftDoctor.status, 0);
         assert.match(driftDoctor.stderr, /Modified command-guard file/);
         assert.doesNotMatch(driftDoctor.stdout, /CAPABILITY command-guard verified/);
@@ -1882,7 +1919,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             installedRegistryPath,
             '{"schema":1,"capabilities":[{"id":"Invalid ID","title":"Broken","aliases":[],"shippedVersion":"1","validations":["browser-runtime-smoke"]}]}\n',
         );
-        const invalidRegistryDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+        const invalidRegistryDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
         assert.notEqual(invalidRegistryDoctor.status, 0);
         assert.match(invalidRegistryDoctor.stderr, /Capability registry invalid/);
         fs.writeFileSync(installedRegistryPath, installedRegistry);
@@ -1971,7 +2008,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(legacyMarker), false);
         assert.equal(fs.existsSync(retiredFile), false);
 
-        const validCustomizedDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+        const validCustomizedDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
         assert.equal(validCustomizedDoctor.status, 0, validCustomizedDoctor.stderr);
 
         const retainedWishlist = path.join(agentDir, "zenpi", "tool-wishlist-events.jsonl");
@@ -2015,7 +2052,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
 
         runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
-        const reinstallDoctor = invokeCli(agentDir, ["doctor"], { PATH: `${fakeBin}:${process.env.PATH}` });
+        const reinstallDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
         assert.equal(reinstallDoctor.status, 0, reinstallDoctor.stderr);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -2026,9 +2063,9 @@ test("managed browser runtime completes install, reuse update, doctor, and unins
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-browser-lifecycle-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
-    writeExecutable(path.join(fakeBin, "pi"), "#!/bin/sh\necho 0.84.4\nexit 0\n");
+    installFakePi(fakeBin);
     installFakeBrowserNpm(fakeBin);
-    const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };
+    const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
     try {
         const install = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
         assert.equal(install.status, 0, install.stderr);
@@ -2068,13 +2105,10 @@ test("default package and shell paths work with an isolated fake pi", () => {
     const shellRc = path.join(root, ".bashrc");
     const fakeBin = path.join(root, "bin");
     const log = path.join(root, "pi.log");
-    writeExecutable(
-        path.join(fakeBin, "pi"),
-        '#!/bin/sh\nif [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\nprintf \'%s\\n\' "$*" >> "$ZENPI_FAKE_LOG"\nexit 0\n',
-    );
+    installFakePi(fakeBin);
     fs.writeFileSync(shellRc, "# personal shell\n");
     const env = {
-        PATH: `${fakeBin}:${process.env.PATH}`,
+        PATH: prependPath(fakeBin),
         SHELL: "/bin/bash",
         ZENPI_SHELL_RC: shellRc,
         ZENPI_FAKE_LOG: log,
@@ -2114,12 +2148,13 @@ test("failed package installation rolls configuration back and releases the lock
     const settingsPath = path.join(agentDir, "settings.json");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(settingsPath, '{"untouched":true}\n');
-    writeExecutable(
-        path.join(fakeBin, "pi"),
-        '#!/bin/sh\nif [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\ncase "$*" in *pi-web-access*) exit 9;; esac\nexit 0\n',
-    );
+    installFakePi(fakeBin);
     installFakeBrowserNpm(fakeBin);
-    const env = { PATH: `${fakeBin}:${process.env.PATH}`, SHELL: "/bin/bash" };
+    const env = {
+        PATH: prependPath(fakeBin),
+        SHELL: "/bin/bash",
+        ZENPI_FAKE_PI_FAIL_PATTERN: "pi-web-access",
+    };
 
     try {
         const result = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
