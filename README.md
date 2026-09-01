@@ -75,11 +75,11 @@ cd ZenPi
 ./zenpi doctor    # verify managed state and re-run capability validators
 ```
 
-On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible. See [SECURITY.md](SECURITY.md) for details.
+On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible. See the [security model](SECURITY_MODEL.md) for details.
 
 ## Command guard
 
-Every model-initiated command is analyzed before it runs. Choose one mode at session start:
+Every supported model-initiated Pi tool call is analyzed before it runs. Choose one mode at session start:
 
 - **Guard** (recommended): denies confirmed host-wide catastrophe outright, asks before Git destroys work, and stays quiet otherwise
 - **Strict:** also asks for mutation, execution, sensitive reads, and network activity
@@ -93,7 +93,7 @@ ZenPi never persists command text and does not read Pi credentials, sessions, or
 
 The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, and `edit` seams. It provides defense in depth within that boundary. Direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its scope. Direct recognized private-path reads receive narrow protection. The guard does not comprehensively detect credentials read through arbitrary shell syntax or scripts. Use OS permissions, a least-privilege account, container, or VM when code or data is hostile.
 
-See [SECURITY.md](SECURITY.md) for the full picture.
+See the [security policy](SECURITY.md) for vulnerability reporting and the [security model](SECURITY_MODEL.md) for the full boundary.
 
 ## Development
 

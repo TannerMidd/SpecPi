@@ -105,8 +105,8 @@ jobs:
           .\zenpi.cmd doctor
 
           $installCalls = @(Get-Content $log | Where-Object { $_ -match '^"?install"? ' })
-          if ($installCalls.Count -ne 6) {
-            throw "Expected 6 pi install calls, found $($installCalls.Count)"
+          if ($installCalls.Count -ne 5) {
+            throw "Expected 5 pi install calls, found $($installCalls.Count)"
           }
           $piBootstrapCalls = @(Get-Content $log | Where-Object {
             $_ -match '^npm "?install"? "?--global"? "?--ignore-scripts"? "?@earendil-works/pi-coding-agent@0\.84\.4"? '

@@ -1525,7 +1525,7 @@ test("installer bootstraps a missing pinned Pi after confirmation", () => {
             calls[0],
             "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 --no-audit --no-fund",
         );
-        assert.equal(calls.filter((line) => line.startsWith("pi install ")).length, 6);
+        assert.equal(calls.filter((line) => line.startsWith("pi install ")).length, 5);
         const manifest = JSON.parse(fs.readFileSync(path.join(agentDir, "zenpi", "manifest.json"), "utf8"));
         assert.deepEqual(
             { ...manifest.piBootstrap, installedAt: "ignored" },
@@ -1545,7 +1545,7 @@ test("installer bootstraps a missing pinned Pi after confirmation", () => {
             updateCalls[0],
             "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 --no-audit --no-fund",
         );
-        assert.equal(updateCalls.filter((line) => line.startsWith("pi install ")).length, 6);
+        assert.equal(updateCalls.filter((line) => line.startsWith("pi install ")).length, 5);
 
         const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
         assert.equal(uninstall.status, 0, uninstall.stderr);
@@ -2067,7 +2067,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
         assert.match(shell, /# >>> ZenPi >>>/);
         assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "pi-profiles.sh")));
         const calls = fs.readFileSync(log, "utf8").trim().split("\n");
-        assert.equal(calls.filter((line) => line.startsWith("install ")).length, 6);
+        assert.equal(calls.filter((line) => line.startsWith("install ")).length, 5);
         assert.ok(calls.some((line) => line.startsWith("--offline --list-models")));
 
         const update = invokeCli(

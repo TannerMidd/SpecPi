@@ -1,72 +1,83 @@
-# Security
+# Security Policy
 
-## Trust model
+This policy explains which ZenPi releases receive security fixes, how to report a vulnerability, and the security responsibilities shared by ZenPi and its users. For architecture, trust boundaries, and component limitations, see [SECURITY_MODEL.md](SECURITY_MODEL.md). Exact third-party versions and licenses are listed in [THIRD_PARTY.md](THIRD_PARTY.md).
 
-ZenPi is configuration and executable extension code for Pi. Pi extensions run with the invoking user's permissions. Clone and review a tagged release before running `./zenpi install` on Unix or `.\zenpi.cmd install` on Windows; avoid piping remote installer content directly into a shell.
+## Supported versions
 
-The installer:
+ZenPi provides security fixes for the latest tagged release only. Older releases are unsupported unless a published security advisory says otherwise. Before reporting, check whether the latest release already corrects the behavior; reports affecting the supported release remain welcome.
 
-- prints a plan and requires confirmation unless `--yes` is passed;
-- prints the exact pinned Pi bootstrap package when Pi is missing, installs it only after confirmation, and supports `--skip-package-install`;
-- prints the exact optional DonSeTch install command, asks before running it interactively, and supports `--skip-tool-install`; `--yes` selects it when missing;
-- backs up only resource files it explicitly replaces, never complete settings or shell startup files;
-- merges documented settings paths instead of replacing complete files;
-- modifies AGENTS and shell files only inside marked blocks;
-- records checksums and ownership in a private manifest;
-- rolls configuration files back when installation fails;
-- never reads `auth.json`, provider credentials, sessions, history, or trust decisions, and never persistently copies complete Pi settings or shell startup files;
-- never commits, pushes, publishes, or creates remote resources.
+| Release | Security support |
+| --- | --- |
+| Latest tagged release | Supported |
+| Older releases | Unsupported |
 
-When `pi` is absent, the confirmed installer globally installs pinned `@earendil-works/pi-coding-agent@0.84.4` through npm with lifecycle scripts disabled. This is external system state: a failed later step does not remove it, and ZenPi uninstall preserves it. Existing Pi installations must satisfy the minimum version and are not replaced automatically. If npm installs Pi outside the persistent `PATH`, ZenPi reports the exact global executable directory and fails rather than completing with a process-local path that later shells cannot use. The managed browser install is staged before atomic promotion and launch-smoked before use or reuse. A failed install restores the prior runtime and rolls configuration files back. Pinned Pi packages are installed through `pi install`, which installs their declared npm dependencies; the separate browser runtime is installed with `npm ci` from ZenPi's reviewed lockfile. ZenPi does not invoke Playwright `install-deps`; the host must satisfy Playwright's Chromium system requirements. Package installation can leave downloaded npm caches after rollback or uninstall. Those caches are inert when absent from Pi settings.
+## Report a vulnerability
 
-The optional DonSeTch tool uses pinned global npm and remains external system state, so ZenPi cannot roll it back or remove it. Updates retire legacy ZenPi-managed bat, git-delta, and glow binaries; modified legacy binaries are moved outside the trusted managed `PATH` before their manifest records are removed. `--skip-tool-install` skips DonSeTch without disabling the normal Pi-package or browser-runtime installation.
+Report suspected vulnerabilities through [GitHub private vulnerability reporting](https://github.com/TannerMidd/ZenPi/security/advisories/new). ZenPi currently accepts private reports only through GitHub.
 
-## Website publishing
+Do not open a public issue, pull request, discussion, or other public report containing vulnerability or exploit details. A GitHub account is required. If private reporting is unexpectedly unavailable, open a public issue containing no vulnerability details and ask the maintainer to restore the private reporting channel before sharing the report.
 
-The `deploy-pages` GitHub Actions workflow publishes only the checked-in `site/` directory. The deploy job retains read-only repository contents access and adds only the `pages: write` and `id-token: write` permissions required by GitHub Pages. The local ZenPi installer does not invoke this workflow or upload local configuration and state.
+Include as much of the following as is safe and practical:
 
-## Command guard
+- the affected ZenPi release or commit;
+- the affected installer command, extension, tool, workflow, or website component;
+- operating system and relevant configuration;
+- expected and observed behavior;
+- security impact and plausible attack scenario;
+- minimal reproduction steps or proof of concept;
+- known mitigations or workarounds;
+- whether the issue is already public or actively exploited;
+- preferred credit or anonymity.
 
-ZenPi's command guard is a pre-execution, defense-in-depth policy layer for model-initiated Pi tool calls. It is not an operating-system sandbox and cannot contain Pi, another extension, or an already-running process. Use a least-privilege account, container, VM, filesystem policy, and protected credentials when executing hostile code.
+Do not include real credentials, personal data, production secrets, or destructive payloads when a minimized demonstration is sufficient.
 
-Interactive top-level sessions ask for one session-only mode: Guard, Strict, or explicitly confirmed Off. For command and mutation calls, Guard is a catastrophe backstop, not a general change-control layer: it permanently denies confirmed host-wide filesystem, disk, boot, security-control, broad process-kill, and enforcement-tampering operations. Determinate non-catastrophic calls run without Guard approval even when they can delete project or user data, publish, deploy, install software, transfer data, change services, or reach outside the workspace. The deliberate exception is Git work destruction: force pushes, remote ref deletion, hard resets, cleans, branch and tag deletion, stash drops, discarding checkouts and restores, and history rewrites ask for Guard approval because they discard or rewrite work no local undo restores. Ordinary pushes, pulls, and fetches stay quiet. Parser, payload, canonicalization, and analysis uncertainty asks for approval when UI exists and denies when it does not; uncertainty does not lock the session. Uncertainty can never *downgrade* a catastrophe into something approvable: when the structural parser is unavailable or fails, the raw command text is still scanned for confirmed catastrophic operations and protected targets, and a match stays an immutable denial. A directory change the analyzer cannot resolve makes every later relative target uncertain rather than treating it as workspace-local. Strict retains the broader approval behavior for mutation, execution, sensitive reads, elevated/network activity, and uncatalogued tools. Escape, timeout, malformed input, parser failure, and internal policy failure never silently approve a call.
+ZenPi handles reports on a best-effort basis. Maintainers will acknowledge, assess, and communicate as capacity permits, but the project does not promise fixed response or remediation times. Fix timing depends on impact, exploitability, complexity, upstream coordination, and release safety.
 
-Approval prompts offer **Deny**, **Allow once**, **Allow exact call for session**, and **Lock session**. A session approval is a bounded in-memory SHA-256 fingerprint of the complete tool input plus cwd, mode, and policy version; at most 128 are retained. Every call is reanalyzed first, so an approval can satisfy only an `ask` decision and can never override a critical `deny`. `/guard clear-approvals`, reset, mode changes, lock/unlock, Off, and session teardown clear the set. The session-start mode prompt falls back to Guard on a short bound, while approval prompts use a longer human-scale bound. Only a structurally proven, lock-worthy critical mutation latches the session lock; parser uncertainty, fallback classifications, wrong-shell cleanup syntax, and refused reads deny the current call without locking later execution. A confirmed lock-worthy mutation locks later execution and mutation until the user confirms `/guard unlock`.
+Please keep the report private while impact, mitigations, a fix, and an advisory are coordinated. Disclosure timing will be discussed with the reporter and may be accelerated when details are already public or exploitation is active. ZenPi does not currently operate a bug bounty program.
 
-Off is a direct-user escape hatch requiring a second confirmation. It cannot be selected through approvals or model tool calls. Print and JSON sessions default to Guard. Pi session switches tear down the old extension and emit a fresh `session_start`; both lifecycle edges clear mode, lock, counters, approvals, and parser cache before guarded calls resume.
+## Scope
 
-The first-party guard intercepts Pi's `bash`, `powershell`, `read`, `write`, and `edit` tool calls. It analyzes Bash/POSIX and cmd command structure conservatively and uses PowerShell's parser API without evaluating input. Bash and cmd are read at the statement level: shell reserved words, negation and builtin prefixes, conditional and loop bodies, `trap` handler strings, and cmd conditionals are treated as structure so the command they guard is classified rather than absorbed as argument text. Working directories are threaded through a command sequence, so a relative target is resolved against the directory in effect where it runs rather than the session directory. Literal `cmd.exe` launches of PowerShell are recursively decoded and analyzed, including `-Command` and `-EncodedCommand`; a confirmed catastrophic inner payload remains an immutable denial. PowerShell text is parsed by whichever installed host accepts it — Windows PowerShell 5.1 and PowerShell 7 disagree on grammar, and either alone is sufficient — resolved only from fixed installer-owned locations so a binary planted on `PATH` cannot answer for the guard. A rejection is authoritative only when every installed host rejects it. Protected-path decisions use the requested lexical path and canonical/nearest-existing ancestor where available. Static analysis cannot resolve every alias, generated command, script body, plugin, symlink race, or runtime expansion; unresolved cases ask with UI and deny without it.
+Reports are in scope when they concern ZenPi-owned behavior, including:
 
-The active mode, lock, category counters, parser cache, and session-approval hashes live only in extension memory. Raw commands, arguments, working directories, paths, ASTs, prompts, approvals, and parser output are never persisted or uploaded by the guard. UI excerpts are bounded and redact common secret-bearing arguments. Direct recognized private-path reads receive narrow protection, and Strict asks about recognized shell credential reads, but arbitrary shell syntax, scripts, encoding, aliases, or runtime expansion can read credentials without comprehensive detection. Credential paths are recognized by shape — dot-prefixed credential files, known credential directories, key and certificate extensions, and system locations — rather than by bare words such as `token`, `secret` or `credentials`, which ordinary source trees use as directory names. The guard must not be treated as a credential sandbox; use filesystem permissions and process isolation for that boundary.
+- the plan, install, update, doctor, and uninstall lifecycle;
+- managed configuration, backups, checksums, rollback, and shell integration;
+- bundled extensions, skills, themes, browser integration, and local state;
+- Command Guard classification, enforcement, approval, or bypass behavior;
+- the GitHub Pages site and repository release or deployment workflows;
+- an upstream dependency when ZenPi's integration, configuration, or selected version creates or exposes the vulnerability.
 
-Direct user `!command`/`!!command`, other extensions, custom/MCP tools not explicitly classified, and direct process execution outside Pi's guarded tool calls are not contained by Guard. Off disables the model-tool guard only for that top-level session. An allowed or approved command or script still runs with the invoking user's full permissions, and check/use races remain possible. `/guard status` reports only bounded in-memory state; `zenpi doctor` requires installed command-guard checksum integrity before reporting its deterministic policy smoke test as verified; this still does not prove universal command safety.
+Pi, npm, Chromium, Playwright, DonSeTch, GitHub, and other third-party projects maintain their own security boundaries. Upstream-only vulnerabilities may be redirected to the responsible project. Reports remain relevant to ZenPi when its use of an upstream component creates a distinct risk or requires a ZenPi mitigation.
 
-## Local improvement state
+A disagreement with an intentional, documented limitation is not by itself a vulnerability. Reports that show the implementation violating its stated boundary, silently weakening a protection, exposing protected data, or enabling a practical bypass are welcome.
 
-Capability-gap collection is disabled until the user makes a one-time local on/off decision. When enabled, ZenPi stores only bounded sanitized summaries plus salted hashes used to count distinct tasks, sessions, and projects. It does not read Pi prompts, source files, sessions, history, credentials, provider authentication state, or trust decisions to construct reports, and it never uploads wishlist state.
+## Security updates
 
-Retirement decisions may additionally carry a bounded local improvement journal: sanitized acceptance-evidence lines (at most 8 of 240 characters), the verification gates that passed, repo-relative changed-file names recorded from `git status` at retirement time (at most 40 entries, never absolute paths), and the ZenPi version. Reopen decisions may carry up to 5 sanitized post-retirement signal summaries and a link to the retirement they review. Journal contents stay in the local decisions log, are sanitized with the same redaction rules as gap reports, are covered by archive/reset, and never leave the machine. Git history is read from the local source checkout, sanitized and bounded to eight 240-character lines before inclusion in the model-facing reopen session prompt, and never persisted to wishlist state.
+When appropriate, ZenPi publishes security information through [GitHub Security Advisories](https://github.com/TannerMidd/ZenPi/security/advisories), tagged releases, and [CHANGELOG.md](CHANGELOG.md). An advisory should identify affected and fixed releases, impact, mitigations or workarounds, and upgrade guidance. A CVE may be requested when appropriate.
 
-Sanitization is defense in depth, not a guarantee that arbitrary plain-language identities can always be recognized. Keep reports general, inspect `/wishlist` before copying any draft, and use `/wishlist off` when local persistence is not appropriate.
+## Secure installation and operation
 
-Observations and lifecycle/alias decisions are append-only. The generated Markdown report is disposable derived state. `/harness-improvement` requires one explicit menu choice for one exact item, records selection, and starts the implementation turn; evidence alone never starts work. Its completion tool is session-bound to that choice, requires source-registry integration, runs the fixed repository check and supported closed validators, and records retirement only after every gate passes. Failed gates leave the item selected. Reports against retired capabilities remain review signals and return to the menu without starting work themselves. Registry validation names resolve only through a closed validator allowlist and are never interpreted as commands.
+- Clone and review a tagged release. Do not pipe remote installer content directly into a shell.
+- Review `zenpi plan` before installation or update. Use `--yes` only when every planned external installation is intended.
+- Run `zenpi doctor` after installation and updates.
+- Run Pi and ZenPi with the least operating-system privilege practical. Use a container or VM for hostile repositories, code, or web content.
+- Protect Pi configuration and credentials with operating-system permissions. ZenPi is not a credential or process sandbox.
+- Use dedicated test accounts rather than personal authenticated browser sessions.
+- Inspect wishlist reports, issue drafts, screenshots, page text, downloads, console output, and visual baselines before sharing them.
+- Review optional and global package installations. Some external state and package caches survive rollback or uninstall.
 
-Confirmed archive/reset prepares a private checksummed snapshot and a recovery transaction before clearing the active queue. If the operation fails after preparation and releases its verified lock, the next locked wishlist operation completes the reset from that snapshot. ZenPi never reclaims an unverified abandoned lock automatically; the existing report explains the required operator check. Collection preference and the private hash salt are intentionally preserved. Wishlist state and archives remain under the ZenPi state directory after uninstall so uninstall cannot silently destroy user evidence; remove them manually only after review.
+## Security boundaries at a glance
 
-## Browser isolation
+| Area | ZenPi provides | ZenPi does not provide |
+| --- | --- | --- |
+| Installer | Explicit plans and confirmation, bounded managed changes, backups, checksums, atomic promotion, and rollback | Rollback of every external package-manager side effect or cache |
+| Command Guard | Pre-execution defense in depth for documented model-tool seams | A general sandbox for direct user commands, arbitrary tools, scripts, extensions, or running processes |
+| Local improvement state | Explicit collection choice, bounded local records, sanitization, and no ZenPi upload | Guaranteed removal of every plain-language identity or automatic deletion on uninstall |
+| Browser | A fresh Chromium context without the personal browser profile | Operating-system or network isolation from hostile web content |
 
-ZenPi launches its managed Chromium in a fresh Playwright context. It does not attach to a running personal browser or load the user's Chrome profile, cookies, saved passwords, or extensions. Browser pages still execute untrusted web content and can reach URLs available to the host. Treat screenshots, page text, downloads, console output, and explicit visual baselines as potentially sensitive artifacts. Default screenshots stay under the private ZenPi state directory; inspect before sharing. Baseline replacement requires an explicit tool argument.
+The authoritative assumptions, enforcement seams, residual risks, and component details are in [SECURITY_MODEL.md](SECURITY_MODEL.md).
 
-The browser is not an operating-system sandbox. Pi and its extensions already run with user permissions. Browser snapshots, viewports, screenshot dimensions, PNG input sizes, and inline images are bounded to limit resource use. Explicit outputs are published atomically and are not replaced without `overwrite=true`; comparison rejects aliased baseline/current/diff paths. Use containers or stronger host isolation for hostile applications, and use dedicated test accounts rather than personal authenticated sessions.
+## Dependencies and supply chain
 
-## External tools
+ZenPi pins reviewed executable dependencies and uses a reviewed lockfile for its managed browser runtime. Pinning and lockfiles improve repeatability but are not cryptographic provenance, release-signature, or reproducible-build guarantees. Installation still trusts the configured package registries, upstream publishers, downloaded browser distribution, GitHub Actions, and the invoking host.
 
-- The managed browser runtime contains pinned Playwright, Chromium, pixelmatch, and pngjs components. It is private to ZenPi and is removed on uninstall; browser artifacts are preserved.
-- The in-house `/files` extension reads project files and invokes Git without a shell for repository discovery, status, and diffs. It bounds file count, file size, and review excerpts; rejects symbolic links and binary content; sanitizes terminal control characters; and does not modify files.
-- The in-house command-policy and parser implementation uses only Node built-ins and the host PowerShell parser. Its PowerShell helper is invoked directly without a shell, receives bounded text through stdin, does not evaluate it, runs with a sanitized environment and timeout, and returns bounded syntax metadata. No command-analysis service or reporting endpoint is contacted.
-- DonSeTch is optional and licensed separately. When selected, ZenPi installs pinned `donsetch@3.4.0` globally through npm; its package installation downloads and verifies the platform binary.
-- Shell profiles are convenience wrappers, not sandboxes.
-
-## Reporting issues
-
-Report vulnerabilities through [GitHub private security advisories](https://github.com/TannerMidd/ZenPi/security/advisories/new). Do not disclose unpatched vulnerabilities in public issues.
+Some optional or bootstrap packages are installed globally and remain external system state. ZenPi uninstall does not remove them. See [THIRD_PARTY.md](THIRD_PARTY.md) for the canonical component and version inventory and [SECURITY_MODEL.md](SECURITY_MODEL.md) for acquisition and rollback boundaries.

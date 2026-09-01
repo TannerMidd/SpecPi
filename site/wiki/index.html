@@ -239,7 +239,7 @@ cd ZenPi</code></pre>
         <div class="section-label"><span>06</span><p>Command guard</p></div>
         <div class="doc-content">
           <h2 id="command-guard-title">Dangerous commands stop at the door.</h2>
-          <p class="doc-lede">Every model-initiated command is analyzed before it runs. Confirmed catastrophe is denied outright; what the analysis cannot settle asks first.</p>
+          <p class="doc-lede">Every supported model-initiated Pi tool call is analyzed before it runs. Confirmed catastrophe is denied outright; what the analysis cannot settle asks first.</p>
           <div class="command-stack">
             <div><code>Guard</code><span>The recommended default. Denies host-wide catastrophe and guard tampering, asks before Git destroys work, and stays quiet otherwise.</span></div>
             <div><code>Strict</code><span>Adds approvals for mutation, execution, sensitive reads, and network activity.</span></div>
@@ -248,7 +248,7 @@ cd ZenPi</code></pre>
           <p>Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Manage everything with <code>/guard</code>: <code>status</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, <code>clear-approvals</code>.</p>
           <aside class="callout callout-boundary">
             <strong>Command-guard boundary</strong>
-            <p>The guard provides defense in depth within its documented scope. Direct shell escapes, malicious extensions, and running processes stay outside that boundary. Use least privilege, containers, or VMs for hostile code. The full model lives in <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+            <p>The guard provides defense in depth within its documented scope. Direct shell escapes, malicious extensions, and running processes stay outside that boundary. Use least privilege, containers, or VMs for hostile code. The full model lives in <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY_MODEL.md">SECURITY_MODEL.md</a>.</p>
           </aside>
         </div>
       </section>
@@ -317,7 +317,7 @@ cd ZenPi</code></pre>
             <article><span>Guarded</span><h3>Critical calls stop first</h3><p>Known catastrophic model commands are blocked; parser uncertainty requires approval and is denied without UI.</p></article>
           </div>
           <p>Pi extensions run with your user permissions. Trusted project settings and dynamically constructed workflow code are user-controlled boundaries outside ZenPi's sandboxing guarantees.</p>
-          <p><a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Read the complete security model <span aria-hidden="true">↗</span></a></p>
+          <p><a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY_MODEL.md">Read the complete security model <span aria-hidden="true">↗</span></a></p>
         </div>
       </section>
 
