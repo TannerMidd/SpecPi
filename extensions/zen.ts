@@ -109,6 +109,11 @@ export default function (pi: ExtensionAPI) {
     let phase: ZenPhase = "ready";
     let turnCount = 0;
     let toolCount = 0;
+    let workflowScope: { active: boolean; pending: number; indeterminate: boolean } = {
+        active: false,
+        pending: 0,
+        indeterminate: false,
+    };
     let toolsWereExpanded: boolean | undefined;
     let widgetTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -190,7 +195,10 @@ export default function (pi: ExtensionAPI) {
                         ];
                     }
 
-                    const detail = `◆ ${state} · ${turnCount} turn${turnCount === 1 ? "" : "s"} · ${toolCount} tool${toolCount === 1 ? "" : "s"} · output collapsed`;
+                    const scopeDetail = workflowScope.active
+                        ? ` · scope ${workflowScope.pending > 0 || workflowScope.indeterminate ? "review" : "clean"}`
+                        : "";
+                    const detail = `◆ ${state} · ${turnCount} turn${turnCount === 1 ? "" : "s"} · ${toolCount} tool${toolCount === 1 ? "" : "s"}${scopeDetail} · output collapsed`;
                     const innerWidth = width - 4;
                     const fitted = truncateToWidth(detail, innerWidth, "");
                     const padding = " ".repeat(Math.max(0, innerWidth - visibleWidth(fitted)));
@@ -258,6 +266,7 @@ export default function (pi: ExtensionAPI) {
         phase = "ready";
         turnCount = 0;
         toolCount = 0;
+        workflowScope = { active: false, pending: 0, indeterminate: false };
         toolsWereExpanded = undefined;
 
         for (const entry of ctx.sessionManager.getBranch()) {
@@ -271,6 +280,14 @@ export default function (pi: ExtensionAPI) {
         if (enabled) {
             applyMode(ctx);
         }
+    });
+
+    pi.events.on("zenpi:workflow-status", (state: any) => {
+        workflowScope = {
+            active: state?.active === true,
+            pending: Number.isInteger(state?.pending) ? Math.max(0, state.pending) : 0,
+            indeterminate: state?.indeterminate === true,
+        };
     });
 
     pi.on("session_shutdown", (_event, ctx) => {

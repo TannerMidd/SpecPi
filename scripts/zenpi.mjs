@@ -741,6 +741,31 @@ function managedFiles(includeShell) {
             0o644,
         ],
         [
+            path.join(repoRoot, "extensions", "workflow-controls", "index.ts"),
+            path.join(agentDir, "extensions", "workflow-controls", "index.ts"),
+            0o644,
+        ],
+        [
+            path.join(repoRoot, "extensions", "workflow-controls", "scope.mjs"),
+            path.join(agentDir, "extensions", "workflow-controls", "scope.mjs"),
+            0o644,
+        ],
+        [
+            path.join(repoRoot, "extensions", "workflow-controls", "experiments.mjs"),
+            path.join(agentDir, "extensions", "workflow-controls", "experiments.mjs"),
+            0o644,
+        ],
+        [
+            path.join(repoRoot, "extensions", "workflow-controls", "challenge.mjs"),
+            path.join(agentDir, "extensions", "workflow-controls", "challenge.mjs"),
+            0o644,
+        ],
+        [
+            path.join(repoRoot, "extensions", "workflow-controls", "smoke.mjs"),
+            path.join(agentDir, "extensions", "workflow-controls", "smoke.mjs"),
+            0o755,
+        ],
+        [
             path.join(repoRoot, "extensions", "files", "index.ts"),
             path.join(agentDir, "extensions", "files", "index.ts"),
             0o644,
@@ -1057,6 +1082,11 @@ function assertSources() {
     const required = [
         "extensions/zen.ts",
         "extensions/ui-refresh/index.ts",
+        "extensions/workflow-controls/index.ts",
+        "extensions/workflow-controls/scope.mjs",
+        "extensions/workflow-controls/experiments.mjs",
+        "extensions/workflow-controls/challenge.mjs",
+        "extensions/workflow-controls/smoke.mjs",
         "extensions/files/index.ts",
         "extensions/files/core.mjs",
         "extensions/browser/index.ts",
@@ -1116,6 +1146,8 @@ Managed files:`);
     console.log("  theme = tea-house");
     console.log("  pinned package entries (merged by npm package identity)");
     console.log("  command-guard mode and approvals are session-only and no raw commands are persisted");
+    console.log("  scope and completion state stays in the active Pi session branch without raw tool content");
+    console.log("  experiment metadata and exported patches stay in private local ZenPi state");
     console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
     console.log("  capability-gap events use sanitized summaries and salted task/session/project hashes");
     console.log("  collection requires one explicit local on/off decision and never uploads data");
@@ -1673,7 +1705,7 @@ async function uninstall(options) {
         retiredBrowserRuntime = undefined;
         console.log("ZenPi configuration, managed optional tools, and managed browser runtime uninstalled.");
         console.log(
-            "Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved.",
+            "Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved. Experiment metadata and exported patches were also preserved.",
         );
         console.log(`Wishlist state: ${stateDir}`);
         for (const warning of warnings) {
