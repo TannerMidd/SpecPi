@@ -1429,6 +1429,8 @@ function pipelineGroups(analysis) {
 // critical here is an immutable denial over a command that only printed a string.
 const TEXT_DESTRUCTIVE_VERB =
     /(?:^|[;&|({\n\r]|&&|\|\|)\s*(?:rm|rmdir|shred|srm|del|erase|rd|remove-item|ri|clear-item|mkfs(?:\.[a-z0-9]+)?|dd|wipefs|diskpart|format|takeown|move-item)(?:[\s;&|)}]|$)/i;
+const TEXT_DIRECTORY_VERB =
+    /(?:^|[;&|({\n\r]|&&|\|\|)\s*(?:cd|chdir|set-location|sl|pushd|push-location)(?:[\s;&|)}]|$)/i;
 const TEXT_STANDALONE_CATASTROPHE =
     /(?:^|[;&|({\n\r]|&&|\|\|)\s*(?:shutdown|reboot|halt|poweroff|stop-computer|restart-computer)(?:[\s;&|)}]|$)|:\s*\(\s*\)\s*\{[^}]*\|[^}]*&[^}]*\}\s*;\s*:/i;
 const ESCAPED_WHITESPACE = "\u0000";
@@ -1578,10 +1580,12 @@ function fallbackProjection(text, shell) {
     const substitutionAt = new Map(substitutions.map((item) => [item.start, item]));
     let syntax = "",
         argumentsText = "",
+        wholeSyntax = "",
         quote = "";
     const append = (syntaxText, argumentText = syntaxText) => {
         syntax += syntaxText;
         argumentsText += argumentText;
+        wholeSyntax += syntaxText;
     };
 
     const flush = () => {
@@ -1683,6 +1687,7 @@ function fallbackProjection(text, shell) {
         if (lineComment) {
             const end = text.indexOf("\n", index + 1);
             flush();
+            wholeSyntax += "\n";
             index = end < 0 ? text.length : end;
             continue;
         }
@@ -1695,7 +1700,9 @@ function fallbackProjection(text, shell) {
 
         if ([";", "&", "|", "\n", "\r"].includes(character)) {
             flush();
+            wholeSyntax += character;
             if ((character === "&" || character === "|") && next === character) {
+                wholeSyntax += next;
                 index += 1;
             }
 
@@ -1709,6 +1716,7 @@ function fallbackProjection(text, shell) {
 
     return {
         statements,
+        wholeSyntax,
         embeddedPayloads: substitutions.map((item) => ({ payload: item.payload, shell: shellName })),
         shell: shellName,
     };
@@ -2044,6 +2052,58 @@ function textPathTokens(text) {
         .filter((token) => token && (/[\\/]/.test(token) || token === "~" || /^[a-z]:$/i.test(token)));
 }
 
+function fallbackDirectoryTarget(statement, shell) {
+    if (!TEXT_DIRECTORY_VERB.test(statement.syntax)) {
+        return undefined;
+    }
+
+    const words = fallbackWords(statement.arguments, shell);
+    const commandIndex = words.findIndex((word) =>
+        ["cd", "chdir", "set-location", "sl", "pushd", "push-location"].includes(executableBase(word.value)),
+    );
+    if (commandIndex < 0) {
+        return undefined;
+    }
+
+    const args = words.slice(commandIndex + 1).map((word) => word.value);
+    const candidates = args.filter((arg) => {
+        if (arg === "--" || /^\/d$/i.test(arg)) {
+            return false;
+        }
+
+        return !arg.startsWith("-");
+    });
+    const target = candidates.at(-1);
+    if (!target || /[$%*?]/.test(target)) {
+        return undefined;
+    }
+
+    return target;
+}
+
+function fallbackDestructiveTargets(statement, shell) {
+    const words = fallbackWords(statement.arguments, shell);
+    const commandIndex = words.findIndex((word) => {
+        const name = executableBase(word.value);
+
+        return DELETE_NAMES.has(name) || /^(?:mkfs(?:\.[a-z0-9]+)?|srm|wipefs|diskpart|format|takeown)$/.test(name);
+    });
+    if (commandIndex < 0) {
+        return [];
+    }
+
+    return words
+        .slice(commandIndex + 1)
+        .map((word) => word.value)
+        .filter((arg) => {
+            if (!arg || arg === "--" || arg.startsWith("-") || /^[A-Za-z_][A-Za-z0-9_]*=/.test(arg)) {
+                return false;
+            }
+
+            return !/^\/[a-z]+$/i.test(arg);
+        });
+}
+
 // A last-resort scan of the RAW command text, used only when the structural parser could not produce a usable
 // analysis. Without it an infrastructure failure — a helper timeout, a missing interpreter, a blown limit —
 // silently converts an immutable catastrophic denial into a prompt a person can approve, which is precisely the
@@ -2100,8 +2160,10 @@ export function catastrophicTextScan(command, options = {}) {
     }
 
     if (
-        projections.some((projection) =>
-            projection.statements.some((statement) => TEXT_STANDALONE_CATASTROPHE.test(statement.syntax)),
+        projections.some(
+            (projection) =>
+                TEXT_STANDALONE_CATASTROPHE.test(projection.wholeSyntax) ||
+                projection.statements.some((statement) => TEXT_STANDALONE_CATASTROPHE.test(statement.syntax)),
         )
     ) {
         return {
@@ -2117,21 +2179,47 @@ export function catastrophicTextScan(command, options = {}) {
     }
 
     const scanOptions = { ...options, mode: "guard", read: false };
-    const reaches = projections.some((projection) =>
-        projection.statements.some((statement) => {
-            if (!TEXT_DESTRUCTIVE_VERB.test(statement.syntax)) {
-                return false;
+    let reaches = false;
+    for (const projection of projections) {
+        let projectedCwd = scanOptions.cwd;
+        let changedDirectory = false;
+        for (const statement of projection.statements) {
+            const directoryTarget = fallbackDirectoryTarget(statement, projection.shell);
+            if (directoryTarget) {
+                try {
+                    projectedCwd = classifyPath(directoryTarget, { ...scanOptions, cwd: projectedCwd }).lexical;
+                    changedDirectory = true;
+                } catch {
+                    changedDirectory = false;
+                }
             }
 
-            return textPathTokens(statement.arguments).some((token) => {
+            if (!TEXT_DESTRUCTIVE_VERB.test(statement.syntax)) {
+                continue;
+            }
+
+            const targets = textPathTokens(statement.arguments);
+            if (changedDirectory) {
+                targets.push(...fallbackDestructiveTargets(statement, projection.shell));
+            }
+
+            reaches = targets.some((token) => {
+                const scoped = { ...scanOptions, cwd: projectedCwd };
                 try {
-                    return classifyPath(token, scanOptions).protected || isAgentPath(token, scanOptions);
+                    return classifyPath(token, scoped).protected || isAgentPath(token, scoped);
                 } catch {
                     return false;
                 }
             });
-        }),
-    );
+            if (reaches) {
+                break;
+            }
+        }
+
+        if (reaches) {
+            break;
+        }
+    }
 
     return reaches
         ? {

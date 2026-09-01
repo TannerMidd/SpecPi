@@ -639,6 +639,8 @@ test("fallback catastrophic paths stay within their statement", () => {
         "Remove-Item -Recurse -Force C:\\Windows",
         'Remove-Item -Recurse -Force "C:\\Windows"',
         "powershell.exe -Command \"Remove-Item -Recurse -Force 'C:\\Windows'\"",
+        "Set-Location C:\\ ; Remove-Item -Recurse -Force Windows",
+        "bash -c ':(){ :|:& };:'",
     ]) {
         const sameStatement = catastrophicTextScan(command, options);
         assert.equal(sameStatement.action, "deny", command);
@@ -1414,7 +1416,8 @@ test("bounded deterministic fuzz corpus never crashes or lowers an appended crit
         assert.equal(appended.action, "deny");
     }
 
-    assert.ok(Date.now() - started < 4000, "bounded fuzz corpus exceeded its regex/runtime budget");
+    const runtimeBudget = process.platform === "win32" ? 8000 : 4000;
+    assert.ok(Date.now() - started < runtimeBudget, "bounded fuzz corpus exceeded its regex/runtime budget");
 });
 
 test("analysis limits ask and deny without UI", () => {

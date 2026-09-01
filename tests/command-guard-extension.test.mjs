@@ -306,7 +306,7 @@ test("real pi-subagents child receives the guard and blocks before execution", {
         const childProof = JSON.parse(fs.readFileSync(childStarted, "utf8"));
         assert.equal(childProof.child, true);
         assert.equal(childProof.binding?.mode, "guard");
-        assert.equal(childProof.binding?.policyVersion, 1);
+        assert.equal(childProof.binding?.policyVersion, 2);
         assert.equal(fs.readFileSync(unrelatedLoaded, "utf8"), "loaded");
         assert.equal(fs.existsSync(canary), false, `guarded child executed the canary command: ${canary}`);
     } finally {
