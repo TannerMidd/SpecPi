@@ -925,7 +925,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /active top-level runs/);
     assert.match(html, /Budgets do not control modern/);
     assert.match(html, /id="goal"/);
-    assert.match(html, /A control loop,<br>not an autopilot\./);
+    assert.match(html, /A control loop<br>with human approval\./);
     assert.match(html, /<code>\/harness-improvement<\/code> opens one clean menu/);
     assert.match(html, /type="module" src="cycle\.js"/);
     assert.match(html, /data-cycle-story/);
@@ -940,7 +940,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /id="install"/);
     assert.match(
         html,
-        /Stable <code>v0\.8\.1<\/code> adds a session command guard that blocks catastrophic model commands before execution and asks before Git destroys work/,
+        /Version <code>v0\.8\.2<\/code> improves command-guard cleanup handling and keeps uncertain denials from locking later work/,
     );
     assert.match(html, /The journal keeps the evidence, gates, changed files, and version/);
     assert.match(html, /Later friction links back to that journal/);

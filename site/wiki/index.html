@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171310">
   <meta name="description" content="ZenPi wiki: installation, workflows, commands, provider-safe delegation, browser QA, and security boundaries.">
-  <meta property="og:title" content="ZenPi Wiki — Build deliberately">
+  <meta property="og:title" content="ZenPi Wiki: Build deliberately">
   <meta property="og:description" content="Practical guides and reference documentation for the ZenPi coding-agent harness.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ZenPi">
   <meta property="og:url" content="https://tannermidd.github.io/ZenPi/wiki/">
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://tannermidd.github.io/ZenPi/wiki/">
-  <title>ZenPi Wiki — Build deliberately</title>
+  <title>ZenPi Wiki: Build deliberately</title>
   <link rel="icon" href="../logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="../wiki.css">
@@ -40,7 +40,7 @@
       <div class="sidebar-heading">
         <p>Documentation</p>
         <strong>ZenPi Wiki</strong>
-        <span>v0.8.1</span>
+        <span>v0.8.2</span>
       </div>
       <nav aria-label="Wiki sections">
         <div class="sidebar-group">
@@ -92,7 +92,7 @@
       </details>
 
       <header class="wiki-hero" id="overview">
-        <p class="eyebrow">Documentation / v0.8.1</p>
+        <p class="eyebrow">Documentation / v0.8.2</p>
         <h1>Build with care,<br><em>work with proof.</em></h1>
         <p>Everything you need to install ZenPi, understand its human-directed improvement loop, and use its focused review, delegation, and browser tools.</p>
         <div class="wiki-hero-actions">
@@ -132,8 +132,8 @@
 
           <h3>1. Clone a reviewed release</h3>
           <div class="code-block">
-            <div><span>terminal</span><span>release v0.8.1</span></div>
-            <pre><code>git clone --branch v0.8.1 --depth 1 https://github.com/TannerMidd/ZenPi.git
+            <div><span>terminal</span><span>release v0.8.2</span></div>
+            <pre><code>git clone --branch v0.8.2 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi</code></pre>
           </div>
 
@@ -189,7 +189,7 @@ cd ZenPi</code></pre>
         <div class="section-label"><span>03</span><p>Improvement loop</p></div>
         <div class="doc-content">
           <h2 id="workflows-title">Let friction become evidence.</h2>
-          <p class="doc-lede">ZenPi is a control loop, not an autopilot. Repeated, reusable gaps rise into view; human judgment starts one bounded change; repository and capability gates decide when it is done.</p>
+          <p class="doc-lede">ZenPi uses a control loop with human approval. Repeated, reusable gaps rise into view; human judgment starts one bounded change; repository and capability gates decide when it is done.</p>
 
           <div class="loop-list" aria-label="Seven stages of the ZenPi improvement loop">
             <div><span>01</span><strong>Friction</strong><p>A real task hits a missing local capability.</p></div>
@@ -261,7 +261,7 @@ cd ZenPi</code></pre>
             <li><code>inherit</code> remains portable and follows the parent model.</li>
             <li>Unavailable saved models become stale and are never silently replaced.</li>
             <li>Role profiles are provider-specific; child budgets and active async capacity remain global.</li>
-            <li>Live processes on different providers fail closed rather than racing the shared settings mirror.</li>
+            <li>Live processes on different providers fail closed to prevent races over the shared settings mirror.</li>
           </ul>
 
           <aside class="callout callout-note">
@@ -281,10 +281,10 @@ cd ZenPi</code></pre>
             <div><code>Strict</code><span>Adds approvals for mutation, execution, sensitive reads, and network activity.</span></div>
             <div><code>Off</code><span>Confirmed twice, lasts one session, and is never inherited by subagents.</span></div>
           </div>
-          <p>Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Manage everything with <code>/guard</code> — <code>status</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, <code>clear-approvals</code>.</p>
+          <p>Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Manage everything with <code>/guard</code>: <code>status</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, <code>clear-approvals</code>.</p>
           <aside class="callout callout-boundary">
-            <strong>Defense in depth, not a sandbox</strong>
-            <p>Direct shell escapes, malicious extensions, and running processes stay outside the boundary. Use least privilege, containers, or VMs for hostile code — the full model lives in <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+            <strong>Command-guard boundary</strong>
+            <p>The guard provides defense in depth within its documented scope. Direct shell escapes, malicious extensions, and running processes stay outside that boundary. Use least privilege, containers, or VMs for hostile code. The full model lives in <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">SECURITY.md</a>.</p>
           </aside>
         </div>
       </section>
@@ -293,7 +293,7 @@ cd ZenPi</code></pre>
         <div class="section-label"><span>07</span><p>Browser QA</p></div>
         <div class="doc-content">
           <h2 id="browser-qa-title">Inspect what users actually see.</h2>
-          <p>ZenPi's browser tools open pages in a fresh isolated Chromium context. Use rendered snapshots and screenshots at relevant desktop, tablet, and mobile viewports; source inspection alone is not visual proof.</p>
+          <p>ZenPi's browser tools open pages in a fresh isolated Chromium context. Use rendered snapshots and screenshots at relevant desktop, tablet, and mobile viewports. Source inspection cannot verify rendered appearance.</p>
           <div class="browser-flow">
             <div><span>1</span><strong>Open</strong><p>Load the local or remote page in isolated Chromium.</p></div>
             <div><span>2</span><strong>Inspect</strong><p>Read the rendered structure and exercise interactive controls.</p></div>
@@ -302,7 +302,7 @@ cd ZenPi</code></pre>
           </div>
           <aside class="callout callout-boundary">
             <strong>Isolation boundary</strong>
-            <p>The browser never attaches to your personal Chrome profile, cookies, passwords, or extensions. It is process-isolated, not an operating-system sandbox.</p>
+            <p>The browser never attaches to your personal Chrome profile, cookies, passwords, or extensions. It runs in a separate process and does not provide operating-system isolation.</p>
           </aside>
         </div>
       </section>
@@ -358,7 +358,7 @@ cd ZenPi</code></pre>
             <article><span>Exact</span><h3>Providers do not blur</h3><p>Different-provider child execution is blocked, even for similarly named models.</p></article>
             <article><span>Guarded</span><h3>Critical calls stop first</h3><p>Known catastrophic model commands are blocked; parser uncertainty requires approval and is denied without UI.</p></article>
           </div>
-          <p>Pi extensions run with your user permissions. Trusted project settings and dynamically constructed workflow code remain user-controlled boundaries rather than claims ZenPi can sandbox.</p>
+          <p>Pi extensions run with your user permissions. Trusted project settings and dynamically constructed workflow code are user-controlled boundaries outside ZenPi's sandboxing guarantees.</p>
           <p><a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Read the complete security model <span aria-hidden="true">↗</span></a></p>
         </div>
       </section>
