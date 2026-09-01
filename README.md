@@ -57,34 +57,39 @@ The goal is to make each justified change obvious, testable, reversible, and exp
 - **Improvement journal:** every retirement keeps its evidence, gates, changed files, and version; `/wishlist history [gap-id]` shows it
 - **Loop health:** `/wishlist status` and the report show retirements, reopen rate, open reviews, time-to-retire, and qualification rate
 - **`/harness-improvement`:** pick one item and let ZenPi fix and verify it
-- **`/zen-subagents`:** remember how you like your subagents set up
 - **Command guard:** blocks catastrophic model commands before execution and asks before Git destroys work
 - **Isolated browser:** check your web UI with screenshots in a fresh browser context
 - **Careful installs:** everything is backed up and can be rolled back
 
 Details live in the [Wiki](https://tannermidd.github.io/ZenPi/wiki/).
 
+## Why ZenPi does not install subagents
+
+ZenPi keeps implementation inside one accountable working context instead of installing an orchestration layer. A parent agent must choose what context a child receives and compress what comes back; either handoff can silently omit the constraint that mattered and make a bad result difficult to reconstruct. Parallel agents writing the same codebase also trade apparent speed for fragmented decisions, conflicting assumptions, and a larger review burden.
+
+Gather context deliberately, leave a reviewable artifact, and begin implementation with that shared record. Keep one writer per working directory; use an isolated worktree and an explicit separate session when an independent review or experiment is worth the coordination cost. This is not a claim that independent agents are never useful. It is a choice to keep context ownership, authorship, and verification visible.
+
 ## Install
 
 You need Node.js 22.19+, npm, and Git. If Pi (0.84.4+) isn't installed yet, the installer sets it up for you.
 
 ```bash
-git clone --branch v0.8.2 --depth 1 https://github.com/TannerMidd/ZenPi.git
+git clone --branch v0.8.3 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
 ./zenpi plan      # preview what will change (changes nothing)
 ./zenpi install   # asks for confirmation first
 ./zenpi doctor    # verify managed state and re-run capability validators
 ```
 
-On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible. See [SECURITY.md](SECURITY.md) for details.
+On Windows, use `.\zenpi.cmd` instead of `./zenpi`. After installing, run `/reload` in Pi. Everything is backed up and reversible. See the [security model](SECURITY_MODEL.md) for details.
 
 ## Command guard
 
-Every model-initiated command is analyzed before it runs. Choose one mode at session start:
+Every supported model-initiated Pi tool call is analyzed before it runs. Choose one mode at session start:
 
 - **Guard** (recommended): denies confirmed host-wide catastrophe outright, asks before Git destroys work, and stays quiet otherwise
 - **Strict:** also asks for mutation, execution, sensitive reads, and network activity
-- **Off:** confirmed, session-only, and never inherited by subagents
+- **Off:** confirmed and session-only
 
 Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Inspect or change the mode any time with `/guard`. For temporary cleanup in the Bash tool, use `rm -rf -- F:/Temp/case`; use `Remove-Item -LiteralPath ... -Recurse -Force` with the PowerShell tool.
 
@@ -92,9 +97,9 @@ Approvals are exact-call and session-scoped. Only a structurally proven, lock-wo
 
 ZenPi never persists command text and does not read Pi credentials, sessions, or history. Wishlist reports are stored locally only. Review them before sharing. Improving ZenPi, installing, and publishing all require your explicit approval.
 
-The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, `edit`, and native-subagent seams. It provides defense in depth within that boundary. Direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its scope. Direct recognized private-path reads receive narrow protection. The guard does not comprehensively detect credentials read through arbitrary shell syntax or scripts. Use OS permissions, a least-privilege account, container, or VM when code or data is hostile.
+The command guard protects model tool calls routed through its documented `bash`, `powershell`, `read`, `write`, and `edit` seams. It provides defense in depth within that boundary. Direct human shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its scope. Direct recognized private-path reads receive narrow protection. The guard does not comprehensively detect credentials read through arbitrary shell syntax or scripts. Use OS permissions, a least-privilege account, container, or VM when code or data is hostile.
 
-See [SECURITY.md](SECURITY.md) for the full picture.
+See the [security policy](SECURITY.md) for vulnerability reporting and the [security model](SECURITY_MODEL.md) for the full boundary.
 
 ## Development
 

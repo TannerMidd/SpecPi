@@ -1,7 +1,7 @@
 {
   "name": "zenpi",
-  "version": "0.8.2",
-  "description": "An explicit, provider-safe, self-improving harness for the Pi coding agent",
+  "version": "0.8.3",
+  "description": "An explicit, privacy-conscious, self-improving harness for the Pi coding agent",
   "author": "Tanner Middleton",
   "repository": {
     "type": "git",
@@ -34,6 +34,7 @@
     "README.md",
     "site/self-improvement-loop-v2.svg",
     "SECURITY.md",
+    "SECURITY_MODEL.md",
     "THIRD_PARTY.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -60,7 +61,7 @@
     "test": "node --test",
     "format": "prettier --write \"**/*.{js,mjs,ts,tsx}\" && eslint . --fix --rule \"@stylistic/max-statements-per-line: off\" && prettier --write \"**/*.{js,mjs,ts,tsx}\" && eslint . --fix",
     "format:check": "prettier --check \"**/*.{js,mjs,ts,tsx}\" && eslint .",
-    "check": "npm run format:check && node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --experimental-strip-types --check extensions/command-guard/index.ts && node --check extensions/command-guard/core.mjs && node --check extensions/command-guard/rules.mjs && node --check extensions/command-guard/bash.mjs && node --check extensions/command-guard/powershell.mjs && node --check extensions/command-guard/cmd.mjs && node --check extensions/command-guard/paths.mjs && node --check extensions/command-guard/redact.mjs && node --check extensions/command-guard/managed-files.mjs && node --check extensions/command-guard/smoke.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/tool-wishlist/validators.mjs && node --check extensions/subagents/core.mjs && node --experimental-strip-types --check extensions/subagents/index.ts && node --experimental-strip-types --check extensions/tool-wishlist/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
+    "check": "npm run format:check && node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --check scripts/lock.mjs && node --experimental-strip-types --check extensions/command-guard/index.ts && node --check extensions/command-guard/core.mjs && node --check extensions/command-guard/rules.mjs && node --check extensions/command-guard/bash.mjs && node --check extensions/command-guard/powershell.mjs && node --check extensions/command-guard/cmd.mjs && node --check extensions/command-guard/paths.mjs && node --check extensions/command-guard/redact.mjs && node --check extensions/command-guard/managed-files.mjs && node --check extensions/command-guard/smoke.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/tool-wishlist/validators.mjs && node --experimental-strip-types --check extensions/tool-wishlist/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",

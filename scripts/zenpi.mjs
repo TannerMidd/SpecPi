@@ -24,7 +24,7 @@ import {
 } from "./lib.mjs";
 import { validateCapabilityRegistry, isValidValidatorName } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
-import { acquireZenPiLock, readProviderProfiles, readProviderLeases } from "../extensions/subagents/core.mjs";
+import { acquireZenPiLock } from "./lock.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -39,9 +39,7 @@ const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.ho
 const stateDir = path.join(agentDir, "zenpi");
 const manifestPath = path.join(stateDir, "manifest.json");
 const settingsPath = path.join(agentDir, "settings.json");
-const subagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
-const subagentProfilePath = path.join(agentDir, "zenpi", "subagent-provider-profiles.json");
-const subagentLeasePath = path.join(agentDir, "zenpi", "subagent-provider-leases.json");
+const retiredSubagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
 const agentsPath = path.join(agentDir, "AGENTS.md");
 const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
@@ -66,7 +64,6 @@ if (hasValidatedManagedTools()) {
 
 const PACKAGES = [
     "npm:pi-web-access@0.25.0",
-    "npm:pi-subagents@0.58.0",
     "npm:@juicesharp/rpiv-ask-user-question@2.7.1",
     "npm:@llblab/pi-codex-usage@0.9.3",
     "npm:@tunnckocore/pi-gpt-fast-mode@0.4.0",
@@ -731,164 +728,8 @@ function validManagedModelScope(value) {
     );
 }
 
-function validThinking(value) {
-    return ["off", "minimal", "low", "medium", "high"].includes(value);
-}
-
-function validRoleModel(value) {
-    return value === "inherit" || (typeof value === "string" && /^[^/]+\/.+/.test(value));
-}
-
 function desiredSettingsOperations() {
-    const webExtension = path.join(agentDir, "npm", "node_modules", "pi-web-access", "index.ts");
-    const commandGuardExtension = path.join(agentDir, "extensions", "command-guard", "index.ts");
-
-    return [
-        { path: ["theme"], value: "tea-house" },
-        { path: ["subagents", "defaultModel"], delete: true },
-        { path: ["subagents", "defaultThinking"], value: "medium", userTunable: true, validate: validThinking },
-        { path: ["subagents", "defaultExtensions"], arrayIncludes: [commandGuardExtension] },
-        { path: ["subagents", "maxThinking"], value: "high" },
-        {
-            path: ["subagents", "modelScope"],
-            value: { enforce: true, strict: true, allow: ["inherit"] },
-            dynamicPolicy: true,
-            validate: validManagedModelScope,
-        },
-        { path: ["subagents", "agentOverrides", "codex-exec", "disabled"], value: true },
-        { path: ["subagents", "agentOverrides", "codex-exec-writer", "disabled"], value: true },
-        {
-            path: ["subagents", "agentOverrides", "scout", "model"],
-            value: "inherit",
-            userTunable: true,
-            validate: validRoleModel,
-        },
-        {
-            path: ["subagents", "agentOverrides", "scout", "thinking"],
-            value: "low",
-            userTunable: true,
-            validate: validThinking,
-        },
-        {
-            path: ["subagents", "agentOverrides", "researcher", "model"],
-            value: "inherit",
-            userTunable: true,
-            validate: validRoleModel,
-        },
-        {
-            path: ["subagents", "agentOverrides", "researcher", "thinking"],
-            value: "medium",
-            userTunable: true,
-            validate: validThinking,
-        },
-        {
-            path: ["subagents", "agentOverrides", "researcher", "extensions"],
-            arrayIncludes: [webExtension, commandGuardExtension],
-        },
-        {
-            path: ["subagents", "agentOverrides", "worker", "model"],
-            value: "inherit",
-            userTunable: true,
-            validate: validRoleModel,
-        },
-        {
-            path: ["subagents", "agentOverrides", "worker", "thinking"],
-            value: "medium",
-            userTunable: true,
-            validate: validThinking,
-        },
-        {
-            path: ["subagents", "agentOverrides", "reviewer", "model"],
-            value: "inherit",
-            userTunable: true,
-            validate: validRoleModel,
-        },
-        {
-            path: ["subagents", "agentOverrides", "reviewer", "thinking"],
-            value: "high",
-            userTunable: true,
-            validate: validThinking,
-        },
-        {
-            path: ["subagents", "agentOverrides", "oracle", "model"],
-            value: "inherit",
-            userTunable: true,
-            validate: validRoleModel,
-        },
-        {
-            path: ["subagents", "agentOverrides", "oracle", "thinking"],
-            value: "high",
-            userTunable: true,
-            validate: validThinking,
-        },
-    ];
-}
-
-function desiredSubagentConfigOperations() {
-    const defaults = readJson(path.join(repoRoot, "templates", "subagent-config.json"));
-
-    return [
-        { path: ["toolDescriptionMode"], value: defaults.toolDescriptionMode },
-        { path: ["inlineToolDisplay"], value: defaults.inlineToolDisplay },
-        { path: ["defaultSubagentContext"], value: defaults.defaultSubagentContext },
-        { path: ["maxSubagentDepth"], value: defaults.maxSubagentDepth },
-        {
-            path: ["maxSubagentSpawnsPerRun"],
-            value: defaults.maxSubagentSpawnsPerRun,
-            userTunable: true,
-            validate: (value) => Number.isSafeInteger(value) && value >= 1 && value <= 1000,
-        },
-        {
-            path: ["maxSubagentSpawnsPerSession"],
-            value: defaults.maxSubagentSpawnsPerSession,
-            userTunable: true,
-            validate: (value) => Number.isSafeInteger(value) && value >= 0 && value <= 10000,
-        },
-        {
-            path: ["maxActiveAsyncRunsPerSession"],
-            value: defaults.maxActiveAsyncRunsPerSession,
-            userTunable: true,
-            validate: (value) => Number.isSafeInteger(value) && value >= 0 && value <= 64,
-        },
-        {
-            path: ["parallel"],
-            value: defaults.parallel,
-            userTunable: true,
-            validate: (value) => value && typeof value === "object" && !Array.isArray(value),
-        },
-        { path: ["missions", "enabled"], value: false },
-        { path: ["scheduledRuns", "enabled"], value: false },
-        { path: ["artifactDir"], value: defaults.artifactDir },
-    ];
-}
-
-function legacySubagentConfigChanges(record) {
-    if (!record) {
-        return [];
-    }
-
-    let original = {};
-    if (record.existed) {
-        const backup = path.join(stateDir, record.backup);
-        if (!fs.existsSync(backup)) {
-            throw new Error(`Missing original subagent config backup: ${backup}`);
-        }
-
-        original = readJson(backup, {});
-    }
-
-    return desiredSubagentConfigOperations().map((operation) => {
-        const before = readPath(original, operation.path);
-
-        return {
-            path: operation.path,
-            beforeExists: before.exists,
-            ...(before.exists ? { before: structuredClone(before.value) } : {}),
-            installedExists: true,
-            installed: structuredClone(operation.value),
-            ...(operation.userTunable ? { userTunable: true } : {}),
-        };
-    });
+    return [{ path: ["theme"], value: "tea-house" }];
 }
 
 function managedFiles(includeShell) {
@@ -947,16 +788,6 @@ function managedFiles(includeShell) {
         [
             path.join(repoRoot, "extensions", "tool-wishlist", "capabilities.json"),
             path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "subagents", "index.ts"),
-            path.join(agentDir, "extensions", "zen-subagents", "index.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "subagents", "core.mjs"),
-            path.join(agentDir, "extensions", "zen-subagents", "core.mjs"),
             0o644,
         ],
         ...COMMAND_GUARD_MANAGED_FILES.map((name) => [
@@ -1238,14 +1069,11 @@ function assertSources() {
         "extensions/tool-wishlist/registry.mjs",
         "extensions/tool-wishlist/validators.mjs",
         "extensions/tool-wishlist/capabilities.json",
-        "extensions/subagents/index.ts",
-        "extensions/subagents/core.mjs",
         ...COMMAND_GUARD_MANAGED_FILES.map((name) => `extensions/command-guard/${name}`),
         "skills/zenpi-improve/SKILL.md",
         "skills/donsetch/SKILL.md",
         "themes/tea-house.json",
         "templates/AGENTS.md",
-        "templates/subagent-config.json",
         "shell/pi-profiles.sh",
     ];
     for (const relative of required) {
@@ -1287,12 +1115,6 @@ Managed files:`);
     console.log("\nSettings ownership:");
     console.log("  theme = tea-house");
     console.log("  pinned package entries (merged by npm package identity)");
-    console.log("  subagent security policy leaves are enforced");
-    console.log("  exact-provider role profiles are created lazily at runtime and preserved byte-for-byte on update");
-    console.log("  global capacity remains user-tunable; provider leases prevent shared-mirror races");
-    console.log("  strict modelScope starts at [inherit] and /zen-subagents synchronizes it to the active provider");
-    console.log("  codex-exec and codex-exec-writer disabled");
-    console.log("  command guard extension is required for native children; unrelated extension entries are preserved");
     console.log("  command-guard mode and approvals are session-only and no raw commands are persisted");
     console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
     console.log("  capability-gap events use sanitized summaries and salted task/session/project hashes");
@@ -1465,7 +1287,7 @@ async function installOrUpdate(options, update) {
 
         const watched = [
             settingsPath,
-            subagentConfigPath,
+            ...(previousManifest?.subagentConfigChanges ? [retiredSubagentConfigPath] : []),
             agentsPath,
             manifestPath,
             ...(shellRc ? [shellRc] : []),
@@ -1519,20 +1341,15 @@ async function installOrUpdate(options, update) {
         writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
         injectTestFailure("after-settings");
 
-        const legacySubagentRecord = previousManifest?.files?.[subagentConfigPath];
-        const subagentConfigExisted =
-            previousManifest?.subagentConfigExisted ?? legacySubagentRecord?.existed ?? pathExists(subagentConfigPath);
-        const subagentConfig = readJson(subagentConfigPath, {});
-        const subagentConfigOperations = desiredSubagentConfigOperations();
-        const previousSubagentConfigChanges =
-            previousManifest?.subagentConfigChanges || legacySubagentConfigChanges(legacySubagentRecord);
-        retireSettings(subagentConfig, previousSubagentConfigChanges, subagentConfigOperations, warnings);
-        const subagentConfigChanges = applySettings(
-            subagentConfig,
-            subagentConfigOperations,
-            previousSubagentConfigChanges,
-        );
-        writeJson(subagentConfigPath, subagentConfig, existingMode(subagentConfigPath, 0o600));
+        if (previousManifest?.subagentConfigChanges) {
+            const retiredConfig = readJson(retiredSubagentConfigPath, {});
+            restoreSettingChanges(retiredConfig, previousManifest.subagentConfigChanges, warnings);
+            if (previousManifest.subagentConfigExisted === false && Object.keys(retiredConfig).length === 0) {
+                fs.rmSync(retiredSubagentConfigPath, { force: true });
+            } else {
+                writeJson(retiredSubagentConfigPath, retiredConfig, existingMode(retiredSubagentConfigPath, 0o600));
+            }
+        }
 
         const fileRecords = structuredClone(previousManifest?.files || {});
         const desiredTargets = new Set(files.map(([, target]) => target));
@@ -1542,11 +1359,6 @@ async function installOrUpdate(options, update) {
 
         for (const [target, record] of Object.entries(fileRecords)) {
             if (desiredTargets.has(target)) {
-                continue;
-            }
-
-            if (target === subagentConfigPath) {
-                delete fileRecords[target];
                 continue;
             }
 
@@ -1597,8 +1409,6 @@ async function installOrUpdate(options, update) {
                 previousManifest?.packagesKeyBeforeExists ?? Object.hasOwn(settingsBeforeOperation, "packages"),
             packageChanges,
             settingsChanges,
-            subagentConfigExisted,
-            subagentConfigChanges,
             browserRuntime: browserRuntimeStatus(),
             piBootstrap: piInstalledByOperation
                 ? {
@@ -1763,7 +1573,7 @@ async function uninstall(options) {
         await confirm(`Uninstall ZenPi ${manifest.version}?`, options.yes);
         const watched = [
             settingsPath,
-            subagentConfigPath,
+            ...(manifest.subagentConfigChanges ? [retiredSubagentConfigPath] : []),
             agentsPath,
             manifestPath,
             ...(manifest.shellRc ? [manifest.shellRc] : []),
@@ -1789,12 +1599,14 @@ async function uninstall(options) {
 
         writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
 
-        const subagentConfig = readJson(subagentConfigPath, {});
-        restoreSettingChanges(subagentConfig, manifest.subagentConfigChanges || [], warnings);
-        if (manifest.subagentConfigExisted === false && Object.keys(subagentConfig).length === 0) {
-            fs.rmSync(subagentConfigPath, { force: true });
-        } else {
-            writeJson(subagentConfigPath, subagentConfig, existingMode(subagentConfigPath, 0o600));
+        if (manifest.subagentConfigChanges) {
+            const retiredConfig = readJson(retiredSubagentConfigPath, {});
+            restoreSettingChanges(retiredConfig, manifest.subagentConfigChanges, warnings);
+            if (manifest.subagentConfigExisted === false && Object.keys(retiredConfig).length === 0) {
+                fs.rmSync(retiredSubagentConfigPath, { force: true });
+            } else {
+                writeJson(retiredSubagentConfigPath, retiredConfig, existingMode(retiredSubagentConfigPath, 0o600));
+            }
         }
 
         for (const [target, record] of Object.entries(manifest.files || {})) {
@@ -1849,15 +1661,6 @@ async function uninstall(options) {
         }
 
         fs.rmSync(manifestPath, { force: true });
-        if (fs.existsSync(subagentLeasePath)) {
-            try {
-                if (readProviderLeases(agentDir).leases.length === 0) {
-                    fs.rmSync(subagentLeasePath, { force: true });
-                }
-            } catch (error) {
-                warnings.push(`Provider lease state was retained because it could not be verified: ${error.message}`);
-            }
-        }
 
         if (retiredBrowserRuntime) {
             try {
@@ -1870,12 +1673,9 @@ async function uninstall(options) {
         retiredBrowserRuntime = undefined;
         console.log("ZenPi configuration, managed optional tools, and managed browser runtime uninstalled.");
         console.log(
-            "Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved. Provider profiles were also preserved.",
+            "Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved.",
         );
         console.log(`Wishlist state: ${stateDir}`);
-        console.log(
-            `Provider profiles (remove manually after stopping Pi for a complete purge): ${subagentProfilePath}`,
-        );
         for (const warning of warnings) {
             console.warn(`Warning: ${warning}`);
         }
@@ -1967,30 +1767,6 @@ async function doctor() {
         );
     }
 
-    let subagentContractStatus;
-    const subagentPackagePath = path.join(agentDir, "npm", "node_modules", "pi-subagents", "package.json");
-    try {
-        const { SUPPORTED_SUBAGENT_CONTRACT } = await import(
-            pathToFileURL(path.join(repoRoot, "extensions", "command-guard", "core.mjs")).href
-        );
-        const installedSubagents = fs.existsSync(subagentPackagePath)
-            ? JSON.parse(fs.readFileSync(subagentPackagePath, "utf8")).version
-            : undefined;
-        if (!installedSubagents) {
-            warnings.push(
-                `${SUPPORTED_SUBAGENT_CONTRACT.packageName} is not installed; protected native child launches are unavailable.`,
-            );
-        } else if (installedSubagents !== SUPPORTED_SUBAGENT_CONTRACT.packageVersion) {
-            errors.push(
-                `Command guard accepts ${SUPPORTED_SUBAGENT_CONTRACT.packageName}@${SUPPORTED_SUBAGENT_CONTRACT.packageVersion} but ${installedSubagents} is installed; every protected native child launch is denied until the pinned contract is revalidated.`,
-            );
-        } else {
-            subagentContractStatus = `${SUPPORTED_SUBAGENT_CONTRACT.packageName}@${installedSubagents} matches the pinned command-guard contract`;
-        }
-    } catch (error) {
-        warnings.push(`Could not verify the pinned native-child contract: ${error.message}`);
-    }
-
     let capabilityRegistry;
     try {
         capabilityRegistry = validateCapabilityRegistry(JSON.parse(fs.readFileSync(capabilityRegistryPath, "utf8")));
@@ -2012,48 +1788,6 @@ async function doctor() {
         if (!valid) {
             errors.push(
                 `${operation.userTunable ? "Invalid user-tunable setting" : "Setting drift"}: ${operation.path.join(".")}`,
-            );
-        }
-    }
-
-    try {
-        const profiles = readProviderProfiles(agentDir);
-        const allow = settings?.subagents?.modelScope?.allow;
-        const inferred =
-            Array.isArray(allow) && allow.length === 1 && typeof allow[0] === "string" && allow[0].endsWith("/*")
-                ? allow[0].slice(0, -2)
-                : undefined;
-        const profile = inferred && profiles.providers[inferred];
-        if (profile) {
-            for (const [role, fields] of Object.entries(profile.roles)) {
-                const mirror = settings?.subagents?.agentOverrides?.[role];
-                if (mirror?.model !== fields.model || mirror?.thinking !== fields.thinking) {
-                    errors.push(`Active settings mirror differs from saved provider profile: ${inferred}/${role}`);
-                }
-            }
-        }
-    } catch (error) {
-        errors.push(`Provider profiles invalid: ${error.message}`);
-    }
-
-    try {
-        const leases = readProviderLeases(agentDir).leases;
-        if (new Set(leases.map((lease) => lease.provider)).size > 1) {
-            errors.push("Provider leases contain conflicting exact providers.");
-        }
-    } catch (error) {
-        errors.push(`Provider leases invalid: ${error.message}`);
-    }
-
-    const subagentConfig = readJson(subagentConfigPath, {});
-    for (const operation of desiredSubagentConfigOperations()) {
-        const current = readPath(subagentConfig, operation.path);
-        const valid = operation.userTunable
-            ? current.exists && (!operation.validate || operation.validate(current.value))
-            : current.exists && deepEqual(current.value, operation.value);
-        if (!valid) {
-            errors.push(
-                `${operation.userTunable ? "Invalid user-tunable subagent config" : "Subagent config drift"}: ${operation.path.join(".")}`,
             );
         }
     }
@@ -2144,10 +1878,6 @@ async function doctor() {
         console.log(
             `POWERSHELL WindowsPowerShell=${powershellStatus.windowsPowerShell || "unavailable"} PowerShell7=${powershellStatus.powerShell7 || "unavailable"}`,
         );
-    }
-
-    if (subagentContractStatus) {
-        console.log(`SUBAGENT CONTRACT ${subagentContractStatus}`);
     }
 
     if (browserSmoke) {

@@ -2,56 +2,9 @@
   "theme": "tea-house",
   "packages": [
     "npm:pi-web-access@0.25.0",
-    "npm:pi-subagents@0.58.0",
     "npm:@juicesharp/rpiv-ask-user-question@2.7.1",
     "npm:@llblab/pi-codex-usage@0.9.3",
     "npm:@tunnckocore/pi-gpt-fast-mode@0.4.0",
     "npm:@narumitw/pi-goal@0.54.3"
-  ],
-  "subagents": {
-    "defaultThinking": "medium",
-    "defaultExtensions": [
-      "__ZENPI_COMMAND_GUARD_EXTENSION__"
-    ],
-    "maxThinking": "high",
-    "modelScope": {
-      "enforce": true,
-      "strict": true,
-      "allow": [
-        "inherit"
-      ]
-    },
-    "agentOverrides": {
-      "codex-exec": {
-        "disabled": true
-      },
-      "codex-exec-writer": {
-        "disabled": true
-      },
-      "scout": {
-        "model": "inherit",
-        "thinking": "low"
-      },
-      "researcher": {
-        "model": "inherit",
-        "thinking": "medium",
-        "extensions": [
-          "__PI_WEB_ACCESS_EXTENSION__",
-          "__ZENPI_COMMAND_GUARD_EXTENSION__"
-        ]
-      },
-      "worker": {
-        "model": "inherit",
-        "thinking": "medium"
-      },
-      "reviewer": {
-        "model": "inherit",
-        "thinking": "high"
-      },
-      "oracle": {
-        "model": "inherit",
-        "thinking": "high"
-      }
-    }
-  }
+  ]
 }

@@ -1,8 +1,6 @@
 import registerCommandGuard from "../../extensions/command-guard/index.ts";
-import { bindingForChild } from "../../extensions/command-guard/core.mjs";
-
 type Harness = ReturnType<typeof createHarness>;
-function createHarness(decisions: string[], child = false) {
+function createHarness(decisions: string[]) {
     const events = new Map<string, any[]>();
     const commands = new Map<string, any>();
     let prompts = 0;
@@ -45,33 +43,7 @@ function createHarness(decisions: string[], child = false) {
     }
 
     async function startup() {
-        const previousChild = process.env.PI_SUBAGENT_CHILD;
-        const previousBindings = process.env.PI_SUBAGENT_EXTENSION_BINDINGS;
-        if (child) {
-            process.env.PI_SUBAGENT_CHILD = "1";
-            process.env.PI_SUBAGENT_EXTENSION_BINDINGS = JSON.stringify({
-                "zenpi.command-guard/1": bindingForChild("strict", "approval_child"),
-            });
-        } else {
-            delete process.env.PI_SUBAGENT_CHILD;
-            delete process.env.PI_SUBAGENT_EXTENSION_BINDINGS;
-        }
-
-        try {
-            return await emit("session_start", { reason: "startup" });
-        } finally {
-            if (previousChild === undefined) {
-                delete process.env.PI_SUBAGENT_CHILD;
-            } else {
-                process.env.PI_SUBAGENT_CHILD = previousChild;
-            }
-
-            if (previousBindings === undefined) {
-                delete process.env.PI_SUBAGENT_EXTENSION_BINDINGS;
-            } else {
-                process.env.PI_SUBAGENT_EXTENSION_BINDINGS = previousBindings;
-            }
-        }
+        return emit("session_start", { reason: "startup" });
     }
 
     return {
@@ -112,13 +84,6 @@ await lock.call("rm -rf /");
 await lock.commands.get("guard").handler("unlock", lock.ctx);
 const afterUnlock = await lock.call(command);
 
-const parent: Harness = createHarness(["Allow exact call for session"]);
-await parent.startup();
-await parent.call(command);
-const child: Harness = createHarness(["Deny (Recommended)"], true);
-await child.startup();
-const childRepeat = await child.call(command);
-
 const concurrent: Harness = createHarness(["Allow exact call for session", "Deny (Recommended)"]);
 await concurrent.startup();
 const [concurrentAllowed, concurrentDenied] = await Promise.all([concurrent.call(command), concurrent.call(command)]);
@@ -129,7 +94,6 @@ process.stdout.write(
         restartClears: afterRestart?.block === true && restarted.prompts() === 2,
         offClears: afterOff?.block === true && off.prompts() === 2,
         lockAndUnlockClear: afterUnlock?.block === true && lock.prompts() === 2,
-        childIsolated: childRepeat?.block === true && child.prompts() === 1,
         concurrentIsolated: !concurrentAllowed?.block && concurrentDenied?.block === true && concurrent.prompts() === 2,
     })}\n`,
 );

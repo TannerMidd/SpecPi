@@ -23,7 +23,6 @@ test("agent-private state is identified by location, not by name appearing in a 
             "zenpi/manifest.json",
             "zenpi/backups/001.json",
             "zenpi/wishlist/state.json",
-            "zenpi/subagent-provider-profiles.json",
             "auth.json",
             "sessions/abc.json",
             "history.db",
