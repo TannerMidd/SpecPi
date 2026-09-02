@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
-  <title id="title">ZenPi</title>
+  <title id="title">SpecPi</title>
   <desc id="desc">A warm Pi glyph on a dark Tea House background</desc>
   <rect width="128" height="128" rx="24" fill="#171310"/>
   <circle cx="64" cy="64" r="50" fill="#1e1914" stroke="#4a4438" stroke-width="2"/>

@@ -18,7 +18,7 @@ function createHarness(decisions: string[]) {
         hasUI: true,
         ui: {
             async select(title: string) {
-                if (title === "ZenPi command guard") {
+                if (title === "SpecPi command guard") {
                     return "Strict";
                 }
 

@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#121519">
-  <meta name="description" content="ZenPi installation, command, workflow, browser, and security reference.">
-  <meta property="og:title" content="ZenPi reference">
-  <meta property="og:description" content="Technical documentation for the ZenPi coding-agent harness.">
+  <meta name="description" content="SpecPi installation, command, workflow, browser, and security reference.">
+  <meta property="og:title" content="SpecPi reference">
+  <meta property="og:description" content="Technical documentation for the SpecPi coding-agent harness.">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="ZenPi">
-  <meta property="og:url" content="https://tannermidd.github.io/ZenPi/wiki/">
+  <meta property="og:site_name" content="SpecPi">
+  <meta property="og:url" content="https://tannermidd.github.io/SpecPi/wiki/">
   <meta name="twitter:card" content="summary">
-  <link rel="canonical" href="https://tannermidd.github.io/ZenPi/wiki/">
-  <title>ZenPi reference</title>
+  <link rel="canonical" href="https://tannermidd.github.io/SpecPi/wiki/">
+  <title>SpecPi reference</title>
   <link rel="icon" href="../logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="../wiki.css">
@@ -21,16 +21,16 @@
   <a class="skip-link" href="#overview">Skip to documentation</a>
 
   <header class="site-header">
-    <a class="brand" href="../" aria-label="ZenPi home">
+    <a class="brand" href="../" aria-label="SpecPi home">
       <span class="brand-mark" aria-hidden="true">π</span>
-      <strong>ZenPi</strong>
+      <strong>SpecPi</strong>
       <span class="brand-separator">/</span>
       <span>v0.8.4</span>
     </a>
     <nav class="header-nav" aria-label="Primary navigation">
       <a href="../">Overview</a>
       <a class="active" href="./" aria-current="page">Wiki</a>
-      <a href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
+      <a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
 
@@ -60,19 +60,19 @@
 
       <section class="doc-section" id="getting-started" aria-labelledby="install-doc-title">
         <header><span>01</span><h2 id="install-doc-title">Install</h2></header>
-        <p>Requirements: Node.js 22.19 or newer, npm, and Git. ZenPi uses Pi 0.84.4 or newer. If Pi is missing, the confirmed install adds the reviewed pinned Pi package. Uninstalling ZenPi leaves that package installed.</p>
+        <p>Requirements: Node.js 22.19 or newer, npm, and Git. SpecPi uses Pi 0.84.4 or newer. If Pi is missing, the confirmed install adds the reviewed pinned Pi package. Uninstalling SpecPi leaves that package installed.</p>
         <div class="terminal doc-terminal">
           <div class="terminal-bar"><span>Clone a reviewed release</span><span>v0.8.4</span></div>
-          <pre><code>git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
-cd ZenPi</code></pre>
+          <pre><code>git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/SpecPi.git
+cd SpecPi</code></pre>
           <div class="terminal-bar secondary"><span>Windows · PowerShell / cmd</span></div>
-          <pre><code>.\zenpi.cmd plan
-.\zenpi.cmd install
-.\zenpi.cmd doctor</code></pre>
+          <pre><code>.\specpi.cmd plan
+.\specpi.cmd install
+.\specpi.cmd doctor</code></pre>
           <div class="terminal-bar secondary"><span>Linux · macOS · Git Bash</span></div>
-          <pre><code>./zenpi plan
-./zenpi install
-./zenpi doctor</code></pre>
+          <pre><code>./specpi plan
+./specpi install
+./specpi doctor</code></pre>
         </div>
         <div class="definition-list">
           <div><code>plan</code><span>Prints intended changes without mutating the system.</span></div>
@@ -86,8 +86,8 @@ cd ZenPi</code></pre>
       <section class="doc-section" id="first-session" aria-labelledby="first-session-title">
         <header><span>02</span><h2 id="first-session-title">First session</h2></header>
         <ol class="step-list">
-          <li><span>1</span><p><strong>Reload Pi.</strong> Run <code>/reload</code> so Pi loads ZenPi's extensions, skills, theme, and managed settings.</p></li>
-          <li><span>2</span><p><strong>Enter focused mode.</strong> Run <code>/zen</code> to switch to the focused execution surface. Run it again to leave.</p></li>
+          <li><span>1</span><p><strong>Reload Pi.</strong> Run <code>/reload</code> so Pi loads SpecPi's extensions, skills, theme, and managed settings.</p></li>
+          <li><span>2</span><p><strong>Enter focused mode.</strong> Run <code>/spec</code> to switch to the focused execution surface. Run it again to leave.</p></li>
           <li><span>3</span><p><strong>Choose collection.</strong> The wishlist asks once whether capability-gap collection is enabled. Reports are local, sanitized, bounded, and deduplicated by task.</p></li>
         </ol>
         <p class="doc-boundary"><strong>No automatic implementation.</strong> Evidence can qualify an item, but only a selection in <code>/harness-improvement</code> authorizes a change.</p>
@@ -106,7 +106,7 @@ cd ZenPi</code></pre>
 
       <section class="doc-section" id="work-ownership" aria-labelledby="ownership-title">
         <header><span>04</span><h2 id="ownership-title">Work ownership</h2></header>
-        <p>ZenPi keeps implementation in one accountable working context. Scope, experiment, and challenge controls make path expectations and review evidence visible.</p>
+        <p>SpecPi keeps implementation in one accountable working context. Scope, experiment, and challenge controls make path expectations and review evidence visible.</p>
         <div class="definition-list wide-keys">
           <div><code>/scope set</code><span>Declares expected paths. Headless and shell-detected drift remains advisory and pending until acknowledged.</span></div>
           <div><code>/scope accept</code><span>Acknowledges one finding without changing the declared contract. Use <code>/scope add</code> to widen the contract.</span></div>
@@ -146,7 +146,7 @@ cd ZenPi</code></pre>
       <section class="doc-section" id="reference" aria-labelledby="commands-title">
         <header><span>07</span><h2 id="commands-title">Commands</h2></header>
         <div class="definition-list command-reference">
-          <div><code>/zen [on|off|status]</code><span>Toggle or inspect focused execution mode.</span></div>
+          <div><code>/spec [on|off|status]</code><span>Toggle or inspect focused execution mode.</span></div>
           <div><code>/files [path]</code><span>Open the file browser at the repository root or a selected path.</span></div>
           <div><code>/scope [set|add|accept|...]</code><span>Declare expected paths and review scope drift.</span></div>
           <div><code>/experiment [start|close|...]</code><span>Manage detached worktree experiments.</span></div>
@@ -160,18 +160,18 @@ cd ZenPi</code></pre>
 
       <section class="doc-section" id="configuration" aria-labelledby="configuration-title">
         <header><span>08</span><h2 id="configuration-title">Configuration</h2></header>
-        <p>The installer merges documented settings paths and preserves unrelated configuration. ZenPi manages global instructions and shell integration only inside marked blocks. Plan output is non-mutating. Install, update, and uninstall require confirmation unless <code>--yes</code> is supplied.</p>
+        <p>The installer merges documented settings paths and preserves unrelated configuration. SpecPi manages global instructions and shell integration only inside marked blocks. Plan output is non-mutating. Install, update, and uninstall require confirmation unless <code>--yes</code> is supplied.</p>
       </section>
 
       <section class="doc-section" id="security" aria-labelledby="security-title">
         <header><span>09</span><h2 id="security-title">Security</h2></header>
         <div class="security-list">
-          <p><strong>Local state.</strong> Wishlist reports, journals, experiment metadata, and exported patches stay in private local ZenPi state. Review local artifacts before sharing.</p>
-          <p><strong>No persisted command text.</strong> ZenPi does not read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current session.</p>
-          <p><strong>Explicit authority.</strong> Improving ZenPi, installing software, and publishing require approval.</p>
+          <p><strong>Local state.</strong> Wishlist reports, journals, experiment metadata, and exported patches stay in private local SpecPi state. Review local artifacts before sharing.</p>
+          <p><strong>No persisted command text.</strong> SpecPi does not read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current session.</p>
+          <p><strong>Explicit authority.</strong> Improving SpecPi, installing software, and publishing require approval.</p>
           <p><strong>Bounded guard.</strong> Direct shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside guard scope.</p>
         </div>
-        <p class="muted">Pi extensions run with user permissions. Use OS permissions, a least-privilege account, a container, or a VM for hostile code or data. Read the <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY_MODEL.md">security model <span aria-hidden="true">↗</span></a>.</p>
+        <p class="muted">Pi extensions run with user permissions. Use OS permissions, a least-privilege account, a container, or a VM for hostile code or data. Read the <a class="text-link" href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md">security model <span aria-hidden="true">↗</span></a>.</p>
       </section>
 
       <section class="doc-section" id="development" aria-labelledby="development-title">
@@ -185,11 +185,11 @@ npm run check</code></pre>
       </section>
 
       <footer>
-        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>ZenPi</span></a>
+        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>SpecPi</span></a>
         <div>
           <a href="../">Overview</a>
-          <a href="https://github.com/TannerMidd/ZenPi">Source</a>
-          <a href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Security</a>
+          <a href="https://github.com/TannerMidd/SpecPi">Source</a>
+          <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a>
         </div>
       </footer>
     </main>

@@ -1,16 +1,16 @@
 {
-  "name": "zenpi",
+  "name": "specpi",
   "version": "0.8.4",
   "description": "An explicit, privacy-conscious, self-improving harness for the Pi coding agent",
   "author": "Tanner Middleton",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TannerMidd/ZenPi.git"
+    "url": "git+https://github.com/TannerMidd/SpecPi.git"
   },
   "bugs": {
-    "url": "https://github.com/TannerMidd/ZenPi/issues"
+    "url": "https://github.com/TannerMidd/SpecPi/issues"
   },
-  "homepage": "https://github.com/TannerMidd/ZenPi#readme",
+  "homepage": "https://github.com/TannerMidd/SpecPi#readme",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -19,11 +19,11 @@
     "agent-harness"
   ],
   "bin": {
-    "zenpi": "./scripts/zenpi.mjs"
+    "specpi": "./scripts/specpi.mjs"
   },
   "files": [
-    "zenpi",
-    "zenpi.cmd",
+    "specpi",
+    "specpi.cmd",
     "scripts",
     "browser-runtime",
     "templates",
@@ -61,7 +61,7 @@
     "test": "node --test",
     "format": "prettier --write \"**/*.{js,mjs,ts,tsx}\" && eslint . --fix --rule \"@stylistic/max-statements-per-line: off\" && prettier --write \"**/*.{js,mjs,ts,tsx}\" && eslint . --fix",
     "format:check": "prettier --check \"**/*.{js,mjs,ts,tsx}\" && eslint .",
-    "check": "npm run format:check && node --check scripts/zenpi.mjs && node --check scripts/lib.mjs && node --check scripts/lock.mjs && node --check extensions/zen/core.mjs && node --experimental-strip-types --check extensions/command-guard/index.ts && node --check extensions/command-guard/core.mjs && node --check extensions/command-guard/rules.mjs && node --check extensions/command-guard/bash.mjs && node --check extensions/command-guard/powershell.mjs && node --check extensions/command-guard/cmd.mjs && node --check extensions/command-guard/paths.mjs && node --check extensions/command-guard/redact.mjs && node --check extensions/command-guard/managed-files.mjs && node --check extensions/command-guard/smoke.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/tool-wishlist/validators.mjs && node --experimental-strip-types --check extensions/tool-wishlist/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --experimental-strip-types --check extensions/workflow-controls/index.ts && node --check extensions/workflow-controls/scope.mjs && node --check extensions/workflow-controls/experiments.mjs && node --check extensions/workflow-controls/challenge.mjs && node --check extensions/workflow-controls/smoke.mjs && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
+    "check": "npm run format:check && node --check scripts/specpi.mjs && node --check scripts/lib.mjs && node --check scripts/lock.mjs && node --check extensions/spec/core.mjs && node --experimental-strip-types --check extensions/command-guard/index.ts && node --check extensions/command-guard/core.mjs && node --check extensions/command-guard/rules.mjs && node --check extensions/command-guard/bash.mjs && node --check extensions/command-guard/powershell.mjs && node --check extensions/command-guard/cmd.mjs && node --check extensions/command-guard/paths.mjs && node --check extensions/command-guard/redact.mjs && node --check extensions/command-guard/managed-files.mjs && node --check extensions/command-guard/smoke.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/tool-wishlist/validators.mjs && node --experimental-strip-types --check extensions/tool-wishlist/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --experimental-strip-types --check extensions/workflow-controls/index.ts && node --check extensions/workflow-controls/scope.mjs && node --check extensions/workflow-controls/experiments.mjs && node --check extensions/workflow-controls/challenge.mjs && node --check extensions/workflow-controls/smoke.mjs && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",

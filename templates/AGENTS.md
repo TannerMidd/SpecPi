@@ -1,4 +1,4 @@
-## ZenPi Working Agreement
+## SpecPi Working Agreement
 
 - Prefer direct execution for small, well-scoped tasks; do not add workflow ceremony without a concrete benefit.
 - Ask concise, decision-oriented questions when material requirements are ambiguous instead of guessing.
@@ -10,14 +10,14 @@
 - Keep one writer per shared working directory. Use `/experiment` or another isolated worktree for intentional parallel writers, and open the separate session yourself.
 - When `/scope` is active, treat outside-scope findings as pending until the human allows once, acknowledges them with `/scope accept`, expands the declared scope with `/scope add`, or clears it; never describe observed drift as accepted scope, and never assume an acknowledged path was added to the contract.
 - Use `/challenge` for material completion review when its adversarial checklist provides concrete value; its readiness card supports human review but is not independent proof.
-- Never launch `codex-exec` or `codex-exec-writer`; ZenPi disables these external subscription runners.
+- Never launch `codex-exec` or `codex-exec-writer`; SpecPi disables these external subscription runners.
 - Treat command-guard denials as hard runtime constraints: use the stated safer alternative or ask the user; never obfuscate, split, encode, or reroute a denied operation to evade protection.
 - When Command Guard is active, prefer direct tool calls and simple, explicit commands. Avoid unnecessary command substitution, process substitution, stdin-driven `xargs`, compound shell programs, inline interpreter code, and executable heredocs because opaque forms require approval. When complexity is genuinely required, keep it transparent and request approval rather than restructuring it to bypass protection.
 - For material changes, run the narrowest relevant checks, inspect the final diff, and use fresh read-only review when risk warrants it.
 - Never claim completion from plausibility alone. Report commands run, validation results, and residual risks.
-- Treat wishlist observations as leads, not permission to edit. Start only from an exact `/harness-improvement` menu choice, use the `zenpi-improve` skill, and retire through its verification gate only after direct evidence passes.
+- Treat wishlist observations as leads, not permission to edit. Start only from an exact `/harness-improvement` menu choice, use the `specpi-improve` skill, and retire through its verification gate only after direct evidence passes.
 - Do not commit, push, publish, deploy, or alter remote state unless the user explicitly requests it.
 - Prefer Pi web tools for ordinary research. Use the DonSeTch skill for whole-site crawling, bot walls, JavaScript-heavy extraction, or focused probes.
-- Use ZenPi browser tools to validate rendered web interfaces at relevant desktop, tablet, and mobile viewports; source review and HTTP checks are not proof of visual correctness.
+- Use SpecPi browser tools to validate rendered web interfaces at relevant desktop, tablet, and mobile viewports; source review and HTTP checks are not proof of visual correctness.
 - Create or replace visual baselines only when explicitly requested, and report current, baseline, and diff artifact paths for regression comparisons.
 - Keep final responses concise and identify changed files clearly.

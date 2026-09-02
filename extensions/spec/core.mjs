@@ -13,7 +13,7 @@ function safeDetail(value) {
         .toUpperCase();
 }
 
-export function describeZenPhase(phase) {
+export function describeSpecPhase(phase) {
     const fixed = PHASES.get(phase);
     if (fixed) {
         return { ...fixed, detail: "" };
@@ -30,13 +30,13 @@ export function describeZenPhase(phase) {
     return { index: "02", label: "ANALYZE", detail: safeDetail(phase) };
 }
 
-export function transformZenMarkdown(markdown, context, enabled) {
+export function transformSpecMarkdown(markdown, context, enabled) {
     if (!enabled) {
         return markdown;
     }
 
     if (context.messageType === "assistant-thinking") {
-        return "> **01 / REASONING** · working trace sealed in Zen mode";
+        return "> **01 / REASONING** · working trace sealed in Spec mode";
     }
 
     if (context.messageType === "assistant" && context.isStreaming) {

@@ -1,4 +1,4 @@
-# ZenPi Workflow Controls Plan
+# SpecPi Workflow Controls Plan
 
 ## Objective
 
@@ -16,9 +16,9 @@ The features should strengthen focus, experimentation, and verification without 
 - Human choices authorize scope expansion, worktree destruction, patch replacement, and completion disposition.
 - A warning is not proof, and a model-authored challenge result is not independent verification.
 - Keep state local, bounded, private, and reconstructable without reading Pi credentials, provider state, unrelated sessions, or history.
-- Use one writer per worktree. ZenPi creates experiment space but never launches a child agent or parallel writer.
+- Use one writer per worktree. SpecPi creates experiment space but never launches a child agent or parallel writer.
 - Use Git through fixed argv arrays with `pi.exec`; never construct shell command strings from user input.
-- Preserve unrelated tools and UI state, compose with `/zen` and Command Guard, and fail closed only where an operation would otherwise become destructive or ambiguous.
+- Preserve unrelated tools and UI state, compose with `/spec` and Command Guard, and fail closed only where an operation would otherwise become destructive or ambiguous.
 - Do not commit, merge, apply patches, push, publish, or change remotes.
 
 ## User-facing contract
@@ -54,7 +54,7 @@ Behavior:
 - Do not classify pre-existing dirty files as new drift until their observed fingerprint changes after scope activation.
 - Post-hoc detections remain pending until `/scope accept`, `/scope add`, `/scope remove`, or `/scope clear`; never expand scope automatically. `/scope accept` acknowledges one finding and leaves the declared contract untouched; only `/scope add` widens it. `/scope recheck` re-baselines the worktree and is the only way to clear snapshot uncertainty.
 - Scope state is session-branch state persisted with `pi.appendEntry`, not a project file. Restore only from the active branch.
-- Emit bounded internal events so `/zen` can display `scope: clean` or `scope: review` without taking ownership of scope state.
+- Emit bounded internal events so `/spec` can display `scope: clean` or `scope: review` without taking ownership of scope state.
 
 ### Guided Experiment Worktrees
 
@@ -77,12 +77,12 @@ Start flow:
    - non-goals.
 3. Inspect repository status. If the base worktree is dirty, explain that the experiment starts from `HEAD` and excludes uncommitted changes; require explicit confirmation or cancel. Never stash or commit those changes.
 4. Preview the detached-worktree path, base commit, and all state to be written.
-5. After confirmation, create a detached worktree with `git worktree add --detach <path> <commit>` under ZenPi's private experiment root.
+5. After confirmation, create a detached worktree with `git worktree add --detach <path> <commit>` under SpecPi's private experiment root.
 6. Record a bounded private registry entry and print exact instructions for opening a separate human-controlled Pi session in that path. Do not launch Pi or another process automatically.
 
 Registry contract:
 
-- Store under `<agent-dir>/zenpi/experiments/` with mode `0700` directories and `0600` files.
+- Store under `<agent-dir>/specpi/experiments/` with mode `0700` directories and `0600` files.
 - Use a schema-validated, atomic registry plus a dedicated ownership-checked lock.
 - Store only: random ID, sanitized name, canonical repository/worktree paths, base commit, bounded hypothesis/acceptance/non-goals, lifecycle state, and timestamps.
 - Use prepared/active/closing transaction states so interrupted creation or removal can be diagnosed.
@@ -139,7 +139,7 @@ Behavior:
 - Return `terminate: true` so the structured challenge card is the final output of that turn.
 - Persist only the bounded structured result in the current session branch and render it with a custom entry renderer. Do not write a global completion log.
 - `/challenge status` renders the latest active-branch challenge. `/challenge clear` clears active challenge state but does not delete prior session entries.
-- Never intercept ordinary final answers or force a challenge on every task. Future `/zen finish` integration is explicitly out of scope for this change.
+- Never intercept ordinary final answers or force a challenge on every task. Future `/spec finish` integration is explicitly out of scope for this change.
 
 ## Architecture
 
@@ -176,11 +176,11 @@ Implementation boundaries:
 - Do not copy Command Guard's shell parser into workflow-controls. Shell/custom-tool drift is detected from before/after Git evidence.
 - Worktree lifecycle Git commands originate from explicit extension commands and must have their own exact human confirmations because extension-internal `pi.exec` calls are outside model tool-call interception.
 
-### With `/zen`
+### With `/spec`
 
 - Workflow-controls owns scope/challenge state.
-- Publish only summarized status through `pi.events`; `/zen` may display it but must not duplicate or persist it.
-- Do not replace `/zen`'s header, working indicator, or tool-collapse restoration.
+- Publish only summarized status through `pi.events`; `/spec` may display it but must not duplicate or persist it.
+- Do not replace `/spec`'s header, working indicator, or tool-collapse restoration.
 
 ### Between the three features
 
@@ -207,7 +207,7 @@ Implementation boundaries:
 - [x] Add direct `write`/`edit` preflight choices without interfering with Command Guard decisions.
 - [x] Add concurrent-safe before/after Git snapshots around tool execution.
 - [x] Surface post-hoc shell/custom-tool drift in UI and next-turn context without raw command persistence.
-- [x] Add active-branch restoration, `/scope accept`, clear behavior, and Zen status events.
+- [x] Add active-branch restoration, `/scope accept`, clear behavior, and Spec status events.
 - [x] Build an extension harness covering TUI, headless advisory behavior, parallel tool IDs, session resume, and Command Guard composition.
 
 ### Phase 3 — Guided Experiment Worktrees
@@ -277,7 +277,7 @@ Implementation boundaries:
 ### Composition
 
 - Scope prompting and Command Guard approval do not grant each other approvals or alter lock state.
-- `/zen` UI restoration remains intact with workflow status active.
+- `/spec` UI restoration remains intact with workflow status active.
 - Completion Challenge reads scope/experiment summaries but cannot mutate them.
 - Experiment commands cannot run concurrently against the same registry record.
 
@@ -319,11 +319,11 @@ Read-only review after implementation found and fixed the following before relea
 
 ## Explicit non-goals
 
-- Full focus-contract implementation or `/zen finish` integration.
+- Full focus-contract implementation or `/spec finish` integration.
 - Autonomous task completion detection or interception of every final answer.
 - Automatic scope expansion, automatic reversion of outside-scope changes, or a general filesystem sandbox.
 - Launching agents, terminals, or background workers inside experiment worktrees.
 - Automatic commits, branches, merges, rebases, patch application, pushes, or remote changes.
 - Container or VM isolation.
-- Persisting raw shell commands, prompts, tool output, source content, or session history in ZenPi state.
+- Persisting raw shell commands, prompts, tool output, source content, or session history in SpecPi state.
 - Replacing Command Guard's security policy with the Scope Drift Monitor.

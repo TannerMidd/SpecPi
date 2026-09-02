@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#121519">
-  <meta name="description" content="ZenPi records recurring Pi capability gaps and supports explicitly approved, verified improvements.">
-  <meta property="og:title" content="ZenPi">
+  <meta name="description" content="SpecPi records recurring Pi capability gaps and supports explicitly approved, verified improvements.">
+  <meta property="og:title" content="SpecPi">
   <meta property="og:description" content="A local, human-directed improvement harness for the Pi coding agent.">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="ZenPi">
-  <meta property="og:url" content="https://tannermidd.github.io/ZenPi/">
+  <meta property="og:site_name" content="SpecPi">
+  <meta property="og:url" content="https://tannermidd.github.io/SpecPi/">
   <meta name="twitter:card" content="summary">
-  <link rel="canonical" href="https://tannermidd.github.io/ZenPi/">
-  <title>ZenPi</title>
+  <link rel="canonical" href="https://tannermidd.github.io/SpecPi/">
+  <title>SpecPi</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="cycle.js"></script>
@@ -21,16 +21,16 @@
   <a class="skip-link" href="#overview">Skip to content</a>
 
   <header class="site-header">
-    <a class="brand" href="#overview" aria-label="ZenPi home">
+    <a class="brand" href="#overview" aria-label="SpecPi home">
       <span class="brand-mark" aria-hidden="true">π</span>
-      <strong>ZenPi</strong>
+      <strong>SpecPi</strong>
       <span class="brand-separator">/</span>
       <span>v0.8.4</span>
     </a>
     <nav class="header-nav" aria-label="Primary navigation">
       <a class="active" href="#overview" aria-current="page">Overview</a>
       <a href="wiki/">Wiki</a>
-      <a href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
+      <a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
 
@@ -55,15 +55,15 @@
       <section class="hero" id="overview" aria-labelledby="hero-title">
         <p class="eyebrow">Self-improving harness for the Pi coding agent</p>
         <h1 id="hero-title">Let friction teach<br>the system.</h1>
-        <p class="hero-summary">ZenPi records capability gaps, measures recurrence across tasks and projects, and presents one bounded improvement for approval.</p>
+        <p class="hero-summary">SpecPi records capability gaps, measures recurrence across tasks and projects, and presents one bounded improvement for approval.</p>
         <p class="hero-boundary">Collection is disabled by default. Reports stay local. Improvements require explicit approval.</p>
         <div class="hero-actions">
-          <a class="button primary" href="#install">Install ZenPi</a>
+          <a class="button primary" href="#install">Install SpecPi</a>
           <a class="button" href="#session">View one session</a>
         </div>
       </section>
 
-      <dl class="facts" aria-label="ZenPi operating constraints">
+      <dl class="facts" aria-label="SpecPi operating constraints">
         <div><dt>Collection</dt><dd>off until enabled</dd></div>
         <div><dt>Storage</dt><dd>local only</dd></div>
         <div><dt>Authority</dt><dd>one human choice</dd></div>
@@ -83,7 +83,7 @@
           <div role="row"><span role="cell">01</span><strong role="cell">Friction</strong><span role="cell">A task encounters a missing local capability.</span><span role="cell">one local signal</span></div>
           <div role="row"><span role="cell">02</span><strong role="cell">Repeat</strong><span role="cell">Distinct tasks and projects establish recurrence.</span><span role="cell">recurrence · reach</span></div>
           <div class="gate" role="row"><span role="cell">03</span><strong role="cell">Choose</strong><span role="cell"><code>/harness-improvement</code> selects one exact item.</span><span role="cell">◆ human gate</span></div>
-          <div role="row"><span role="cell">04</span><strong role="cell">Build</strong><span role="cell"><code>zenpi-improve</code> implements the narrowest sufficient change.</span><span role="cell">approved scope</span></div>
+          <div role="row"><span role="cell">04</span><strong role="cell">Build</strong><span role="cell"><code>specpi-improve</code> implements the narrowest sufficient change.</span><span role="cell">approved scope</span></div>
           <div class="gate" role="row"><span role="cell">05</span><strong role="cell">Prove</strong><span role="cell">Repository checks and closed offline validators run.</span><span role="cell">◆ automated gate</span></div>
           <div role="row"><span role="cell">06</span><strong role="cell">Retire</strong><span role="cell">The journal records evidence, gates, changed files, and version.</span><span role="cell">only on pass</span></div>
           <div role="row"><span role="cell">07</span><strong role="cell">Return</strong><span role="cell">Later friction returns the item to the review menu.</span><span role="cell">human review</span></div>
@@ -118,7 +118,7 @@
   select one to authorize › <span class="bright">1</span>
 
   authorized   local-browser-automation
-  skill        zenpi-improve
+  skill        specpi-improve
   scope        extensions/browser/**, capability registry
   this choice covers no other work
 
@@ -132,7 +132,7 @@
         <div class="command-cards">
           <div><code>/wishlist status</code><p>Queue size, retirements, reopen rate, and time to retire.</p></div>
           <div><code>/wishlist history</code><p>Evidence, gates, changed files, and rollback context.</p></div>
-          <div><code>zenpi doctor</code><p>Runs the validators linked to retired capabilities.</p></div>
+          <div><code>specpi doctor</code><p>Runs the validators linked to retired capabilities.</p></div>
         </div>
       </section>
 
@@ -173,10 +173,10 @@
         </header>
         <div class="writer-layout">
           <div>
-            <p>ZenPi does not install a subagent orchestration layer. A parent agent decides what context a child receives and summarizes the result. Either handoff can omit a material constraint.</p>
+            <p>SpecPi does not install a subagent orchestration layer. A parent agent decides what context a child receives and summarizes the result. Either handoff can omit a material constraint.</p>
             <p>Parallel writers also create conflicting assumptions and increase review work.</p>
             <p>Keep one writer in each working directory. For an independent review or trial, <code>/experiment start</code> creates a detached worktree that you open in a separate Pi session.</p>
-            <p class="muted">Independent agents can still be useful. ZenPi keeps their context, ownership, and output explicit.</p>
+            <p class="muted">Independent agents can still be useful. SpecPi keeps their context, ownership, and output explicit.</p>
           </div>
           <div class="ownership-cards">
             <p>Workflow controls</p>
@@ -197,25 +197,25 @@
 
         <div class="terminal install-terminal">
           <div class="terminal-bar"><span>Linux · macOS · Git Bash</span><span>v0.8.4</span></div>
-          <pre><code>git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
-cd ZenPi
-./zenpi plan      <span class="comment"># preview changes</span>
-./zenpi install   <span class="comment"># confirm before mutation</span>
-./zenpi doctor    <span class="comment"># verify managed state and validators</span></code></pre>
+          <pre><code>git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/SpecPi.git
+cd SpecPi
+./specpi plan      <span class="comment"># preview changes</span>
+./specpi install   <span class="comment"># confirm before mutation</span>
+./specpi doctor    <span class="comment"># verify managed state and validators</span></code></pre>
           <div class="terminal-bar secondary"><span>Windows · PowerShell / cmd</span></div>
-          <pre><code>.\zenpi.cmd plan
-.\zenpi.cmd install
-.\zenpi.cmd doctor</code></pre>
+          <pre><code>.\specpi.cmd plan
+.\specpi.cmd install
+.\specpi.cmd doctor</code></pre>
         </div>
-        <p class="section-note">After installation, run <code>/reload</code> in Pi. ZenPi backs up managed files before mutation and supports uninstall.</p>
+        <p class="section-note">After installation, run <code>/reload</code> in Pi. SpecPi backs up managed files before mutation and supports uninstall.</p>
       </section>
 
       <footer>
-        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>ZenPi</span></a>
+        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>SpecPi</span></a>
         <div>
-          <a href="https://github.com/TannerMidd/ZenPi">Source</a>
-          <a href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Security</a>
-          <a href="https://github.com/TannerMidd/ZenPi/blob/main/LICENSE">MIT</a>
+          <a href="https://github.com/TannerMidd/SpecPi">Source</a>
+          <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a>
+          <a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
         </div>
       </footer>
     </main>

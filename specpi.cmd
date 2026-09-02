@@ -1,4 +1,4 @@
 @echo off
 setlocal
-node "%~dp0scripts\zenpi.mjs" %*
+node "%~dp0scripts\specpi.mjs" %*
 exit /b %ERRORLEVEL%

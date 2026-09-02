@@ -414,7 +414,7 @@ export function formatReviewMessage(relativePath, startLine, endLine, selectedTe
     const fence = "`".repeat(longestFence);
     const truncated = safeSelection.length > MAX_REVIEW_CHARS;
     const excerpt = truncated
-        ? `${safeSelection.slice(0, MAX_REVIEW_CHARS)}\n… [selection truncated by ZenPi]`
+        ? `${safeSelection.slice(0, MAX_REVIEW_CHARS)}\n… [selection truncated by SpecPi]`
         : safeSelection;
     const safeComment = sanitizeTerminalText(comment, { preserveNewlines: true }).trim();
 

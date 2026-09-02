@@ -9,7 +9,7 @@ function assertSafeLockPath(agentDir, lockPath) {
     while (current !== root) {
         try {
             if (fs.lstatSync(current).isSymbolicLink()) {
-                throw new Error(`ZenPi refuses a symlinked lock parent: ${current}`);
+                throw new Error(`SpecPi refuses a symlinked lock parent: ${current}`);
             }
         } catch (error) {
             if (error.code !== "ENOENT") {
@@ -19,7 +19,7 @@ function assertSafeLockPath(agentDir, lockPath) {
 
         const parent = path.dirname(current);
         if (parent === current) {
-            throw new Error(`ZenPi lock path escapes the agent directory: ${lockPath}`);
+            throw new Error(`SpecPi lock path escapes the agent directory: ${lockPath}`);
         }
 
         current = parent;
@@ -27,7 +27,7 @@ function assertSafeLockPath(agentDir, lockPath) {
 
     try {
         if (fs.lstatSync(lockPath).isSymbolicLink()) {
-            throw new Error(`ZenPi refuses a symlinked lock target: ${lockPath}`);
+            throw new Error(`SpecPi refuses a symlinked lock target: ${lockPath}`);
         }
     } catch (error) {
         if (error.code !== "ENOENT") {
@@ -50,9 +50,9 @@ function processState(pid) {
     }
 }
 
-export function acquireZenPiLock(agentDir) {
+export function acquireSpecPiLock(agentDir) {
     const root = path.resolve(agentDir);
-    const stateDir = path.join(root, "zenpi");
+    const stateDir = path.join(root, "specpi");
     const lockPath = path.join(stateDir, "install.lock");
     assertSafeLockPath(root, lockPath);
     fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
@@ -75,7 +75,7 @@ export function acquireZenPiLock(agentDir) {
             try {
                 parsed = JSON.parse(raw);
             } catch {
-                throw new Error(`ZenPi lock is malformed and was not reclaimed: ${lockPath}`);
+                throw new Error(`SpecPi lock is malformed and was not reclaimed: ${lockPath}`);
             }
 
             if (
@@ -87,18 +87,18 @@ export function acquireZenPiLock(agentDir) {
                 typeof parsed.token !== "string" ||
                 !parsed.token
             ) {
-                throw new Error(`ZenPi lock is malformed and was not reclaimed: ${lockPath}`);
+                throw new Error(`SpecPi lock is malformed and was not reclaimed: ${lockPath}`);
             }
 
             pid = parsed.pid;
         }
 
         if (processState(pid) === "active") {
-            throw new Error(`Another ZenPi operation appears active: ${lockPath}`);
+            throw new Error(`Another SpecPi operation appears active: ${lockPath}`);
         }
 
         if (fs.readFileSync(lockPath, "utf8").trim() !== raw) {
-            throw new Error(`ZenPi lock changed during recovery and was not reclaimed: ${lockPath}`);
+            throw new Error(`SpecPi lock changed during recovery and was not reclaimed: ${lockPath}`);
         }
 
         fs.rmSync(lockPath);

@@ -1,14 +1,14 @@
 /**
- * Zen - focused execution mode for Pi.
+ * Spec - focused execution mode for Pi.
  *
- * Zen mode is deliberately visible and behavioral:
+ * Spec mode is deliberately visible and behavioral:
  * - a persistent specification panel and reduced footer replace normal chrome;
  * - live reasoning and answer streams become stable placeholders until completion;
  * - tool output stays collapsed and routine narration is suppressed;
  * - each model turn receives quiet, evidence-led execution guidance;
  * - disabling the mode restores the normal interface and transcript rendering.
  *
- * Toggle with /zen or Ctrl+Alt+Z.
+ * Toggle with /spec or Ctrl+Alt+Z.
  */
 
 import fs from "node:fs";
@@ -17,15 +17,15 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { describeZenPhase, transformZenMarkdown } from "./zen/core.mjs";
+import { describeSpecPhase, transformSpecMarkdown } from "./spec/core.mjs";
 
-const zenPiAgentDir = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
-const zenPiStateDir = path.join(zenPiAgentDir, "zenpi");
-const zenPiManagedBin = path.join(zenPiStateDir, "bin");
+const specPiAgentDir = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
+const specPiStateDir = path.join(specPiAgentDir, "specpi");
+const specPiManagedBin = path.join(specPiStateDir, "bin");
 
-function hasValidatedZenPiTools(): boolean {
+function hasValidatedSpecPiTools(): boolean {
     try {
-        const manifest = JSON.parse(fs.readFileSync(path.join(zenPiStateDir, "manifest.json"), "utf8"));
+        const manifest = JSON.parse(fs.readFileSync(path.join(specPiStateDir, "manifest.json"), "utf8"));
         const records = manifest.managedOptionalTools || [];
         if (records.length === 0) {
             return false;
@@ -33,7 +33,7 @@ function hasValidatedZenPiTools(): boolean {
 
         const expectedNames = new Set<string>();
         for (const record of records) {
-            if (path.dirname(record.target) !== zenPiManagedBin) {
+            if (path.dirname(record.target) !== specPiManagedBin) {
                 return false;
             }
 
@@ -50,7 +50,7 @@ function hasValidatedZenPiTools(): boolean {
             expectedNames.add(path.basename(record.target));
         }
 
-        const actualNames = fs.readdirSync(zenPiManagedBin).filter((name) => !name.startsWith("."));
+        const actualNames = fs.readdirSync(specPiManagedBin).filter((name) => !name.startsWith("."));
 
         return actualNames.length === expectedNames.size && actualNames.every((name) => expectedNames.has(name));
     } catch {
@@ -60,18 +60,18 @@ function hasValidatedZenPiTools(): boolean {
 
 process.env.PATH = (process.env.PATH || "")
     .split(path.delimiter)
-    .filter((entry) => path.resolve(entry || ".").toLowerCase() !== path.resolve(zenPiManagedBin).toLowerCase())
+    .filter((entry) => path.resolve(entry || ".").toLowerCase() !== path.resolve(specPiManagedBin).toLowerCase())
     .join(path.delimiter);
-if (hasValidatedZenPiTools()) {
-    process.env.PATH = `${zenPiManagedBin}${path.delimiter}${process.env.PATH || ""}`;
+if (hasValidatedSpecPiTools()) {
+    process.env.PATH = `${specPiManagedBin}${path.delimiter}${process.env.PATH || ""}`;
 }
 
-type ZenPhase = "ready" | "thinking" | "reasoning" | "synthesizing" | `using ${string}` | `${string} failed`;
+type SpecPhase = "ready" | "thinking" | "reasoning" | "synthesizing" | `using ${string}` | `${string} failed`;
 
-const ZEN_STATE_ENTRY = "zen-mode";
-const ZEN_SYSTEM_GUIDANCE = `
+const SPEC_STATE_ENTRY = "spec-mode";
+const SPEC_SYSTEM_GUIDANCE = `
 
-[ZEN MODE — SPEC EXECUTION]
+[SPEC MODE — SPEC EXECUTION]
 Operate as a quiet technical instrument on one objective.
 - Inspect relevant state before changing it.
 - Prefer the smallest coherent change; avoid unrelated additions and cleanup.
@@ -115,7 +115,7 @@ function countLabel(value: number, unit: string): string {
 
 export default function (pi: ExtensionAPI) {
     let enabled = false;
-    let phase: ZenPhase = "ready";
+    let phase: SpecPhase = "ready";
     let turnCount = 0;
     let toolCount = 0;
     let workflowScope: { active: boolean; pending: number; indeterminate: boolean } = {
@@ -124,7 +124,7 @@ export default function (pi: ExtensionAPI) {
         indeterminate: false,
     };
     let toolsWereExpanded: boolean | undefined;
-    let requestZenRender: (() => void) | undefined;
+    let requestSpecRender: (() => void) | undefined;
 
     const updateActivity = (ctx: ExtensionContext) => {
         if (!enabled) {
@@ -132,14 +132,14 @@ export default function (pi: ExtensionAPI) {
         }
 
         const theme = ctx.ui.theme;
-        const state = describeZenPhase(phase);
+        const state = describeSpecPhase(phase);
         const detail = state.detail ? ` · ${state.detail}` : "";
         ctx.ui.setStatus(
-            "zen-mode",
+            "spec-mode",
             `${theme.fg("accent", theme.bold("π SPEC"))}${theme.fg("dim", ` · ${state.index} / ${state.label}${detail}`)}`,
         );
         ctx.ui.setWorkingMessage(`${state.index} / ${state.label}${detail}`);
-        requestZenRender?.();
+        requestSpecRender?.();
     };
 
     const applyMode = (ctx: ExtensionContext) => {
@@ -162,7 +162,7 @@ export default function (pi: ExtensionAPI) {
                 if (width < 44) {
                     return [
                         renderEdge("┌", "┐", "─ π / SPEC ", width, (text) => theme.fg("borderAccent", text)),
-                        truncateToWidth(theme.fg("dim", "ZENPI · QUIET TECHNICAL EXECUTION"), width, ""),
+                        truncateToWidth(theme.fg("dim", "SPECPI · QUIET TECHNICAL EXECUTION"), width, ""),
                         renderEdge("└", "┘", "─ 00 ", width, (text) => theme.fg("borderMuted", text)),
                     ];
                 }
@@ -172,10 +172,10 @@ export default function (pi: ExtensionAPI) {
                     `${theme.fg("borderMuted", "│")} ${splitLine(left, right, innerWidth)} ${theme.fg("borderMuted", "│")}`;
 
                 return [
-                    renderEdge("┌", "┐", "─ π  ZENPI / SPEC EXECUTION ", width, (text) =>
+                    renderEdge("┌", "┐", "─ π  SPECPI / SPEC EXECUTION ", width, (text) =>
                         theme.fg("borderAccent", text),
                     ),
-                    row(theme.fg("text", theme.bold("SYSTEM  ZENPI")), theme.fg("dim", "MODE  FOCUSED")),
+                    row(theme.fg("text", theme.bold("SYSTEM  SPECPI")), theme.fg("dim", "MODE  FOCUSED")),
                     row(theme.fg("muted", "STREAM  HELD UNTIL COMPLETE"), theme.fg("dim", "TOOLS  COLLAPSED")),
                     renderEdge("└", "┘", "─ HUMAN-DIRECTED · EVIDENCE-LED ", width, (text) =>
                         theme.fg("borderMuted", text),
@@ -191,7 +191,7 @@ export default function (pi: ExtensionAPI) {
                 dispose: unsubscribe,
                 invalidate() {},
                 render(width: number): string[] {
-                    const state = describeZenPhase(phase);
+                    const state = describeSpecPhase(phase);
                     const detail = state.detail ? ` · ${state.detail}` : "";
                     const usage = ctx.getContextUsage();
                     const context =
@@ -208,19 +208,19 @@ export default function (pi: ExtensionAPI) {
             };
         });
 
-        ctx.ui.setWidget("zen-mode", (tui, theme) => {
+        ctx.ui.setWidget("spec-mode", (tui, theme) => {
             const renderNow = () => tui.requestRender();
-            requestZenRender = renderNow;
+            requestSpecRender = renderNow;
 
             return {
                 dispose() {
-                    if (requestZenRender === renderNow) {
-                        requestZenRender = undefined;
+                    if (requestSpecRender === renderNow) {
+                        requestSpecRender = undefined;
                     }
                 },
                 invalidate() {},
                 render(width: number): string[] {
-                    const state = describeZenPhase(phase);
+                    const state = describeSpecPhase(phase);
                     const detail = state.detail ? ` · ${state.detail}` : "";
                     const phaseText = `${state.index} / ${state.label}${detail}`;
                     const run = `${countLabel(turnCount, "T")} · ${countLabel(toolCount, "X")}`;
@@ -235,7 +235,7 @@ export default function (pi: ExtensionAPI) {
                             renderEdge("┌", "┐", "─ ACTIVE SPEC ", width, (text) => theme.fg("borderAccent", text)),
                             truncateToWidth(theme.fg("accent", phaseText), width, ""),
                             truncateToWidth(theme.fg("dim", `${run} · SCOPE ${scope} · OUTPUT HELD`), width, ""),
-                            renderEdge("└", "┘", "─ /zen exits ", width, (text) => theme.fg("borderMuted", text)),
+                            renderEdge("└", "┘", "─ /spec exits ", width, (text) => theme.fg("borderMuted", text)),
                         ];
                     }
 
@@ -264,9 +264,9 @@ export default function (pi: ExtensionAPI) {
     };
 
     const clearMode = (ctx: ExtensionContext) => {
-        requestZenRender = undefined;
-        ctx.ui.setStatus("zen-mode", undefined);
-        ctx.ui.setWidget("zen-mode", undefined);
+        requestSpecRender = undefined;
+        ctx.ui.setStatus("spec-mode", undefined);
+        ctx.ui.setWidget("spec-mode", undefined);
         ctx.ui.setFooter(undefined);
         ctx.ui.setWorkingIndicator();
         ctx.ui.setWorkingMessage();
@@ -281,12 +281,12 @@ export default function (pi: ExtensionAPI) {
     };
 
     const persistMode = () => {
-        pi.appendEntry(ZEN_STATE_ENTRY, { enabled, toolsWereExpanded });
+        pi.appendEntry(SPEC_STATE_ENTRY, { enabled, toolsWereExpanded });
     };
 
     const setMode = (next: boolean, ctx: ExtensionContext, persist = true) => {
         if (enabled === next) {
-            ctx.ui.notify(`Zen mode is already ${enabled ? "on" : "off"}.`, "info");
+            ctx.ui.notify(`Spec mode is already ${enabled ? "on" : "off"}.`, "info");
 
             return;
         }
@@ -298,7 +298,7 @@ export default function (pi: ExtensionAPI) {
             ctx.ui.notify("SPEC MODE / ACTIVE · live response held · tools collapsed", "info");
         } else {
             clearMode(ctx);
-            ctx.ui.notify("Zen mode disabled. Previous interface restored.", "info");
+            ctx.ui.notify("Spec mode disabled. Previous interface restored.", "info");
         }
 
         if (persist) {
@@ -308,7 +308,7 @@ export default function (pi: ExtensionAPI) {
 
     const toggleMode = (ctx: ExtensionContext) => setMode(!enabled, ctx);
 
-    pi.registerMarkdownTransformer((markdown, context) => transformZenMarkdown(markdown, context, enabled));
+    pi.registerMarkdownTransformer((markdown, context) => transformSpecMarkdown(markdown, context, enabled));
 
     pi.on("session_start", async (_event, ctx) => {
         enabled = false;
@@ -317,10 +317,10 @@ export default function (pi: ExtensionAPI) {
         toolCount = 0;
         workflowScope = { active: false, pending: 0, indeterminate: false };
         toolsWereExpanded = undefined;
-        requestZenRender = undefined;
+        requestSpecRender = undefined;
 
         for (const entry of ctx.sessionManager.getBranch()) {
-            if (entry.type === "custom" && entry.customType === ZEN_STATE_ENTRY) {
+            if (entry.type === "custom" && entry.customType === SPEC_STATE_ENTRY) {
                 const state = entry.data as { enabled?: boolean; toolsWereExpanded?: boolean } | undefined;
                 enabled = Boolean(state?.enabled);
                 toolsWereExpanded = state?.toolsWereExpanded;
@@ -332,20 +332,20 @@ export default function (pi: ExtensionAPI) {
         }
     });
 
-    pi.events.on("zenpi:workflow-status", (state: any) => {
+    pi.events.on("specpi:workflow-status", (state: any) => {
         workflowScope = {
             active: state?.active === true,
             pending: Number.isInteger(state?.pending) ? Math.max(0, state.pending) : 0,
             indeterminate: state?.indeterminate === true,
         };
-        requestZenRender?.();
+        requestSpecRender?.();
     });
 
     pi.on("session_shutdown", (_event, ctx) => {
         if (enabled) {
             clearMode(ctx);
         } else {
-            requestZenRender = undefined;
+            requestSpecRender = undefined;
         }
     });
 
@@ -398,14 +398,14 @@ export default function (pi: ExtensionAPI) {
     });
 
     pi.on("before_agent_start", async (event) => {
-        if (!enabled || event.systemPrompt.includes("[ZEN MODE — SPEC EXECUTION]")) {
+        if (!enabled || event.systemPrompt.includes("[SPEC MODE — SPEC EXECUTION]")) {
             return;
         }
 
-        return { systemPrompt: `${event.systemPrompt}${ZEN_SYSTEM_GUIDANCE}` };
+        return { systemPrompt: `${event.systemPrompt}${SPEC_SYSTEM_GUIDANCE}` };
     });
 
-    pi.registerCommand("zen", {
+    pi.registerCommand("spec", {
         description: "Toggle immersive spec execution (held live stream, collapsed tools, reduced chrome)",
         getArgumentCompletions: (prefix: string) => {
             const options = ["on", "off", "status"];
@@ -434,24 +434,24 @@ export default function (pi: ExtensionAPI) {
             }
 
             if (action === "status") {
-                const state = describeZenPhase(phase);
+                const state = describeSpecPhase(phase);
                 const detail = state.detail ? ` · ${state.detail}` : "";
                 ctx.ui.notify(
                     enabled
                         ? `SPEC MODE / ACTIVE · ${state.index} / ${state.label}${detail} · ${countLabel(turnCount, "T")} · ${countLabel(toolCount, "X")}`
-                        : "Zen mode is off.",
+                        : "Spec mode is off.",
                     "info",
                 );
 
                 return;
             }
 
-            ctx.ui.notify("Usage: /zen [on|off|status]", "error");
+            ctx.ui.notify("Usage: /spec [on|off|status]", "error");
         },
     });
 
     pi.registerShortcut(Key.ctrlAlt("z"), {
-        description: "Toggle Zen focused execution mode",
+        description: "Toggle Spec focused execution mode",
         handler: async (ctx) => toggleMode(ctx),
     });
 }

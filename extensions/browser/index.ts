@@ -22,7 +22,7 @@ import {
 } from "./core.mjs";
 
 const agentDir = getAgentDir(import.meta.url);
-const runtimeDir = path.join(agentDir, "zenpi", "browser-runtime");
+const runtimeDir = path.join(agentDir, "specpi", "browser-runtime");
 const deterministicStyle = `
 *, *::before, *::after {
   animation-delay: 0s !important;
@@ -53,7 +53,7 @@ const FillParams = Type.Object({
 });
 const ScreenshotParams = Type.Object({
     path: Type.Optional(
-        Type.String({ description: "Optional output path. Defaults to ZenPi's browser artifact directory." }),
+        Type.String({ description: "Optional output path. Defaults to SpecPi's browser artifact directory." }),
     ),
     overwrite: Type.Optional(Type.Boolean({ description: "Must be true to replace an existing explicit output." })),
     fullPage: Type.Optional(Type.Boolean()),
@@ -295,12 +295,12 @@ export default function browserExtension(pi: ExtensionAPI) {
 
     function targetLocator(page: any, target: string) {
         const value = target.trim();
-        if (value.startsWith("@zen-")) {
+        if (value.startsWith("@spec-")) {
             if (!state.acceptedRefs.has(value)) {
                 throw new Error(`Unknown or stale browser snapshot ref: ${value}`);
             }
 
-            return page.locator(`[data-zenpi-ref="${value.slice(1)}"]`);
+            return page.locator(`[data-specpi-ref="${value.slice(1)}"]`);
         }
 
         if (value.startsWith("text=")) {
@@ -323,7 +323,7 @@ export default function browserExtension(pi: ExtensionAPI) {
         name: "browser_open",
         label: "Browser Open",
         description:
-            "Open an HTTP(S) page in ZenPi's fresh isolated Chromium context. Use this for rendered local web QA.",
+            "Open an HTTP(S) page in SpecPi's fresh isolated Chromium context. Use this for rendered local web QA.",
         promptSnippet: "Open local or remote web pages in an isolated browser for rendered validation",
         promptGuidelines: ["Use browser_open and browser_snapshot before claiming a web UI renders correctly."],
         parameters: OpenParams,
@@ -383,9 +383,9 @@ export default function browserExtension(pi: ExtensionAPI) {
                     page.evaluate(
                         ({ namespace, bodyLimit, priorRefs }: any) => {
                             const prior = new Set(priorRefs);
-                            document.querySelectorAll("[data-zenpi-ref]").forEach((element) => {
-                                if (prior.has(element.getAttribute("data-zenpi-ref"))) {
-                                    element.removeAttribute("data-zenpi-ref");
+                            document.querySelectorAll("[data-specpi-ref]").forEach((element) => {
+                                if (prior.has(element.getAttribute("data-specpi-ref"))) {
+                                    element.removeAttribute("data-specpi-ref");
                                 }
                             });
                             const clean = (value: unknown, limit: number) => {
@@ -422,8 +422,8 @@ export default function browserExtension(pi: ExtensionAPI) {
                             const controls = Array.from(document.querySelectorAll(selectors))
                                 .slice(0, 100)
                                 .map((element, index) => {
-                                    const ref = `zen-${namespace}-${index + 1}`;
-                                    element.setAttribute("data-zenpi-ref", ref);
+                                    const ref = `spec-${namespace}-${index + 1}`;
+                                    element.setAttribute("data-specpi-ref", ref);
                                     const html = element as HTMLElement;
                                     const input = element as HTMLInputElement;
 
@@ -710,12 +710,12 @@ export default function browserExtension(pi: ExtensionAPI) {
     register({
         name: "browser_close",
         label: "Browser Close",
-        description: "Close ZenPi's isolated browser and discard its temporary context, cookies, and storage.",
+        description: "Close SpecPi's isolated browser and discard its temporary context, cookies, and storage.",
         parameters: Type.Object({}),
         async execute() {
             await shutdownNow();
 
-            return { content: [{ type: "text", text: "Closed the isolated ZenPi browser context." }], details: {} };
+            return { content: [{ type: "text", text: "Closed the isolated SpecPi browser context." }], details: {} };
         },
     });
 

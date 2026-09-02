@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 360" role="img" aria-labelledby="loop-title loop-desc">
-  <title id="loop-title">ZenPi human-directed improvement loop</title>
-  <desc id="loop-desc">Local friction becomes qualified evidence. A person chooses one exact improvement, ZenPi builds the smallest change, and proof retires it. Failed proof remains selected, while later evidence returns retired work to human review.</desc>
+  <title id="loop-title">SpecPi human-directed improvement loop</title>
+  <desc id="loop-desc">Local friction becomes qualified evidence. A person chooses one exact improvement, SpecPi builds the smallest change, and proof retires it. Failed proof remains selected, while later evidence returns retired work to human review.</desc>
   <defs>
     <marker id="arrow-tea" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M0 0 10 5 0 10z" fill="#c4a06a"/>

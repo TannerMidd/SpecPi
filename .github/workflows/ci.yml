@@ -32,11 +32,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $env:ZENPI_TEST_GIT_BASH = Join-Path $env:ProgramFiles "Git\bin\bash.exe"
-          if (-not (Test-Path $env:ZENPI_TEST_GIT_BASH)) { throw "Git Bash is required for the Windows command-guard matrix" }
-          $env:ZENPI_TEST_POWERSHELL_EXE = (Get-Command powershell.exe).Source
+          $env:SPECPI_TEST_GIT_BASH = Join-Path $env:ProgramFiles "Git\bin\bash.exe"
+          if (-not (Test-Path $env:SPECPI_TEST_GIT_BASH)) { throw "Git Bash is required for the Windows command-guard matrix" }
+          $env:SPECPI_TEST_POWERSHELL_EXE = (Get-Command powershell.exe).Source
           node tests/fixtures/command-guard-windows-runtime.mjs
-          $env:ZENPI_TEST_POWERSHELL_EXE = (Get-Command pwsh.exe).Source
+          $env:SPECPI_TEST_POWERSHELL_EXE = (Get-Command pwsh.exe).Source
           node tests/fixtures/command-guard-windows-runtime.mjs
           node --test tests/command-guard.test.mjs tests/command-guard-paths.test.mjs tests/command-guard-extension.test.mjs
       - name: Exercise Windows launcher and lifecycle shims
@@ -46,7 +46,7 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $env:NODE_OPTIONS = "--throw-deprecation"
 
-          $root = Join-Path $env:RUNNER_TEMP "zenpi-windows-smoke"
+          $root = Join-Path $env:RUNNER_TEMP "specpi-windows-smoke"
           $agentDir = Join-Path $root "agent"
           $fakeBin = Join-Path $root "bin"
           $log = Join-Path $root "pi.log"
@@ -57,23 +57,23 @@ jobs:
             echo 0.84.4
             exit /b 0
           )
-          echo %*>>"%ZENPI_FAKE_LOG%"
+          echo %*>>"%SPECPI_FAKE_LOG%"
           exit /b 0
           '@ | Set-Content (Join-Path $fakeBin "pi-template.cmd") -Encoding ascii
           "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "pi") -Encoding ascii
           @'
           @echo off
           if "%~1"=="install" if "%~2"=="--global" if "%~3"=="--ignore-scripts" (
-            echo npm %*>>"%ZENPI_FAKE_LOG%"
-            copy /y "%ZENPI_FAKE_BIN%\pi-template.cmd" "%ZENPI_FAKE_BIN%\pi.cmd" >nul
+            echo npm %*>>"%SPECPI_FAKE_LOG%"
+            copy /y "%SPECPI_FAKE_BIN%\pi-template.cmd" "%SPECPI_FAKE_BIN%\pi.cmd" >nul
             exit /b 0
           )
           if "%~1"=="install" if "%~2"=="--global" (
-            echo npm %*>>"%ZENPI_FAKE_LOG%"
-            echo @exit /b 0>"%ZENPI_FAKE_BIN%\donsetch.cmd"
+            echo npm %*>>"%SPECPI_FAKE_LOG%"
+            echo @exit /b 0>"%SPECPI_FAKE_BIN%\donsetch.cmd"
             exit /b 0
           )
-          node "%ZENPI_REPO%\tests\fixtures\fake-browser-npm.mjs" %*
+          node "%SPECPI_REPO%\tests\fixtures\fake-browser-npm.mjs" %*
           exit /b %ERRORLEVEL%
           '@ | Set-Content (Join-Path $fakeBin "npm.cmd") -Encoding ascii
           "#!/bin/sh`nexit 99" | Set-Content (Join-Path $fakeBin "npm") -Encoding ascii
@@ -81,29 +81,29 @@ jobs:
           $gitDir = Split-Path (Get-Command git).Source
           $env:PATH = "$fakeBin;$nodeDir;$gitDir;$env:SystemRoot\System32;$env:SystemRoot"
           $env:PI_CODING_AGENT_DIR = $agentDir
-          $env:ZENPI_FAKE_BIN = $fakeBin
-          $env:ZENPI_FAKE_LOG = $log
-          $env:ZENPI_REPO = (Get-Location).Path
-          .\zenpi.cmd plan --skip-package-install --skip-shell
-          .\zenpi.cmd install --yes --skip-shell
-          .\zenpi.cmd doctor
+          $env:SPECPI_FAKE_BIN = $fakeBin
+          $env:SPECPI_FAKE_LOG = $log
+          $env:SPECPI_REPO = (Get-Location).Path
+          .\specpi.cmd plan --skip-package-install --skip-shell
+          .\specpi.cmd install --yes --skip-shell
+          .\specpi.cmd doctor
 
           $settingsBefore = [IO.File]::ReadAllBytes((Join-Path $agentDir "settings.json"))
-          $manifestBefore = [IO.File]::ReadAllBytes((Join-Path $agentDir "zenpi\manifest.json"))
+          $manifestBefore = [IO.File]::ReadAllBytes((Join-Path $agentDir "specpi\manifest.json"))
           $guardBefore = @{}
           Get-ChildItem (Join-Path $agentDir "extensions\command-guard") -File | ForEach-Object { $guardBefore[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
-          $env:ZENPI_TESTING = "1"
-          $env:ZENPI_TEST_FAIL_POINT = "after-first-command-guard-file"
+          $env:SPECPI_TESTING = "1"
+          $env:SPECPI_TEST_FAIL_POINT = "after-first-command-guard-file"
           $PSNativeCommandUseErrorActionPreference = $false
-          .\zenpi.cmd update --yes --force --skip-package-install --skip-browser-install --skip-tool-install --skip-shell
+          .\specpi.cmd update --yes --force --skip-package-install --skip-browser-install --skip-tool-install --skip-shell
           if ($LASTEXITCODE -eq 0) { throw "Injected Windows update failure unexpectedly succeeded" }
           $PSNativeCommandUseErrorActionPreference = $true
-          Remove-Item Env:ZENPI_TEST_FAIL_POINT, Env:ZENPI_TESTING
+          Remove-Item Env:SPECPI_TEST_FAIL_POINT, Env:SPECPI_TESTING
           if ([Convert]::ToBase64String($settingsBefore) -ne [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $agentDir "settings.json")))) { throw "Settings were not rolled back byte-for-byte" }
-          if ([Convert]::ToBase64String($manifestBefore) -ne [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $agentDir "zenpi\manifest.json")))) { throw "Manifest was not rolled back byte-for-byte" }
+          if ([Convert]::ToBase64String($manifestBefore) -ne [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $agentDir "specpi\manifest.json")))) { throw "Manifest was not rolled back byte-for-byte" }
           Get-ChildItem (Join-Path $agentDir "extensions\command-guard") -File | ForEach-Object { if ($guardBefore[$_.Name] -ne (Get-FileHash $_.FullName -Algorithm SHA256).Hash) { throw "Guard file was not rolled back: $($_.Name)" } }
-          .\zenpi.cmd update --yes --skip-package-install --skip-browser-install --skip-tool-install --skip-shell
-          .\zenpi.cmd doctor
+          .\specpi.cmd update --yes --skip-package-install --skip-browser-install --skip-tool-install --skip-shell
+          .\specpi.cmd doctor
 
           $installCalls = @(Get-Content $log | Where-Object { $_ -match '^"?install"? ' })
           if ($installCalls.Count -ne 5) {
@@ -122,6 +122,6 @@ jobs:
             throw "Expected 1 optional tool install call, found $($toolCalls.Count)"
           }
 
-          .\zenpi.cmd uninstall --yes
+          .\specpi.cmd uninstall --yes
       - shell: pwsh
         run: git diff --check

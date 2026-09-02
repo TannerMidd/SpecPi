@@ -1,6 +1,6 @@
 {
 	"$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
-	"name": "zenpi-spec",
+	"name": "specpi-spec",
 	"vars": {
 		"blueprint": "#8FB6D9",
 		"blueprintBright": "#B8D4EC",

@@ -20,8 +20,8 @@ import {
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
-import { acquireZenPiLock } from "../scripts/lock.mjs";
-import { describeZenPhase, transformZenMarkdown } from "../extensions/zen/core.mjs";
+import { acquireSpecPiLock } from "../scripts/lock.mjs";
+import { describeSpecPhase, transformSpecMarkdown } from "../extensions/spec/core.mjs";
 import {
     assertDistinctPaths,
     comparePngBuffers,
@@ -54,7 +54,7 @@ import {
 } from "../scripts/lib.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const cli = path.join(repoRoot, "scripts", "zenpi.mjs");
+const cli = path.join(repoRoot, "scripts", "specpi.mjs");
 
 function invokeCli(agentDir, args, extraEnv = {}) {
     return spawnSync(process.execPath, [cli, ...args], {
@@ -67,7 +67,7 @@ function invokeCli(agentDir, args, extraEnv = {}) {
 function runCli(agentDir, ...args) {
     const result = invokeCli(agentDir, args);
     if (result.status !== 0) {
-        throw new Error(`zenpi ${args.join(" ")} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+        throw new Error(`specpi ${args.join(" ")} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
     }
 
     return result;
@@ -113,9 +113,9 @@ function installFakePi(fakeBin) {
         [
             'import fs from "node:fs";',
             "const args = process.argv.slice(2);",
-            'if (args[0] === "--version") { console.log(process.env.ZENPI_FAKE_PI_VERSION || "0.84.4"); process.exit(0); }',
-            'if (process.env.ZENPI_FAKE_LOG) { fs.appendFileSync(process.env.ZENPI_FAKE_LOG, `${args.join(" ")}\\n`); }',
-            'if (process.env.ZENPI_FAKE_PI_FAIL_PATTERN && args.join(" ").includes(process.env.ZENPI_FAKE_PI_FAIL_PATTERN)) { process.exit(9); }',
+            'if (args[0] === "--version") { console.log(process.env.SPECPI_FAKE_PI_VERSION || "0.84.4"); process.exit(0); }',
+            'if (process.env.SPECPI_FAKE_LOG) { fs.appendFileSync(process.env.SPECPI_FAKE_LOG, `${args.join(" ")}\\n`); }',
+            'if (process.env.SPECPI_FAKE_PI_FAIL_PATTERN && args.join(" ").includes(process.env.SPECPI_FAKE_PI_FAIL_PATTERN)) { process.exit(9); }',
         ].join("\n"),
     );
 }
@@ -150,12 +150,12 @@ function runWishlistExtensionHarness(agentDir) {
         throw new Error(`wishlist extension harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
     }
 
-    const marker = result.stdout.split("\n").find((line) => line.startsWith("ZENPI_WISHLIST_HARNESS="));
+    const marker = result.stdout.split("\n").find((line) => line.startsWith("SPECPI_WISHLIST_HARNESS="));
     if (!marker) {
         throw new Error(`wishlist extension harness result missing\n${result.stdout}`);
     }
 
-    return JSON.parse(marker.slice("ZENPI_WISHLIST_HARNESS=".length));
+    return JSON.parse(marker.slice("SPECPI_WISHLIST_HARNESS=".length));
 }
 
 function runUiRefreshHarness() {
@@ -169,12 +169,12 @@ function runUiRefreshHarness() {
         throw new Error(`UI refresh harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
     }
 
-    const marker = result.stdout.split("\n").find((line) => line.startsWith("ZENPI_UI_REFRESH_HARNESS="));
+    const marker = result.stdout.split("\n").find((line) => line.startsWith("SPECPI_UI_REFRESH_HARNESS="));
     if (!marker) {
         throw new Error(`UI refresh harness result missing\n${result.stdout}`);
     }
 
-    return JSON.parse(marker.slice("ZENPI_UI_REFRESH_HARNESS=".length));
+    return JSON.parse(marker.slice("SPECPI_UI_REFRESH_HARNESS=".length));
 }
 
 function installFakeBrowserNpm(fakeBin) {
@@ -182,21 +182,21 @@ function installFakeBrowserNpm(fakeBin) {
     writeNodeCommand(fakeBin, "npm", source.replace(/^#!.*\n/u, ""));
 }
 
-test("Zen mode holds live prose behind a stable specification state", () => {
-    assert.deepEqual(describeZenPhase("ready"), { index: "00", label: "READY", detail: "" });
-    assert.deepEqual(describeZenPhase("using browser_open"), {
+test("Spec mode holds live prose behind a stable specification state", () => {
+    assert.deepEqual(describeSpecPhase("ready"), { index: "00", label: "READY", detail: "" });
+    assert.deepEqual(describeSpecPhase("using browser_open"), {
         index: "03",
         label: "TOOL",
         detail: "BROWSER_OPEN",
     });
-    assert.deepEqual(describeZenPhase("bash failed"), { index: "!!", label: "FAULT", detail: "BASH" });
-    assert.deepEqual(describeZenPhase("using unsafe\u001b[31mtool"), {
+    assert.deepEqual(describeSpecPhase("bash failed"), { index: "!!", label: "FAULT", detail: "BASH" });
+    assert.deepEqual(describeSpecPhase("using unsafe\u001b[31mtool"), {
         index: "03",
         label: "TOOL",
         detail: "UNSAFE-31MTOOL",
     });
 
-    const live = transformZenMarkdown(
+    const live = transformSpecMarkdown(
         "partial answer that keeps growing",
         {
             messageType: "assistant",
@@ -207,21 +207,21 @@ test("Zen mode holds live prose behind a stable specification state", () => {
     assert.equal(live, "> **04 / SYNTHESIS** · response held until complete");
     assert.doesNotMatch(live, /partial answer/);
     assert.equal(
-        transformZenMarkdown("private reasoning", { messageType: "assistant-thinking", isStreaming: false }, true),
-        "> **01 / REASONING** · working trace sealed in Zen mode",
+        transformSpecMarkdown("private reasoning", { messageType: "assistant-thinking", isStreaming: false }, true),
+        "> **01 / REASONING** · working trace sealed in Spec mode",
     );
     assert.equal(
-        transformZenMarkdown("final answer", { messageType: "assistant", isStreaming: false }, true),
+        transformSpecMarkdown("final answer", { messageType: "assistant", isStreaming: false }, true),
         "final answer",
     );
     assert.equal(
-        transformZenMarkdown("normal mode", { messageType: "assistant", isStreaming: true }, false),
+        transformSpecMarkdown("normal mode", { messageType: "assistant", isStreaming: true }, false),
         "normal mode",
     );
 });
 
-test("zenpi-spec defines the complete Pi theme surface from the site palette", () => {
-    const theme = JSON.parse(fs.readFileSync(path.join(repoRoot, "themes", "zenpi-spec.json"), "utf8"));
+test("specpi-spec defines the complete Pi theme surface from the site palette", () => {
+    const theme = JSON.parse(fs.readFileSync(path.join(repoRoot, "themes", "specpi-spec.json"), "utf8"));
     const expectedTokens = [
         "accent",
         "bashMode",
@@ -280,7 +280,7 @@ test("zenpi-spec defines the complete Pi theme surface from the site palette", (
         "warning",
     ];
 
-    assert.equal(theme.name, "zenpi-spec");
+    assert.equal(theme.name, "specpi-spec");
     assert.deepEqual(Object.keys(theme.colors).sort(), expectedTokens.sort());
     assert.equal(theme.vars.blueprint, "#8FB6D9");
     assert.equal(theme.vars.toolSuccessBg, "#192027");
@@ -297,7 +297,7 @@ test("zenpi-spec defines the complete Pi theme surface from the site palette", (
 
     assert.equal(
         JSON.parse(fs.readFileSync(path.join(repoRoot, "templates", "settings.json"), "utf8")).theme,
-        "zenpi-spec",
+        "specpi-spec",
     );
 });
 
@@ -334,16 +334,16 @@ test("path operations create, read, and prune empty parents", () => {
     assert.deepEqual(value, {});
 });
 
-test("shared ZenPi lock fails closed and release preserves a substituted lock", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-lock-"));
+test("shared SpecPi lock fails closed and release preserves a substituted lock", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-lock-"));
     const agentDir = path.join(root, "agent");
-    const lockPath = path.join(agentDir, "zenpi", "install.lock");
+    const lockPath = path.join(agentDir, "specpi", "install.lock");
     try {
         fs.mkdirSync(path.dirname(lockPath), { recursive: true });
         fs.writeFileSync(lockPath, "malformed\n");
-        assert.throws(() => acquireZenPiLock(agentDir), /malformed/);
+        assert.throws(() => acquireSpecPiLock(agentDir), /malformed/);
         fs.rmSync(lockPath);
-        const release = acquireZenPiLock(agentDir);
+        const release = acquireSpecPiLock(agentDir);
         fs.writeFileSync(lockPath, '{"pid":999999,"token":"replacement"}\n');
         release();
         assert.equal(fs.existsSync(lockPath), true);
@@ -358,18 +358,18 @@ test("UI prompt refresh flushes one immediate TUI frame and cleans up its invisi
     const result = runUiRefreshHarness();
     assert.deepEqual(result.eventNames, ["session_start", "ui_prompt_start", "session_shutdown"]);
     assert.deepEqual(result.widgetCalls, [
-        { key: "zenpi-ui-prompt-refresh", cleared: false },
-        { key: "zenpi-ui-prompt-refresh", cleared: true },
+        { key: "specpi-ui-prompt-refresh", cleared: false },
+        { key: "specpi-ui-prompt-refresh", cleared: true },
     ]);
     assert.equal(result.renderCount, 1);
 });
 
 test("platform launchers invoke Node directly", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-    const windowsLauncher = fs.readFileSync(path.join(repoRoot, "zenpi.cmd"), "utf8");
-    assert.equal(manifest.bin.zenpi, "./scripts/zenpi.mjs");
-    assert.match(windowsLauncher, /node "%~dp0scripts\\zenpi\.mjs" %\*/i);
-    assert.ok(fs.readFileSync(path.join(repoRoot, "zenpi"), "utf8").startsWith("#!/usr/bin/env sh\n"));
+    const windowsLauncher = fs.readFileSync(path.join(repoRoot, "specpi.cmd"), "utf8");
+    assert.equal(manifest.bin.specpi, "./scripts/specpi.mjs");
+    assert.match(windowsLauncher, /node "%~dp0scripts\\specpi\.mjs" %\*/i);
+    assert.ok(fs.readFileSync(path.join(repoRoot, "specpi"), "utf8").startsWith("#!/usr/bin/env sh\n"));
 });
 
 test("showcase site is self-contained and Pages-ready", () => {
@@ -422,8 +422,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /role="tablist" aria-label="Command guard modes"/);
     assert.equal(html.match(/data-guard-mode=/g)?.length, 3);
     assert.equal(html.match(/data-guard-verdict/g)?.length, 5);
-    assert.match(html, /\\zenpi\.cmd install/);
-    assert.match(html, /\.\/zenpi install/);
+    assert.match(html, /\\specpi\.cmd install/);
+    assert.match(html, /\.\/specpi install/);
     assert.match(html, /Collection is disabled by default/);
     assert.match(html, /One writer per working directory/);
     assert.match(css, /grid-template-columns: 13\.375rem minmax\(0, 1fr\)/);
@@ -447,7 +447,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(thirdParty, /IBM Plex Sans and IBM Plex Mono/);
     assert.match(thirdParty, /SIL Open Font License 1\.1/);
 
-    assert.match(readme, /tannermidd\.github\.io\/ZenPi\/wiki\//);
+    assert.match(readme, /tannermidd\.github\.io\/SpecPi\/wiki\//);
     assert.match(readme, /\/wishlist history \[gap-id\]/);
     assert.match(readme, /registry-linked validators/);
     assert.match(wikiHtml, /<html lang="en">/);
@@ -476,8 +476,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /\/harness-improvement/);
     assert.match(wikiHtml, /\/wishlist status/);
     assert.match(wikiHtml, /\/wishlist history \[gap-id\]/);
-    assert.match(wikiHtml, /\.\\zenpi\.cmd doctor/);
-    assert.match(wikiHtml, /\.\/zenpi doctor/);
+    assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
+    assert.match(wikiHtml, /\.\/specpi doctor/);
     assert.match(wikiHtml, /npm run check/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
     assert.match(wikiCss, /\.definition-list/);
@@ -557,7 +557,7 @@ test("capability keys and registry validation are exact", () => {
 });
 
 test("files core resolves paths, builds filtered trees, and formats bounded reviews", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-files-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-files-test-"));
     try {
         fs.mkdirSync(path.join(root, "src"));
         fs.writeFileSync(path.join(root, "src", "a.ts"), "const a = 1;\n");
@@ -611,7 +611,7 @@ test("files core resolves paths, builds filtered trees, and formats bounded revi
 });
 
 test("files keeps deleted Git files available as diff-only entries", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-files-deleted-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-files-deleted-"));
     try {
         const deleted = path.join(root, "deleted.txt");
         const secondDeleted = path.join(root, "second-deleted.txt");
@@ -624,7 +624,7 @@ test("files keeps deleted Git files available as diff-only entries", () => {
                 "-C",
                 root,
                 "-c",
-                "user.name=ZenPi Test",
+                "user.name=SpecPi Test",
                 "-c",
                 "user.email=test@example.invalid",
                 "commit",
@@ -711,7 +711,7 @@ test("browser PNG comparison reports exact pass and dimension mismatch", () => {
 });
 
 test("browser output helpers reject aliases and preserve existing files by default", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-browser-output-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-browser-output-"));
     const output = path.join(root, "capture.png");
     try {
         assert.throws(
@@ -743,8 +743,8 @@ test("browser output helpers reject aliases and preserve existing files by defau
 });
 
 test("tool wishlist deduplicates a gap per task and stores privacy-minimized metrics", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-test-"));
-    const stateDir = path.join(root, "zenpi");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-test-"));
+    const stateDir = path.join(root, "specpi");
     const gap = {
         capability: "Local audio transcription",
         scenario: "Interact with src/private/customer.ts in a dynamic web application\nwithout a browser interface",
@@ -811,8 +811,8 @@ test("tool wishlist deduplicates a gap per task and stores privacy-minimized met
 });
 
 test("wishlist aggregation ignores duplicate run records and malformed lines", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-refresh-test-"));
-    const stateDir = path.join(root, "zenpi");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-refresh-test-"));
+    const stateDir = path.join(root, "specpi");
     fs.mkdirSync(stateDir, { recursive: true });
     const event = {
         schema: 1,
@@ -999,7 +999,7 @@ test("wishlist ranking uses reach and recency after impact-weighted task evidenc
 });
 
 test("wishlist next requires qualified evidence and gives selected-state guidance", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-next-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-next-"));
     const gap = {
         capability: "Local audio transcription",
         scenario: "Transcribe a local recording",
@@ -1029,7 +1029,7 @@ test("wishlist next requires qualified evidence and gives selected-state guidanc
 });
 
 test("wishlist collection is fail-closed and explicit at the mutation boundary", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-consent-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-consent-"));
     const gap = {
         capability: "Local audio transcription",
         scenario: "Transcribe a local recording",
@@ -1067,7 +1067,7 @@ test("wishlist collection is fail-closed and explicit at the mutation boundary",
 });
 
 test("wishlist lifecycle requires evidence, captures regressions, and reopens explicitly", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-lifecycle-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-lifecycle-"));
     const gap = {
         capability: "Local audio transcription",
         scenario: "Transcribe a local recording",
@@ -1154,7 +1154,7 @@ test("wishlist lifecycle requires evidence, captures regressions, and reopens ex
 });
 
 test("wishlist aliases are exact and reversibly reference merge decisions", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-alias-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-alias-"));
     const gap = (capability) => ({
         capability,
         scenario: "Exercise a reusable workflow",
@@ -1200,7 +1200,7 @@ test("wishlist aliases are exact and reversibly reference merge decisions", asyn
 });
 
 test("merging an observed gap into a retired registry capability surfaces review without reopening", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-registry-merge-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-registry-merge-"));
     const gap = {
         capability: "Rendered page interaction",
         scenario: "Interact with a locally rendered page",
@@ -1228,7 +1228,7 @@ test("merging an observed gap into a retired registry capability surfaces review
 });
 
 test("wishlist issue drafts stay local and archives recover after a prepared operation failure", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-archive-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-archive-"));
     const gap = {
         capability: "Local audio transcription",
         scenario: "Transcribe a local recording at /private/customer.wav",
@@ -1263,7 +1263,7 @@ test("wishlist issue drafts stay local and archives recover after a prepared ope
 });
 
 test("wishlist extension runs the one-command improvement loop and preserves consent, drafts, reset, and checksums", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-extension-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-extension-"));
     try {
         const result = runWishlistExtensionHarness(path.join(root, "agent"));
         if (!result) {
@@ -1295,18 +1295,18 @@ test("wishlist extension runs the one-command improvement loop and preserves con
         assert.match(result.unauthorizedCompletion, /not authorized by \/harness-improvement in the current session/);
         assert.match(
             result.implementationStarted,
-            /Begin the selected ZenPi harness improvement: local-browser-automation/,
+            /Begin the selected SpecPi harness improvement: local-browser-automation/,
         );
         const commands = result.verificationCommands.map((item) => item.args);
         const validatorInvocation = [
             path.join(root, "agent", "project", "extensions", "tool-wishlist", "validators.mjs"),
             "browser-runtime-smoke",
             "--state-dir",
-            path.join(root, "agent", "zenpi"),
+            path.join(root, "agent", "specpi"),
             "--cwd",
             path.join(root, "agent", "project"),
             "--browser-runtime",
-            path.join(root, "agent", "zenpi", "browser-runtime"),
+            path.join(root, "agent", "specpi", "browser-runtime"),
         ];
         assert.equal(commands.length, 7);
         assert.deepEqual(commands.slice(0, 6), [
@@ -1334,7 +1334,7 @@ test("wishlist extension runs the one-command improvement loop and preserves con
             /Capability validator browser-runtime-smoke failed[\s\S]*validator exploded/,
         );
         assert.equal(result.selectedAfterFailedValidator, true);
-        assert.match(result.reopenPrompt, /Begin the selected ZenPi harness improvement: local-browser-automation/);
+        assert.match(result.reopenPrompt, /Begin the selected SpecPi harness improvement: local-browser-automation/);
         assert.match(
             result.reopenPrompt,
             /Original proof from the improvement journal:\n- Browser interaction and visual comparison smoke passed/,
@@ -1365,8 +1365,8 @@ test("wishlist extension runs the one-command improvement loop and preserves con
 });
 
 test("wishlist capacity refusal leaves existing data refreshable", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-capacity-test-"));
-    const stateDir = path.join(root, "zenpi");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-capacity-test-"));
+    const stateDir = path.join(root, "specpi");
     const gap = {
         capability: "Local audio transcription",
         scenario: "Exercise an interactive site",
@@ -1405,8 +1405,8 @@ test("wishlist capacity refusal leaves existing data refreshable", async () => {
 });
 
 test("wishlist never reclaims an unverified lock", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-lock-test-"));
-    const stateDir = path.join(root, "zenpi");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-lock-test-"));
+    const stateDir = path.join(root, "specpi");
     const lockDir = path.join(stateDir, ".tool-wishlist.lock");
     fs.mkdirSync(lockDir, { recursive: true });
     fs.writeFileSync(path.join(lockDir, "owner"), "another-process:token\n");
@@ -1423,8 +1423,8 @@ test("wishlist never reclaims an unverified lock", async () => {
 });
 
 test("wishlist release never removes a substituted lock", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-lock-replacement-test-"));
-    const stateDir = path.join(root, "zenpi");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-lock-replacement-test-"));
+    const stateDir = path.join(root, "specpi");
     const lockDir = path.join(stateDir, ".tool-wishlist.lock");
     const replacementMarker = path.join(lockDir, "replacement-owner");
     const gap = {
@@ -1457,7 +1457,7 @@ test("wishlist release never removes a substituted lock", async () => {
 });
 
 test("installer plan is non-mutating even when browser installation is planned", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-plan-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-plan-test-"));
     const agentDir = path.join(root, "agent");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.writeFileSync(path.join(agentDir, "settings.json"), '{"kept":true}\n');
@@ -1468,7 +1468,7 @@ test("installer plan is non-mutating even when browser installation is planned",
         assert.match(result.stdout, /Playwright 1\.62\.1 \+ matching managed Chromium/);
         assert.match(result.stdout, /salted task\/session\/project hashes/);
         assert.equal(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"), before);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
@@ -1479,19 +1479,19 @@ test("--yes installs each missing optional external tool", () => {
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-tools-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-optional-tools-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     const log = path.join(root, "tools.log");
     fs.mkdirSync(fakeBin, { recursive: true });
     writeExecutable(
         path.join(fakeBin, "npm"),
-        '#!/bin/sh\nprintf \'npm %s\\n\' "$*" >> "$ZENPI_FAKE_LOG"\nprintf \'#!/bin/sh\\nexit 0\\n\' > "$ZENPI_FAKE_BIN/donsetch"\n/bin/chmod 755 "$ZENPI_FAKE_BIN/donsetch"\n',
+        '#!/bin/sh\nprintf \'npm %s\\n\' "$*" >> "$SPECPI_FAKE_LOG"\nprintf \'#!/bin/sh\\nexit 0\\n\' > "$SPECPI_FAKE_BIN/donsetch"\n/bin/chmod 755 "$SPECPI_FAKE_BIN/donsetch"\n',
     );
     const env = {
         PATH: fakeBin,
-        ZENPI_FAKE_BIN: fakeBin,
-        ZENPI_FAKE_LOG: log,
+        SPECPI_FAKE_BIN: fakeBin,
+        SPECPI_FAKE_LOG: log,
     };
 
     try {
@@ -1509,7 +1509,7 @@ test("optional tool failures warn without blocking the core install", () => {
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-failure-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-optional-failure-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(fakeBin, { recursive: true });
@@ -1521,7 +1521,7 @@ test("optional tool failures warn without blocking the core install", () => {
         });
         assert.equal(result.status, 0, result.stderr);
         assert.match(result.stderr, /Optional tool DonSeTch failed to install/);
-        assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
+        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")));
         runCli(agentDir, "uninstall", "--yes");
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -1533,13 +1533,13 @@ test("later core failure reports external optional tools that remain installed",
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-optional-core-failure-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-optional-core-failure-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(fakeBin, { recursive: true });
     writeExecutable(
         path.join(fakeBin, "npm"),
-        '#!/bin/sh\nprintf \'#!/bin/sh\\nexit 0\\n\' > "$ZENPI_FAKE_BIN/donsetch"\n/bin/chmod 755 "$ZENPI_FAKE_BIN/donsetch"\n',
+        '#!/bin/sh\nprintf \'#!/bin/sh\\nexit 0\\n\' > "$SPECPI_FAKE_BIN/donsetch"\n/bin/chmod 755 "$SPECPI_FAKE_BIN/donsetch"\n',
     );
     writeExecutable(
         path.join(fakeBin, "pi"),
@@ -1549,28 +1549,28 @@ test("later core failure reports external optional tools that remain installed",
     try {
         const result = invokeCli(agentDir, ["install", "--yes", "--skip-browser-install", "--skip-shell"], {
             PATH: fakeBin,
-            ZENPI_FAKE_BIN: fakeBin,
+            SPECPI_FAKE_BIN: fakeBin,
         });
         assert.notEqual(result.status, 0);
         assert.match(result.stderr, /External optional tool changes were not rolled back: DonSeTch/);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
 
 test("uninstall moves modified managed tools outside the trusted bin", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-modified-tool-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-modified-tool-test-"));
     const agentDir = path.join(root, "agent");
     try {
         runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
-        const target = path.join(agentDir, "zenpi", "bin", "bat");
-        const marker = path.join(agentDir, "zenpi", "optional-tools", "bat.json");
+        const target = path.join(agentDir, "specpi", "bin", "bat");
+        const marker = path.join(agentDir, "specpi", "optional-tools", "bat.json");
         fs.mkdirSync(path.dirname(target), { recursive: true });
         fs.mkdirSync(path.dirname(marker), { recursive: true });
         fs.writeFileSync(target, "modified\n", { mode: 0o755 });
         fs.writeFileSync(marker, "{}\n");
-        const manifestPath = path.join(agentDir, "zenpi", "manifest.json");
+        const manifestPath = path.join(agentDir, "specpi", "manifest.json");
         const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
         manifest.managedOptionalTools = [
             {
@@ -1587,7 +1587,7 @@ test("uninstall moves modified managed tools outside the trusted bin", () => {
         const result = runCli(agentDir, "uninstall", "--yes");
         assert.match(result.stderr, /Moved modified managed optional tool outside trusted PATH/);
         assert.equal(fs.existsSync(target), false);
-        const preservedDir = path.join(agentDir, "zenpi", "preserved-modified-tools");
+        const preservedDir = path.join(agentDir, "specpi", "preserved-modified-tools");
         const preserved = fs.readdirSync(preservedDir);
         assert.equal(preserved.length, 1);
         assert.equal(fs.readFileSync(path.join(preservedDir, preserved[0]), "utf8"), "modified\n");
@@ -1601,16 +1601,16 @@ test("plan previews missing Pi bootstrap without invoking npm", () => {
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-plan-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-plan-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     const log = path.join(root, "npm.log");
     fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$ZENPI_FAKE_LOG\"\n");
+    writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$SPECPI_FAKE_LOG\"\n");
     try {
         const result = invokeCli(agentDir, ["plan", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], {
             PATH: fakeBin,
-            ZENPI_FAKE_LOG: log,
+            SPECPI_FAKE_LOG: log,
         });
         assert.equal(result.status, 0, result.stderr);
         assert.match(
@@ -1618,7 +1618,7 @@ test("plan previews missing Pi bootstrap without invoking npm", () => {
             /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.4 after confirmation/,
         );
         assert.equal(fs.existsSync(log), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
@@ -1629,19 +1629,19 @@ test("unconfirmed install never bootstraps missing Pi", () => {
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-decline-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-decline-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     const log = path.join(root, "npm.log");
     fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$ZENPI_FAKE_LOG\"\n");
+    writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$SPECPI_FAKE_LOG\"\n");
     try {
         const result = spawnSync(
             process.execPath,
             [cli, "install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
             {
                 cwd: repoRoot,
-                env: { ...process.env, PATH: fakeBin, ZENPI_FAKE_LOG: log, PI_CODING_AGENT_DIR: agentDir },
+                env: { ...process.env, PATH: fakeBin, SPECPI_FAKE_LOG: log, PI_CODING_AGENT_DIR: agentDir },
                 input: "n\n",
                 encoding: "utf8",
             },
@@ -1649,7 +1649,7 @@ test("unconfirmed install never bootstraps missing Pi", () => {
         assert.notEqual(result.status, 0);
         assert.match(result.stderr, /Confirmation requires a TTY/);
         assert.equal(fs.existsSync(log), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
@@ -1660,16 +1660,16 @@ test("installer bootstraps a missing pinned Pi after confirmation", () => {
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     const log = path.join(root, "bootstrap.log");
     fs.mkdirSync(fakeBin, { recursive: true });
     writeExecutable(
         path.join(fakeBin, "npm"),
-        '#!/bin/sh\nprintf \'npm %s\\n\' "$*" >> "$ZENPI_FAKE_LOG"\nprintf \'%s\\n\' \'#!/bin/sh\' \'if [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\' \'printf \'"\'"\'pi %s\\n\'"\'"\' "$*" >> "$ZENPI_FAKE_LOG"\' \'exit 0\' > "$ZENPI_FAKE_BIN/pi"\n/bin/chmod 755 "$ZENPI_FAKE_BIN/pi"\n',
+        '#!/bin/sh\nprintf \'npm %s\\n\' "$*" >> "$SPECPI_FAKE_LOG"\nprintf \'%s\\n\' \'#!/bin/sh\' \'if [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\' \'printf \'"\'"\'pi %s\\n\'"\'"\' "$*" >> "$SPECPI_FAKE_LOG"\' \'exit 0\' > "$SPECPI_FAKE_BIN/pi"\n/bin/chmod 755 "$SPECPI_FAKE_BIN/pi"\n',
     );
-    const env = { PATH: fakeBin, ZENPI_FAKE_BIN: fakeBin, ZENPI_FAKE_LOG: log };
+    const env = { PATH: fakeBin, SPECPI_FAKE_BIN: fakeBin, SPECPI_FAKE_LOG: log };
 
     try {
         const result = invokeCli(
@@ -1688,7 +1688,7 @@ test("installer bootstraps a missing pinned Pi after confirmation", () => {
             "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 --no-audit --no-fund",
         );
         assert.equal(calls.filter((line) => line.startsWith("pi install ")).length, 5);
-        const manifest = JSON.parse(fs.readFileSync(path.join(agentDir, "zenpi", "manifest.json"), "utf8"));
+        const manifest = JSON.parse(fs.readFileSync(path.join(agentDir, "specpi", "manifest.json"), "utf8"));
         assert.deepEqual(
             { ...manifest.piBootstrap, installedAt: "ignored" },
             { package: "@earendil-works/pi-coding-agent", version: "0.84.4", installedAt: "ignored", external: true },
@@ -1723,7 +1723,7 @@ test("bootstrap fails actionably when npm global bin is not persistently on PATH
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-prefix-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-prefix-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     const globalPrefix = path.join(root, "npm-prefix");
@@ -1732,9 +1732,9 @@ test("bootstrap fails actionably when npm global bin is not persistently on PATH
     fs.mkdirSync(fakeBin, { recursive: true });
     writeExecutable(
         path.join(fakeBin, "npm"),
-        '#!/bin/sh\nif [ "$1" = "prefix" ]; then echo "$ZENPI_FAKE_PREFIX"; exit 0; fi\nprintf \'npm %s\\n\' "$*" >> "$ZENPI_FAKE_LOG"\n/bin/mkdir -p "$ZENPI_FAKE_PREFIX/bin"\nprintf \'%s\\n\' \'#!/bin/sh\' \'if [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\' \'exit 0\' > "$ZENPI_FAKE_PREFIX/bin/pi"\n/bin/chmod 755 "$ZENPI_FAKE_PREFIX/bin/pi"\n',
+        '#!/bin/sh\nif [ "$1" = "prefix" ]; then echo "$SPECPI_FAKE_PREFIX"; exit 0; fi\nprintf \'npm %s\\n\' "$*" >> "$SPECPI_FAKE_LOG"\n/bin/mkdir -p "$SPECPI_FAKE_PREFIX/bin"\nprintf \'%s\\n\' \'#!/bin/sh\' \'if [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\' \'exit 0\' > "$SPECPI_FAKE_PREFIX/bin/pi"\n/bin/chmod 755 "$SPECPI_FAKE_PREFIX/bin/pi"\n',
     );
-    const baseEnv = { PATH: fakeBin, ZENPI_FAKE_PREFIX: globalPrefix, ZENPI_FAKE_LOG: log };
+    const baseEnv = { PATH: fakeBin, SPECPI_FAKE_PREFIX: globalPrefix, SPECPI_FAKE_LOG: log };
 
     try {
         const first = invokeCli(
@@ -1751,7 +1751,7 @@ test("bootstrap fails actionably when npm global bin is not persistently on PATH
             first.stderr,
             /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.4 was attempted and is not rolled back automatically/,
         );
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
 
         const persistentEnv = {
             ...baseEnv,
@@ -1786,19 +1786,19 @@ test("later bootstrap failure discloses retained external Pi", () => {
         return;
     }
 
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-rollback-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-rollback-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(fakeBin, { recursive: true });
     writeExecutable(
         path.join(fakeBin, "npm"),
-        "#!/bin/sh\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi' 'exit 9' > \"$ZENPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$ZENPI_FAKE_BIN/pi\"\n",
+        "#!/bin/sh\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi' 'exit 9' > \"$SPECPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$SPECPI_FAKE_BIN/pi\"\n",
     );
     try {
         const result = invokeCli(
             agentDir,
             ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            { PATH: fakeBin, ZENPI_FAKE_BIN: fakeBin },
+            { PATH: fakeBin, SPECPI_FAKE_BIN: fakeBin },
         );
         assert.notEqual(result.status, 0);
         assert.match(
@@ -1806,14 +1806,14 @@ test("later bootstrap failure discloses retained external Pi", () => {
             /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.4 was attempted and is not rolled back automatically/,
         );
         assert.equal(fs.existsSync(path.join(fakeBin, "pi")), true);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
 
 test("missing Pi fails before mutation when npm is unavailable", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-bootstrap-no-npm-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-no-npm-test-"));
     const agentDir = path.join(root, "agent");
     const emptyBin = path.join(root, "empty-bin");
     fs.mkdirSync(emptyBin, { recursive: true });
@@ -1825,14 +1825,14 @@ test("missing Pi fails before mutation when npm is unavailable", () => {
         );
         assert.notEqual(result.status, 0);
         assert.match(result.stderr, /npm is required to install missing Pi @earendil-works\/pi-coding-agent@0\.84\.4/);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
 
 test("installer rejects an incompatible Pi even when package installation is skipped", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-pi-version-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-version-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(agentDir, { recursive: true });
@@ -1850,24 +1850,24 @@ test("installer rejects an incompatible Pi even when package installation is ski
                 "--skip-tool-install",
                 "--skip-shell",
             ],
-            { PATH: prependPath(fakeBin), ZENPI_FAKE_PI_VERSION: "0.84.3" },
+            { PATH: prependPath(fakeBin), SPECPI_FAKE_PI_VERSION: "0.84.3" },
         );
         assert.notEqual(result.status, 0);
         assert.match(result.stderr, /Pi 0\.84\.4 or newer is required; found 0\.84\.3/);
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8")), { kept: true });
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
 
 test("command guard install and update failures roll back settings, files, and manifest", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-command-guard-rollback-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-command-guard-rollback-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     fs.mkdirSync(agentDir, { recursive: true });
     installFakePi(fakeBin);
-    const env = { PATH: prependPath(fakeBin), ZENPI_TESTING: "1" };
+    const env = { PATH: prependPath(fakeBin), SPECPI_TESTING: "1" };
     const settingsPath = path.join(agentDir, "settings.json");
     const originalSettings = Buffer.from('{"kept":true}\n');
     fs.writeFileSync(settingsPath, originalSettings);
@@ -1882,10 +1882,10 @@ test("command guard install and update failures roll back settings, files, and m
                 "--skip-tool-install",
                 "--skip-shell",
             ],
-            { ...env, ZENPI_TEST_FAIL_POINT: "after-settings" },
+            { ...env, SPECPI_TEST_FAIL_POINT: "after-settings" },
         );
         assert.notEqual(failedInstall.status, 0);
-        assert.match(failedInstall.stderr, /ZenPi-managed changes rolled back/);
+        assert.match(failedInstall.stderr, /SpecPi-managed changes rolled back/);
         assert.deepEqual(fs.readFileSync(settingsPath), originalSettings);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")), false);
 
@@ -1903,7 +1903,7 @@ test("command guard install and update failures roll back settings, files, and m
         );
         assert.equal(install.status, 0, install.stderr);
         const guardDir = path.join(agentDir, "extensions", "command-guard");
-        const manifestPath = path.join(agentDir, "zenpi", "manifest.json");
+        const manifestPath = path.join(agentDir, "specpi", "manifest.json");
         const customized = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
         customized.kept = "customized";
         fs.writeFileSync(settingsPath, `${JSON.stringify(customized, null, 2)}\n`);
@@ -1925,10 +1925,10 @@ test("command guard install and update failures roll back settings, files, and m
                 "--skip-tool-install",
                 "--skip-shell",
             ],
-            { ...env, ZENPI_TEST_FAIL_POINT: "after-first-command-guard-file" },
+            { ...env, SPECPI_TEST_FAIL_POINT: "after-first-command-guard-file" },
         );
         assert.notEqual(failedUpdate.status, 0);
-        assert.match(failedUpdate.stderr, /ZenPi-managed changes rolled back/);
+        assert.match(failedUpdate.stderr, /SpecPi-managed changes rolled back/);
         assert.deepEqual(fs.readFileSync(settingsPath), beforeSettings);
         assert.deepEqual(fs.readFileSync(manifestPath), beforeManifest);
         assert.deepEqual(fs.readdirSync(guardDir).sort(), [...beforeFiles.keys()].sort());
@@ -1948,7 +1948,7 @@ test("command guard install and update failures roll back settings, files, and m
 });
 
 test("install, update, doctor, and uninstall round trip in an isolated agent dir", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-test-"));
     const agentDir = path.join(root, "agent");
     fs.mkdirSync(path.join(agentDir, "extensions"), { recursive: true });
 
@@ -1960,7 +1960,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
     };
     fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(originalSettings, null, 2)}\n`);
     fs.writeFileSync(path.join(agentDir, "AGENTS.md"), "# Personal instructions\n");
-    fs.writeFileSync(path.join(agentDir, "extensions", "zen.ts"), "// personal prior zen\n");
+    fs.writeFileSync(path.join(agentDir, "extensions", "spec.ts"), "// personal prior spec\n");
 
     try {
         runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
@@ -1972,12 +1972,12 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             false,
         );
         assert.equal(installed.customSetting, true);
-        assert.equal(installed.theme, "zenpi-spec");
-        assert.ok(fs.existsSync(path.join(agentDir, "themes", "zenpi-spec.json")));
+        assert.equal(installed.theme, "specpi-spec");
+        assert.ok(fs.existsSync(path.join(agentDir, "themes", "specpi-spec.json")));
         assert.ok(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")));
-        assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen", "core.mjs")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")));
+        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")));
+        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "spec", "core.mjs")));
+        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "specpi-ui-refresh", "index.ts")));
         for (const file of ["index.ts", "scope.mjs", "experiments.mjs", "challenge.mjs", "smoke.mjs"]) {
             assert.ok(
                 fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", file)),
@@ -2010,7 +2010,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             );
         }
 
-        const installedManifest = JSON.parse(fs.readFileSync(path.join(agentDir, "zenpi", "manifest.json"), "utf8"));
+        const installedManifest = JSON.parse(fs.readFileSync(path.join(agentDir, "specpi", "manifest.json"), "utf8"));
         const installedGuardDirectory = path.join(agentDir, "extensions", "command-guard");
         const manifestGuardFiles = Object.keys(installedManifest.files || {})
             .filter((target) => path.dirname(target) === installedGuardDirectory)
@@ -2018,7 +2018,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             .sort();
         assert.deepEqual(manifestGuardFiles, [...COMMAND_GUARD_MANAGED_FILES].sort());
 
-        assert.ok(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")));
+        assert.ok(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "smoke.mjs")));
@@ -2057,16 +2057,16 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         customizedSettings.unrelatedUserSetting = "preserved";
         fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(customizedSettings, null, 2)}\n`);
 
-        // Simulate ownership retired by a future ZenPi version.
+        // Simulate ownership retired by a future SpecPi version.
         const retiredFile = path.join(agentDir, "extensions", "retired.ts");
         fs.writeFileSync(retiredFile, "// retired\n");
         const beforeUpdateSettings = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
         beforeUpdateSettings.retiredFlag = true;
-        beforeUpdateSettings.packages.push("npm:retired-zenpi-package@1.0.0");
+        beforeUpdateSettings.packages.push("npm:retired-specpi-package@1.0.0");
         beforeUpdateSettings.packages.push("npm:@tmustier/pi-files-widget@0.2.0");
         beforeUpdateSettings.packages.push("npm:pi-subagents@0.58.0");
         fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(beforeUpdateSettings, null, 2)}\n`);
-        const manifestPath = path.join(agentDir, "zenpi", "manifest.json");
+        const manifestPath = path.join(agentDir, "specpi", "manifest.json");
         const beforeUpdateManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
         beforeUpdateManifest.settingsChanges.push({
             path: ["retiredFlag"],
@@ -2075,9 +2075,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             installed: true,
         });
         beforeUpdateManifest.packageChanges.push({
-            identity: "npm:retired-zenpi-package",
+            identity: "npm:retired-specpi-package",
             beforeExists: false,
-            installed: "npm:retired-zenpi-package@1.0.0",
+            installed: "npm:retired-specpi-package@1.0.0",
         });
         beforeUpdateManifest.packageChanges.push({
             identity: "npm:@tmustier/pi-files-widget",
@@ -2089,8 +2089,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             beforeExists: false,
             installed: "npm:pi-subagents@0.58.0",
         });
-        const legacyTool = path.join(agentDir, "zenpi", "bin", "bat");
-        const legacyMarker = path.join(agentDir, "zenpi", "optional-tools", "bat.json");
+        const legacyTool = path.join(agentDir, "specpi", "bin", "bat");
+        const legacyMarker = path.join(agentDir, "specpi", "optional-tools", "bat.json");
         fs.mkdirSync(path.dirname(legacyTool), { recursive: true });
         fs.mkdirSync(path.dirname(legacyMarker), { recursive: true });
         fs.writeFileSync(legacyTool, "legacy tool\n", { mode: 0o755 });
@@ -2126,7 +2126,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             false,
         );
         assert.equal(
-            afterUpdate.packages.some((entry) => String(entry).includes("retired-zenpi-package")),
+            afterUpdate.packages.some((entry) => String(entry).includes("retired-specpi-package")),
             false,
         );
         assert.equal(
@@ -2140,8 +2140,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         const validCustomizedDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
         assert.equal(validCustomizedDoctor.status, 0, validCustomizedDoctor.stderr);
 
-        const retainedWishlist = path.join(agentDir, "zenpi", "tool-wishlist-events.jsonl");
-        const retainedExperiment = path.join(agentDir, "zenpi", "experiments", "registry.json");
+        const retainedWishlist = path.join(agentDir, "specpi", "tool-wishlist-events.jsonl");
+        const retainedExperiment = path.join(agentDir, "specpi", "experiments", "registry.json");
         fs.mkdirSync(path.dirname(retainedExperiment), { recursive: true });
         fs.writeFileSync(retainedWishlist, '{"local":"evidence"}\n', { mode: 0o600 });
         fs.writeFileSync(retainedExperiment, '{"schema":1,"experiments":[]}\n', { mode: 0o600 });
@@ -2158,9 +2158,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(restored.customSetting, true);
         assert.equal(restored.unrelatedUserSetting, "preserved");
         assert.equal(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), "# Personal instructions\n");
-        assert.equal(fs.readFileSync(path.join(agentDir, "extensions", "zen.ts"), "utf8"), "// personal prior zen\n");
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen", "core.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")), false);
+        assert.equal(fs.readFileSync(path.join(agentDir, "extensions", "spec.ts"), "utf8"), "// personal prior spec\n");
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "spec", "core.mjs")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "specpi-ui-refresh", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "scope.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "experiments.mjs")), false);
@@ -2176,12 +2176,12 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "powershell-parser.ps1")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "smoke.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "themes", "zenpi-spec.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "themes", "specpi-spec.json")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
 
         runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
         const reinstallDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
@@ -2192,7 +2192,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
 });
 
 test("managed browser runtime completes install, reuse update, doctor, and uninstall with fake browser", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-browser-lifecycle-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-browser-lifecycle-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     installFakePi(fakeBin);
@@ -2201,8 +2201,8 @@ test("managed browser runtime completes install, reuse update, doctor, and unins
     try {
         const install = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
         assert.equal(install.status, 0, install.stderr);
-        const runtime = path.join(agentDir, "zenpi", "browser-runtime");
-        assert.ok(fs.existsSync(path.join(runtime, "zenpi-runtime.json")));
+        const runtime = path.join(agentDir, "specpi", "browser-runtime");
+        assert.ok(fs.existsSync(path.join(runtime, "specpi-runtime.json")));
 
         const doctor = invokeCli(agentDir, ["doctor"], env);
         assert.equal(doctor.status, 0, doctor.stderr);
@@ -2232,7 +2232,7 @@ test("managed browser runtime completes install, reuse update, doctor, and unins
 });
 
 test("default package and shell paths work with an isolated fake pi", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-shell-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-shell-test-"));
     const agentDir = path.join(root, "agent");
     const shellRc = path.join(root, ".bashrc");
     const fakeBin = path.join(root, "bin");
@@ -2242,16 +2242,16 @@ test("default package and shell paths work with an isolated fake pi", () => {
     const env = {
         PATH: prependPath(fakeBin),
         SHELL: "/bin/bash",
-        ZENPI_SHELL_RC: shellRc,
-        ZENPI_FAKE_LOG: log,
+        SPECPI_SHELL_RC: shellRc,
+        SPECPI_FAKE_LOG: log,
     };
 
     try {
         const install = invokeCli(agentDir, ["install", "--yes", "--skip-browser-install", "--skip-tool-install"], env);
         assert.equal(install.status, 0, install.stderr);
         const shell = fs.readFileSync(shellRc, "utf8");
-        assert.match(shell, /# >>> ZenPi >>>/);
-        assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "pi-profiles.sh")));
+        assert.match(shell, /# >>> SpecPi >>>/);
+        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "pi-profiles.sh")));
         const calls = fs.readFileSync(log, "utf8").trim().split("\n");
         assert.equal(calls.filter((line) => line.startsWith("install ")).length, 5);
         assert.ok(calls.some((line) => line.startsWith("--offline --list-models")));
@@ -2262,8 +2262,8 @@ test("default package and shell paths work with an isolated fake pi", () => {
             env,
         );
         assert.equal(update.status, 0, update.stderr);
-        assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "pi-profiles.sh")));
-        assert.match(fs.readFileSync(shellRc, "utf8"), /# >>> ZenPi >>>/);
+        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "pi-profiles.sh")));
+        assert.match(fs.readFileSync(shellRc, "utf8"), /# >>> SpecPi >>>/);
 
         const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
         assert.equal(uninstall.status, 0, uninstall.stderr);
@@ -2274,7 +2274,7 @@ test("default package and shell paths work with an isolated fake pi", () => {
 });
 
 test("failed package installation rolls configuration back and releases the lock", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-failure-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-failure-test-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
     const settingsPath = path.join(agentDir, "settings.json");
@@ -2285,23 +2285,23 @@ test("failed package installation rolls configuration back and releases the lock
     const env = {
         PATH: prependPath(fakeBin),
         SHELL: "/bin/bash",
-        ZENPI_FAKE_PI_FAIL_PATTERN: "pi-web-access",
+        SPECPI_FAKE_PI_FAIL_PATTERN: "pi-web-access",
     };
 
     try {
         const result = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
         assert.notEqual(result.status, 0);
         assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath, "utf8")), { untouched: true });
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "browser-runtime")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "install.lock")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "browser-runtime")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "install.lock")), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
 
 test("settings symlinks remain symlinks through install and uninstall", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-symlink-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-symlink-test-"));
     const agentDir = path.join(root, "agent");
     const target = path.join(root, "settings-target.json");
     const link = path.join(agentDir, "settings.json");
@@ -2321,7 +2321,7 @@ test("settings symlinks remain symlinks through install and uninstall", () => {
 });
 
 test("empty AGENTS and shell symlink targets remain linked after uninstall", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-block-symlink-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-block-symlink-test-"));
     const agentDir = path.join(root, "agent");
     const agentsTarget = path.join(root, "AGENTS-target.md");
     const shellTarget = path.join(root, "shell-target.rc");
@@ -2332,7 +2332,7 @@ test("empty AGENTS and shell symlink targets remain linked after uninstall", () 
     fs.writeFileSync(shellTarget, "");
     fs.symlinkSync(agentsTarget, agentsLink);
     fs.symlinkSync(shellTarget, shellLink);
-    const env = { SHELL: "/bin/bash", ZENPI_SHELL_RC: shellLink };
+    const env = { SHELL: "/bin/bash", SPECPI_SHELL_RC: shellLink };
 
     try {
         const install = invokeCli(agentDir, ["install", "--yes", "--skip-package-install", "--skip-tool-install"], env);
@@ -2349,7 +2349,7 @@ test("empty AGENTS and shell symlink targets remain linked after uninstall", () 
 });
 
 test("broken managed-path symlinks fail without leaving a lock", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-broken-link-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-broken-link-test-"));
     const agentDir = path.join(root, "agent");
     fs.mkdirSync(agentDir, { recursive: true });
     fs.symlinkSync(path.join(root, "missing-settings.json"), path.join(agentDir, "settings.json"));
@@ -2364,7 +2364,7 @@ test("broken managed-path symlinks fail without leaving a lock", () => {
         ]);
         assert.notEqual(result.status, 0);
         assert.match(result.stderr, /Broken symlink is unsupported/);
-        assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "install.lock")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "install.lock")), false);
         assert.equal(fs.lstatSync(path.join(agentDir, "settings.json")).isSymbolicLink(), true);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });

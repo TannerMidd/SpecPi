@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="site/logo.svg" width="104" alt="ZenPi logo">
+  <img src="site/logo.svg" width="104" alt="SpecPi logo">
 </p>
 
-<h1 align="center">ZenPi</h1>
+<h1 align="center">SpecPi</h1>
 
 <p align="center">
   A local, human-directed improvement harness for the
@@ -10,20 +10,20 @@
 </p>
 
 <p align="center">
-  <a href="https://tannermidd.github.io/ZenPi/"><strong>Overview</strong></a>
-  · <a href="https://tannermidd.github.io/ZenPi/wiki/">Wiki</a>
+  <a href="https://tannermidd.github.io/SpecPi/"><strong>Overview</strong></a>
+  · <a href="https://tannermidd.github.io/SpecPi/wiki/">Wiki</a>
   · <a href="#install">Install</a>
   · <a href="SECURITY.md">Security</a>
 </p>
 
 ## Purpose
 
-ZenPi records recurring capability gaps in local state and presents qualified items for review. Selecting an item with `/harness-improvement` authorizes one bounded change. Repository checks and capability-specific validators must pass before the item can retire.
+SpecPi records recurring capability gaps in local state and presents qualified items for review. Selecting an item with `/harness-improvement` authorizes one bounded change. Repository checks and capability-specific validators must pass before the item can retire.
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded.
 
 <p align="center">
-  <img src="site/self-improvement-loop-v2.svg" width="760" alt="ZenPi improvement loop: local friction becomes qualified evidence; a person chooses one change; verification failure keeps it selected; later evidence returns it to human review.">
+  <img src="site/self-improvement-loop-v2.svg" width="760" alt="SpecPi improvement loop: local friction becomes qualified evidence; a person chooses one change; verification failure keeps it selected; later evidence returns it to human review.">
 </p>
 
 ## Improvement loop
@@ -31,7 +31,7 @@ Collection is disabled until explicitly enabled. Reports are sanitized, bounded,
 1. **Record:** A reusable capability gap is stored as a sanitized local report.
 2. **Qualify:** Recurrence, project reach, impact, and recency determine whether the item enters the review menu.
 3. **Select:** `/harness-improvement` authorizes one exact item.
-4. **Implement:** The `zenpi-improve` skill makes the narrowest sufficient change and adds direct checks.
+4. **Implement:** The `specpi-improve` skill makes the narrowest sufficient change and adds direct checks.
 5. **Verify:** The completion gate checks registry integration, runs `npm run check`, and runs the item's closed validator.
 6. **Retire:** A passing item leaves the queue. Its evidence, gates, changed files, and version remain in the local journal.
 7. **Review again:** Later evidence returns the item as `review-needed`. Implementation does not restart automatically.
@@ -42,7 +42,7 @@ Use `/wishlist status` for queue and loop-health totals. Use `/wishlist history 
 
 | Capability | Interface | Behavior |
 | --- | --- | --- |
-| Spec execution | `/zen` | Replaces normal chrome with a technical run panel, seals live reasoning, holds streaming prose until complete, and keeps tools collapsed. |
+| Spec execution | `/spec` | Replaces normal chrome with a technical run panel, seals live reasoning, holds streaming prose until complete, and keeps tools collapsed. |
 | File review | `/files` | Browses source, rendered Markdown, Git diffs, and bounded review comments. |
 | Scope monitoring | `/scope` | Declares expected paths and reports unacknowledged drift. |
 | Worktree experiments | `/experiment` | Creates detached worktrees with keep, binary patch export, and confirmed discard outcomes. |
@@ -51,12 +51,12 @@ Use `/wishlist status` for queue and loop-health totals. Use `/wishlist history 
 | Improvement selection | `/harness-improvement` | Authorizes one qualified or review-needed item. |
 | Command guard | `/guard` | Denies confirmed host-wide destructive calls and requests approval for bounded risk classes. |
 | Browser QA | Browser tools | Opens an isolated Chromium context for rendered inspection and screenshots. |
-| Specification theme | `zenpi-spec` | Applies the GitHub Pages design’s blueprint blue, technical greys, layered surfaces, and restrained semantic states across Pi. |
-| Installer lifecycle | `zenpi` | Plans, installs, updates, verifies, and uninstalls managed state with backups and rollback. |
+| Specification theme | `specpi-spec` | Applies the GitHub Pages design’s blueprint blue, technical greys, layered surfaces, and restrained semantic states across Pi. |
+| Installer lifecycle | `specpi` | Plans, installs, updates, verifies, and uninstalls managed state with backups and rollback. |
 
-`zenpi-spec` is the default Pi theme. It carries the site’s clean specification direction through message surfaces, tools, Markdown, diffs, syntax highlighting, search, and the full thinking-level scale. The original `tea-house` theme remains bundled and selectable from `/settings`.
+`specpi-spec` is the default Pi theme. It carries the site’s clean specification direction through message surfaces, tools, Markdown, diffs, syntax highlighting, search, and the full thinking-level scale. The original `tea-house` theme remains bundled and selectable from `/settings`.
 
-Capability registry entries include closed offline validators. Completion, `npm run check`, and `zenpi doctor` run those validators.
+Capability registry entries include closed offline validators. Completion, `npm run check`, and `specpi doctor` run those validators.
 
 ## Install
 
@@ -68,19 +68,19 @@ Requirements:
 - Pi 0.84.4 or newer. If Pi is absent, the confirmed install adds the reviewed pinned package.
 
 ```bash
-git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
-cd ZenPi
-./zenpi plan
-./zenpi install
-./zenpi doctor
+git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/SpecPi.git
+cd SpecPi
+./specpi plan
+./specpi install
+./specpi doctor
 ```
 
-On Windows, use `.\zenpi.cmd` in place of `./zenpi`:
+On Windows, use `.\specpi.cmd` in place of `./specpi`:
 
 ```powershell
-.\zenpi.cmd plan
-.\zenpi.cmd install
-.\zenpi.cmd doctor
+.\specpi.cmd plan
+.\specpi.cmd install
+.\specpi.cmd doctor
 ```
 
 `plan` does not mutate the system. Install, update, and uninstall require confirmation unless `--yes` is supplied. After installation, run `/reload` in Pi.
@@ -99,9 +99,9 @@ The guard covers the documented `bash`, `powershell`, `read`, `write`, and `edit
 
 ## Work ownership
 
-ZenPi does not install subagent orchestration. Keep one writer per working directory. A parent agent determines what context a child receives and summarizes what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
+SpecPi does not install subagent orchestration. Keep one writer per working directory. A parent agent determines what context a child receives and summarizes what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
 
-Use `/experiment start` when an independent review or trial justifies a separate worktree. Open the reported path in another Pi session. ZenPi does not launch an agent, copy dirty base changes, commit, merge, or touch remotes.
+Use `/experiment start` when an independent review or trial justifies a separate worktree. Open the reported path in another Pi session. SpecPi does not launch an agent, copy dirty base changes, commit, merge, or touch remotes.
 
 `/scope set` declares expected paths. `/scope accept <path>` acknowledges one finding without widening the contract. `/scope add <path>` widens it. `/scope recheck` replaces an uncertain baseline.
 
@@ -109,7 +109,7 @@ Use `/experiment start` when an independent review or trial justifies a separate
 
 ## Data and security boundaries
 
-ZenPi does not persist command text or read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current Pi session. Wishlist reports, improvement journals, experiment metadata, and exported patches remain in private local ZenPi state and can survive uninstall. Review local artifacts before sharing.
+SpecPi does not persist command text or read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current Pi session. Wishlist reports, improvement journals, experiment metadata, and exported patches remain in private local SpecPi state and can survive uninstall. Review local artifacts before sharing.
 
 Pi extensions run with the current user's permissions. Use OS permissions, a least-privilege account, a container, or a VM for hostile code or data. See [SECURITY_MODEL.md](SECURITY_MODEL.md) for the complete trust model and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 

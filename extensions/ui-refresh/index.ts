@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const REFRESH_WIDGET = "zenpi-ui-prompt-refresh";
+const REFRESH_WIDGET = "specpi-ui-prompt-refresh";
 
 /**
  * Pi's regular-screen renderer can occasionally leave a newly mounted extension

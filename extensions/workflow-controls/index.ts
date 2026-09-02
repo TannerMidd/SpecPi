@@ -35,10 +35,10 @@ import {
 } from "./challenge.mjs";
 
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
-const stateDir = path.join(agentDir, "zenpi");
-const SCOPE_ENTRY = "zenpi-scope-state";
-const CHALLENGE_ENTRY = "zenpi-completion-challenge";
-const SCOPE_STATUS = "zenpi-scope";
+const stateDir = path.join(agentDir, "specpi");
+const SCOPE_ENTRY = "specpi-scope-state";
+const CHALLENGE_ENTRY = "specpi-completion-challenge";
+const SCOPE_STATUS = "specpi-scope";
 const MAX_PENDING_SCOPE = 40;
 // `read` is the one documented Pi seam that cannot mutate the worktree. Every other tool, including extension-provided
 // ones, still gets snapshotted because an unrecognised tool is exactly the case post-hoc detection exists for.
@@ -154,7 +154,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                   indeterminate: scope.indeterminate,
               }
             : { active: false, pending: 0, entries: 0, indeterminate: false };
-        pi.events.emit("zenpi:workflow-status", summary);
+        pi.events.emit("specpi:workflow-status", summary);
         if (!scope.active) {
             ctx.ui.setStatus(SCOPE_STATUS, undefined);
             ctx.ui.setWidget(SCOPE_STATUS, undefined);
@@ -479,7 +479,7 @@ export default function workflowControls(pi: ExtensionAPI) {
         }
 
         addPending(comparison.outside, ctx);
-        const warning = `ZenPi scope warning: mutation outside declared scope is pending acknowledgement: ${comparison.outside.slice(0, 8).map(sanitizePathLabel).join(", ")}. The human can run /scope accept <path> to acknowledge it without widening scope, /scope add <path> to widen scope, or /scope clear.`;
+        const warning = `SpecPi scope warning: mutation outside declared scope is pending acknowledgement: ${comparison.outside.slice(0, 8).map(sanitizePathLabel).join(", ")}. The human can run /scope accept <path> to acknowledge it without widening scope, /scope add <path> to widen scope, or /scope clear.`;
 
         return { content: [...event.content, { type: "text", text: warning }] };
     });
@@ -488,7 +488,7 @@ export default function workflowControls(pi: ExtensionAPI) {
         const guidance = [];
         if (scope.active) {
             guidance.push(
-                `[ZENPI SCOPE]\nDeclared paths: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}\nPending outside-scope paths: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}. Do not describe pending paths as accepted scope.`,
+                `[SPECPI SCOPE]\nDeclared paths: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}\nPending outside-scope paths: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}. Do not describe pending paths as accepted scope.`,
             );
         }
 
@@ -902,7 +902,7 @@ export default function workflowControls(pi: ExtensionAPI) {
 
                     for (const finding of pending) {
                         // An orphan directory is neither present nor missing: Git has forgotten it but the files are
-                        // still there, so it can only be released, never activated, and ZenPi never deletes it.
+                        // still there, so it can only be released, never activated, and SpecPi never deletes it.
                         const state = finding.present
                             ? "worktree present"
                             : finding.orphanDirectory

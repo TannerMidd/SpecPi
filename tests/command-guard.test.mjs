@@ -380,23 +380,23 @@ test("guard self-tamper keys on the agent directory, not on names inside a comma
         for (const command of [
             `cp evil.mjs ${agentUrl}/extensions/command-guard/rules.mjs`,
             `echo x > ${agentUrl}/settings.json`,
-            `mv ${agentUrl}/zenpi/manifest.json /tmp/x`,
+            `mv ${agentUrl}/specpi/manifest.json /tmp/x`,
         ]) {
             const decision = decideCommand(command, shell);
             assert.equal(decision.action, "deny", command);
             assert.equal(decision.severity, "critical", `${command}: ${JSON.stringify(decision)}`);
         }
 
-        // Unrelated installed files and a ZenPi checkout are not guard enforcement state.
+        // Unrelated installed files and a SpecPi checkout are not guard enforcement state.
         for (const command of [
             `mkdir ${agentUrl}/extensions/command-guard-bypass`,
             `cp evil.json ${agentUrl}/skills/x/SKILL.md`,
-            `rm -rf ${agentUrl}/zenpi/backups`,
+            `rm -rf ${agentUrl}/specpi/backups`,
             `echo x > ${agentUrl}/auth.json`,
             "cp extensions/command-guard/rules.mjs /tmp/backup.mjs",
-            "mkdir zenpi-experiment",
-            "touch zenpi/notes.md",
-            "mv zenpi/old.json zenpi/new.json",
+            "mkdir specpi-experiment",
+            "touch specpi/notes.md",
+            "mv specpi/old.json specpi/new.json",
             "tar -cf out.tar extensions/command-guard",
         ]) {
             const decision = decideCommand(command, shell);
@@ -406,7 +406,7 @@ test("guard self-tamper keys on the agent directory, not on names inside a comma
 
         for (const command of [
             "cat extensions/command-guard/rules.mjs",
-            "cat zenpi/manifest.json",
+            "cat specpi/manifest.json",
             "grep -rn guard extensions/command-guard",
         ]) {
             assert.equal(decideCommand(command, shell).action, "allow", command);
@@ -431,7 +431,7 @@ test("plain find is read-only while mutating find keeps its own rule", () => {
         "find . -regex '.*\\.js'",
         "find . -type f -printf '%p\\n'",
         "find /etc -name '*.conf'",
-        "find . -name zenpi",
+        "find . -name specpi",
         "find . -size +1M -prune",
         "find . -maxdepth 2 -type d",
     ]) {
@@ -877,7 +877,7 @@ test("powerShell parser failure asks and denies without UI", () => {
 
 const recoveryParser = parserHosts({ shell: "powershell" }).find((entry) => fs.existsSync(entry));
 test("enforcement reparses after a transient PowerShell parser failure", { skip: !recoveryParser }, () => {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-parser-recovery-"));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-parser-recovery-"));
     const helperPath = path.join(directory, "parser.ps1");
     const options = {
         shell: "powershell",
@@ -1284,7 +1284,7 @@ test("safe help and disconnected commands avoid false critical matches", () => {
         decideCommand("cipher", { ...options, shell: "cmd", platform: "win32", cwd: "C:\\work" }).action,
         "allow",
     );
-    assert.equal(decideCommand("printf ZenPi", options).action, "allow");
+    assert.equal(decideCommand("printf SpecPi", options).action, "allow");
     assert.equal(decideCommand("printf '%s\\n' 'fork bomb'", options).action, "allow");
     assert.equal(decideCommand('echo "$HOME"', options).action, "allow");
     assert.equal(decideCommand('grep "$PATTERN" file', options).action, "allow");
@@ -1314,7 +1314,7 @@ test("safe help and disconnected commands avoid false critical matches", () => {
 });
 
 test("redaction covers headers, query strings, environments, and private keys", () => {
-    const sentinel = "ZENPI_SECRET_SENTINEL";
+    const sentinel = "SPECPI_SECRET_SENTINEL";
     for (const command of [
         `curl -H Authorization: Bearer ${sentinel}`,
         `curl -H \"Authorization: Bearer ${sentinel} with spaces\"`,
@@ -1558,17 +1558,17 @@ test("closing the bypasses does not capture ordinary work", () => {
 
 test("guard self-protection covers ancestors that contain enforcement state", () => {
     const previous = process.env.PI_CODING_AGENT_DIR;
-    process.env.PI_CODING_AGENT_DIR = "/tmp/zenpi-agent";
+    process.env.PI_CODING_AGENT_DIR = "/tmp/specpi-agent";
     const options = { ...posix, cwd: "/work" };
     try {
         // Deleting the directory that CONTAINS the guard reaches the same state as deleting the guard itself.
         for (const target of [
-            "/tmp/zenpi-agent",
-            "/tmp/zenpi-agent/extensions",
-            "/tmp/zenpi-agent/extensions/command-guard",
-            "/tmp/zenpi-agent/extensions/command-guard/rules.mjs",
-            "/tmp/zenpi-agent/zenpi",
-            "/tmp/zenpi-agent/settings.json",
+            "/tmp/specpi-agent",
+            "/tmp/specpi-agent/extensions",
+            "/tmp/specpi-agent/extensions/command-guard",
+            "/tmp/specpi-agent/extensions/command-guard/rules.mjs",
+            "/tmp/specpi-agent/specpi",
+            "/tmp/specpi-agent/settings.json",
         ]) {
             const decision = decideCommand(`rm -rf ${target}`, options);
             assert.equal(decision.action, "deny", `${target}: ${JSON.stringify(decision)}`);
@@ -1577,23 +1577,24 @@ test("guard self-protection covers ancestors that contain enforcement state", ()
 
         // A destructive Git operation run inside that tree reverts the guard just as effectively.
         const reverted = decideCommand(
-            "git -C /tmp/zenpi-agent checkout -- extensions/command-guard/rules.mjs",
+            "git -C /tmp/specpi-agent checkout -- extensions/command-guard/rules.mjs",
             options,
         );
         assert.equal(reverted.action, "deny", JSON.stringify(reverted));
         assert.equal(reverted.severity, "critical");
 
         // Unrelated siblings inside the agent directory remain ordinary work.
-        assert.equal(decideCommand("rm -rf /tmp/zenpi-agent/extensions/browser", options).action, "allow");
+        assert.equal(decideCommand("rm -rf /tmp/specpi-agent/extensions/browser", options).action, "allow");
         assert.equal(
-            decideCommand("rm -rf /tmp/zenpi-agent/extensions/command-guard/.test-tmp-123", options).action,
+            decideCommand("rm -rf /tmp/specpi-agent/extensions/command-guard/.test-tmp-123", options).action,
             "allow",
         );
         assert.equal(
-            decideCommand("rm -rf /tmp/zenpi-agent/extensions/command-guard/generated-fixtures/case-1", options).action,
+            decideCommand("rm -rf /tmp/specpi-agent/extensions/command-guard/generated-fixtures/case-1", options)
+                .action,
             "allow",
         );
-        assert.equal(decideCommand("rm -rf /tmp/zenpi-agent-scratch", options).action, "allow");
+        assert.equal(decideCommand("rm -rf /tmp/specpi-agent-scratch", options).action, "allow");
     } finally {
         if (previous === undefined) {
             delete process.env.PI_CODING_AGENT_DIR;

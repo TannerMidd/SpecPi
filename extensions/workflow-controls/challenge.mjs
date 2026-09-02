@@ -129,7 +129,7 @@ export function boundedChallengeFacts(value = {}) {
 export function challengePrompt(generation, facts) {
     const bounded = boundedChallengeFacts(facts);
     const lines = [
-        `[ZENPI COMPLETION CHALLENGE ${generation}]`,
+        `[SPECPI COMPLETION CHALLENGE ${generation}]`,
         "The user explicitly requested an adversarial completion review. Do not continue implementation in this turn.",
         "Use only evidence already available in context and the bounded facts below. Identify uncertainty rather than inventing proof.",
         "Answer all six questions through submit_completion_challenge as the final tool call:",

@@ -77,7 +77,7 @@ for (const handler of events.get("session_start") || []) {
 
 const nonLatchingCleanup: any =
     process.platform === "win32"
-        ? { toolName: "bash", input: { command: "rmdir /s /q F:\\Temp\\zenpi-test-123" } }
+        ? { toolName: "bash", input: { command: "rmdir /s /q F:\\Temp\\specpi-test-123" } }
         : { toolName: "powershell", input: { command: "rm -rf /" } };
 let nonLatchingCleanupResult: any;
 for (const handler of events.get("tool_call") || []) {
@@ -158,7 +158,7 @@ for (const handler of events.get("tool_call") || []) {
 }
 
 await commands.get("guard").handler("unlock", ctx);
-const unlockRestoredStrict = statuses.get("zenpi-command-guard") === "🛡 Strict";
+const unlockRestoredStrict = statuses.get("specpi-command-guard") === "🛡 Strict";
 for (const handler of events.get("session_shutdown") || []) {
     await handler({}, ctx);
 }
@@ -167,19 +167,19 @@ for (const handler of events.get("session_start") || []) {
     await handler({ reason: "resume" }, ctx);
 }
 
-const sessionResetGuard = statuses.get("zenpi-command-guard") === "🛡 Guard";
+const sessionResetGuard = statuses.get("specpi-command-guard") === "🛡 Guard";
 await commands.get("guard").handler("off", ctx);
 let offResult: any;
 for (const handler of events.get("tool_call") || []) {
     offResult = await handler({ toolName: "bash", input: { command: "rm -rf /" } }, ctx);
 }
 
-const confirmedOffAllows = !offResult?.block && statuses.get("zenpi-command-guard") === "Guard Off";
+const confirmedOffAllows = !offResult?.block && statuses.get("specpi-command-guard") === "Guard Off";
 for (const handler of events.get("session_start") || []) {
     await handler({ reason: "resume", previousSessionFile: "inert" }, ctx);
 }
 
-const startOnlyReset = statuses.get("zenpi-command-guard") === "🛡 Guard";
+const startOnlyReset = statuses.get("specpi-command-guard") === "🛡 Guard";
 process.stdout.write(
-    `COMMAND_GUARD_HARNESS=${JSON.stringify({ dangerousBlocked: dangerousResult?.block === true, mutatedApprovalBlocked, lockedApprovalBlocked, safeBlockedAfterLock: safeResult?.block === true, nonLatchingCleanupBlocked: nonLatchingCleanupResult?.block === true, nonLatchingCleanupDidNotLock: !safeAfterNonLatchingCleanupResult?.block, guardUnknownAllowed: !guardUnknownResult?.block, unknownTerminalBlocked: unknownTerminalResult?.block === true, promptTimeoutBlocked: timedPathResult?.block === true, promptFailureBlocked: promptFailureResult?.block === true, promptHasContext: approvalTitles.some((title) => title.includes("Severity:") && title.includes("category:") && title.includes("cwd:") && title.includes("reason:") && title.includes("safer:")), commandRegistered: commands.has("guard"), statusInspectable, unlockRestoredStrict, sessionResetGuard, confirmedOffAllows, startOnlyReset, status: statuses.get("zenpi-command-guard"), notificationCount: notifications.length })}\n`,
+    `COMMAND_GUARD_HARNESS=${JSON.stringify({ dangerousBlocked: dangerousResult?.block === true, mutatedApprovalBlocked, lockedApprovalBlocked, safeBlockedAfterLock: safeResult?.block === true, nonLatchingCleanupBlocked: nonLatchingCleanupResult?.block === true, nonLatchingCleanupDidNotLock: !safeAfterNonLatchingCleanupResult?.block, guardUnknownAllowed: !guardUnknownResult?.block, unknownTerminalBlocked: unknownTerminalResult?.block === true, promptTimeoutBlocked: timedPathResult?.block === true, promptFailureBlocked: promptFailureResult?.block === true, promptHasContext: approvalTitles.some((title) => title.includes("Severity:") && title.includes("category:") && title.includes("cwd:") && title.includes("reason:") && title.includes("safer:")), commandRegistered: commands.has("guard"), statusInspectable, unlockRestoredStrict, sessionResetGuard, confirmedOffAllows, startOnlyReset, status: statuses.get("specpi-command-guard"), notificationCount: notifications.length })}\n`,
 );

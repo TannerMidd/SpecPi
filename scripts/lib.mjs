@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 
-export const AGENTS_START = "<!-- zenpi:start -->";
-export const AGENTS_END = "<!-- zenpi:end -->";
-export const SHELL_START = "# >>> ZenPi >>>";
-export const SHELL_END = "# <<< ZenPi <<<";
+export const AGENTS_START = "<!-- specpi:start -->";
+export const AGENTS_END = "<!-- specpi:end -->";
+export const SHELL_START = "# >>> SpecPi >>>";
+export const SHELL_END = "# <<< SpecPi <<<";
 
 export function sha256(data) {
     return createHash("sha256").update(data).digest("hex");
