@@ -15,11 +15,13 @@ const artifactIndex = process.argv.indexOf("--artifact");
 const manifestIndex = process.argv.indexOf("--manifest");
 const artifactPath = artifactIndex >= 0 ? process.argv[artifactIndex + 1] : undefined;
 const artifactManifestPath = manifestIndex >= 0 ? process.argv[manifestIndex + 1] : undefined;
+const hasArtifact = artifactIndex >= 0;
+const hasManifest = manifestIndex >= 0;
 
 if (
-    artifactIndex >= 0 !== manifestIndex >= 0 ||
-    (artifactIndex >= 0 && (!artifactPath || !artifactManifestPath)) ||
-    (artifactIndex < 0 && process.argv.length > 2)
+    hasArtifact !== hasManifest ||
+    (hasArtifact && (!artifactPath || !artifactManifestPath)) ||
+    (!hasArtifact && process.argv.length > 2)
 ) {
     throw new Error("Use no arguments, or supply --artifact <tarball> and --manifest <npm-pack.json> together");
 }
@@ -132,7 +134,12 @@ function runNpm(args, options = {}) {
 }
 
 function quoteWindowsCommandArg(value) {
-    return `"${String(value).replaceAll("%", "%%").replaceAll('"', '""')}"`;
+    const text = String(value);
+    if (text.includes("%")) {
+        throw new Error(`cmd.exe expands "%" on its command line and cannot receive this argument safely: ${text}`);
+    }
+
+    return `"${text.replaceAll('"', '""')}"`;
 }
 
 function runInstalledBin(binPath, args, options = {}) {
@@ -416,7 +423,10 @@ try {
     assert.equal(packResult.version, sourcePackage.version);
     assert.deepEqual(packResult.bundled || [], [], "packed artifact unexpectedly bundles dependencies");
     assert.ok(packResult.size < 300_000, `packed artifact unexpectedly exceeds 300 KB: ${packResult.size}`);
-    assert.ok(packResult.unpackedSize < 1_000_000, `unpacked artifact unexpectedly exceeds 1 MB`);
+    assert.ok(
+        packResult.unpackedSize < 1_000_000,
+        `unpacked artifact unexpectedly exceeds 1 MB: ${packResult.unpackedSize}`,
+    );
 
     assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");
     assertArtifactMatchesManifest(tarball, packResult);

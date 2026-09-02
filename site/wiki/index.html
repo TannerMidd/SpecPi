@@ -69,12 +69,18 @@ specpi install
 specpi doctor</code></pre>
           <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
           <pre><code>npm install --global specpi@0.10.0</code></pre>
-          <div class="terminal-bar secondary"><span>Source-audited release</span></div>
+          <div class="terminal-bar secondary"><span>Source-audited release · Linux, macOS, Git Bash</span></div>
           <pre><code>git clone --branch v0.10.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
 ./specpi doctor</code></pre>
+          <div class="terminal-bar secondary"><span>Source-audited release · Windows PowerShell / cmd</span></div>
+          <pre><code>git clone --branch v0.10.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+cd SpecPi
+.\specpi.cmd plan
+.\specpi.cmd install
+.\specpi.cmd doctor</code></pre>
           <div class="terminal-bar secondary"><span>Update · two explicit steps</span></div>
           <pre><code>npm install --global specpi@latest
 specpi update

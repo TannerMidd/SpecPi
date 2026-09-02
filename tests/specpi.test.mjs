@@ -461,9 +461,11 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.doesNotMatch(publish, /NODE_AUTH_TOKEN|secrets\.|uses: actions\/[^\s]+@v\d/);
     assert.match(releaseRunbook, /--provenance=false/);
     assert.match(releaseRunbook, /Do not publish a GitHub Release for that same bootstrap version/);
-    assert.match(ci, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
-    assert.match(ci, /npm run check:package/);
-    assert.match(ci, /npm run check:pi-package/);
+    assert.match(releaseRunbook, /Publication is a post-merge operation/);
+    assert.match(releaseRunbook, /never publish from an unmerged commit/);
+    assert.match(ci, /os: \[windows-latest, macos-latest\]/);
+    assert.equal(ci.match(/npm run check:package/g)?.length, 1);
+    assert.equal(ci.match(/npm run check:pi-package/g)?.length, 2);
 });
 
 test("showcase site is self-contained and Pages-ready", () => {
@@ -574,6 +576,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /specpi doctor/);
     assert.match(wikiHtml, /pi install npm:specpi/);
     assert.match(wikiHtml, /\.\/specpi doctor/);
+    assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
+    assert.equal(wikiHtml.match(/git clone --branch v0\.10\.0/g)?.length, 2);
     assert.match(wikiHtml, /npm run check/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
     assert.match(wikiCss, /\.definition-list/);

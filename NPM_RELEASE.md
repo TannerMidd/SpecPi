@@ -44,6 +44,21 @@ Verify the registry bytes and metadata immediately, then configure trusted publi
 7. Obtain fresh read-only review of package metadata, installer behavior, workflow permissions, and the packed artifact.
 8. Commit the reviewed release, create the matching `v<version>` tag, and create a GitHub Release only after explicit approval.
 
+## Documentation and publication order
+
+Publication is a post-merge operation. npm versions are immutable, and the protected workflow must run from a reviewed release tag on `main`, so never publish from an unmerged commit: that would leave permanent public bytes whose source might never land.
+
+`README.md`, `site/index.html`, and `site/wiki/index.html` document both the canonical `npm install --global specpi@latest` route and a version-pinned example, while `.github/workflows/pages.yml` deploys the site on any push to `main` that touches `site/**`. The release merge therefore deploys install instructions for a version that is not yet on the registry, and the site advertises a command that resolves to `E404` until publication completes.
+
+Keep that window short and bounded:
+
+1. Merge the reviewed release to `main`.
+2. Create the `v<version>` tag and GitHub Release immediately, and approve the `npm` environment without delay. For the one bootstrap version described above, publish the reviewed tarball interactively instead and create no GitHub Release.
+3. Wait for the publish job to verify registry version, integrity, dist-tag, and attestation state.
+4. Complete the registry smoke check below, then confirm the deployed site and announce the release.
+
+If publication cannot complete, revert the release merge on `main` so the site stops advertising an unavailable version, and restart from a new version rather than reusing the failed one.
+
 ## Automated publication
 
 Publishing the GitHub Release starts `.github/workflows/npm-publish.yml`.
