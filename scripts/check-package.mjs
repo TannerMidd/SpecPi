@@ -258,6 +258,10 @@ function assertInstalledLifecycle(packageRoot, temporaryRoot, baseEnv) {
         ...baseEnv,
         PATH: `${fakeBin}${path.delimiter}${baseEnv.PATH || ""}`,
         PI_CODING_AGENT_DIR: agentDir,
+        GIT_AUTHOR_NAME: "SpecPi Package Check",
+        GIT_AUTHOR_EMAIL: "specpi-package-check@example.invalid",
+        GIT_COMMITTER_NAME: "SpecPi Package Check",
+        GIT_COMMITTER_EMAIL: "specpi-package-check@example.invalid",
     };
     const cli = path.join(packageRoot, "scripts", "specpi.mjs");
 
