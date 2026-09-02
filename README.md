@@ -42,7 +42,7 @@ Use `/wishlist status` for queue and loop-health totals. Use `/wishlist history 
 
 | Capability | Interface | Behavior |
 | --- | --- | --- |
-| Focused execution | `/zen` | Toggles a reduced-noise execution mode. |
+| Spec execution | `/zen` | Replaces normal chrome with a technical run panel, seals live reasoning, holds streaming prose until complete, and keeps tools collapsed. |
 | File review | `/files` | Browses source, rendered Markdown, Git diffs, and bounded review comments. |
 | Scope monitoring | `/scope` | Declares expected paths and reports unacknowledged drift. |
 | Worktree experiments | `/experiment` | Creates detached worktrees with keep, binary patch export, and confirmed discard outcomes. |
@@ -51,7 +51,10 @@ Use `/wishlist status` for queue and loop-health totals. Use `/wishlist history 
 | Improvement selection | `/harness-improvement` | Authorizes one qualified or review-needed item. |
 | Command guard | `/guard` | Denies confirmed host-wide destructive calls and requests approval for bounded risk classes. |
 | Browser QA | Browser tools | Opens an isolated Chromium context for rendered inspection and screenshots. |
+| Specification theme | `zenpi-spec` | Applies the GitHub Pages design’s blueprint blue, technical greys, layered surfaces, and restrained semantic states across Pi. |
 | Installer lifecycle | `zenpi` | Plans, installs, updates, verifies, and uninstalls managed state with backups and rollback. |
+
+`zenpi-spec` is the default Pi theme. It carries the site’s clean specification direction through message surfaces, tools, Markdown, diffs, syntax highlighting, search, and the full thinking-level scale. The original `tea-house` theme remains bundled and selectable from `/settings`.
 
 Capability registry entries include closed offline validators. Completion, `npm run check`, and `zenpi doctor` run those validators.
 

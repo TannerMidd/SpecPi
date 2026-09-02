@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add the immersive `zenpi-spec` Pi theme based on ZenPi’s clean GitHub Pages specification design, with layered technical surfaces and complete palettes for Markdown, tools, diffs, syntax, search, statuses, and thinking levels. Make it the default while retaining Tea House as an installed option.
+- Rebuild `/zen` as an immersive specification console: replace normal header and footer chrome, show indexed execution phases and scope state, seal reasoning traces, hold live response prose until completion, keep tool output collapsed, and suppress routine model narration while preserving the full transcript and restoring normal rendering when the mode exits.
+
 ## 0.8.4 - 2026-09-01
 
 - Add opt-in workflow controls: `/scope` declares project-relative change boundaries and surfaces direct or observed drift without silently expanding scope; `/experiment` creates detached, private-state Git worktrees with complete patch export and explicitly confirmed discard; `/challenge` produces a structured adversarial readiness card whose deterministic gate rejects unresolved evidence.

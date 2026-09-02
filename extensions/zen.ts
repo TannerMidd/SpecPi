@@ -2,11 +2,11 @@
  * Zen - focused execution mode for Pi.
  *
  * Zen mode is deliberately visible and behavioral:
- * - a persistent activity panel and footer status show that the mode is active;
- * - tool output starts collapsed to reduce transcript noise;
- * - the working indicator reports the current phase;
- * - each model turn receives focused-execution guidance;
- * - disabling the mode restores the user's prior UI state.
+ * - a persistent specification panel and reduced footer replace normal chrome;
+ * - live reasoning and answer streams become stable placeholders until completion;
+ * - tool output stays collapsed and routine narration is suppressed;
+ * - each model turn receives quiet, evidence-led execution guidance;
+ * - disabling the mode restores the normal interface and transcript rendering.
  *
  * Toggle with /zen or Ctrl+Alt+Z.
  */
@@ -17,6 +17,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { describeZenPhase, transformZenMarkdown } from "./zen/core.mjs";
 
 const zenPiAgentDir = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
 const zenPiStateDir = path.join(zenPiAgentDir, "zenpi");
@@ -70,13 +71,15 @@ type ZenPhase = "ready" | "thinking" | "reasoning" | "synthesizing" | `using ${s
 const ZEN_STATE_ENTRY = "zen-mode";
 const ZEN_SYSTEM_GUIDANCE = `
 
-[ZEN MODE — FOCUSED EXECUTION]
-Work on one clear objective at a time.
+[ZEN MODE — SPEC EXECUTION]
+Operate as a quiet technical instrument on one objective.
 - Inspect relevant state before changing it.
 - Prefer the smallest coherent change; avoid unrelated additions and cleanup.
+- Use tools without narrating routine progress. Speak mid-task only for a material decision, blocker, or safety boundary.
+- Do not repeat tool output. Convert evidence into conclusions.
 - Ask when ambiguity would materially change the result.
 - Validate with direct evidence before declaring completion.
-- Keep narration concise and emphasize decisions, evidence, and results.`;
+- Keep the final response specification-minimal: outcome, evidence, and residual risk only when useful.`;
 
 function renderEdge(
     left: string,
@@ -100,8 +103,14 @@ function renderEdge(
     return truncateToWidth(color(`${left}${fittedLabel}${fill}${right}`), width, "");
 }
 
-function formatPhase(phase: ZenPhase): string {
-    return phase.replace(/^using /, "using ");
+function splitLine(left: string, right: string, width: number): string {
+    const gap = Math.max(1, width - visibleWidth(left) - visibleWidth(right));
+
+    return truncateToWidth(`${left}${" ".repeat(gap)}${right}`, width, "");
+}
+
+function countLabel(value: number, unit: string): string {
+    return `${unit}${String(value).padStart(2, "0")}`;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -115,14 +124,7 @@ export default function (pi: ExtensionAPI) {
         indeterminate: false,
     };
     let toolsWereExpanded: boolean | undefined;
-    let widgetTimer: ReturnType<typeof setInterval> | undefined;
-
-    const stopWidgetTimer = () => {
-        if (widgetTimer) {
-            clearInterval(widgetTimer);
-            widgetTimer = undefined;
-        }
-    };
+    let requestZenRender: (() => void) | undefined;
 
     const updateActivity = (ctx: ExtensionContext) => {
         if (!enabled) {
@@ -130,9 +132,14 @@ export default function (pi: ExtensionAPI) {
         }
 
         const theme = ctx.ui.theme;
-        const state = formatPhase(phase);
-        ctx.ui.setStatus("zen-mode", `${theme.fg("accent", theme.bold("◆ ZEN"))}${theme.fg("dim", ` · ${state}`)}`);
-        ctx.ui.setWorkingMessage(`ZEN · ${state}`);
+        const state = describeZenPhase(phase);
+        const detail = state.detail ? ` · ${state.detail}` : "";
+        ctx.ui.setStatus(
+            "zen-mode",
+            `${theme.fg("accent", theme.bold("π SPEC"))}${theme.fg("dim", ` · ${state.index} / ${state.label}${detail}`)}`,
+        );
+        ctx.ui.setWorkingMessage(`${state.index} / ${state.label}${detail}`);
+        requestZenRender?.();
     };
 
     const applyMode = (ctx: ExtensionContext) => {
@@ -145,86 +152,126 @@ export default function (pi: ExtensionAPI) {
         }
 
         ctx.ui.setToolsExpanded(false);
-        ctx.ui.setWorkingIndicator({
-            frames: [
-                ctx.ui.theme.fg("dim", "◇"),
-                ctx.ui.theme.fg("muted", "◈"),
-                ctx.ui.theme.fg("accent", "◆"),
-                ctx.ui.theme.fg("muted", "◈"),
-            ],
-            intervalMs: 420,
-        });
-        updateActivity(ctx);
+        ctx.ui.setWorkingVisible(false);
+        ctx.ui.setWorkingIndicator({ frames: [] });
+        ctx.ui.setHiddenThinkingLabel("01 / REASONING · SEALED");
 
         ctx.ui.setHeader((_tui, theme) => ({
             invalidate() {},
             render(width: number): string[] {
-                if (width < 36) {
-                    return [truncateToWidth(theme.fg("accent", theme.bold("◆ ZEN MODE")), width, "")];
+                if (width < 44) {
+                    return [
+                        renderEdge("┌", "┐", "─ π / SPEC ", width, (text) => theme.fg("borderAccent", text)),
+                        truncateToWidth(theme.fg("dim", "ZENPI · QUIET TECHNICAL EXECUTION"), width, ""),
+                        renderEdge("└", "┘", "─ 00 ", width, (text) => theme.fg("borderMuted", text)),
+                    ];
                 }
 
-                const title = theme.fg("accent", theme.bold("Z E N   ◆"));
-                const subtitle = theme.fg("dim", "focus · evidence · finish");
-                const center = (line: string) => {
-                    const padding = Math.max(0, Math.floor((width - visibleWidth(line)) / 2));
+                const innerWidth = width - 4;
+                const row = (left: string, right: string) =>
+                    `${theme.fg("borderMuted", "│")} ${splitLine(left, right, innerWidth)} ${theme.fg("borderMuted", "│")}`;
 
-                    return truncateToWidth(`${" ".repeat(padding)}${line}`, width, "");
-                };
-
-                return ["", center(title), center(subtitle), ""];
+                return [
+                    renderEdge("┌", "┐", "─ π  ZENPI / SPEC EXECUTION ", width, (text) =>
+                        theme.fg("borderAccent", text),
+                    ),
+                    row(theme.fg("text", theme.bold("SYSTEM  ZENPI")), theme.fg("dim", "MODE  FOCUSED")),
+                    row(theme.fg("muted", "STREAM  HELD UNTIL COMPLETE"), theme.fg("dim", "TOOLS  COLLAPSED")),
+                    renderEdge("└", "┘", "─ HUMAN-DIRECTED · EVIDENCE-LED ", width, (text) =>
+                        theme.fg("borderMuted", text),
+                    ),
+                ];
             },
         }));
 
-        ctx.ui.setWidget("zen-mode", (tui, theme) => {
-            stopWidgetTimer();
-            widgetTimer = setInterval(() => tui.requestRender(), 30_000);
+        ctx.ui.setFooter((tui, theme, footerData) => {
+            const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
 
             return {
-                dispose: stopWidgetTimer,
+                dispose: unsubscribe,
                 invalidate() {},
                 render(width: number): string[] {
-                    const state = formatPhase(phase);
-                    if (width < 32) {
+                    const state = describeZenPhase(phase);
+                    const detail = state.detail ? ` · ${state.detail}` : "";
+                    const usage = ctx.getContextUsage();
+                    const context =
+                        usage?.percent === null || usage?.percent === undefined
+                            ? "CTX --"
+                            : `CTX ${usage.percent.toFixed(0)}%`;
+                    const branch = footerData.getGitBranch();
+                    const model = ctx.model?.id || "NO MODEL";
+                    const left = theme.fg("accent", `${state.index} / ${state.label}${detail}`);
+                    const right = theme.fg("dim", `${context} · ${model}${branch ? ` · ${branch}` : ""}`);
+
+                    return [splitLine(left, right, width)];
+                },
+            };
+        });
+
+        ctx.ui.setWidget("zen-mode", (tui, theme) => {
+            const renderNow = () => tui.requestRender();
+            requestZenRender = renderNow;
+
+            return {
+                dispose() {
+                    if (requestZenRender === renderNow) {
+                        requestZenRender = undefined;
+                    }
+                },
+                invalidate() {},
+                render(width: number): string[] {
+                    const state = describeZenPhase(phase);
+                    const detail = state.detail ? ` · ${state.detail}` : "";
+                    const phaseText = `${state.index} / ${state.label}${detail}`;
+                    const run = `${countLabel(turnCount, "T")} · ${countLabel(toolCount, "X")}`;
+                    const scope = !workflowScope.active
+                        ? "UNSET"
+                        : workflowScope.pending > 0 || workflowScope.indeterminate
+                          ? "REVIEW"
+                          : "CLEAN";
+
+                    if (width < 44) {
                         return [
-                            truncateToWidth(theme.fg("accent", `◆ ZEN · ${state}`), width, ""),
-                            truncateToWidth(
-                                theme.fg("dim", `${turnCount} turns · ${toolCount} tools · /zen exits`),
-                                width,
-                                "",
-                            ),
+                            renderEdge("┌", "┐", "─ ACTIVE SPEC ", width, (text) => theme.fg("borderAccent", text)),
+                            truncateToWidth(theme.fg("accent", phaseText), width, ""),
+                            truncateToWidth(theme.fg("dim", `${run} · SCOPE ${scope} · OUTPUT HELD`), width, ""),
+                            renderEdge("└", "┘", "─ /zen exits ", width, (text) => theme.fg("borderMuted", text)),
                         ];
                     }
 
-                    const scopeDetail = workflowScope.active
-                        ? ` · scope ${workflowScope.pending > 0 || workflowScope.indeterminate ? "review" : "clean"}`
-                        : "";
-                    const detail = `◆ ${state} · ${turnCount} turn${turnCount === 1 ? "" : "s"} · ${toolCount} tool${toolCount === 1 ? "" : "s"}${scopeDetail} · output collapsed`;
                     const innerWidth = width - 4;
-                    const fitted = truncateToWidth(detail, innerWidth, "");
-                    const padding = " ".repeat(Math.max(0, innerWidth - visibleWidth(fitted)));
+                    const row = (left: string, right: string) =>
+                        `${theme.fg("borderMuted", "│")} ${splitLine(left, right, innerWidth)} ${theme.fg("borderMuted", "│")}`;
 
                     return [
-                        renderEdge("╭", "╮", "─ ZEN MODE ", width, (text) => theme.fg("borderAccent", text)),
-                        truncateToWidth(
-                            `${theme.fg("borderAccent", "│")} ${theme.fg("muted", fitted)}${padding} ${theme.fg("borderAccent", "│")}`,
-                            width,
-                            "",
+                        renderEdge("┌", "┐", "─ ACTIVE SPECIFICATION ", width, (text) =>
+                            theme.fg("borderAccent", text),
                         ),
-                        renderEdge("╰", "╯", "─ focused execution · /zen exits ", width, (text) =>
+                        row(theme.fg("accent", theme.bold(phaseText)), theme.fg("dim", `RUN  ${run}`)),
+                        row(
+                            theme.fg("muted", "OUTPUT  RESPONSE HELD · TOOLS COLLAPSED"),
+                            theme.fg("dim", `SCOPE  ${scope}`),
+                        ),
+                        renderEdge("└", "┘", "─ CTRL+ALT+Z / EXIT SPEC MODE ", width, (text) =>
                             theme.fg("borderMuted", text),
                         ),
                     ];
                 },
             };
         });
+
+        updateActivity(ctx);
     };
 
     const clearMode = (ctx: ExtensionContext) => {
-        stopWidgetTimer();
+        requestZenRender = undefined;
         ctx.ui.setStatus("zen-mode", undefined);
         ctx.ui.setWidget("zen-mode", undefined);
+        ctx.ui.setFooter(undefined);
         ctx.ui.setWorkingIndicator();
         ctx.ui.setWorkingMessage();
+        ctx.ui.setWorkingVisible(true);
+        ctx.ui.setHiddenThinkingLabel();
         ctx.ui.setHeader(undefined);
         if (toolsWereExpanded !== undefined) {
             ctx.ui.setToolsExpanded(toolsWereExpanded);
@@ -248,7 +295,7 @@ export default function (pi: ExtensionAPI) {
         phase = "ready";
         if (enabled) {
             applyMode(ctx);
-            ctx.ui.notify("Zen mode enabled: focused guidance, live activity, collapsed tool output.", "info");
+            ctx.ui.notify("SPEC MODE / ACTIVE · live response held · tools collapsed", "info");
         } else {
             clearMode(ctx);
             ctx.ui.notify("Zen mode disabled. Previous interface restored.", "info");
@@ -261,6 +308,8 @@ export default function (pi: ExtensionAPI) {
 
     const toggleMode = (ctx: ExtensionContext) => setMode(!enabled, ctx);
 
+    pi.registerMarkdownTransformer((markdown, context) => transformZenMarkdown(markdown, context, enabled));
+
     pi.on("session_start", async (_event, ctx) => {
         enabled = false;
         phase = "ready";
@@ -268,6 +317,7 @@ export default function (pi: ExtensionAPI) {
         toolCount = 0;
         workflowScope = { active: false, pending: 0, indeterminate: false };
         toolsWereExpanded = undefined;
+        requestZenRender = undefined;
 
         for (const entry of ctx.sessionManager.getBranch()) {
             if (entry.type === "custom" && entry.customType === ZEN_STATE_ENTRY) {
@@ -288,13 +338,14 @@ export default function (pi: ExtensionAPI) {
             pending: Number.isInteger(state?.pending) ? Math.max(0, state.pending) : 0,
             indeterminate: state?.indeterminate === true,
         };
+        requestZenRender?.();
     });
 
     pi.on("session_shutdown", (_event, ctx) => {
         if (enabled) {
             clearMode(ctx);
         } else {
-            stopWidgetTimer();
+            requestZenRender = undefined;
         }
     });
 
@@ -323,6 +374,7 @@ export default function (pi: ExtensionAPI) {
         }
 
         toolCount += 1;
+        ctx.ui.setToolsExpanded(false);
         phase = `using ${event.toolName}`;
         updateActivity(ctx);
     });
@@ -346,7 +398,7 @@ export default function (pi: ExtensionAPI) {
     });
 
     pi.on("before_agent_start", async (event) => {
-        if (!enabled || event.systemPrompt.includes("[ZEN MODE — FOCUSED EXECUTION]")) {
+        if (!enabled || event.systemPrompt.includes("[ZEN MODE — SPEC EXECUTION]")) {
             return;
         }
 
@@ -354,7 +406,7 @@ export default function (pi: ExtensionAPI) {
     });
 
     pi.registerCommand("zen", {
-        description: "Toggle focused execution mode (visible state, collapsed output, focused guidance)",
+        description: "Toggle immersive spec execution (held live stream, collapsed tools, reduced chrome)",
         getArgumentCompletions: (prefix: string) => {
             const options = ["on", "off", "status"];
             const matches = options.filter((option) => option.startsWith(prefix.trim().toLowerCase()));
@@ -382,9 +434,11 @@ export default function (pi: ExtensionAPI) {
             }
 
             if (action === "status") {
+                const state = describeZenPhase(phase);
+                const detail = state.detail ? ` · ${state.detail}` : "";
                 ctx.ui.notify(
                     enabled
-                        ? `Zen mode is on · ${formatPhase(phase)} · ${turnCount} turns · ${toolCount} tools.`
+                        ? `SPEC MODE / ACTIVE · ${state.index} / ${state.label}${detail} · ${countLabel(turnCount, "T")} · ${countLabel(toolCount, "X")}`
                         : "Zen mode is off.",
                     "info",
                 );

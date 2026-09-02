@@ -1,5 +1,5 @@
 /**
- * ZenPi Files — a dependency-free, Tea House-native project browser.
+ * ZenPi Files — a dependency-free, theme-native project browser.
  *
  * /files [path] opens a compact tree, themed source/Markdown viewer,
  * git diff view, and line-comment workflow without external renderers.
@@ -636,7 +636,7 @@ class ZenFilesComponent implements Component {
 
 export default function filesExtension(pi: ExtensionAPI): void {
     pi.registerCommand("files", {
-        description: "Browse, read, diff, and comment on project files in the Tea House theme",
+        description: "Browse, read, diff, and comment on project files in the active ZenPi theme",
         handler: async (args, ctx) => {
             if (ctx.mode !== "tui") {
                 ctx.ui.notify("/files is available in interactive TUI mode.", "warning");

@@ -729,12 +729,17 @@ function validManagedModelScope(value) {
 }
 
 function desiredSettingsOperations() {
-    return [{ path: ["theme"], value: "tea-house" }];
+    return [{ path: ["theme"], value: "zenpi-spec" }];
 }
 
 function managedFiles(includeShell) {
     const files = [
         [path.join(repoRoot, "extensions", "zen.ts"), path.join(agentDir, "extensions", "zen.ts"), 0o644],
+        [
+            path.join(repoRoot, "extensions", "zen", "core.mjs"),
+            path.join(agentDir, "extensions", "zen", "core.mjs"),
+            0o644,
+        ],
         [
             path.join(repoRoot, "extensions", "ui-refresh", "index.ts"),
             path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts"),
@@ -831,6 +836,7 @@ function managedFiles(includeShell) {
             0o644,
         ],
         [path.join(repoRoot, "themes", "tea-house.json"), path.join(agentDir, "themes", "tea-house.json"), 0o644],
+        [path.join(repoRoot, "themes", "zenpi-spec.json"), path.join(agentDir, "themes", "zenpi-spec.json"), 0o644],
     ];
     if (includeShell) {
         files.push([path.join(repoRoot, "shell", "pi-profiles.sh"), path.join(stateDir, "pi-profiles.sh"), 0o644]);
@@ -1081,6 +1087,7 @@ async function confirm(message, yes) {
 function assertSources() {
     const required = [
         "extensions/zen.ts",
+        "extensions/zen/core.mjs",
         "extensions/ui-refresh/index.ts",
         "extensions/workflow-controls/index.ts",
         "extensions/workflow-controls/scope.mjs",
@@ -1103,6 +1110,7 @@ function assertSources() {
         "skills/zenpi-improve/SKILL.md",
         "skills/donsetch/SKILL.md",
         "themes/tea-house.json",
+        "themes/zenpi-spec.json",
         "templates/AGENTS.md",
         "shell/pi-profiles.sh",
     ];
@@ -1143,7 +1151,7 @@ Managed files:`);
     console.log(`  ${manifestPath}`);
 
     console.log("\nSettings ownership:");
-    console.log("  theme = tea-house");
+    console.log("  theme = zenpi-spec");
     console.log("  pinned package entries (merged by npm package identity)");
     console.log("  command-guard mode and approvals are session-only and no raw commands are persisted");
     console.log("  scope and completion state stays in the active Pi session branch without raw tool content");

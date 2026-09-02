@@ -1,5 +1,5 @@
 {
-  "theme": "tea-house",
+  "theme": "zenpi-spec",
   "packages": [
     "npm:pi-web-access@0.25.0",
     "npm:@juicesharp/rpiv-ask-user-question@2.7.1",

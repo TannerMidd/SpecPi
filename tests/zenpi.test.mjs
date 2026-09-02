@@ -21,6 +21,7 @@ import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
 import { acquireZenPiLock } from "../scripts/lock.mjs";
+import { describeZenPhase, transformZenMarkdown } from "../extensions/zen/core.mjs";
 import {
     assertDistinctPaths,
     comparePngBuffers,
@@ -180,6 +181,125 @@ function installFakeBrowserNpm(fakeBin) {
     const source = fs.readFileSync(path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs"), "utf8");
     writeNodeCommand(fakeBin, "npm", source.replace(/^#!.*\n/u, ""));
 }
+
+test("Zen mode holds live prose behind a stable specification state", () => {
+    assert.deepEqual(describeZenPhase("ready"), { index: "00", label: "READY", detail: "" });
+    assert.deepEqual(describeZenPhase("using browser_open"), {
+        index: "03",
+        label: "TOOL",
+        detail: "BROWSER_OPEN",
+    });
+    assert.deepEqual(describeZenPhase("bash failed"), { index: "!!", label: "FAULT", detail: "BASH" });
+    assert.deepEqual(describeZenPhase("using unsafe\u001b[31mtool"), {
+        index: "03",
+        label: "TOOL",
+        detail: "UNSAFE-31MTOOL",
+    });
+
+    const live = transformZenMarkdown(
+        "partial answer that keeps growing",
+        {
+            messageType: "assistant",
+            isStreaming: true,
+        },
+        true,
+    );
+    assert.equal(live, "> **04 / SYNTHESIS** · response held until complete");
+    assert.doesNotMatch(live, /partial answer/);
+    assert.equal(
+        transformZenMarkdown("private reasoning", { messageType: "assistant-thinking", isStreaming: false }, true),
+        "> **01 / REASONING** · working trace sealed in Zen mode",
+    );
+    assert.equal(
+        transformZenMarkdown("final answer", { messageType: "assistant", isStreaming: false }, true),
+        "final answer",
+    );
+    assert.equal(
+        transformZenMarkdown("normal mode", { messageType: "assistant", isStreaming: true }, false),
+        "normal mode",
+    );
+});
+
+test("zenpi-spec defines the complete Pi theme surface from the site palette", () => {
+    const theme = JSON.parse(fs.readFileSync(path.join(repoRoot, "themes", "zenpi-spec.json"), "utf8"));
+    const expectedTokens = [
+        "accent",
+        "bashMode",
+        "border",
+        "borderAccent",
+        "borderMuted",
+        "customMessageBg",
+        "customMessageLabel",
+        "customMessageText",
+        "dim",
+        "error",
+        "mdCode",
+        "mdCodeBlock",
+        "mdCodeBlockBorder",
+        "mdHeading",
+        "mdHr",
+        "mdLink",
+        "mdLinkUrl",
+        "mdListBullet",
+        "mdQuote",
+        "mdQuoteBorder",
+        "muted",
+        "scrollbarThumb",
+        "searchMatchBg",
+        "searchMatchText",
+        "selectedBg",
+        "success",
+        "syntaxComment",
+        "syntaxFunction",
+        "syntaxKeyword",
+        "syntaxNumber",
+        "syntaxOperator",
+        "syntaxPunctuation",
+        "syntaxString",
+        "syntaxType",
+        "syntaxVariable",
+        "text",
+        "thinkingHigh",
+        "thinkingLow",
+        "thinkingMax",
+        "thinkingMedium",
+        "thinkingMinimal",
+        "thinkingOff",
+        "thinkingText",
+        "thinkingXhigh",
+        "toolDiffAdded",
+        "toolDiffContext",
+        "toolDiffRemoved",
+        "toolErrorBg",
+        "toolOutput",
+        "toolPendingBg",
+        "toolSuccessBg",
+        "toolTitle",
+        "userMessageBg",
+        "userMessageText",
+        "warning",
+    ];
+
+    assert.equal(theme.name, "zenpi-spec");
+    assert.deepEqual(Object.keys(theme.colors).sort(), expectedTokens.sort());
+    assert.equal(theme.vars.blueprint, "#8FB6D9");
+    assert.equal(theme.vars.toolSuccessBg, "#192027");
+    assert.equal(theme.colors.toolTitle, "paperBright");
+    assert.equal(theme.export.pageBg, "#121519");
+
+    for (const [name, value] of Object.entries(theme.vars)) {
+        assert.match(value, /^#[0-9A-F]{6}$/i, `invalid theme variable ${name}`);
+    }
+
+    for (const [token, value] of Object.entries(theme.colors)) {
+        assert.ok(value in theme.vars || /^#[0-9A-F]{6}$/i.test(value), `unresolved theme token ${token}`);
+    }
+
+    assert.equal(
+        JSON.parse(fs.readFileSync(path.join(repoRoot, "templates", "settings.json"), "utf8")).theme,
+        "zenpi-spec",
+    );
+});
 
 test("npm package identities ignore pinned versions", () => {
     assert.equal(packageIdentity("npm:pi-web-access@0.25.0"), "npm:pi-web-access");
@@ -1852,7 +1972,11 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             false,
         );
         assert.equal(installed.customSetting, true);
+        assert.equal(installed.theme, "zenpi-spec");
+        assert.ok(fs.existsSync(path.join(agentDir, "themes", "zenpi-spec.json")));
+        assert.ok(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")));
         assert.ok(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")));
+        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zen", "core.mjs")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")));
         for (const file of ["index.ts", "scope.mjs", "experiments.mjs", "challenge.mjs", "smoke.mjs"]) {
             assert.ok(
@@ -2035,6 +2159,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(restored.unrelatedUserSetting, "preserved");
         assert.equal(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), "# Personal instructions\n");
         assert.equal(fs.readFileSync(path.join(agentDir, "extensions", "zen.ts"), "utf8"), "// personal prior zen\n");
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zen", "core.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "scope.mjs")), false);
@@ -2054,6 +2179,8 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(path.join(agentDir, "skills", "zenpi-improve", "SKILL.md")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "themes", "zenpi-spec.json")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "zenpi", "manifest.json")), false);
 
         runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
