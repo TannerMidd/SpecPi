@@ -261,6 +261,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     const cycle = fs.readFileSync(path.join(siteDir, "cycle.js"), "utf8");
     const svg = fs.readFileSync(path.join(siteDir, "self-improvement-loop-v2.svg"), "utf8");
     const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+    const thirdParty = fs.readFileSync(path.join(repoRoot, "THIRD_PARTY.md"), "utf8");
     const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
 
     const svgViewBox = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
@@ -280,7 +281,6 @@ test("showcase site is self-contained and Pages-ready", () => {
     );
     assert.match(readme, /src="site\/self-improvement-loop-v2\.svg"/);
     assert.match(readme, /alt="[^"]*failure[^"]*later evidence[^"]*human review/i);
-    assert.doesNotMatch(readme, /notice → qualify/);
     assert.ok(
         JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).files.includes(
             "site/self-improvement-loop-v2.svg",
@@ -291,56 +291,58 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /name="viewport"/);
     assert.match(html, /href="styles\.css"/);
     assert.match(html, /href="logo\.svg"/);
-    assert.match(html, /id="principles"/);
-    assert.match(html, /id="features"/);
-    assert.match(html, /themed \/files review/);
-    assert.match(html, /id="wishlist"/);
-    assert.match(html, /id="workings"/);
-    assert.match(html, /id="goal"/);
-    assert.match(html, /A control loop<br>with human approval\./);
-    assert.match(html, /<code>\/harness-improvement<\/code> opens one clean menu/);
-    assert.match(html, /type="module" src="cycle\.js"/);
-    assert.match(html, /data-cycle-story/);
-    assert.match(html, /role="tablist" aria-label="Improvement stages"/);
-    assert.equal(html.match(/data-cycle-step=/g)?.length, 7);
-    assert.match(html, /class="story-fallback"/);
-    assert.match(html, /surface later evidence for human review/);
-    assert.match(html, /aria-live="polite" data-story-announcement/);
-    assert.match(html, /Walk one gap from friction to proof\./);
-    assert.doesNotMatch(html, /cycle-charts|cycle-orbit|gate-outcomes/);
-    assert.doesNotMatch(html, /<strong>high<\/strong><span>impact/);
+    assert.match(html, /class="section-index"/);
+    assert.match(html, /id="overview"/);
+    assert.match(html, /id="loop"/);
+    assert.match(html, /id="session"/);
+    assert.match(html, /id="guard"/);
+    assert.match(html, /id="writer"/);
     assert.match(html, /id="install"/);
-    assert.match(
-        html,
-        /Version <code>v0\.8\.4<\/code> adds human-led scope monitoring, detached worktree experiments, and structured completion challenges\./,
-    );
-    assert.match(html, /The journal keeps the evidence, gates, changed files, and version/);
-    assert.match(html, /Later friction links back to that journal/);
-    assert.match(html, /durable validators/);
+    assert.match(html, /type="module" src="cycle\.js"/);
+    assert.match(html, /role="tablist" aria-label="Command guard modes"/);
+    assert.equal(html.match(/data-guard-mode=/g)?.length, 3);
+    assert.equal(html.match(/data-guard-verdict/g)?.length, 5);
     assert.match(html, /\\zenpi\.cmd install/);
     assert.match(html, /\.\/zenpi install/);
-    assert.ok(fs.existsSync(path.join(siteDir, "logo.svg")));
-    assert.match(css, /\.cycle-story/);
-    assert.match(css, /\.story-tabs button\[aria-selected="true"\]/);
+    assert.match(html, /Collection is disabled by default/);
+    assert.match(html, /One writer per working directory/);
+    assert.match(css, /grid-template-columns: 13\.375rem minmax\(0, 1fr\)/);
+    assert.match(css, /\.section-index/);
+    assert.match(css, /\.guard-controls button\[aria-selected="true"\]/);
     assert.match(css, /prefers-reduced-motion: reduce/);
+    assert.doesNotMatch(css, /url\(["']https?:/i);
 
-    assert.match(html, /class="wiki-link" href="wiki\/"/);
-    assert.match(css, /\.site-header nav \.wiki-link \{ display: block; \}/);
+    for (const font of [
+        "ibm-plex-mono-regular.woff2",
+        "ibm-plex-mono-medium.woff2",
+        "ibm-plex-mono-semibold.woff2",
+        "ibm-plex-sans.woff2",
+        "LICENSE.txt",
+    ]) {
+        assert.ok(fs.existsSync(path.join(siteDir, "fonts", font)));
+    }
+
+    assert.match(css, /fonts\/ibm-plex-mono-regular\.woff2/);
+    assert.match(css, /fonts\/ibm-plex-sans\.woff2/);
+    assert.match(thirdParty, /IBM Plex Sans and IBM Plex Mono/);
+    assert.match(thirdParty, /SIL Open Font License 1\.1/);
+
     assert.match(readme, /tannermidd\.github\.io\/ZenPi\/wiki\//);
     assert.match(readme, /\/wishlist history \[gap-id\]/);
-    assert.match(readme, /executes every validator linked from the capability registry/);
+    assert.match(readme, /registry-linked validators/);
     assert.match(wikiHtml, /<html lang="en">/);
     assert.match(wikiHtml, /name="viewport"/);
     assert.match(wikiHtml, /href="\.\.\/styles\.css"/);
     assert.match(wikiHtml, /href="\.\.\/wiki\.css"/);
     assert.match(wikiHtml, /href="\.\.\/logo\.svg"/);
     assert.match(wikiHtml, /aria-label="Wiki navigation"/);
-    assert.match(wikiHtml, /class="mobile-wiki-nav"[\s\S]*?href="#first-session"/);
     for (const id of [
         "overview",
         "getting-started",
         "first-session",
         "workflows",
+        "work-ownership",
+        "command-guard",
         "file-review",
         "browser-qa",
         "reference",
@@ -354,19 +356,19 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /\/harness-improvement/);
     assert.match(wikiHtml, /\/wishlist status/);
     assert.match(wikiHtml, /\/wishlist history \[gap-id\]/);
-    assert.match(wikiHtml, /post-retirement signal window/);
     assert.match(wikiHtml, /\.\\zenpi\.cmd doctor/);
     assert.match(wikiHtml, /\.\/zenpi doctor/);
     assert.match(wikiHtml, /npm run check/);
-    assert.match(wikiHtml, /Nothing self-starts/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
-    assert.match(wikiCss, /\.wiki-layout/);
-    assert.match(wikiCss, /\.wiki-sidebar/);
-    assert.match(wikiCss, /\.mobile-wiki-nav nav a \{ display: flex; min-height: 2rem;/);
+    assert.match(wikiCss, /\.definition-list/);
+    assert.match(wikiCss, /\.doc-section/);
     assert.match(wikiCss, /@media \(max-width: 520px\)/);
 
+    for (const content of [html, wikiHtml, readme]) {
+        assert.doesNotMatch(content, /—|real task|real, reusable/i);
+    }
+
     assert.equal(cycle.match(/stage: "/g)?.length, 7);
-    assert.match(cycle, /scrollIntoView/);
     assert.match(cycle, /ArrowRight|ArrowDown/);
     assert.equal(CYCLE_STAGES.length, 7);
     assert.deepEqual(

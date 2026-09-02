@@ -3,387 +3,196 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171310">
-  <meta name="description" content="ZenPi wiki: installation, workflows, commands, browser QA, and security boundaries.">
-  <meta property="og:title" content="ZenPi Wiki: Build deliberately">
-  <meta property="og:description" content="Practical guides and reference documentation for the ZenPi coding-agent harness.">
+  <meta name="theme-color" content="#121519">
+  <meta name="description" content="ZenPi installation, command, workflow, browser, and security reference.">
+  <meta property="og:title" content="ZenPi reference">
+  <meta property="og:description" content="Technical documentation for the ZenPi coding-agent harness.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ZenPi">
   <meta property="og:url" content="https://tannermidd.github.io/ZenPi/wiki/">
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://tannermidd.github.io/ZenPi/wiki/">
-  <title>ZenPi Wiki: Build deliberately</title>
+  <title>ZenPi reference</title>
   <link rel="icon" href="../logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="../wiki.css">
 </head>
 <body class="wiki-page">
-  <a class="skip-link" href="#wiki-content">Skip to wiki content</a>
+  <a class="skip-link" href="#overview">Skip to documentation</a>
 
-  <header class="site-header wiki-header">
+  <header class="site-header">
     <a class="brand" href="../" aria-label="ZenPi home">
       <span class="brand-mark" aria-hidden="true">π</span>
-      <span>ZenPi</span>
+      <strong>ZenPi</strong>
+      <span class="brand-separator">/</span>
+      <span>v0.8.4</span>
     </a>
-    <nav aria-label="Primary navigation">
-      <a href="../">Showcase</a>
-      <a href="#getting-started">Start</a>
-      <a href="#workflows">Guides</a>
-      <a href="#reference">Reference</a>
-      <a aria-current="page" href="./">Wiki</a>
-      <a class="github-link" href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
+    <nav class="header-nav" aria-label="Primary navigation">
+      <a href="../">Overview</a>
+      <a class="active" href="./" aria-current="page">Wiki</a>
+      <a href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
 
-  <main id="main" class="wiki-layout">
-    <aside class="wiki-sidebar" aria-label="Wiki navigation">
-      <div class="sidebar-heading">
-        <p>Documentation</p>
-        <strong>ZenPi Wiki</strong>
-        <span>v0.8.4</span>
-      </div>
-      <nav aria-label="Wiki sections">
-        <div class="sidebar-group">
-          <p>Start here</p>
-          <a href="#overview">Overview</a>
-          <a href="#getting-started">Install ZenPi</a>
-          <a href="#first-session">First session</a>
-        </div>
-        <div class="sidebar-group">
-          <p>Guides</p>
-          <a href="#workflows">Improvement loop</a>
-          <a href="#file-review">Review files</a>
-          <a href="#work-ownership">Work ownership</a>
-          <a href="#command-guard">Command guard</a>
-          <a href="#browser-qa">Browser QA</a>
-        </div>
-        <div class="sidebar-group">
-          <p>Reference</p>
-          <a href="#reference">Commands</a>
-          <a href="#configuration">Configuration</a>
-          <a href="#security">Security</a>
-          <a href="#development">Development</a>
-        </div>
+  <div class="page-layout wiki-layout">
+    <aside class="section-index wiki-sidebar" aria-label="Wiki navigation">
+      <p>Documentation</p>
+      <nav>
+        <a href="#getting-started"><span>01</span>Install</a>
+        <a href="#first-session"><span>02</span>First session</a>
+        <a href="#workflows"><span>03</span>Improvement loop</a>
+        <a href="#work-ownership"><span>04</span>Work ownership</a>
+        <a href="#command-guard"><span>05</span>Command guard</a>
+        <a href="#file-review"><span>06</span>Files &amp; browser</a>
+        <a href="#reference"><span>07</span>Commands</a>
+        <a href="#security"><span>08</span>Security</a>
+        <a href="#development"><span>09</span>Development</a>
       </nav>
-      <a class="sidebar-source" href="https://github.com/TannerMidd/ZenPi">View source <span aria-hidden="true">↗</span></a>
+      <div class="index-meta"><span>Reference · v0.8.4</span></div>
     </aside>
 
-    <article class="wiki-article" id="wiki-content">
-      <div class="breadcrumbs" aria-label="Breadcrumb">
-        <a href="../">ZenPi</a><span aria-hidden="true">/</span><span aria-current="page">Wiki</span>
-      </div>
-
-      <details class="mobile-wiki-nav">
-        <summary>Browse the wiki <span aria-hidden="true">⌄</span></summary>
-        <nav aria-label="Mobile wiki navigation">
-          <a href="#overview">Overview</a>
-          <a href="#getting-started">Install</a>
-          <a href="#first-session">First session</a>
-          <a href="#workflows">Improvement loop</a>
-          <a href="#file-review">File review</a>
-          <a href="#work-ownership">Work ownership</a>
-          <a href="#command-guard">Command guard</a>
-          <a href="#browser-qa">Browser QA</a>
-          <a href="#reference">Commands</a>
-          <a href="#configuration">Configuration</a>
-          <a href="#security">Security</a>
-          <a href="#development">Development</a>
-        </nav>
-      </details>
-
-      <header class="wiki-hero" id="overview">
+    <main id="main" class="content wiki-content">
+      <header class="wiki-intro" id="overview">
         <p class="eyebrow">Documentation / v0.8.4</p>
-        <h1>Build with care,<br><em>work with proof.</em></h1>
-        <p>Everything you need to install ZenPi, understand its human-directed improvement loop, and use its focused review and browser tools.</p>
-        <div class="wiki-hero-actions">
-          <a class="button button-primary" href="#getting-started">Get started</a>
-          <a class="button button-secondary" href="#reference">Command reference</a>
-        </div>
+        <h1>Reference</h1>
+        <p>Installation, improvement workflows, command guard behavior, browser tools, and security boundaries.</p>
       </header>
 
-      <section class="quick-links" aria-label="Popular wiki topics">
-        <a href="#getting-started">
-          <span>01 / setup</span>
-          <strong>Install safely</strong>
-          <small>Preview every change before it lands.</small>
-        </a>
-        <a href="#workflows">
-          <span>02 / improve</span>
-          <strong>Follow the loop</strong>
-          <small>Turn recurring friction into verified work.</small>
-        </a>
-      </section>
-
-      <section class="wiki-section" id="getting-started" aria-labelledby="getting-started-title">
-        <div class="section-label"><span>01</span><p>Getting started</p></div>
-        <div class="doc-content">
-          <h2 id="getting-started-title">Install deliberately.</h2>
-          <p class="doc-lede">ZenPi is review-first. Start with the non-mutating plan, confirm the install only when it matches your expectations, then ask the doctor to verify the result.</p>
-
-          <aside class="callout callout-note">
-            <strong>Requirements</strong>
-            <p>Node.js 22.19 or newer, npm, and Git. ZenPi uses Pi 0.84.4 or newer and can install the reviewed pinned Pi release when Pi is missing.</p>
-          </aside>
-
-          <h3>1. Clone a reviewed release</h3>
-          <div class="code-block">
-            <div><span>terminal</span><span>release v0.8.4</span></div>
-            <pre><code>git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
+      <section class="doc-section" id="getting-started" aria-labelledby="install-doc-title">
+        <header><span>01</span><h2 id="install-doc-title">Install</h2></header>
+        <p>Requirements: Node.js 22.19 or newer, npm, and Git. ZenPi uses Pi 0.84.4 or newer. If Pi is missing, the confirmed install adds the reviewed pinned Pi package. Uninstalling ZenPi leaves that package installed.</p>
+        <div class="terminal doc-terminal">
+          <div class="terminal-bar"><span>Clone a reviewed release</span><span>v0.8.4</span></div>
+          <pre><code>git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi</code></pre>
-          </div>
-
-          <div class="platform-grid">
-            <div>
-              <h3>Windows</h3>
-              <div class="code-block compact-code">
-                <div><span>PowerShell / cmd</span></div>
-                <pre><code>.\zenpi.cmd plan
+          <div class="terminal-bar secondary"><span>Windows · PowerShell / cmd</span></div>
+          <pre><code>.\zenpi.cmd plan
 .\zenpi.cmd install
 .\zenpi.cmd doctor</code></pre>
-              </div>
-            </div>
-            <div>
-              <h3>Linux, macOS, or Git Bash</h3>
-              <div class="code-block compact-code">
-                <div><span>shell</span></div>
-                <pre><code>./zenpi plan
+          <div class="terminal-bar secondary"><span>Linux · macOS · Git Bash</span></div>
+          <pre><code>./zenpi plan
 ./zenpi install
 ./zenpi doctor</code></pre>
-              </div>
-            </div>
-          </div>
-
-          <h3>What the lifecycle does</h3>
-          <div class="definition-list">
-            <div><code>plan</code><p>Prints intended changes without mutating your system.</p></div>
-            <div><code>install</code><p>Confirms, backs up, writes atomically, and rolls configuration back if setup fails.</p></div>
-            <div><code>doctor</code><p>Checks managed files, settings, runtime dependencies, profiles, browser readiness, and every validator linked from the capability registry.</p></div>
-            <div><code>update</code><p>Refreshes managed resources while preserving unrelated settings and user-tunable state.</p></div>
-            <div><code>uninstall</code><p>Removes managed integration while retaining local evidence, profiles, and external packages.</p></div>
-          </div>
+        </div>
+        <div class="definition-list">
+          <div><code>plan</code><span>Prints intended changes without mutating the system.</span></div>
+          <div><code>install</code><span>Confirms, backs up, writes atomically, and rolls configuration back if setup fails.</span></div>
+          <div><code>doctor</code><span>Checks managed files, settings, dependencies, profiles, browser readiness, and registry-linked validators.</span></div>
+          <div><code>update</code><span>Refreshes managed resources while preserving unrelated settings and user-tunable state.</span></div>
+          <div><code>uninstall</code><span>Removes managed integration while retaining local evidence, profiles, and external packages.</span></div>
         </div>
       </section>
 
-      <section class="wiki-section" id="first-session" aria-labelledby="first-session-title">
-        <div class="section-label"><span>02</span><p>First session</p></div>
-        <div class="doc-content">
-          <h2 id="first-session-title">Begin with three small moves.</h2>
-          <ol class="steps">
-            <li><span>1</span><div><strong>Reload Pi</strong><p>After installation, run <code>/reload</code> so Pi loads ZenPi's extensions, skills, theme, and managed settings.</p></div></li>
-            <li><span>2</span><div><strong>Enter focused mode</strong><p>Run <code>/zen</code> to use ZenPi's quiet execution surface. Run it again when you want to leave.</p></div></li>
-            <li><span>3</span><div><strong>Choose local collection</strong><p>The wishlist asks once whether capability-gap collection should be on or off. Reports stay local and sanitized.</p></div></li>
-          </ol>
-          <aside class="callout callout-boundary">
-            <strong>Nothing self-starts</strong>
-            <p>Evidence can qualify a wishlist item, but only your explicit choice in <code>/harness-improvement</code> authorizes implementation.</p>
-          </aside>
+      <section class="doc-section" id="first-session" aria-labelledby="first-session-title">
+        <header><span>02</span><h2 id="first-session-title">First session</h2></header>
+        <ol class="step-list">
+          <li><span>1</span><p><strong>Reload Pi.</strong> Run <code>/reload</code> so Pi loads ZenPi's extensions, skills, theme, and managed settings.</p></li>
+          <li><span>2</span><p><strong>Enter focused mode.</strong> Run <code>/zen</code> to switch to the focused execution surface. Run it again to leave.</p></li>
+          <li><span>3</span><p><strong>Choose collection.</strong> The wishlist asks once whether capability-gap collection is enabled. Reports are local, sanitized, bounded, and deduplicated by task.</p></li>
+        </ol>
+        <p class="doc-boundary"><strong>No automatic implementation.</strong> Evidence can qualify an item, but only a selection in <code>/harness-improvement</code> authorizes a change.</p>
+      </section>
+
+      <section class="doc-section" id="workflows" aria-labelledby="workflows-title">
+        <header><span>03</span><h2 id="workflows-title">Improvement loop</h2></header>
+        <p>Recurring capability gaps enter the review menu. A person selects one item. Repository checks and capability validators determine whether the item can retire. A failed gate leaves it selected. Later evidence returns it as <code>review-needed</code>.</p>
+        <div class="definition-list wide-keys">
+          <div><code>/harness-improvement</code><span>Lists qualified and review-needed items. Selecting one authorizes that exact improvement.</span></div>
+          <div><code>/wishlist</code><span>Inspects and curates the local list, including duplicate cleanup, issue drafts, archives, and resets.</span></div>
+          <div><code>/wishlist status</code><span>Reports queue size, retirements, reopen rate, open reviews, time to retire, and qualification rate.</span></div>
+          <div><code>/wishlist history [gap-id]</code><span>Shows retirement evidence, validators, changed files, reopen signals, and rollback context.</span></div>
         </div>
       </section>
 
-      <section class="wiki-section" id="workflows" aria-labelledby="workflows-title">
-        <div class="section-label"><span>03</span><p>Improvement loop</p></div>
-        <div class="doc-content">
-          <h2 id="workflows-title">Let friction become evidence.</h2>
-          <p class="doc-lede">ZenPi uses a control loop with human approval. Repeated, reusable gaps rise into view; human judgment starts one bounded change; repository and capability gates decide when it is done.</p>
-
-          <div class="loop-list" aria-label="Seven stages of the ZenPi improvement loop">
-            <div><span>01</span><strong>Friction</strong><p>A real task hits a missing local capability.</p></div>
-            <div><span>02</span><strong>Repeat</strong><p>Distinct tasks and projects establish reusable evidence.</p></div>
-            <div class="gate"><span>03</span><strong>Choose</strong><p>A person authorizes one exact wishlist item.</p></div>
-            <div><span>04</span><strong>Build</strong><p>The smallest sufficient intervention is implemented.</p></div>
-            <div class="gate"><span>05</span><strong>Prove</strong><p>Repository checks and closed validators gate completion.</p></div>
-            <div><span>06</span><strong>Retire</strong><p>Passing proof closes the item and journals evidence, gates, changed files, and version.</p></div>
-            <div><span>07</span><strong>Return</strong><p>Later evidence links to that retirement and surfaces bounded context for human review.</p></div>
-          </div>
-
-          <h3>Run an improvement</h3>
-          <div class="code-block compact-code">
-            <div><span>Pi command</span><span>one explicit choice</span></div>
-            <pre><code>/harness-improvement</code></pre>
-          </div>
-          <p>Choose a qualified or review-needed item. The <code>zenpi-improve</code> workflow scopes the intervention, makes the change, and gathers direct acceptance evidence. A failed gate leaves the item selected instead of pretending it is complete.</p>
-
-          <h3>Inspect proof and loop health</h3>
-          <div class="command-stack">
-            <div><code>/wishlist status</code><span>Summarize the queue, retirements, reopen rate, and open reviews.</span></div>
-            <div><code>/wishlist history</code><span>Show the latest retirement and reopen decisions across the local journal.</span></div>
-            <div><code>/wishlist history &lt;gap-id&gt;</code><span>Show one gap's evidence, gates, changed files, linked reopens, and rollback context.</span></div>
-          </div>
-          <p>Every registry capability names a closed offline validator. Completion runs the source validator under review, while <code>npm run check</code> and <code>zenpi doctor</code> continuously re-prove shipped capabilities. Reopens include the original proof, a post-retirement signal window, and sanitized bounded Git context.</p>
-          <p><a class="text-link" href="../#wishlist">Walk through the interactive loop <span aria-hidden="true">→</span></a></p>
+      <section class="doc-section" id="work-ownership" aria-labelledby="ownership-title">
+        <header><span>04</span><h2 id="ownership-title">Work ownership</h2></header>
+        <p>ZenPi keeps implementation in one accountable working context. Scope, experiment, and challenge controls make path expectations and review evidence visible.</p>
+        <div class="definition-list wide-keys">
+          <div><code>/scope set</code><span>Declares expected paths. Headless and shell-detected drift remains advisory and pending until acknowledged.</span></div>
+          <div><code>/scope accept</code><span>Acknowledges one finding without changing the declared contract. Use <code>/scope add</code> to widen the contract.</span></div>
+          <div><code>/experiment start</code><span>Creates a detached worktree from <code>HEAD</code>. It does not copy dirty base changes, launch an agent, commit, merge, or touch remotes.</span></div>
+          <div><code>/experiment close</code><span>Keeps the worktree, exports tracked and untracked changes as a binary patch, or discards it after confirmation.</span></div>
+          <div><code>/challenge</code><span>Runs a structured readiness review. The result is model-authored and does not replace direct proof.</span></div>
         </div>
       </section>
 
-      <section class="wiki-section" id="file-review" aria-labelledby="file-review-title">
-        <div class="section-label"><span>04</span><p>File review</p></div>
-        <div class="doc-content">
-          <h2 id="file-review-title">Browse the work without leaving Pi.</h2>
-          <p>Open the Tea House-native project browser with <code>/files</code>, or start at a specific path. The viewer handles source, rendered Markdown, Git diffs, and bounded review comments without external pager dependencies.</p>
-          <div class="code-block compact-code">
-            <div><span>Pi commands</span></div>
-            <pre><code>/files
-/files path/to/directory</code></pre>
-          </div>
-          <div class="key-grid" aria-label="File browser keyboard shortcuts">
-            <div><kbd>j</kbd><kbd>k</kbd><span>Move</span></div>
-            <div><kbd>Enter</kbd><span>Open</span></div>
-            <div><kbd>/</kbd><span>Search</span></div>
-            <div><kbd>c</kbd><span>Changed files</span></div>
-            <div><kbd>r</kbd><span>Refresh</span></div>
-            <div><kbd>v</kbd><span>Select lines</span></div>
-            <div><kbd>c</kbd><span>Comment</span></div>
-            <div><kbd>Ctrl</kbd><kbd>Enter</kbd><span>Submit</span></div>
-          </div>
+      <section class="doc-section" id="command-guard" aria-labelledby="guard-doc-title">
+        <header><span>05</span><h2 id="guard-doc-title">Command guard</h2></header>
+        <p>Choose a mode at session start. Approvals apply to one exact call and one session. Only a structurally proven critical mutation locks the session. Parser uncertainty and invalid cleanup syntax are denied without locking later work.</p>
+        <div class="definition-list">
+          <div><code>guard</code><span>Recommended. Denies confirmed host-wide catastrophe and guard tampering, asks before Git destroys work, and stays quiet otherwise.</span></div>
+          <div><code>strict</code><span>Also asks before mutation, execution, sensitive reads, and network activity.</span></div>
+          <div><code>off</code><span>Requires confirmation and applies only to the current session.</span></div>
+        </div>
+        <p>Use <code>/guard</code> to inspect or change the mode. Available actions include <code>status</code>, <code>guard</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, and <code>clear-approvals</code>.</p>
+      </section>
+
+      <section class="doc-section" id="file-review" aria-labelledby="files-title">
+        <header><span>06</span><h2 id="files-title">Files and browser</h2></header>
+        <p><code>/files</code> opens the project browser for source, rendered Markdown, Git diffs, and bounded review comments.</p>
+        <div class="key-list" aria-label="File browser shortcuts">
+          <span><kbd>j</kbd> <kbd>k</kbd> move</span>
+          <span><kbd>Enter</kbd> open</span>
+          <span><kbd>/</kbd> search</span>
+          <span><kbd>c</kbd> changed files</span>
+          <span><kbd>v</kbd> select lines</span>
+          <span><kbd>Ctrl+Enter</kbd> submit</span>
+        </div>
+        <h3 id="browser-qa">Browser QA</h3>
+        <p>Browser tools open a fresh isolated Chromium context. Load the page, inspect rendered structure, test interactions, resize across desktop, tablet, and mobile viewports, then capture bounded evidence. Source inspection does not verify rendered appearance.</p>
+        <p class="doc-boundary"><strong>Isolation boundary.</strong> The browser does not attach to a personal Chrome profile, cookies, passwords, or extensions. It runs as a separate process and does not provide operating-system isolation.</p>
+      </section>
+
+      <section class="doc-section" id="reference" aria-labelledby="commands-title">
+        <header><span>07</span><h2 id="commands-title">Commands</h2></header>
+        <div class="definition-list command-reference">
+          <div><code>/zen [on|off|status]</code><span>Toggle or inspect focused execution mode.</span></div>
+          <div><code>/files [path]</code><span>Open the file browser at the repository root or a selected path.</span></div>
+          <div><code>/scope [set|add|accept|...]</code><span>Declare expected paths and review scope drift.</span></div>
+          <div><code>/experiment [start|close|...]</code><span>Manage detached worktree experiments.</span></div>
+          <div><code>/challenge [status|clear]</code><span>Run or inspect a structured completion-readiness review.</span></div>
+          <div><code>/wishlist [status|history|off]</code><span>Inspect, curate, and audit the local capability list.</span></div>
+          <div><code>/harness-improvement</code><span>Select and begin one improvement.</span></div>
+          <div><code>/guard [status|strict|off|...]</code><span>Inspect or change session command protection.</span></div>
+          <div><code>/reload</code><span>Reload Pi after installation or startup-loaded changes.</span></div>
         </div>
       </section>
 
-      <section class="wiki-section" id="work-ownership" aria-labelledby="work-ownership-title">
-        <div class="section-label"><span>05</span><p>Work ownership</p></div>
-        <div class="doc-content">
-          <h2 id="work-ownership-title">Keep context and authorship visible.</h2>
-          <p class="doc-lede">ZenPi does not install subagent orchestration. The apparent speed of hidden delegation is not worth losing track of what each worker knew, assumed, changed, or left unsaid.</p>
-          <div class="definition-list">
-            <div><strong>Own the context handoff</strong><p>A parent chooses what a child sees and reduces what comes back. Either boundary can omit the decisive constraint, leaving a result that is difficult to explain or reproduce.</p></div>
-            <div><strong>Keep one writer</strong><p>Parallel writers accumulate conflicting assumptions and fragmented decisions faster than reviewers can reconcile them. Use <code>/experiment start</code> to create a detached worktree, then open that path yourself in a separate Pi session.</p></div>
-            <div><strong>Make scope visible</strong><p><code>/scope set</code> declares expected project paths. Direct and Git-observed drift remains visible and pending until you explicitly allow once, acknowledge it with <code>/scope accept</code>, expand the contract with <code>/scope add</code>, or clear it.</p></div>
-            <div><strong>Challenge completion</strong><p><code>/challenge</code> asks for structured requirement evidence, contradictions, possible false-positive checks, missing validation, and residual risk. Its card supports human review; it is not independent proof.</p></div>
-            <div><strong>Leave durable evidence</strong><p>Gather context deliberately and record it in a reviewable artifact before implementation. <code>/experiment close</code> keeps the worktree, exports a byte-exact patch, or explicitly discards it without merging or committing. Ignored files cannot travel in a patch, so they are named before you export or discard.</p></div>
-          </div>
-          <aside class="callout callout-note">
-            <strong>A workflow choice, not a universal ban</strong>
-            <p>Independent agents can provide a valuable second opinion. ZenPi simply keeps their context, ownership, and output explicit instead of making delegation a default hidden layer.</p>
-          </aside>
-        </div>
+      <section class="doc-section" id="configuration" aria-labelledby="configuration-title">
+        <header><span>08</span><h2 id="configuration-title">Configuration</h2></header>
+        <p>The installer merges documented settings paths and preserves unrelated configuration. ZenPi manages global instructions and shell integration only inside marked blocks. Plan output is non-mutating. Install, update, and uninstall require confirmation unless <code>--yes</code> is supplied.</p>
       </section>
 
-      <section class="wiki-section" id="command-guard" aria-labelledby="command-guard-title">
-        <div class="section-label"><span>06</span><p>Command guard</p></div>
-        <div class="doc-content">
-          <h2 id="command-guard-title">Dangerous commands stop at the door.</h2>
-          <p class="doc-lede">Every supported model-initiated Pi tool call is analyzed before it runs. Confirmed catastrophe is denied outright; what the analysis cannot settle asks first.</p>
-          <div class="command-stack">
-            <div><code>Guard</code><span>The recommended default. Denies host-wide catastrophe and guard tampering, asks before Git destroys work, and stays quiet otherwise.</span></div>
-            <div><code>Strict</code><span>Adds approvals for mutation, execution, sensitive reads, and network activity.</span></div>
-            <div><code>Off</code><span>Confirmed twice and limited to one session.</span></div>
-          </div>
-          <p>Approvals are exact-call and session-scoped. Only a structurally proven, lock-worthy critical mutation locks the session; parser uncertainty and wrong-shell cleanup syntax are denied without stranding later work. Manage everything with <code>/guard</code>: <code>status</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, <code>clear-approvals</code>.</p>
-          <aside class="callout callout-boundary">
-            <strong>Command-guard boundary</strong>
-            <p>The guard provides defense in depth within its documented scope. Direct shell escapes, malicious extensions, and running processes stay outside that boundary. Use least privilege, containers, or VMs for hostile code. The full model lives in <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY_MODEL.md">SECURITY_MODEL.md</a>.</p>
-          </aside>
+      <section class="doc-section" id="security" aria-labelledby="security-title">
+        <header><span>09</span><h2 id="security-title">Security</h2></header>
+        <div class="security-list">
+          <p><strong>Local state.</strong> Wishlist reports, journals, experiment metadata, and exported patches stay in private local ZenPi state. Review local artifacts before sharing.</p>
+          <p><strong>No persisted command text.</strong> ZenPi does not read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current session.</p>
+          <p><strong>Explicit authority.</strong> Improving ZenPi, installing software, and publishing require approval.</p>
+          <p><strong>Bounded guard.</strong> Direct shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside guard scope.</p>
         </div>
+        <p class="muted">Pi extensions run with user permissions. Use OS permissions, a least-privilege account, a container, or a VM for hostile code or data. Read the <a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY_MODEL.md">security model <span aria-hidden="true">↗</span></a>.</p>
       </section>
 
-      <section class="wiki-section" id="browser-qa" aria-labelledby="browser-qa-title">
-        <div class="section-label"><span>07</span><p>Browser QA</p></div>
-        <div class="doc-content">
-          <h2 id="browser-qa-title">Inspect what users actually see.</h2>
-          <p>ZenPi's browser tools open pages in a fresh isolated Chromium context. Use rendered snapshots and screenshots at relevant desktop, tablet, and mobile viewports. Source inspection cannot verify rendered appearance.</p>
-          <div class="browser-flow">
-            <div><span>1</span><strong>Open</strong><p>Load the local or remote page in isolated Chromium.</p></div>
-            <div><span>2</span><strong>Inspect</strong><p>Read the rendered structure and exercise interactive controls.</p></div>
-            <div><span>3</span><strong>Resize</strong><p>Validate desktop, tablet, and mobile layouts.</p></div>
-            <div><span>4</span><strong>Capture</strong><p>Save bounded evidence or compare an explicitly approved baseline.</p></div>
-          </div>
-          <aside class="callout callout-boundary">
-            <strong>Isolation boundary</strong>
-            <p>The browser never attaches to your personal Chrome profile, cookies, passwords, or extensions. It runs in a separate process and does not provide operating-system isolation.</p>
-          </aside>
+      <section class="doc-section" id="development" aria-labelledby="development-title">
+        <header><span>10</span><h2 id="development-title">Development</h2></header>
+        <div class="terminal doc-terminal">
+          <pre><code>npm install --ignore-scripts --omit=peer --no-package-lock
+npm run format
+npm run check</code></pre>
         </div>
+        <p>JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check validates formatting and syntax, runs the Node test suite, and executes registry-linked validators with isolated prerequisites.</p>
       </section>
 
-      <section class="wiki-section" id="reference" aria-labelledby="reference-title">
-        <div class="section-label"><span>08</span><p>Reference</p></div>
-        <div class="doc-content">
-          <h2 id="reference-title">Command reference.</h2>
-          <div class="reference-table" role="region" aria-label="ZenPi command reference" tabindex="0">
-            <table>
-              <thead><tr><th scope="col">Command</th><th scope="col">Purpose</th></tr></thead>
-              <tbody>
-                <tr><th scope="row"><code>/zen [on|off|status]</code></th><td>Toggle or inspect focused Zen execution mode.</td></tr>
-                <tr><th scope="row"><code>/files [path]</code></th><td>Browse, render, diff, and review project files.</td></tr>
-                <tr><th scope="row"><code>/scope [set|add|remove|accept|recheck|status|clear]</code></th><td>Declare expected paths and review unacknowledged scope drift. <code>accept</code> acknowledges a finding, <code>add</code> widens the contract.</td></tr>
-                <tr><th scope="row"><code>/experiment [start|status|close|recover]</code></th><td>Manage detached, human-opened Git worktree experiments.</td></tr>
-                <tr><th scope="row"><code>/challenge [status|clear]</code></th><td>Run or inspect a structured adversarial completion-readiness review.</td></tr>
-                <tr><th scope="row"><code>/wishlist</code></th><td>Inspect and curate the local capability wishlist.</td></tr>
-                <tr><th scope="row"><code>/wishlist status</code></th><td>Show collection mode, queue size, retirements, reopen rate, and open reviews.</td></tr>
-                <tr><th scope="row"><code>/wishlist history [gap-id]</code></th><td>Review the bounded local improvement journal globally or for one gap.</td></tr>
-                <tr><th scope="row"><code>/wishlist off</code></th><td>Disable local capability-gap collection.</td></tr>
-                <tr><th scope="row"><code>/harness-improvement</code></th><td>Select and begin one qualified or review-needed improvement.</td></tr>
-                <tr><th scope="row"><code>/guard [status|guard|strict|off|unlock|clear-approvals]</code></th><td>Inspect or change session-only command protection.</td></tr>
-                <tr><th scope="row"><code>/reload</code></th><td>Reload Pi after installation or a startup-loaded configuration change.</td></tr>
-              </tbody>
-            </table>
-          </div>
+      <footer>
+        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>ZenPi</span></a>
+        <div>
+          <a href="../">Overview</a>
+          <a href="https://github.com/TannerMidd/ZenPi">Source</a>
+          <a href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Security</a>
         </div>
-      </section>
-
-      <section class="wiki-section" id="configuration" aria-labelledby="configuration-title">
-        <div class="section-label"><span>09</span><p>Configuration</p></div>
-        <div class="doc-content">
-          <h2 id="configuration-title">Know what ZenPi owns.</h2>
-          <p>ZenPi merges documented leaves and preserves unrelated packages and configuration. Managed state lives under the Pi agent directory; setting <code>PI_CODING_AGENT_DIR</code> relocates the equivalent paths.</p>
-          <div class="path-list">
-            <div><code>settings.json</code><p>Theme and package settings. Unrelated values are preserved.</p></div>
-            <div><code>zenpi/</code><p>Private wishlist evidence, experiment metadata and patches, retirement journals, loop-health source data, checksummed archives, browser artifacts, and bounded managed state.</p></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="wiki-section" id="security" aria-labelledby="security-title">
-        <div class="section-label"><span>10</span><p>Security</p></div>
-        <div class="doc-content">
-          <h2 id="security-title">Trust is explicit.</h2>
-          <div class="boundary-grid">
-            <article><span>Local</span><h3>Evidence stays here</h3><p>Wishlist reports and journals are bounded, sanitized, archive-safe, and never uploaded by ZenPi.</p></article>
-            <article><span>Human</span><h3>Choice grants authority</h3><p>Qualification recommends work; one explicit selection starts it.</p></article>
-            <article><span>Exact</span><h3>Providers do not blur</h3><p>Different-provider child execution is blocked, even for similarly named models.</p></article>
-            <article><span>Guarded</span><h3>Critical calls stop first</h3><p>Known catastrophic model commands are blocked; parser uncertainty requires approval and is denied without UI.</p></article>
-          </div>
-          <p>Pi extensions run with your user permissions. Trusted project settings and dynamically constructed workflow code are user-controlled boundaries outside ZenPi's sandboxing guarantees.</p>
-          <p><a class="text-link" href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY_MODEL.md">Read the complete security model <span aria-hidden="true">↗</span></a></p>
-        </div>
-      </section>
-
-      <section class="wiki-section" id="development" aria-labelledby="development-title">
-        <div class="section-label"><span>11</span><p>Development</p></div>
-        <div class="doc-content">
-          <h2 id="development-title">Contribute with evidence.</h2>
-          <p>Inspect repository guidance before editing, keep changes surgical, and use project-native dependencies. The standard check validates syntax, runs the complete Node test suite, and executes every registry-linked capability validator with isolated prerequisites.</p>
-          <div class="code-block compact-code">
-            <div><span>repository check</span></div>
-            <pre><code>npm run check</code></pre>
-          </div>
-          <ul class="check-list">
-            <li>Run the narrowest relevant checks while iterating, then the full repository check.</li>
-            <li>Use a temporary <code>PI_CODING_AGENT_DIR</code> for installer integration tests.</li>
-            <li>Inspect the final diff and verify rendered site work at relevant viewports.</li>
-            <li>Do not commit, publish, deploy, or alter remotes without explicit approval.</li>
-          </ul>
-          <div class="doc-actions">
-            <a class="button button-primary" href="https://github.com/TannerMidd/ZenPi">Explore the repository <span aria-hidden="true">↗</span></a>
-            <a class="button button-secondary" href="https://github.com/TannerMidd/ZenPi/issues">View issues <span aria-hidden="true">↗</span></a>
-          </div>
-        </div>
-      </section>
-
-      <div class="wiki-end">
-        <span aria-hidden="true">π</span>
-        <p><strong>That is the system.</strong><br>Small signals. Clear choices. Verified change.</p>
-        <a href="#overview">Back to top ↑</a>
-      </div>
-    </article>
-  </main>
-
-  <footer>
-    <a class="brand footer-brand" href="../"><span class="brand-mark" aria-hidden="true">π</span><span>ZenPi</span></a>
-    <p>Breathe. Then build.</p>
-    <div class="footer-links">
-      <a href="./">Wiki</a>
-      <a href="https://github.com/TannerMidd/ZenPi">Source</a>
-      <a href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Security</a>
-      <a href="https://github.com/TannerMidd/ZenPi/blob/main/LICENSE">MIT</a>
-    </div>
-  </footer>
+      </footer>
+    </main>
+  </div>
 </body>
 </html>

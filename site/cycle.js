@@ -1,103 +1,12 @@
 export const CYCLE_STAGES = Object.freeze(
     [
-        {
-            stage: "01 / friction",
-            headline: "A real task hits a real limit.",
-            copy: "A responsive page needs rendered desktop and mobile inspection, but no local browser is available.",
-            action: "record one sanitized local signal",
-            boundary: "One report records evidence. Work starts only after explicit approval.",
-            status: "open",
-            signal: "Signal recorded locally",
-            tasks: "1",
-            projects: "1",
-            impact: "degraded",
-            progress: "18%",
-            nextLabel: "add a second task",
-        },
-        {
-            stage: "02 / repeat",
-            headline: "Another task proves the gap is reusable.",
-            copy: "The same limitation appears again. Distinct tasks, projects, impact, and recency now make the signal worth attention.",
-            action: "qualify the item for the improvement menu",
-            boundary: "Qualification recommends work. Explicit selection grants permission to start.",
-            status: "qualified",
-            signal: "Recurring evidence earns priority",
-            tasks: "2",
-            projects: "2",
-            impact: "degraded",
-            progress: "38%",
-            nextLabel: "choose one item",
-        },
-        {
-            stage: "03 / choose",
-            headline: "A person chooses exactly one improvement.",
-            copy: "The /harness-improvement menu shows the evidence. Selecting this item authorizes only its smallest sufficient intervention.",
-            action: "record the exact human choice",
-            boundary: "No adjacent feature, install, upload, or remote change is included.",
-            status: "selected",
-            signal: "One bounded change is authorized",
-            tasks: "2",
-            projects: "2",
-            impact: "degraded",
-            progress: "52%",
-            nextLabel: "build the smallest change",
-        },
-        {
-            stage: "04 / build",
-            headline: "The smallest sufficient capability is implemented.",
-            copy: "The agent inspects the current harness, rejects feature accumulation, adds focused tests, and keeps a clean rollback path.",
-            action: "implement only what the evidence supports",
-            boundary: "The item stays selected until direct evidence proves the gap is closed.",
-            status: "selected",
-            signal: "Implementation ready for proof",
-            tasks: "2",
-            projects: "2",
-            impact: "degraded",
-            progress: "69%",
-            nextLabel: "run the proof gate",
-        },
-        {
-            stage: "05 / prove",
-            headline: "Behavior decides the outcome.",
-            copy: "The completion gate requires registry integration, runs the repository suite, and executes the capability's closed validator.",
-            action: "verify the integrated behavior directly",
-            boundary: "If any gate fails, retirement is blocked and the item remains selected.",
-            status: "verifying",
-            signal: "Repository + capability gates",
-            tasks: "2",
-            projects: "2",
-            impact: "degraded",
-            progress: "86%",
-            nextLabel: "pass and retire",
-        },
-        {
-            stage: "06 / retire",
-            headline: "Passing proof closes the active work.",
-            copy: "The verified capability leaves the queue. Its evidence and retirement decision remain local, append-only, and reviewable.",
-            action: "retire the item with validation evidence",
-            boundary: "Retired means integrated and verified. Later evidence can reopen it.",
-            status: "retired",
-            signal: "Closed with direct evidence",
-            tasks: "2",
-            projects: "2",
-            impact: "degraded",
-            progress: "100%",
-            nextLabel: "see what later evidence does",
-        },
-        {
-            stage: "07 / return",
-            headline: "New friction makes the retired item visible again.",
-            copy: "A later task reports the same gap. ZenPi preserves the signal and returns the item to the menu as review-needed.",
-            action: "surface the regression for human review",
-            boundary: "Nothing reopens itself. Choosing the item again is the next explicit decision.",
-            status: "review-needed",
-            signal: "Post-retirement evidence needs review",
-            tasks: "3",
-            projects: "2",
-            impact: "degraded",
-            progress: "100%",
-            nextLabel: "choose it again",
-        },
+        { stage: "friction", status: "open" },
+        { stage: "repeat", status: "qualified" },
+        { stage: "choose", status: "selected" },
+        { stage: "build", status: "selected" },
+        { stage: "prove", status: "verifying" },
+        { stage: "retire", status: "retired" },
+        { stage: "return", status: "review-needed" },
     ].map((stage) => Object.freeze(stage)),
 );
 
@@ -109,105 +18,98 @@ export function previousCycleStep(current) {
     return Math.max(0, current - 1);
 }
 
-const story = typeof document === "undefined" ? null : document.querySelector("[data-cycle-story]");
+const GUARD_MODES = Object.freeze({
+    guard: {
+        description:
+            "Confirmed host-wide destructive commands are denied. Git operations that destroy work ask first. Other calls run without interruption.",
+        verdicts: [
+            ["denied · never approvable", "deny"],
+            ["asks first", "ask"],
+            ["asks first", "ask"],
+            ["runs", "pass"],
+            ["runs quietly", "pass"],
+        ],
+    },
+    strict: {
+        description:
+            "Host-wide destructive commands remain denied. Mutation, execution, sensitive reads, and network activity require approval.",
+        verdicts: [
+            ["denied · never approvable", "deny"],
+            ["asks first", "ask"],
+            ["asks first", "ask"],
+            ["asks first", "ask"],
+            ["asks first", "ask"],
+        ],
+    },
+    off: {
+        description:
+            "Protection is disabled for the current session after two confirmations. A later session does not inherit this mode.",
+        verdicts: [
+            ["runs · unprotected", "deny"],
+            ["runs · unprotected", "off"],
+            ["runs · unprotected", "off"],
+            ["runs · unprotected", "off"],
+            ["runs", "off"],
+        ],
+    },
+});
 
-if (story) {
-    story.classList.add("is-interactive");
-    const stages = CYCLE_STAGES;
-    const tabs = [...story.querySelectorAll("[data-cycle-step]")];
-    const panel = story.querySelector("#cycle-story-panel");
-    const fields = {
-        stage: story.querySelector("[data-story-stage]"),
-        headline: story.querySelector("[data-story-headline]"),
-        copy: story.querySelector("[data-story-copy]"),
-        action: story.querySelector("[data-story-action]"),
-        boundary: story.querySelector("[data-story-boundary]"),
-        status: story.querySelector("[data-story-status]"),
-        signal: story.querySelector("[data-story-signal]"),
-        meter: story.querySelector("[data-story-meter]"),
-        tasks: story.querySelector("[data-story-tasks]"),
-        projects: story.querySelector("[data-story-projects]"),
-        impact: story.querySelector("[data-story-impact]"),
-        count: story.querySelector("[data-story-count]"),
-        nextLabel: story.querySelector("[data-story-next-label]"),
-        announcement: story.querySelector("[data-story-announcement]"),
-    };
-    const previous = story.querySelector("[data-story-previous]");
-    const next = story.querySelector("[data-story-next]");
-    let current = 0;
+const controls = typeof document === "undefined" ? null : document.querySelector(".guard-controls");
+
+if (controls) {
+    const tabs = [...controls.querySelectorAll("[data-guard-mode]")];
+    const current = controls.querySelector("[data-guard-current]");
+    const panel = document.querySelector("#guard-comparison");
+    const description = document.querySelector("[data-guard-description]");
+    const verdicts = [...document.querySelectorAll("[data-guard-verdict]")];
+
+    function render(mode, focus = false) {
+        const value = GUARD_MODES[mode];
+        const activeIndex = tabs.findIndex((tab) => tab.dataset.guardMode === mode);
+        current.textContent = mode;
+        panel.setAttribute("aria-labelledby", tabs[activeIndex].id);
+        description.textContent = value.description;
+        tabs.forEach((tab, index) => {
+            const active = index === activeIndex;
+            tab.setAttribute("aria-selected", String(active));
+            tab.tabIndex = active ? 0 : -1;
+        });
+        verdicts.forEach((verdict, index) => {
+            verdict.textContent = value.verdicts[index][0];
+            verdict.dataset.tone = value.verdicts[index][1];
+        });
+
+        if (focus) {
+            tabs[activeIndex].focus();
+        }
+    }
 
     tabs.forEach((tab, index) => {
-        tab.id = `cycle-story-step-${index + 1}`;
-        tab.addEventListener("click", () => render(index));
+        tab.addEventListener("click", () => render(tab.dataset.guardMode));
         tab.addEventListener("keydown", (event) => {
-            let target;
+            let nextIndex;
             if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-                target = (index + 1) % tabs.length;
+                nextIndex = (index + 1) % tabs.length;
             }
 
             if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-                target = (index - 1 + tabs.length) % tabs.length;
+                nextIndex = (index - 1 + tabs.length) % tabs.length;
             }
 
             if (event.key === "Home") {
-                target = 0;
+                nextIndex = 0;
             }
 
             if (event.key === "End") {
-                target = tabs.length - 1;
+                nextIndex = tabs.length - 1;
             }
 
-            if (target === undefined) {
+            if (nextIndex === undefined) {
                 return;
             }
 
             event.preventDefault();
-            render(target, true);
-            tabs[target].focus();
+            render(tabs[nextIndex].dataset.guardMode, true);
         });
     });
-
-    function render(index, revealTab = false) {
-        current = index;
-        const value = stages[index];
-        for (const key of [
-            "stage",
-            "headline",
-            "copy",
-            "action",
-            "boundary",
-            "signal",
-            "tasks",
-            "projects",
-            "impact",
-            "nextLabel",
-        ]) {
-            fields[key].textContent = value[key];
-        }
-
-        fields.status.textContent = value.status;
-        fields.status.dataset.status = value.status;
-        fields.meter.style.setProperty("--story-progress", value.progress);
-        fields.count.textContent = String(index + 1);
-        fields.announcement.textContent = `${value.stage}. ${value.headline} Status: ${value.status}. ${value.boundary}`;
-        tabs.forEach((tab, tabIndex) => {
-            const active = tabIndex === index;
-            tab.setAttribute("aria-selected", String(active));
-            tab.tabIndex = active ? 0 : -1;
-        });
-        panel.setAttribute("aria-labelledby", tabs[index].id);
-        previous.disabled = index === 0;
-        next.innerHTML =
-            index === stages.length - 1
-                ? 'Choose again <span aria-hidden="true">↻</span>'
-                : 'Next <span aria-hidden="true">→</span>';
-        if (revealTab) {
-            const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-            tabs[index].scrollIntoView({ behavior, block: "nearest", inline: "center" });
-        }
-    }
-
-    previous.addEventListener("click", () => render(previousCycleStep(current), true));
-    next.addEventListener("click", () => render(nextCycleStep(current), true));
-    render(0);
 }
