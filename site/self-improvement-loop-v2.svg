@@ -1,88 +1,108 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 360" role="img" aria-labelledby="loop-title loop-desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" role="img" aria-labelledby="loop-title loop-desc">
   <title id="loop-title">SpecPi human-directed improvement loop</title>
-  <desc id="loop-desc">Local friction becomes qualified evidence. A person chooses one exact improvement, SpecPi builds the smallest change, and proof retires it. Failed proof remains selected, while later evidence returns retired work to human review.</desc>
+  <desc id="loop-desc">Seven stages move local friction through evidence, human choice, a bounded change, verification, retirement, and review. Verification failure returns to the change while later evidence returns retired work to human review.</desc>
   <defs>
-    <marker id="arrow-tea" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0 0 10 5 0 10z" fill="#c4a06a"/>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#20262e" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow-progress" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 10 5 0 10z" fill="#5d6876"/>
     </marker>
-    <marker id="arrow-rice" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0 0 10 5 0 10z" fill="#95897a"/>
+    <marker id="arrow-blueprint" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 10 5 0 10z" fill="#8fb6d9"/>
     </marker>
-    <marker id="arrow-matcha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0 0 10 5 0 10z" fill="#aab784"/>
+    <marker id="arrow-pass" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 10 5 0 10z" fill="#7fb08a"/>
     </marker>
   </defs>
 
-  <rect x="2" y="2" width="876" height="356" rx="18" fill="#171310" stroke="#4a4438" stroke-width="2"/>
-  <circle cx="42" cy="38" r="18" fill="#c4a06a"/>
-  <text x="42" y="45" fill="#171310" font-family="Georgia, 'Times New Roman', serif" font-size="22" font-weight="700" text-anchor="middle">π</text>
-  <text x="72" y="32" fill="#e3c28f" font-family="ui-monospace, 'SFMono-Regular', Consolas, monospace" font-size="14" font-weight="700" letter-spacing="2">THE IMPROVEMENT LOOP</text>
-  <text x="72" y="52" fill="#95897a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16">Evidence proposes. A person chooses. Proof closes.</text>
-  <path d="M42 72H838" stroke="#342c25"/>
+  <rect x="1" y="1" width="998" height="418" fill="#121519" stroke="#2a313b" stroke-width="2"/>
+  <rect x="1" y="1" width="998" height="418" fill="url(#grid)" opacity="0.42"/>
 
-  <g fill="none" stroke="#6b5842" stroke-width="2" marker-end="url(#arrow-tea)">
-    <path d="M112 146H196"/>
-    <path d="M254 146H338"/>
-    <path d="M396 146H480"/>
-    <path d="M538 146H622"/>
-    <path d="M680 146H764"/>
+  <g font-family="'IBM Plex Mono', Consolas, 'Liberation Mono', monospace">
+    <rect x="28" y="22" width="36" height="36" fill="#181c22" stroke="#39424f" stroke-width="2"/>
+    <text x="46" y="48" fill="#8fb6d9" font-size="24" font-weight="600" text-anchor="middle">π</text>
+    <text x="78" y="38" fill="#f7f9fc" font-size="18" font-weight="600" letter-spacing="2">SPECPI / IMPROVEMENT LOOP</text>
+    <text x="78" y="58" fill="#78838f" font-size="16">Evidence proposes. A person chooses. Proof closes.</text>
+    <text x="972" y="44" fill="#78838f" font-size="16" letter-spacing="1" text-anchor="end">7 STAGES · 2 GATES</text>
+  </g>
+  <path d="M28 82H972" stroke="#39424f" stroke-width="1"/>
+  <path d="M28 82H154" stroke="#8fb6d9" stroke-width="2"/>
+
+  <g fill="none" stroke-width="2" marker-end="url(#arrow-progress)">
+    <path d="M146 181h9" stroke="#5d6876"/>
+    <path d="M277 181h9" stroke="#8fb6d9" marker-end="url(#arrow-blueprint)"/>
+    <path d="M408 181h9" stroke="#5d6876"/>
+    <path d="M539 181h9" stroke="#7fb08a" marker-end="url(#arrow-pass)"/>
+    <path d="M670 181h9" stroke="#7fb08a" marker-end="url(#arrow-pass)"/>
+    <path d="M801 181h9" stroke="#5d6876"/>
   </g>
 
-  <g font-family="ui-monospace, 'SFMono-Regular', Consolas, monospace" font-size="14" font-weight="700" letter-spacing="1" text-anchor="middle">
-    <text x="84" y="100" fill="#95897a">01 · SIGNAL</text>
-    <text x="226" y="100" fill="#95897a">02 · EVIDENCE</text>
-    <text x="368" y="100" fill="#e3c28f">03 · DECISION</text>
-    <text x="510" y="100" fill="#95897a">04 · CHANGE</text>
-    <text x="652" y="100" fill="#aab784">05 · VERIFY</text>
-    <text x="794" y="100" fill="#aab784">06 · OUTCOME</text>
+  <g font-family="'IBM Plex Mono', Consolas, 'Liberation Mono', monospace">
+    <g>
+      <rect x="28" y="114" width="118" height="134" fill="#181c22" stroke="#2a313b" stroke-width="2"/>
+      <text x="42" y="140" fill="#78838f" font-size="16">01</text>
+      <text x="42" y="166" fill="#a3adbc" font-size="16" letter-spacing="1">SIGNAL</text>
+      <text x="42" y="205" fill="#e9edf4" font-size="18">Friction</text>
+      <text x="42" y="232" fill="#78838f" font-size="16">local</text>
+    </g>
+    <g>
+      <rect x="159" y="114" width="118" height="134" fill="#181c22" stroke="#2a313b" stroke-width="2"/>
+      <text x="173" y="140" fill="#78838f" font-size="16">02</text>
+      <text x="173" y="166" fill="#a3adbc" font-size="16" letter-spacing="1">EVIDENCE</text>
+      <text x="173" y="205" fill="#e9edf4" font-size="18">Qualify</text>
+      <text x="173" y="232" fill="#78838f" font-size="16">recurrent</text>
+    </g>
+    <g>
+      <rect x="290" y="114" width="118" height="134" fill="#20252d" stroke="#8fb6d9" stroke-width="2"/>
+      <path d="M290 114h118" stroke="#8fb6d9" stroke-width="5"/>
+      <rect x="380" y="130" width="12" height="12" fill="#8fb6d9"/>
+      <text x="304" y="140" fill="#8fb6d9" font-size="16">03</text>
+      <text x="304" y="166" fill="#b8d4ec" font-size="16" letter-spacing="1">HUMAN</text>
+      <text x="304" y="205" fill="#f7f9fc" font-size="18">Choose</text>
+      <text x="304" y="232" fill="#8fb6d9" font-size="16">explicit</text>
+    </g>
+    <g>
+      <rect x="421" y="114" width="118" height="134" fill="#181c22" stroke="#2a313b" stroke-width="2"/>
+      <text x="435" y="140" fill="#78838f" font-size="16">04</text>
+      <text x="435" y="166" fill="#a3adbc" font-size="16" letter-spacing="1">CHANGE</text>
+      <text x="435" y="205" fill="#e9edf4" font-size="18">Build</text>
+      <text x="435" y="232" fill="#78838f" font-size="16">bounded</text>
+    </g>
+    <g>
+      <rect x="552" y="114" width="118" height="134" fill="#20252d" stroke="#7fb08a" stroke-width="2"/>
+      <path d="M552 114h118" stroke="#7fb08a" stroke-width="5"/>
+      <rect x="642" y="130" width="12" height="12" fill="#7fb08a"/>
+      <text x="566" y="140" fill="#7fb08a" font-size="16">05</text>
+      <text x="566" y="166" fill="#7fb08a" font-size="16" letter-spacing="1">PROOF</text>
+      <text x="566" y="205" fill="#f7f9fc" font-size="18">Verify</text>
+      <text x="566" y="232" fill="#7fb08a" font-size="16">closed</text>
+    </g>
+    <g>
+      <rect x="683" y="114" width="118" height="134" fill="#192027" stroke="#39424f" stroke-width="2"/>
+      <text x="697" y="140" fill="#7fb08a" font-size="16">06</text>
+      <text x="697" y="166" fill="#7fb08a" font-size="16" letter-spacing="1">OUTCOME</text>
+      <text x="697" y="205" fill="#e9edf4" font-size="18">Retire</text>
+      <text x="697" y="232" fill="#7fb08a" font-size="16">passed</text>
+    </g>
+    <g>
+      <rect x="814" y="114" width="118" height="134" fill="#181c22" stroke="#8fb6d9" stroke-width="2" stroke-dasharray="5 4"/>
+      <text x="828" y="140" fill="#8fb6d9" font-size="16">07</text>
+      <text x="828" y="166" fill="#b8d4ec" font-size="16" letter-spacing="1">RETURN</text>
+      <text x="828" y="205" fill="#e9edf4" font-size="18">Review</text>
+      <text x="828" y="232" fill="#8fb6d9" font-size="16">later</text>
+    </g>
   </g>
 
-  <g text-anchor="middle">
-    <g>
-      <circle cx="84" cy="146" r="28" fill="#201a15" stroke="#5c4c3c" stroke-width="2"/>
-      <circle cx="84" cy="146" r="5" fill="#c4a06a"/>
-      <text x="84" y="198" fill="#f1eade" font-family="Georgia, 'Times New Roman', serif" font-size="18">Friction</text>
-      <text x="84" y="218" fill="#95897a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">local only</text>
-    </g>
-    <g>
-      <circle cx="226" cy="146" r="28" fill="#201a15" stroke="#5c4c3c" stroke-width="2"/>
-      <path d="M215 151h22M215 144h16M215 137h19" stroke="#c4a06a" stroke-width="2" stroke-linecap="round"/>
-      <text x="226" y="198" fill="#f1eade" font-family="Georgia, 'Times New Roman', serif" font-size="18">Qualify</text>
-      <text x="226" y="218" fill="#95897a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">repeat + reach</text>
-    </g>
-    <g>
-      <circle cx="368" cy="146" r="33" fill="#c4a06a"/>
-      <path d="M354 146l9 9 19-21" fill="none" stroke="#171310" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="368" y="198" fill="#e3c28f" font-family="Georgia, 'Times New Roman', serif" font-size="18">Choose</text>
-      <text x="368" y="218" fill="#b9aa99" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">human gate</text>
-    </g>
-    <g>
-      <circle cx="510" cy="146" r="28" fill="#201a15" stroke="#5c4c3c" stroke-width="2"/>
-      <path d="M500 153l18-18M499 138l15 15" fill="none" stroke="#c4a06a" stroke-width="2.5" stroke-linecap="round"/>
-      <text x="510" y="198" fill="#f1eade" font-family="Georgia, 'Times New Roman', serif" font-size="18">Build</text>
-      <text x="510" y="218" fill="#95897a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">smallest scope</text>
-    </g>
-    <g>
-      <circle cx="652" cy="146" r="28" fill="#1d2119" stroke="#aab784" stroke-width="2"/>
-      <path d="M641 146l7 7 15-17" fill="none" stroke="#aab784" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="652" y="198" fill="#f1eade" font-family="Georgia, 'Times New Roman', serif" font-size="18">Prove</text>
-      <text x="652" y="218" fill="#95897a" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">tests + gate</text>
-    </g>
-    <g>
-      <circle cx="794" cy="146" r="28" fill="#aab784"/>
-      <path d="M783 140h22v16h-22zM788 135h12" fill="none" stroke="#171310" stroke-width="2.5" stroke-linejoin="round"/>
-      <text x="794" y="198" fill="#dce3c8" font-family="Georgia, 'Times New Roman', serif" font-size="18">Retire</text>
-      <text x="794" y="218" fill="#a9a18f" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">only on pass</text>
-    </g>
-  </g>
+  <path id="verification-failure-return" d="M611 248v41H480v-33" fill="none" stroke="#78838f" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow-progress)"/>
+  <rect x="506" y="276" width="192" height="25" fill="#121519"/>
+  <text x="602" y="294" fill="#a3adbc" font-family="'IBM Plex Mono', Consolas, 'Liberation Mono', monospace" font-size="16" text-anchor="middle">FAIL / STAYS SELECTED</text>
 
-  <path id="verification-failure-return" d="M652 234v25H510v-25" fill="none" stroke="#95897a" stroke-width="1.5" stroke-dasharray="4 5" marker-end="url(#arrow-rice)"/>
-  <rect x="481" y="247" width="200" height="22" rx="11" fill="#171310"/>
-  <text x="581" y="263" fill="#b9aa99" font-family="ui-monospace, 'SFMono-Regular', Consolas, monospace" font-size="14" text-anchor="middle">FAIL · STAYS SELECTED</text>
+  <path id="later-evidence-review-return" d="M873 248v101H349v-93" fill="none" stroke="#8fb6d9" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arrow-blueprint)"/>
+  <rect x="497" y="336" width="278" height="25" fill="#121519"/>
+  <text x="636" y="354" fill="#8fb6d9" font-family="'IBM Plex Mono', Consolas, 'Liberation Mono', monospace" font-size="16" text-anchor="middle">LATER EVIDENCE / HUMAN REVIEW</text>
 
-  <path id="later-evidence-review-return" d="M794 234v73H368v-73" fill="none" stroke="#aab784" stroke-width="1.5" stroke-dasharray="4 5" marker-end="url(#arrow-matcha)"/>
-  <rect x="445" y="295" width="272" height="22" rx="11" fill="#171310"/>
-  <text x="581" y="311" fill="#aab784" font-family="ui-monospace, 'SFMono-Regular', Consolas, monospace" font-size="14" text-anchor="middle">LATER EVIDENCE · HUMAN REVIEW</text>
-
-  <text x="42" y="341" fill="#95897a" font-family="ui-monospace, 'SFMono-Regular', Consolas, monospace" font-size="14" letter-spacing="1">PRIVATE SIGNAL → EXPLICIT AUTHORITY → VERIFIED CHANGE</text>
+  <path d="M28 382H972" stroke="#2a313b"/>
+  <text x="28" y="405" fill="#78838f" font-family="'IBM Plex Mono', Consolas, 'Liberation Mono', monospace" font-size="16" letter-spacing="1">LOCAL SIGNAL → EXPLICIT AUTHORITY → VERIFIED CHANGE</text>
+  <text x="972" y="405" fill="#5d6876" font-family="'IBM Plex Mono', Consolas, 'Liberation Mono', monospace" font-size="16" text-anchor="end">PRIVATE · LOCAL · REVERSIBLE</text>
 </svg>
