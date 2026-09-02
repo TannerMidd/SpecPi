@@ -78,7 +78,11 @@ jobs:
 
     validate:
         needs: build
-        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+        runs-on: ${{ matrix.os }}
         steps:
             - name: Check out release tag
               uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -99,6 +103,7 @@ jobs:
               run: npm install --ignore-scripts --omit=peer --no-package-lock
 
             - name: Run repository checks
+              if: ${{ matrix.os == 'ubuntu-latest' }}
               run: npm run check
 
             - name: Download immutable release candidate
@@ -114,9 +119,7 @@ jobs:
                   VERSION="$(node --print "require('./package.json').version")"
                   TARBALL="${GITHUB_WORKSPACE}/candidate/specpi-${VERSION}.tgz"
                   MANIFEST="${GITHUB_WORKSPACE}/candidate/npm-pack.json"
-                  cd candidate
-                  sha512sum --check "specpi-${VERSION}.tgz.sha512"
-                  cd "${GITHUB_WORKSPACE}"
+                  node scripts/verify-artifact.mjs "${TARBALL}" "${TARBALL}.sha512"
                   npm run check:package -- --artifact "${TARBALL}" --manifest "${MANIFEST}"
                   npm run check:pi-package -- --artifact "${TARBALL}"
                   npm publish --dry-run --ignore-scripts "${TARBALL}"
@@ -149,7 +152,9 @@ jobs:
               run: |
                   set -euo pipefail
                   VERSION="$(node --print "require('./package.json').version")"
+                  DIST_TAG="$(node scripts/check-release-order.mjs tag "${VERSION}")"
                   echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+                  echo "DIST_TAG=${DIST_TAG}" >> "${GITHUB_ENV}"
 
             - name: Download validated release candidate
               uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -161,24 +166,20 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  cd dist
-                  sha512sum --check "specpi-${VERSION}.tgz.sha512"
+                  node scripts/verify-artifact.mjs "dist/specpi-${VERSION}.tgz" "dist/specpi-${VERSION}.tgz.sha512"
 
-            - name: Refuse a stable dist-tag regression
+            - name: Refuse a dist-tag regression
               shell: bash
               run: |
                   set -euo pipefail
-                  if [[ "${VERSION}" == *-* ]]; then
-                    exit 0
-                  fi
                   set +e
-                  LOOKUP="$(npm view specpi dist-tags.latest 2>&1)"
+                  LOOKUP="$(npm view specpi "dist-tags.${DIST_TAG}" 2>&1)"
                   LOOKUP_STATUS=$?
                   set -e
                   if [[ ${LOOKUP_STATUS} -eq 0 && -n "${LOOKUP}" ]]; then
-                    node scripts/check-release-order.mjs "${VERSION}" "${LOOKUP}"
+                    node scripts/check-release-order.mjs advance "${VERSION}" "${LOOKUP}"
                   elif [[ ${LOOKUP_STATUS} -ne 0 && "${LOOKUP}" != *"E404"* ]]; then
-                    printf 'Could not read the current latest version:\n%s\n' "${LOOKUP}" >&2
+                    printf 'Could not read the current %s version:\n%s\n' "${DIST_TAG}" "${LOOKUP}" >&2
                     exit 1
                   fi
 
@@ -187,13 +188,7 @@ jobs:
               run: |
                   set -euo pipefail
                   TARBALL="dist/specpi-${VERSION}.tgz"
-                  if [[ "${VERSION}" == *-* ]]; then
-                    DIST_TAG="next"
-                  else
-                    DIST_TAG="latest"
-                  fi
                   npm publish --ignore-scripts --access public --provenance --tag "${DIST_TAG}" "${TARBALL}"
-                  echo "DIST_TAG=${DIST_TAG}" >> "${GITHUB_ENV}"
 
             - name: Verify registry publication
               shell: bash

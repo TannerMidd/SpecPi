@@ -381,18 +381,38 @@ test("platform launchers invoke Node directly", () => {
     assert.ok(fs.readFileSync(path.join(repoRoot, "specpi"), "utf8").startsWith("#!/usr/bin/env sh\n"));
 });
 
-test("stable release order guard rejects latest regressions", () => {
+test("release order guard classifies SemVer and rejects dist-tag regressions", () => {
     const script = path.join(repoRoot, "scripts", "check-release-order.mjs");
-    const newer = spawnSync(process.execPath, [script, "0.10.0", "0.9.9"], { encoding: "utf8" });
-    assert.equal(newer.status, 0, newer.stderr);
-    assert.match(newer.stdout, /advances latest/);
+    const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
+    for (const [version, expectedTag] of [
+        ["0.10.0", "latest"],
+        ["0.10.0+build-foo", "latest"],
+        ["0.10.0-next.1", "next"],
+    ]) {
+        const tagged = run("tag", version);
+        assert.equal(tagged.status, 0, tagged.stderr);
+        assert.equal(tagged.stdout.trim(), expectedTag);
+    }
+
+    for (const [candidate, current] of [
+        ["0.10.0", "0.9.9"],
+        ["0.10.0", "0.10.0-next.9"],
+        ["0.10.0-next.10", "0.10.0-next.2"],
+        ["0.10.0-rc.1", "0.10.0-beta.9"],
+    ]) {
+        const newer = run("advance", candidate, current);
+        assert.equal(newer.status, 0, newer.stderr);
+        assert.match(newer.stdout, /advances its dist-tag/);
+    }
 
     for (const [candidate, current] of [
         ["0.10.0", "0.10.0"],
         ["0.9.9", "0.10.0"],
-        ["0.10.0-next.1", "0.9.9"],
+        ["0.10.0-next.1", "0.10.0-next.2"],
+        ["0.10.0+build.2", "0.10.0+build.1"],
+        ["0.10.0-next.01", "0.10.0-next.0"],
     ]) {
-        const rejected = spawnSync(process.execPath, [script, candidate, current], { encoding: "utf8" });
+        const rejected = run("advance", candidate, current);
         assert.notEqual(rejected.status, 0, `${candidate} should not advance ${current}`);
     }
 });
@@ -427,10 +447,12 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.equal(publish.match(/npm@\$\{RELEASE_NPM_VERSION\}/g)?.length, 3);
     assert.match(publish, /id-token: write/);
     assert.match(publish, /npm publish --ignore-scripts --access public --provenance/);
-    assert.match(publish, /sha512sum --check/);
+    assert.equal(publish.match(/node scripts\/verify-artifact\.mjs/g)?.length, 2);
+    assert.match(publish, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
     assert.match(publish, /--artifact "\$\{TARBALL\}" --manifest "\$\{MANIFEST\}"/);
     assert.match(publish, /check:pi-package -- --artifact "\$\{TARBALL\}"/);
-    assert.match(publish, /node scripts\/check-release-order\.mjs "\$\{VERSION\}" "\$\{LOOKUP\}"/);
+    assert.match(publish, /check-release-order\.mjs tag "\$\{VERSION\}"/);
+    assert.match(publish, /check-release-order\.mjs advance "\$\{VERSION\}" "\$\{LOOKUP\}"/);
     assert.match(publish, /dist\.attestations\.url/);
     assert.doesNotMatch(publish, /NODE_AUTH_TOKEN|secrets\.|uses: actions\/[^\s]+@v\d/);
     assert.match(ci, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);

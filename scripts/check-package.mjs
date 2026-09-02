@@ -74,6 +74,7 @@ const requiredFiles = [
     "scripts/lib.mjs",
     "scripts/lock.mjs",
     "scripts/specpi.mjs",
+    "scripts/verify-artifact.mjs",
     "shell/pi-profiles.sh",
     "site/logo.svg",
     "site/self-improvement-loop-v2.svg",
@@ -85,6 +86,13 @@ const requiredFiles = [
     "templates/settings.json",
     "themes/specpi-spec.json",
     "themes/tea-house.json",
+];
+
+const hostPeerPackages = [
+    "@earendil-works/pi-ai",
+    "@earendil-works/pi-coding-agent",
+    "@earendil-works/pi-tui",
+    "typebox",
 ];
 
 const forbiddenPrefixes = [
@@ -158,6 +166,37 @@ function runInstalledBin(binPath, args, options = {}) {
     return result;
 }
 
+function snapshotTree(root, ignoredPrefixes = []) {
+    const snapshot = {};
+    const visit = (directory, relativeDirectory = "") => {
+        for (const entry of fs
+            .readdirSync(directory, { withFileTypes: true })
+            .sort((left, right) => left.name.localeCompare(right.name))) {
+            const relativePath = path.posix.join(relativeDirectory.replaceAll("\\", "/"), entry.name);
+            if (ignoredPrefixes.some((prefix) => relativePath === prefix || relativePath.startsWith(`${prefix}/`))) {
+                continue;
+            }
+
+            const absolutePath = path.join(directory, entry.name);
+            const stats = fs.lstatSync(absolutePath);
+            if (stats.isDirectory()) {
+                snapshot[relativePath] = { type: "directory" };
+                visit(absolutePath, relativePath);
+            } else if (stats.isSymbolicLink()) {
+                snapshot[relativePath] = { type: "symlink", target: fs.readlinkSync(absolutePath) };
+            } else if (stats.isFile()) {
+                snapshot[relativePath] = { type: "file", data: fs.readFileSync(absolutePath).toString("base64") };
+            } else {
+                snapshot[relativePath] = { type: "other" };
+            }
+        }
+    };
+
+    visit(root);
+
+    return snapshot;
+}
+
 function packageRootForPrefix(prefix, env) {
     const root = runNpm(["root", "--global", "--prefix", prefix], { env }).stdout.trim();
     assert.ok(root, "npm did not report a global package root");
@@ -201,15 +240,10 @@ function assertPackageMetadata(packageJson) {
     assert.equal(packageJson.scripts?.install, undefined);
     assert.equal(packageJson.scripts?.postinstall, undefined);
     assert.deepEqual(Object.keys(packageJson.dependencies || {}), []);
+    assert.deepEqual(Object.keys(packageJson.optionalDependencies || {}), []);
 
-    const expectedPeers = [
-        "@earendil-works/pi-ai",
-        "@earendil-works/pi-coding-agent",
-        "@earendil-works/pi-tui",
-        "typebox",
-    ];
-    assert.deepEqual(Object.keys(packageJson.peerDependencies || {}).sort(), expectedPeers);
-    for (const peer of expectedPeers) {
+    assert.deepEqual(Object.keys(packageJson.peerDependencies || {}).sort(), hostPeerPackages);
+    for (const peer of hostPeerPackages) {
         assert.equal(packageJson.peerDependencies[peer], "*");
         assert.equal(packageJson.peerDependenciesMeta?.[peer]?.optional, true);
     }
@@ -301,16 +335,10 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     runCli(["install", ...lifecycleFlags]);
     runCli(["doctor"], { timeout: 300_000 });
 
-    const settingsPath = path.join(agentDir, "settings.json");
-    const manifestPath = path.join(agentDir, "specpi", "manifest.json");
     const guardDirectory = path.join(agentDir, "extensions", "command-guard");
     const driftedGuardPath = path.join(guardDirectory, "index.ts");
     fs.appendFileSync(driftedGuardPath, "\n// package-check rollback drift\n");
-    const settingsBeforeFailure = fs.readFileSync(settingsPath);
-    const manifestBeforeFailure = fs.readFileSync(manifestPath);
-    const guardBeforeFailure = new Map(
-        fs.readdirSync(guardDirectory).map((name) => [name, fs.readFileSync(path.join(guardDirectory, name))]),
-    );
+    const treeBeforeFailure = snapshotTree(agentDir, ["specpi/backups"]);
     const failedUpdate = runCli(["update", ...lifecycleFlags, "--force"], {
         expectFailure: true,
         env: {
@@ -320,11 +348,11 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         },
     });
     assert.match(`${failedUpdate.stdout}\n${failedUpdate.stderr}`, /SpecPi-managed changes rolled back/);
-    assert.deepEqual(fs.readFileSync(settingsPath), settingsBeforeFailure);
-    assert.deepEqual(fs.readFileSync(manifestPath), manifestBeforeFailure);
-    for (const [name, expected] of guardBeforeFailure) {
-        assert.deepEqual(fs.readFileSync(path.join(guardDirectory, name)), expected);
-    }
+    assert.deepEqual(
+        snapshotTree(agentDir, ["specpi/backups"]),
+        treeBeforeFailure,
+        "failed update did not restore the complete managed tree",
+    );
 
     const privateEvidence = new Map([
         [path.join(agentDir, "specpi", "wishlist", "observations.jsonl"), '{"private":true}\n'],
@@ -418,16 +446,19 @@ try {
     );
 
     const installedRoot = path.dirname(packageRoot);
-    assert.equal(
-        fs.existsSync(path.join(installedRoot, "@earendil-works")),
-        false,
-        "npm installed optional Pi host peers",
-    );
-    assert.equal(
-        fs.existsSync(path.join(installedRoot, "typebox")),
-        false,
-        "npm installed the optional typebox host peer",
-    );
+    for (const peer of hostPeerPackages) {
+        const peerSegments = peer.split("/");
+        assert.equal(
+            fs.existsSync(path.join(installedRoot, ...peerSegments)),
+            false,
+            `npm installed optional host peer beside SpecPi: ${peer}`,
+        );
+        assert.equal(
+            fs.existsSync(path.join(packageRoot, "node_modules", ...peerSegments)),
+            false,
+            `npm installed optional host peer inside SpecPi: ${peer}`,
+        );
+    }
 
     assertPackageMetadata(JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8")));
     assertReadmeAssets(packageRoot);

@@ -44,9 +44,9 @@ All three jobs pin npm 11.19.1, above npm's 11.5.1 trusted-publishing minimum, o
 
 The build job checks tag, package version, changelog entry, and registry immutability, then creates and checksums one tarball before installing repository development tools. It stores that immutable candidate for seven days.
 
-The validation job downloads and verifies the candidate, runs the full repository checks, exercises that exact tarball through the npm and native Pi package lifecycles, and runs an npm publish dry-run.
+The validation job runs as an Ubuntu, Windows, and macOS matrix. Every runner downloads and verifies the same candidate, exercises that exact tarball through the npm and native Pi package lifecycles, and runs an npm publish dry-run; Ubuntu also runs the full repository checks.
 
-The publish job requires approval in the `npm` environment. Publication runs are serialized, and stable candidates must advance the existing `latest` version. The job downloads and verifies the same immutable candidate, publishes through GitHub OIDC with npm provenance, uses `next` for prereleases and `latest` for stable versions, and reads the registry back until version, integrity, dist-tag, and attestation state match.
+The publish job requires approval in the `npm` environment. Publication runs are serialized, and every candidate must advance its existing dist-tag. The job downloads and verifies the same immutable candidate, publishes through GitHub OIDC with npm provenance, uses `next` for prereleases and `latest` for stable versions, and reads the registry back until version, integrity, dist-tag, and attestation state match.
 
 ## Registry smoke check
 

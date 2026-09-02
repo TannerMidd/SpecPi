@@ -15,6 +15,12 @@ const artifactPath = artifactIndex >= 0 ? process.argv[artifactIndex + 1] : unde
 const piPackage = "@earendil-works/pi-coding-agent";
 const piVersion = "0.84.4";
 const specpiVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
+const hostPeerPackages = [
+    "@earendil-works/pi-ai",
+    "@earendil-works/pi-coding-agent",
+    "@earendil-works/pi-tui",
+    "typebox",
+];
 
 if ((artifactIndex >= 0 && !artifactPath) || (artifactIndex < 0 && process.argv.length > 2)) {
     throw new Error("Use no arguments, or supply --artifact <tarball>");
@@ -133,6 +139,20 @@ try {
     const specpiRoot = path.join(agentDir, "npm", "node_modules", "specpi");
     assert.ok(fs.existsSync(path.join(specpiRoot, "package.json")), "Pi did not install the npm package candidate");
     assert.equal(JSON.parse(fs.readFileSync(path.join(specpiRoot, "package.json"), "utf8")).version, specpiVersion);
+    for (const peer of hostPeerPackages) {
+        const peerSegments = peer.split("/");
+        assert.equal(
+            fs.existsSync(path.join(agentDir, "npm", "node_modules", ...peerSegments)),
+            false,
+            `Pi installed host peer beside SpecPi: ${peer}`,
+        );
+        assert.equal(
+            fs.existsSync(path.join(specpiRoot, "node_modules", ...peerSegments)),
+            false,
+            `Pi installed host peer inside SpecPi: ${peer}`,
+        );
+    }
+
     const listed = runNode([piCli, "list"], { cwd: temporaryRoot, env });
     assert.match(listed.stdout, /User packages:/);
     assert.match(listed.stdout, new RegExp(`npm:specpi@${specpiVersion.replaceAll(".", "\\.")}`));
