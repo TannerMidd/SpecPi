@@ -27,6 +27,7 @@ If npm requires an initial interactive publication before a trusted publisher ca
 
    ```bash
    npm run check
+   npm run check:pi-package
    npm publish --dry-run --ignore-scripts
    git diff --check
    ```
@@ -41,16 +42,11 @@ Publishing the GitHub Release starts `.github/workflows/npm-publish.yml`.
 
 Both jobs pin npm 11.19.1, above npm's 11.5.1 trusted-publishing minimum, on Node.js 22.19.0 and GitHub-hosted runners.
 
-The validation job:
+The build job checks tag, package version, changelog entry, and registry immutability, then creates and checksums one tarball before installing repository development tools. It stores that immutable candidate for seven days.
 
-- checks tag, package version, changelog entry, and registry immutability;
-- runs the full repository and packed lifecycle checks;
-- creates one tarball;
-- records its SHA-512 checksum and npm file manifest;
-- runs an npm publish dry-run;
-- uploads the validated artifact for seven days.
+The validation job downloads and verifies the candidate, runs the full repository checks, exercises that exact tarball through the npm and native Pi package lifecycles, and runs an npm publish dry-run.
 
-The publish job requires approval in the `npm` environment. It downloads and verifies the same artifact, publishes through GitHub OIDC with npm provenance, uses `next` for prereleases and `latest` for stable versions, and reads the registry back until version, integrity, dist-tag, and attestation state match.
+The publish job requires approval in the `npm` environment. It downloads and verifies the same immutable candidate, publishes through GitHub OIDC with npm provenance, uses `next` for prereleases and `latest` for stable versions, and reads the registry back until version, integrity, dist-tag, and attestation state match.
 
 ## Registry smoke check
 

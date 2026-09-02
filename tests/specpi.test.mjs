@@ -404,12 +404,14 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(publish, /release:\s*\n\s*types: \[published\]/);
     assert.match(publish, /environment: npm/);
     assert.match(publish, /RELEASE_NPM_VERSION: "11\.19\.1"/);
-    assert.equal(publish.match(/npm@\$\{RELEASE_NPM_VERSION\}/g)?.length, 2);
+    assert.equal(publish.match(/npm@\$\{RELEASE_NPM_VERSION\}/g)?.length, 3);
     assert.match(publish, /id-token: write/);
     assert.match(publish, /npm publish --ignore-scripts --access public --provenance/);
     assert.match(publish, /sha512sum --check/);
+    assert.match(publish, /--artifact "\$\{TARBALL\}" --manifest "\$\{MANIFEST\}"/);
+    assert.match(publish, /check:pi-package -- --artifact "\$\{TARBALL\}"/);
     assert.match(publish, /dist\.attestations\.url/);
-    assert.doesNotMatch(publish, /NODE_AUTH_TOKEN|secrets\./);
+    assert.doesNotMatch(publish, /NODE_AUTH_TOKEN|secrets\.|uses: actions\/[^\s]+@v\d/);
     assert.match(ci, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
     assert.match(ci, /npm run check:package/);
     assert.match(ci, /npm run check:pi-package/);

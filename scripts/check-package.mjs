@@ -10,6 +10,18 @@ import { fileURLToPath } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const npmCli = process.env.npm_execpath;
+const artifactIndex = process.argv.indexOf("--artifact");
+const manifestIndex = process.argv.indexOf("--manifest");
+const artifactPath = artifactIndex >= 0 ? process.argv[artifactIndex + 1] : undefined;
+const artifactManifestPath = manifestIndex >= 0 ? process.argv[manifestIndex + 1] : undefined;
+
+if (
+    artifactIndex >= 0 !== manifestIndex >= 0 ||
+    (artifactIndex >= 0 && (!artifactPath || !artifactManifestPath)) ||
+    (artifactIndex < 0 && process.argv.length > 2)
+) {
+    throw new Error("Use no arguments, or supply --artifact <tarball> and --manifest <npm-pack.json> together");
+}
 
 if (!npmCli || !fs.existsSync(npmCli)) {
     throw new Error("Run package validation through npm so npm_execpath identifies the active npm CLI");
@@ -105,24 +117,6 @@ function runNode(args, options = {}) {
     return result;
 }
 
-function runNodeFailure(args, options = {}) {
-    const result = spawnSync(process.execPath, args, {
-        cwd: options.cwd || repoRoot,
-        env: options.env || process.env,
-        encoding: "utf8",
-        windowsHide: true,
-        timeout: options.timeout || 180_000,
-        maxBuffer: 20 * 1024 * 1024,
-    });
-    if (result.error) {
-        throw result.error;
-    }
-
-    assert.notEqual(result.status, 0, `${process.execPath} ${args.join(" ")} unexpectedly succeeded`);
-
-    return result;
-}
-
 function runNpm(args, options = {}) {
     return runNode([npmCli, ...args], options);
 }
@@ -131,28 +125,32 @@ function quoteWindowsCommandArg(value) {
     return `"${String(value).replaceAll("%", "%%").replaceAll('"', '""')}"`;
 }
 
-function runInstalledBin(binPath, env) {
+function runInstalledBin(binPath, args, options = {}) {
     const common = {
         cwd: repoRoot,
-        env,
+        env: options.env || process.env,
         encoding: "utf8",
         windowsHide: true,
-        timeout: 30_000,
-        maxBuffer: 1024 * 1024,
+        timeout: options.timeout || 180_000,
+        maxBuffer: 20 * 1024 * 1024,
     };
     const result =
         process.platform === "win32"
-            ? spawnSync([binPath, "help"].map(quoteWindowsCommandArg).join(" "), {
+            ? spawnSync([binPath, ...args].map(quoteWindowsCommandArg).join(" "), {
                   ...common,
                   shell: process.env.ComSpec || "cmd.exe",
               })
-            : spawnSync(binPath, ["help"], common);
+            : spawnSync(binPath, args, common);
     if (result.error) {
         throw result.error;
     }
 
-    if (result.status !== 0) {
-        throw new Error(`installed SpecPi bin failed (${result.status})\n${result.stdout || ""}${result.stderr || ""}`);
+    if (options.expectFailure) {
+        assert.notEqual(result.status, 0, `installed SpecPi bin ${args.join(" ")} unexpectedly succeeded`);
+    } else if (result.status !== 0) {
+        throw new Error(
+            `installed SpecPi bin ${args.join(" ")} failed (${result.status})\n${result.stdout || ""}${result.stderr || ""}`,
+        );
     }
 
     return result;
@@ -250,7 +248,7 @@ function assertReadmeAssets(packageRoot) {
     }
 }
 
-function assertInstalledLifecycle(packageRoot, temporaryRoot, baseEnv) {
+function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) {
     const agentDir = path.join(temporaryRoot, "agent");
     const fakeBin = path.join(temporaryRoot, "fake-bin");
     writeFakePi(fakeBin);
@@ -263,17 +261,17 @@ function assertInstalledLifecycle(packageRoot, temporaryRoot, baseEnv) {
         GIT_COMMITTER_NAME: "SpecPi Package Check",
         GIT_COMMITTER_EMAIL: "specpi-package-check@example.invalid",
     };
-    const cli = path.join(packageRoot, "scripts", "specpi.mjs");
-
-    const help = runNode([cli, "help"], { env });
+    const help = runInstalledBin(binPath, ["help"], { env });
     const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"));
     assert.match(help.stdout, new RegExp(`SpecPi ${packageJson.version.replaceAll(".", "\\.")}`));
 
-    runNode([cli, "plan", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], {
-        env,
-    });
+    runInstalledBin(
+        binPath,
+        ["plan", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
+        { env },
+    );
     assert.equal(fs.existsSync(agentDir), false, "plan mutated the isolated agent directory");
-    const unknown = runNodeFailure([cli, "unknown-package-smoke-command"], { env });
+    const unknown = runInstalledBin(binPath, ["unknown-package-smoke-command"], { env, expectFailure: true });
     assert.match(`${unknown.stdout}\n${unknown.stderr}`, /Unknown command: unknown-package-smoke-command/);
     assert.equal(fs.existsSync(agentDir), false, "unknown command mutated the isolated agent directory");
 
@@ -284,8 +282,8 @@ function assertInstalledLifecycle(packageRoot, temporaryRoot, baseEnv) {
         "--skip-tool-install",
         "--skip-shell",
     ];
-    runNode([cli, "install", ...lifecycleFlags], { env });
-    runNode([cli, "doctor"], { env, timeout: 300_000 });
+    runInstalledBin(binPath, ["install", ...lifecycleFlags], { env });
+    runInstalledBin(binPath, ["doctor"], { env, timeout: 300_000 });
 
     const settingsPath = path.join(agentDir, "settings.json");
     const manifestPath = path.join(agentDir, "specpi", "manifest.json");
@@ -295,7 +293,8 @@ function assertInstalledLifecycle(packageRoot, temporaryRoot, baseEnv) {
     const guardBeforeFailure = new Map(
         fs.readdirSync(guardDirectory).map((name) => [name, fs.readFileSync(path.join(guardDirectory, name))]),
     );
-    const failedUpdate = runNodeFailure([cli, "update", ...lifecycleFlags], {
+    const failedUpdate = runInstalledBin(binPath, ["update", ...lifecycleFlags], {
+        expectFailure: true,
         env: {
             ...env,
             SPECPI_TESTING: "1",
@@ -320,9 +319,9 @@ function assertInstalledLifecycle(packageRoot, temporaryRoot, baseEnv) {
         fs.writeFileSync(file, '{"private":true}\n', { mode: 0o600 });
     }
 
-    runNode([cli, "update", ...lifecycleFlags], { env });
-    runNode([cli, "doctor"], { env, timeout: 300_000 });
-    runNode([cli, "uninstall", "--yes"], { env });
+    runInstalledBin(binPath, ["update", ...lifecycleFlags], { env });
+    runInstalledBin(binPath, ["doctor"], { env, timeout: 300_000 });
+    runInstalledBin(binPath, ["uninstall", "--yes"], { env });
 
     assert.equal(
         fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")),
@@ -341,11 +340,23 @@ try {
     fs.mkdirSync(packDirectory, { recursive: true });
     fs.mkdirSync(prefix, { recursive: true });
 
-    const packed = runNpm(["pack", "--pack-destination", packDirectory, "--json", "--ignore-scripts"]);
-    assert.equal(packed.stderr.trim(), "", `npm pack emitted warnings:\n${packed.stderr}`);
-    const results = JSON.parse(packed.stdout);
-    assert.equal(results.length, 1, "npm pack did not produce exactly one artifact");
-    const packResult = results[0];
+    let packResult;
+    let tarball;
+    if (artifactPath) {
+        const results = JSON.parse(fs.readFileSync(path.resolve(artifactManifestPath), "utf8"));
+        assert.equal(results.length, 1, "artifact manifest does not describe exactly one package");
+        packResult = results[0];
+        tarball = path.resolve(artifactPath);
+        assert.equal(path.basename(tarball), packResult.filename, "artifact filename differs from its npm manifest");
+    } else {
+        const packed = runNpm(["pack", "--pack-destination", packDirectory, "--json", "--ignore-scripts"]);
+        assert.equal(packed.stderr.trim(), "", `npm pack emitted warnings:\n${packed.stderr}`);
+        const results = JSON.parse(packed.stdout);
+        assert.equal(results.length, 1, "npm pack did not produce exactly one artifact");
+        packResult = results[0];
+        tarball = path.join(packDirectory, packResult.filename);
+    }
+
     assertPackageFiles(packResult);
 
     const sourcePackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
@@ -356,8 +367,7 @@ try {
     assert.ok(packResult.size < 300_000, `packed artifact unexpectedly exceeds 300 KB: ${packResult.size}`);
     assert.ok(packResult.unpackedSize < 1_000_000, `unpacked artifact unexpectedly exceeds 1 MB`);
 
-    const tarball = path.join(packDirectory, packResult.filename);
-    assert.ok(fs.existsSync(tarball), "npm pack did not create the reported tarball");
+    assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");
 
     const installEnv = { ...process.env, npm_config_audit: "false", npm_config_fund: "false" };
     runNpm(
@@ -380,7 +390,7 @@ try {
     const binPath = process.platform === "win32" ? path.join(prefix, "specpi.cmd") : path.join(prefix, "bin", "specpi");
     assert.ok(fs.existsSync(binPath), "npm did not create the platform CLI shim");
     assert.match(
-        runInstalledBin(binPath, installEnv).stdout,
+        runInstalledBin(binPath, ["help"], { env: installEnv }).stdout,
         new RegExp(`SpecPi ${sourcePackage.version.replaceAll(".", "\\.")}`),
     );
 
@@ -398,7 +408,7 @@ try {
 
     assertPackageMetadata(JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8")));
     assertReadmeAssets(packageRoot);
-    assertInstalledLifecycle(packageRoot, temporaryRoot, installEnv);
+    assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, installEnv);
 
     console.log(
         `Package check passed: ${packResult.filename} (${packResult.entryCount} files, ${packResult.size} bytes compressed)`,

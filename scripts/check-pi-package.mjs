@@ -10,8 +10,14 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
 const npmCli = process.env.npm_execpath;
+const artifactIndex = process.argv.indexOf("--artifact");
+const artifactPath = artifactIndex >= 0 ? process.argv[artifactIndex + 1] : undefined;
 const piPackage = "@earendil-works/pi-coding-agent";
 const piVersion = "0.84.4";
+
+if ((artifactIndex >= 0 && !artifactPath) || (artifactIndex < 0 && process.argv.length > 2)) {
+    throw new Error("Use no arguments, or supply --artifact <tarball>");
+}
 
 if (!npmCli || !fs.existsSync(npmCli)) {
     throw new Error("Run Pi package validation through npm so npm_execpath identifies the active npm CLI");
@@ -61,10 +67,22 @@ try {
         npm_config_audit: "false",
         npm_config_fund: "false",
     };
-    const packed = runNpm(["pack", "--pack-destination", packDirectory, "--json", "--ignore-scripts"], { env });
-    const packResult = JSON.parse(packed.stdout)[0];
-    assert.ok(packResult?.filename, "npm pack did not report the SpecPi tarball");
-    const tarball = path.join(packDirectory, packResult.filename);
+    let tarball;
+    let artifactLabel;
+    if (artifactPath) {
+        tarball = path.resolve(artifactPath);
+        artifactLabel = path.basename(tarball);
+    } else {
+        const packed = runNpm(["pack", "--pack-destination", packDirectory, "--json", "--ignore-scripts"], {
+            env,
+        });
+        const packResult = JSON.parse(packed.stdout)[0];
+        assert.ok(packResult?.filename, "npm pack did not report the SpecPi tarball");
+        tarball = path.join(packDirectory, packResult.filename);
+        artifactLabel = packResult.filename;
+    }
+
+    assert.ok(fs.existsSync(tarball), "the SpecPi tarball does not exist");
 
     runNpm(
         [
@@ -91,20 +109,18 @@ try {
     const piCli = path.join(piRoot, piBin);
     assert.ok(fs.existsSync(piCli), "the pinned Pi package did not provide its CLI entrypoint");
 
-    const loaded = runNode(
-        [
-            piCli,
-            "--offline",
-            "--no-session",
-            "--no-context-files",
-            "--no-extensions",
-            "-e",
-            specpiRoot,
-            "--list-models",
-            "gpt",
-        ],
-        { env, timeout: 300_000 },
+    runNode([piCli, "install", specpiRoot], { env });
+    const listed = runNode([piCli, "list"], { env });
+    assert.match(listed.stdout, /User packages:/);
+    assert.ok(
+        listed.stdout.replaceAll("\\", "/").includes(specpiRoot.replaceAll("\\", "/")),
+        "Pi list did not report the installed SpecPi package root",
     );
+
+    const loaded = runNode([piCli, "--offline", "--no-session", "--no-context-files", "--list-models", "gpt"], {
+        env,
+        timeout: 300_000,
+    });
     assert.doesNotMatch(
         `${loaded.stdout}\n${loaded.stderr}`,
         /failed to load|cannot find package|ERR_MODULE_NOT_FOUND/i,
@@ -121,7 +137,7 @@ try {
         /SpecPi browser runtime is not installed.*Run specpi update/s,
     );
 
-    console.log(`Pi package check passed: ${packResult.filename} loaded through Pi ${piVersion}`);
+    console.log(`Pi package check passed: ${artifactLabel} loaded through Pi ${piVersion}`);
 } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true });
 }

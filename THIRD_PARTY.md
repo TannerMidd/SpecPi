@@ -35,7 +35,7 @@ The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mo
 
 The npm release workflow installs `npm@11.19.1` as its pinned publishing client. npm is distributed under the Artistic License 2.0 and runs only on the ephemeral GitHub-hosted release runner.
 
-Repository automation uses these official GitHub Actions at pinned major versions:
+Repository automation uses these official GitHub Actions. General CI and Pages workflows track the listed major versions; the npm publishing workflow pins exact reviewed commit SHAs so the OIDC job does not execute mutable action tags:
 
 - `actions/checkout@v4`
 - `actions/setup-node@v4`

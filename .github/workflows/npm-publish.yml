@@ -11,17 +11,82 @@ env:
   RELEASE_NPM_VERSION: "11.19.1"
 
 jobs:
-  validate:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js and npm registry
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22.19.0"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install pinned release npm
+        run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
+
+      - name: Verify immutable release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node --print "require('./package.json').version")"
+          test "${GITHUB_REF_NAME}" = "v${VERSION}"
+          grep --fixed-strings "## ${VERSION} - " CHANGELOG.md
+          set +e
+          LOOKUP="$(npm view "specpi@${VERSION}" version 2>&1)"
+          LOOKUP_STATUS=$?
+          set -e
+          if [[ ${LOOKUP_STATUS} -eq 0 ]]; then
+            echo "specpi@${VERSION} already exists and cannot be replaced" >&2
+            exit 1
+          fi
+          if [[ "${LOOKUP}" != *"E404"* ]]; then
+            printf 'Could not prove registry version absence:\n%s\n' "${LOOKUP}" >&2
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+
+      - name: Build and checksum release artifact before development install
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          npm pack --ignore-scripts --json --pack-destination dist > dist/npm-pack.json
+          TARBALL="specpi-${VERSION}.tgz"
+          test -f "dist/${TARBALL}"
+          cd dist
+          sha512sum "${TARBALL}" > "${TARBALL}.sha512"
+
+      - name: Preserve immutable release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: specpi-npm-candidate
+          path: |
+            dist/specpi-${{ env.VERSION }}.tgz
+            dist/specpi-${{ env.VERSION }}.tgz.sha512
+            dist/npm-pack.json
+          if-no-files-found: error
+          retention-days: 7
+
+  validate:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and npm registry
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.19.0"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
       - name: Install pinned release npm
         run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
@@ -29,46 +94,28 @@ jobs:
       - name: Install pinned repository development tools
         run: npm install --ignore-scripts --omit=peer --no-package-lock
 
-      - name: Run repository and packed-artifact checks
+      - name: Run repository checks
         run: npm run check
 
-      - name: Load the packed resources through pinned Pi
-        run: npm run check:pi-package
+      - name: Download immutable release candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: specpi-npm-candidate
+          path: candidate
 
-      - name: Verify release identity
+      - name: Verify and exercise the exact release artifact
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(node --print "require('./package.json').version")"
-          test "${GITHUB_REF_NAME}" = "v${VERSION}"
-          grep --extended-regexp --line-regexp "## ${VERSION} - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md
-          if npm view "specpi@${VERSION}" version >/dev/null 2>&1; then
-            echo "specpi@${VERSION} already exists and cannot be replaced" >&2
-            exit 1
-          fi
-          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
-
-      - name: Build the release artifact once
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          npm pack --ignore-scripts --json --pack-destination dist > dist/npm-pack.json
-          TARBALL="dist/specpi-${VERSION}.tgz"
-          test -f "${TARBALL}"
-          sha512sum "${TARBALL}" > "${TARBALL}.sha512"
+          TARBALL="${GITHUB_WORKSPACE}/candidate/specpi-${VERSION}.tgz"
+          MANIFEST="${GITHUB_WORKSPACE}/candidate/npm-pack.json"
+          cd candidate
+          sha512sum --check "specpi-${VERSION}.tgz.sha512"
+          cd "${GITHUB_WORKSPACE}"
+          npm run check:package -- --artifact "${TARBALL}" --manifest "${MANIFEST}"
+          npm run check:pi-package -- --artifact "${TARBALL}"
           npm publish --dry-run --ignore-scripts "${TARBALL}"
-
-      - name: Upload validated npm artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: specpi-npm-${{ env.VERSION }}
-          path: |
-            dist/specpi-${{ env.VERSION }}.tgz
-            dist/specpi-${{ env.VERSION }}.tgz.sha512
-            dist/npm-pack.json
-          if-no-files-found: error
-          retention-days: 7
 
   publish:
     needs: validate
@@ -79,13 +126,16 @@ jobs:
       id-token: write
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js and npm registry
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22.19.0"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
       - name: Install pinned release npm
         run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
@@ -97,10 +147,10 @@ jobs:
           VERSION="$(node --print "require('./package.json').version")"
           echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
 
-      - name: Download validated npm artifact
-        uses: actions/download-artifact@v4
+      - name: Download validated release candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: specpi-npm-${{ env.VERSION }}
+          name: specpi-npm-candidate
           path: dist
 
       - name: Verify downloaded artifact
