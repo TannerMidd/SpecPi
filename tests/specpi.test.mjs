@@ -354,7 +354,16 @@ test("shared SpecPi lock fails closed and release preserves a substituted lock",
 
 test("UI prompt refresh flushes one immediate TUI frame and cleans up its invisible widget", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-    assert.equal(manifest.peerDependencies["@earendil-works/pi-coding-agent"], ">=0.84.4");
+    assert.deepEqual(manifest.peerDependencies, {
+        "@earendil-works/pi-ai": "*",
+        "@earendil-works/pi-coding-agent": "*",
+        "@earendil-works/pi-tui": "*",
+        typebox: "*",
+    });
+    for (const peer of Object.keys(manifest.peerDependencies)) {
+        assert.equal(manifest.peerDependenciesMeta[peer].optional, true);
+    }
+
     const result = runUiRefreshHarness();
     assert.deepEqual(result.eventNames, ["session_start", "ui_prompt_start", "session_shutdown"]);
     assert.deepEqual(result.widgetCalls, [
@@ -370,6 +379,93 @@ test("platform launchers invoke Node directly", () => {
     assert.equal(manifest.bin.specpi, "./scripts/specpi.mjs");
     assert.match(windowsLauncher, /node "%~dp0scripts\\specpi\.mjs" %\*/i);
     assert.ok(fs.readFileSync(path.join(repoRoot, "specpi"), "utf8").startsWith("#!/usr/bin/env sh\n"));
+});
+
+test("release order guard classifies SemVer and rejects dist-tag regressions", () => {
+    const script = path.join(repoRoot, "scripts", "check-release-order.mjs");
+    const run = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
+    for (const [version, expectedTag] of [
+        ["0.10.0", "latest"],
+        ["0.10.0+build-foo", "latest"],
+        ["0.10.0-next.1", "next"],
+    ]) {
+        const tagged = run("tag", version);
+        assert.equal(tagged.status, 0, tagged.stderr);
+        assert.equal(tagged.stdout.trim(), expectedTag);
+    }
+
+    for (const [candidate, current] of [
+        ["0.10.0", "0.9.9"],
+        ["0.10.0", "0.10.0-next.9"],
+        ["0.10.0-next.10", "0.10.0-next.2"],
+        ["0.10.0-next.9007199254740993", "0.10.0-next.9007199254740992"],
+        ["9007199254740993.0.0", "9007199254740992.999999999999999999999.999999999999999999999"],
+        ["0.10.0-rc.1", "0.10.0-beta.9"],
+    ]) {
+        const newer = run("advance", candidate, current);
+        assert.equal(newer.status, 0, newer.stderr);
+        assert.match(newer.stdout, /advances its dist-tag/);
+    }
+
+    for (const [candidate, current] of [
+        ["0.10.0", "0.10.0"],
+        ["0.9.9", "0.10.0"],
+        ["0.10.0-next.1", "0.10.0-next.2"],
+        ["0.10.0+build.2", "0.10.0+build.1"],
+        ["0.10.0-next.01", "0.10.0-next.0"],
+    ]) {
+        const rejected = run("advance", candidate, current);
+        assert.notEqual(rejected.status, 0, `${candidate} should not advance ${current}`);
+    }
+});
+
+test("npm release metadata, docs, and protected workflow stay aligned", () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+    const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+    const changelog = fs.readFileSync(path.join(repoRoot, "CHANGELOG.md"), "utf8");
+    const site = fs.readFileSync(path.join(repoRoot, "site", "index.html"), "utf8");
+    const wiki = fs.readFileSync(path.join(repoRoot, "site", "wiki", "index.html"), "utf8");
+    const publish = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "npm-publish.yml"), "utf8");
+    const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
+    const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
+
+    assert.equal(manifest.version, "0.10.0");
+    assert.equal(manifest.publishConfig.access, "public");
+    assert.equal(manifest.publishConfig.provenance, true);
+    assert.equal(manifest.scripts.preinstall, undefined);
+    assert.equal(manifest.scripts.install, undefined);
+    assert.equal(manifest.scripts.postinstall, undefined);
+    assert.match(readme, new RegExp(`specpi@${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(readme, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(readme, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(changelog, new RegExp(`^## ${manifest.version.replaceAll(".", "\\.")} - \\d{4}-\\d{2}-\\d{2}$`, "m"));
+    assert.match(site, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(site, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(wiki, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(wiki, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(publish, /release:\s*\n\s*types: \[published\]/);
+    assert.match(publish, /environment: npm/);
+    assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);
+    assert.match(publish, /RELEASE_NPM_VERSION: "11\.19\.1"/);
+    assert.equal(publish.match(/npm@\$\{RELEASE_NPM_VERSION\}/g)?.length, 3);
+    assert.match(publish, /id-token: write/);
+    assert.match(publish, /npm publish --dry-run --ignore-scripts --provenance=false/);
+    assert.match(publish, /npm publish --ignore-scripts --access public --provenance/);
+    assert.equal(publish.match(/node scripts\/verify-artifact\.mjs/g)?.length, 2);
+    assert.match(publish, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
+    assert.match(publish, /--artifact "\$\{TARBALL\}" --manifest "\$\{MANIFEST\}"/);
+    assert.match(publish, /check:pi-package -- --artifact "\$\{TARBALL\}"/);
+    assert.match(publish, /check-release-order\.mjs tag "\$\{VERSION\}"/);
+    assert.match(publish, /check-release-order\.mjs advance "\$\{VERSION\}" "\$\{LOOKUP\}"/);
+    assert.match(publish, /dist\.attestations\.url/);
+    assert.doesNotMatch(publish, /NODE_AUTH_TOKEN|secrets\.|uses: actions\/[^\s]+@v\d/);
+    assert.match(releaseRunbook, /--provenance=false/);
+    assert.match(releaseRunbook, /Do not publish a GitHub Release for that same bootstrap version/);
+    assert.match(releaseRunbook, /Publication is a post-merge operation/);
+    assert.match(releaseRunbook, /never publish from an unmerged commit/);
+    assert.match(ci, /os: \[windows-latest, macos-latest\]/);
+    assert.equal(ci.match(/npm run check:package/g)?.length, 1);
+    assert.equal(ci.match(/npm run check:pi-package/g)?.length, 2);
 });
 
 test("showcase site is self-contained and Pages-ready", () => {
@@ -422,8 +518,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /role="tablist" aria-label="Command guard modes"/);
     assert.equal(html.match(/data-guard-mode=/g)?.length, 3);
     assert.equal(html.match(/data-guard-verdict/g)?.length, 5);
-    assert.match(html, /\\specpi\.cmd install/);
-    assert.match(html, /\.\/specpi install/);
+    assert.match(html, /npm install --global specpi@latest/);
+    assert.match(html, /specpi install/);
     assert.match(html, /Collection is disabled by default/);
     assert.match(html, /One writer per working directory/);
     assert.match(css, /grid-template-columns: 13\.375rem minmax\(0, 1fr\)/);
@@ -476,8 +572,12 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /\/harness-improvement/);
     assert.match(wikiHtml, /\/wishlist status/);
     assert.match(wikiHtml, /\/wishlist history \[gap-id\]/);
-    assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
+    assert.match(wikiHtml, /npm install --global specpi@latest/);
+    assert.match(wikiHtml, /specpi doctor/);
+    assert.match(wikiHtml, /pi install npm:specpi/);
     assert.match(wikiHtml, /\.\/specpi doctor/);
+    assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
+    assert.equal(wikiHtml.match(/git clone --branch v0\.10\.0/g)?.length, 2);
     assert.match(wikiHtml, /npm run check/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
     assert.match(wikiCss, /\.definition-list/);

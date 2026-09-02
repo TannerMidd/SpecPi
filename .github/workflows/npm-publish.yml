@@ -1,0 +1,211 @@
+name: publish-npm
+
+on:
+    release:
+        types: [published]
+
+permissions:
+    contents: read
+
+env:
+    RELEASE_NPM_VERSION: "11.19.1"
+
+concurrency:
+    group: npm-publish
+    cancel-in-progress: false
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out release tag
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  persist-credentials: false
+
+            - name: Set up Node.js and npm registry
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+              with:
+                  node-version: "22.19.0"
+                  registry-url: "https://registry.npmjs.org"
+                  package-manager-cache: false
+
+            - name: Install pinned release npm
+              run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
+
+            - name: Verify immutable release identity
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  VERSION="$(node --print "require('./package.json').version")"
+                  test "${GITHUB_REF_NAME}" = "v${VERSION}"
+                  grep --fixed-strings "## ${VERSION} - " CHANGELOG.md
+                  set +e
+                  LOOKUP="$(npm view "specpi@${VERSION}" version 2>&1)"
+                  LOOKUP_STATUS=$?
+                  set -e
+                  if [[ ${LOOKUP_STATUS} -eq 0 ]]; then
+                    echo "specpi@${VERSION} already exists and cannot be replaced" >&2
+                    exit 1
+                  fi
+                  if [[ "${LOOKUP}" != *"E404"* ]]; then
+                    printf 'Could not prove registry version absence:\n%s\n' "${LOOKUP}" >&2
+                    exit 1
+                  fi
+                  echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+
+            - name: Build and checksum release artifact before development install
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir -p dist
+                  npm pack --ignore-scripts --json --pack-destination dist > dist/npm-pack.json
+                  TARBALL="specpi-${VERSION}.tgz"
+                  test -f "dist/${TARBALL}"
+                  cd dist
+                  sha512sum "${TARBALL}" > "${TARBALL}.sha512"
+
+            - name: Preserve immutable release candidate
+              uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+              with:
+                  name: specpi-npm-candidate
+                  path: |
+                      dist/specpi-${{ env.VERSION }}.tgz
+                      dist/specpi-${{ env.VERSION }}.tgz.sha512
+                      dist/npm-pack.json
+                  if-no-files-found: error
+                  retention-days: 7
+
+    validate:
+        needs: build
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+            - name: Check out release tag
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  persist-credentials: false
+
+            - name: Set up Node.js and npm registry
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+              with:
+                  node-version: "22.19.0"
+                  registry-url: "https://registry.npmjs.org"
+                  package-manager-cache: false
+
+            - name: Install pinned release npm
+              shell: bash
+              run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
+
+            - name: Install pinned repository development tools
+              run: npm install --ignore-scripts --omit=peer --no-package-lock
+
+            - name: Run repository checks
+              if: ${{ matrix.os == 'ubuntu-latest' }}
+              run: npm run check
+
+            - name: Download immutable release candidate
+              uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+              with:
+                  name: specpi-npm-candidate
+                  path: candidate
+
+            - name: Verify and exercise the exact release artifact
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  VERSION="$(node --print "require('./package.json').version")"
+                  TARBALL="${GITHUB_WORKSPACE}/candidate/specpi-${VERSION}.tgz"
+                  MANIFEST="${GITHUB_WORKSPACE}/candidate/npm-pack.json"
+                  node scripts/verify-artifact.mjs "${TARBALL}" "${TARBALL}.sha512"
+                  npm run check:package -- --artifact "${TARBALL}" --manifest "${MANIFEST}"
+                  npm run check:pi-package -- --artifact "${TARBALL}"
+                  npm publish --dry-run --ignore-scripts --provenance=false "${TARBALL}"
+
+    publish:
+        needs: validate
+        runs-on: ubuntu-latest
+        environment: npm
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - name: Check out release tag
+              uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  persist-credentials: false
+
+            - name: Set up Node.js and npm registry
+              uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+              with:
+                  node-version: "22.19.0"
+                  registry-url: "https://registry.npmjs.org"
+                  package-manager-cache: false
+
+            - name: Install pinned release npm
+              run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
+
+            - name: Read release version
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  VERSION="$(node --print "require('./package.json').version")"
+                  DIST_TAG="$(node scripts/check-release-order.mjs tag "${VERSION}")"
+                  echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+                  echo "DIST_TAG=${DIST_TAG}" >> "${GITHUB_ENV}"
+
+            - name: Download validated release candidate
+              uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+              with:
+                  name: specpi-npm-candidate
+                  path: dist
+
+            - name: Verify downloaded artifact
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  node scripts/verify-artifact.mjs "dist/specpi-${VERSION}.tgz" "dist/specpi-${VERSION}.tgz.sha512"
+
+            - name: Refuse a dist-tag regression
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  set +e
+                  LOOKUP="$(npm view specpi "dist-tags.${DIST_TAG}" 2>&1)"
+                  LOOKUP_STATUS=$?
+                  set -e
+                  if [[ ${LOOKUP_STATUS} -eq 0 && -n "${LOOKUP}" ]]; then
+                    node scripts/check-release-order.mjs advance "${VERSION}" "${LOOKUP}"
+                  elif [[ ${LOOKUP_STATUS} -ne 0 && "${LOOKUP}" != *"E404"* ]]; then
+                    printf 'Could not read the current %s version:\n%s\n' "${DIST_TAG}" "${LOOKUP}" >&2
+                    exit 1
+                  fi
+
+            - name: Publish with npm provenance
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  TARBALL="dist/specpi-${VERSION}.tgz"
+                  npm publish --ignore-scripts --access public --provenance --tag "${DIST_TAG}" "${TARBALL}"
+
+            - name: Verify registry publication
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  EXPECTED_INTEGRITY="sha512-$(openssl dgst -sha512 -binary "dist/specpi-${VERSION}.tgz" | openssl base64 -A)"
+                  for attempt in 1 2 3 4 5 6; do
+                    ACTUAL_VERSION="$(npm view "specpi@${VERSION}" version 2>/dev/null || true)"
+                    ACTUAL_INTEGRITY="$(npm view "specpi@${VERSION}" dist.integrity 2>/dev/null || true)"
+                    ACTUAL_TAG="$(npm view "specpi" "dist-tags.${DIST_TAG}" 2>/dev/null || true)"
+                    ATTESTATION_URL="$(npm view "specpi@${VERSION}" dist.attestations.url 2>/dev/null || true)"
+                    if [[ "${ACTUAL_VERSION}" == "${VERSION}" && "${ACTUAL_INTEGRITY}" == "${EXPECTED_INTEGRITY}" && "${ACTUAL_TAG}" == "${VERSION}" && -n "${ATTESTATION_URL}" ]]; then
+                      printf 'Verified specpi@%s (%s) with provenance\n' "${VERSION}" "${DIST_TAG}"
+                      exit 0
+                    fi
+                    sleep 10
+                  done
+                  echo "Published package did not converge to the expected version, integrity, dist-tag, and provenance" >&2
+                  exit 1

@@ -12,6 +12,15 @@ SpecPi pins but does not vendor these Pi packages:
 
 They retain their own copyright and license terms. Pi downloads them from npm when the installer runs `pi install`. SpecPi does not patch, fork, vendor, or use unsupported deep imports from these packages.
 
+The published `specpi` npm package declares the Pi host runtime modules its extensions import as optional peer dependencies, each at Pi's documented `"*"` range:
+
+- `@earendil-works/pi-coding-agent` — extension API, theme, markdown, and highlighting helpers
+- `@earendil-works/pi-ai` — the `StringEnum` tool-schema helper
+- `@earendil-works/pi-tui` — terminal component, key, and width primitives
+- `typebox` — the unscoped TypeBox package Pi bundles, used for tool input schemas
+
+They retain their own copyright and license terms. SpecPi never vendors, bundles, or installs them; the Pi host supplies them at extension load time through loader aliases. Pi disables peer resolution for managed package installs, so a peer range would not enforce the host version there. Marking the peers optional also keeps an ordinary npm CLI installation from adding a second copy beside or inside SpecPi. The full managed installation enforces its supported Pi floor through the installer's `MIN_PI_VERSION` compatibility check, and the limited direct Pi mode documents the same host prerequisite.
+
 SpecPi also installs these exact browser-runtime packages from the reviewed `browser-runtime/package-lock.json`:
 
 - `playwright@1.62.1` and `playwright-core@1.62.1` — Apache-2.0
@@ -33,15 +42,19 @@ They are development-only dependencies, are not shipped by the SpecPi installer,
 
 The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mono. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". The font files are distributed under the SIL Open Font License 1.1; the required license text is included at `site/fonts/LICENSE.txt`.
 
-Repository automation uses these official GitHub Actions at pinned major versions:
+The npm release workflow installs `npm@11.19.1` as its pinned publishing client. npm is distributed under the Artistic License 2.0 and runs only on the ephemeral GitHub-hosted release runner.
+
+Repository automation uses these official GitHub Actions. General CI and Pages workflows track the listed major versions; the npm publishing workflow pins exact reviewed commit SHAs so the OIDC job does not execute mutable action tags:
 
 - `actions/checkout@v4`
 - `actions/setup-node@v4`
 - `actions/configure-pages@v5`
 - `actions/upload-pages-artifact@v4`
 - `actions/deploy-pages@v4`
+- `actions/upload-artifact@v4`
+- `actions/download-artifact@v4`
 
-They retain their own copyright and license terms. The Pages actions receive only the permissions documented in `.github/workflows/pages.yml`.
+They retain their own copyright and license terms. These actions receive only the permissions declared in their respective workflows.
 
 The optional DonSeTch CLI is distributed under AGPL-3.0-only and is not bundled in this repository. When selected during installation, SpecPi installs `donsetch@3.4.0` globally through npm; that package downloads and verifies its platform binary. The included skill documents how to invoke it.
 

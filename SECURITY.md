@@ -56,8 +56,9 @@ When appropriate, SpecPi publishes security information through [GitHub Security
 
 ## Secure installation and operation
 
-- Clone and review a tagged release. Do not pipe remote installer content directly into a shell.
-- Review `specpi plan` before installation or update. Use `--yes` only when every planned external installation is intended.
+- Install a version-pinned npm release or clone and review the matching source tag. Verify npm provenance when relying on the registry artifact. Do not pipe remote installer content directly into a shell.
+- Installing the npm package adds the CLI only. Review `specpi plan` before installation or update, and use `--yes` only when every planned external installation is intended.
+- Treat `pi install npm:specpi` as limited resource-only mode, not as the managed installer with browser runtime, supporting packages, instructions, backups, and rollback ownership.
 - Run `specpi doctor` after installation and updates.
 - Run Pi and SpecPi with the least operating-system privilege practical. Use a container or VM for hostile repositories, code, or web content.
 - Protect Pi configuration and credentials with operating-system permissions. SpecPi is not a credential or process sandbox.
@@ -69,6 +70,7 @@ When appropriate, SpecPi publishes security information through [GitHub Security
 
 | Area | SpecPi provides | SpecPi does not provide |
 | --- | --- | --- |
+| npm distribution | Reviewed file allow-list, no install lifecycle script, protected publishing, and requested provenance | Automatic execution of the managed SpecPi installer or proof that packaged code is safe |
 | Installer | Explicit plans and confirmation, bounded managed changes, backups, checksums, atomic promotion, and rollback | Rollback of every external package-manager side effect or cache |
 | Command Guard | Pre-execution defense in depth for documented model-tool seams | A general sandbox for direct user commands, arbitrary tools, scripts, extensions, or running processes |
 | Local improvement state | Explicit collection choice, bounded local records, sanitization, and no SpecPi upload | Guaranteed removal of every plain-language identity or automatic deletion on uninstall |
@@ -78,6 +80,6 @@ The authoritative assumptions, enforcement seams, residual risks, and component 
 
 ## Dependencies and supply chain
 
-SpecPi pins reviewed executable dependencies and uses a reviewed lockfile for its managed browser runtime. Pinning and lockfiles improve repeatability but are not cryptographic provenance, release-signature, or reproducible-build guarantees. Installation still trusts the configured package registries, upstream publishers, downloaded browser distribution, GitHub Actions, and the invoking host.
+SpecPi pins reviewed executable dependencies and uses a reviewed lockfile for its managed browser runtime. The npm release workflow validates one tarball, publishes those same bytes from a protected environment with GitHub OIDC, and requests npm provenance. Provenance links an artifact to its build workflow but does not prove the source or dependencies are safe. Pinning, lockfiles, and provenance improve accountability but are not complete reproducible-build guarantees. Installation still trusts the configured package registries, upstream publishers, downloaded browser distribution, GitHub Actions, and the invoking host.
 
 Some optional or bootstrap packages are installed globally and remain external system state. SpecPi uninstall does not remove them. See [THIRD_PARTY.md](THIRD_PARTY.md) for the canonical component and version inventory and [SECURITY_MODEL.md](SECURITY_MODEL.md) for acquisition and rollback boundaries.

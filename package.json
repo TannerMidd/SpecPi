@@ -1,6 +1,6 @@
 {
   "name": "specpi",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "An explicit, privacy-conscious, self-improving harness for the Pi coding agent",
   "author": "Tanner Middleton",
   "repository": {
@@ -32,12 +32,14 @@
     "themes",
     "shell",
     "README.md",
+    "site/logo.svg",
     "site/self-improvement-loop-v2.svg",
     "SECURITY.md",
     "SECURITY_MODEL.md",
     "THIRD_PARTY.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "NPM_RELEASE.md"
   ],
   "pi": {
     "extensions": [
@@ -51,8 +53,28 @@
     ]
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.84.4",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=22.19.0"
@@ -61,7 +83,10 @@
     "test": "node --test",
     "format": "prettier --write \"**/*.{js,mjs,ts,tsx}\" && eslint . --fix --rule \"@stylistic/max-statements-per-line: off\" && prettier --write \"**/*.{js,mjs,ts,tsx}\" && eslint . --fix",
     "format:check": "prettier --check \"**/*.{js,mjs,ts,tsx}\" && eslint .",
-    "check": "npm run format:check && node --check scripts/specpi.mjs && node --check scripts/lib.mjs && node --check scripts/lock.mjs && node --check extensions/spec/core.mjs && node --experimental-strip-types --check extensions/command-guard/index.ts && node --check extensions/command-guard/core.mjs && node --check extensions/command-guard/rules.mjs && node --check extensions/command-guard/bash.mjs && node --check extensions/command-guard/powershell.mjs && node --check extensions/command-guard/cmd.mjs && node --check extensions/command-guard/paths.mjs && node --check extensions/command-guard/redact.mjs && node --check extensions/command-guard/managed-files.mjs && node --check extensions/command-guard/smoke.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/tool-wishlist/validators.mjs && node --experimental-strip-types --check extensions/tool-wishlist/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --experimental-strip-types --check extensions/workflow-controls/index.ts && node --check extensions/workflow-controls/scope.mjs && node --check extensions/workflow-controls/experiments.mjs && node --check extensions/workflow-controls/challenge.mjs && node --check extensions/workflow-controls/smoke.mjs && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test"
+    "check:package": "node scripts/check-package.mjs",
+    "check:pi-package": "node scripts/check-pi-package.mjs",
+    "prepublishOnly": "npm run check",
+    "check": "npm run format:check && node --check scripts/specpi.mjs && node --check scripts/lib.mjs && node --check scripts/lock.mjs && node --check scripts/check-release-order.mjs && node --check scripts/verify-artifact.mjs && node --check extensions/spec/core.mjs && node --experimental-strip-types --check extensions/command-guard/index.ts && node --check extensions/command-guard/core.mjs && node --check extensions/command-guard/rules.mjs && node --check extensions/command-guard/bash.mjs && node --check extensions/command-guard/powershell.mjs && node --check extensions/command-guard/cmd.mjs && node --check extensions/command-guard/paths.mjs && node --check extensions/command-guard/redact.mjs && node --check extensions/command-guard/managed-files.mjs && node --check extensions/command-guard/smoke.mjs && node --check extensions/files/core.mjs && node --check extensions/tool-wishlist/core.mjs && node --check extensions/tool-wishlist/registry.mjs && node --check extensions/tool-wishlist/validators.mjs && node --experimental-strip-types --check extensions/tool-wishlist/index.ts && node --experimental-strip-types --check extensions/ui-refresh/index.ts && node --experimental-strip-types --check extensions/workflow-controls/index.ts && node --check extensions/workflow-controls/scope.mjs && node --check extensions/workflow-controls/experiments.mjs && node --check extensions/workflow-controls/challenge.mjs && node --check extensions/workflow-controls/smoke.mjs && node --check extensions/browser/core.mjs && node --check extensions/browser/smoke.mjs && node --check site/cycle.js && node --test && npm run check:package"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",

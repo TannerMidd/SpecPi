@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.10.0 - 2026-09-02
+
+- Add the public npm distribution contract for the `specpi` installer CLI, including global install, explicit managed install/update/uninstall steps, source-audited alternatives, and the limited resource-only boundary of direct `pi install npm:specpi` usage.
+- Validate the exact npm tarball in isolated state: enforce its public file allow-list and metadata, install it offline into a temporary global prefix without auto-installing Pi host peers, and run packed `plan`, `install`, `doctor`, `update`, and `uninstall` lifecycle checks while proving private evidence survives.
+- Declare every imported Pi core module as an optional host peer, ship the README logo, preserve an executable package bin, and add public/provenance publishing metadata without npm installation lifecycle scripts.
+- Add a release-only npm workflow that checks immutable tag/version/changelog alignment, rejects existing versions, preserves and checksums one validated tarball, separates protected publication from validation, publishes through GitHub OIDC with npm provenance, and verifies registry integrity, dist-tag, and attestation state.
+
 ## 0.9.0 - 2026-09-01
 
 - Adopt the SpecPi identity across the package, executables, installer and private state, environment variables, managed markers, extensions and events, `/spec` mode, improvement skill, theme, tests, documentation, security policy, and GitHub Pages URLs.
