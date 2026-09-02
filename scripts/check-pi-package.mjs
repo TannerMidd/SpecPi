@@ -14,6 +14,7 @@ const artifactIndex = process.argv.indexOf("--artifact");
 const artifactPath = artifactIndex >= 0 ? process.argv[artifactIndex + 1] : undefined;
 const piPackage = "@earendil-works/pi-coding-agent";
 const piVersion = "0.84.4";
+const specpiVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
 
 if ((artifactIndex >= 0 && !artifactPath) || (artifactIndex < 0 && process.argv.length > 2)) {
     throw new Error("Use no arguments, or supply --artifact <tarball>");
@@ -94,13 +95,11 @@ try {
             "--no-audit",
             "--no-fund",
             `${piPackage}@${piVersion}`,
-            tarball,
         ],
         { env, timeout: 600_000 },
     );
 
     const globalRoot = runNpm(["root", "--global", "--prefix", prefix], { env }).stdout.trim();
-    const specpiRoot = path.join(globalRoot, "specpi");
     const piRoot = path.join(globalRoot, "@earendil-works", "pi-coding-agent");
     const piManifest = JSON.parse(fs.readFileSync(path.join(piRoot, "package.json"), "utf8"));
     assert.equal(piManifest.version, piVersion);
@@ -108,14 +107,35 @@ try {
     assert.equal(typeof piBin, "string");
     const piCli = path.join(piRoot, piBin);
     assert.ok(fs.existsSync(piCli), "the pinned Pi package did not provide its CLI entrypoint");
+    assert.equal(fs.existsSync(path.join(globalRoot, "specpi")), false, "SpecPi shared Pi's npm installation tree");
 
-    runNode([piCli, "install", specpiRoot], { env });
-    const listed = runNode([piCli, "list"], { env });
-    assert.match(listed.stdout, /User packages:/);
-    assert.ok(
-        listed.stdout.replaceAll("\\", "/").includes(specpiRoot.replaceAll("\\", "/")),
-        "Pi list did not report the installed SpecPi package root",
+    const npmWrapper = path.join(temporaryRoot, "candidate-npm.mjs");
+    fs.writeFileSync(
+        npmWrapper,
+        `import process from "node:process";\n` +
+            `import { spawnSync } from "node:child_process";\n` +
+            `const npmCli = ${JSON.stringify(npmCli)};\n` +
+            `const candidate = ${JSON.stringify(tarball)};\n` +
+            `const requested = ${JSON.stringify(`specpi@${specpiVersion}`)};\n` +
+            `const args = process.argv.slice(2).map((arg) => arg === requested ? candidate : arg);\n` +
+            `const result = spawnSync(process.execPath, [npmCli, ...args], { env: process.env, stdio: "inherit" });\n` +
+            `if (result.error) throw result.error;\n` +
+            `process.exitCode = result.status ?? 1;\n`,
     );
+    fs.writeFileSync(
+        path.join(agentDir, "settings.json"),
+        `${JSON.stringify({ npmCommand: [process.execPath, npmWrapper] }, null, 2)}\n`,
+        { mode: 0o600 },
+    );
+
+    const npmSource = `npm:specpi@${specpiVersion}`;
+    runNode([piCli, "install", npmSource], { cwd: temporaryRoot, env });
+    const specpiRoot = path.join(agentDir, "npm", "node_modules", "specpi");
+    assert.ok(fs.existsSync(path.join(specpiRoot, "package.json")), "Pi did not install the npm package candidate");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(specpiRoot, "package.json"), "utf8")).version, specpiVersion);
+    const listed = runNode([piCli, "list"], { cwd: temporaryRoot, env });
+    assert.match(listed.stdout, /User packages:/);
+    assert.match(listed.stdout, new RegExp(`npm:specpi@${specpiVersion.replaceAll(".", "\\.")}`));
 
     const probePath = path.join(temporaryRoot, "resource-probe.mjs");
     const piEntryUrl = pathToFileURL(path.join(piRoot, "dist", "index.js")).href;

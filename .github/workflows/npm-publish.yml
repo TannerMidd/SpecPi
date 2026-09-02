@@ -175,9 +175,9 @@ jobs:
                   LOOKUP="$(npm view specpi dist-tags.latest 2>&1)"
                   LOOKUP_STATUS=$?
                   set -e
-                  if [[ ${LOOKUP_STATUS} -eq 0 ]]; then
+                  if [[ ${LOOKUP_STATUS} -eq 0 && -n "${LOOKUP}" ]]; then
                     node scripts/check-release-order.mjs "${VERSION}" "${LOOKUP}"
-                  elif [[ "${LOOKUP}" != *"E404"* ]]; then
+                  elif [[ ${LOOKUP_STATUS} -ne 0 && "${LOOKUP}" != *"E404"* ]]; then
                     printf 'Could not read the current latest version:\n%s\n' "${LOOKUP}" >&2
                     exit 1
                   fi

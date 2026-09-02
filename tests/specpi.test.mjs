@@ -413,10 +413,13 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.equal(manifest.scripts.install, undefined);
     assert.equal(manifest.scripts.postinstall, undefined);
     assert.match(readme, new RegExp(`specpi@${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(readme, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(readme, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(changelog, new RegExp(`^## ${manifest.version.replaceAll(".", "\\.")} - \\d{4}-\\d{2}-\\d{2}$`, "m"));
     assert.match(site, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(site, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(wiki, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(wiki, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(publish, /release:\s*\n\s*types: \[published\]/);
     assert.match(publish, /environment: npm/);
     assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);

@@ -76,9 +76,10 @@ specpi install
 specpi doctor
 ```
 
-To inspect the plan without retaining a global CLI installation:
+Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
 
 ```bash
+npm install --global specpi@0.10.0
 npx --package specpi@0.10.0 specpi plan
 ```
 

@@ -129,7 +129,7 @@ function quoteWindowsCommandArg(value) {
 
 function runInstalledBin(binPath, args, options = {}) {
     const common = {
-        cwd: repoRoot,
+        cwd: options.cwd || repoRoot,
         env: options.env || process.env,
         encoding: "utf8",
         windowsHide: true,
@@ -278,17 +278,16 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         GIT_COMMITTER_NAME: "SpecPi Package Check",
         GIT_COMMITTER_EMAIL: "specpi-package-check@example.invalid",
     };
-    const help = runInstalledBin(binPath, ["help"], { env });
+    const lifecycleCwd = path.join(temporaryRoot, "lifecycle-cwd");
+    fs.mkdirSync(lifecycleCwd, { recursive: true });
+    const runCli = (args, options = {}) => runInstalledBin(binPath, args, { cwd: lifecycleCwd, env, ...options });
+    const help = runCli(["help"]);
     const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"));
     assert.match(help.stdout, new RegExp(`SpecPi ${packageJson.version.replaceAll(".", "\\.")}`));
 
-    runInstalledBin(
-        binPath,
-        ["plan", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-        { env },
-    );
+    runCli(["plan", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"]);
     assert.equal(fs.existsSync(agentDir), false, "plan mutated the isolated agent directory");
-    const unknown = runInstalledBin(binPath, ["unknown-package-smoke-command"], { env, expectFailure: true });
+    const unknown = runCli(["unknown-package-smoke-command"], { expectFailure: true });
     assert.match(`${unknown.stdout}\n${unknown.stderr}`, /Unknown command: unknown-package-smoke-command/);
     assert.equal(fs.existsSync(agentDir), false, "unknown command mutated the isolated agent directory");
 
@@ -299,8 +298,8 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         "--skip-tool-install",
         "--skip-shell",
     ];
-    runInstalledBin(binPath, ["install", ...lifecycleFlags], { env });
-    runInstalledBin(binPath, ["doctor"], { env, timeout: 300_000 });
+    runCli(["install", ...lifecycleFlags]);
+    runCli(["doctor"], { timeout: 300_000 });
 
     const settingsPath = path.join(agentDir, "settings.json");
     const manifestPath = path.join(agentDir, "specpi", "manifest.json");
@@ -312,7 +311,7 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     const guardBeforeFailure = new Map(
         fs.readdirSync(guardDirectory).map((name) => [name, fs.readFileSync(path.join(guardDirectory, name))]),
     );
-    const failedUpdate = runInstalledBin(binPath, ["update", ...lifecycleFlags, "--force"], {
+    const failedUpdate = runCli(["update", ...lifecycleFlags, "--force"], {
         expectFailure: true,
         env: {
             ...env,
@@ -341,9 +340,9 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         fs.writeFileSync(file, content, { mode: 0o600 });
     }
 
-    runInstalledBin(binPath, ["update", ...lifecycleFlags, "--force"], { env });
-    runInstalledBin(binPath, ["doctor"], { env, timeout: 300_000 });
-    runInstalledBin(binPath, ["uninstall", "--yes"], { env });
+    runCli(["update", ...lifecycleFlags, "--force"]);
+    runCli(["doctor"], { timeout: 300_000 });
+    runCli(["uninstall", "--yes"]);
 
     assert.equal(
         fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")),
