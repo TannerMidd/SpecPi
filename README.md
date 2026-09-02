@@ -68,7 +68,7 @@ Requirements:
 - Pi 0.84.4 or newer. If Pi is absent, the confirmed install adds the reviewed pinned package.
 
 ```bash
-git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/SpecPi.git
+git clone --branch v0.9.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
