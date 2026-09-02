@@ -1,329 +1,388 @@
-# SpecPi Workflow Controls Plan
+# SpecPi npm Publishing Plan
 
 ## Objective
 
-Implement three first-party harness features as one coherent, optional workflow-controls extension:
+Publish SpecPi as a public npm package that distributes the existing installer CLI and packaged Pi resources without weakening SpecPi's confirmation, rollback, privacy, or validation guarantees.
 
-1. **Scope Drift Monitor** — declare expected project paths, visibly flag mutations outside them, and require explicit acknowledgement before the declared scope expands.
-2. **Guided Experiment Worktrees** — create bounded detached Git worktrees for intentional experiments, preserve one writer per worktree, and offer explicit keep, patch-export, or discard outcomes.
-3. **Completion Challenge** — run an explicit adversarial completion review that identifies unproven requirements, contradictory evidence, scope expansion, missing validation, and residual risk before presenting a readiness verdict.
+The canonical npm installation path will be:
 
-The features should strengthen focus, experimentation, and verification without adding subagents, automatic commits, remote operations, raw command logging, or mandatory ceremony for small tasks.
-
-## Product principles
-
-- All three features are opt-in and quiet when inactive.
-- Human choices authorize scope expansion, worktree destruction, patch replacement, and completion disposition.
-- A warning is not proof, and a model-authored challenge result is not independent verification.
-- Keep state local, bounded, private, and reconstructable without reading Pi credentials, provider state, unrelated sessions, or history.
-- Use one writer per worktree. SpecPi creates experiment space but never launches a child agent or parallel writer.
-- Use Git through fixed argv arrays with `pi.exec`; never construct shell command strings from user input.
-- Preserve unrelated tools and UI state, compose with `/spec` and Command Guard, and fail closed only where an operation would otherwise become destructive or ambiguous.
-- Do not commit, merge, apply patches, push, publish, or change remotes.
-
-## User-facing contract
-
-### Scope Drift Monitor
-
-Commands:
-
-```text
-/scope
-/scope set
-/scope add <project-relative-path>
-/scope remove <project-relative-path>
-/scope accept <project-relative-path>
-/scope recheck
-/scope status
-/scope clear
+```bash
+npm install --global specpi
+specpi plan
+specpi install
+specpi doctor
 ```
 
-Behavior:
+Publishing is a remote, irreversible release action. This plan prepares and validates the package, but the first `npm publish` requires a separate explicit human instruction.
 
-- `/scope set` opens a bounded editor with one project-relative file or directory per line.
-- An empty `/scope` shows status when active and starts the editor when inactive.
-- Scope entries are exact files or directory prefixes; do not introduce glob syntax in the first version.
-- Resolve entries against the current Git root when available, otherwise against `ctx.cwd`. Reject absolute paths, traversal outside the root, control characters, symlink escapes, duplicates, and more than 40 entries.
-- Show a compact persistent status/widget while active: entry count, observed changed-file count, and pending outside-scope paths.
-- For direct `write` and `edit` calls outside scope, show an interactive choice before execution:
-  - `Deny this call (Recommended)`
-  - `Allow once without expanding scope`
-  - `Add this path to scope and allow`
-- In non-interactive modes, remain advisory rather than pretending an acknowledgement occurred: allow the call, record a pending violation, and inject a bounded warning into the next model context.
-- Detect mutations performed through shell or other tools by comparing bounded Git worktree snapshots before and after tool execution. Record only changed project-relative paths, not command text or file content.
-- Do not classify pre-existing dirty files as new drift until their observed fingerprint changes after scope activation.
-- Post-hoc detections remain pending until `/scope accept`, `/scope add`, `/scope remove`, or `/scope clear`; never expand scope automatically. `/scope accept` acknowledges one finding and leaves the declared contract untouched; only `/scope add` widens it. `/scope recheck` re-baselines the worktree and is the only way to clear snapshot uncertainty.
-- Scope state is session-branch state persisted with `pi.appendEntry`, not a project file. Restore only from the active branch.
-- Emit bounded internal events so `/spec` can display `scope: clean` or `scope: review` without taking ownership of scope state.
+## Implementation status
 
-### Guided Experiment Worktrees
+The release-preparation implementation targets `0.10.0` and is complete in this branch. Publication remains a post-merge human release operation because npm versions are immutable and the protected workflow must run from the reviewed release tag.
 
-Commands:
+Implemented evidence:
 
-```text
-/experiment start [short-name]
-/experiment status [id]
-/experiment close [id]
-/experiment recover
+- `package.json` declares `specpi@0.10.0`, complete optional Pi host peers, public provenance metadata, an executable `specpi` bin, and an exact public file allow-list.
+- `scripts/check-package.mjs` builds the real tarball in temporary state, checks its exact 55-file manifest and metadata, installs it offline without host peers, invokes the npm shim, and runs packed plan/install/doctor/update/uninstall and rollback checks.
+- `scripts/check-pi-package.mjs` installs the tarball with pinned Pi 0.84.4, loads its extensions, skills, and themes through Pi's package loader, preserves an authentication canary, and verifies the limited browser-runtime error.
+- CI runs packed lifecycle checks on Ubuntu, Windows, and macOS; the release workflow uses Node.js 22.19.0 and pinned npm 11.19.1.
+- `.github/workflows/npm-publish.yml` validates and checksums one artifact, requires the protected `npm` environment, publishes through OIDC with provenance, and verifies registry version, integrity, dist-tag, and attestation metadata.
+- npm installation, source-audited installation, explicit update/uninstall, limited native Pi mode, security boundaries, and maintainer release steps are documented.
+- The public registry returned `E404` for `specpi` during implementation, suggesting the name is available but not reserving it.
+
+## Distribution contract
+
+### Supported full installation
+
+The npm package is primarily an installer CLI. A full installation requires running the SpecPi lifecycle after npm installs the command:
+
+```bash
+npm install --global specpi@latest
+specpi plan
+specpi install
+specpi doctor
 ```
 
-Start flow:
+This route retains the existing plan, confirmation, backup, atomic write, rollback, checksum, and doctor behavior.
 
-1. Require a trusted Git worktree and resolve its canonical repository/common directory.
-2. Read a compact experiment card through the UI:
-   - short name;
-   - hypothesis;
-   - direct acceptance check;
-   - non-goals.
-3. Inspect repository status. If the base worktree is dirty, explain that the experiment starts from `HEAD` and excludes uncommitted changes; require explicit confirmation or cancel. Never stash or commit those changes.
-4. Preview the detached-worktree path, base commit, and all state to be written.
-5. After confirmation, create a detached worktree with `git worktree add --detach <path> <commit>` under SpecPi's private experiment root.
-6. Record a bounded private registry entry and print exact instructions for opening a separate human-controlled Pi session in that path. Do not launch Pi or another process automatically.
+### One-shot evaluation
 
-Registry contract:
+Document a version-pinned `npx` route for evaluating the plan without permanently installing the CLI:
 
-- Store under `<agent-dir>/specpi/experiments/` with mode `0700` directories and `0600` files.
-- Use a schema-validated, atomic registry plus a dedicated ownership-checked lock.
-- Store only: random ID, sanitized name, canonical repository/worktree paths, base commit, bounded hypothesis/acceptance/non-goals, lifecycle state, and timestamps.
-- Use prepared/active/closing transaction states so interrupted creation or removal can be diagnosed.
-- `/experiment recover` reconciles registry records with `git worktree list --porcelain`; it may repair metadata after confirmation but must never delete a worktree automatically.
-- Bound the registry to 32 active/retained experiments and provide an actionable refusal when full.
-
-Close flow:
-
-1. Refuse ambiguous IDs and default only when the current cwd maps to exactly one active experiment.
-2. Show base commit, changed-file counts, untracked-file counts, acceptance check, and current worktree path.
-3. Offer:
-   - `Keep worktree` — no mutation; leave it active.
-   - `Export patch` — create a binary Git patch in private state or an explicit path without overwriting by default; keep the worktree.
-   - `Discard worktree` — require a second confirmation when dirty, then remove only that registered worktree and prune its registry entry.
-4. Generate complete patches, including untracked files, with a temporary Git index (`GIT_INDEX_FILE`, `git read-tree`, `git add -A`, `git diff --cached --binary HEAD`) so the real index is untouched. Remove the temporary index in `finally`.
-5. Publish patch bytes atomically. Existing outputs require explicit overwrite confirmation.
-6. Never apply the patch, merge it into the base worktree, create a branch, commit, or alter remotes.
-7. On discard, verify the registered path, Git common directory, and worktree identity again immediately before `git worktree remove --force`.
-
-### Completion Challenge
-
-Commands and tool:
-
-```text
-/challenge
-/challenge status
-/challenge clear
-submit_completion_challenge
+```bash
+npx --package specpi@<version> specpi plan
 ```
 
-Behavior:
+Do not present `npx ... install` as the primary route until packed-artifact lifecycle tests prove its update and uninstall ergonomics.
 
-- `/challenge` is explicit and requires an idle agent. It snapshots only bounded observable facts: current Git changed paths, active scope entries and pending violations, current experiment metadata when cwd matches one, and tool failure counts observed by this extension during the active task.
-- It starts a challenge generation, persists a small activation entry, and triggers one agent turn with a deterministic checklist:
-  1. Which requirement remains unproven?
-  2. What evidence contradicts the proposed result?
-  3. Could any check have passed for the wrong reason?
-  4. Did scope expand or remain pending?
-  5. Was runtime, visual, or platform validation required but omitted?
-  6. What residual risk must be disclosed?
-- While active, inject concise challenge guidance through `before_agent_start`. Do not rewrite or inspect unrelated historical session content.
-- The agent must finish with `submit_completion_challenge`; reject calls when no challenge is active or the generation/session does not match.
-- Tool input is bounded and structured:
-  - verdict: `ready-for-human-review`, `incomplete`, or `blocked`;
-  - requirement assessments with `proven`, `partial`, or `unproven` status and concise evidence;
-  - contradictions;
-  - possible false-positive checks;
-  - scope findings;
-  - validation gaps;
-  - residual risks;
-  - next action.
-- Deterministically reject `ready-for-human-review` when any requirement is partial/unproven, contradictions or validation gaps remain, or the Scope Drift Monitor has pending violations.
-- A ready verdict may still contain residual risks; render them prominently.
-- Return `terminate: true` so the structured challenge card is the final output of that turn.
-- Persist only the bounded structured result in the current session branch and render it with a custom entry renderer. Do not write a global completion log.
-- `/challenge status` renders the latest active-branch challenge. `/challenge clear` clears active challenge state but does not delete prior session entries.
-- Never intercept ordinary final answers or force a challenge on every task. Future `/spec finish` integration is explicitly out of scope for this change.
+### Native Pi package installation
 
-## Architecture
+`pi install npm:specpi` can discover the packaged extensions, skills, and themes, but it does not run SpecPi's installer lifecycle. It therefore does not guarantee installation of:
 
-Add one extension with small testable modules:
+- managed global instructions;
+- browser runtime dependencies and Chromium;
+- supporting third-party Pi packages;
+- optional tools;
+- shell integration;
+- installer manifests, backups, and managed-file ownership.
 
-```text
-extensions/workflow-controls/
-  index.ts                 # Pi registration, commands, hooks, UI, event composition
-  scope.mjs                # path normalization, matching, snapshots, drift calculations
-  experiments.mjs          # registry, locks, Git argv operations, recovery, patch export
-  challenge.mjs            # bounded schemas, consistency gate, challenge rendering data
-  smoke.mjs                # deterministic temporary-state feature probes used by closed validators
+For the first npm release, document native Pi installation as a limited resource-only mode, not as equivalent to the full SpecPi installation. Do not claim full parity until it has its own explicit contract and tests.
+
+## Release principles
+
+- Preserve `plan` as non-mutating.
+- Preserve confirmation unless the user explicitly supplies `--yes`.
+- Keep the npm package free of `preinstall`, `install`, and `postinstall` mutation scripts.
+- Do not download Pi, Chromium, optional tools, or supporting packages merely because npm unpacked SpecPi.
+- Publish only reviewed files from the explicit package allow-list.
+- Test the exact tarball that will be published.
+- Pin the released version; never republish changed bytes under an existing version.
+- Use npm provenance and a protected publishing environment when supported.
+- Never place npm tokens in the repository, package, logs, or ordinary CI artifacts.
+- Treat npm publication, deprecation, ownership changes, and dist-tag changes as explicit remote operations.
+
+## Phase 1 — Finalize package identity and installation behavior
+
+- [ ] Confirm the unscoped `specpi` name while authenticated with the intended npm owner.
+- [x] Confirm and validate the author, public support URL, repository URL, and homepage metadata.
+- [x] Select `0.10.0` as the first npm-ready version. Do not publish the changed current tree as `0.9.0`.
+- [x] Record npm 11.19.1 and Node.js 22.19.0 for release validation.
+- [ ] Confirm that global installation creates the expected `specpi` executable on Windows, Linux, and macOS-compatible npm layouts.
+- [ ] Confirm that invoking `specpi` from an npm installation resolves all bundled source files relative to the package root.
+- [x] Verify that npm unpacking alone performs no SpecPi host mutation and runs no install lifecycle script.
+
+Acceptance:
+
+- The package identity is available and controlled by the intended owner.
+- The selected version has never been published.
+- Installing the package alone changes only npm-managed package state.
+- `specpi --help` or the default help output runs from a temporary global npm prefix on Windows and Linux.
+
+## Phase 2 — Correct package metadata and contents
+
+- [x] Add every imported Pi core module to `peerDependencies` using Pi's documented `"*"` range:
+  - `@earendil-works/pi-ai`;
+  - `@earendil-works/pi-coding-agent`;
+  - `@earendil-works/pi-tui`;
+  - `typebox`.
+- [x] Mark host-provided Pi peers optional so npm does not install them before SpecPi's explicit installer confirmation.
+- [x] Prove the chosen peer configuration both under npm CLI installation and under Pi package loading.
+- [x] Add `site/logo.svg` to the package file allow-list.
+- [ ] Ensure every README asset renders on both GitHub and npm.
+- [x] Add explicit public access and provenance publishing metadata.
+- [x] Pin the publishing npm version in release automation without imposing it on contributors through `packageManager`.
+- [x] Keep development dependencies out of the production artifact.
+- [x] Confirm that `browser-runtime/package.json` and its lockfile remain included without including its installed `node_modules`.
+- [x] Confirm that tests, private design files, Git metadata, local state, caches, logs, and browser artifacts are excluded.
+- [x] Review and enforce the packed file list against an exact allow-list.
+
+Acceptance:
+
+- All runtime imports are represented by the documented host-peer contract or an explicit bundled dependency.
+- npm installation does not auto-install an uncontrolled Pi version before `specpi install` asks for confirmation.
+- The npm README has no broken images or repository-relative links.
+- The tarball contains only the reviewed runtime, documentation, license, and public asset files.
+
+## Phase 3 — Add deterministic package validation
+
+Add a focused package test that creates and examines the real tarball rather than validating only source files.
+
+- [x] Run `npm pack --json` in a clean temporary output directory.
+- [x] Parse the reported tarball metadata and fail on unexpected warnings.
+- [x] Assert required files are present, including:
+  - `package.json`;
+  - `scripts/specpi.mjs`, `scripts/lib.mjs`, and `scripts/lock.mjs`;
+  - all installer-managed extension files;
+  - capability registry and validators;
+  - skills and themes;
+  - templates and shell source;
+  - browser-runtime manifests;
+  - README assets;
+  - security, third-party, changelog, license, and README documents.
+- [x] Assert forbidden files are absent, including:
+  - `.git/**` and `.github/**` unless deliberately required;
+  - `tests/**`;
+  - `design/**`;
+  - root and browser-runtime `node_modules/**`;
+  - temporary state, logs, screenshots, and package tarballs.
+- [x] Verify the bin target exists, is executable on POSIX, and produces the npm platform shim.
+- [x] Verify the package name, version, license, engines, repository, and public access metadata from the packed `package.json`.
+- [x] Verify the packed README references assets included in the artifact.
+- [x] Build and remove validation artifacts entirely in temporary state.
+
+Acceptance:
+
+- The checked tarball file list is bounded and deterministic.
+- Missing runtime files and newly included unintended files fail CI.
+- Package validation creates no tracked diff and leaves no tarball in the repository root.
+
+## Phase 4 — Exercise the packed installer lifecycle
+
+Use a fresh temporary npm prefix and `PI_CODING_AGENT_DIR`. Never run package integration tests against the live Pi directory.
+
+### CLI installation smoke
+
+- [x] Install the generated tarball into a temporary global npm prefix.
+- [x] Invoke the installed executable through the platform-specific npm bin path.
+- [x] Verify help output reports the packed version.
+- [x] Verify `plan` is non-mutating.
+- [x] Verify unknown arguments fail clearly.
+- [x] Verify the Node.js engine floor is represented and documented.
+
+### Isolated lifecycle smoke
+
+- [x] Reuse the existing fake Pi and isolated lifecycle patterns.
+- [x] Run packed `plan`, `install`, `doctor`, `update`, and `uninstall` against isolated state.
+- [x] Prove the packed installer can find every source resource it copies.
+- [x] Prove packed update rollback restores configuration and managed files byte-for-byte after injected failure.
+- [x] Prove uninstall preserves private wishlist, journal, experiment, and patch state according to the current contract.
+- [x] Use isolated agent state, skip shell integration, and preserve an authentication canary during Pi loading.
+
+### Pi resource smoke
+
+- [x] Load the tarball through isolated pinned Pi 0.84.4.
+- [x] Verify extension, skill, and theme discovery from the packed layout.
+- [x] Verify host-provided peer imports resolve without bundling a second Pi runtime.
+- [x] Verify limited native Pi mode gives an actionable `specpi update` error for the absent browser runtime.
+
+Platforms:
+
+- [ ] Ubuntu CI.
+- [ ] Windows CI, including the npm `.cmd` launcher.
+- [ ] Perform a macOS smoke before general availability if no macOS CI job is added.
+
+Acceptance:
+
+- The exact tarball completes the supported lifecycle in isolated state on Windows and Linux.
+- Package-root path assumptions work after npm renames and nests the installation directory.
+- Native Pi resource loading matches its documented limited-mode contract.
+
+## Phase 5 — Documentation and update semantics
+
+- [x] Make npm installation the primary README and site path for `0.10.0`.
+- [x] Retain source-checkout installation as a documented development or audit path.
+- [x] Document the difference between installing the npm CLI and running `specpi install`.
+- [x] Document limited `pi install npm:specpi` behavior and avoid implying full lifecycle parity.
+- [x] Document update as two explicit steps:
+
+```bash
+npm install --global specpi@latest
+specpi update
+specpi doctor
 ```
 
-Implementation boundaries:
+- [x] Document uninstall behavior separately for managed SpecPi state and the npm CLI:
 
-- Keep parsing, path matching, registry validation, state transitions, and challenge consistency checks in pure exported functions.
-- Keep Pi APIs and UI orchestration in `index.ts`.
-- Serialize extension commands that mutate experiment state; reject overlapping start/close/recover operations.
-- Correlate before/after tool snapshots by `toolCallId` because sibling tools may execute concurrently.
-- Do not retain raw tool inputs. Direct mutation paths may be normalized transiently, then only project-relative path findings are persisted.
-- Bound Git calls by timeout and output size. Treat malformed or truncated porcelain output as indeterminate and warn rather than claiming the scope is clean.
-- Use `ctx.hasUI` and `ctx.mode` correctly; custom TUI rendering is optional, while RPC-compatible selects/confirms and plain notifications remain supported.
-- On `session_shutdown`, clear timers, transient tool snapshots, challenge generations, and pending command operations; reconstruct durable branch state on `session_start`.
+```bash
+specpi uninstall
+npm uninstall --global specpi
+```
 
-## Composition rules
+- [x] Explain which private state survives uninstall.
+- [x] Document version-pinned installation for reproducibility.
+- [x] Update the wiki, security model, security policy, third-party inventory, and changelog for the distribution contract.
+- [ ] Add npm package and provenance links after the first successful publication.
+- [x] Ensure all displayed versions and clone tags match `0.10.0`.
 
-### With Command Guard
+Acceptance:
 
-- Scope Drift Monitor is narrower task-scope governance, not a replacement security parser.
-- Command Guard remains authoritative for catastrophic or uncertain commands.
-- A scope denial must never latch Command Guard or create a reusable Command Guard approval.
-- If either extension blocks a call, the call does not execute.
-- Do not copy Command Guard's shell parser into workflow-controls. Shell/custom-tool drift is detected from before/after Git evidence.
-- Worktree lifecycle Git commands originate from explicit extension commands and must have their own exact human confirmations because extension-internal `pi.exec` calls are outside model tool-call interception.
+- A new user can distinguish npm package installation, SpecPi host installation, updates, and uninstall.
+- Documentation does not claim that npm or Pi package installation silently performs confirmed SpecPi mutations.
+- Version references are consistent across package metadata, CLI output, README, site, wiki, and changelog.
 
-### With `/spec`
+## Phase 6 — Secure publishing automation
 
-- Workflow-controls owns scope/challenge state.
-- Publish only summarized status through `pi.events`; `/spec` may display it but must not duplicate or persist it.
-- Do not replace `/spec`'s header, working indicator, or tool-collapse restoration.
+Create a dedicated release workflow; never publish from ordinary push or pull-request workflows.
 
-### Between the three features
+Recommended trigger:
 
-- Completion Challenge includes pending scope findings and experiment acceptance metadata automatically.
-- Starting an experiment does not automatically copy the original session's scope; the separate session must set its own scope.
-- When cwd matches a registered experiment worktree, `/experiment status` and `/challenge` use that exact registry record.
-- A completion challenge never closes or discards an experiment.
+- a manually approved GitHub Release or version tag matching `v<package.version>`;
+- protected GitHub environment named `npm`;
+- npm trusted publishing through GitHub OIDC when available.
 
-## Implementation phases
+Workflow gates:
 
-### Phase 1 — Pure contracts and state models
+- [x] Check out the exact release tag.
+- [x] Install pinned release npm and repository development tools with lifecycle scripts disabled and peers omitted.
+- [x] Run `npm run check`.
+- [x] Run packed-artifact, packed lifecycle, and native Pi package smoke tests.
+- [x] Assert the Git tag exactly equals `v${package.version}`.
+- [x] Assert the changelog contains the same version.
+- [x] Assert the version is not already present on npm.
+- [x] Build one tarball and preserve its filename, SHA-512 integrity, and file manifest in workflow output.
+- [x] Run `npm publish --dry-run` against that artifact.
+- [x] Require the protected `npm` environment before the publish job.
+- [x] Publish the already-validated artifact with public access and provenance.
+- [x] Read the registry back and verify name, version, dist-tag, integrity, and provenance.
+- [x] Route prereleases to `next` and stable versions to `latest`.
 
-- [x] Define bounded schemas and sanitizers for scope state, experiment cards/registry, and challenge results.
-- [x] Implement canonical root/path resolution and exact-file/directory-prefix scope matching.
-- [x] Implement NUL-delimited Git status parsing and bounded changed-path fingerprints.
-- [x] Implement scope drift comparison that distinguishes baseline dirt from post-activation changes.
-- [x] Implement experiment lifecycle state transitions and strict registry/path validation.
-- [x] Implement challenge consistency rules and ready-verdict rejection conditions.
-- [x] Add unit tests for malformed input, path escape, symlink alias, bounds, duplicate entries, invalid state transitions, and contradictory challenge verdicts.
+Credential model:
 
-### Phase 2 — Scope Drift Monitor
+- Prefer npm trusted publishing and short-lived OIDC credentials.
+- If npm requires an interactive first publication before trusted publishing can be configured, perform that one publication manually with 2FA after all gates pass.
+- Never use a broad personal access token when a package-scoped automation credential or trusted publisher is available.
+- Never expose credentials to pull-request jobs, forked workflows, install scripts, or package tests.
 
-- [x] Register `/scope` commands, completions, branch persistence, status, and widget.
-- [x] Add direct `write`/`edit` preflight choices without interfering with Command Guard decisions.
-- [x] Add concurrent-safe before/after Git snapshots around tool execution.
-- [x] Surface post-hoc shell/custom-tool drift in UI and next-turn context without raw command persistence.
-- [x] Add active-branch restoration, `/scope accept`, clear behavior, and Spec status events.
-- [x] Build an extension harness covering TUI, headless advisory behavior, parallel tool IDs, session resume, and Command Guard composition.
+Acceptance:
 
-### Phase 3 — Guided Experiment Worktrees
+- Only an approved release ref can publish.
+- CI validates the same bytes it sends to npm.
+- The published package carries verifiable provenance where npm supports it.
+- No persistent npm credential is committed or included in artifacts.
 
-- [x] Implement the private experiment registry, lock, atomic writes, and transaction recovery.
-- [x] Implement start preflight, dirty-base disclosure, card collection, preview, and detached worktree creation.
-- [x] Implement status discovery from both registry and `git worktree list --porcelain`.
-- [x] Implement complete temporary-index patch export with no real-index changes and no overwrite by default.
-- [x] Implement keep and twice-confirmed dirty discard paths with final identity revalidation.
-- [x] Implement recover behavior for prepared, missing, moved, and externally removed worktrees without automatic deletion.
-- [x] Add temporary-repository integration tests proving the base worktree, base index, branches, commits, and remotes are unchanged.
+## Phase 7 — First release procedure
 
-### Phase 4 — Completion Challenge
+### Preparation
 
-- [x] Register `/challenge`, status, clear, the structured terminating tool, and entry renderer.
-- [x] Track only bounded task-local facts needed by the challenge; exclude raw commands, outputs, prompts, and file content.
-- [x] Inject the deterministic six-question checklist only while a generation is active.
-- [x] Enforce session/generation binding and structured consistency at tool execution.
-- [x] Include scope and experiment facts without granting the model authority to clear or mutate them.
-- [x] Restore challenge state from the active branch and invalidate stale active generations after session replacement.
-- [x] Add a harness proving ready, incomplete, blocked, stale-generation, pending-scope, and terminating-result behavior.
+- [ ] Start from a clean working tree and reviewed release commit.
+- [ ] Confirm all CI and packed-artifact jobs pass.
+- [ ] Inspect `npm pack --dry-run --json` and the final tarball manifest manually.
+- [ ] Inspect the final diff with special attention to scripts, package metadata, peer resolution, and release workflow permissions.
+- [ ] Obtain fresh read-only review of the installer and publishing changes.
+- [ ] Confirm the npm owner account has 2FA and recovery access.
+- [ ] Confirm the package name and target version are still available.
 
-### Phase 5 — Shipping integration
+### Release
 
-- [x] Add every workflow-controls source to installer managed files, source assertions, uninstall/update retirement, syntax checks, and package contents.
-- [x] Add capability registry entries for `scope-drift-monitor`, `guided-experiment-worktrees`, and `completion-challenge`.
-- [x] Add separate closed validators for each capability; each validator must use a temporary repository/state directory and exercise the feature's direct contract.
-- [x] Update the Working Agreement with concise guidance for using scope, experiments, and completion challenges without making them mandatory.
-- [x] Update README/wiki command references, security/privacy data classes, `THIRD_PARTY.md` only if dependencies change (none are planned), and CHANGELOG.
-- [x] Add an isolated installer lifecycle assertion that all new files install, update, doctor-validate, and uninstall cleanly while experiment data is preserved unless explicitly discarded.
+- [x] Update versioned documentation and changelog for `0.10.0`.
+- [ ] Create the explicit release commit and matching tag only when requested.
+- [ ] Run the protected publish workflow or explicitly approved manual publish.
+- [ ] Verify the npm package page, README rendering, provenance, license, repository links, and `latest` dist-tag.
+- [ ] Install the registry version into a fresh temporary prefix rather than reusing the local tarball.
+- [ ] Run `specpi plan` from the registry installation.
+- [ ] Complete one disposable isolated install/doctor/uninstall smoke from the registry version.
+
+### Announcement readiness
+
+- [ ] Publish installation commands only after registry verification passes.
+- [x] Link installation guidance to the security policy and versioned source tag.
+- [x] State that Pi extensions run with user permissions and should be reviewed before installation.
+- [x] State the limited contract of direct `pi install npm:specpi`.
+
+## Failure and rollback policy
+
+npm versions are immutable. Do not attempt to replace a broken version with different bytes.
+
+If validation fails before publication:
+
+- stop the release;
+- leave npm unchanged;
+- fix the issue and select a new release candidate.
+
+If a defective version is published:
+
+- verify the defect from the registry artifact;
+- deprecate the affected version with a concise actionable message when warranted;
+- publish a corrected patch version after the full gates pass;
+- move `latest` only through an explicit reviewed dist-tag operation;
+- document security-impacting defects through the security policy;
+- use npm unpublish only when policy, legal, or credential exposure requirements make it necessary.
+
+If a credential is exposed:
+
+- revoke it immediately;
+- stop active publishing workflows;
+- inspect npm ownership and dist-tag history;
+- follow the private security-reporting process;
+- rotate related credentials before resuming.
 
 ## Test matrix
 
-### Scope
+### Package shape
 
-- Exact file and directory-prefix matching on Windows, Linux, and macOS path semantics.
-- Absolute path, `..`, symlink escape, case behavior, control character, duplicate, and capacity rejection.
-- Pre-existing dirty files do not create false drift; subsequent changes do.
-- Direct edit/write choices: deny, allow once, and add-to-scope.
-- Headless mode records a warning without inventing consent.
-- Shell-created, deleted, renamed, and untracked files are detected post hoc.
-- Parallel tool calls retain separate before/after snapshots.
-- Session branching restores only active-branch scope state.
+- Required files included.
+- Private and development files excluded.
+- Bin mode executable.
+- README assets resolvable.
+- No lifecycle mutation scripts.
+- No bundled Pi runtime.
+- No unreviewed production dependency.
 
-### Experiments
+### npm behavior
 
-- Reject non-Git directories and ambiguous/malformed worktree state.
-- Clean and explicitly confirmed dirty-base starts use the exact recorded `HEAD` commit.
-- Creation never creates a branch or changes the base index/worktree.
-- Registry lock ownership, atomic writes, stale/malformed transaction refusal, and bounded capacity.
-- Patch export includes tracked, deleted, renamed, binary, and untracked changes while leaving both indexes unchanged.
-- Existing patch output is preserved without overwrite approval.
-- Keep is non-mutating; dirty discard requires two confirmations; clean discard requires one explicit confirmation.
-- Identity revalidation prevents deletion after registry/path substitution.
-- Recovery reports orphaned registry and worktree states without deleting either.
+- Temporary global install on Linux.
+- Temporary global install on Windows.
+- No peer auto-install before SpecPi confirmation.
+- Help and plan run from npm's installed location.
+- Unsupported Node version produces an actionable npm engine warning or refusal.
 
-### Completion Challenge
+### SpecPi lifecycle
 
-- No active generation, wrong session, stale generation, malformed input, and oversized input fail closed.
-- Ready verdict is rejected with partial/unproven requirements, contradictions, validation gaps, or pending scope findings.
-- Incomplete and blocked verdicts require a concrete next action.
-- Residual risks remain visible on ready results.
-- The result terminates the turn and persists only bounded structured session data.
-- Ordinary tasks remain unaffected when challenge mode is inactive.
-- Resume restores the latest completed card but does not silently restart an interrupted challenge.
+- Plan remains non-mutating.
+- Install requires confirmation without `--yes`.
+- Managed files install from the tarball.
+- Doctor validates installed checksums and capability validators.
+- Update preserves unrelated configuration and private state.
+- Injected failure rolls back.
+- Uninstall removes managed state while preserving documented private evidence.
 
-### Composition
+### Release safety
 
-- Scope prompting and Command Guard approval do not grant each other approvals or alter lock state.
-- `/spec` UI restoration remains intact with workflow status active.
-- Completion Challenge reads scope/experiment summaries but cannot mutate them.
-- Experiment commands cannot run concurrently against the same registry record.
-
-## Validation sequence
-
-1. Run pure module tests for the feature currently being implemented.
-2. Run the workflow-controls extension harness.
-3. Run the temporary Git worktree integration suite.
-4. Run focused Command Guard composition tests.
-5. Run focused installer lifecycle tests with a temporary `PI_CODING_AGENT_DIR`.
-6. Run every new closed capability validator independently.
-7. Run `npm run format` and `npm run check`.
-8. Inspect the final diff and obtain fresh read-only review because worktree deletion, path boundaries, state recovery, and tool interception are safety-sensitive.
-9. Exercise the commands manually in a disposable repository in TUI mode, including a separate human-opened experiment session.
+- Wrong tag/version fails.
+- Existing npm version fails.
+- Dirty or unexpected package contents fail.
+- Pull requests cannot publish.
+- Prereleases do not receive `latest` automatically.
+- Registry integrity matches the validated artifact.
 
 ## Definition of done
 
-- Scope Drift Monitor makes scope and drift visible, never expands scope silently, and remains advisory in headless operation.
-- Guided Experiment Worktrees can create, inspect, export, recover, keep, and explicitly discard an experiment without changing the base worktree, index, branch set, commits, or remotes.
-- Completion Challenge produces a bounded structured readiness card and cannot report ready while its own recorded evidence contains unresolved requirements, validation gaps, contradictions, or pending scope drift.
-- All features are inactive by default, add no executable dependency, persist no raw commands/prompts/source, and perform no remote operation.
-- Installed files, docs, capability registry, closed validators, lifecycle behavior, and rollback paths are synchronized.
-- Focused tests and the full repository check pass, and remaining limitations are documented.
-
-## Post-review corrections
-
-Read-only review after implementation found and fixed the following before release:
-
-- `/scope accept` had become an alias for `/scope add` and silently widened the declared contract; acknowledging a finding and widening scope are now distinct.
-- Patch export decoded Git's bytes into a JavaScript string, so a text file that is not valid UTF-8 exported to a patch that no longer applied. Git now writes the patch file itself.
-- Ignored files are invisible to Git status and `git add -A`, so a worktree holding only ignored work reported as clean, exported nothing, and was discarded without the dirty-experiment confirmation. Ignored paths are now counted and named.
-- A completion challenge the agent turn ended without answering stayed armed and kept injecting its instruction into every later turn; it now expires with the turn.
-- `/experiment recover` offered "Forget missing record" for a directory Git no longer tracks, which always failed. That case now offers releasing the record while leaving the files in place.
-- Every tool, including read-only ones, paid for two full worktree snapshots. The previous result is now reused as the next baseline and `read` is skipped.
-- Branch entries held live references to the scope arrays, so a later mutation could rewrite an already appended record. Entries are copied both on append and on restore.
-- An expired challenge was recorded as `cleared`, so restoring a session discarded the last completed readiness card. Expiry is now a distinct entry kind.
-- `/experiment status` with no ID reported only changed paths, hiding ignored work in exactly the form used from inside an experiment.
-- Recovery acted on a presence answer captured before its interactive prompt. Presence is now re-derived inside the registry lock immediately before mutation.
+- `specpi` is published publicly under the intended npm owner at a new immutable version.
+- `npm install --global specpi` installs only the CLI package and performs no SpecPi host mutation by itself.
+- The installed CLI completes `plan`, `install`, `doctor`, `update`, and `uninstall` from the packed layout in isolated Windows and Linux tests.
+- The package contains every required runtime file and no tests, private state, credentials, caches, or unintended artifacts.
+- Pi core imports follow the documented peer dependency contract without installing an uncontrolled duplicate runtime.
+- README and wiki instructions accurately distinguish npm, full SpecPi lifecycle, and limited native Pi package installation.
+- The release is version/tag/changelog consistent, provenance-backed where supported, and reproducible from the reviewed tag.
+- Full repository checks, packed-artifact tests, registry smoke checks, final diff inspection, and fresh read-only review pass.
+- No commit, tag, GitHub Release, npm publish, dist-tag change, deprecation, or announcement occurs without explicit human authorization.
 
 ## Explicit non-goals
 
-- Full focus-contract implementation or `/spec finish` integration.
-- Autonomous task completion detection or interception of every final answer.
-- Automatic scope expansion, automatic reversion of outside-scope changes, or a general filesystem sandbox.
-- Launching agents, terminals, or background workers inside experiment worktrees.
-- Automatic commits, branches, merges, rebases, patch application, pushes, or remote changes.
-- Container or VM isolation.
-- Persisting raw shell commands, prompts, tool output, source content, or session history in SpecPi state.
-- Replacing Command Guard's security policy with the Scope Drift Monitor.
+- Automatically publishing on every push to `main`.
+- Running SpecPi installation from an npm lifecycle script.
+- Silently installing Pi, Chromium, optional tools, or supporting packages during npm unpacking.
+- Claiming full installer parity for `pi install npm:specpi` in the first release.
+- Bundling Pi core packages inside the SpecPi tarball.
+- Adding a self-updating executable that mutates npm global state.
+- Repurposing or overwriting the existing `0.9.0` version.
+- Publishing, tagging, releasing, or changing npm ownership as part of plan implementation without separate approval.

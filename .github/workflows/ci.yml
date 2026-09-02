@@ -19,7 +19,25 @@ jobs:
         run: npm install --ignore-scripts --omit=peer --no-package-lock
       - run: npm test
       - run: npm run check
+      - name: Load the packed resources through pinned Pi
+        run: npm run check:pi-package
       - run: git diff --check
+
+  package-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+      - name: Install pinned repository development tools
+        run: npm install --ignore-scripts --omit=peer --no-package-lock
+      - name: Exercise packed npm artifact and installer lifecycle
+        run: npm run check:package
 
   windows-smoke:
     runs-on: windows-latest

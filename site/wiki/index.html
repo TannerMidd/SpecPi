@@ -25,7 +25,7 @@
       <span class="brand-mark" aria-hidden="true">π</span>
       <strong>SpecPi</strong>
       <span class="brand-separator">/</span>
-      <span>v0.9.0</span>
+      <span>v0.10.0</span>
     </a>
     <nav class="header-nav" aria-label="Primary navigation">
       <a href="../">Overview</a>
@@ -48,12 +48,12 @@
         <a href="#security"><span>08</span>Security</a>
         <a href="#development"><span>09</span>Development</a>
       </nav>
-      <div class="index-meta"><span>Reference · v0.9.0</span></div>
+      <div class="index-meta"><span>Reference · v0.10.0</span></div>
     </aside>
 
     <main id="main" class="content wiki-content">
       <header class="wiki-intro" id="overview">
-        <p class="eyebrow">Documentation / v0.9.0</p>
+        <p class="eyebrow">Documentation / v0.10.0</p>
         <h1>Reference</h1>
         <p>Installation, improvement workflows, command guard behavior, browser tools, and security boundaries.</p>
       </header>
@@ -62,18 +62,23 @@
         <header><span>01</span><h2 id="install-doc-title">Install</h2></header>
         <p>Requirements: Node.js 22.19 or newer, npm, and Git. SpecPi uses Pi 0.84.4 or newer. If Pi is missing, the confirmed install adds the reviewed pinned Pi package. Uninstalling SpecPi leaves that package installed.</p>
         <div class="terminal doc-terminal">
-          <div class="terminal-bar"><span>Clone a reviewed release</span><span>v0.9.0</span></div>
-          <pre><code>git clone --branch v0.9.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
-cd SpecPi</code></pre>
-          <div class="terminal-bar secondary"><span>Windows · PowerShell / cmd</span></div>
-          <pre><code>.\specpi.cmd plan
-.\specpi.cmd install
-.\specpi.cmd doctor</code></pre>
-          <div class="terminal-bar secondary"><span>Linux · macOS · Git Bash</span></div>
-          <pre><code>./specpi plan
+          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.10.0</span></div>
+          <pre><code>npm install --global specpi@latest
+specpi plan
+specpi install
+specpi doctor</code></pre>
+          <div class="terminal-bar secondary"><span>Source-audited release</span></div>
+          <pre><code>git clone --branch v0.10.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+cd SpecPi
+./specpi plan
 ./specpi install
 ./specpi doctor</code></pre>
+          <div class="terminal-bar secondary"><span>Update · two explicit steps</span></div>
+          <pre><code>npm install --global specpi@latest
+specpi update
+specpi doctor</code></pre>
         </div>
+        <p class="doc-boundary"><strong>Native Pi package mode is limited.</strong> <code>pi install npm:specpi</code> loads extensions, skills, and themes, but does not run the managed installer or provide its browser runtime, supporting packages, instructions, shell integration, backups, or ownership records.</p>
         <div class="definition-list">
           <div><code>plan</code><span>Prints intended changes without mutating the system.</span></div>
           <div><code>install</code><span>Confirms, backs up, writes atomically, and rolls configuration back if setup fails.</span></div>

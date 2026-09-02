@@ -67,23 +67,51 @@ Requirements:
 - Git
 - Pi 0.84.4 or newer. If Pi is absent, the confirmed install adds the reviewed pinned package.
 
+Install the CLI, inspect its non-mutating plan, and then confirm the managed installation:
+
 ```bash
-git clone --branch v0.9.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+npm install --global specpi@latest
+specpi plan
+specpi install
+specpi doctor
+```
+
+To inspect the plan without retaining a global CLI installation:
+
+```bash
+npx --package specpi@0.10.0 specpi plan
+```
+
+For a source-audited installation, clone the exact release instead:
+
+```bash
+git clone --branch v0.10.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
 ./specpi doctor
 ```
 
-On Windows, use `.\specpi.cmd` in place of `./specpi`:
-
-```powershell
-.\specpi.cmd plan
-.\specpi.cmd install
-.\specpi.cmd doctor
-```
+On Windows source checkouts, use `.\specpi.cmd` in place of `./specpi`. The npm installation provides the `specpi` command on every supported platform.
 
 `plan` does not mutate the system. Install, update, and uninstall require confirmation unless `--yes` is supplied. After installation, run `/reload` in Pi.
+
+Update the npm CLI and its managed installation as two explicit steps:
+
+```bash
+npm install --global specpi@latest
+specpi update
+specpi doctor
+```
+
+Uninstall managed SpecPi resources before removing the CLI. Private wishlist, journal, experiment, and patch state remains local unless explicitly removed:
+
+```bash
+specpi uninstall
+npm uninstall --global specpi
+```
+
+Direct `pi install npm:specpi` loads the package's extensions, skills, and themes only. It does not run the full installer or provide managed instructions, browser runtime dependencies, supporting Pi packages, optional tools, shell integration, backups, or ownership records.
 
 ## Command guard
 
@@ -121,6 +149,6 @@ npm run format
 npm run check
 ```
 
-JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check enforces formatting, validates syntax, runs the Node test suite, and executes registry-linked validators with isolated prerequisites.
+JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check enforces formatting, validates syntax, runs the Node test suite, executes registry-linked validators, and installs the exact npm tarball through an isolated lifecycle. Maintainers should follow [NPM_RELEASE.md](NPM_RELEASE.md) for release preparation and protected publication.
 
 MIT licensed.

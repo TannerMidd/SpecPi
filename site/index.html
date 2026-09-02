@@ -25,7 +25,7 @@
       <span class="brand-mark" aria-hidden="true">π</span>
       <strong>SpecPi</strong>
       <span class="brand-separator">/</span>
-      <span>v0.9.0</span>
+      <span>v0.10.0</span>
     </a>
     <nav class="header-nav" aria-label="Primary navigation">
       <a class="active" href="#overview" aria-current="page">Overview</a>
@@ -196,16 +196,15 @@
         <p class="section-summary">Run the non-mutating plan first. Confirm the install after reviewing the printed changes, then run the doctor check. If Pi 0.84.4+ is missing, the confirmed install adds the reviewed pinned package.</p>
 
         <div class="terminal install-terminal">
-          <div class="terminal-bar"><span>Linux · macOS · Git Bash</span><span>v0.9.0</span></div>
-          <pre><code>git clone --branch v0.9.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
-cd SpecPi
-./specpi plan      <span class="comment"># preview changes</span>
-./specpi install   <span class="comment"># confirm before mutation</span>
-./specpi doctor    <span class="comment"># verify managed state and validators</span></code></pre>
-          <div class="terminal-bar secondary"><span>Windows · PowerShell / cmd</span></div>
-          <pre><code>.\specpi.cmd plan
-.\specpi.cmd install
-.\specpi.cmd doctor</code></pre>
+          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.10.0</span></div>
+          <pre><code>npm install --global specpi@latest
+specpi plan      <span class="comment"># preview changes</span>
+specpi install   <span class="comment"># confirm before mutation</span>
+specpi doctor    <span class="comment"># verify managed state and validators</span></code></pre>
+          <div class="terminal-bar secondary"><span>Update · two explicit steps</span></div>
+          <pre><code>npm install --global specpi@latest
+specpi update
+specpi doctor</code></pre>
         </div>
         <p class="section-note">After installation, run <code>/reload</code> in Pi. SpecPi backs up managed files before mutation and supports uninstall.</p>
       </section>

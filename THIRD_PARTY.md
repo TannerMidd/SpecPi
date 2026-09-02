@@ -33,6 +33,8 @@ They are development-only dependencies, are not shipped by the SpecPi installer,
 
 The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mono. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". The font files are distributed under the SIL Open Font License 1.1; the required license text is included at `site/fonts/LICENSE.txt`.
 
+The npm release workflow installs `npm@11.19.1` as its pinned publishing client. npm is distributed under the Artistic License 2.0 and runs only on the ephemeral GitHub-hosted release runner.
+
 Repository automation uses these official GitHub Actions at pinned major versions:
 
 - `actions/checkout@v4`
@@ -40,8 +42,10 @@ Repository automation uses these official GitHub Actions at pinned major version
 - `actions/configure-pages@v5`
 - `actions/upload-pages-artifact@v4`
 - `actions/deploy-pages@v4`
+- `actions/upload-artifact@v4`
+- `actions/download-artifact@v4`
 
-They retain their own copyright and license terms. The Pages actions receive only the permissions documented in `.github/workflows/pages.yml`.
+They retain their own copyright and license terms. These actions receive only the permissions declared in their respective workflows.
 
 The optional DonSeTch CLI is distributed under AGPL-3.0-only and is not bundled in this repository. When selected during installation, SpecPi installs `donsetch@3.4.0` globally through npm; that package downloads and verifies its platform binary. The included skill documents how to invoke it.
 
