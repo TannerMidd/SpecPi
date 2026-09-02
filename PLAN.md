@@ -22,10 +22,10 @@ The release-preparation implementation targets `0.10.0` and is complete in this 
 Implemented evidence:
 
 - `package.json` declares `specpi@0.10.0`, complete optional Pi host peers, public provenance metadata, an executable `specpi` bin, and an exact public file allow-list.
-- `scripts/check-package.mjs` builds the real tarball in temporary state, checks its exact 55-file manifest and metadata, installs it offline without host peers, invokes the npm shim, and runs packed plan/install/doctor/update/uninstall and rollback checks.
-- `scripts/check-pi-package.mjs` installs the tarball with pinned Pi 0.84.4, loads its extensions, skills, and themes through Pi's package loader, preserves an authentication canary, and verifies the limited browser-runtime error.
+- `scripts/check-package.mjs` builds the real tarball in temporary state, checks its exact 57-file manifest and metadata, installs it offline without host peers, invokes the npm shim from an unrelated working directory, and runs packed plan/install/doctor/update/uninstall and complete managed-tree rollback checks.
+- `scripts/check-pi-package.mjs` installs pinned Pi 0.84.4 separately, installs the tarball through Pi's `npm:specpi@0.10.0` path, positively verifies every extension plus both skills and themes, preserves an authentication canary, rejects duplicate host runtimes, and verifies the limited browser-runtime error.
 - CI runs packed lifecycle checks on Ubuntu, Windows, and macOS; the release workflow uses Node.js 22.19.0 and pinned npm 11.19.1.
-- `.github/workflows/npm-publish.yml` validates and checksums one artifact, requires the protected `npm` environment, publishes through OIDC with provenance, and verifies registry version, integrity, dist-tag, and attestation metadata.
+- `.github/workflows/npm-publish.yml` builds and checksums one artifact before development installation, gates those exact bytes on Ubuntu, Windows, and macOS, requires the protected `npm` environment, prevents SemVer dist-tag regressions, publishes through OIDC with provenance, and verifies registry version, integrity, dist-tag, and attestation metadata.
 - npm installation, source-audited installation, explicit update/uninstall, limited native Pi mode, security boundaries, and maintainer release steps are documented.
 - The public registry returned `E404` for `specpi` during implementation, suggesting the name is available but not reserving it.
 
@@ -86,8 +86,8 @@ For the first npm release, document native Pi installation as a limited resource
 - [x] Confirm and validate the author, public support URL, repository URL, and homepage metadata.
 - [x] Select `0.10.0` as the first npm-ready version. Do not publish the changed current tree as `0.9.0`.
 - [x] Record npm 11.19.1 and Node.js 22.19.0 for release validation.
-- [ ] Confirm that global installation creates the expected `specpi` executable on Windows, Linux, and macOS-compatible npm layouts.
-- [ ] Confirm that invoking `specpi` from an npm installation resolves all bundled source files relative to the package root.
+- [x] Confirm that global installation creates the expected `specpi` executable on Windows, Linux, and macOS-compatible npm layouts.
+- [x] Confirm that invoking `specpi` from an npm installation resolves all bundled source files relative to the package root.
 - [x] Verify that npm unpacking alone performs no SpecPi host mutation and runs no install lifecycle script.
 
 Acceptance:
@@ -107,7 +107,7 @@ Acceptance:
 - [x] Mark host-provided Pi peers optional so npm does not install them before SpecPi's explicit installer confirmation.
 - [x] Prove the chosen peer configuration both under npm CLI installation and under Pi package loading.
 - [x] Add `site/logo.svg` to the package file allow-list.
-- [ ] Ensure every README asset renders on both GitHub and npm.
+- [x] Ensure every README asset uses a package-included path that renders from both GitHub and npm.
 - [x] Add explicit public access and provenance publishing metadata.
 - [x] Pin the publishing npm version in release automation without imposing it on contributors through `packageManager`.
 - [x] Keep development dependencies out of the production artifact.
@@ -186,9 +186,9 @@ Use a fresh temporary npm prefix and `PI_CODING_AGENT_DIR`. Never run package in
 
 Platforms:
 
-- [ ] Ubuntu CI.
-- [ ] Windows CI, including the npm `.cmd` launcher.
-- [ ] Perform a macOS smoke before general availability if no macOS CI job is added.
+- [x] Ubuntu CI.
+- [x] Windows CI, including the npm `.cmd` launcher.
+- [x] macOS CI smoke.
 
 Acceptance:
 
