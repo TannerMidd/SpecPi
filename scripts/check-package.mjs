@@ -303,15 +303,16 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     const agentDir = path.join(temporaryRoot, "agent");
     const fakeBin = path.join(temporaryRoot, "fake-bin");
     writeFakePi(fakeBin);
+    const pathKey = Object.keys(baseEnv).find((key) => key.toLowerCase() === "path") || "PATH";
     const env = {
         ...baseEnv,
-        PATH: `${fakeBin}${path.delimiter}${baseEnv.PATH || ""}`,
         PI_CODING_AGENT_DIR: agentDir,
         GIT_AUTHOR_NAME: "SpecPi Package Check",
         GIT_AUTHOR_EMAIL: "specpi-package-check@example.invalid",
         GIT_COMMITTER_NAME: "SpecPi Package Check",
         GIT_COMMITTER_EMAIL: "specpi-package-check@example.invalid",
     };
+    env[pathKey] = `${fakeBin}${path.delimiter}${baseEnv[pathKey] || ""}`;
     const lifecycleCwd = path.join(temporaryRoot, "lifecycle-cwd");
     fs.mkdirSync(lifecycleCwd, { recursive: true });
     const runCli = (args, options = {}) => runInstalledBin(binPath, args, { cwd: lifecycleCwd, env, ...options });
