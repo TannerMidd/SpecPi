@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,7 @@ const requiredFiles = [
     "package.json",
     "scripts/check-package.mjs",
     "scripts/check-pi-package.mjs",
+    "scripts/check-release-order.mjs",
     "scripts/lib.mjs",
     "scripts/lock.mjs",
     "scripts/specpi.mjs",
@@ -213,6 +215,21 @@ function assertPackageMetadata(packageJson) {
     }
 }
 
+function assertArtifactMatchesManifest(tarball, packResult) {
+    const bytes = fs.readFileSync(tarball);
+    assert.equal(fs.statSync(tarball).size, packResult.size, "artifact size differs from its npm manifest");
+    assert.equal(
+        createHash("sha1").update(bytes).digest("hex"),
+        packResult.shasum,
+        "artifact SHA-1 differs from its npm manifest",
+    );
+    assert.equal(
+        `sha512-${createHash("sha512").update(bytes).digest("base64")}`,
+        packResult.integrity,
+        "artifact integrity differs from its npm manifest",
+    );
+}
+
 function assertPackageFiles(packResult) {
     const entries = new Map(packResult.files.map((entry) => [entry.path.replaceAll("\\", "/"), entry]));
     assert.deepEqual(
@@ -288,12 +305,14 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     const settingsPath = path.join(agentDir, "settings.json");
     const manifestPath = path.join(agentDir, "specpi", "manifest.json");
     const guardDirectory = path.join(agentDir, "extensions", "command-guard");
+    const driftedGuardPath = path.join(guardDirectory, "index.ts");
+    fs.appendFileSync(driftedGuardPath, "\n// package-check rollback drift\n");
     const settingsBeforeFailure = fs.readFileSync(settingsPath);
     const manifestBeforeFailure = fs.readFileSync(manifestPath);
     const guardBeforeFailure = new Map(
         fs.readdirSync(guardDirectory).map((name) => [name, fs.readFileSync(path.join(guardDirectory, name))]),
     );
-    const failedUpdate = runInstalledBin(binPath, ["update", ...lifecycleFlags], {
+    const failedUpdate = runInstalledBin(binPath, ["update", ...lifecycleFlags, "--force"], {
         expectFailure: true,
         env: {
             ...env,
@@ -308,18 +327,21 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         assert.deepEqual(fs.readFileSync(path.join(guardDirectory, name)), expected);
     }
 
-    const privateEvidence = [
-        path.join(agentDir, "specpi", "wishlist", "observations.jsonl"),
-        path.join(agentDir, "specpi", "wishlist", "decisions.jsonl"),
-        path.join(agentDir, "specpi", "experiments", "registry.json"),
-        path.join(agentDir, "specpi", "experiments", "patches", "package-smoke.patch"),
-    ];
-    for (const file of privateEvidence) {
+    const privateEvidence = new Map([
+        [path.join(agentDir, "specpi", "wishlist", "observations.jsonl"), '{"private":true}\n'],
+        [
+            path.join(agentDir, "specpi", "wishlist", "decisions.jsonl"),
+            '{"action":"retire","journal":{"schema":1,"evidence":["private proof"],"gates":["npm run check"],"version":"0.10.0"}}\n',
+        ],
+        [path.join(agentDir, "specpi", "experiments", "registry.json"), '{"private":true}\n'],
+        [path.join(agentDir, "specpi", "experiments", "patches", "package-smoke.patch"), "private patch\n"],
+    ]);
+    for (const [file, content] of privateEvidence) {
         fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, '{"private":true}\n', { mode: 0o600 });
+        fs.writeFileSync(file, content, { mode: 0o600 });
     }
 
-    runInstalledBin(binPath, ["update", ...lifecycleFlags], { env });
+    runInstalledBin(binPath, ["update", ...lifecycleFlags, "--force"], { env });
     runInstalledBin(binPath, ["doctor"], { env, timeout: 300_000 });
     runInstalledBin(binPath, ["uninstall", "--yes"], { env });
 
@@ -328,8 +350,9 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         false,
         "uninstall left a managed extension behind",
     );
-    for (const file of privateEvidence) {
+    for (const [file, expected] of privateEvidence) {
         assert.equal(fs.existsSync(file), true, `uninstall removed private SpecPi evidence: ${file}`);
+        assert.equal(fs.readFileSync(file, "utf8"), expected, `uninstall changed private SpecPi evidence: ${file}`);
     }
 }
 
@@ -368,6 +391,7 @@ try {
     assert.ok(packResult.unpackedSize < 1_000_000, `unpacked artifact unexpectedly exceeds 1 MB`);
 
     assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");
+    assertArtifactMatchesManifest(tarball, packResult);
 
     const installEnv = { ...process.env, npm_config_audit: "false", npm_config_fund: "false" };
     runNpm(

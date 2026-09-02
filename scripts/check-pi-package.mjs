@@ -117,6 +117,46 @@ try {
         "Pi list did not report the installed SpecPi package root",
     );
 
+    const probePath = path.join(temporaryRoot, "resource-probe.mjs");
+    const piEntryUrl = pathToFileURL(path.join(piRoot, "dist", "index.js")).href;
+    fs.writeFileSync(
+        probePath,
+        `import { DefaultResourceLoader } from ${JSON.stringify(piEntryUrl)};\n` +
+            `const loader = new DefaultResourceLoader(${JSON.stringify({ cwd: temporaryRoot, agentDir })});\n` +
+            "await loader.reload();\n" +
+            "const extensionResult = loader.getExtensions();\n" +
+            "console.log('SPECPI_RESOURCE_PROBE=' + JSON.stringify({\n" +
+            "  extensionPaths: extensionResult.extensions.map((extension) => extension.resolvedPath),\n" +
+            "  extensionErrors: extensionResult.errors,\n" +
+            "  skillNames: loader.getSkills().skills.map((skill) => skill.name),\n" +
+            "  themeNames: loader.getThemes().themes.map((theme) => theme.name),\n" +
+            "}));\n",
+    );
+    const probeResult = runNode([probePath], { cwd: temporaryRoot, env });
+    const probeLine = probeResult.stdout.split(/\r?\n/).find((line) => line.startsWith("SPECPI_RESOURCE_PROBE="));
+    assert.ok(probeLine, `Pi resource probe did not return structured output:\n${probeResult.stdout}`);
+    const resources = JSON.parse(probeLine.slice("SPECPI_RESOURCE_PROBE=".length));
+    for (const expected of [
+        "/extensions/browser/index.ts",
+        "/extensions/command-guard/index.ts",
+        "/extensions/files/index.ts",
+        "/extensions/spec.ts",
+        "/extensions/tool-wishlist/index.ts",
+        "/extensions/ui-refresh/index.ts",
+        "/extensions/workflow-controls/index.ts",
+    ]) {
+        assert.ok(
+            resources.extensionPaths.some((entry) => entry.replaceAll("\\", "/").endsWith(expected)),
+            `Pi did not discover ${expected}: ${JSON.stringify(resources)}`,
+        );
+    }
+
+    assert.deepEqual(resources.extensionErrors, [], `Pi reported extension load errors: ${JSON.stringify(resources)}`);
+    assert.ok(resources.skillNames.includes("specpi-improve"), "Pi did not discover the SpecPi improvement skill");
+    assert.ok(resources.skillNames.includes("donsetch"), "Pi did not discover the DonSeTch skill");
+    assert.ok(resources.themeNames.includes("specpi-spec"), "Pi did not discover the SpecPi theme");
+    assert.ok(resources.themeNames.includes("tea-house"), "Pi did not discover the tea-house theme");
+
     const loaded = runNode([piCli, "--offline", "--no-session", "--no-context-files", "--list-models", "gpt"], {
         env,
         timeout: 300_000,

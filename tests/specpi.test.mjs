@@ -381,6 +381,22 @@ test("platform launchers invoke Node directly", () => {
     assert.ok(fs.readFileSync(path.join(repoRoot, "specpi"), "utf8").startsWith("#!/usr/bin/env sh\n"));
 });
 
+test("stable release order guard rejects latest regressions", () => {
+    const script = path.join(repoRoot, "scripts", "check-release-order.mjs");
+    const newer = spawnSync(process.execPath, [script, "0.10.0", "0.9.9"], { encoding: "utf8" });
+    assert.equal(newer.status, 0, newer.stderr);
+    assert.match(newer.stdout, /advances latest/);
+
+    for (const [candidate, current] of [
+        ["0.10.0", "0.10.0"],
+        ["0.9.9", "0.10.0"],
+        ["0.10.0-next.1", "0.9.9"],
+    ]) {
+        const rejected = spawnSync(process.execPath, [script, candidate, current], { encoding: "utf8" });
+        assert.notEqual(rejected.status, 0, `${candidate} should not advance ${current}`);
+    }
+});
+
 test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
     const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
@@ -403,6 +419,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(wiki, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(publish, /release:\s*\n\s*types: \[published\]/);
     assert.match(publish, /environment: npm/);
+    assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);
     assert.match(publish, /RELEASE_NPM_VERSION: "11\.19\.1"/);
     assert.equal(publish.match(/npm@\$\{RELEASE_NPM_VERSION\}/g)?.length, 3);
     assert.match(publish, /id-token: write/);
@@ -410,6 +427,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(publish, /sha512sum --check/);
     assert.match(publish, /--artifact "\$\{TARBALL\}" --manifest "\$\{MANIFEST\}"/);
     assert.match(publish, /check:pi-package -- --artifact "\$\{TARBALL\}"/);
+    assert.match(publish, /node scripts\/check-release-order\.mjs "\$\{VERSION\}" "\$\{LOOKUP\}"/);
     assert.match(publish, /dist\.attestations\.url/);
     assert.doesNotMatch(publish, /NODE_AUTH_TOKEN|secrets\.|uses: actions\/[^\s]+@v\d/);
     assert.match(ci, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
