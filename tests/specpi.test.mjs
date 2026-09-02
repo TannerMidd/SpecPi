@@ -426,6 +426,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const site = fs.readFileSync(path.join(repoRoot, "site", "index.html"), "utf8");
     const wiki = fs.readFileSync(path.join(repoRoot, "site", "wiki", "index.html"), "utf8");
     const publish = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "npm-publish.yml"), "utf8");
+    const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
     assert.equal(manifest.version, "0.10.0");
@@ -457,6 +458,8 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(publish, /check-release-order\.mjs advance "\$\{VERSION\}" "\$\{LOOKUP\}"/);
     assert.match(publish, /dist\.attestations\.url/);
     assert.doesNotMatch(publish, /NODE_AUTH_TOKEN|secrets\.|uses: actions\/[^\s]+@v\d/);
+    assert.match(releaseRunbook, /--provenance=false/);
+    assert.match(releaseRunbook, /Do not publish a GitHub Release for that same bootstrap version/);
     assert.match(ci, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
     assert.match(ci, /npm run check:package/);
     assert.match(ci, /npm run check:pi-package/);

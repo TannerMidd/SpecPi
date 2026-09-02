@@ -258,7 +258,7 @@ Workflow gates:
 Credential model:
 
 - Prefer npm trusted publishing and short-lived OIDC credentials.
-- If npm requires an interactive first publication before trusted publishing can be configured, perform that one publication manually with 2FA after all gates pass.
+- If npm requires an interactive first publication before trusted publishing can be configured, perform that one publication manually with 2FA after all gates pass and explicitly override the package's provenance request with `--provenance=false`; a local interactive session cannot issue GitHub OIDC provenance. Do not trigger the release workflow for that already-published bootstrap version.
 - Never use a broad personal access token when a package-scoped automation credential or trusted publisher is available.
 - Never expose credentials to pull-request jobs, forked workflows, install scripts, or package tests.
 

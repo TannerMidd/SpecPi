@@ -10,7 +10,13 @@ This runbook is for SpecPi maintainers. Publishing, changing dist-tags, deprecat
 4. Configure npm trusted publishing for `TannerMidd/SpecPi` and `.github/workflows/npm-publish.yml`.
 5. Do not configure a long-lived `NPM_TOKEN` when trusted publishing is available.
 
-If npm requires an initial interactive publication before a trusted publisher can be attached, validate the release artifact through every gate below, publish that exact tarball once with 2FA after explicit approval, and then configure trusted publishing before any later release.
+If npm requires an initial interactive publication before a trusted publisher can be attached, validate the release artifact through every gate below. A local interactive npm session cannot issue GitHub's OIDC provenance, while this package requests provenance by default. For this one bootstrap exception only, publish the exact reviewed tarball with 2FA and an explicit override:
+
+```bash
+npm publish --ignore-scripts --access public --provenance=false ./specpi-<version>.tgz
+```
+
+Verify the registry bytes and metadata immediately, then configure trusted publishing before any later release. Do not publish a GitHub Release for that same bootstrap version: the release workflow deliberately rejects versions that already exist. Keep the reviewed source tag as its immutable source reference. All later versions use the protected OIDC workflow and provenance.
 
 ## Prepare a release
 
