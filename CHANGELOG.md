@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.9.0 - 2026-09-01
+
 - Adopt the SpecPi identity across the package, executables, installer and private state, environment variables, managed markers, extensions and events, `/spec` mode, improvement skill, theme, tests, documentation, security policy, and GitHub Pages URLs.
 - Add the immersive `specpi-spec` Pi theme based on SpecPi’s clean GitHub Pages specification design, with layered technical surfaces and complete palettes for Markdown, tools, diffs, syntax, search, statuses, and thinking levels. Make it the default while retaining Tea House as an installed option.
 - Rebuild `/spec` as an immersive specification console: replace normal header and footer chrome, show indexed execution phases and scope state, seal reasoning traces, hold live response prose until completion, keep tool output collapsed, and suppress routine model narration while preserving the full transcript and restoring normal rendering when the mode exits.
