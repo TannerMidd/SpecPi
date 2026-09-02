@@ -249,7 +249,7 @@ Workflow gates:
 - [x] Assert the changelog contains the same version.
 - [x] Assert the version is not already present on npm.
 - [x] Build one tarball and preserve its filename, SHA-512 integrity, and file manifest in workflow output.
-- [x] Run `npm publish --dry-run` against that artifact.
+- [x] Run `npm publish --dry-run --provenance=false` against that artifact; dry-run contexts have no GitHub OIDC identity.
 - [x] Require the protected `npm` environment before the publish job.
 - [x] Publish the already-validated artifact with public access and provenance.
 - [x] Read the registry back and verify name, version, dist-tag, integrity, and provenance.

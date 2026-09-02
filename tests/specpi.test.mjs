@@ -449,6 +449,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(publish, /RELEASE_NPM_VERSION: "11\.19\.1"/);
     assert.equal(publish.match(/npm@\$\{RELEASE_NPM_VERSION\}/g)?.length, 3);
     assert.match(publish, /id-token: write/);
+    assert.match(publish, /npm publish --dry-run --ignore-scripts --provenance=false/);
     assert.match(publish, /npm publish --ignore-scripts --access public --provenance/);
     assert.equal(publish.match(/node scripts\/verify-artifact\.mjs/g)?.length, 2);
     assert.match(publish, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);

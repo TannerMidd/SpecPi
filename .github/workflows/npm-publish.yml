@@ -123,7 +123,7 @@ jobs:
                   node scripts/verify-artifact.mjs "${TARBALL}" "${TARBALL}.sha512"
                   npm run check:package -- --artifact "${TARBALL}" --manifest "${MANIFEST}"
                   npm run check:pi-package -- --artifact "${TARBALL}"
-                  npm publish --dry-run --ignore-scripts "${TARBALL}"
+                  npm publish --dry-run --ignore-scripts --provenance=false "${TARBALL}"
 
     publish:
         needs: validate

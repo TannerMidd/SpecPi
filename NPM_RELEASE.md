@@ -34,9 +34,11 @@ Verify the registry bytes and metadata immediately, then configure trusted publi
    ```bash
    npm run check
    npm run check:pi-package
-   npm publish --dry-run --ignore-scripts
+   npm publish --dry-run --ignore-scripts --provenance=false
    git diff --check
    ```
+
+   Dry runs explicitly disable provenance because local and validation contexts do not have GitHub OIDC; the protected publish job still requires provenance.
 
 6. Inspect the final diff and the JSON file manifest emitted by `npm pack --dry-run --json`.
 7. Obtain fresh read-only review of package metadata, installer behavior, workflow permissions, and the packed artifact.
