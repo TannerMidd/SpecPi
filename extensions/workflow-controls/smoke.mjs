@@ -61,7 +61,7 @@ function status(root) {
 }
 
 async function scopeSmoke() {
-    const root = repositoryFixture("zenpi-scope-smoke-");
+    const root = repositoryFixture("specpi-scope-smoke-");
     try {
         const entries = normalizeScopeEntries(root, ["src/"]);
         const before = createWorktreeSnapshot(root, status(root));
@@ -78,8 +78,8 @@ async function scopeSmoke() {
 }
 
 async function experimentSmoke() {
-    const root = repositoryFixture("zenpi-experiment-smoke-");
-    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-experiment-state-smoke-"));
+    const root = repositoryFixture("specpi-experiment-smoke-");
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-experiment-state-smoke-"));
     try {
         const repository = await inspectRepository(run, root);
         const head = git(root, "rev-parse", "HEAD").trim();
@@ -127,7 +127,7 @@ async function experimentSmoke() {
         assert.equal(status(root), "");
         assert.equal(git(root, "rev-parse", "HEAD").trim(), head);
 
-        const applyTarget = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-experiment-apply-smoke-"));
+        const applyTarget = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-experiment-apply-smoke-"));
         try {
             git(applyTarget, "clone", "--quiet", root, applyTarget);
             git(applyTarget, "apply", "--check", exported.outputPath);

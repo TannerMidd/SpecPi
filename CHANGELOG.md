@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Adopt the SpecPi identity across the package, executables, installer and private state, environment variables, managed markers, extensions and events, `/spec` mode, improvement skill, theme, tests, documentation, security policy, and GitHub Pages URLs.
+- Add the immersive `specpi-spec` Pi theme based on SpecPi’s clean GitHub Pages specification design, with layered technical surfaces and complete palettes for Markdown, tools, diffs, syntax, search, statuses, and thinking levels. Make it the default while retaining Tea House as an installed option.
+- Rebuild `/spec` as an immersive specification console: replace normal header and footer chrome, show indexed execution phases and scope state, seal reasoning traces, hold live response prose until completion, keep tool output collapsed, and suppress routine model narration while preserving the full transcript and restoring normal rendering when the mode exits.
+
 ## 0.8.4 - 2026-09-01
 
 - Add opt-in workflow controls: `/scope` declares project-relative change boundaries and surfaces direct or observed drift without silently expanding scope; `/experiment` creates detached, private-state Git worktrees with complete patch export and explicitly confirmed discard; `/challenge` produces a structured adversarial readiness card whose deterministic gate rejects unresolved evidence.
@@ -21,7 +27,7 @@
 
 ## 0.8.3 - 2026-09-01
 
-- Remove the `pi-subagents` package and ZenPi's native-subagent configuration, runtime integration, and installation defaults.
+- Remove the `pi-subagents` package and SpecPi's native-subagent configuration, runtime integration, and installation defaults.
 - Make the workflow rationale explicit: automated parent/child handoffs can silently omit decisive context, while parallel writers fragment assumptions and ownership. Prefer deliberate context gathering, reviewable artifacts, explicit second-opinion sessions, and one writer per working directory or isolated worktree.
 - Split the public security policy from the technical security model. Document latest-release support, private vulnerability reporting, best-effort response expectations, reporting scope, secure operation, and supply-chain assumptions while keeping implementation boundaries in a shipped `SECURITY_MODEL.md`.
 
@@ -57,10 +63,10 @@
 - Classify argv-prefix runners (`setsid`, `stdbuf`, `ionice`, `taskset`, `flock`, `systemd-run`, `unbuffer`, `runuser`, `setarch`, `xvfb-run`, `proxychains`), command-string runners (`su`, `runuser`, `script`, `watch`), awk shell escapes, and `osascript`/`tclsh`/`expect` inline code, so a critical payload cannot be laundered through an unlisted wrapper.
 - Treat a whitespace-bearing command token as unresolved rather than reducing it to its trailing path segment, and propagate an unresolved nested child up to the whole analysis so wrapped command strings cannot be reported as a clean parse.
 - Match every PowerShell parameter prefix, not only full spellings: `-enc` runs the same code as `-EncodedCommand`, so an abbreviated flag used to carry a base64 payload past the guard with no approval when the invocation arrived through the Bash or cmd parser. Bash- and cmd-hosted `powershell`/`pwsh` invocations now decode and classify their `-Command`/`-EncodedCommand` payload instead of seeing one opaque argument, including recursive `cmd /c powershell.exe` dispatch, and an absent PowerShell parser downgrades to an approval rather than locking the session over an interpreter the command could not have used.
-- Remove routine Guard approvals for determinate non-catastrophic work, including project or user-data deletion, force push, publication, installation, network transfer, process termination, service and registry changes, and out-of-workspace targets. Keep those broader prompts in Strict. Narrow Guard's protected mutation boundary to host-root/key system targets and, inside the installed agent, command-guard enforcement sources, `settings.json`, and `zenpi/manifest.json`.
-- Identify Pi and ZenPi private state by location rather than by name. `zenpi/manifest.json`, `zenpi/backups`, `zenpi/wishlist` and `extensions/command-guard` were matched as bare relative segments, so reviewing ZenPi's own repository denied a file read critically and locked the session, and `guard.self-tamper` fired on any mutation whose arguments merely contained "zenpi" or "command-guard" — `mkdir zenpi-experiment` was a critical denial. On POSIX the rule was an unanchored `/(?:zenpi|pi).*(?:auth|session|…)/`, so everyday files such as `src/api/session.ts` and `lib/api/auth.py` ("pi" inside "api") were denied critically too. These now key on the resolved `PI_CODING_AGENT_DIR`; Guard protects only enforcement-critical installed state while Strict retains the wider private-path policy.
+- Remove routine Guard approvals for determinate non-catastrophic work, including project or user-data deletion, force push, publication, installation, network transfer, process termination, service and registry changes, and out-of-workspace targets. Keep those broader prompts in Strict. Narrow Guard's protected mutation boundary to host-root/key system targets and, inside the installed agent, command-guard enforcement sources, `settings.json`, and `specpi/manifest.json`.
+- Identify Pi and SpecPi private state by location rather than by name. `specpi/manifest.json`, `specpi/backups`, `specpi/wishlist` and `extensions/command-guard` were matched as bare relative segments, so reviewing SpecPi's own repository denied a file read critically and locked the session, and `guard.self-tamper` fired on any mutation whose arguments merely contained "specpi" or "command-guard" — `mkdir specpi-experiment` was a critical denial. On POSIX the rule was an unanchored `/(?:specpi|pi).*(?:auth|session|…)/`, so everyday files such as `src/api/session.ts` and `lib/api/auth.py` ("pi" inside "api") were denied critically too. These now key on the resolved `PI_CODING_AGENT_DIR`; Guard protects only enforcement-critical installed state while Strict retains the wider private-path policy.
 - Stop latching the session lock when a *read* is refused. Blocking the read is the protection; locking additionally refused every later call — including read-only ones — until `/guard unlock`, so one blocked file ended the session. Critical mutation attempts still lock.
-- Stop treating a plain `find` as a deletion. `find` sits in the delete family for `-delete`/`-exec`, but `hasRecursiveFlag` matches any predicate containing an "r", so `find src -type f -print` was reported as "Recursive deletion needs approval", `find /etc -name '*.conf'` denied critically, and `find . -name zenpi` tripped guard self-tamper. Mutating `find` now reaches `filesystem.find-mutation`, which was unreachable behind the delete-family branch, and `clearlyReadOnly` shares the same predicate list.
+- Stop treating a plain `find` as a deletion. `find` sits in the delete family for `-delete`/`-exec`, but `hasRecursiveFlag` matches any predicate containing an "r", so `find src -type f -print` was reported as "Recursive deletion needs approval", `find /etc -name '*.conf'` denied critically, and `find . -name specpi` tripped guard self-tamper. Mutating `find` now reaches `filesystem.find-mutation`, which was unreachable behind the delete-family branch, and `clearlyReadOnly` shares the same predicate list.
 - Classify complete environment enumeration however it is spelled (`printenv`, `declare -x`, `export -p`, `compgen -v`, bare `declare`) and recognize `/proc/<pid>/environ` and `/proc/<pid>/mem` shell reads. Strict asks about those findings; Guard does not claim comprehensive credential-read protection.
 - Protect macOS system roots (`/System`, `/Library`, `/Applications`, `/Users/<name>`, `/Volumes/<name>`, `/private/etc`, `/cores`) and `.bash_profile`/`.zshenv`/`.zlogin`, without capturing the firmlinked `/System/Volumes/Data` user tree.
 - Give approval prompts a human-scale bound and add **Allow exact call for session**. Reuse is limited to 128 in-memory SHA-256 fingerprints over complete tool input, cwd, mode, and policy version; calls are always reanalyzed first, critical denials cannot be overridden, and `/guard clear-approvals` clears the set.
@@ -69,15 +75,15 @@
 
 ## 0.7.0 - 2026-08-29
 
-- Make retirement durable: every capability now ships a closed validator from a reviewed catalog, `finish_harness_improvement` dispatches all linked validators generically and fails closed on unknown names, and `npm run check` plus `zenpi doctor` continuously re-prove retired capabilities in temporary state.
-- Add the improvement journal: retirements persist bounded sanitized proof (acceptance evidence, gates, repo-relative changed files, ZenPi version) in the local decision log, `/wishlist history [id]` renders the harness's own changelog with rollback context, and the report's retired list shows verification dates and gates.
+- Make retirement durable: every capability now ships a closed validator from a reviewed catalog, `finish_harness_improvement` dispatches all linked validators generically and fails closed on unknown names, and `npm run check` plus `specpi doctor` continuously re-prove retired capabilities in temporary state.
+- Add the improvement journal: retirements persist bounded sanitized proof (acceptance evidence, gates, repo-relative changed files, SpecPi version) in the local decision log, `/wishlist history [id]` renders the harness's own changelog with rollback context, and the report's retired list shows verification dates and gates.
 - Add loop health metrics: deterministic retirements, reopen rate, open reviews, median time-to-retire, and qualification rate rendered in the report footer and summarized by `/wishlist status`.
 - Make reopens context-rich: reopen decisions link to the retirement they review, carry up to five sanitized post-retirement signals, and the `/harness-improvement` prompt includes the original proof and what changed since.
-- Extend repository checks to the wishlist extension and validator sources, ship the validator module through install/update/uninstall, and run completion validators from the source checkout under review; document the new local-only journal data classes in SECURITY.md and the `ZenPi-Gap:` commit trailer convention in the improvement skill.
+- Extend repository checks to the wishlist extension and validator sources, ship the validator module through install/update/uninstall, and run completion validators from the source checkout under review; document the new local-only journal data classes in SECURITY.md and the `SpecPi-Gap:` commit trailer convention in the improvement skill.
 
 ## 0.6.1 - 2026-08-29
 
-- Flush a prompt frame when extension dialogs mount so chained menus such as `/zen-subagents` do not remain invisible until the next keypress in regular TUI sessions, notably through Windows SSH terminals; require and bootstrap the reviewed Pi 0.84.4 baseline that provides prompt lifecycle events.
+- Flush a prompt frame when extension dialogs mount so chained menus such as `/spec-subagents` do not remain invisible until the next keypress in regular TUI sessions, notably through Windows SSH terminals; require and bootstrap the reviewed Pi 0.84.4 baseline that provides prompt lifecycle events.
 - Fix provider-profile activation on model changes by prompting the user to run the documented `/reload` flow instead of calling command-only `ctx.reload()` from a lifecycle event context.
 - Redesign the README self-improvement diagram as a compact Tea House graphic and version its asset URL so GitHub and browser caches cannot retain the previous rendering.
 
@@ -91,7 +97,7 @@
 ## 0.5.0 - 2026-08-29
 
 - Automatically install pinned `@earendil-works/pi-coding-agent@0.84.3` through npm after confirmation when `pi` is absent; preserve the external installation on rollback and uninstall, with `--skip-package-install` as the opt-out.
-- Add `/zen-subagents` with confirmed capacity, builtin-role model, and thinking configuration using only the documented `pi-subagents` config surface.
+- Add `/spec-subagents` with confirmed capacity, builtin-role model, and thinking configuration using only the documented `pi-subagents` config surface.
 - Synchronize strict native subagent scope to the parent's exact Pi provider, filter model choices accordingly, flag stale role models after provider changes, and block unsafe project-scope tool launches.
 - Preserve user-tunable role and capacity leaves across update/uninstall while continuing to enforce security-owned settings; add bounded leaf backups, shared locking, atomic writes, rollback, doctor validation, and legacy whole-file config migration.
 - Add provider-safe delegation guidance to the working agreement, README, security documentation, and static showcase.
@@ -104,9 +110,9 @@
 ## 0.3.0 - 2026-08-29
 
 - Complete the local improvement loop with explicit collection consent, deterministic evidence ranking, lifecycle decisions, and regression-aware retirement.
-- Replace hard-coded implemented capability keys with a reviewed registry linked to closed `zenpi doctor` validators; the browser smoke now verifies both exact and changed pixel comparisons.
+- Replace hard-coded implemented capability keys with a reviewed registry linked to closed `specpi doctor` validators; the browser smoke now verifies both exact and changed pixel comparisons.
 - Add reversible exact alias decisions, local sanitized issue drafts, and recoverable checksummed archive/reset operations.
-- Add the one-command `/harness-improvement` menu and `zenpi-improve` workflow, with session-bound implementation authorization, repository and capability verification gates, and automatic retirement only after success.
+- Add the one-command `/harness-improvement` menu and `specpi-improve` workflow, with session-bound implementation authorization, repository and capability verification gates, and automatic retirement only after success.
 - Refresh the minimal README and showcase with explicit retired/review semantics plus accessible cycle and verification-outcome charts.
 
 ## 0.2.0 - 2026-08-29
@@ -126,10 +132,10 @@
 - Add managed AGENTS and shell blocks with backups and checksums.
 - Add provider-safe strict native-subagent inheritance.
 - Disable external Codex subscription runners.
-- Bundle the Zen extension, Tea House theme, and DonSeTch skill.
-- Make `/zen` a focused execution mode with persistent activity UI, collapsed tool output, per-turn guidance, session persistence, and full toggle restoration.
-- Add a privacy-minimized, task-deduplicated capability-gap collector and generated tool wishlist, with `/wishlist` rendering the refreshed Markdown report directly in the conversation and retiring capabilities implemented by ZenPi.
+- Bundle the Spec extension, Tea House theme, and DonSeTch skill.
+- Make `/spec` a focused execution mode with persistent activity UI, collapsed tool output, per-turn guidance, session persistence, and full toggle restoration.
+- Add a privacy-minimized, task-deduplicated capability-gap collector and generated tool wishlist, with `/wishlist` rendering the refreshed Markdown report directly in the conversation and retiring capabilities implemented by SpecPi.
 - Add managed isolated browser QA on hosts satisfying Playwright Chromium system requirements, with a pinned runtime, responsive viewport tools, bounded inline screenshots, explicit baselines, and pixel-diff artifacts.
 - Add browser runtime staging, rollback, doctor smoke validation, and uninstall cleanup while preserving browser artifacts.
-- Add a zero-dependency ZenPi showcase site with GitHub Pages publishing.
+- Add a zero-dependency SpecPi showcase site with GitHub Pages publishing.
 - Pin the reviewed Pi package baseline.

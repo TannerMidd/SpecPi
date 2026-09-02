@@ -24,7 +24,7 @@ import {
 } from "./lib.mjs";
 import { validateCapabilityRegistry, isValidValidatorName } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
-import { acquireZenPiLock } from "./lock.mjs";
+import { acquireSpecPiLock } from "./lock.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -34,22 +34,22 @@ const VERSION = packageJson.version;
 const MIN_PI_VERSION = "0.84.4";
 const PI_PACKAGE = "@earendil-works/pi-coding-agent";
 const PI_PACKAGE_VERSION = "0.84.4";
-const CLI = process.platform === "win32" ? ".\\zenpi.cmd" : "./zenpi";
+const CLI = process.platform === "win32" ? ".\\specpi.cmd" : "./specpi";
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
-const stateDir = path.join(agentDir, "zenpi");
+const stateDir = path.join(agentDir, "specpi");
 const manifestPath = path.join(stateDir, "manifest.json");
 const settingsPath = path.join(agentDir, "settings.json");
 const retiredSubagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
 const agentsPath = path.join(agentDir, "AGENTS.md");
 const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
-const browserRuntimeMarker = path.join(browserRuntimeDir, "zenpi-runtime.json");
+const browserRuntimeMarker = path.join(browserRuntimeDir, "specpi-runtime.json");
 const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
 const capabilityRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
 const managedToolsDir = path.join(stateDir, "optional-tools");
 const managedBinDir = path.join(stateDir, "bin");
 function injectTestFailure(point) {
-    if (process.env.ZENPI_TESTING === "1" && process.env.ZENPI_TEST_FAIL_POINT === point) {
+    if (process.env.SPECPI_TESTING === "1" && process.env.SPECPI_TEST_FAIL_POINT === point) {
         throw new Error(`Injected test failure at ${point}`);
     }
 }
@@ -76,7 +76,7 @@ const OPTIONAL_TOOLS = [
 const DONSETCH_VERSION = "3.4.0";
 
 function usage() {
-    console.log(`ZenPi ${VERSION}
+    console.log(`SpecPi ${VERSION}
 
 Usage:
   ${CLI} plan
@@ -87,7 +87,7 @@ Usage:
 
 Options:
   --yes                   Do not ask for confirmation; attempt all missing optional tools.
-  --force                 Replace locally modified ZenPi-managed files during update.
+  --force                 Replace locally modified SpecPi-managed files during update.
   --skip-package-install  Do not bootstrap Pi or install external Pi packages (also skips the browser runtime).
   --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
   --skip-tool-install     Do not offer or install the optional DonSeTch CLI.
@@ -282,7 +282,7 @@ function installPi() {
     if (!commandExists("pi")) {
         const binDir = npmGlobalBinDir();
         throw new Error(
-            `Pi was installed by npm, but ${binDir} is not available on PATH. Add that directory to PATH, open a new terminal, and rerun ZenPi install.`,
+            `Pi was installed by npm, but ${binDir} is not available on PATH. Add that directory to PATH, open a new terminal, and rerun SpecPi install.`,
         );
     }
 
@@ -462,7 +462,7 @@ function browserRuntimeStatus() {
         const hasBrowser =
             fs.existsSync(browsersDir) && fs.readdirSync(browsersDir).some((entry) => !entry.startsWith("."));
         if (marker.schema !== 1 || marker.lockHash !== browserRuntimeLockHash()) {
-            return { installed: false, reason: "runtime lock does not match this ZenPi release" };
+            return { installed: false, reason: "runtime lock does not match this SpecPi release" };
         }
 
         if (playwright.version !== "1.62.1") {
@@ -486,7 +486,7 @@ function smokeBrowserRuntime(directory) {
         });
     } catch (error) {
         throw new Error(
-            `${error.message}\nChromium could not launch. Verify the host satisfies Playwright Chromium system dependencies; ZenPi does not install Playwright system dependencies.`,
+            `${error.message}\nChromium could not launch. Verify the host satisfies Playwright Chromium system dependencies; SpecPi does not install Playwright system dependencies.`,
         );
     }
 }
@@ -530,7 +530,7 @@ function installBrowserRuntime(warnings) {
             env: { PLAYWRIGHT_BROWSERS_PATH: browsersPath },
         });
         writeJson(
-            path.join(stage, "zenpi-runtime.json"),
+            path.join(stage, "specpi-runtime.json"),
             { schema: 1, playwrightVersion: "1.62.1", lockHash: browserRuntimeLockHash() },
             0o600,
         );
@@ -698,8 +698,8 @@ function existingMode(file, fallback) {
 }
 
 function detectShellRc() {
-    if (process.env.ZENPI_SHELL_RC) {
-        return path.resolve(process.env.ZENPI_SHELL_RC);
+    if (process.env.SPECPI_SHELL_RC) {
+        return path.resolve(process.env.SPECPI_SHELL_RC);
     }
 
     const shell = path.basename(process.env.SHELL || "");
@@ -729,15 +729,20 @@ function validManagedModelScope(value) {
 }
 
 function desiredSettingsOperations() {
-    return [{ path: ["theme"], value: "tea-house" }];
+    return [{ path: ["theme"], value: "specpi-spec" }];
 }
 
 function managedFiles(includeShell) {
     const files = [
-        [path.join(repoRoot, "extensions", "zen.ts"), path.join(agentDir, "extensions", "zen.ts"), 0o644],
+        [path.join(repoRoot, "extensions", "spec.ts"), path.join(agentDir, "extensions", "spec.ts"), 0o644],
+        [
+            path.join(repoRoot, "extensions", "spec", "core.mjs"),
+            path.join(agentDir, "extensions", "spec", "core.mjs"),
+            0o644,
+        ],
         [
             path.join(repoRoot, "extensions", "ui-refresh", "index.ts"),
-            path.join(agentDir, "extensions", "zenpi-ui-refresh", "index.ts"),
+            path.join(agentDir, "extensions", "specpi-ui-refresh", "index.ts"),
             0o644,
         ],
         [
@@ -821,8 +826,8 @@ function managedFiles(includeShell) {
             0o644,
         ]),
         [
-            path.join(repoRoot, "skills", "zenpi-improve", "SKILL.md"),
-            path.join(agentDir, "skills", "zenpi-improve", "SKILL.md"),
+            path.join(repoRoot, "skills", "specpi-improve", "SKILL.md"),
+            path.join(agentDir, "skills", "specpi-improve", "SKILL.md"),
             0o644,
         ],
         [
@@ -831,6 +836,7 @@ function managedFiles(includeShell) {
             0o644,
         ],
         [path.join(repoRoot, "themes", "tea-house.json"), path.join(agentDir, "themes", "tea-house.json"), 0o644],
+        [path.join(repoRoot, "themes", "specpi-spec.json"), path.join(agentDir, "themes", "specpi-spec.json"), 0o644],
     ];
     if (includeShell) {
         files.push([path.join(repoRoot, "shell", "pi-profiles.sh"), path.join(stateDir, "pi-profiles.sh"), 0o644]);
@@ -1022,7 +1028,7 @@ function restoreFileRecord(target, record, warnings, reason) {
 function makeAgentsBlock() {
     const template = fs.readFileSync(path.join(repoRoot, "templates", "AGENTS.md"), "utf8").trim();
 
-    return `_ZenPi-managed guidance, version ${VERSION}._\n\n${template}`;
+    return `_SpecPi-managed guidance, version ${VERSION}._\n\n${template}`;
 }
 
 function makeShellBlock() {
@@ -1043,7 +1049,7 @@ function finishManagedBlockRemoval(file, result, existedBefore) {
 function readManifest(required = false) {
     if (!fs.existsSync(manifestPath)) {
         if (required) {
-            throw new Error(`ZenPi is not installed. Run ${CLI} install first.`);
+            throw new Error(`SpecPi is not installed. Run ${CLI} install first.`);
         }
 
         return undefined;
@@ -1058,7 +1064,7 @@ function readManifest(required = false) {
 }
 
 function acquireLock() {
-    return acquireZenPiLock(agentDir);
+    return acquireSpecPiLock(agentDir);
 }
 
 async function confirm(message, yes) {
@@ -1080,7 +1086,8 @@ async function confirm(message, yes) {
 
 function assertSources() {
     const required = [
-        "extensions/zen.ts",
+        "extensions/spec.ts",
+        "extensions/spec/core.mjs",
         "extensions/ui-refresh/index.ts",
         "extensions/workflow-controls/index.ts",
         "extensions/workflow-controls/scope.mjs",
@@ -1100,9 +1107,10 @@ function assertSources() {
         "extensions/tool-wishlist/validators.mjs",
         "extensions/tool-wishlist/capabilities.json",
         ...COMMAND_GUARD_MANAGED_FILES.map((name) => `extensions/command-guard/${name}`),
-        "skills/zenpi-improve/SKILL.md",
+        "skills/specpi-improve/SKILL.md",
         "skills/donsetch/SKILL.md",
         "themes/tea-house.json",
+        "themes/specpi-spec.json",
         "templates/AGENTS.md",
         "shell/pi-profiles.sh",
     ];
@@ -1123,7 +1131,7 @@ function assertSources() {
 function printPlan(options) {
     const shellRc = detectShellRc();
     const manageShell = !options.skipShell && Boolean(shellRc);
-    console.log(`ZenPi ${VERSION} installation plan
+    console.log(`SpecPi ${VERSION} installation plan
 
 Pi agent directory:
   ${agentDir}
@@ -1143,11 +1151,11 @@ Managed files:`);
     console.log(`  ${manifestPath}`);
 
     console.log("\nSettings ownership:");
-    console.log("  theme = tea-house");
+    console.log("  theme = specpi-spec");
     console.log("  pinned package entries (merged by npm package identity)");
     console.log("  command-guard mode and approvals are session-only and no raw commands are persisted");
     console.log("  scope and completion state stays in the active Pi session branch without raw tool content");
-    console.log("  experiment metadata and exported patches stay in private local ZenPi state");
+    console.log("  experiment metadata and exported patches stay in private local SpecPi state");
     console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
     console.log("  capability-gap events use sanitized summaries and salted task/session/project hashes");
     console.log("  collection requires one explicit local on/off decision and never uploads data");
@@ -1172,7 +1180,7 @@ Managed files:`);
         console.log("  existing Pi installation will be used");
     } else {
         console.log(`  missing; npm will globally install ${PI_PACKAGE}@${PI_PACKAGE_VERSION} after confirmation`);
-        console.log("  this external installation is preserved by ZenPi uninstall");
+        console.log("  this external installation is preserved by SpecPi uninstall");
     }
 
     console.log("\nPinned packages:");
@@ -1230,7 +1238,7 @@ function validateManagedUpdate(manifest, files, force) {
 function retireManagedOptionalToolRecords(records, warnings, preserved) {
     for (const record of records || []) {
         if (path.dirname(record.target) !== managedBinDir || path.dirname(record.marker) !== managedToolsDir) {
-            throw new Error(`Legacy managed optional tool path is outside ZenPi state: ${record.target}`);
+            throw new Error(`Legacy managed optional tool path is outside SpecPi state: ${record.target}`);
         }
 
         if (lstatMaybe(record.target)?.isSymbolicLink() || lstatMaybe(record.marker)?.isSymbolicLink()) {
@@ -1295,19 +1303,19 @@ async function installOrUpdate(options, update) {
     try {
         const previousManifest = readManifest(update);
         if (!update && previousManifest) {
-            throw new Error(`ZenPi is already installed. Run ${CLI} update.`);
+            throw new Error(`SpecPi is already installed. Run ${CLI} update.`);
         }
 
         const shellRc = previousManifest?.shellRc || (options.skipShell ? undefined : detectShellRc());
         const manageShellNow = Boolean(shellRc) && !options.skipShell;
         if (!options.skipShell && !shellRc) {
-            console.warn("Shell integration skipped: ZenPi currently supports bash and zsh only.");
+            console.warn("Shell integration skipped: SpecPi currently supports bash and zsh only.");
         }
 
         const files = managedFiles(manageShellNow);
         validateManagedUpdate(previousManifest, files, options.force);
         printPlan({ ...options, skipShell: !manageShellNow });
-        await confirm(`${update ? "Update" : "Install"} ZenPi ${VERSION}?`, options.yes);
+        await confirm(`${update ? "Update" : "Install"} SpecPi ${VERSION}?`, options.yes);
         if (shouldBootstrapPi) {
             piBootstrapAttempted = true;
             installPi();
@@ -1461,7 +1469,7 @@ async function installOrUpdate(options, update) {
         }
 
         browserRuntimeTransaction?.commit();
-        console.log(`\nZenPi ${update ? "updated" : "installed"} successfully.`);
+        console.log(`\nSpecPi ${update ? "updated" : "installed"} successfully.`);
         console.log(`Manifest: ${manifestPath}`);
         for (const warning of warnings) {
             console.warn(`Warning: ${warning}`);
@@ -1528,7 +1536,7 @@ async function installOrUpdate(options, update) {
 
         const externalNote = externalNotes.length ? `\n${externalNotes.join("\n")}` : "";
         throw new Error(
-            `${transaction ? "ZenPi-managed changes rolled back: " : ""}${error.message}${optionalWarnings}${externalNote}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`,
+            `${transaction ? "SpecPi-managed changes rolled back: " : ""}${error.message}${optionalWarnings}${externalNote}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`,
         );
     } finally {
         releaseLock();
@@ -1602,7 +1610,7 @@ async function uninstall(options) {
     const preservedManagedTools = [];
     try {
         const manifest = readManifest(true);
-        await confirm(`Uninstall ZenPi ${manifest.version}?`, options.yes);
+        await confirm(`Uninstall SpecPi ${manifest.version}?`, options.yes);
         const watched = [
             settingsPath,
             ...(manifest.subagentConfigChanges ? [retiredSubagentConfigPath] : []),
@@ -1703,7 +1711,7 @@ async function uninstall(options) {
         }
 
         retiredBrowserRuntime = undefined;
-        console.log("ZenPi configuration, managed optional tools, and managed browser runtime uninstalled.");
+        console.log("SpecPi configuration, managed optional tools, and managed browser runtime uninstalled.");
         console.log(
             "Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved. Experiment metadata and exported patches were also preserved.",
         );
@@ -1852,13 +1860,13 @@ async function doctor() {
 
     const agents = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, "utf8") : "";
     if (!agents.includes(AGENTS_START) || !agents.includes(AGENTS_END)) {
-        errors.push("Missing ZenPi AGENTS.md block");
+        errors.push("Missing SpecPi AGENTS.md block");
     }
 
     if (manifest.shellRc) {
         const shell = fs.existsSync(manifest.shellRc) ? fs.readFileSync(manifest.shellRc, "utf8") : "";
         if (!shell.includes(SHELL_START) || !shell.includes(SHELL_END)) {
-            errors.push("Missing ZenPi shell block");
+            errors.push("Missing SpecPi shell block");
         }
     }
 
@@ -1904,7 +1912,7 @@ async function doctor() {
         warnings.push("donsetch is missing (optional skill prerequisite)");
     }
 
-    console.log(`ZenPi ${manifest.version} doctor`);
+    console.log(`SpecPi ${manifest.version} doctor`);
     console.log(`Agent directory: ${agentDir}`);
     if (powershellStatus) {
         console.log(
@@ -2024,6 +2032,6 @@ async function main() {
 }
 
 main().catch((error) => {
-    console.error(`ZenPi: ${error.message}`);
+    console.error(`SpecPi: ${error.message}`);
     process.exitCode = 1;
 });

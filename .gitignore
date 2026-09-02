@@ -13,8 +13,8 @@ sessions/
 missions/
 *.backup-*
 
-# ZenPi development/install state
-.zenpi-test/
+# SpecPi development/install state
+.specpi-test/
 *.log
 Screenshot*.png
 

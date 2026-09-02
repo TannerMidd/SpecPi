@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-harness-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-harness-"));
 const agentDir = path.join(root, "agent");
 const repository = path.join(root, "repo");
 fs.mkdirSync(repository, { recursive: true });
@@ -153,7 +153,7 @@ for (const handler of events.get("tool_call") || []) {
     allowed &&= result?.block !== true;
 }
 
-const scopeState = entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data;
+const scopeState = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
 const safeCall = { toolName: "bash", toolCallId: "safe-after-scope-denial", input: { command: "printf safe" } };
 let guardStillUsable = true;
 for (const handler of events.get("tool_call") || []) {
@@ -176,16 +176,16 @@ for (const handler of events.get("tool_call") || []) {
 ctx.hasUI = true;
 
 // `accept` acknowledges the finding without widening the contract; `add` is the verb that widens it.
-const scopeBeforeAccept = entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data;
+const scopeBeforeAccept = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
 await commands.get("scope").handler("accept outside.txt", ctx);
-const scopeAfterAccept = entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data;
+const scopeAfterAccept = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
 const acceptClearedPending =
     scopeBeforeAccept?.pending?.includes("outside.txt") === true &&
     scopeAfterAccept?.pending?.includes("outside.txt") === false;
 const acceptKeptScope = scopeAfterAccept?.entries?.length === scopeBeforeAccept?.entries?.length;
 
 await commands.get("scope").handler("add outside.txt", ctx);
-const scopeAfterAdd = entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data;
+const scopeAfterAdd = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
 const addWidenedScope = scopeAfterAdd?.entries?.length === (scopeAfterAccept?.entries?.length ?? 0) + 1;
 
 // Display escaping must not replace the canonical path used for matching. A literal percent sign is encoded in UI
@@ -201,9 +201,9 @@ for (const handler of events.get("tool_call") || []) {
 }
 
 ctx.hasUI = true;
-const scopeBeforePercentAdd = entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data;
+const scopeBeforePercentAdd = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
 await commands.get("scope").handler("add percent%25.txt", ctx);
-const scopeAfterPercentAdd = entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data;
+const scopeAfterPercentAdd = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
 const percentPathStayedCanonical =
     scopeBeforePercentAdd?.pending?.includes("percent%.txt") === true &&
     scopeAfterPercentAdd?.pending?.includes("percent%.txt") === false &&
@@ -231,13 +231,13 @@ for (const handler of events.get("tool_result") || []) {
 pi.exec = countingExec;
 const readSkippedSnapshots =
     execCallsDuringRead === 0 &&
-    entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data?.indeterminate ===
+    entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data?.indeterminate ===
         indeterminateBeforeRead;
 
 await commands.get("challenge").handler("", ctx);
 const challengeTriggered = messages.length === 1 && messages[0].options.triggerTurn === true;
 const activation = entries
-    .filter((entry) => entry.customType === "zenpi-completion-challenge" && entry.data.kind === "active")
+    .filter((entry) => entry.customType === "specpi-completion-challenge" && entry.data.kind === "active")
     .at(-1)?.data;
 const challengeSubmission = {
     generation: activation.generation,
@@ -265,7 +265,7 @@ try {
 // A challenge the model receives but never answers must expire with the turn instead of steering every later turn.
 await commands.get("challenge").handler("", ctx);
 const abandoned = entries
-    .filter((entry) => entry.customType === "zenpi-completion-challenge" && entry.data.kind === "active")
+    .filter((entry) => entry.customType === "specpi-completion-challenge" && entry.data.kind === "active")
     .at(-1)?.data;
 let promptWhileArmed = "";
 for (const handler of events.get("before_agent_start") || []) {
@@ -292,7 +292,7 @@ for (const handler of events.get("session_start") || []) {
     await handler({}, ctx);
 }
 
-const resumedScope = entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data;
+const resumedScope = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
 const resumedActive = resumedScope?.active === true && resumedScope.entries.length > 0;
 let resumedChallengeArmed = false;
 for (const handler of events.get("before_agent_start") || []) {
@@ -302,11 +302,11 @@ for (const handler of events.get("before_agent_start") || []) {
 
 // A challenge that expired unanswered must not retire the last completed card the way /challenge clear does.
 const displaysBeforeStatus = entries.filter(
-    (entry) => entry.customType === "zenpi-completion-challenge" && entry.data.kind === "display",
+    (entry) => entry.customType === "specpi-completion-challenge" && entry.data.kind === "display",
 ).length;
 await commands.get("challenge").handler("status", ctx);
 const completedResultSurvivedRestart =
-    entries.filter((entry) => entry.customType === "zenpi-completion-challenge" && entry.data.kind === "display")
+    entries.filter((entry) => entry.customType === "specpi-completion-challenge" && entry.data.kind === "display")
         .length ===
     displaysBeforeStatus + 1;
 
@@ -315,7 +315,7 @@ const restoredRecordJson = JSON.stringify(resumedScope);
 await commands.get("scope").handler("add docs/", ctx);
 const restoredRecordUnchanged = JSON.stringify(resumedScope) === restoredRecordJson;
 const addAfterResumeWidened =
-    (entries.filter((entry) => entry.customType === "zenpi-scope-state").at(-1)?.data?.entries?.length ?? 0) ===
+    (entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data?.entries?.length ?? 0) ===
     resumedScope.entries.length + 1;
 
 process.stdout.write(
@@ -329,7 +329,7 @@ process.stdout.write(
         pendingRecorded: scopeState?.pending?.includes("outside.txt") === true,
         headlessAllowed,
         headlessPending: entries
-            .filter((entry) => entry.customType === "zenpi-scope-state")
+            .filter((entry) => entry.customType === "specpi-scope-state")
             .at(-1)
             ?.data?.pending?.includes("another.txt"),
         challengeTriggered,
@@ -348,7 +348,7 @@ process.stdout.write(
         restoredRecordUnchanged,
         addAfterResumeWidened,
         guardStillUsable,
-        emittedScopeStatus: emitted.some((item) => item.name === "zenpi:workflow-status"),
+        emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
     })}\n`,
 );
 

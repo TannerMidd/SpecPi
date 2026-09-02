@@ -26,7 +26,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const validatorsCli = path.join(repoRoot, "extensions", "tool-wishlist", "validators.mjs");
 const capabilitiesPath = path.join(repoRoot, "extensions", "tool-wishlist", "capabilities.json");
 const fakeBrowserNpm = path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs");
-const cli = path.join(repoRoot, "scripts", "zenpi.mjs");
+const cli = path.join(repoRoot, "scripts", "specpi.mjs");
 
 async function seedLifecycle(stateDir, { withJournal = true } = {}) {
     await setCollectionMode({ stateDir, mode: "on" });
@@ -84,7 +84,7 @@ async function seedLifecycle(stateDir, { withJournal = true } = {}) {
 }
 
 test("retirement journal persists sanitized bounded proof next to the decision", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-journal-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-"));
     try {
         const { retire } = await seedLifecycle(root, { withJournal: true });
         const decisions = readDecisionsFile(path.join(root, "tool-wishlist-decisions.jsonl")).decisions;
@@ -109,7 +109,7 @@ test("retirement journal persists sanitized bounded proof next to the decision",
 });
 
 test("retirement journals tolerate absent git context by omitting changed files", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-journal-nogit-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-nogit-"));
     try {
         const gap = {
             capability: "Audio transcript generation",
@@ -159,7 +159,7 @@ test("retirement journals tolerate absent git context by omitting changed files"
 });
 
 test("journal bounds and placement fail closed", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-journal-bounds-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-bounds-"));
     try {
         const { retire } = await seedLifecycle(root);
         const base = {
@@ -322,7 +322,7 @@ test("journal bounds and placement fail closed", async () => {
 });
 
 test("reopen evidence is bounded, sanitized, and rejected elsewhere", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-reopen-evidence-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-reopen-evidence-"));
     try {
         const { gap } = await seedLifecycle(root);
         await recordCapabilityGap({
@@ -369,7 +369,7 @@ test("reopen evidence is bounded, sanitized, and rejected elsewhere", async () =
 });
 
 test("legacy decision records without journal or evidence still parse", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-journal-legacy-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-legacy-"));
     try {
         const legacy = {
             schema: 1,
@@ -392,7 +392,7 @@ test("legacy decision records without journal or evidence still parse", () => {
 });
 
 test("reopen decisions reject malformed journal placement at the reader boundary", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-journal-reader-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-reader-"));
     try {
         const invalid = {
             schema: 1,
@@ -415,7 +415,7 @@ test("reopen decisions reject malformed journal placement at the reader boundary
 });
 
 test("reopen lineage links to the latest retirement and rejects broken explicit links", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-lineage-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-lineage-"));
     try {
         const { retire, gap } = await seedLifecycle(root);
         await recordCapabilityGap({
@@ -642,7 +642,7 @@ test("loop health metrics are deterministic and rendered only with observations"
 });
 
 test("improvement journal renders summaries, detail, and rejects unknown gaps", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-history-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-history-"));
     try {
         const { gap } = await seedLifecycle(root);
         await recordCapabilityGap({
@@ -673,7 +673,7 @@ test("improvement journal renders summaries, detail, and rejects unknown gaps", 
         assert.match(detail, /## Local audio transcription/);
         assert.match(detail, /### Retired 2026-01-03/);
         assert.match(detail, /- Gates: npm run check, wishlist-state-smoke/);
-        assert.match(detail, /- ZenPi version: 0\.7\.0/);
+        assert.match(detail, /- SpecPi version: 0\.7\.0/);
         assert.match(
             detail,
             /- Changed files: `extensions\/tool-wishlist\/core.mjs`, `tests\/wishlist-improvement-loop.test.mjs`/,
@@ -752,7 +752,7 @@ test("validator catalog, registry, and capability links stay in sync", () => {
 });
 
 test("every registry-linked validator executes through the shared CLI with isolated prerequisites", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-registry-validators-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-registry-validators-"));
     try {
         const runtime = path.join(root, "browser-runtime");
         fs.mkdirSync(runtime, { recursive: true });
@@ -804,7 +804,7 @@ test("wishlist-state-smoke fails when its expectations cannot hold", () => {
     const result = spawnSync(process.execPath, [validatorsCli, "wishlist-state-smoke"], {
         encoding: "utf8",
         timeout: 120000,
-        env: { ...process.env, ZENPI_WISHLIST_SMOKE_FAULT: "expectation" },
+        env: { ...process.env, SPECPI_WISHLIST_SMOKE_FAULT: "expectation" },
     });
     assert.equal(result.status, 1);
     assert.match(result.stderr, /Injected expectation fault/);
@@ -830,7 +830,7 @@ test("validator runs are killed at their timeout and reported as failures", () =
 });
 
 test("doctor fails when a linked capability validator fails", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-doctor-validator-fail-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-doctor-validator-fail-"));
     const agentDir = path.join(root, "agent");
     try {
         const install = spawnSync(
@@ -845,7 +845,7 @@ test("doctor fails when a linked capability validator fails", () => {
         assert.equal(install.status, 0, install.stderr);
         const doctor = spawnSync(process.execPath, [cli, "doctor"], {
             cwd: repoRoot,
-            env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, ZENPI_WISHLIST_SMOKE_FAULT: "expectation" },
+            env: { ...process.env, PI_CODING_AGENT_DIR: agentDir, SPECPI_WISHLIST_SMOKE_FAULT: "expectation" },
             encoding: "utf8",
         });
         assert.notEqual(doctor.status, 0);
@@ -857,7 +857,7 @@ test("doctor fails when a linked capability validator fails", () => {
 });
 
 test("aggregate events tolerate journal-carrying decisions in merges", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-journal-merge-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-merge-"));
     try {
         await seedLifecycle(root, { withJournal: false });
         await recordCapabilityGap({

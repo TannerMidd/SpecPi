@@ -55,7 +55,7 @@ function git(root, ...args) {
 }
 
 function createRepository() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-test-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-test-"));
     git(root, "init");
     git(root, "config", "user.email", "workflow@example.invalid");
     git(root, "config", "user.name", "Workflow Test");
@@ -77,7 +77,7 @@ function statusZ(root) {
 
 test("scope entries are bounded project-relative exact files and directory prefixes", () => {
     const root = createRepository();
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-scope-outside-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-scope-outside-"));
     try {
         const entries = normalizeScopeEntries(root, ["src/", "outside.txt", "src/"]);
         assert.deepEqual(entries, [
@@ -161,7 +161,7 @@ test("NUL porcelain and worktree porcelain parsing fail closed on malformed reco
 
 test("guided experiment lifecycle leaves the base worktree and index untouched", async () => {
     const root = createRepository();
-    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-state-"));
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-state-"));
     try {
         const repository = await inspectRepository(run, root);
         const baseHead = git(root, "rev-parse", "HEAD").trim();
@@ -212,7 +212,7 @@ test("guided experiment lifecycle leaves the base worktree and index untouched",
         // The patch must keep the original latin-1 byte instead of a UTF-8 replacement character, or it stops applying.
         assert.ok(patchBytes.includes(0xe9), "patch lost the original non-UTF-8 bytes");
         assert.ok(!patchBytes.includes(Buffer.from("\uFFFD")), "patch contains a UTF-8 replacement character");
-        const applyTarget = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-apply-"));
+        const applyTarget = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-apply-"));
         try {
             git(applyTarget, "clone", "--quiet", root, applyTarget);
             git(applyTarget, "apply", "--check", exported.outputPath);
@@ -244,7 +244,7 @@ test("guided experiment lifecycle leaves the base worktree and index untouched",
 
 test("committed experiment work stays visible to status, export, and discard", async () => {
     const root = createRepository();
-    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-committed-"));
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-committed-"));
     try {
         const repository = await inspectRepository(run, root);
         const record = await createExperiment({
@@ -274,7 +274,7 @@ test("committed experiment work stays visible to status, export, and discard", a
         const patch = fs.readFileSync(exported.outputPath, "utf8");
         assert.match(patch, /result\.txt/);
         assert.match(patch, /dirty\.txt/);
-        const applyTarget = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-committed-apply-"));
+        const applyTarget = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-committed-apply-"));
         try {
             git(applyTarget, "clone", "--quiet", root, applyTarget);
             git(applyTarget, "apply", "--check", exported.outputPath);
@@ -291,8 +291,8 @@ test("committed experiment work stays visible to status, export, and discard", a
 
 test("a patch destination that appears after the check is never silently replaced", async () => {
     const root = createRepository();
-    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-race-"));
-    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-out-"));
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-race-"));
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-out-"));
     try {
         const repository = await inspectRepository(run, root);
         const record = await createExperiment({
@@ -338,7 +338,7 @@ test("a patch destination that appears after the check is never silently replace
 
 test("recovery can release an orphan directory and never drops a record Git still tracks", async () => {
     const root = createRepository();
-    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-workflow-recover-"));
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-recover-"));
     try {
         const repository = await inspectRepository(run, root);
         const record = await createExperiment({

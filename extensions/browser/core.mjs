@@ -120,7 +120,7 @@ export function sanitizeArtifactSegment(value) {
 }
 
 export function makeArtifactPath(agentDir, sessionId, kind, extension = "png") {
-    const dir = path.join(agentDir, "zenpi", "browser-artifacts", sanitizeArtifactSegment(sessionId));
+    const dir = path.join(agentDir, "specpi", "browser-artifacts", sanitizeArtifactSegment(sessionId));
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     const stamp = new Date().toISOString().replaceAll(":", "").replaceAll(".", "-");
     const suffix = Math.random().toString(16).slice(2, 10);
@@ -178,7 +178,7 @@ export async function loadBrowserRuntime(runtimeDir) {
     const packageJson = path.join(runtimeDir, "package.json");
     if (!fs.existsSync(packageJson)) {
         throw new Error(
-            `ZenPi browser runtime is not installed at ${runtimeDir}. Run zenpi update without --skip-browser-install.`,
+            `SpecPi browser runtime is not installed at ${runtimeDir}. Run specpi update without --skip-browser-install.`,
         );
     }
 

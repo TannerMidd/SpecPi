@@ -1,5 +1,5 @@
 /**
- * ZenPi Files — a dependency-free, Tea House-native project browser.
+ * SpecPi Files — a dependency-free, theme-native project browser.
  *
  * /files [path] opens a compact tree, themed source/Markdown viewer,
  * git diff view, and line-comment workflow without external renderers.
@@ -141,7 +141,7 @@ function diffLine(line: string, theme: Theme): string {
     return theme.fg("toolDiffContext", safe);
 }
 
-class ZenFilesComponent implements Component {
+class SpecFilesComponent implements Component {
     private snapshot: Snapshot;
     private root: TreeNode;
     private expanded = new Set<string>();
@@ -206,7 +206,7 @@ class ZenFilesComponent implements Component {
         }
 
         this.renderedCache = undefined;
-        this.notify("Zen Files refreshed.", "info");
+        this.notify("Spec Files refreshed.", "info");
     }
 
     private openFile(node: TreeNode): void {
@@ -636,7 +636,7 @@ class ZenFilesComponent implements Component {
 
 export default function filesExtension(pi: ExtensionAPI): void {
     pi.registerCommand("files", {
-        description: "Browse, read, diff, and comment on project files in the Tea House theme",
+        description: "Browse, read, diff, and comment on project files in the active SpecPi theme",
         handler: async (args, ctx) => {
             if (ctx.mode !== "tui") {
                 ctx.ui.notify("/files is available in interactive TUI mode.", "warning");
@@ -654,7 +654,7 @@ export default function filesExtension(pi: ExtensionAPI): void {
             }
 
             await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
-                const component = new ZenFilesComponent(
+                const component = new SpecFilesComponent(
                     root,
                     theme,
                     () => tui.requestRender(),

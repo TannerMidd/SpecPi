@@ -103,7 +103,7 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T, milliseconds = 3
 
 function startupChoice(ctx: ExtensionContext, milliseconds = 3000): Promise<string | undefined> {
     return withTimeout(
-        ctx.ui.select("ZenPi command guard", ["Guard (Recommended)", "Strict", "Off for this session"]),
+        ctx.ui.select("SpecPi command guard", ["Guard (Recommended)", "Strict", "Off for this session"]),
         undefined,
         milliseconds,
     );
@@ -117,7 +117,7 @@ function updateStatus(ctx: ExtensionContext, state: State): void {
               ? "🛡 Locked"
               : `🛡 ${state.mode[0].toUpperCase()}${state.mode.slice(1)}`;
     try {
-        ctx.ui.setStatus("zenpi-command-guard", label);
+        ctx.ui.setStatus("specpi-command-guard", label);
     } catch {
         /* Status is optional in older hosts. */
     }
@@ -233,7 +233,7 @@ export default function registerCommandGuard(
     pi.on("session_shutdown", (_event, ctx) => {
         reset();
         try {
-            ctx.ui.setStatus("zenpi-command-guard", undefined);
+            ctx.ui.setStatus("specpi-command-guard", undefined);
         } catch {
             /* optional */
         }

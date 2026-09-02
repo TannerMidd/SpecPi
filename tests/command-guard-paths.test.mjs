@@ -20,9 +20,9 @@ test("agent-private state is identified by location, not by name appearing in a 
     try {
         // Installed state stays protected for reads and writes alike.
         for (const relative of [
-            "zenpi/manifest.json",
-            "zenpi/backups/001.json",
-            "zenpi/wishlist/state.json",
+            "specpi/manifest.json",
+            "specpi/backups/001.json",
+            "specpi/wishlist/state.json",
             "auth.json",
             "sessions/abc.json",
             "history.db",
@@ -39,11 +39,11 @@ test("agent-private state is identified by location, not by name appearing in a 
         assert.equal(classifyPath(guardSource, { ...options, read: true }).protected, false);
         assert.equal(isAgentPath(guardSource, options), true);
 
-        // A checkout that merely contains these names is ordinary work — this is ZenPi's own source tree.
+        // A checkout that merely contains these names is ordinary work — this is SpecPi's own source tree.
         for (const relative of [
-            "zenpi/manifest.json",
+            "specpi/manifest.json",
             "extensions/command-guard/rules.mjs",
-            "zenpi/wishlist/state.json",
+            "specpi/wishlist/state.json",
         ]) {
             assert.equal(classifyPath(relative, { ...options, read: true }).protected, false, `read ${relative}`);
             assert.equal(classifyPath(relative, options).protected, false, `write ${relative}`);
@@ -59,7 +59,7 @@ test("agent-private state is identified by location, not by name appearing in a 
 });
 
 test("ordinary project paths are not mistaken for Pi private state", () => {
-    // The POSIX rule used to be an unanchored /(?:zenpi|pi).*(?:auth|session|…)/, so "pi" inside "api" plus a
+    // The POSIX rule used to be an unanchored /(?:specpi|pi).*(?:auth|session|…)/, so "pi" inside "api" plus a
     // later "session" or "auth" denied everyday source files critically and locked the session.
     const unix = { platform: "linux", cwd: "/home/dev/app" };
     for (const target of [
@@ -280,11 +280,17 @@ test("ordinary profile-contained and UNC workspaces remain usable", () => {
     const unc = classifyPath("src\\file.ts", { platform: "win32", cwd: "\\\\server\\share\\project" });
     assert.equal(unc.protected, false);
     assert.equal(unc.withinWorkspace, true);
-    const namedZenPi = classifyPath("D:\\a\\ZenPi\\ZenPi\\$TARGET", { platform: "win32", cwd: "D:\\a\\ZenPi\\ZenPi" });
-    assert.equal(namedZenPi.protected, false);
+    const namedSpecPi = classifyPath("D:\\a\\SpecPi\\SpecPi\\$TARGET", {
+        platform: "win32",
+        cwd: "D:\\a\\SpecPi\\SpecPi",
+    });
+    assert.equal(namedSpecPi.protected, false);
     assert.equal(
-        classifyPath("D:\\a\\ZenPi\\ZenPi\\README.md", { platform: "win32", cwd: "D:\\a\\ZenPi\\ZenPi", read: true })
-            .protected,
+        classifyPath("D:\\a\\SpecPi\\SpecPi\\README.md", {
+            platform: "win32",
+            cwd: "D:\\a\\SpecPi\\SpecPi",
+            read: true,
+        }).protected,
         false,
     );
 });

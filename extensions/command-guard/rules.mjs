@@ -836,13 +836,13 @@ function criticalLeaf(leaf, options) {
             "guard.self-tamper",
             "critical",
             "protected-path",
-            "A destructive Git operation targets protected host or ZenPi enforcement state.",
+            "A destructive Git operation targets protected host or SpecPi enforcement state.",
             leaf,
         );
     }
 
-    // Keyed on where the target resolves, not on "zenpi" or "command-guard" appearing anywhere in the arguments:
-    // that substring test made `mkdir zenpi-experiment` a critical, session-locking denial in any checkout.
+    // Keyed on where the target resolves, not on "specpi" or "command-guard" appearing anywhere in the arguments:
+    // that substring test made `mkdir specpi-experiment` a critical, session-locking denial in any checkout.
     if (
         mutationIntent &&
         [...targets().targets, ...protectedMutationTargets].some((target) => isAgentPath(target, options))
@@ -851,7 +851,7 @@ function criticalLeaf(leaf, options) {
             "guard.self-tamper",
             "critical",
             "protected-path",
-            "The command targets ZenPi guard, configuration, or private state.",
+            "The command targets SpecPi guard, configuration, or private state.",
             leaf,
         );
     }

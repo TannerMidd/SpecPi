@@ -80,11 +80,11 @@ const privatePath =
 
 // A .pi directory is Pi state wherever it appears, including the default agent directory.
 const dotPi = /(?:^|[\\/])\.pi(?:[\\/]|$)/i;
-// Pi and ZenPi private state is identified by LOCATION, not by name. Matching these as bare relative segments
-// protected every repository that merely contained a zenpi/ or extensions/command-guard/ path — ZenPi's own
+// Pi and SpecPi private state is identified by LOCATION, not by name. Matching these as bare relative segments
+// protected every repository that merely contained a specpi/ or extensions/command-guard/ path — SpecPi's own
 // source tree included — and the unanchored POSIX variant matched ordinary project files such as
 // src/api/session.ts ("pi" inside "api", then "session"), denying them critically and locking the session.
-const agentPrivateState = /^(?:zenpi[\\/](?:manifest\.json|backups|wishlist))(?:[\\/]|$)/i;
+const agentPrivateState = /^(?:specpi[\\/](?:manifest\.json|backups|wishlist))(?:[\\/]|$)/i;
 const agentPrivateName = /^(?:auth|sessions?|history|missions?|trust|private)[^\\/]*(?:[\\/]|$)/i;
 const agentGuardSource = /^extensions[\\/]command-guard(?:[\\/]|$)/i;
 // The installed state Guard must keep intact to keep enforcing, expressed as path segments so containment can be
@@ -92,7 +92,7 @@ const agentGuardSource = /^extensions[\\/]command-guard(?:[\\/]|$)/i;
 // ancestor that CONTAINS the subtree reaches the same state and must weigh the same.
 const enforcementNodes = [
     ["settings.json"],
-    ["zenpi", "manifest.json"],
+    ["specpi", "manifest.json"],
     ...COMMAND_GUARD_MANAGED_FILES.map((name) => ["extensions", "command-guard", name]),
 ];
 function agentDirectories(windows) {
@@ -337,7 +337,7 @@ export function classifyPath(input, options = {}) {
 }
 
 // True when the path resolves to installed state required to enforce the guard. A checkout that merely
-// contains a zenpi/ or extensions/command-guard/ directory remains ordinary work.
+// contains a specpi/ or extensions/command-guard/ directory remains ordinary work.
 export function isAgentPath(input, options = {}) {
     const result = classifyPath(input, options);
     if (typeof result.lexical !== "string") {

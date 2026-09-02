@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Closed capability validators for the ZenPi improvement loop.
+ * Closed capability validators for the SpecPi improvement loop.
  *
  * Every shipped capability links to at least one validator from this catalog.
  * Validators are deterministic, offline, bounded in time, and never touch the
@@ -95,7 +95,7 @@ function runBrowserRuntimeSmoke(environment) {
 
 async function runWishlistStateSmoke() {
     const core = await import("./core.mjs");
-    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "zenpi-wishlist-state-smoke-"));
+    const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-state-smoke-"));
     try {
         const gap = {
             capability: "Wishlist state smoke",
@@ -206,7 +206,7 @@ async function runWishlistStateSmoke() {
             throw new Error("Expected the journal to render retirement evidence and the reopen linkage");
         }
 
-        if (process.env.ZENPI_WISHLIST_SMOKE_FAULT === "expectation") {
+        if (process.env.SPECPI_WISHLIST_SMOKE_FAULT === "expectation") {
             throw new Error("Injected expectation fault: metrics.retirements should have been 999");
         }
 

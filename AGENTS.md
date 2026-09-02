@@ -1,19 +1,19 @@
-# ZenPi Repository Guide
+# SpecPi Repository Guide
 
 ## Purpose
 
-ZenPi is a minimal, evidence-led harness for Pi. Preserve human control: changes should be the smallest sufficient intervention, testable, reversible, private by default, and supported by observed behavior rather than model claims.
+SpecPi is a minimal, evidence-led harness for Pi. Preserve human control: changes should be the smallest sufficient intervention, testable, reversible, private by default, and supported by observed behavior rather than model claims.
 
 Wishlist observations are leads, not authorization. Only an exact human selection through `/harness-improvement` authorizes a wishlist-sourced change.
 
 ## Repository map
 
-- `scripts/zenpi.mjs` and `scripts/lib.mjs`: installer lifecycle, managed-state transactions, and CLI behavior.
+- `scripts/specpi.mjs` and `scripts/lib.mjs`: installer lifecycle, managed-state transactions, and CLI behavior.
 - `templates/`, `extensions/`, `skills/`, `themes/`, and `shell/`: installable source-of-truth files. Edit these, not installed copies.
 - `tests/`: installer, command-guard, provider, browser, and wishlist regressions.
 - `SECURITY.md`: public support and vulnerability-reporting policy.
 - `SECURITY_MODEL.md`: authoritative trust model and security boundaries.
-- `templates/AGENTS.md`: the installed global working agreement; this root file governs ZenPi repository development.
+- `templates/AGENTS.md`: the installed global working agreement; this root file governs SpecPi repository development.
 
 ## Setup and validation
 
@@ -33,11 +33,11 @@ For rendered `site/` or browser changes, validate relevant desktop, tablet, and 
 ## Invariants
 
 - `plan` is non-mutating. `install`, `update`, and `uninstall` require confirmation unless `--yes` is supplied.
-- Merge only documented settings paths and preserve unrelated configuration. Manage global AGENTS and shell integration only inside ZenPi marker blocks.
+- Merge only documented settings paths and preserve unrelated configuration. Manage global AGENTS and shell integration only inside SpecPi marker blocks.
 - Back up before mutation, write atomically, retain checksums, and roll configuration files back on failure.
 - Never inspect, copy, log, or modify Pi authentication, provider credentials, trust decisions, sessions, missions, or history.
 - Treat Command Guard denials as hard constraints. Never evade them through encoding, command splitting, indirection, or alternate tools.
-- Do not edit dependencies under `node_modules/` or installed ZenPi resources.
+- Do not edit dependencies under `node_modules/` or installed SpecPi resources.
 - Do not add or upgrade executable dependencies unless required by the task. Pin reviewed versions and update `THIRD_PARTY.md`, `CHANGELOG.md`, and security documentation when their contracts change.
 - Use four-space indentation, explicit braced control flow, one statement per line, and the project formatter.
 - Do not commit, push, publish, deploy, create releases, or alter remotes unless explicitly requested.

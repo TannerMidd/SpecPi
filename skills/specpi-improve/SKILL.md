@@ -1,9 +1,9 @@
 ---
-name: zenpi-improve
-description: Turns a selected ZenPi capability-gap wishlist item into a minimal, evidence-backed, reversible improvement. Use when the user asks to improve ZenPi from its wishlist, act on a selected gap, or complete the notice-to-retire loop.
+name: specpi-improve
+description: Turns a selected SpecPi capability-gap wishlist item into a minimal, evidence-backed, reversible improvement. Use when the user asks to improve SpecPi from its wishlist, act on a selected gap, or complete the notice-to-retire loop.
 ---
 
-# ZenPi Improve
+# SpecPi Improve
 
 Improve the harness through an explicit experiment, never through quiet self-modification.
 
@@ -34,10 +34,10 @@ The `/harness-improvement` selection authorizes this exact smallest-sufficient c
 2. Implement the smallest coherent intervention.
 3. Add focused tests that reproduce the gap and prove the new behavior.
 4. Update the reviewed capability registry only when the capability is actually shipped. Use exact aliases; do not hide adjacent unsupported cases.
-5. Link deterministic capabilities to an existing or new `zenpi doctor` check.
+5. Link deterministic capabilities to an existing or new `specpi doctor` check.
 6. Update README, security documentation, changelog, third-party notices, and installer source lists only where the change requires it.
 7. Keep installation explicit, reversible, backed up, atomic, and checksum-tracked.
-8. If the user chooses to commit the improvement, include a `ZenPi-Gap: <gap-id>` trailer so the commit can be linked to its retirement in the journal. ZenPi itself never commits.
+8. If the user chooses to commit the improvement, include a `SpecPi-Gap: <gap-id>` trailer so the commit can be linked to its retirement in the journal. SpecPi itself never commits.
 
 ## Verification and retirement
 

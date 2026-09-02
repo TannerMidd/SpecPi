@@ -106,7 +106,7 @@ export default async function wishlistExtensionHarness() {
     fs.mkdirSync(path.join(ctx.cwd, "extensions", "tool-wishlist"), { recursive: true });
     fs.writeFileSync(
         path.join(ctx.cwd, "package.json"),
-        JSON.stringify({ name: "zenpi", scripts: { check: "node --test" } }),
+        JSON.stringify({ name: "specpi", scripts: { check: "node --test" } }),
     );
     fs.copyFileSync(
         path.resolve("extensions", "tool-wishlist", "capabilities.json"),
@@ -150,7 +150,7 @@ export default async function wishlistExtensionHarness() {
     }
 
     await reportTool.execute("call-2", browserGap, undefined, undefined, ctx);
-    const stateDir = path.join(agentDir, "zenpi");
+    const stateDir = path.join(agentDir, "specpi");
     const legacyCandidate = improvementCandidatesFromRefresh({
         report: fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"),
     })[0];
@@ -230,7 +230,7 @@ export default async function wishlistExtensionHarness() {
     const gitContextLines = gitContextBlock.split("\n").filter((line) => line.startsWith("- "));
 
     process.stdout.write(
-        `ZENPI_WISHLIST_HARNESS=${JSON.stringify({
+        `SPECPI_WISHLIST_HARNESS=${JSON.stringify({
             toolNames: tools.map((tool) => tool.name),
             commandNames: [...commands.keys()],
             consent: confirmations[0],

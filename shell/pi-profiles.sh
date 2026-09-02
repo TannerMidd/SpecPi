@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# ZenPi capability profiles.
+# SpecPi capability profiles.
 
 pi-core() {
   command pi --tools read,bash,edit,write,ask_user_question "$@"

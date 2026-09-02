@@ -5,10 +5,10 @@ import { spawnSync } from "node:child_process";
 import { decideCommand } from "../../extensions/command-guard/core.mjs";
 import { parserHosts } from "../../extensions/command-guard/powershell.mjs";
 
-const executable = process.env.ZENPI_TEST_POWERSHELL_EXE;
-const gitBash = process.env.ZENPI_TEST_GIT_BASH;
+const executable = process.env.SPECPI_TEST_POWERSHELL_EXE;
+const gitBash = process.env.SPECPI_TEST_GIT_BASH;
 if (!executable) {
-    throw new Error("ZENPI_TEST_POWERSHELL_EXE is required");
+    throw new Error("SPECPI_TEST_POWERSHELL_EXE is required");
 }
 
 const powershell = { shell: "powershell", mode: "guard", cwd: "C:\\work", platform: "win32", hasUI: true, executable };
@@ -74,7 +74,7 @@ const nonCatastrophicSystemWrites = [
 ];
 for (const command of [
     ...nonCatastrophicSystemWrites,
-    "New-PSDrive -Name Z -PSProvider Registry -Root HKEY_CURRENT_USER | Out-Null; sp -WhatIf -Path Z:\\Software\\ZenPiGuardProbe -Name Probe -Value 1",
+    "New-PSDrive -Name Z -PSProvider Registry -Root HKEY_CURRENT_USER | Out-Null; sp -WhatIf -Path Z:\\Software\\SpecPiGuardProbe -Name Probe -Value 1",
     "Copy-ItemProperty -Path HKCU:\\Software\\Source -Destination HKCU:\\Software\\Destination -Name Value",
     "cpp -Path HKCU:\\Software\\Source -Destination HKCU:\\Software\\Destination -Name Value",
     "Move-ItemProperty -Path HKCU:\\Software\\Source -Destination HKCU:\\Software\\Destination -Name Value",
@@ -188,7 +188,7 @@ assert.match(delayedRun.stdout, /CMD_DYNAMIC/);
 assert.equal(decideCommand(delayedExpansion, cmd).action, "ask");
 
 if (!gitBash || !path.isAbsolute(gitBash) || !fs.existsSync(gitBash)) {
-    throw new Error("ZENPI_TEST_GIT_BASH is required for the Windows Bash matrix");
+    throw new Error("SPECPI_TEST_GIT_BASH is required for the Windows Bash matrix");
 }
 
 const bashPayload = "printf 'BASH_FIRST\\n'\nprintf 'BASH_SECOND\\n'";

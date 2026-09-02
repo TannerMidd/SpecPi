@@ -49,7 +49,7 @@ for (const handler of events.get("session_shutdown") ?? []) {
 }
 
 process.stdout.write(
-    `ZENPI_UI_REFRESH_HARNESS=${JSON.stringify({
+    `SPECPI_UI_REFRESH_HARNESS=${JSON.stringify({
         eventNames: [...events.keys()],
         widgetCalls,
         renderCount,

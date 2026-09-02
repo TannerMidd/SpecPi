@@ -1,5 +1,5 @@
 /**
- * ZenPi capability-gap collector and explicit improvement lifecycle.
+ * SpecPi capability-gap collector and explicit improvement lifecycle.
  *
  * Observations are privacy-minimized and task-deduplicated. One explicit
  * menu choice starts an improvement; proof-gated completion retires it.
@@ -29,9 +29,9 @@ import {
 import { VALIDATOR_CATALOG } from "./validators.mjs";
 
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
-const stateDir = path.join(agentDir, "zenpi");
-const WISHLIST_REPORT_ENTRY = "zenpi-wishlist-report";
-const HARNESS_IMPROVEMENT_ENTRY = "zenpi-harness-improvement";
+const stateDir = path.join(agentDir, "specpi");
+const WISHLIST_REPORT_ENTRY = "specpi-wishlist-report";
+const HARNESS_IMPROVEMENT_ENTRY = "specpi-harness-improvement";
 const MAX_REPORT_DISPLAY_BYTES = 50 * 1024;
 const MAX_REPORT_DISPLAY_LINES = 2000;
 const MAX_JOURNAL_CHANGED_FILES = 40;
@@ -58,12 +58,12 @@ function sourceCheckout(cwd: string) {
     const registryFile = path.join(cwd, "extensions", "tool-wishlist", "capabilities.json");
     const validatorsFile = path.join(cwd, "extensions", "tool-wishlist", "validators.mjs");
     if (!fs.existsSync(packageFile) || !fs.existsSync(registryFile) || !fs.existsSync(validatorsFile)) {
-        throw new Error("Run /harness-improvement from a complete ZenPi source checkout");
+        throw new Error("Run /harness-improvement from a complete SpecPi source checkout");
     }
 
     const manifest = JSON.parse(fs.readFileSync(packageFile, "utf8"));
-    if (manifest?.name !== "zenpi" || typeof manifest?.scripts?.check !== "string") {
-        throw new Error("The current directory is not a verifiable ZenPi source checkout");
+    if (manifest?.name !== "specpi" || typeof manifest?.scripts?.check !== "string") {
+        throw new Error("The current directory is not a verifiable SpecPi source checkout");
     }
 
     return { registryFile, validatorsFile, version: String(manifest.version ?? "unknown") };
@@ -196,7 +196,7 @@ function improvementPrompt(group: any, context: ImprovementContext = {}) {
     const observed = group.scenarios?.[0] ?? "No representative need was recorded.";
     const limitation = group.limitations?.[0] ?? "No representative limitation was recorded.";
     const lines = [
-        `Begin the selected ZenPi harness improvement: ${group.canonicalKey}.`,
+        `Begin the selected SpecPi harness improvement: ${group.canonicalKey}.`,
         "",
         `Observed need: ${observed}`,
         `Current limitation: ${limitation}`,
@@ -228,7 +228,7 @@ function improvementPrompt(group: any, context: ImprovementContext = {}) {
 
     lines.push(
         "",
-        "This exact menu selection authorizes implementation of the smallest sufficient intervention in the current ZenPi source checkout. Load and follow the zenpi-improve skill. Treat the wishlist evidence as a lead, inspect current behavior, keep scope minimal, and do not ask for another approval unless scope expands or external/remote state would change.",
+        "This exact menu selection authorizes implementation of the smallest sufficient intervention in the current SpecPi source checkout. Load and follow the specpi-improve skill. Treat the wishlist evidence as a lead, inspect current behavior, keep scope minimal, and do not ask for another approval unless scope expands or external/remote state would change.",
         "Run direct acceptance checks and focused tests. At the end, call finish_harness_improvement with the gap ID, concise acceptance evidence, and a validation note. That tool must run the repository gate, verify registry integration, run supported capability validators, and retire the item. If any check fails, do not retire it; leave it selected and report the blocker.",
     );
 
@@ -294,7 +294,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
             });
         } else if ((ctx.mode === "tui" || ctx.mode === undefined) && typeof ctx.ui.editor === "function") {
             await ctx.ui.editor(
-                "ZenPi Wishlist (view only; changes are ignored)",
+                "SpecPi Wishlist (view only; changes are ignored)",
                 `${content}\n\n---\nReport: ${displayPath}`,
             );
         }
@@ -304,13 +304,13 @@ export default function toolWishlist(pi: ExtensionAPI) {
         name: "report_capability_gap",
         label: "Report Capability Gap",
         description:
-            "Privately record a material, reusable capability gap in ZenPi's local wishlist. Report only after reasonable existing tools or workarounds proved insufficient. Do not use for transient failures, command mistakes, credentials or permissions the user must supply, ordinary project-specific work, or speculative nice-to-haves. Never include secrets, source code, full commands, file paths, URLs with private data, or user prompt text. Report a gap at most once per user task. Collection requires an explicit local on/off decision and never uploads data.",
+            "Privately record a material, reusable capability gap in SpecPi's local wishlist. Report only after reasonable existing tools or workarounds proved insufficient. Do not use for transient failures, command mistakes, credentials or permissions the user must supply, ordinary project-specific work, or speculative nice-to-haves. Never include secrets, source code, full commands, file paths, URLs with private data, or user prompt text. Report a gap at most once per user task. Collection requires an explicit local on/off decision and never uploads data.",
         promptSnippet: "Record recurring, generalizable capability friction without interrupting the user task",
         promptGuidelines: [
             "Use report_capability_gap only for a material and generalizable missing capability after reasonable existing tools or workarounds have proved insufficient.",
             "Do not use report_capability_gap for transient errors, model mistakes, missing credentials or permissions, ordinary project-specific work, or speculative nice-to-haves.",
             "Call report_capability_gap at most once per distinct gap per user task; use a short durable capability phrase without project names, and never include secrets, source code, full commands, private paths, or user prompt text.",
-            "After report_capability_gap, continue the requested task; never treat a report as permission to modify ZenPi or external state.",
+            "After report_capability_gap, continue the requested task; never treat a report as permission to modify SpecPi or external state.",
         ],
         parameters: Type.Object(
             {
@@ -363,7 +363,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
                 const enabled = await ctx.ui.confirm(
                     "Enable local capability-gap collection?",
-                    "ZenPi stores sanitized summaries and salted task, session, and project hashes locally. It never uploads them. You can change this later with /wishlist on or /wishlist off.",
+                    "SpecPi stores sanitized summaries and salted task, session, and project hashes locally. It never uploads them. You can change this later with /wishlist on or /wishlist off.",
                 );
                 mode = enabled ? "on" : "off";
                 await setCollectionMode({ stateDir, mode, signal });
@@ -411,7 +411,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
         name: "finish_harness_improvement",
         label: "Finish Harness Improvement",
         description:
-            "Complete the exact wishlist item selected through /harness-improvement. Use only after implementing the smallest sufficient change and running direct acceptance checks. This tool independently runs ZenPi's repository check, requires reviewed capability-registry integration, runs supported closed validators, and retires the item only when every gate passes.",
+            "Complete the exact wishlist item selected through /harness-improvement. Use only after implementing the smallest sufficient change and running direct acceptance checks. This tool independently runs SpecPi's repository check, requires reviewed capability-registry integration, runs supported closed validators, and retires the item only when every gate passes.",
         parameters: Type.Object(
             {
                 gapId: Type.String({
@@ -454,7 +454,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
             const npm = process.platform === "win32" ? "npm.cmd" : "npm";
             const check = await pi.exec(npm, ["run", "check"], { cwd: ctx.cwd, signal, timeout: 15 * 60 * 1000 });
             if (check.code !== 0) {
-                throw new Error(`ZenPi repository verification failed with exit code ${check.code}`);
+                throw new Error(`SpecPi repository verification failed with exit code ${check.code}`);
             }
 
             const verifiedBy = ["npm run check"];
@@ -631,7 +631,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
     const usage =
         "Usage: /wishlist [status|on|off|history [id]|decline <id>|merge <from> <to>|unmerge <merge-decision-id>|draft <id>|archive|reset]";
     pi.registerCommand("wishlist", {
-        description: "View and curate ZenPi's local capability evidence",
+        description: "View and curate SpecPi's local capability evidence",
         getArgumentCompletions: (prefix: string) => {
             const options = [
                 "status",
