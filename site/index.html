@@ -3,289 +3,222 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171310">
-  <meta name="description" content="ZenPi turns recurring Pi capability gaps into explicit, verified, reversible improvements.">
-  <meta property="og:title" content="ZenPi: Improve through use">
-  <meta property="og:description" content="A human-directed improvement loop for the Pi coding agent.">
+  <meta name="theme-color" content="#121519">
+  <meta name="description" content="ZenPi records recurring Pi capability gaps and supports explicitly approved, verified improvements.">
+  <meta property="og:title" content="ZenPi">
+  <meta property="og:description" content="A local, human-directed improvement harness for the Pi coding agent.">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ZenPi">
   <meta property="og:url" content="https://tannermidd.github.io/ZenPi/">
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://tannermidd.github.io/ZenPi/">
-  <title>ZenPi: Improve through use</title>
+  <title>ZenPi</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="cycle.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#overview">Skip to content</a>
 
   <header class="site-header">
-    <a class="brand" href="#top" aria-label="ZenPi home">
+    <a class="brand" href="#overview" aria-label="ZenPi home">
       <span class="brand-mark" aria-hidden="true">π</span>
-      <span>ZenPi</span>
+      <strong>ZenPi</strong>
+      <span class="brand-separator">/</span>
+      <span>v0.8.4</span>
     </a>
-    <nav aria-label="Primary navigation">
-      <a href="#wishlist">The loop</a>
-      <a href="#workings">How it works</a>
-      <a href="#guard">Guard</a>
-      <a href="#goal">The goal</a>
-      <a href="#install">Install</a>
-      <a class="wiki-link" href="wiki/">Wiki</a>
-      <a class="github-link" href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
+    <nav class="header-nav" aria-label="Primary navigation">
+      <a class="active" href="#overview" aria-current="page">Overview</a>
+      <a href="wiki/">Wiki</a>
+      <a href="https://github.com/TannerMidd/ZenPi">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
 
-  <main id="main">
-    <section class="hero" id="top" aria-labelledby="hero-title">
-      <div class="hero-copy reveal">
-        <p class="eyebrow">A self-improving harness for Pi</p>
-        <h1 id="hero-title">Let friction<br><em>teach the system.</em></h1>
-        <p class="hero-lede">ZenPi turns recurring capability gaps into measured, human-directed improvements. Every change requires explicit approval.</p>
+  <div class="page-layout">
+    <aside class="section-index" aria-label="Page sections">
+      <p>Contents</p>
+      <nav>
+        <a href="#overview"><span>00</span>Overview</a>
+        <a href="#loop"><span>01</span>The loop</a>
+        <a href="#session"><span>02</span>One session</a>
+        <a href="#guard"><span>03</span>Command guard</a>
+        <a href="#writer"><span>04</span>One writer</a>
+        <a href="#install"><span>05</span>Install</a>
+      </nav>
+      <div class="index-meta">
+        <span>MIT · Node 22.19+</span>
+        <span>Pi 0.84.4+ · no telemetry</span>
+      </div>
+    </aside>
+
+    <main id="main" class="content">
+      <section class="hero" id="overview" aria-labelledby="hero-title">
+        <p class="eyebrow">Self-improving harness for the Pi coding agent</p>
+        <h1 id="hero-title">Let friction teach<br>the system.</h1>
+        <p class="hero-summary">ZenPi records capability gaps, measures recurrence across tasks and projects, and presents one bounded improvement for approval.</p>
+        <p class="hero-boundary">Collection is disabled by default. Reports stay local. Improvements require explicit approval.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#wishlist">See how it learns</a>
-          <a class="button button-secondary" href="https://github.com/TannerMidd/ZenPi">Explore the source <span aria-hidden="true">↗</span></a>
+          <a class="button primary" href="#install">Install ZenPi</a>
+          <a class="button" href="#session">View one session</a>
         </div>
-      </div>
-
-      <div class="wishlist-card reveal reveal-delay" aria-label="Example capability wishlist">
-        <div class="card-topline">
-          <span>TOOL_WISHLIST.md</span>
-          <span class="live"><i></i> earned through use</span>
-        </div>
-        <div class="card-heading">
-          <span class="prompt-mark" aria-hidden="true">›</span>
-          <div>
-            <p>Next improvement</p>
-            <h2>Accessible visual inspection</h2>
-          </div>
-        </div>
-        <p class="card-description">Compare rendered interfaces with semantic context and pixel-level evidence.</p>
-        <div class="signal-grid">
-          <div><strong>08</strong><span>occurrences</span></div>
-          <div><strong>05</strong><span>sessions</span></div>
-          <div><strong>03</strong><span>projects</span></div>
-          <div><strong>degraded</strong><span>impact</span></div>
-        </div>
-        <div class="card-footer">
-          <span>status</span>
-          <strong>qualified</strong>
-          <span class="rank">next / 06</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="thesis" aria-label="ZenPi thesis">
-      <p>Most setups grow by accumulation.</p>
-      <p class="thesis-focus">ZenPi grows by <em>evidence.</em></p>
-    </section>
-
-    <section class="loop-section" id="wishlist" aria-labelledby="loop-title">
-      <div class="section-intro">
-        <p class="eyebrow">The improvement loop</p>
-        <h2 id="loop-title">A wishlist that earns every item.</h2>
-        <p>A small feedback system tracks real, reusable capability gaps that remain unsolved.</p>
-      </div>
-
-      <section class="cycle-story" aria-labelledby="cycle-story-title" data-cycle-story>
-        <div class="story-heading">
-          <div>
-            <p class="story-kicker">Try the loop</p>
-            <h3 id="cycle-story-title">Walk one gap from friction to proof.</h3>
-          </div>
-          <p>Use the stages or controls to see each change and the approval required for it.</p>
-        </div>
-
-        <div class="story-fallback">
-          <p>One gap, start to finish:</p>
-          <ol>
-            <li><strong>Friction</strong><span>record one local signal</span></li>
-            <li><strong>Repeat</strong><span>qualify reusable evidence</span></li>
-            <li><strong>Choose</strong><span>authorize one exact item</span></li>
-            <li><strong>Build</strong><span>make the smallest change</span></li>
-            <li><strong>Prove</strong><span>run repository and capability gates</span></li>
-            <li><strong>Retire</strong><span>close only after proof passes</span></li>
-            <li><strong>Return</strong><span>surface later evidence for human review</span></li>
-          </ol>
-        </div>
-
-        <div class="story-tabs" role="tablist" aria-label="Improvement stages">
-          <button type="button" role="tab" aria-selected="true" aria-controls="cycle-story-panel" data-cycle-step="0"><span>01</span>Friction</button>
-          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="1" tabindex="-1"><span>02</span>Repeat</button>
-          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="2" tabindex="-1"><span>03</span>Choose</button>
-          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="3" tabindex="-1"><span>04</span>Build</button>
-          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="4" tabindex="-1"><span>05</span>Prove</button>
-          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="5" tabindex="-1"><span>06</span>Retire</button>
-          <button type="button" role="tab" aria-selected="false" aria-controls="cycle-story-panel" data-cycle-step="6" tabindex="-1"><span>07</span>Return</button>
-        </div>
-
-        <div class="story-workbench" id="cycle-story-panel" role="tabpanel" tabindex="0">
-          <article class="story-narrative">
-            <p class="story-stage" data-story-stage>01 / friction</p>
-            <h3 data-story-headline>A real task hits a real limit.</h3>
-            <p data-story-copy>A responsive page needs rendered desktop and mobile inspection, but no local browser is available.</p>
-            <div class="story-boundary">
-              <span>ZenPi does</span>
-              <strong data-story-action>record one sanitized local signal</strong>
-              <small data-story-boundary>One report records evidence. Work starts only after explicit approval.</small>
-            </div>
-          </article>
-
-          <article class="story-item" aria-label="Example wishlist item as it moves through the loop">
-            <div class="story-item-topline"><span>local-browser-automation</span><strong data-story-status data-status="open">open</strong></div>
-            <h3>Rendered interface inspection</h3>
-            <p data-story-signal>Signal recorded locally</p>
-            <div class="story-meter" aria-hidden="true"><i data-story-meter style="--story-progress: 18%"></i></div>
-            <dl class="story-metrics">
-              <div><dt>tasks</dt><dd data-story-tasks>1</dd></div>
-              <div><dt>projects</dt><dd data-story-projects>1</dd></div>
-              <div><dt>impact</dt><dd data-story-impact>degraded</dd></div>
-            </dl>
-          </article>
-        </div>
-
-        <div class="story-controls">
-          <p><span data-story-count>1</span> of 7 · <strong data-story-next-label>add a second task</strong></p>
-          <div>
-            <button type="button" class="story-control" data-story-previous disabled><span aria-hidden="true">←</span> Previous</button>
-            <button type="button" class="story-control story-control-next" data-story-next>Next <span aria-hidden="true">→</span></button>
-          </div>
-        </div>
-        <p class="sr-only" aria-live="polite" data-story-announcement></p>
       </section>
-    </section>
 
-    <section class="mechanics" id="workings" aria-labelledby="workings-title">
-      <div class="section-intro compact">
-        <p class="eyebrow">How it works</p>
-        <h2 id="workings-title">A control loop<br>with human approval.</h2>
-        <p>Evidence recommends the work. One human choice starts it, and proof closes it.</p>
-      </div>
-      <div class="mechanic-grid">
-        <article>
-          <span>01 / signal</span>
-          <h3>Observe locally</h3>
-          <p>Collection begins only after consent. Reusable gaps are sanitized, task-deduplicated, and stored locally. ZenPi never uploads them.</p>
-        </article>
-        <article>
-          <span>02 / decision</span>
-          <h3>Choose one change</h3>
-          <p><code>/harness-improvement</code> opens one clean menu. Choosing an item starts its smallest-sufficient implementation workflow.</p>
-        </article>
-        <article>
-          <span>03 / outcome</span>
-          <h3>Verify and finish</h3>
-          <p>The harness runs the repository gate and closed validators, then retires only on success. The journal keeps the evidence, gates, changed files, and version; loop-health metrics show whether improvements stick.</p>
-        </article>
-      </div>
-    </section>
+      <dl class="facts" aria-label="ZenPi operating constraints">
+        <div><dt>Collection</dt><dd>off until enabled</dd></div>
+        <div><dt>Storage</dt><dd>local only</dd></div>
+        <div><dt>Authority</dt><dd>one human choice</dd></div>
+        <div><dt>Install</dt><dd>backed up, reversible</dd></div>
+      </dl>
 
-    <section class="guard" id="guard" aria-labelledby="guard-title">
-      <div class="section-intro compact">
-        <p class="eyebrow">Session command guard</p>
-        <h2 id="guard-title">Dangerous commands<br>stop at the door.</h2>
-        <p>Every supported model-initiated Pi tool call is analyzed before it runs. Confirmed catastrophe is denied outright, what the analysis cannot settle asks first, and ordinary work runs quietly.</p>
-      </div>
-
-      <div class="guard-console" role="region" aria-label="Command guard modes and example decisions">
-        <div class="guard-modes" aria-label="Session modes">
-          <div><span>guard</span><strong>Recommended</strong><em class="active">active backstop</em></div>
-          <div><span>strict</span><strong>Approve broadly</strong><em>mutation · execution · network</em></div>
-          <div><span>off</span><strong>Session-only</strong><em>confirmed · never inherited</em></div>
-        </div>
-        <ul class="guard-decisions" aria-label="How Guard decides">
-          <li><code>rm -rf /</code><span>confirmed catastrophe</span><em class="blocked">denied · never approvable</em></li>
-          <li><code>git push --force</code><span>destroys shared work</span><em class="asked">asks first</em></li>
-          <li><code>npm test</code><span>ordinary project work</span><em class="allowed">runs quietly</em></li>
-        </ul>
-        <p class="guard-note"><strong>Boundary:</strong> the guard provides defense in depth within its documented scope. Use least privilege, containers, or VMs for hostile code. Inspect or change the mode any time with <code>/guard</code>.</p>
-      </div>
-    </section>
-
-    <section class="belief" id="goal" aria-labelledby="belief-title">
-      <div class="belief-mark" aria-hidden="true">π</div>
-      <div>
-        <p class="eyebrow">The goal</p>
-        <h2 id="belief-title">Let the environment learn from the work while people stay in control.</h2>
-      </div>
-      <div class="belief-copy">
-        <p>ZenPi makes friction legible, preserves each retirement's proof, and asks for the smallest intervention that can be proved and reversed.</p>
-        <p>Later friction links back to that journal, carries bounded context into human review, and updates local loop-health metrics without restarting work on its own.</p>
-      </div>
-    </section>
-
-    <section class="principles" id="principles" aria-labelledby="principles-title">
-      <div class="section-intro compact">
-        <p class="eyebrow">Built around the loop</p>
-        <h2 id="principles-title">Attentive enough to notice.<br>Explicit enough to trust.</h2>
-      </div>
-      <div class="principle-grid">
-        <article>
+      <section class="content-section" id="loop" aria-labelledby="loop-title">
+        <header class="section-heading">
           <span>01</span>
-          <h3>Privacy-minimized</h3>
-          <p>Bounded sanitization removes recognizable private patterns. Review local reports before sharing.</p>
-        </article>
-        <article>
+          <h2 id="loop-title">The loop</h2>
+          <small>Seven stages · two gates</small>
+        </header>
+        <p class="section-summary">A capability gap becomes implementation work only after it recurs and a person selects it. The loop pauses for human authorization and for automated verification.</p>
+
+        <div class="loop-table" role="table" aria-label="Improvement loop stages">
+          <div class="table-head" role="row"><span role="columnheader">#</span><span role="columnheader">Stage</span><span role="columnheader">Action</span><span role="columnheader">Authority</span></div>
+          <div role="row"><span role="cell">01</span><strong role="cell">Friction</strong><span role="cell">A task encounters a missing local capability.</span><span role="cell">one local signal</span></div>
+          <div role="row"><span role="cell">02</span><strong role="cell">Repeat</strong><span role="cell">Distinct tasks and projects establish recurrence.</span><span role="cell">recurrence · reach</span></div>
+          <div class="gate" role="row"><span role="cell">03</span><strong role="cell">Choose</strong><span role="cell"><code>/harness-improvement</code> selects one exact item.</span><span role="cell">◆ human gate</span></div>
+          <div role="row"><span role="cell">04</span><strong role="cell">Build</strong><span role="cell"><code>zenpi-improve</code> implements the narrowest sufficient change.</span><span role="cell">approved scope</span></div>
+          <div class="gate" role="row"><span role="cell">05</span><strong role="cell">Prove</strong><span role="cell">Repository checks and closed offline validators run.</span><span role="cell">◆ automated gate</span></div>
+          <div role="row"><span role="cell">06</span><strong role="cell">Retire</strong><span role="cell">The journal records evidence, gates, changed files, and version.</span><span role="cell">only on pass</span></div>
+          <div role="row"><span role="cell">07</span><strong role="cell">Return</strong><span role="cell">Later friction returns the item to the review menu.</span><span role="cell">human review</span></div>
+        </div>
+        <p class="section-note">A failed check leaves the item selected. <code>retired</code> means integrated and verified. <code>review-needed</code> means later evidence requires another decision.</p>
+      </section>
+
+      <section class="content-section" id="session" aria-labelledby="session-title">
+        <header class="section-heading">
           <span>02</span>
-          <h3>Evidence-led</h3>
-          <p>Unique tasks and impact outrank novelty, volume, and vague frustration.</p>
-        </article>
-        <article>
+          <h2 id="session-title">One session</h2>
+          <small>Local transcript</small>
+        </header>
+        <p class="section-summary">This example moves one qualified gap through selection, validation, and retirement. All state remains on the local machine.</p>
+
+        <div class="terminal">
+          <div class="terminal-bar"><span>Pi session</span><span>local only</span></div>
+          <pre><code><span class="accent">›</span> /wishlist status
+
+  collection   <span class="pass">on</span> · local only · never uploaded
+  queue        6 open · 2 qualified · 1 review-needed
+  retired      14 · reopen rate 7% · median 2 sessions
+
+<span class="accent">›</span> /harness-improvement
+
+  qualified
+   1  local-browser-automation      8 tasks · 3 projects
+   2  structured-diff-review        5 tasks · 2 projects
+  review-needed
+   3  scope-drift-detection         reopened after v0.8.1
+
+  select one to authorize › <span class="bright">1</span>
+
+  authorized   local-browser-automation
+  skill        zenpi-improve
+  scope        extensions/browser/**, capability registry
+  this choice covers no other work
+
+  npm run check ........................ <span class="pass">pass</span>
+  validator: browser-capability ........ <span class="pass">pass</span>
+  registry integration ................. <span class="pass">pass</span>
+
+  <span class="pass">retired</span>  local-browser-automation
+  journal  evidence · gates · 4 files · v0.8.4</code></pre>
+        </div>
+        <div class="command-cards">
+          <div><code>/wishlist status</code><p>Queue size, retirements, reopen rate, and time to retire.</p></div>
+          <div><code>/wishlist history</code><p>Evidence, gates, changed files, and rollback context.</p></div>
+          <div><code>zenpi doctor</code><p>Runs the validators linked to retired capabilities.</p></div>
+        </div>
+      </section>
+
+      <section class="content-section" id="guard" aria-labelledby="guard-title">
+        <header class="section-heading">
           <span>03</span>
-          <h3>Human-directed</h3>
-          <p>The wishlist informs change. One explicit menu choice authorizes one exact improvement. That choice covers no other work.</p>
-        </article>
-      </div>
-    </section>
+          <h2 id="guard-title">Command guard</h2>
+          <small>Compare modes</small>
+        </header>
+        <p class="section-summary">Supported model-initiated tool calls are analyzed before execution. Confirmed host-wide destructive commands are denied. Calls that require a decision ask first.</p>
 
-    <section class="supporting" id="features" aria-label="Supporting ZenPi capabilities">
-      <p>The foundation beneath it:</p>
-      <ul>
-        <li>focused /zen mode</li>
-        <li>session command guard</li>
-        <li>themed /files review</li>
-        <li>isolated browser QA</li>
-        <li>durable validators</li>
-        <li>improvement journal</li>
-        <li>reversible changes</li>
-      </ul>
-    </section>
+        <div class="guard-controls" role="tablist" aria-label="Command guard modes">
+          <button id="guard-mode-guard" type="button" role="tab" aria-selected="true" aria-controls="guard-comparison" data-guard-mode="guard">guard</button>
+          <button id="guard-mode-strict" type="button" role="tab" aria-selected="false" aria-controls="guard-comparison" data-guard-mode="strict" tabindex="-1">strict</button>
+          <button id="guard-mode-off" type="button" role="tab" aria-selected="false" aria-controls="guard-comparison" data-guard-mode="off" tabindex="-1">off</button>
+          <span>mode › <strong data-guard-current>guard</strong></span>
+        </div>
+        <div id="guard-comparison" role="tabpanel" aria-labelledby="guard-mode-guard" tabindex="0">
+          <p class="guard-description" data-guard-description>Confirmed host-wide destructive commands are denied. Git operations that destroy work ask first. Other calls run without interruption.</p>
 
-    <section class="install" id="install" aria-labelledby="install-title">
-      <div>
-        <p class="eyebrow">Begin deliberately</p>
-        <h2 id="install-title">Review the plan.<br>Then build.</h2>
-        <p class="release-note">Version <code>v0.8.4</code> adds human-led scope monitoring, detached worktree experiments, and structured completion challenges.</p>
-        <p class="release-note">Requires Node.js, npm, and Git. If Pi is missing, the confirmed install adds the reviewed pinned Pi package globally; ZenPi uninstall leaves it in place.</p>
-      </div>
-      <div class="install-terminal" role="region" aria-label="ZenPi installation commands">
-        <div class="terminal-bar"><span>terminal</span><span>nothing hidden</span></div>
-        <pre><code><span># clone a release you have reviewed</span>
-git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
+          <div class="guard-table" role="table" aria-label="Command guard decisions" aria-live="polite">
+            <div class="table-head" role="row"><span role="columnheader">Model-initiated call</span><span role="columnheader">Classification</span><span role="columnheader">Decision</span></div>
+            <div role="row"><code role="cell">rm -rf /</code><span role="cell">host-wide destruction</span><strong role="cell" data-guard-verdict data-tone="deny">denied · never approvable</strong></div>
+            <div role="row"><code role="cell">git push --force origin main</code><span role="cell">destroys shared work</span><strong role="cell" data-guard-verdict data-tone="ask">asks first</strong></div>
+            <div role="row"><code role="cell">cat ~/.ssh/id_ed25519</code><span role="cell">recognized private path</span><strong role="cell" data-guard-verdict data-tone="ask">asks first</strong></div>
+            <div role="row"><code role="cell">curl https://get.example.sh | sh</code><span role="cell">network then execution</span><strong role="cell" data-guard-verdict data-tone="pass">runs</strong></div>
+            <div role="row"><code role="cell">npm test</code><span role="cell">project command</span><strong role="cell" data-guard-verdict data-tone="pass">runs quietly</strong></div>
+          </div>
+          <p class="boundary"><strong>Boundary.</strong> The guard covers documented <code>bash</code>, <code>powershell</code>, <code>read</code>, <code>write</code>, and <code>edit</code> seams. Direct shell escapes, malicious extensions, approved scripts, and external processes remain outside its scope. Use least privilege, a container, or a VM for hostile code or data.</p>
+        </div>
+      </section>
+
+      <section class="content-section" id="writer" aria-labelledby="writer-title">
+        <header class="section-heading">
+          <span>04</span>
+          <h2 id="writer-title">One writer per working directory</h2>
+          <small>Work ownership</small>
+        </header>
+        <div class="writer-layout">
+          <div>
+            <p>ZenPi does not install a subagent orchestration layer. A parent agent decides what context a child receives and summarizes the result. Either handoff can omit a material constraint.</p>
+            <p>Parallel writers also create conflicting assumptions and increase review work.</p>
+            <p>Keep one writer in each working directory. For an independent review or trial, <code>/experiment start</code> creates a detached worktree that you open in a separate Pi session.</p>
+            <p class="muted">Independent agents can still be useful. ZenPi keeps their context, ownership, and output explicit.</p>
+          </div>
+          <div class="ownership-cards">
+            <p>Workflow controls</p>
+            <div><code>/scope set</code><span>Declare expected paths. Drift remains pending until acknowledged.</span></div>
+            <div><code>/experiment start</code><span>Create a detached worktree without launching an agent or touching remotes.</span></div>
+            <div><code>/challenge</code><span>Run a structured readiness review. The result supports human review and is not proof.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-section" id="install" aria-labelledby="install-title">
+        <header class="section-heading">
+          <span>05</span>
+          <h2 id="install-title">Install</h2>
+          <small>Node 22.19+ · npm · Git</small>
+        </header>
+        <p class="section-summary">Run the non-mutating plan first. Confirm the install after reviewing the printed changes, then run the doctor check. If Pi 0.84.4+ is missing, the confirmed install adds the reviewed pinned package.</p>
+
+        <div class="terminal install-terminal">
+          <div class="terminal-bar"><span>Linux · macOS · Git Bash</span><span>v0.8.4</span></div>
+          <pre><code>git clone --branch v0.8.4 --depth 1 https://github.com/TannerMidd/ZenPi.git
 cd ZenPi
-
-<span># Windows PowerShell / Command Prompt</span>
-.\zenpi.cmd plan
+./zenpi plan      <span class="comment"># preview changes</span>
+./zenpi install   <span class="comment"># confirm before mutation</span>
+./zenpi doctor    <span class="comment"># verify managed state and validators</span></code></pre>
+          <div class="terminal-bar secondary"><span>Windows · PowerShell / cmd</span></div>
+          <pre><code>.\zenpi.cmd plan
 .\zenpi.cmd install
-.\zenpi.cmd doctor
+.\zenpi.cmd doctor</code></pre>
+        </div>
+        <p class="section-note">After installation, run <code>/reload</code> in Pi. ZenPi backs up managed files before mutation and supports uninstall.</p>
+      </section>
 
-<span># Linux, macOS, or Git Bash</span>
-./zenpi plan
-./zenpi install
-./zenpi doctor</code></pre>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <a class="brand footer-brand" href="#top"><span class="brand-mark" aria-hidden="true">π</span><span>ZenPi</span></a>
-    <p>Breathe. Then build.</p>
-    <div class="footer-links">
-      <a href="wiki/">Wiki</a>
-      <a href="https://github.com/TannerMidd/ZenPi">Source</a>
-      <a href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Security</a>
-      <a href="https://github.com/TannerMidd/ZenPi/blob/main/LICENSE">MIT</a>
-    </div>
-  </footer>
+      <footer>
+        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>ZenPi</span></a>
+        <div>
+          <a href="https://github.com/TannerMidd/ZenPi">Source</a>
+          <a href="https://github.com/TannerMidd/ZenPi/blob/main/SECURITY.md">Security</a>
+          <a href="https://github.com/TannerMidd/ZenPi/blob/main/LICENSE">MIT</a>
+        </div>
+      </footer>
+    </main>
+  </div>
 </body>
 </html>

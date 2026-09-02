@@ -31,6 +31,8 @@ Repository development uses these exact, project-local formatting and linting pa
 
 They are development-only dependencies, are not shipped by the ZenPi installer, and enforce the repository's JavaScript and TypeScript readability rules.
 
+The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mono. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". The font files are distributed under the SIL Open Font License 1.1; the required license text is included at `site/fonts/LICENSE.txt`.
+
 Repository automation uses these official GitHub Actions at pinned major versions:
 
 - `actions/checkout@v4`
