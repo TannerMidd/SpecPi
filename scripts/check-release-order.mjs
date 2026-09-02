@@ -18,16 +18,24 @@ function parseVersion(value, label) {
     }
 
     return {
-        core: match.slice(1, 4).map(Number),
+        core: match.slice(1, 4),
         prerelease,
     };
+}
+
+function compareNumericIdentifiers(left, right) {
+    if (left.length !== right.length) {
+        return left.length > right.length ? 1 : -1;
+    }
+
+    return left === right ? 0 : left > right ? 1 : -1;
 }
 
 function compareIdentifiers(left, right) {
     const leftNumeric = /^\d+$/.test(left);
     const rightNumeric = /^\d+$/.test(right);
     if (leftNumeric && rightNumeric) {
-        return Number(left) === Number(right) ? 0 : Number(left) > Number(right) ? 1 : -1;
+        return compareNumericIdentifiers(left, right);
     }
 
     if (leftNumeric !== rightNumeric) {
@@ -39,8 +47,9 @@ function compareIdentifiers(left, right) {
 
 function compareVersions(left, right) {
     for (let index = 0; index < left.core.length; index += 1) {
-        if (left.core[index] !== right.core[index]) {
-            return left.core[index] > right.core[index] ? 1 : -1;
+        const compared = compareNumericIdentifiers(left.core[index], right.core[index]);
+        if (compared !== 0) {
+            return compared;
         }
     }
 

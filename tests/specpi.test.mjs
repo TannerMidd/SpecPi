@@ -398,6 +398,8 @@ test("release order guard classifies SemVer and rejects dist-tag regressions", (
         ["0.10.0", "0.9.9"],
         ["0.10.0", "0.10.0-next.9"],
         ["0.10.0-next.10", "0.10.0-next.2"],
+        ["0.10.0-next.9007199254740993", "0.10.0-next.9007199254740992"],
+        ["9007199254740993.0.0", "9007199254740992.999999999999999999999.999999999999999999999"],
         ["0.10.0-rc.1", "0.10.0-beta.9"],
     ]) {
         const newer = run("advance", candidate, current);
