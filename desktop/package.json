@@ -1,0 +1,123 @@
+{
+    "name": "@specpi/desktop",
+    "version": "0.1.2",
+    "private": true,
+    "description": "Minimal local-first desktop host for Pi and SpecPi",
+    "author": "Tanner Middleton",
+    "type": "module",
+    "main": "out/main/index.js",
+    "engines": {
+        "node": ">=22.19.0"
+    },
+    "scripts": {
+        "dev": "electron-vite dev",
+        "build": "electron-vite build",
+        "preview": "electron-vite preview",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "check": "npm run typecheck && npm run test && npm run build",
+        "smoke": "npm run build && electron . --smoke",
+        "smoke:packaged": "node scripts/smoke-packaged.mjs",
+        "package": "npm run check && electron-builder --dir",
+        "package:win": "npm run check && electron-builder --win",
+        "package:mac": "npm run check && electron-builder --mac",
+        "package:linux": "npm run check && electron-builder --linux",
+        "checksums": "node scripts/checksums.mjs",
+        "dist": "npm run check && electron-builder && npm run checksums",
+        "dist:win": "npm run check && electron-builder --win && npm run checksums",
+        "dist:mac": "npm run check && electron-builder --mac && npm run checksums",
+        "dist:linux": "npm run check && electron-builder --linux && npm run checksums"
+    },
+    "dependencies": {
+        "@tanstack/react-virtual": "3.13.18",
+        "dompurify": "3.4.14",
+        "marked": "18.0.11",
+        "react": "19.2.8",
+        "react-dom": "19.2.8",
+        "zod": "4.5.4"
+    },
+    "devDependencies": {
+        "@types/node": "26.4.1",
+        "@types/react": "19.2.18",
+        "@types/react-dom": "19.2.5",
+        "@vitejs/plugin-react": "5.2.0",
+        "electron": "44.1.1",
+        "electron-builder": "26.15.3",
+        "electron-vite": "5.0.0",
+        "typescript": "7.0.2",
+        "vite": "7.3.6",
+        "vitest": "4.1.11"
+    },
+    "build": {
+        "appId": "dev.specpi.desktop",
+        "productName": "SpecPi Desktop",
+        "asar": true,
+        "icon": "build/icon.png",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "out/**",
+            "package.json",
+            "NOTICE.md",
+            "LICENSES.md",
+            "IBM-PLEX-LICENSE.txt"
+        ],
+        "mac": {
+            "category": "public.app-category.developer-tools",
+            "target": [
+                {
+                    "target": "dmg",
+                    "arch": [
+                        "universal"
+                    ]
+                },
+                {
+                    "target": "zip",
+                    "arch": [
+                        "universal"
+                    ]
+                }
+            ]
+        },
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "portable",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ]
+        },
+        "linux": {
+            "category": "Development",
+            "target": [
+                {
+                    "target": "AppImage",
+                    "arch": [
+                        "x64"
+                    ]
+                },
+                {
+                    "target": "deb",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ]
+        }
+    },
+    "allowScripts": {
+        "electron@44.1.1": true,
+        "esbuild@0.25.12": true,
+        "esbuild@0.28.2": true,
+        "electron-winstaller": false
+    }
+}

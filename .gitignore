@@ -1,5 +1,8 @@
 # Dependencies and Pi package caches
 node_modules/
+desktop/out/
+desktop/dist/
+desktop/*.log
 .pi/npm/
 .pi/git/
 

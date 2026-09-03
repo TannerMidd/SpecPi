@@ -94,6 +94,14 @@ Snapshots, screenshots, page text, downloads, console output, and visual baselin
 
 The browser is not an operating-system or network sandbox. Use a container or VM for hostile applications and dedicated test accounts instead of personal authenticated sessions.
 
+## Desktop application
+
+The optional desktop package is not part of the published `specpi` npm tarball. It supervises a user-selected Pi executable through LF-delimited JSON RPC and does not replace Pi's authority over credentials, sessions, models, extensions, or tools. Pi and Git are launched without a shell.
+
+Electron renderers are sandboxed with Node integration disabled, context isolation enabled, navigation and child windows denied, and permissions rejected. A frozen preload bridge exposes only named, schema-validated IPC operations. The main process enforces bounded RPC records, command allowlisting, sender checks, root-confined and symlink-aware read-only project previews, safe external-link protocols, and bounded redacted diagnostics. It never reads or writes Pi authentication, trust, or session files directly.
+
+Desktop sandboxing does not sandbox the Pi child process or trusted extensions. Those retain the current user's authority, and Command Guard remains defense in depth rather than an OS security boundary. See `desktop/SECURITY.md` for the full desktop-specific contract.
+
 ## Website and automation
 
 The GitHub Pages workflow publishes the checked-in `site/` directory. Its deploy job uses read-only repository contents access plus the Pages and identity-token permissions required for deployment. The local installer does not invoke that workflow or upload local configuration or state.

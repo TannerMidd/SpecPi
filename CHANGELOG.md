@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add SpecPi Desktop as a separate Electron + React application around Pi's documented JSONL RPC mode, with secure process supervision, sandboxed preload IPC, project/session/model controls, streamed transcripts and tools, standard extension dialogs, native SpecPi command access, read-only Files/Changes views, focused Spec mode, responsive accessible UI, and cross-platform packaging configuration.
+- Add strict runtime discovery and compatibility checks, bounded root-confined file previews, redacted diagnostics, atomic desktop-only preferences, unit/integration/live-Pi tests, packaged Electron smoke validation, three-platform CI, and desktop architecture, security, compatibility, dependency, development, and packaging documentation.
+- Implement the approved Desktop Workbench design with bundled IBM Plex typography, project/session navigation, workspace tabs, a permanent run inspector, responsive empty/chat/Spec/files states, redesigned command and trust dialogs, and a structured composer.
+
 ## 0.10.0 - 2026-09-02
 
 - Add the public npm distribution contract for the `specpi` installer CLI, including global install, explicit managed install/update/uninstall steps, source-audited alternatives, and the limited resource-only boundary of direct `pi install npm:specpi` usage.
