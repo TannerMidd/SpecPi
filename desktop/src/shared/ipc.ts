@@ -1,7 +1,8 @@
-import type { DesktopState, FileNode, FilePreview, GitStatus } from "./domain";
+import type { DesktopState, FileNode, FilePreview, GitStatus, SessionRecord } from "./domain";
 import type {
     ExtensionUiResponse,
     RpcCommand,
+    RuntimeDescriptor,
     RuntimeEvent,
     RuntimeSnapshot,
     RuntimeStatus,
@@ -12,10 +13,14 @@ export const IPC = {
     chooseProject: "desktop:choose-project",
     choosePi: "desktop:choose-pi",
     chooseSession: "desktop:choose-session",
+    openWorkspace: "desktop:open-workspace",
+    launchIntent: "desktop:launch-intent",
     getDesktopState: "desktop:get-state",
     updateDesktopState: "desktop:update-state",
     saveSessionDraft: "desktop:save-session-draft",
+    saveSession: "desktop:save-session",
     runtimeSnapshot: "runtime:snapshot",
+    runtimeRoster: "runtime:roster",
     runtimeDiagnostics: "runtime:diagnostics",
     saveDiagnostics: "runtime:save-diagnostics",
     runtimeStart: "runtime:start",
@@ -45,10 +50,14 @@ export interface DesktopApi {
     chooseProject(): Promise<string | undefined>;
     choosePi(): Promise<string | undefined>;
     chooseSession(): Promise<string | undefined>;
+    openWorkspace(options: StartRuntimeOptions): Promise<void>;
+    getLaunchIntent(): Promise<StartRuntimeOptions | undefined>;
     getDesktopState(): Promise<DesktopState>;
     updateDesktopState(patch: DesktopStatePatch): Promise<DesktopState>;
     saveSessionDraft(sessionId: string, draft: string): Promise<DesktopState>;
+    saveSession(session: SessionRecord): Promise<DesktopState>;
     getRuntimeSnapshot(): Promise<RuntimeSnapshot>;
+    getRuntimeRoster(): Promise<RuntimeDescriptor[]>;
     getRuntimeDiagnostics(): Promise<readonly string[]>;
     saveRuntimeDiagnostics(): Promise<string | undefined>;
     startRuntime(options: StartRuntimeOptions): Promise<RuntimeStatus>;
@@ -64,4 +73,5 @@ export interface DesktopApi {
     openExternal(url: string): Promise<void>;
     onRuntimeEvent(listener: (event: RuntimeEvent) => void): () => void;
     onRuntimeStatus(listener: (status: RuntimeStatus) => void): () => void;
+    onRuntimeRoster(listener: (runtimes: RuntimeDescriptor[]) => void): () => void;
 }

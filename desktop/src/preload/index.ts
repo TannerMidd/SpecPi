@@ -5,13 +5,16 @@ import {
     fileNodeSchema,
     filePreviewSchema,
     gitStatusSchema,
+    runtimeDescriptorSchema,
     runtimeEventSchema,
     runtimeSnapshotSchema,
     runtimeStatusSchema,
+    startRuntimeSchema,
 } from "../shared/schemas";
 import type {
     ExtensionUiResponse,
     RpcCommand,
+    RuntimeDescriptor,
     RuntimeEvent,
     RuntimeSnapshot,
     RuntimeStatus,
@@ -22,13 +25,25 @@ const api: DesktopApi = {
     chooseProject: () => ipcRenderer.invoke(IPC.chooseProject),
     choosePi: () => ipcRenderer.invoke(IPC.choosePi),
     chooseSession: () => ipcRenderer.invoke(IPC.chooseSession),
+    openWorkspace: (options: StartRuntimeOptions) => ipcRenderer.invoke(IPC.openWorkspace, options),
+    getLaunchIntent: async () => {
+        const value = await ipcRenderer.invoke(IPC.launchIntent);
+
+        return value === undefined ? undefined : startRuntimeSchema.parse(value);
+    },
     getDesktopState: async () => desktopStateSchema.parse(await ipcRenderer.invoke(IPC.getDesktopState)),
     updateDesktopState: async (patch: DesktopStatePatch) =>
         desktopStateSchema.parse(await ipcRenderer.invoke(IPC.updateDesktopState, patch)),
     saveSessionDraft: async (sessionId, draft) =>
         desktopStateSchema.parse(await ipcRenderer.invoke(IPC.saveSessionDraft, { sessionId, draft })),
+    saveSession: async (session) => desktopStateSchema.parse(await ipcRenderer.invoke(IPC.saveSession, session)),
     getRuntimeSnapshot: async () =>
         runtimeSnapshotSchema.parse(await ipcRenderer.invoke(IPC.runtimeSnapshot)) as RuntimeSnapshot,
+    getRuntimeRoster: async () =>
+        runtimeDescriptorSchema
+            .array()
+            .max(32)
+            .parse(await ipcRenderer.invoke(IPC.runtimeRoster)) as RuntimeDescriptor[],
     getRuntimeDiagnostics: async () =>
         ((await ipcRenderer.invoke(IPC.runtimeDiagnostics)) as unknown[])
             .map((item) => String(item).slice(0, 8_192))
@@ -74,6 +89,18 @@ const api: DesktopApi = {
         ipcRenderer.on(IPC.runtimeStatus, wrapped);
 
         return () => ipcRenderer.removeListener(IPC.runtimeStatus, wrapped);
+    },
+    onRuntimeRoster: (listener) => {
+        const wrapped = (_event: Electron.IpcRendererEvent, payload: RuntimeDescriptor[]) => {
+            const parsed = runtimeDescriptorSchema.array().max(32).safeParse(payload);
+            if (parsed.success) {
+                listener(parsed.data);
+            }
+        };
+
+        ipcRenderer.on(IPC.runtimeRoster, wrapped);
+
+        return () => ipcRenderer.removeListener(IPC.runtimeRoster, wrapped);
     },
 };
 

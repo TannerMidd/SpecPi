@@ -77,6 +77,35 @@ describe("conversation projection", () => {
         expect(state.streaming?.blocks[0]?.text).not.toContain("npm run check");
     });
 
+    it("hands a prepared tool placeholder off to one compact execution card", () => {
+        let state = reduceRuntimeEvent(
+            emptyConversation(),
+            event({
+                type: "message_update",
+                assistantMessageEvent: {
+                    type: "toolcall_start",
+                    contentIndex: 0,
+                    partial: { content: [{ type: "toolCall", name: "bash", arguments: {} }] },
+                },
+            }),
+        );
+        state = reduceRuntimeEvent(
+            state,
+            event({ type: "tool_execution_start", toolCallId: "bash-a", toolName: "bash", args: { command: "x" } }),
+        );
+        expect(state.streaming).toBeUndefined();
+        expect(state.items).toHaveLength(1);
+        expect(state.items[0]).toMatchObject({ kind: "tool", title: "bash", status: "running" });
+    });
+
+    it("does not put internal Spec state records into the visible feed", () => {
+        const state = reduceRuntimeEvent(
+            emptyConversation(),
+            event({ type: "entry_appended", entry: { id: "spec", customType: "spec-mode", data: { enabled: true } } }),
+        );
+        expect(state.items).toHaveLength(0);
+    });
+
     it("replaces accumulated partial tool output", () => {
         let state = reduceRuntimeEvent(
             emptyConversation(),

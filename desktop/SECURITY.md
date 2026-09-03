@@ -16,13 +16,15 @@ Diagnostics redact credential-like environment names, bearer tokens, URL userinf
 
 ## Files and subprocesses
 
-Pi and Git are spawned directly with argument arrays and `shell: false`. Windows npm shims are resolved to reviewed package entry points before launch. Pi receives an explicit project cwd. Shutdown closes stdin, waits briefly, then terminates the owned process tree.
+Pi and Git are spawned directly with argument arrays and `shell: false`. Windows npm shims are resolved to reviewed package entry points before launch. Each Pi process receives an explicit project cwd, and each window's runtime pool is capped at 32 processes. Runtime commands, extension responses, diagnostics, and export authorization are routed only to the currently visible process; background processes can continue work but cannot project events into another session's view. Window shutdown closes and terminates every owned process tree.
 
 File operations are read-only, project-root-confined, symlink-aware, and bounded by entry count, file size, and preview type. Active SVG/HTML is never rendered from project files. Images are returned as bounded data URLs.
 
 ## Command Guard
 
-Desktop does not reimplement or bypass Command Guard. Startup approval requests block interaction and are shown natively; tool calls still execute inside Pi, where the installed extension applies its policy. Unsupported extension UI is never auto-approved.
+Desktop does not reimplement Command Guard policy. Its owned RPC child is marked with `SPECPI_DESKTOP=1`, allowing the current installed extension to start **Off** without a blocking startup prompt on each session switch. All RPC hosts avoid blocking `session_start` prompts because Pi attaches its RPC input reader only after extension binding; non-Desktop RPC defaults to Guard. The supervisor's narrowly matched legacy startup response remains compatibility defense in depth, but older installed Command Guard versions still require an explicit SpecPi update because that response cannot be consumed before Pi's legacy startup timeout. It never matches tool approvals. A compact Off/Guard/Strict selector beside Send invokes the authoritative `/guard` command; that explicit selection replaces a duplicate confirmation dialog. The choice is session-scoped and Desktop never persists it.
+
+When Guard or Strict is enabled, command and path decisions still execute inside Pi, where the installed extension applies unchanged policy. Desktop projects approval requests as a minimal inline bar with expandable context. The extension-provided deny, allow-once, exact-call-for-session, and lock values are returned unchanged. Critical unlocks and other consequential extension input remain native dialogs. Unsupported extension UI is never auto-approved.
 
 ## Residual boundary
 

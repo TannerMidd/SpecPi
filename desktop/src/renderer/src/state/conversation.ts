@@ -205,9 +205,15 @@ export function reduceRuntimeEvent(state: ConversationState, event: RuntimeEvent
 
     if (record.type === "tool_execution_start") {
         const toolCallId = String(record.toolCallId ?? `tool-${Date.now()}`);
+        const remainingBlocks = state.streaming?.blocks.filter((block) => block.type !== "tool") ?? [];
 
         return {
             ...state,
+            streaming: state.streaming
+                ? remainingBlocks.length > 0
+                    ? { ...state.streaming, blocks: remainingBlocks }
+                    : undefined
+                : undefined,
             toolCount: state.toolCount + 1,
             items: boundedItems([
                 ...state.items,
@@ -294,7 +300,7 @@ export function reduceRuntimeEvent(state: ConversationState, event: RuntimeEvent
 
     if (record.type === "entry_appended") {
         const entry = record.entry as Record<string, unknown> | undefined;
-        if (!entry) {
+        if (!entry || entry.customType === "spec-mode") {
             return state;
         }
 

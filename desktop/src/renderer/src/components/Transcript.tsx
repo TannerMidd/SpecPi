@@ -1,7 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { contentBlocks, imageSource, type ContentBlock } from "../lib/content-blocks";
-import { safeJson } from "../lib/text";
+import { safeJson, stripAnsi } from "../lib/text";
 import type { ConversationState, TranscriptItem } from "../state/conversation";
 import { contentText } from "../state/conversation";
 import { Markdown } from "./Markdown";
@@ -20,13 +20,13 @@ const ContentBlocks = memo(function ContentBlocks({
             return (
                 <details key={index} className="thinking" open={!collapseThinking}>
                     <summary>Reasoning</summary>
-                    <Markdown content={block.thinking} />
+                    <Markdown content={stripAnsi(block.thinking)} />
                 </details>
             );
         }
 
         if (block.type === "text" && typeof block.text === "string") {
-            return <Markdown key={index} content={block.text} />;
+            return <Markdown key={index} content={stripAnsi(block.text)} />;
         }
 
         const source = imageSource(block);
@@ -54,14 +54,8 @@ function toolMetadata(content: unknown): unknown {
     return Object.keys(metadata).length > 0 ? metadata : undefined;
 }
 
-const ToolCard = memo(function ToolCard({
-    item,
-    collapsedDefault,
-}: {
-    item: TranscriptItem;
-    collapsedDefault: boolean;
-}) {
-    const [open, setOpen] = useState(!collapsedDefault && item.status === "running");
+const ToolCard = memo(function ToolCard({ item }: { item: TranscriptItem }) {
+    const [open, setOpen] = useState(false);
     const blocks = contentBlocks(item.content);
     const metadata = blocks ? toolMetadata(item.content) : undefined;
 
@@ -151,7 +145,7 @@ const StreamingResponse = memo(function StreamingResponse({
                     return (
                         <details key={index} className="thinking" open={!specMode}>
                             <summary>Reasoning · streaming</summary>
-                            <Markdown content={block.text} />
+                            <div className="streaming-copy">{stripAnsi(block.text)}</div>
                         </details>
                     );
                 }
@@ -165,7 +159,12 @@ const StreamingResponse = memo(function StreamingResponse({
                     );
                 }
 
-                return specMode ? null : <Markdown key={index} content={block.text} />;
+                return specMode ? null : (
+                    <div className="streaming-copy" key={index}>
+                        {stripAnsi(block.text)}
+                        <span className="streaming-caret" aria-hidden="true" />
+                    </div>
+                );
             })}
             {hasHeldText ? <div className="held-output">Response held until complete</div> : null}
         </article>
@@ -312,7 +311,7 @@ export function Transcript({ conversation, specMode }: { conversation: Conversat
                         >
                             {item ? (
                                 item.kind === "tool" ? (
-                                    <ToolCard item={item} collapsedDefault={specMode} />
+                                    <ToolCard item={item} />
                                 ) : item.kind === "entry" ? (
                                     <EntryCard item={item} />
                                 ) : (

@@ -71,9 +71,27 @@ export const rpcCommandSchema = z.discriminatedUnion("type", [
     z.object({ ...identified, type: z.literal("get_tree") }),
     z.object({ ...identified, type: z.literal("get_last_assistant_text") }),
     z.object({ ...identified, type: z.literal("set_session_name"), name: z.string().max(200) }),
+    z.object({
+        ...identified,
+        type: z.literal("set_label"),
+        entryId: z.string().min(1).max(256),
+        label: z.string().max(200).optional(),
+    }),
     z.object({ ...identified, type: z.literal("get_messages") }),
     z.object({ ...identified, type: z.literal("get_commands") }),
 ]);
+
+export const sessionRecordSchema = z.object({
+    id: z.string().max(256),
+    projectId: z.string().max(256),
+    sessionId: z.string().max(256),
+    sessionPath: z.string().max(32_768),
+    name: z.string().max(200).optional(),
+    model: z.string().max(768).optional(),
+    lastOpenedAt: z.string().max(64),
+    draft: boundedString,
+    scrollTop: z.number().finite().nonnegative().optional(),
+});
 
 export const desktopStatePatchSchema = z.object({
     piPath: z.string().max(32_768).optional(),
@@ -94,24 +112,14 @@ export const desktopStatePatchSchema = z.object({
         )
         .max(500)
         .optional(),
-    sessions: z
-        .array(
-            z.object({
-                id: z.string().max(256),
-                projectId: z.string().max(256),
-                sessionId: z.string().max(256),
-                sessionPath: z.string().max(32_768),
-                name: z.string().max(200).optional(),
-                model: z.string().max(768).optional(),
-                lastOpenedAt: z.string().max(64),
-                draft: boundedString,
-                scrollTop: z.number().finite().nonnegative().optional(),
-            }),
-        )
-        .max(2_000)
-        .optional(),
+    sessions: z.array(sessionRecordSchema).max(2_000).optional(),
     layout: z
-        .object({ filesOpen: z.boolean().optional(), filesWidth: z.number().min(280).max(900).optional() })
+        .object({
+            filesOpen: z.boolean().optional(),
+            filesWidth: z.number().min(280).max(900).optional(),
+            inspectorOpen: z.boolean().optional(),
+            sidebarOpen: z.boolean().optional(),
+        })
         .optional(),
 });
 
@@ -128,7 +136,12 @@ export const desktopStateSchema = z.object({
     sessions: desktopStatePatchSchema.shape.sessions.unwrap(),
     activeProjectId: z.string().max(256).optional(),
     activeSessionId: z.string().max(256).optional(),
-    layout: z.object({ filesOpen: z.boolean(), filesWidth: z.number().min(280).max(900) }),
+    layout: z.object({
+        filesOpen: z.boolean(),
+        filesWidth: z.number().min(280).max(900),
+        inspectorOpen: z.boolean(),
+        sidebarOpen: z.boolean(),
+    }),
 });
 
 export const runtimeStatusSchema = z.object({
@@ -149,6 +162,14 @@ export const runtimeEventSchema = z.object({
 export const runtimeSnapshotSchema = z.object({
     status: runtimeStatusSchema,
     pendingUi: z.array(rpcRecordSchema).max(256),
+});
+
+export const runtimeDescriptorSchema = z.object({
+    runtimeId: z.string().uuid(),
+    projectPath: z.string().min(1).max(32_768),
+    sessionPath: z.string().min(1).max(32_768).optional(),
+    active: z.boolean(),
+    status: runtimeStatusSchema,
 });
 
 export const fileNodeSchema = z.object({

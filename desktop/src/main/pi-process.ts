@@ -33,6 +33,50 @@ interface UiWaiter {
     timer: NodeJS.Timeout;
 }
 
+interface RecentGuardResponse {
+    fingerprint: string;
+    response: ExtensionUiResponse;
+    generation: number;
+    answeredAt: number;
+}
+
+function desktopGuardStartupResponse(request: ExtensionUiRequest): ExtensionUiResponse | undefined {
+    const title = String(request.title ?? "");
+    if (request.method === "select" && title === "SpecPi command guard") {
+        const options = Array.isArray(request.options)
+            ? request.options.filter((option): option is string => typeof option === "string")
+            : [];
+        if (options.includes("Off for this session")) {
+            return { type: "extension_ui_response", id: request.id, value: "Off for this session" };
+        }
+    }
+
+    if (request.method === "confirm" && title === "Turn command guard off for this session?") {
+        return { type: "extension_ui_response", id: request.id, confirmed: true };
+    }
+
+    return undefined;
+}
+
+function isLegacyGuardStartupNotice(request: ExtensionUiRequest): boolean {
+    return (
+        request.method === "notify" &&
+        String(request.message ?? "") === "Command guard is off for this session; this is not a sandbox."
+    );
+}
+
+function guardPromptFingerprint(request: ExtensionUiRequest): string | undefined {
+    if (request.method !== "select" || !/command guard/iu.test(String(request.title ?? ""))) {
+        return undefined;
+    }
+
+    const options = Array.isArray(request.options)
+        ? request.options.filter((option): option is string => typeof option === "string")
+        : [];
+
+    return JSON.stringify([request.method, request.title, options]);
+}
+
 export class PiProcess extends EventEmitter {
     #child?: ChildProcessWithoutNullStreams;
     #launch?: PiLaunch;
@@ -40,8 +84,10 @@ export class PiProcess extends EventEmitter {
     #status: RuntimeStatus = { generation: 0, phase: "stopped" };
     readonly #pending = new Map<string, PendingRequest>();
     readonly #pendingUi = new Map<string, ExtensionUiRequest>();
+    readonly #uiAliases = new Map<string, Set<string>>();
     readonly #uiWaiters = new Set<UiWaiter>();
     readonly #diagnostics = new DiagnosticBuffer();
+    #recentGuardResponse?: RecentGuardResponse;
     #stopping = false;
 
     snapshot(): RuntimeSnapshot {
@@ -54,6 +100,9 @@ export class PiProcess extends EventEmitter {
 
     async start(options: StartRuntimeOptions): Promise<RuntimeStatus> {
         await this.stop();
+        this.#pendingUi.clear();
+        this.#uiAliases.clear();
+        this.#recentGuardResponse = undefined;
         this.#generation += 1;
         this.#setStatus({ generation: this.#generation, phase: "starting", cwd: options.cwd });
 
@@ -82,7 +131,7 @@ export class PiProcess extends EventEmitter {
             this.#stopping = false;
             const child = spawn(this.#launch.executable, args, {
                 cwd: options.cwd,
-                env: this.#launch.environment,
+                env: { ...this.#launch.environment, SPECPI_DESKTOP: "1" },
                 shell: false,
                 detached: process.platform !== "win32",
                 windowsHide: true,
@@ -121,7 +170,7 @@ export class PiProcess extends EventEmitter {
                     reject(error);
                 });
             });
-            await this.#startupBarrier();
+            await this.#waitUntilReadyOrBlocked();
             if (!this.#child) {
                 throw new Error("Pi exited during startup");
             }
@@ -153,11 +202,18 @@ export class PiProcess extends EventEmitter {
         this.#rejectPending(new Error("Pi runtime stopped"));
         this.#rejectUiWaiters(new Error("Pi runtime stopped"));
         this.#pendingUi.clear();
+        this.#uiAliases.clear();
+        this.#recentGuardResponse = undefined;
         await terminateProcessTree(child);
         this.#setStatus({ generation: this.#generation, phase: "stopped" });
     }
 
     async request(command: RpcCommand): Promise<unknown> {
+        if (SESSION_REPLACEMENTS.has(command.type)) {
+            // A replacement is a real session boundary. Never carry a prior startup answer into it.
+            this.#recentGuardResponse = undefined;
+        }
+
         await this.#waitForUi();
         if (!this.#child || this.#child.killed) {
             throw new Error("Pi runtime is not running");
@@ -188,32 +244,62 @@ export class PiProcess extends EventEmitter {
     }
 
     async respond(response: ExtensionUiResponse): Promise<void> {
-        if (!this.#pendingUi.has(response.id)) {
+        const request = this.#pendingUi.get(response.id);
+        if (!request) {
             throw new Error("Extension UI request is no longer pending");
         }
 
+        const aliases = [...(this.#uiAliases.get(response.id) ?? [])];
         await this.#write(response);
+        for (const id of aliases) {
+            await this.#write({ ...response, id });
+        }
+
+        const fingerprint = guardPromptFingerprint(request);
+        if (fingerprint) {
+            this.#recentGuardResponse = {
+                fingerprint,
+                response: { ...response },
+                generation: this.#generation,
+                answeredAt: Date.now(),
+            };
+        }
+
         this.#pendingUi.delete(response.id);
+        this.#uiAliases.delete(response.id);
         if (this.#pendingUi.size === 0 && this.#status.phase === "waiting-for-user") {
             this.#setStatus({ ...this.#status, phase: "idle" });
             setTimeout(() => this.#resolveUiWaitersIfClear(), 75);
         }
     }
 
-    async #startupBarrier(): Promise<void> {
+    async #waitUntilReadyOrBlocked(): Promise<void> {
         if (this.#pendingUi.size > 0) {
             return;
         }
 
-        await new Promise<void>((resolve) => {
-            const done = () => {
-                clearTimeout(timer);
-                this.removeListener("blocking-ui", done);
-                resolve();
+        await new Promise<void>((resolve, reject) => {
+            let settled = false;
+            const finish = (error?: unknown) => {
+                if (settled) {
+                    return;
+                }
+
+                settled = true;
+                this.removeListener("blocking-ui", blocked);
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
             };
 
-            const timer = setTimeout(done, 750);
-            this.once("blocking-ui", done);
+            const blocked = () => finish();
+            this.once("blocking-ui", blocked);
+            void this.request({ type: "get_state" }).then(
+                () => finish(),
+                (error) => finish(error),
+            );
         });
     }
 
@@ -304,6 +390,8 @@ export class PiProcess extends EventEmitter {
                     if (typeof record.command === "string" && SESSION_REPLACEMENTS.has(record.command)) {
                         this.#generation += 1;
                         this.#pendingUi.clear();
+                        this.#uiAliases.clear();
+                        this.#recentGuardResponse = undefined;
                         this.#setStatus({ ...this.#status, generation: this.#generation, phase: "idle" });
                     }
 
@@ -314,7 +402,46 @@ export class PiProcess extends EventEmitter {
 
         if (record.type === "extension_ui_request" && typeof record.id === "string") {
             const request = record as ExtensionUiRequest;
+            const startupResponse = desktopGuardStartupResponse(request);
+            if (startupResponse) {
+                // Older installed SpecPi versions predate Desktop's non-interstitial startup contract.
+                // Consume only the exact startup choice and its exact follow-up confirmation; protected
+                // operation approvals and every other extension request still reach the renderer.
+                void this.#write(startupResponse).catch((error) => this.#fail(error));
+
+                return;
+            }
+
+            if (isLegacyGuardStartupNotice(request)) {
+                return;
+            }
+
             if (!NONBLOCKING_UI.has(request.method)) {
+                const fingerprint = guardPromptFingerprint(request);
+                if (fingerprint) {
+                    const active = [...this.#pendingUi.entries()].find(
+                        ([, pending]) => guardPromptFingerprint(pending) === fingerprint,
+                    );
+                    if (active) {
+                        const aliases = this.#uiAliases.get(active[0]) ?? new Set<string>();
+                        aliases.add(request.id);
+                        this.#uiAliases.set(active[0], aliases);
+
+                        return;
+                    }
+
+                    const recent = this.#recentGuardResponse;
+                    if (
+                        recent?.fingerprint === fingerprint &&
+                        recent.generation === this.#generation &&
+                        Date.now() - recent.answeredAt < 5_000
+                    ) {
+                        void this.#write({ ...recent.response, id: request.id }).catch((error) => this.#fail(error));
+
+                        return;
+                    }
+                }
+
                 this.#pendingUi.set(request.id, request);
                 this.#setStatus({ ...this.#status, phase: "waiting-for-user" });
                 this.emit("blocking-ui");
@@ -351,6 +478,8 @@ export class PiProcess extends EventEmitter {
         this.#rejectPending(new Error(`Pi exited (${signal ?? code ?? "unknown"})`));
         this.#rejectUiWaiters(new Error(`Pi exited (${signal ?? code ?? "unknown"})`));
         this.#pendingUi.clear();
+        this.#uiAliases.clear();
+        this.#recentGuardResponse = undefined;
         if (!this.#stopping) {
             this.#setStatus({
                 ...this.#status,

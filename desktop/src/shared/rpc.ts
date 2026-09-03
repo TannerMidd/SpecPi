@@ -55,6 +55,14 @@ export interface RuntimeSnapshot {
     pendingUi: ExtensionUiRequest[];
 }
 
+export interface RuntimeDescriptor {
+    runtimeId: string;
+    projectPath: string;
+    sessionPath?: string;
+    active: boolean;
+    status: RuntimeStatus;
+}
+
 export interface ExtensionUiResponse {
     type: "extension_ui_response";
     id: string;

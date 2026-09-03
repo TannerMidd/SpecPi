@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it, vi } from "vitest";
+import type { RuntimeEvent } from "../../src/shared/rpc";
 import { PiProcess } from "../../src/main/pi-process";
 
 const execute = promisify(execFile);
@@ -11,7 +12,7 @@ const live = process.env.SPECPI_LIVE_PI === "1";
 
 describe("installed Pi RPC", () => {
     it.runIf(live)(
-        "loads SpecPi from isolated state and completes startup UI",
+        "loads SpecPi commands without blocking Desktop startup or session switches",
         async () => {
             const repository = path.resolve(import.meta.dirname, "../../..");
             const agentDirectory = path.join(os.tmpdir(), `specpi-desktop-live-${crypto.randomUUID()}`);
@@ -35,18 +36,26 @@ describe("installed Pi RPC", () => {
             const previous = process.env.PI_CODING_AGENT_DIR;
             process.env.PI_CODING_AGENT_DIR = agentDirectory;
             const runtime = new PiProcess();
+            const events: RuntimeEvent[] = [];
+            runtime.on("event", (event: RuntimeEvent) => events.push(event));
             try {
                 await runtime.start({ cwd: repository, trust: "approve", noSession: true, offline: true });
-                await vi.waitFor(() => expect(runtime.snapshot().pendingUi.length).toBeGreaterThan(0), {
-                    timeout: 20_000,
-                });
-                const request = runtime.snapshot().pendingUi.find((item) => item.method === "select");
-                expect(request?.title).toContain("SpecPi command guard");
-                await runtime.respond({
-                    type: "extension_ui_response",
-                    id: request!.id,
-                    value: "Guard (Recommended)",
-                });
+                expect(runtime.snapshot().pendingUi).toEqual([]);
+                expect(
+                    events.some(
+                        (event) =>
+                            event.record.type === "extension_ui_request" &&
+                            event.record.method === "select" &&
+                            String(event.record.title).includes("SpecPi command guard"),
+                    ),
+                ).toBe(false);
+                await vi.waitFor(() =>
+                    expect(
+                        events.some(
+                            (event) => event.record.method === "setStatus" && event.record.statusText === "Guard Off",
+                        ),
+                    ).toBe(true),
+                );
                 const state = (await runtime.request({ type: "get_state" })) as { sessionFile?: string };
                 expect(state.sessionFile).toBeUndefined();
                 const result = (await runtime.request({ type: "get_commands" })) as {
@@ -65,6 +74,45 @@ describe("installed Pi RPC", () => {
                 ]) {
                     expect(names.has(name)).toBe(true);
                 }
+
+                await runtime.request({ type: "prompt", message: "/guard status" });
+                await runtime.request({ type: "prompt", message: "/guard strict" });
+                await vi.waitFor(() =>
+                    expect(
+                        events.some(
+                            (event) =>
+                                event.record.method === "setStatus" &&
+                                String(event.record.statusText).includes("Strict"),
+                        ),
+                    ).toBe(true),
+                );
+                await runtime.request({ type: "prompt", message: "/guard off" });
+                expect(runtime.snapshot().pendingUi).toEqual([]);
+                await runtime.request({ type: "new_session" });
+                await new Promise((resolve) => setTimeout(resolve, 250));
+                expect(runtime.snapshot().pendingUi).toEqual([]);
+                expect(
+                    events.some(
+                        (event) =>
+                            event.record.type === "extension_ui_request" &&
+                            event.record.method === "select" &&
+                            String(event.record.title).includes("SpecPi command guard"),
+                    ),
+                ).toBe(false);
+
+                await runtime.request({ type: "prompt", message: "/spec on" });
+                await vi.waitFor(
+                    () =>
+                        expect(
+                            events.some((event) => {
+                                const entry = event.record.entry as
+                                    { customType?: string; data?: { enabled?: boolean } } | undefined;
+
+                                return entry?.customType === "spec-mode" && entry.data?.enabled === true;
+                            }),
+                        ).toBe(true),
+                    { timeout: 10_000 },
+                );
 
                 expect((await stat(path.join(agentDirectory, "auth.json"))).size).toBe(canary.length);
             } finally {

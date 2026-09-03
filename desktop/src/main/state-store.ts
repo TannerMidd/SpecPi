@@ -1,7 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { DesktopState } from "../shared/domain";
+import type { DesktopState, SessionRecord } from "../shared/domain";
 import type { DesktopStatePatch } from "../shared/ipc";
+import { mergeSessionRecord } from "../shared/session-registry";
 
 const defaultState = (): DesktopState => ({
     schema: 1,
@@ -11,6 +12,8 @@ const defaultState = (): DesktopState => ({
     layout: {
         filesOpen: false,
         filesWidth: 420,
+        inspectorOpen: true,
+        sidebarOpen: true,
     },
 });
 
@@ -61,6 +64,22 @@ export class StateStore {
             sessions: this.#state.sessions.map((session) =>
                 session.id === sessionId ? { ...session, draft } : session,
             ),
+        });
+    }
+
+    async saveSession(session: SessionRecord): Promise<DesktopState> {
+        const sessions = mergeSessionRecord(this.#state.sessions, session);
+        const projects = this.#state.projects.map((project) =>
+            project.id === session.projectId
+                ? { ...project, lastSessionPath: session.sessionPath, lastOpenedAt: session.lastOpenedAt }
+                : project,
+        );
+
+        return this.update({
+            sessions,
+            projects,
+            activeSessionId: session.id,
+            activeProjectId: session.projectId,
         });
     }
 

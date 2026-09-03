@@ -31,6 +31,8 @@ export interface DesktopState {
     layout: {
         filesOpen: boolean;
         filesWidth: number;
+        inspectorOpen: boolean;
+        sidebarOpen: boolean;
     };
 }
 

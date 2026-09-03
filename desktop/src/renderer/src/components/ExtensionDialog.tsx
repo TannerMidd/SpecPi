@@ -1,19 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExtensionUiRequest, ExtensionUiResponse } from "../../../shared/rpc";
 import { stripAnsi } from "../lib/text";
 
 function optionDescription(option: string): string | undefined {
     const normalized = option.toLowerCase();
-    if (normalized.includes("approve")) {
-        return "one call · one session";
+    if (normalized.includes("exact call")) {
+        return "remember this exact call until the session closes";
     }
 
-    if (normalized.includes("deny") && normalized.includes("lock")) {
-        return "blocks further mutation";
+    if (normalized.includes("allow once")) {
+        return "approve only this request";
+    }
+
+    if (normalized.includes("lock")) {
+        return "deny and block further mutation";
     }
 
     if (normalized.includes("deny")) {
-        return "recommended";
+        return "keep the project unchanged";
     }
 
     if (normalized.includes("strict")) {
@@ -29,6 +33,21 @@ function optionDescription(option: string): string | undefined {
     }
 
     return undefined;
+}
+
+function isGuardApproval(title: string): boolean {
+    return /^(?:command guard|path mutation|unknown tool) approval\b/iu.test(title);
+}
+
+function approvalDetails(title: string): { heading: string; fields: Array<[string, string]> } {
+    const [heading, detail = ""] = title.split(/\s+—\s+/u, 2);
+    const fields = detail
+        .split(/;\s*/u)
+        .map((part) => part.match(/^([^:]+):\s*(.*)$/u))
+        .filter((match): match is RegExpMatchArray => Boolean(match?.[2]))
+        .map((match) => [match[1]!.trim(), match[2]!.trim()] as [string, string]);
+
+    return { heading: heading || "Command approval", fields };
 }
 
 export function ExtensionDialog({
@@ -55,10 +74,73 @@ export function ExtensionDialog({
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [request.id]);
     const title = stripAnsi(String(request.title ?? "Pi requires input"));
+    const approval = useMemo(() => approvalDetails(title), [title]);
     if (request.method === "select") {
         const options = Array.isArray(request.options)
             ? request.options.filter((item): item is string => typeof item === "string")
             : [];
+        if (isGuardApproval(title)) {
+            const detail = Object.fromEntries(
+                approval.fields.map(([label, fieldValue]) => [label.toLowerCase(), fieldValue]),
+            );
+            const summary = detail.reason ?? detail.affected ?? "Review this protected operation.";
+            const optionLabel = (option: string) =>
+                /exact call/iu.test(option)
+                    ? "Session"
+                    : /allow once/iu.test(option)
+                      ? "Once"
+                      : /lock/iu.test(option)
+                        ? "Lock"
+                        : "Deny";
+
+            return (
+                <section className="approval-dock" role="dialog" aria-modal="false" aria-labelledby="approval-title">
+                    <div className="approval-line">
+                        <div className="approval-shield" aria-hidden="true">
+                            ◇
+                        </div>
+                        <div className="approval-copy">
+                            <h2 id="approval-title">Approval needed</h2>
+                            <p>{summary}</p>
+                        </div>
+                        <div className="approval-actions">
+                            {options.map((option, index) => (
+                                <button
+                                    ref={index === 0 ? first : undefined}
+                                    key={option}
+                                    title={optionDescription(option)}
+                                    className={
+                                        /deny.*recommended/iu.test(option)
+                                            ? "safe"
+                                            : /allow/iu.test(option)
+                                              ? "allow"
+                                              : ""
+                                    }
+                                    onClick={() =>
+                                        void respond({ type: "extension_ui_response", id: request.id, value: option })
+                                    }
+                                >
+                                    {optionLabel(option)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    {approval.fields.length > 0 ? (
+                        <details className="approval-more">
+                            <summary>Review details</summary>
+                            <dl className="approval-details">
+                                {approval.fields.map(([label, fieldValue]) => (
+                                    <div key={label}>
+                                        <dt>{label}</dt>
+                                        <dd>{fieldValue}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        </details>
+                    ) : null}
+                </section>
+            );
+        }
 
         return (
             <div

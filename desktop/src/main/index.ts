@@ -11,42 +11,56 @@ import {
     fileRequestSchema,
     rpcCommandSchema,
     sessionDraftSchema,
+    sessionRecordSchema,
     startRuntimeSchema,
 } from "../shared/schemas";
-import type { RpcCommand, RuntimeEvent, RuntimeStatus } from "../shared/rpc";
+import type { RpcCommand, RuntimeEvent, RuntimeStatus, StartRuntimeOptions } from "../shared/rpc";
 import { listDirectory, previewFile } from "./file-service";
 import { readGitDiff, readGitStatus } from "./git-service";
-import { PiProcess } from "./pi-process";
+import { RuntimePool } from "./runtime-pool";
 import { StateStore } from "./state-store";
 import { TITLE_BAR_HEIGHT, windowThemeColors } from "./window-theme";
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
-const runtime = new PiProcess();
-let window: BrowserWindow | undefined;
-let store: StateStore;
-const exportPaths = new Set<string>();
 
-function send(channel: string, payload: unknown): void {
-    if (window && !window.isDestroyed()) {
-        window.webContents.send(channel, payload);
+interface WindowContext {
+    window: BrowserWindow;
+    runtimes: RuntimePool;
+    launchIntent?: StartRuntimeOptions;
+    closing: boolean;
+}
+
+const windows = new Map<number, WindowContext>();
+let store: StateStore;
+let quitting = false;
+
+function send(context: WindowContext, channel: string, payload: unknown): void {
+    if (!context.window.isDestroyed()) {
+        context.window.webContents.send(channel, payload);
     }
 }
 
 function applyWindowTheme(): void {
-    if (!window || window.isDestroyed()) {
-        return;
-    }
-
     const colors = windowThemeColors(store.get().theme, nativeTheme.shouldUseDarkColors);
-    window.setBackgroundColor(colors.backgroundColor);
-    if (process.platform !== "darwin") {
-        window.setTitleBarOverlay({ color: colors.color, symbolColor: colors.symbolColor, height: TITLE_BAR_HEIGHT });
+    for (const context of windows.values()) {
+        if (context.window.isDestroyed()) {
+            continue;
+        }
+
+        context.window.setBackgroundColor(colors.backgroundColor);
+        if (process.platform !== "darwin") {
+            context.window.setTitleBarOverlay({
+                color: colors.color,
+                symbolColor: colors.symbolColor,
+                height: TITLE_BAR_HEIGHT,
+            });
+        }
     }
 }
 
-async function createWindow(): Promise<void> {
+async function createWindow(launchIntent?: StartRuntimeOptions): Promise<WindowContext> {
     const colors = windowThemeColors(store.get().theme, nativeTheme.shouldUseDarkColors);
-    window = new BrowserWindow({
+    const browserWindow = new BrowserWindow({
         width: 1440,
         height: 900,
         minWidth: 880,
@@ -67,37 +81,67 @@ async function createWindow(): Promise<void> {
             devTools: Boolean(process.env.ELECTRON_RENDERER_URL),
         },
     });
+    const context: WindowContext = {
+        window: browserWindow,
+        runtimes: new RuntimePool(),
+        launchIntent,
+        closing: false,
+    };
+    const webContentsId = browserWindow.webContents.id;
+    windows.set(webContentsId, context);
+    context.runtimes.on("event", (event: RuntimeEvent) => send(context, IPC.runtimeEvent, event));
+    context.runtimes.on("status", (status: RuntimeStatus) => send(context, IPC.runtimeStatus, status));
+    context.runtimes.on("roster", () => send(context, IPC.runtimeRoster, context.runtimes.roster()));
+
     if (!process.env.ELECTRON_RENDERER_URL && process.platform !== "darwin") {
-        window.removeMenu();
+        browserWindow.removeMenu();
     }
 
-    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    window.webContents.session.setPermissionCheckHandler(() => false);
-    window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-    window.webContents.on("will-navigate", (event) => event.preventDefault());
-    window.once("ready-to-show", () => window?.show());
-    window.once("closed", () => {
-        window = undefined;
-        void runtime.stop();
+    browserWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    browserWindow.webContents.session.setPermissionCheckHandler(() => false);
+    browserWindow.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) =>
+        callback(false),
+    );
+    browserWindow.webContents.on("will-navigate", (event) => event.preventDefault());
+    browserWindow.once("ready-to-show", () => browserWindow.show());
+    browserWindow.on("close", (event) => {
+        if (!quitting && !context.closing && context.runtimes.hasRunningProcesses()) {
+            event.preventDefault();
+            context.closing = true;
+            void context.runtimes.stopAll().finally(() => browserWindow.destroy());
+        }
+    });
+    browserWindow.once("closed", () => {
+        windows.delete(webContentsId);
+        void context.runtimes.stopAll();
     });
 
     if (process.env.ELECTRON_RENDERER_URL) {
-        await window.loadURL(process.env.ELECTRON_RENDERER_URL);
+        await browserWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
     } else {
-        await window.loadFile(path.join(currentDirectory, "../renderer/index.html"));
+        await browserWindow.loadFile(path.join(currentDirectory, "../renderer/index.html"));
     }
+
+    return context;
 }
 
-function assertTrustedSender(event: IpcMainInvokeEvent): void {
-    if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) {
+function contextFor(event: IpcMainInvokeEvent): WindowContext {
+    const context = windows.get(event.sender.id);
+    if (
+        !context ||
+        event.sender !== context.window.webContents ||
+        event.senderFrame !== context.window.webContents.mainFrame
+    ) {
         throw new Error("Rejected IPC from an untrusted frame");
     }
+
+    return context;
 }
 
 function registerIpc(): void {
     ipcMain.handle(IPC.chooseProject, async (event) => {
-        assertTrustedSender(event);
-        const result = await dialog.showOpenDialog(window!, { properties: ["openDirectory"] });
+        const context = contextFor(event);
+        const result = await dialog.showOpenDialog(context.window, { properties: ["openDirectory"] });
         if (result.canceled || !result.filePaths[0]) {
             return undefined;
         }
@@ -105,8 +149,8 @@ function registerIpc(): void {
         return realpath(result.filePaths[0]);
     });
     ipcMain.handle(IPC.choosePi, async (event) => {
-        assertTrustedSender(event);
-        const result = await dialog.showOpenDialog(window!, {
+        const context = contextFor(event);
+        const result = await dialog.showOpenDialog(context.window, {
             properties: ["openFile"],
             filters:
                 process.platform === "win32"
@@ -117,8 +161,8 @@ function registerIpc(): void {
         return result.canceled ? undefined : result.filePaths[0];
     });
     ipcMain.handle(IPC.chooseSession, async (event) => {
-        assertTrustedSender(event);
-        const result = await dialog.showOpenDialog(window!, {
+        const context = contextFor(event);
+        const result = await dialog.showOpenDialog(context.window, {
             defaultPath: path.join(app.getPath("home"), ".pi", "agent", "sessions"),
             properties: ["openFile"],
             filters: [{ name: "Pi session", extensions: ["jsonl"] }],
@@ -129,13 +173,18 @@ function registerIpc(): void {
 
         return realpath(result.filePaths[0]);
     });
+    ipcMain.handle(IPC.openWorkspace, async (event, options) => {
+        contextFor(event);
+        await createWindow(startRuntimeSchema.parse(options));
+    });
+    ipcMain.handle(IPC.launchIntent, (event) => contextFor(event).launchIntent);
     ipcMain.handle(IPC.getDesktopState, (event) => {
-        assertTrustedSender(event);
+        contextFor(event);
 
         return store.get();
     });
     ipcMain.handle(IPC.updateDesktopState, async (event, patch: DesktopStatePatch) => {
-        assertTrustedSender(event);
+        contextFor(event);
         const safe = desktopStatePatchSchema.parse(patch);
         const next = await store.update(safe);
         if (safe.theme) {
@@ -145,24 +194,22 @@ function registerIpc(): void {
         return next;
     });
     ipcMain.handle(IPC.saveSessionDraft, async (event, request) => {
-        assertTrustedSender(event);
+        contextFor(event);
         const safe = sessionDraftSchema.parse(request);
 
         return store.updateSessionDraft(safe.sessionId, safe.draft);
     });
-    ipcMain.handle(IPC.runtimeSnapshot, (event) => {
-        assertTrustedSender(event);
+    ipcMain.handle(IPC.saveSession, async (event, session) => {
+        contextFor(event);
 
-        return runtime.snapshot();
+        return store.saveSession(sessionRecordSchema.parse(session));
     });
-    ipcMain.handle(IPC.runtimeDiagnostics, (event) => {
-        assertTrustedSender(event);
-
-        return runtime.diagnostics();
-    });
+    ipcMain.handle(IPC.runtimeSnapshot, (event) => contextFor(event).runtimes.snapshot());
+    ipcMain.handle(IPC.runtimeRoster, (event) => contextFor(event).runtimes.roster());
+    ipcMain.handle(IPC.runtimeDiagnostics, (event) => contextFor(event).runtimes.diagnostics());
     ipcMain.handle(IPC.saveDiagnostics, async (event) => {
-        assertTrustedSender(event);
-        const result = await dialog.showSaveDialog(window!, {
+        const context = contextFor(event);
+        const result = await dialog.showSaveDialog(context.window, {
             defaultPath: "specpi-desktop-diagnostics.txt",
             filters: [{ name: "Text", extensions: ["txt"] }],
         });
@@ -170,72 +217,72 @@ function registerIpc(): void {
             return undefined;
         }
 
-        await writeFile(result.filePath, `${runtime.diagnostics().join("\n")}\n`, { encoding: "utf8", mode: 0o600 });
+        await writeFile(result.filePath, `${context.runtimes.diagnostics().join("\n")}\n`, {
+            encoding: "utf8",
+            mode: 0o600,
+        });
 
         return result.filePath;
     });
     ipcMain.handle(IPC.runtimeStart, async (event, options) => {
-        assertTrustedSender(event);
+        const context = contextFor(event);
         const safe = startRuntimeSchema.parse(options);
-        exportPaths.clear();
 
-        return runtime.start(safe);
+        return context.runtimes.activate(safe);
     });
     ipcMain.handle(IPC.runtimeStop, (event) => {
-        assertTrustedSender(event);
-        exportPaths.clear();
+        const context = contextFor(event);
 
-        return runtime.stop();
+        return context.runtimes.stopActive();
     });
     ipcMain.handle(IPC.runtimeCommand, async (event, command: RpcCommand) => {
-        assertTrustedSender(event);
+        const context = contextFor(event);
         const safe = rpcCommandSchema.parse(command) as RpcCommand;
-        const result = await runtime.request(safe);
+        const result = await context.runtimes.request(safe);
         if (safe.type === "export_html" && result && typeof result === "object" && "path" in result) {
             const sourcePath = (result as { path?: unknown }).path;
             if (typeof sourcePath === "string") {
-                exportPaths.add(await realpath(sourcePath));
+                context.runtimes.authorizeExport(await realpath(sourcePath));
             }
         }
 
         return result;
     });
     ipcMain.handle(IPC.runtimeUiResponse, async (event, response) => {
-        assertTrustedSender(event);
-        await runtime.respond(extensionUiResponseSchema.parse(response));
+        await contextFor(event).runtimes.respond(extensionUiResponseSchema.parse(response));
     });
     ipcMain.handle(IPC.listDirectory, async (event, request) => {
-        assertTrustedSender(event);
+        contextFor(event);
         const safe = fileRequestSchema.parse(request);
 
         return listDirectory(safe.projectRoot, safe.relativePath);
     });
     ipcMain.handle(IPC.readFile, async (event, request) => {
-        assertTrustedSender(event);
+        contextFor(event);
         const safe = fileRequestSchema.parse(request);
 
         return previewFile(safe.projectRoot, safe.relativePath);
     });
     ipcMain.handle(IPC.gitStatus, async (event, projectRoot: string) => {
-        assertTrustedSender(event);
+        contextFor(event);
         const safe = fileRequestSchema.shape.projectRoot.parse(projectRoot);
 
         return readGitStatus(safe);
     });
     ipcMain.handle(IPC.gitDiff, async (event, request) => {
-        assertTrustedSender(event);
+        contextFor(event);
         const safe = diffRequestSchema.parse(request);
 
         return readGitDiff(safe.projectRoot, safe.relativePath);
     });
     ipcMain.handle(IPC.saveExport, async (event, sourcePath: string) => {
-        assertTrustedSender(event);
+        const context = contextFor(event);
         const source = await realpath(fileRequestSchema.shape.projectRoot.parse(sourcePath));
-        if (!exportPaths.has(source)) {
+        if (!context.runtimes.isExportAuthorized(source)) {
             throw new Error("The file was not produced by this Pi runtime");
         }
 
-        const result = await dialog.showSaveDialog(window!, {
+        const result = await dialog.showSaveDialog(context.window, {
             defaultPath: path.basename(source),
             filters: [{ name: "HTML", extensions: ["html"] }],
         });
@@ -248,7 +295,7 @@ function registerIpc(): void {
         return result.filePath;
     });
     ipcMain.handle(IPC.copyText, (event, text: string) => {
-        assertTrustedSender(event);
+        contextFor(event);
         if (typeof text !== "string" || Buffer.byteLength(text) > 1024 * 1024) {
             throw new Error("Clipboard text exceeds the size limit");
         }
@@ -256,33 +303,35 @@ function registerIpc(): void {
         clipboard.writeText(text);
     });
     ipcMain.handle(IPC.openExternal, async (event, url: string) => {
-        assertTrustedSender(event);
+        contextFor(event);
         await shell.openExternal(externalUrlSchema.parse(url));
     });
 }
-
-runtime.on("event", (event: RuntimeEvent) => send(IPC.runtimeEvent, event));
-runtime.on("status", (status: RuntimeStatus) => send(IPC.runtimeStatus, status));
 
 app.whenReady().then(async () => {
     store = new StateStore(app.getPath("userData"));
     await store.load();
     registerIpc();
     nativeTheme.on("updated", applyWindowTheme);
-    await createWindow();
+    const context = await createWindow();
     if (process.env.SPECPI_DESKTOP_SMOKE === "1" || process.argv.includes("--smoke")) {
-        const smoke = await window!.webContents.executeJavaScript(
+        const smoke = await context.window.webContents.executeJavaScript(
             "({ title: document.title, hasBridge: typeof window.specpi?.getDesktopState === 'function' })",
             true,
         );
-        if (smoke.title !== "SpecPi Desktop" || smoke.hasBridge !== true) {
-            console.error("SPECPI_DESKTOP_SMOKE_FAILED", JSON.stringify(smoke));
+        await context.window.webContents.executeJavaScript(
+            `window.specpi.openWorkspace({ cwd: ${JSON.stringify(process.cwd())}, trust: "deny", noSession: true })`,
+            true,
+        );
+        const windowCount = BrowserWindow.getAllWindows().length;
+        if (smoke.title !== "SpecPi Desktop" || smoke.hasBridge !== true || windowCount !== 2) {
+            console.error("SPECPI_DESKTOP_SMOKE_FAILED", JSON.stringify({ ...smoke, windowCount }));
             app.exit(1);
 
             return;
         }
 
-        console.log("SPECPI_DESKTOP_SMOKE_OK");
+        console.log("SPECPI_DESKTOP_SMOKE_OK", JSON.stringify({ windowCount }));
         app.quit();
 
         return;
@@ -302,8 +351,10 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", (event) => {
-    if (runtime.snapshot().status.phase !== "stopped") {
+    const active = [...windows.values()].filter((context) => context.runtimes.hasRunningProcesses());
+    if (!quitting && active.length > 0) {
         event.preventDefault();
-        void runtime.stop().finally(() => app.quit());
+        quitting = true;
+        void Promise.all(active.map((context) => context.runtimes.stopAll())).finally(() => app.quit());
     }
 });

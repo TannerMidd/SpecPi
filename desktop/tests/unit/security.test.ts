@@ -6,6 +6,10 @@ describe("desktop boundaries", () => {
     it("does not expose direct RPC bash execution", () => {
         expect(rpcCommandSchema.safeParse({ type: "bash", command: "echo unsafe" }).success).toBe(false);
         expect(rpcCommandSchema.safeParse({ type: "prompt", message: "hello" }).success).toBe(true);
+        expect(rpcCommandSchema.safeParse({ type: "set_label", entryId: "entry", label: "reviewed" }).success).toBe(
+            true,
+        );
+        expect(rpcCommandSchema.safeParse({ type: "set_label", entryId: "", label: "reviewed" }).success).toBe(false);
     });
 
     it("allows only explicit HTTP(S) external links", () => {
