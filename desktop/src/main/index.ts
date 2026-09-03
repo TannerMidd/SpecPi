@@ -12,6 +12,7 @@ import {
     rpcCommandSchema,
     sessionDraftSchema,
     sessionRecordSchema,
+    sessionTitleSchema,
     startRuntimeSchema,
 } from "../shared/schemas";
 import type { RpcCommand, RuntimeEvent, RuntimeStatus, StartRuntimeOptions } from "../shared/rpc";
@@ -198,6 +199,12 @@ function registerIpc(): void {
         const safe = sessionDraftSchema.parse(request);
 
         return store.updateSessionDraft(safe.sessionId, safe.draft);
+    });
+    ipcMain.handle(IPC.saveSessionTitle, async (event, request) => {
+        contextFor(event);
+        const safe = sessionTitleSchema.parse(request);
+
+        return store.updateSessionTitle(safe.sessionId, safe.title);
     });
     ipcMain.handle(IPC.saveSession, async (event, session) => {
         contextFor(event);

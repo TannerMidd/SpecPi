@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { redactDiagnostic } from "../../src/main/diagnostics";
-import { externalUrlSchema, rpcCommandSchema } from "../../src/shared/schemas";
+import { externalUrlSchema, rpcCommandSchema, sessionRecordSchema } from "../../src/shared/schemas";
 
 describe("desktop boundaries", () => {
     it("does not expose direct RPC bash execution", () => {
@@ -10,6 +10,20 @@ describe("desktop boundaries", () => {
             true,
         );
         expect(rpcCommandSchema.safeParse({ type: "set_label", entryId: "", label: "reviewed" }).success).toBe(false);
+    });
+
+    it("bounds locally cached session titles", () => {
+        const session = {
+            id: "session",
+            projectId: "project",
+            sessionId: "session",
+            sessionPath: "C:/sessions/session.jsonl",
+            lastOpenedAt: new Date().toISOString(),
+            draft: "",
+        };
+
+        expect(sessionRecordSchema.safeParse({ ...session, title: "First prompt title" }).success).toBe(true);
+        expect(sessionRecordSchema.safeParse({ ...session, title: "x".repeat(73) }).success).toBe(false);
     });
 
     it("allows only explicit HTTP(S) external links", () => {

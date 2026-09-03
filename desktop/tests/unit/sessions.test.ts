@@ -14,7 +14,7 @@ function session(id: string, sessionPath: string): SessionRecord {
 }
 
 describe("session registry", () => {
-    it("replaces duplicate IDs and normalized paths while preserving distinct untitled sessions", () => {
+    it("replaces duplicate IDs and normalized paths while preserving distinct unnamed sessions", () => {
         const current = session("current", "C:\\sessions\\current.jsonl");
         const sessions = mergeSessionRecord(
             [

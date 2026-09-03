@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_SESSION_TITLE_LENGTH } from "./session-title";
 
 const boundedString = z.string().max(1_000_000);
 
@@ -87,6 +88,7 @@ export const sessionRecordSchema = z.object({
     sessionId: z.string().max(256),
     sessionPath: z.string().max(32_768),
     name: z.string().max(200).optional(),
+    title: z.string().max(MAX_SESSION_TITLE_LENGTH).optional(),
     model: z.string().max(768).optional(),
     lastOpenedAt: z.string().max(64),
     draft: boundedString,
@@ -126,6 +128,11 @@ export const desktopStatePatchSchema = z.object({
 export const sessionDraftSchema = z.object({
     sessionId: z.string().min(1).max(256),
     draft: boundedString,
+});
+
+export const sessionTitleSchema = z.object({
+    sessionId: z.string().min(1).max(256),
+    title: z.string().min(1).max(MAX_SESSION_TITLE_LENGTH),
 });
 
 export const desktopStateSchema = z.object({

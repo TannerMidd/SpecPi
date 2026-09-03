@@ -8,6 +8,7 @@ import type {
     RuntimeStatus,
     StartRuntimeOptions,
 } from "../../shared/rpc";
+import { sessionDisplayTitle, sessionTitleFromMessages, sessionTitleFromPrompt } from "../../shared/session-title";
 import { CommandPalette, type CommandInfo } from "./components/CommandPalette";
 import { ExtensionDialog } from "./components/ExtensionDialog";
 import { FilesPanel } from "./components/FilesPanel";
@@ -388,7 +389,11 @@ export function App() {
                     projectId: project.id,
                     sessionId,
                     sessionPath: sessionFile,
-                    name: typeof stateData.sessionName === "string" ? stateData.sessionName : existing?.name,
+                    name:
+                        typeof stateData.sessionName === "string" && stateData.sessionName.trim()
+                            ? stateData.sessionName
+                            : undefined,
+                    title: sessionTitleFromMessages(messages) ?? existing?.title,
                     model: object(stateData.model).id
                         ? `${String(object(stateData.model).provider)}/${String(object(stateData.model).id)}`
                         : existing?.model,
@@ -838,6 +843,11 @@ export function App() {
         const images = attachments.map(({ name: _name, ...image }) => image);
         const slash = parseSlashCommand(message);
         const discovered = slash ? commands.find((command) => command.name.toLowerCase() === slash.name) : undefined;
+        const currentSession = desktop?.sessions.find((session) => session.id === activeSessionId);
+        const automaticTitle =
+            currentSession && !currentSession.name?.trim() && !currentSession.title?.trim()
+                ? sessionTitleFromPrompt(message)
+                : undefined;
         try {
             let command: RpcCommand = { type: "prompt", message, images };
             const streamingBehavior = composerStreamingBehavior(agentBusy, discovered?.source, delivery);
@@ -852,6 +862,19 @@ export function App() {
             setDraft("");
             setAttachments([]);
             await window.specpi.sendRuntimeCommand(command);
+            if (automaticTitle && currentSession) {
+                try {
+                    const saved = await window.specpi.saveSessionTitle(currentSession.id, automaticTitle);
+                    setDesktop(saved);
+                } catch (caught) {
+                    setError(
+                        `Prompt accepted, but the session title could not be saved: ${
+                            caught instanceof Error ? caught.message : String(caught)
+                        }`,
+                    );
+                }
+            }
+
             promptHistory.current = [message, ...promptHistory.current.filter((item) => item !== message)].slice(
                 0,
                 100,
@@ -1202,7 +1225,7 @@ export function App() {
     }, [models]);
     const currentSessions = desktop?.sessions.filter((item) => item.projectId === selectedProject?.id) ?? [];
     const visibleSessions = currentSessions.filter((session) =>
-        `${session.name ?? ""} ${session.model ?? ""} ${session.sessionPath}`
+        `${sessionDisplayTitle(session.name, session.title)} ${session.model ?? ""} ${session.sessionPath}`
             .toLowerCase()
             .includes(sessionSearch.trim().toLowerCase()),
     );
@@ -1216,6 +1239,7 @@ export function App() {
         [runtimeRoster],
     );
     const activeSession = currentSessions.find((item) => item.id === activeSessionId);
+    const activeSessionTitle = activeSession ? sessionDisplayTitle(activeSession.name, activeSession.title) : undefined;
     const paletteCommands = useMemo(() => {
         const localNames = new Set(DESKTOP_COMMANDS.map((command) => command.name.toLowerCase()));
 
@@ -1276,7 +1300,7 @@ export function App() {
                     ☰
                 </button>
                 <span aria-hidden="true">π</span>
-                <strong>SpecPi Desktop{activeSession?.name ? ` — ${activeSession.name}` : ""}</strong>
+                <strong>SpecPi Desktop{activeSessionTitle ? ` — ${activeSessionTitle}` : ""}</strong>
             </header>
             <aside className="sidebar">
                 <header className="brand">
@@ -1347,6 +1371,7 @@ export function App() {
                     ) : null}
                     {visibleSessions.map((session) => {
                         const active = session.id === activeSessionId;
+                        const sessionTitle = sessionDisplayTitle(session.name, session.title);
                         const sessionRuntime = runtimeBySessionPath.get(normalizedSessionPath(session.sessionPath));
                         const sessionStatus = active ? runtime : sessionRuntime?.status;
                         const runningLabel = active
@@ -1364,7 +1389,7 @@ export function App() {
                                     disabled={sessionChanging}
                                     onClick={() => void switchSession(session)}
                                 >
-                                    <strong>{session.name || "Untitled session"}</strong>
+                                    <strong>{sessionTitle}</strong>
                                     <small className={runtimeClass}>
                                         {runningLabel
                                             ? `${runningLabel} · `
@@ -1377,7 +1402,7 @@ export function App() {
                                 <button
                                     className="session-popout"
                                     title={active ? "Already active in this window" : "Open in an independent window"}
-                                    aria-label={`Open ${session.name || "session"} in an independent window`}
+                                    aria-label={`Open ${sessionTitle} in an independent window`}
                                     disabled={active}
                                     onClick={() => void openIndependentWorkspace(session.sessionPath)}
                                 >

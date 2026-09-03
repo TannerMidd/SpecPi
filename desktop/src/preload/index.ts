@@ -36,6 +36,8 @@ const api: DesktopApi = {
         desktopStateSchema.parse(await ipcRenderer.invoke(IPC.updateDesktopState, patch)),
     saveSessionDraft: async (sessionId, draft) =>
         desktopStateSchema.parse(await ipcRenderer.invoke(IPC.saveSessionDraft, { sessionId, draft })),
+    saveSessionTitle: async (sessionId, title) =>
+        desktopStateSchema.parse(await ipcRenderer.invoke(IPC.saveSessionTitle, { sessionId, title })),
     saveSession: async (session) => desktopStateSchema.parse(await ipcRenderer.invoke(IPC.saveSession, session)),
     getRuntimeSnapshot: async () =>
         runtimeSnapshotSchema.parse(await ipcRenderer.invoke(IPC.runtimeSnapshot)) as RuntimeSnapshot,

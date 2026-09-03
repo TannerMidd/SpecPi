@@ -18,7 +18,7 @@ describe("desktop state store", () => {
         expect(parsed).toMatchObject({ theme: "dark", activeProjectId: "project", layout: { filesOpen: true } });
     });
 
-    it("saves a session draft without replacing newer registry state", async () => {
+    it("saves session-local metadata without replacing newer registry state", async () => {
         const directory = path.join(os.tmpdir(), `specpi-state-${crypto.randomUUID()}`);
         const store = new StateStore(directory);
         await store.load();
@@ -36,11 +36,13 @@ describe("desktop state store", () => {
         });
         await Promise.all([
             store.updateSessionDraft("session-a", "new"),
-            store.update({ activeProjectId: "project-a", activeSessionId: "session-a" }),
+            store.updateSessionTitle("session-a", "First prompt title"),
+            store.update({ activeProjectId: "project-b", activeSessionId: "session-b" }),
         ]);
+        await store.updateSessionTitle("session-a", "A later prompt");
         const state = store.get();
-        expect(state.sessions[0]?.draft).toBe("new");
-        expect(state.activeSessionId).toBe("session-a");
+        expect(state.sessions[0]).toMatchObject({ draft: "new", title: "First prompt title" });
+        expect(state.activeSessionId).toBe("session-b");
     });
 
     it("keeps an existing session in place when it becomes active", async () => {

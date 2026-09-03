@@ -31,7 +31,7 @@ npm --prefix desktop run smoke
 5. Type `/` in the composer to discover and run Pi extension commands, skills, prompt templates, and native desktop actions. Use arrows to navigate, Tab to complete, Enter to run, and Up/Down at an empty prompt to recall composer history. Extension commands execute through Pi's authoritative `prompt` RPC even during an active turn.
 6. Use **Spec** in the top bar to enter or leave focused Spec mode at any point. During an active turn the visual mode changes immediately and the authoritative `/spec` state synchronizes as soon as that turn settles.
 7. Use **Commands** or Ctrl+K / Ctrl+Shift+P for a searchable keyboard command palette. Commands that require rich TUI rendering use native desktop equivalents where defined.
-8. Search sessions by name, model, or path. Selecting a session keeps prior sessions running and swaps the visible workspace in place; status dots show background work. Use the explicit pop-out control only when a separate window is wanted. Ctrl+B collapses the session rail, Ctrl+N opens a new independent session, Ctrl+O opens a project, and Ctrl+L focuses the composer.
+8. Search sessions by title, model, or path. A fresh session is labeled **New session**, then receives a compact local title from its first meaningful prompt; an explicit Pi session name always takes precedence. Selecting a session keeps prior sessions running and swaps the visible workspace in place; status dots show background work. Use the explicit pop-out control only when a separate window is wanted. Ctrl+B collapses the session rail, Ctrl+N opens a new independent session, Ctrl+O opens a project, and Ctrl+L focuses the composer.
 9. Use **Files** for read-only, project-root-confined file previews and Git status/diffs.
 10. Expand or collapse **Session pulse** for live context, token, cost, model, elapsed-time, message, tool, queue, change, and policy metrics.
 11. Use **Runtime** to inspect redacted diagnostics, select a different Pi executable, restart, or stop.
@@ -58,7 +58,7 @@ Desktop release is manual and separate from npm. After explicit human approval, 
 
 ### Local data and retention
 
-Desktop stores `desktop-state.json` under Electron's per-user application-data directory (`%APPDATA%` on Windows, `~/Library/Application Support` on macOS, and the XDG configuration directory on Linux). It contains project/session path references and UI preferences, not transcripts or credentials. Corrupt files are quarantined beside it. Uninstallers do not delete Pi state; remove the Desktop application-data directory separately only when those local references should also be forgotten.
+Desktop stores `desktop-state.json` under Electron's per-user application-data directory (`%APPDATA%` on Windows, `~/Library/Application Support` on macOS, and the XDG configuration directory on Linux). It contains project/session path references, bounded first-prompt display titles, and UI preferences, not transcripts or credentials. Corrupt files are quarantined beside it. Uninstallers do not delete Pi state; remove the Desktop application-data directory separately only when those local references should also be forgotten.
 
 ## Boundaries and limitations
 

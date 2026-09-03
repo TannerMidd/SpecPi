@@ -18,6 +18,7 @@ export const IPC = {
     getDesktopState: "desktop:get-state",
     updateDesktopState: "desktop:update-state",
     saveSessionDraft: "desktop:save-session-draft",
+    saveSessionTitle: "desktop:save-session-title",
     saveSession: "desktop:save-session",
     runtimeSnapshot: "runtime:snapshot",
     runtimeRoster: "runtime:roster",
@@ -55,6 +56,7 @@ export interface DesktopApi {
     getDesktopState(): Promise<DesktopState>;
     updateDesktopState(patch: DesktopStatePatch): Promise<DesktopState>;
     saveSessionDraft(sessionId: string, draft: string): Promise<DesktopState>;
+    saveSessionTitle(sessionId: string, title: string): Promise<DesktopState>;
     saveSession(session: SessionRecord): Promise<DesktopState>;
     getRuntimeSnapshot(): Promise<RuntimeSnapshot>;
     getRuntimeRoster(): Promise<RuntimeDescriptor[]>;

@@ -55,7 +55,6 @@ let state: DesktopState = {
             projectId: "specpi-project",
             sessionId: "guard",
             sessionPath: "C:/demo/guard.jsonl",
-            name: "Guard interaction",
             model: "openai-codex/gpt-5.6",
             lastOpenedAt: new Date(now - 26 * 3_600_000).toISOString(),
             draft: "",
@@ -65,7 +64,7 @@ let state: DesktopState = {
             projectId: "specpi-project",
             sessionId: "audit",
             sessionPath: "C:/demo/audit.jsonl",
-            name: "Implementation audit",
+            title: "Implementation audit",
             model: "openai-codex/gpt-5.6",
             lastOpenedAt: new Date(now - 4 * 86_400_000).toISOString(),
             draft: "",
@@ -136,6 +135,18 @@ export function installMockApi(): void {
             state = {
                 ...state,
                 sessions: state.sessions.map((session) => (session.id === sessionId ? { ...session, draft } : session)),
+            };
+
+            return structuredClone(state);
+        },
+        saveSessionTitle: async (sessionId, title) => {
+            state = {
+                ...state,
+                sessions: state.sessions.map((session) =>
+                    session.id === sessionId && !session.name?.trim() && !session.title?.trim()
+                        ? { ...session, title }
+                        : session,
+                ),
             };
 
             return structuredClone(state);
@@ -222,11 +233,16 @@ export function installMockApi(): void {
                     thinkingLevel: "high",
                     sessionId: session?.sessionId ?? "demo-session",
                     sessionFile: session?.sessionPath ?? activePath,
-                    sessionName: session?.name ?? "Desktop implementation",
+                    sessionName: session?.name,
                 };
             }
 
             if (command.type === "get_messages") {
+                const activePath = runtimes.find((runtime) => runtime.active)?.sessionPath;
+                if (activePath?.replaceAll("\\", "/").toLowerCase() === "c:/demo/guard.jsonl") {
+                    return { messages: [] };
+                }
+
                 return {
                     messages: [
                         { role: "user", content: "Implement the desktop interface", timestamp: 1 },

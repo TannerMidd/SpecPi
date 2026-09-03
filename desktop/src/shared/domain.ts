@@ -13,7 +13,10 @@ export interface SessionRecord {
     projectId: string;
     sessionId: string;
     sessionPath: string;
+    /** Explicit name owned by Pi. */
     name?: string;
+    /** Local display fallback derived from the first meaningful user prompt. */
+    title?: string;
     model?: string;
     lastOpenedAt: string;
     draft: string;

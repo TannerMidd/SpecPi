@@ -67,6 +67,16 @@ export class StateStore {
         });
     }
 
+    async updateSessionTitle(sessionId: string, title: string): Promise<DesktopState> {
+        return this.update({
+            sessions: this.#state.sessions.map((session) =>
+                session.id === sessionId && !session.name?.trim() && !session.title?.trim()
+                    ? { ...session, title }
+                    : session,
+            ),
+        });
+    }
+
     async saveSession(session: SessionRecord): Promise<DesktopState> {
         const sessions = mergeSessionRecord(this.#state.sessions, session);
         const projects = this.#state.projects.map((project) =>
