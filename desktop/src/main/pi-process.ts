@@ -19,9 +19,19 @@ import { assertSupportedPi, compatibilityWarning, probePi, resolvePiLaunch, type
 const NONBLOCKING_UI = new Set(["notify", "setStatus", "setWidget", "setTitle", "set_editor_text"]);
 const REQUEST_TIMEOUT = 120_000;
 const MAX_PENDING_REQUESTS = 256;
+const MAX_RPC_RECORD_BYTES = 4 * 1024 * 1024;
+const MAX_BULK_RESPONSE_BYTES = 64 * 1024 * 1024;
+const BULK_RESPONSE_COMMANDS = new Set([
+    "get_entries",
+    "get_fork_messages",
+    "get_last_assistant_text",
+    "get_messages",
+    "get_tree",
+]);
 const SESSION_REPLACEMENTS = new Set(["new_session", "switch_session", "fork", "clone"]);
 
 interface PendingRequest {
+    command: string;
     resolve(value: unknown): void;
     reject(error: Error): void;
     timer: NodeJS.Timeout;
@@ -127,7 +137,7 @@ export class PiProcess extends EventEmitter {
                 args.push("--offline");
             }
 
-            const decoder = new JsonlDecoder();
+            const decoder = new JsonlDecoder(MAX_BULK_RESPONSE_BYTES);
             this.#stopping = false;
             const child = spawn(this.#launch.executable, args, {
                 cwd: options.cwd,
@@ -231,7 +241,7 @@ export class PiProcess extends EventEmitter {
                 this.#pending.delete(id);
                 reject(new Error(`Pi request timed out: ${command.type}`));
             }, REQUEST_TIMEOUT);
-            this.#pending.set(id, { resolve, reject, timer });
+            this.#pending.set(id, { command: command.type, resolve, reject, timer });
             this.#write(outgoing).catch((error) => {
                 const pending = this.#pending.get(id);
                 if (pending) {
@@ -350,7 +360,7 @@ export class PiProcess extends EventEmitter {
         }
 
         const line = `${JSON.stringify(record)}\n`;
-        if (Buffer.byteLength(line) > 4 * 1024 * 1024) {
+        if (Buffer.byteLength(line) > MAX_RPC_RECORD_BYTES) {
             throw new Error("Pi RPC command exceeded the size limit");
         }
 
@@ -379,8 +389,15 @@ export class PiProcess extends EventEmitter {
         }
 
         const record = result.data as RpcRecord;
+        const pending =
+            record.type === "response" && typeof record.id === "string" ? this.#pending.get(record.id) : undefined;
+        const isExpectedBulkResponse =
+            pending !== undefined && BULK_RESPONSE_COMMANDS.has(pending.command) && record.command === pending.command;
+        if (Buffer.byteLength(line) > MAX_RPC_RECORD_BYTES && !isExpectedBulkResponse) {
+            throw new Error(`RPC record exceeded ${MAX_RPC_RECORD_BYTES} bytes`);
+        }
+
         if (record.type === "response" && typeof record.id === "string") {
-            const pending = this.#pending.get(record.id);
             if (pending) {
                 clearTimeout(pending.timer);
                 this.#pending.delete(record.id);

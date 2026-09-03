@@ -36,6 +36,8 @@ process.stdin.on("data", (chunk) => {
       write({ type: "extension_ui_request", id: "approval-duplicate", method: "select", title: "Command guard approval — Severity: high", options: ["Deny (Recommended)", "Allow once"] });
     } else if (command.type === "extension_ui_response") write({ type: "extension_ui_request", id: "notice", method: "notify", message: "Guard active", notifyType: "info" });
     else if (command.type === "get_state") write({ type: "response", id: command.id, command: "get_state", success: true, data: { sessionId: "fake", thinkingLevel: "off", desktop: process.env.SPECPI_DESKTOP, startupValue, startupConfirmed } });
+    else if (command.type === "get_messages") write({ type: "response", id: command.id, command: "get_messages", success: true, data: { messages: [{ role: "user", content: "x".repeat(4 * 1024 * 1024), timestamp: 1 }] } });
+    else if (command.type === "get_session_stats") write({ type: "response", id: command.id, command: "get_session_stats", success: true, data: { unexpected: "x".repeat(4 * 1024 * 1024) } });
     else if (command.type === "new_session") write({ type: "response", id: command.id, command: "new_session", success: true, data: {} });
   }
 });
@@ -94,6 +96,46 @@ describe("PiProcess", () => {
         expect(early).toBe(false);
         expect(runtime.snapshot().status.phase).toBe("starting");
         await expect(starting).resolves.toMatchObject({ phase: "idle" });
+        await runtime.stop();
+    });
+
+    it("accepts bounded bulk session responses above the ordinary record limit", async () => {
+        const fixture = await fakePi();
+        const runtime = new PiProcess();
+        await runtime.start({
+            cwd: fixture.directory,
+            piPath: fixture.shim,
+            trust: "deny",
+            noSession: true,
+            offline: true,
+        });
+
+        const result = (await runtime.request({ type: "get_messages" })) as {
+            messages: Array<{ content: string }>;
+        };
+        expect(result.messages[0]?.content).toHaveLength(4 * 1024 * 1024);
+        expect(runtime.snapshot().status.phase).not.toBe("failed");
+        await runtime.stop();
+    });
+
+    it("still rejects oversized non-bulk RPC records", async () => {
+        const fixture = await fakePi();
+        const runtime = new PiProcess();
+        await runtime.start({
+            cwd: fixture.directory,
+            piPath: fixture.shim,
+            trust: "deny",
+            noSession: true,
+            offline: true,
+        });
+
+        await expect(runtime.request({ type: "get_session_stats" })).rejects.toThrow(
+            "RPC record exceeded 4194304 bytes",
+        );
+        expect(runtime.snapshot().status).toMatchObject({
+            phase: "failed",
+            error: "RPC record exceeded 4194304 bytes",
+        });
         await runtime.stop();
     });
 
