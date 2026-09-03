@@ -95,7 +95,12 @@ describe("conversation projection", () => {
         );
         expect(state.streaming).toBeUndefined();
         expect(state.items).toHaveLength(1);
-        expect(state.items[0]).toMatchObject({ kind: "tool", title: "bash", status: "running" });
+        expect(state.items[0]).toMatchObject({
+            kind: "tool",
+            title: "bash",
+            input: { command: "x" },
+            status: "running",
+        });
     });
 
     it("does not put internal Spec state records into the visible feed", () => {

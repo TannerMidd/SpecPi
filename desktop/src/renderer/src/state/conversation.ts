@@ -5,6 +5,7 @@ export interface TranscriptItem {
     kind: "message" | "tool" | "notice" | "entry";
     role?: "user" | "assistant" | "tool";
     content: unknown;
+    input?: unknown;
     title?: string;
     status?: "running" | "success" | "error";
     toolCallId?: string;
@@ -222,6 +223,7 @@ export function reduceRuntimeEvent(state: ConversationState, event: RuntimeEvent
                     kind: "tool",
                     title: String(record.toolName ?? "tool"),
                     content: record.args ?? {},
+                    input: record.args ?? {},
                     status: "running",
                     toolCallId,
                     timestamp: Date.now(),

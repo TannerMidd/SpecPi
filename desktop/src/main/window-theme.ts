@@ -1,6 +1,6 @@
 import type { DesktopState } from "../shared/domain";
 
-export const TITLE_BAR_HEIGHT = 40;
+export const TITLE_BAR_HEIGHT = 38;
 
 export interface WindowThemeColors {
     backgroundColor: string;
@@ -12,6 +12,6 @@ export function windowThemeColors(theme: DesktopState["theme"], systemDark: bool
     const dark = theme === "dark" || (theme === "system" && systemDark);
 
     return dark
-        ? { backgroundColor: "#0b0d10", color: "#0f1216", symbolColor: "#e9edf4" }
-        : { backgroundColor: "#e8e8e3", color: "#f4f4f1", symbolColor: "#202b35" };
+        ? { backgroundColor: "#0a0c0f", color: "#0a0c0f", symbolColor: "#eaeef4" }
+        : { backgroundColor: "#e8e9e7", color: "#e8e9e7", symbolColor: "#1f2b33" };
 }

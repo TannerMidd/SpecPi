@@ -5,6 +5,7 @@ import { stabilizeStreamingMarkdown } from "../lib/streaming-markdown";
 import { safeJson, stripAnsi } from "../lib/text";
 import type { ConversationState, TranscriptItem } from "../state/conversation";
 import { contentText } from "../state/conversation";
+import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
 
 const ContentBlocks = memo(function ContentBlocks({
@@ -55,18 +56,73 @@ function toolMetadata(content: unknown): unknown {
     return Object.keys(metadata).length > 0 ? metadata : undefined;
 }
 
+function toolRecord(value: unknown): Record<string, unknown> | undefined {
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function toolOutputText(content: unknown): string | undefined {
+    if (typeof content === "string") {
+        return content;
+    }
+
+    const record = toolRecord(content);
+    for (const key of ["content", "output", "text"]) {
+        if (typeof record?.[key] === "string") {
+            return record[key];
+        }
+    }
+
+    return undefined;
+}
+
+function toolTarget(item: TranscriptItem): string {
+    if (typeof item.input === "string") {
+        return item.input;
+    }
+
+    const input = toolRecord(item.input);
+    for (const key of ["path", "filePath", "file_path", "relativePath", "command", "url", "query"]) {
+        if (typeof input?.[key] === "string" && input[key].trim()) {
+            return input[key];
+        }
+    }
+
+    return item.status === "running" ? "In progress" : item.status === "error" ? "Failed" : "Complete";
+}
+
+function toolSummary(item: TranscriptItem): string {
+    if (item.status === "running") {
+        return "running";
+    }
+
+    if (item.status === "error") {
+        return "failed";
+    }
+
+    const output = toolOutputText(item.content);
+    if (item.title?.toLowerCase() === "read" && output) {
+        const lines = output.split(/\r?\n/u).length;
+
+        return `${lines} ${lines === 1 ? "line" : "lines"}`;
+    }
+
+    return "complete";
+}
+
 const ToolCard = memo(function ToolCard({ item }: { item: TranscriptItem }) {
     const [open, setOpen] = useState(false);
     const blocks = contentBlocks(item.content);
+    const output = toolOutputText(item.content);
     const metadata = blocks ? toolMetadata(item.content) : undefined;
 
     return (
         <article className={`tool-card ${item.status ?? ""}`}>
             <button className="tool-heading" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
                 <span className="tool-dot" />
-                <strong>{item.title}</strong>
-                <span>{item.status}</span>
-                <span className="chevron">{open ? "−" : "+"}</span>
+                <span className="tool-kind">{item.title ?? "tool"}</span>
+                <strong>{toolTarget(item)}</strong>
+                <span className="tool-status">{toolSummary(item)}</span>
+                <Icon className="chevron" name={open ? "chevron-down" : "chevron-right"} size={13} />
             </button>
             {open ? (
                 blocks ? (
@@ -78,6 +134,8 @@ const ToolCard = memo(function ToolCard({ item }: { item: TranscriptItem }) {
                         />
                         {metadata ? <pre>{safeJson(metadata)}</pre> : null}
                     </div>
+                ) : output ? (
+                    <pre>{stripAnsi(output)}</pre>
                 ) : (
                     <pre>{safeJson(item.content)}</pre>
                 )

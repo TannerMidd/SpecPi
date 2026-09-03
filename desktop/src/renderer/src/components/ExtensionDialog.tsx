@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExtensionUiRequest, ExtensionUiResponse } from "../../../shared/rpc";
 import { stripAnsi } from "../lib/text";
+import { Icon } from "./Icons";
 
 function optionDescription(option: string): string | undefined {
     const normalized = option.toLowerCase();
@@ -83,12 +84,18 @@ export function ExtensionDialog({
             const detail = Object.fromEntries(
                 approval.fields.map(([label, fieldValue]) => [label.toLowerCase(), fieldValue]),
             );
-            const summary = detail.reason ?? detail.affected ?? "Review this protected operation.";
+            const summary = detail.reason
+                ? `${detail.reason}${detail.affected ? ` — ${detail.affected}` : ""}`
+                : (detail.affected ?? "Review this protected operation.");
+            const mode = detail.mode ?? detail.severity ?? "guard";
+            const orderedOptions = [...options].sort((left, right) =>
+                /allow once/iu.test(left) ? 1 : /allow once/iu.test(right) ? -1 : 0,
+            );
             const optionLabel = (option: string) =>
                 /exact call/iu.test(option)
                     ? "Session"
                     : /allow once/iu.test(option)
-                      ? "Once"
+                      ? "Allow once"
                       : /lock/iu.test(option)
                         ? "Lock"
                         : "Deny";
@@ -96,15 +103,15 @@ export function ExtensionDialog({
             return (
                 <section className="approval-dock" role="dialog" aria-modal="false" aria-labelledby="approval-title">
                     <div className="approval-line">
-                        <div className="approval-shield" aria-hidden="true">
-                            ◇
+                        <div className="approval-shield">
+                            <Icon name="shield" size={15} />
                         </div>
                         <div className="approval-copy">
-                            <h2 id="approval-title">Approval needed</h2>
-                            <p>{summary}</p>
+                            <h2 id="approval-title">{summary}</h2>
+                            <span>Command Guard · {mode} · waiting on you</span>
                         </div>
                         <div className="approval-actions">
-                            {options.map((option, index) => (
+                            {orderedOptions.map((option, index) => (
                                 <button
                                     ref={index === 0 ? first : undefined}
                                     key={option}
@@ -112,7 +119,7 @@ export function ExtensionDialog({
                                     className={
                                         /deny.*recommended/iu.test(option)
                                             ? "safe"
-                                            : /allow/iu.test(option)
+                                            : /allow once/iu.test(option)
                                               ? "allow"
                                               : ""
                                     }

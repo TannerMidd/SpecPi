@@ -4,10 +4,11 @@ import type { RuntimeDescriptor, RuntimeEvent, RuntimeStatus } from "../../share
 import { mergeSessionRecord } from "../../shared/session-registry";
 
 const projectPath = "F:/Development/SpecPi";
+const preview = new URLSearchParams(window.location.search).get("preview");
 const now = Date.now();
 let state: DesktopState = {
     schema: 1,
-    theme: "dark",
+    theme: preview === "light" ? "light" : "dark",
     projects: [
         {
             id: "specpi-project",
@@ -70,8 +71,8 @@ let state: DesktopState = {
             draft: "",
         },
     ],
-    activeProjectId: "specpi-project",
-    activeSessionId: "demo-session",
+    activeProjectId: preview === "empty" ? undefined : "specpi-project",
+    activeSessionId: preview === "empty" ? undefined : "demo-session",
     layout: { filesOpen: false, filesWidth: 420, inspectorOpen: true, sidebarOpen: true },
 };
 let status: RuntimeStatus = { generation: 0, phase: "stopped" };
@@ -124,7 +125,10 @@ export function installMockApi(): void {
         choosePi: async () => "C:/Users/example/AppData/Roaming/npm/pi.cmd",
         chooseSession: async () => "C:/demo/session.jsonl",
         openWorkspace: async () => undefined,
-        getLaunchIntent: async () => ({ cwd: projectPath, trust: "approve", sessionPath: "C:/demo/session.jsonl" }),
+        getLaunchIntent: async () =>
+            preview === "empty"
+                ? undefined
+                : { cwd: projectPath, trust: "approve", sessionPath: "C:/demo/session.jsonl" },
         getDesktopState: async () => structuredClone(state),
         updateDesktopState: async (patch: DesktopStatePatch) => {
             state = { ...state, ...patch, layout: { ...state.layout, ...patch.layout } };
@@ -196,7 +200,7 @@ export function installMockApi(): void {
                 },
             ];
             emitStatus({ generation: status.generation + 1, phase: "starting", cwd: options.cwd });
-            await new Promise((resolve) => setTimeout(resolve, 2_000));
+            await new Promise((resolve) => setTimeout(resolve, preview === "startup" ? 60_000 : 2_000));
             emitStatus({
                 generation: status.generation,
                 phase: "idle",
@@ -342,6 +346,25 @@ export function installMockApi(): void {
                     message: { role: "user", content: command.message, timestamp: Date.now() },
                 });
                 emitRuntimeStatus(runtimeId, "streaming");
+                if (preview === "tools") {
+                    setTimeout(() => {
+                        emitRuntimeEvent(runtimeId, {
+                            type: "tool_execution_start",
+                            toolCallId: "mock-read",
+                            toolName: "read",
+                            args: { path: "desktop/src/renderer/src/App.tsx" },
+                        });
+                    }, 350);
+                    setTimeout(() => {
+                        emitRuntimeEvent(runtimeId, {
+                            type: "tool_execution_end",
+                            toolCallId: "mock-read",
+                            result: { content: "export function App() {\n    return <SpecPiDesktop />;\n}" },
+                            isError: false,
+                        });
+                    }, 900);
+                }
+
                 setTimeout(() => {
                     emitRuntimeEvent(runtimeId, {
                         type: "message_update",
@@ -409,7 +432,17 @@ export function installMockApi(): void {
             branch: "main",
             files: [{ path: "PLAN.md", index: " ", worktree: "M" }],
         }),
-        getGitDiff: async () => "diff --git a/PLAN.md b/PLAN.md\n+SpecPi Desktop implementation plan",
+        getGitDiff: async () =>
+            [
+                "diff --git a/PLAN.md b/PLAN.md",
+                "--- a/PLAN.md",
+                "+++ b/PLAN.md",
+                "@@ -18,3 +18,4 @@ Desktop implementation",
+                " - Preserve local Pi ownership",
+                "-- Match the current shell",
+                "+- Match the refined desktop workbench",
+                "+- Validate responsive states",
+            ].join("\n"),
         saveExport: async () => undefined,
         copyText: async () => undefined,
         openExternal: async () => undefined,

@@ -12,18 +12,14 @@ import { sessionDisplayTitle, sessionTitleFromMessages, sessionTitleFromPrompt }
 import { CommandPalette, type CommandInfo } from "./components/CommandPalette";
 import { ExtensionDialog } from "./components/ExtensionDialog";
 import { FilesPanel } from "./components/FilesPanel";
+import { Icon } from "./components/Icons";
+import { ModelSelector, type ModelOption } from "./components/ModelSelector";
 import { SessionNameDialog } from "./components/SessionNameDialog";
 import { Transcript } from "./components/Transcript";
 import { commandSuggestions, composerStreamingBehavior, parseSlashCommand } from "./lib/commands";
 import { sessionOpenAction, spinupDetail } from "./lib/spinup";
 import { stripAnsi } from "./lib/text";
 import { emptyConversation, messagesToItems, reduceRuntimeEvent } from "./state/conversation";
-
-interface ModelInfo {
-    id: string;
-    provider: string;
-    name?: string;
-}
 
 interface Toast {
     id: string;
@@ -186,7 +182,7 @@ function sessionRuntimeLabel(status?: RuntimeStatus): string | undefined {
 
     const labels: Partial<Record<RuntimeStatus["phase"], string>> = {
         starting: "starting",
-        idle: "running",
+        idle: "idle",
         streaming: "working",
         "waiting-for-user": "waiting",
         compacting: "compacting",
@@ -262,7 +258,7 @@ export function App() {
     runtimeRef.current = runtime;
     const [conversation, dispatch] = useReducer(reduceRuntimeEvent, undefined, emptyConversation);
     const [commands, setCommands] = useState<CommandInfo[]>([]);
-    const [models, setModels] = useState<ModelInfo[]>([]);
+    const [models, setModels] = useState<ModelOption[]>([]);
     const [thinkingLevels, setThinkingLevels] = useState<string[]>([]);
     const [sessionState, setSessionState] = useState<Record<string, unknown>>({});
     const [sessionStats, setSessionStats] = useState<Record<string, unknown>>({});
@@ -305,11 +301,17 @@ export function App() {
     const [renameSessionOpen, setRenameSessionOpen] = useState(false);
     const [filesTab, setFilesTab] = useState<"files" | "changes">("files");
     const [changedFiles, setChangedFiles] = useState(0);
+    const [gitBranch, setGitBranch] = useState("");
+    const [filesRefreshToken, setFilesRefreshToken] = useState(0);
+    const [filesMounted, setFilesMounted] = useState(false);
+    const [projectMenuOpen, setProjectMenuOpen] = useState(false);
     const [runtimePanel, setRuntimePanel] = useState(false);
     const [treeView, setTreeView] = useState<unknown>();
     const [diagnostics, setDiagnostics] = useState<readonly string[]>([]);
     const [spinup, setSpinup] = useState<SpinupStatus>();
     const [spinupElapsed, setSpinupElapsed] = useState(0);
+    const startGeneration = useRef(0);
+    const startInFlight = useRef(false);
     const [sessionChanging, setSessionChanging] = useState(false);
     const [error, setError] = useState("");
 
@@ -368,7 +370,7 @@ export function App() {
                           .filter((command) => typeof command.name === "string")
                     : [],
             );
-            setModels(Array.isArray(modelList) ? modelList.map((item) => object(item) as unknown as ModelInfo) : []);
+            setModels(Array.isArray(modelList) ? modelList.map((item) => object(item) as unknown as ModelOption) : []);
             setThinkingLevels(
                 Array.isArray(levels) ? levels.filter((item): item is string => typeof item === "string") : [],
             );
@@ -573,6 +575,12 @@ export function App() {
     }, [desktop?.theme]);
 
     useEffect(() => {
+        if (desktop?.layout.filesOpen) {
+            setFilesMounted(true);
+        }
+    }, [desktop?.layout.filesOpen]);
+
+    useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             const modifier = event.ctrlKey || event.metaKey;
             const key = event.key.toLowerCase();
@@ -589,17 +597,20 @@ export function App() {
                 composerRef.current?.focus();
             } else if (event.key === "Escape" && palette) {
                 setPalette(false);
+            } else if (event.key === "Escape" && pendingProject) {
+                setPendingProject(undefined);
             }
         };
 
         window.addEventListener("keydown", onKeyDown);
 
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [desktop, dialogs.length, palette, persist, runtime.phase]);
+    }, [desktop, dialogs.length, palette, pendingProject, persist, runtime.phase]);
 
     useEffect(() => {
         if (!selectedProject) {
             setChangedFiles(0);
+            setGitBranch("");
 
             return;
         }
@@ -610,11 +621,13 @@ export function App() {
             .then((git) => {
                 if (active) {
                     setChangedFiles(git.files.length);
+                    setGitBranch(git.branch ?? "");
                 }
             })
             .catch(() => {
                 if (active) {
                     setChangedFiles(0);
+                    setGitBranch("");
                 }
             });
 
@@ -674,6 +687,14 @@ export function App() {
             return;
         }
 
+        if (startInFlight.current) {
+            toast("Pi is still finishing the previous runtime transition.", "warning");
+
+            return;
+        }
+
+        startInFlight.current = true;
+        const startToken = ++startGeneration.current;
         const normalizedPath = sessionPath ? normalizedSessionPath(sessionPath) : undefined;
         const openingSession = normalizedPath
             ? desktopState.sessions.find((session) => normalizedSessionPath(session.sessionPath) === normalizedPath)
@@ -722,6 +743,12 @@ export function App() {
                 sessionPath,
                 noSession,
             });
+            if (startToken !== startGeneration.current) {
+                await window.specpi.stopRuntime();
+
+                return;
+            }
+
             runtimeRef.current = started;
             setRuntime(started);
             if (["streaming", "compacting", "retrying"].includes(started.phase)) {
@@ -742,9 +769,14 @@ export function App() {
             const activeSession = hydrated?.sessions.find((session) => session.id === hydrated.activeSessionId);
             setDraft(activeSession?.draft ?? "");
         } catch (caught) {
-            setError(caught instanceof Error ? caught.message : String(caught));
+            if (startToken === startGeneration.current) {
+                setError(caught instanceof Error ? caught.message : String(caught));
+            }
         } finally {
-            setSpinup(undefined);
+            startInFlight.current = false;
+            if (startToken === startGeneration.current) {
+                setSpinup(undefined);
+            }
         }
     };
 
@@ -1215,14 +1247,6 @@ export function App() {
     }, [pendingSpecMode, runtime.phase]);
 
     const activeModel = object(sessionState.model);
-    const modelGroups = useMemo(() => {
-        const groups = new Map<string, ModelInfo[]>();
-        for (const model of models) {
-            groups.set(model.provider, [...(groups.get(model.provider) ?? []), model]);
-        }
-
-        return groups;
-    }, [models]);
     const currentSessions = desktop?.sessions.filter((item) => item.projectId === selectedProject?.id) ?? [];
     const visibleSessions = currentSessions.filter((session) =>
         `${sessionDisplayTitle(session.name, session.title)} ${session.model ?? ""} ${session.sessionPath}`
@@ -1281,6 +1305,8 @@ export function App() {
             : runtime.phase === "waiting-for-user"
               ? "REVIEW"
               : runtime.phase.toUpperCase();
+    const sidebarHidden = !desktop?.layout.sidebarOpen || specMode;
+    const inspectorHidden = !desktop?.layout.inspectorOpen || specMode || Boolean(desktop?.layout.filesOpen);
 
     if (!desktop) {
         return <main className="loading">Loading SpecPi Desktop…</main>;
@@ -1297,65 +1323,75 @@ export function App() {
                     title={`${desktop.layout.sidebarOpen ? "Collapse" : "Expand"} sidebar (Ctrl+B)`}
                     onClick={() => void persist({ layout: { sidebarOpen: !desktop.layout.sidebarOpen } })}
                 >
-                    ☰
+                    <Icon name="panel-left" size={17} />
                 </button>
-                <span aria-hidden="true">π</span>
-                <strong>SpecPi Desktop{activeSessionTitle ? ` — ${activeSessionTitle}` : ""}</strong>
-            </header>
-            <aside className="sidebar">
-                <header className="brand">
-                    <span className="brand-mark" aria-hidden="true">
-                        π
+                <i className="window-divider" aria-hidden="true" />
+                <span className="window-mark" aria-hidden="true">
+                    π
+                </span>
+                <strong className="window-project">{selectedProject?.label ?? "SpecPi Desktop"}</strong>
+                {activeSessionTitle ? (
+                    <>
+                        <span className="window-slash" aria-hidden="true">
+                            /
+                        </span>
+                        <strong className="window-session">{activeSessionTitle}</strong>
+                    </>
+                ) : null}
+                {specMode ? (
+                    <span className="window-spec-badge">
+                        <i aria-hidden="true" /> Spec
                     </span>
-                    <div>
-                        <strong>SpecPi</strong>
-                        <small>Desktop</small>
-                    </div>
-                </header>
-                <button className="new-project" onClick={() => void addProject()}>
-                    ＋ Open project
-                </button>
-                <div className="section-heading project-heading">Projects</div>
-                <nav className="projects" aria-label="Projects">
-                    {desktop.projects.map((project) => (
-                        <button
-                            key={project.id}
-                            className={project.id === selectedProject?.id ? "active" : ""}
-                            onClick={() => void startProject(project, project.lastSessionPath)}
-                        >
-                            <span>{project.label.slice(0, 1).toUpperCase()}</span>
-                            <div>
-                                <strong>{project.label}</strong>
-                                <small>{compactPath(project.path)}</small>
-                            </div>
-                        </button>
-                    ))}
-                </nav>
-                <section className="sessions">
-                    <div className="section-heading">
-                        <span>Sessions</span>
-                        <div>
+                ) : null}
+            </header>
+            <aside className="sidebar" aria-hidden={sidebarHidden} inert={sidebarHidden ? true : undefined}>
+                {selectedProject ? (
+                    <>
+                        <div className="project-switcher-wrap">
                             <button
-                                title="Open a session in an independent window"
-                                aria-label="Open a session in an independent window"
-                                disabled={!selectedProject || sessionChanging}
-                                onClick={() => void runDesktopCommand("@open-session")}
+                                className="project-switcher"
+                                aria-expanded={projectMenuOpen}
+                                onClick={() => setProjectMenuOpen((open) => !open)}
                             >
-                                ◇
+                                <span>{selectedProject.label.slice(0, 1).toUpperCase()}</span>
+                                <div>
+                                    <strong>{selectedProject.label}</strong>
+                                    <small>{compactPath(selectedProject.path)}</small>
+                                </div>
+                                <Icon name="chevron-down" size={15} />
                             </button>
-                            <button
-                                title="New session in an independent window"
-                                aria-label="New session in an independent window"
-                                disabled={!selectedProject || sessionChanging}
-                                onClick={() => void runDesktopCommand("@new-session")}
-                            >
-                                ＋
-                            </button>
+                            {projectMenuOpen ? (
+                                <div className="project-menu">
+                                    {desktop.projects.map((project) => (
+                                        <button
+                                            key={project.id}
+                                            className={project.id === selectedProject.id ? "active" : ""}
+                                            onClick={() => {
+                                                setProjectMenuOpen(false);
+                                                void startProject(project, project.lastSessionPath);
+                                            }}
+                                        >
+                                            <span>{project.label.slice(0, 1).toUpperCase()}</span>
+                                            <div>
+                                                <strong>{project.label}</strong>
+                                                <small>{compactPath(project.path)}</small>
+                                            </div>
+                                        </button>
+                                    ))}
+                                    <button
+                                        className="project-menu-open"
+                                        onClick={() => {
+                                            setProjectMenuOpen(false);
+                                            void addProject();
+                                        }}
+                                    >
+                                        <Icon name="plus" size={14} /> Open project…
+                                    </button>
+                                </div>
+                            ) : null}
                         </div>
-                    </div>
-                    {currentSessions.length > 4 || sessionSearch ? (
                         <label className="session-search">
-                            <span aria-hidden="true">⌕</span>
+                            <Icon name="search" size={14} />
                             <input
                                 value={sessionSearch}
                                 placeholder="Find sessions"
@@ -1364,72 +1400,134 @@ export function App() {
                             />
                             {sessionSearch ? (
                                 <button aria-label="Clear session search" onClick={() => setSessionSearch("")}>
-                                    ×
+                                    <Icon name="close" size={11} />
                                 </button>
                             ) : null}
                         </label>
-                    ) : null}
-                    {visibleSessions.map((session) => {
-                        const active = session.id === activeSessionId;
-                        const sessionTitle = sessionDisplayTitle(session.name, session.title);
-                        const sessionRuntime = runtimeBySessionPath.get(normalizedSessionPath(session.sessionPath));
-                        const sessionStatus = active ? runtime : sessionRuntime?.status;
-                        const runningLabel = active
-                            ? (sessionRuntimeLabel(sessionStatus) ?? "stopped")
-                            : sessionRuntimeLabel(sessionStatus);
-                        const runtimeClass =
-                            sessionStatus && sessionStatus.phase !== "stopped"
-                                ? `session-state ${sessionStatus.phase}`
-                                : "";
-
-                        return (
-                            <div className={`session-row ${active ? "active" : ""}`} key={session.id}>
-                                <button
-                                    className="session-main"
-                                    disabled={sessionChanging}
-                                    onClick={() => void switchSession(session)}
-                                >
-                                    <strong>{sessionTitle}</strong>
-                                    <small className={runtimeClass}>
-                                        {runningLabel
-                                            ? `${runningLabel} · `
-                                            : session.model
-                                              ? `${session.model.split("/").at(-1)} · `
-                                              : ""}
-                                        {relativeTime(session.lastOpenedAt)}
-                                    </small>
-                                </button>
-                                <button
-                                    className="session-popout"
-                                    title={active ? "Already active in this window" : "Open in an independent window"}
-                                    aria-label={`Open ${sessionTitle} in an independent window`}
-                                    disabled={active}
-                                    onClick={() => void openIndependentWorkspace(session.sessionPath)}
-                                >
-                                    ↗
-                                </button>
+                        <section className="sessions">
+                            <div className="section-heading">
+                                <span>Sessions</span>
+                                <div>
+                                    <button
+                                        title="Open a session in an independent window"
+                                        aria-label="Open a session in an independent window"
+                                        disabled={sessionChanging}
+                                        onClick={() => void runDesktopCommand("@open-session")}
+                                    >
+                                        <Icon name="document" size={15} />
+                                    </button>
+                                    <button
+                                        title="New session in an independent window (Ctrl+N)"
+                                        aria-label="New session in an independent window"
+                                        disabled={sessionChanging}
+                                        onClick={() => void runDesktopCommand("@new-session")}
+                                    >
+                                        <Icon name="plus" size={15} />
+                                    </button>
+                                </div>
                             </div>
-                        );
-                    })}
-                    {currentSessions.length > 0 && visibleSessions.length === 0 ? (
-                        <p className="session-empty">No matching sessions</p>
-                    ) : null}
-                </section>
+                            <nav className="session-list" aria-label="Sessions">
+                                {visibleSessions.map((session) => {
+                                    const active = session.id === activeSessionId;
+                                    const sessionTitle = sessionDisplayTitle(session.name, session.title);
+                                    const sessionRuntime = runtimeBySessionPath.get(
+                                        normalizedSessionPath(session.sessionPath),
+                                    );
+                                    const sessionStatus = active ? runtime : sessionRuntime?.status;
+                                    const runningLabel = active
+                                        ? (sessionRuntimeLabel(sessionStatus) ?? "stopped")
+                                        : sessionRuntimeLabel(sessionStatus);
+                                    const runtimeClass =
+                                        sessionStatus && sessionStatus.phase !== "stopped"
+                                            ? `session-state ${sessionStatus.phase}`
+                                            : "";
+
+                                    return (
+                                        <div className={`session-row ${active ? "active" : ""}`} key={session.id}>
+                                            <button
+                                                className="session-main"
+                                                disabled={sessionChanging}
+                                                onClick={() => void switchSession(session)}
+                                            >
+                                                <strong>{sessionTitle}</strong>
+                                                <small className={runtimeClass}>
+                                                    {runningLabel
+                                                        ? `${runningLabel} · `
+                                                        : session.model
+                                                          ? `${session.model.split("/").at(-1)} · `
+                                                          : ""}
+                                                    {relativeTime(session.lastOpenedAt)}
+                                                </small>
+                                            </button>
+                                            <button
+                                                className="session-popout"
+                                                title={
+                                                    active
+                                                        ? "Already active in this window"
+                                                        : "Open in an independent window"
+                                                }
+                                                aria-label={`Open ${sessionTitle} in an independent window`}
+                                                disabled={active}
+                                                onClick={() => void openIndependentWorkspace(session.sessionPath)}
+                                            >
+                                                ↗
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                                {currentSessions.length > 0 && visibleSessions.length === 0 ? (
+                                    <p className="session-empty">No matching sessions</p>
+                                ) : null}
+                            </nav>
+                        </section>
+                    </>
+                ) : (
+                    <>
+                        <button className="open-project-row" onClick={() => void addProject()}>
+                            <span>
+                                <Icon name="plus" size={15} />
+                            </span>
+                            <strong>Open a project…</strong>
+                            <kbd>{/Macintosh/iu.test(navigator.userAgent) ? "⌘O" : "Ctrl O"}</kbd>
+                        </button>
+                        <div className="section-heading project-heading">Projects</div>
+                        <nav className="projects" aria-label="Projects">
+                            {desktop.projects.map((project) => (
+                                <button
+                                    key={project.id}
+                                    onClick={() => void startProject(project, project.lastSessionPath)}
+                                >
+                                    <span>{project.label.slice(0, 1).toUpperCase()}</span>
+                                    <div>
+                                        <strong>{project.label}</strong>
+                                        <small>{compactPath(project.path)}</small>
+                                    </div>
+                                </button>
+                            ))}
+                        </nav>
+                        <div className="sidebar-spacer" />
+                    </>
+                )}
                 <footer>
-                    <button onClick={() => void openRuntimePanel()}>⚙ Runtime</button>
-                    <small>{runtime.piVersion ? `Pi ${runtime.piVersion}` : "Pi not connected"}</small>
+                    <span className={`runtime-connection ${runtime.phase}`}>
+                        <i /> {runtime.piVersion ? `Pi ${runtime.piVersion}` : "Pi not connected"}
+                    </span>
+                    <button title="Runtime" aria-label="Runtime" onClick={() => void openRuntimePanel()}>
+                        <Icon name="sliders" size={16} />
+                    </button>
                 </footer>
             </aside>
 
             <section className="workspace">
-                <header className="topbar">
-                    {selectedProject ? (
+                {selectedProject ? (
+                    <header className="topbar">
                         <nav className="workspace-tabs" aria-label="Workspace views">
                             <button
                                 className={!desktop.layout.filesOpen ? "active" : ""}
                                 onClick={() => void persist({ layout: { filesOpen: false } })}
                             >
                                 Chat
+                                <i />
                             </button>
                             <button
                                 className={desktop.layout.filesOpen && filesTab === "files" ? "active" : ""}
@@ -1439,6 +1537,7 @@ export function App() {
                                 }}
                             >
                                 Files
+                                <i />
                             </button>
                             <button
                                 className={desktop.layout.filesOpen && filesTab === "changes" ? "active" : ""}
@@ -1447,101 +1546,136 @@ export function App() {
                                     void persist({ layout: { filesOpen: true } });
                                 }}
                             >
-                                Changes {changedFiles || ""}
+                                Changes
+                                {changedFiles ? <span className="change-count">{changedFiles}</span> : null}
+                                <i />
                             </button>
                         </nav>
-                    ) : (
-                        <div className="project-title">
-                            <strong>No project</strong>
-                            <span className="runtime-state stopped">Stopped</span>
-                        </div>
-                    )}
-                    <div className="top-actions">
-                        <select
-                            aria-label="Model"
-                            value={`${String(activeModel.provider ?? "")}/${String(activeModel.id ?? "")}`}
-                            disabled={runtime.phase === "stopped" || agentBusy}
-                            onChange={(event) => void switchModel(event.target.value)}
-                        >
-                            <option value="">Model</option>
-                            {[...modelGroups.entries()].map(([provider, providerModels]) => (
-                                <optgroup key={provider} label={provider}>
-                                    {providerModels.map((model) => (
-                                        <option
-                                            key={`${model.provider}/${model.id}`}
-                                            value={`${model.provider}/${model.id}`}
-                                        >
-                                            {model.name || model.id}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
-                        <select
-                            aria-label="Thinking level"
-                            value={String(sessionState.thinkingLevel ?? "off")}
-                            disabled={runtime.phase === "stopped"}
-                            onChange={async (event) => {
-                                await window.specpi.sendRuntimeCommand({
-                                    type: "set_thinking_level",
-                                    level: event.target.value,
-                                });
-                                await hydrate(selectedProject);
-                            }}
-                        >
-                            <option value="off">off</option>
-                            {thinkingLevels
-                                .filter((level) => level !== "off")
-                                .map((level) => (
-                                    <option key={level} value={level}>
-                                        {level}
-                                    </option>
-                                ))}
-                        </select>
-                        <button
-                            className={`spec-toggle ${specMode ? "active" : ""}`}
-                            disabled={runtime.phase === "stopped" || runtime.phase === "failed" || dialogs.length > 0}
-                            aria-pressed={specMode}
-                            title={specMode ? "Leave Spec mode" : "Enter Spec mode"}
-                            onClick={() => void requestSpecMode()}
-                        >
-                            <i /> Spec
-                        </button>
-                        <button
-                            className="commands-button"
-                            disabled={runtime.phase === "stopped"}
-                            onClick={() => setPalette(true)}
-                        >
-                            ⌘K&nbsp; Commands
-                        </button>
-                        <button
-                            className={`inspector-toggle ${desktop.layout.inspectorOpen ? "active" : ""}`}
-                            disabled={!selectedProject}
-                            aria-label={
-                                desktop.layout.inspectorOpen ? "Collapse run inspector" : "Expand run inspector"
-                            }
-                            title={desktop.layout.inspectorOpen ? "Collapse inspector" : "Expand inspector"}
-                            onClick={() => void persist({ layout: { inspectorOpen: !desktop.layout.inspectorOpen } })}
-                        >
-                            ◫
-                        </button>
-                    </div>
-                </header>
-                {specMode ? (
-                    <div className="spec-banner">
-                        <div>
-                            <strong>π SPEC EXECUTION</strong>
-                            <span>{pendingSpecMode !== undefined ? "SYNC PENDING" : specPhase}</span>
-                        </div>
-                        <div>
-                            <span>T{String(totalTurns).padStart(2, "0")}</span>
-                            <span>X{String(totalTools).padStart(2, "0")}</span>
-                            <span>
-                                SCOPE{" "}
-                                {Array.from(statuses.keys()).some((key) => key.includes("scope")) ? "ACTIVE" : "UNSET"}
-                            </span>
-                        </div>
-                    </div>
+                        {specMode ? (
+                            <div className="top-actions spec-actions">
+                                <div className="spec-status" aria-label="Spec execution status">
+                                    <span>{pendingSpecMode !== undefined ? "Sync pending" : specPhase}</span>
+                                    <span>T{String(totalTurns).padStart(2, "0")}</span>
+                                    <span>X{String(totalTools).padStart(2, "0")}</span>
+                                    <span className={scopeReady ? "good" : ""}>
+                                        scope{" "}
+                                        {Array.from(statuses.keys()).some((key) => key.includes("scope"))
+                                            ? "active"
+                                            : "unset"}
+                                    </span>
+                                </div>
+                                <i className="top-divider" aria-hidden="true" />
+                                <button
+                                    className="spec-toggle active"
+                                    disabled={runtime.phase === "stopped" || dialogs.length > 0}
+                                    onClick={() => void requestSpecMode(false)}
+                                >
+                                    <span className="diamond-icon" aria-hidden="true" /> Leave Spec
+                                </button>
+                                <button
+                                    className="inspector-toggle"
+                                    aria-label="Show session pulse"
+                                    title="Show session pulse"
+                                    onClick={() =>
+                                        void persist({ layout: { inspectorOpen: !desktop.layout.inspectorOpen } })
+                                    }
+                                >
+                                    <Icon name="panel-right" size={16} />
+                                </button>
+                            </div>
+                        ) : desktop.layout.filesOpen ? (
+                            <div className="top-actions file-actions">
+                                {gitBranch ? (
+                                    <span className="branch-label">
+                                        <Icon name="branch" size={14} /> {gitBranch}
+                                    </span>
+                                ) : null}
+                                <button
+                                    className="icon-button"
+                                    title="Refresh files and changes"
+                                    aria-label="Refresh files and changes"
+                                    onClick={() => setFilesRefreshToken((token) => token + 1)}
+                                >
+                                    <Icon name="refresh" size={16} />
+                                </button>
+                                <button
+                                    className="inspector-toggle active"
+                                    aria-label="Close files panel"
+                                    title="Close files panel"
+                                    onClick={() => void persist({ layout: { filesOpen: false } })}
+                                >
+                                    <Icon name="panel-right" size={16} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="top-actions">
+                                <ModelSelector
+                                    models={models}
+                                    value={`${String(activeModel.provider ?? "")}/${String(activeModel.id ?? "")}`}
+                                    disabled={runtime.phase === "stopped" || agentBusy}
+                                    onChange={(value) => void switchModel(value)}
+                                />
+                                <label className="top-select thinking-select">
+                                    <select
+                                        aria-label="Thinking level"
+                                        value={String(sessionState.thinkingLevel ?? "off")}
+                                        disabled={runtime.phase === "stopped"}
+                                        onChange={async (event) => {
+                                            await window.specpi.sendRuntimeCommand({
+                                                type: "set_thinking_level",
+                                                level: event.target.value,
+                                            });
+                                            await hydrate(selectedProject);
+                                        }}
+                                    >
+                                        <option value="off">off</option>
+                                        {thinkingLevels
+                                            .filter((level) => level !== "off")
+                                            .map((level) => (
+                                                <option key={level} value={level}>
+                                                    {level}
+                                                </option>
+                                            ))}
+                                    </select>
+                                    <Icon name="chevron-down" size={12} />
+                                </label>
+                                <i className="top-divider" aria-hidden="true" />
+                                <button
+                                    className="spec-toggle"
+                                    disabled={
+                                        runtime.phase === "stopped" || runtime.phase === "failed" || dialogs.length > 0
+                                    }
+                                    aria-pressed={false}
+                                    title="Enter Spec mode"
+                                    onClick={() => void requestSpecMode(true)}
+                                >
+                                    <span className="diamond-icon" aria-hidden="true" /> Spec
+                                </button>
+                                <button
+                                    className="commands-button"
+                                    disabled={runtime.phase === "stopped"}
+                                    onClick={() => setPalette(true)}
+                                >
+                                    Commands
+                                    <kbd>{/Macintosh/iu.test(navigator.userAgent) ? "⌘K" : "Ctrl K"}</kbd>
+                                </button>
+                                <button
+                                    className={`inspector-toggle ${desktop.layout.inspectorOpen ? "active" : ""}`}
+                                    aria-label={
+                                        desktop.layout.inspectorOpen ? "Collapse session pulse" : "Expand session pulse"
+                                    }
+                                    title={
+                                        desktop.layout.inspectorOpen ? "Collapse session pulse" : "Expand session pulse"
+                                    }
+                                    onClick={() =>
+                                        void persist({ layout: { inspectorOpen: !desktop.layout.inspectorOpen } })
+                                    }
+                                >
+                                    <Icon name="panel-right" size={16} />
+                                </button>
+                            </div>
+                        )}
+                    </header>
                 ) : null}
                 <div className="content-row">
                     {selectedProject ? (
@@ -1595,7 +1729,7 @@ export function App() {
                                             {slashSuggestions.length > 0 ? (
                                                 <div className="slash-menu" role="listbox" aria-label="Slash commands">
                                                     <header>
-                                                        <span>Commands</span>
+                                                        <span>{slashSuggestions.length} Commands</span>
                                                         <small>↑↓ navigate · Tab complete · ↵ run</small>
                                                     </header>
                                                     {slashSuggestions.map((suggestion, index) => (
@@ -1755,7 +1889,7 @@ export function App() {
                                                                 document.getElementById("image-input")?.click()
                                                             }
                                                         >
-                                                            ＋
+                                                            <Icon name="image" size={16} />
                                                         </button>
                                                         <input
                                                             id="image-input"
@@ -1778,30 +1912,12 @@ export function App() {
                                                                     });
                                                             }}
                                                         />
-                                                        <div
-                                                            className="delivery-toggle"
-                                                            aria-label="Queued message delivery"
-                                                        >
-                                                            <button
-                                                                className={delivery === "steer" ? "active" : ""}
-                                                                onClick={() => setDelivery("steer")}
-                                                            >
-                                                                Steer now
-                                                            </button>
-                                                            <button
-                                                                className={delivery === "followUp" ? "active" : ""}
-                                                                onClick={() => setDelivery("followUp")}
-                                                            >
-                                                                Follow up
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="composer-end">
+                                                        <i className="composer-divider" aria-hidden="true" />
                                                         <label
-                                                            className="protection-picker"
+                                                            className={`protection-picker ${guardMode}`}
                                                             title="Command protection for this session"
                                                         >
-                                                            <span aria-hidden="true">◇</span>
+                                                            <Icon name="shield" size={14} />
                                                             <select
                                                                 aria-label="Command protection"
                                                                 value={guardMode}
@@ -1817,7 +1933,36 @@ export function App() {
                                                                 <option value="guard">Guard</option>
                                                                 <option value="strict">Strict</option>
                                                             </select>
+                                                            <Icon
+                                                                name="chevron-down"
+                                                                size={11}
+                                                                className="picker-chevron"
+                                                            />
                                                         </label>
+                                                        <div
+                                                            className="delivery-toggle"
+                                                            aria-label="Queued message delivery"
+                                                        >
+                                                            <button
+                                                                className={delivery === "steer" ? "active" : ""}
+                                                                onClick={() => setDelivery("steer")}
+                                                            >
+                                                                Steer
+                                                            </button>
+                                                            <button
+                                                                className={delivery === "followUp" ? "active" : ""}
+                                                                onClick={() => setDelivery("followUp")}
+                                                            >
+                                                                Follow up
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="composer-end">
+                                                        <span className="newline-hint" aria-hidden="true">
+                                                            {draft.trim().startsWith("/")
+                                                                ? "↵ runs immediately"
+                                                                : "⇧↵ newline"}
+                                                        </span>
                                                         {agentBusy ? (
                                                             <button
                                                                 className="abort-button"
@@ -1840,6 +1985,7 @@ export function App() {
                                                                 : agentBusy
                                                                   ? "Queue"
                                                                   : "Send"}
+                                                            <Icon name="arrow-up" size={14} />
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1862,116 +2008,114 @@ export function App() {
                                         </div>
                                     </div>
                                 </section>
-                                {desktop.layout.filesOpen ? (
+                                {filesMounted ? (
                                     <FilesPanel
+                                        open={desktop.layout.filesOpen}
                                         root={selectedProject.path}
                                         tab={filesTab}
                                         setTab={setFilesTab}
                                         close={() => void persist({ layout: { filesOpen: false } })}
                                         sendComment={(message) => setDraft(message)}
-                                        refreshToken={conversation.toolCount}
-                                        onGitStatus={(git) => setChangedFiles(git.files.length)}
+                                        refreshToken={conversation.toolCount + filesRefreshToken}
+                                        onGitStatus={(git) => {
+                                            setChangedFiles(git.files.length);
+                                            setGitBranch(git.branch ?? "");
+                                        }}
                                     />
                                 ) : null}
                             </div>
-                            {desktop.layout.inspectorOpen ? (
-                                <aside
-                                    className={`run-inspector ${desktop.layout.filesOpen ? "files-open" : ""}`}
-                                    aria-label="Run inspector"
-                                >
-                                    <header>
-                                        <span>Session pulse</span>
-                                        <strong className={`runtime-state ${runtime.phase}`}>
-                                            <i /> {statusText}
-                                        </strong>
-                                        <button
-                                            aria-label="Collapse run inspector"
-                                            title="Collapse inspector"
-                                            onClick={() => void persist({ layout: { inspectorOpen: false } })}
-                                        >
-                                            ›
-                                        </button>
-                                    </header>
-                                    <section className="inspector-model">
-                                        <span>Active model</span>
+                            <aside
+                                className={`run-inspector${inspectorHidden ? " collapsed" : ""}`}
+                                aria-label="Session pulse"
+                                aria-hidden={inspectorHidden}
+                                inert={inspectorHidden ? true : undefined}
+                            >
+                                <header>
+                                    <span>Session pulse</span>
+                                    <strong className={`runtime-state ${runtime.phase}`}>
+                                        <i /> {statusText}
+                                    </strong>
+                                </header>
+                                <section className="inspector-overview">
+                                    <div className="inspector-model">
                                         <strong title={modelLabel}>{modelLabel}</strong>
-                                        <small>{String(sessionState.thinkingLevel ?? "off")} thinking</small>
-                                    </section>
-                                    <div className="metric-grid">
-                                        <div>
-                                            <span>Turns</span>
-                                            <strong>{formatCount(totalTurns)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Tools</span>
-                                            <strong>{formatCount(totalTools)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Messages</span>
-                                            <strong>{formatCount(messageTotal)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Elapsed</span>
-                                            <strong>{formatElapsed(displayElapsed)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Changes</span>
-                                            <strong>{formatCount(changedFiles)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Queued</span>
-                                            <strong>{formatCount(queueTotal)}</strong>
-                                        </div>
+                                        <span>{String(sessionState.thinkingLevel ?? "off")}</span>
                                     </div>
-                                    <section className="token-breakdown">
-                                        <h2>Token activity</h2>
-                                        <div>
-                                            <span>Input</span>
-                                            <strong>{formatCount(tokenStats.input)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Output</span>
-                                            <strong>{formatCount(tokenStats.output)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Cache</span>
-                                            <strong>
-                                                {formatCount(
-                                                    Number(tokenStats.cacheRead ?? 0) +
-                                                        Number(tokenStats.cacheWrite ?? 0),
-                                                )}
-                                            </strong>
-                                        </div>
-                                    </section>
-                                    <section className="session-details">
-                                        <h2>Session detail</h2>
-                                        <div>
-                                            <span>User prompts</span>
-                                            <strong>{formatCount(sessionStats.userMessages)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Responses</span>
-                                            <strong>{formatCount(sessionStats.assistantMessages)}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Context free</span>
-                                            <strong>
-                                                {contextUsage.percent != null
-                                                    ? `${Math.max(0, 100 - Number(contextUsage.percent)).toFixed(0)}%`
-                                                    : "—"}
-                                            </strong>
-                                        </div>
-                                        <div>
-                                            <span>Pi runtime</span>
-                                            <strong>{runtime.piVersion ?? "—"}</strong>
-                                        </div>
-                                        <div>
-                                            <span>Session</span>
-                                            <strong title={String(sessionState.sessionId ?? "")}>
-                                                {String(sessionState.sessionId ?? "—").slice(0, 8)}
-                                            </strong>
-                                        </div>
-                                    </section>
+                                    <div className="context-heading">
+                                        <strong>
+                                            {contextUsage.percent != null
+                                                ? Number(contextUsage.percent).toFixed(0)
+                                                : "—"}
+                                            <small>%</small>
+                                        </strong>
+                                        <span>Context used</span>
+                                    </div>
+                                    <div className="context-meter">
+                                        <i
+                                            style={{
+                                                width: `${Math.min(100, Math.max(0, Number(contextUsage.percent) || 0))}%`,
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="context-detail">
+                                        <span>
+                                            {formatCount(contextUsage.tokens)} of{" "}
+                                            {formatCount(contextUsage.contextWindow)}
+                                        </span>
+                                        <strong>
+                                            {typeof sessionStats.cost === "number"
+                                                ? `$${sessionStats.cost.toFixed(4)}`
+                                                : "$—"}
+                                        </strong>
+                                    </div>
+                                </section>
+                                <div className="metric-grid">
+                                    <div>
+                                        <span>Turns</span>
+                                        <strong>{formatCount(totalTurns)}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Tools</span>
+                                        <strong>{formatCount(totalTools)}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Elapsed</span>
+                                        <strong>{formatElapsed(displayElapsed)}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Messages</span>
+                                        <strong>{formatCount(messageTotal)}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Changes</span>
+                                        <strong className="accent-value">{formatCount(changedFiles)}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Queued</span>
+                                        <strong>{formatCount(queueTotal)}</strong>
+                                    </div>
+                                </div>
+                                <section className="token-breakdown">
+                                    <h2>Tokens</h2>
+                                    <div>
+                                        <span>Input</span>
+                                        <strong>{formatCount(tokenStats.input)}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Output</span>
+                                        <strong>{formatCount(tokenStats.output)}</strong>
+                                    </div>
+                                    <div>
+                                        <span>Cache</span>
+                                        <strong>
+                                            {formatCount(
+                                                Number(tokenStats.cacheRead ?? 0) + Number(tokenStats.cacheWrite ?? 0),
+                                            )}
+                                        </strong>
+                                    </div>
+                                </section>
+                                <section className="policy-section">
+                                    <h2>Policy</h2>
                                     <dl className="run-state-list">
                                         <dt>guard</dt>
                                         <dd className={guardReady ? "good" : "warning"}>{guardState}</dd>
@@ -1984,37 +2128,15 @@ export function App() {
                                         <dt>experiment</dt>
                                         <dd>{experimentState}</dd>
                                     </dl>
-                                    <div className="inspector-spacer" />
-                                    <footer className="usage-panel">
-                                        <div>
-                                            <span>Context window</span>
-                                            <strong>
-                                                {contextUsage.percent != null
-                                                    ? `${Number(contextUsage.percent).toFixed(0)}%`
-                                                    : "—"}
-                                            </strong>
-                                        </div>
-                                        <div className="context-meter">
-                                            <i
-                                                style={{
-                                                    width: `${Math.min(100, Math.max(0, Number(contextUsage.percent) || 0))}%`,
-                                                }}
-                                            />
-                                        </div>
-                                        <div>
-                                            <span>
-                                                {formatCount(contextUsage.tokens)} /{" "}
-                                                {formatCount(contextUsage.contextWindow)}
-                                            </span>
-                                            <strong>
-                                                {typeof sessionStats.cost === "number"
-                                                    ? `$${sessionStats.cost.toFixed(4)}`
-                                                    : "$—"}
-                                            </strong>
-                                        </div>
-                                    </footer>
-                                </aside>
-                            ) : null}
+                                </section>
+                                <div className="inspector-spacer" />
+                                <footer className="inspector-footer">
+                                    <span title={String(sessionState.sessionId ?? "")}>
+                                        session {String(sessionState.sessionId ?? "—").slice(0, 8)}
+                                    </span>
+                                    <span>{runtime.piVersion ? `Pi ${runtime.piVersion}` : "Pi —"}</span>
+                                </footer>
+                            </aside>
                         </>
                     ) : (
                         <section className="empty-workspace">
@@ -2023,7 +2145,7 @@ export function App() {
                                 <h1>What should Pi work on?</h1>
                                 <p>Pi and SpecPi remain in control. This window is only their local interface.</p>
                                 <button className="primary-action" onClick={() => void addProject()}>
-                                    Open project…
+                                    <Icon name="plus" size={15} /> Open project
                                 </button>
                                 {desktop.projects.length > 0 ? (
                                     <div className="recent-projects">
@@ -2047,8 +2169,8 @@ export function App() {
                                 ) : null}
                             </div>
                             <footer>
-                                <span>Pi not connected</span>
-                                <span>no telemetry · no auto-update</span>
+                                <span>no telemetry</span>
+                                <span>no auto-update · no listener</span>
                             </footer>
                         </section>
                     )}
@@ -2056,39 +2178,48 @@ export function App() {
             </section>
 
             {pendingProject ? (
-                <div className="modal-backdrop">
+                <div
+                    className="modal-backdrop trust-backdrop"
+                    onMouseDown={(event) => event.target === event.currentTarget && setPendingProject(undefined)}
+                >
                     <section
                         className="modal trust-modal"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="trust-title"
                     >
-                        <header className="modal-header">
-                            <h2 id="trust-title">Project trust</h2>
-                            <span>{compactPath(pendingProject)}</span>
+                        <header className="trust-heading">
+                            <span className="trust-icon">
+                                <Icon name="shield" size={16} />
+                            </span>
+                            <div>
+                                <h2 id="trust-title">Trust this project for one run?</h2>
+                                <span>{compactPath(pendingProject)}</span>
+                            </div>
                         </header>
-                        <div className="modal-body">
-                            <p>Pi project resources may execute code. Choose how this RPC launch should treat them.</p>
-                            <div className="trust-actions">
-                                <button onClick={() => void confirmProject("default")}>
-                                    <strong>Use Pi decision</strong>
-                                    <span>defer to Pi’s own record</span>
-                                </button>
-                                <button onClick={() => void confirmProject("deny")}>
-                                    <strong>Ignore this run</strong>
-                                    <span>no project resources</span>
-                                </button>
-                                <button className="preferred" onClick={() => void confirmProject("approve")}>
-                                    <strong>Trust this run</strong>
-                                    <span>this session only</span>
-                                </button>
-                            </div>
-                            <div className="modal-actions">
-                                <button className="secondary" onClick={() => setPendingProject(undefined)}>
-                                    Cancel
-                                </button>
-                            </div>
+                        <p>
+                            Pi project resources may execute code. Trust is always explicit and scoped to this session.
+                        </p>
+                        <div className="trust-actions">
+                            <button className="preferred" onClick={() => void confirmProject("approve")}>
+                                <strong>Trust this run</strong>
+                                <span>this session only</span>
+                            </button>
+                            <button onClick={() => void confirmProject("default")}>
+                                <strong>Use Pi’s decision</strong>
+                                <span>defer to its own record</span>
+                            </button>
+                            <button onClick={() => void confirmProject("deny")}>
+                                <strong>Ignore project resources</strong>
+                                <span>nothing loaded this run</span>
+                            </button>
                         </div>
+                        <footer className="trust-footer">
+                            <span>Esc to cancel</span>
+                            <button className="secondary" onClick={() => setPendingProject(undefined)}>
+                                Cancel
+                            </button>
+                        </footer>
                     </section>
                 </div>
             ) : null}
@@ -2242,35 +2373,54 @@ export function App() {
             {spinup ? (
                 <div className="spinup-backdrop">
                     <section className="spinup-card" role="status" aria-live="polite" aria-label="Starting Pi">
-                        <div className="spinup-mark" aria-hidden="true">
-                            <i />
-                            <i />
-                            <span>π</span>
+                        <header className="spinup-heading">
+                            <div className="spinup-mark" aria-hidden="true">
+                                <i />
+                                <span>π</span>
+                            </div>
+                            <div>
+                                <h2>
+                                    {spinup.sessionLabel
+                                        ? `Opening ${spinup.sessionLabel}`
+                                        : `Starting ${spinup.projectLabel}`}
+                                </h2>
+                                <span>local Pi runtime · {formatElapsed(spinupElapsed)}</span>
+                            </div>
+                        </header>
+                        <div className="spinup-steps" aria-hidden="true">
+                            <div className="complete">
+                                <Icon name="check" size={15} />
+                                <span>Runtime spawned</span>
+                                <small>local</small>
+                            </div>
+                            <div className="active">
+                                <i />
+                                <span>Loading SpecPi extensions</span>
+                                <small>in progress</small>
+                            </div>
+                            <div>
+                                <i />
+                                <span>Waiting for Pi to answer RPC</span>
+                            </div>
+                            <div>
+                                <i />
+                                <span>Parsing session file</span>
+                            </div>
                         </div>
-                        <div className="spinup-eyebrow">
-                            <span>Local Pi runtime</span>
-                            <strong aria-hidden="true">{formatElapsed(spinupElapsed)}</strong>
-                        </div>
-                        <h2>
-                            {spinup.sessionLabel ? `Opening ${spinup.sessionLabel}` : `Starting ${spinup.projectLabel}`}
-                        </h2>
-                        <p>{spinupDetail(spinupElapsed)}</p>
                         <div className="spinup-progress" aria-hidden="true">
                             <i />
                         </div>
-                        <div className="spinup-pipeline" aria-hidden="true">
-                            <span>Runtime</span>
-                            <b>•</b>
-                            <span>Extensions</span>
-                            <b>•</b>
-                            <span>Session</span>
-                        </div>
-                        <footer>
-                            <span>
-                                <i aria-hidden="true" /> Preparing locally
-                            </span>
-                            <strong aria-hidden="true">{formatElapsed(spinupElapsed)} elapsed</strong>
-                        </footer>
+                        <p>{spinupDetail(spinupElapsed)}</p>
+                        <button
+                            className="spinup-cancel"
+                            onClick={() => {
+                                startGeneration.current += 1;
+                                setSpinup(undefined);
+                                void window.specpi.stopRuntime();
+                            }}
+                        >
+                            Cancel start
+                        </button>
                     </section>
                 </div>
             ) : null}
