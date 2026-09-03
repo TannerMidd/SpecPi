@@ -342,30 +342,41 @@ export function installMockApi(): void {
                     message: { role: "user", content: command.message, timestamp: Date.now() },
                 });
                 emitRuntimeStatus(runtimeId, "streaming");
-                setTimeout(
-                    () =>
-                        emitRuntimeEvent(runtimeId, {
-                            type: "message_update",
-                            assistantMessageEvent: {
-                                type: "text_delta",
-                                contentIndex: 0,
-                                delta: "Working through Pi RPC…",
-                            },
-                        }),
-                    120,
-                );
+                setTimeout(() => {
+                    emitRuntimeEvent(runtimeId, {
+                        type: "message_update",
+                        assistantMessageEvent: {
+                            type: "thinking_delta",
+                            contentIndex: 0,
+                            delta: "**Checking incremental Markdown rendering**",
+                        },
+                    });
+                    emitRuntimeEvent(runtimeId, {
+                        type: "message_update",
+                        assistantMessageEvent: {
+                            type: "text_delta",
+                            contentIndex: 1,
+                            delta: "## Working through Pi RPC\n\n- Streaming Markdown stays formatted.",
+                        },
+                    });
+                }, 120);
                 setTimeout(() => {
                     emitRuntimeEvent(runtimeId, {
                         type: "message_end",
                         message: {
                             role: "assistant",
-                            content: [{ type: "text", text: "Working through Pi RPC…" }],
+                            content: [
+                                {
+                                    type: "text",
+                                    text: "## Working through Pi RPC\n\n- Streaming Markdown stayed formatted.",
+                                },
+                            ],
                             timestamp: Date.now(),
                         },
                     });
                     emitRuntimeEvent(runtimeId, { type: "agent_settled" });
                     emitRuntimeStatus(runtimeId, "idle");
-                }, 450);
+                }, 2_500);
             }
 
             return {};

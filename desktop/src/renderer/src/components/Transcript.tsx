@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { contentBlocks, imageSource, type ContentBlock } from "../lib/content-blocks";
+import { stabilizeStreamingMarkdown } from "../lib/streaming-markdown";
 import { safeJson, stripAnsi } from "../lib/text";
 import type { ConversationState, TranscriptItem } from "../state/conversation";
 import { contentText } from "../state/conversation";
@@ -145,7 +146,7 @@ const StreamingResponse = memo(function StreamingResponse({
                     return (
                         <details key={index} className="thinking" open={!specMode}>
                             <summary>Reasoning · streaming</summary>
-                            <div className="streaming-copy">{stripAnsi(block.text)}</div>
+                            <Markdown content={stabilizeStreamingMarkdown(stripAnsi(block.text))} />
                         </details>
                     );
                 }
@@ -160,10 +161,7 @@ const StreamingResponse = memo(function StreamingResponse({
                 }
 
                 return specMode ? null : (
-                    <div className="streaming-copy" key={index}>
-                        {stripAnsi(block.text)}
-                        <span className="streaming-caret" aria-hidden="true" />
-                    </div>
+                    <Markdown key={index} content={stabilizeStreamingMarkdown(stripAnsi(block.text))} />
                 );
             })}
             {hasHeldText ? <div className="held-output">Response held until complete</div> : null}

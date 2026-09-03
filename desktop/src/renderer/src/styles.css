@@ -1048,22 +1048,6 @@ pre {
     border-radius: 9px;
 }
 
-.streaming-copy {
-    color: var(--text-high);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-}
-
-.streaming-caret {
-    display: inline-block;
-    width: 2px;
-    height: 1.05em;
-    margin-left: 3px;
-    vertical-align: -0.14em;
-    background: var(--accent);
-    animation: pulse 1s infinite;
-}
-
 .streaming-tool {
     display: flex;
     align-items: center;
