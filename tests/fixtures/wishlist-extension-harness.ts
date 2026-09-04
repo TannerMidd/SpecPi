@@ -1,12 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import registerWishlist, { improvementCandidatesFromRefresh } from "../../extensions/tool-wishlist/index.ts";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 export default async function wishlistExtensionHarness() {
     const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR!);
     const tools: any[] = [];
     const commands = new Map<string, any>();
+    const renderers = new Map<string, any>();
     const events = new Map<string, any[]>();
     const entries: any[] = [];
     const confirmations: string[] = [];
@@ -28,9 +32,11 @@ export default async function wishlistExtensionHarness() {
         registerCommand(name: string, command: any) {
             commands.set(name, command);
         },
-        registerEntryRenderer() {},
+        registerEntryRenderer(type: string, renderer: any) {
+            renderers.set(type, renderer);
+        },
         appendEntry(type: string, data: any) {
-            entries.push({ type, data });
+            entries.push({ type: "custom", customType: type, data });
         },
         sendUserMessage(message: string) {
             sentUserMessages.push(message);
@@ -85,7 +91,10 @@ export default async function wishlistExtensionHarness() {
         hasUI: true,
         mode: "tui",
         isIdle: () => true,
-        sessionManager: { getSessionId: () => "extension-harness-session", getBranch: () => [] },
+        sessionManager: {
+            getSessionId: () => "extension-harness-session",
+            getBranch: () => entries,
+        },
         ui: {
             async confirm(title: string, message: string) {
                 confirmations.push(`${title}\n${message}`);
@@ -104,24 +113,49 @@ export default async function wishlistExtensionHarness() {
         },
     };
     fs.mkdirSync(path.join(ctx.cwd, "extensions", "tool-wishlist"), { recursive: true });
+    fs.mkdirSync(path.join(ctx.cwd, "extensions", "workflow-controls"), { recursive: true });
+    fs.mkdirSync(path.join(ctx.cwd, "scripts"), { recursive: true });
     fs.writeFileSync(
         path.join(ctx.cwd, "package.json"),
         JSON.stringify({ name: "specpi", scripts: { check: "node --test" } }),
     );
     fs.copyFileSync(
-        path.resolve("extensions", "tool-wishlist", "capabilities.json"),
+        path.join(repoRoot, "extensions", "tool-wishlist", "capabilities.json"),
         path.join(ctx.cwd, "extensions", "tool-wishlist", "capabilities.json"),
     );
     fs.copyFileSync(
-        path.resolve("extensions", "tool-wishlist", "validators.mjs"),
+        path.join(repoRoot, "extensions", "tool-wishlist", "validators.mjs"),
         path.join(ctx.cwd, "extensions", "tool-wishlist", "validators.mjs"),
+    );
+    for (const file of ["index.ts", "core.mjs", "registry.mjs", "verification.mjs"]) {
+        fs.copyFileSync(
+            path.join(repoRoot, "extensions", "tool-wishlist", file),
+            path.join(ctx.cwd, "extensions", "tool-wishlist", file),
+        );
+    }
+
+    for (const file of ["task-contract.mjs", "scope.mjs"]) {
+        fs.copyFileSync(
+            path.join(repoRoot, "extensions", "workflow-controls", file),
+            path.join(ctx.cwd, "extensions", "workflow-controls", file),
+        );
+    }
+
+    for (const file of [".editorconfig", ".prettierignore", "eslint.config.js", "prettier.config.mjs"]) {
+        fs.copyFileSync(path.join(repoRoot, file), path.join(ctx.cwd, file));
+    }
+
+    fs.copyFileSync(
+        path.join(repoRoot, "scripts", "check-package.mjs"),
+        path.join(ctx.cwd, "scripts", "check-package.mjs"),
     );
 
     const reportTool = tools.find((tool) => tool.name === "report_capability_gap");
+    const contractTool = tools.find((tool) => tool.name === "record_harness_contract");
     const finishTool = tools.find((tool) => tool.name === "finish_harness_improvement");
     const wishlist = commands.get("wishlist");
     const harnessImprovement = commands.get("harness-improvement");
-    if (!reportTool || !finishTool || !wishlist || !harnessImprovement) {
+    if (!reportTool || !contractTool || !finishTool || !wishlist || !harnessImprovement) {
         throw new Error("Wishlist extension did not register its public surfaces");
     }
 
@@ -167,6 +201,30 @@ export default async function wishlistExtensionHarness() {
     }
 
     await harnessImprovement.handler("", ctx);
+    const activeSelection = entries.findLast((entry: any) => entry.data?.status === "active")?.data;
+    await contractTool.execute(
+        "contract-1",
+        {
+            gapId: completion.gapId,
+            selectionId: activeSelection.selectionId,
+            sourceRoot: ctx.cwd,
+            objective: "Prove local browser improvement",
+            hypothesis: "The selected browser capability can be verified by its closed smoke test",
+            requirements: [
+                {
+                    id: "R1",
+                    description: "The closed browser validator passes",
+                    acceptance: "Validator exits with code zero in temporary state",
+                },
+            ],
+            paths: ["extensions/tool-wishlist/verification.mjs"],
+            rollback: "Revert the scoped source changes and rerun the checks",
+            nonGoals: ["No remote browser or provider state"],
+        },
+        undefined,
+        undefined,
+        ctx,
+    );
     let failedGate = "";
     try {
         await finishTool.execute("finish-failed", completion, undefined, undefined, ctx);
@@ -228,9 +286,21 @@ export default async function wishlistExtensionHarness() {
             .split("Changed since the retirement (untrusted, sanitized Git metadata):\n")[1]
             ?.split("\n\n")[0] ?? "";
     const gitContextLines = gitContextBlock.split("\n").filter((line) => line.startsWith("- "));
+    const pathRenderer = renderers.get("specpi-wishlist-report");
+    const renderedPath = pathRenderer(
+        { data: { markdown: "", reportPath: "report\nroot\u2028format\u202e%`file.md", truncated: false } },
+        {},
+        { bg: (_color: string, text: string) => text, fg: (_color: string, text: string) => text },
+    )
+        .render(400)
+        .join("\n");
+    const reportPathRenderingSafe =
+        renderedPath.includes("report%0Aroot%E2%80%A8format%E2%80%AE%25%60file.md") &&
+        !/[\u2028\u202e`]/u.test(renderedPath);
 
     process.stdout.write(
         `SPECPI_WISHLIST_HARNESS=${JSON.stringify({
+            reportPathRenderingSafe,
             toolNames: tools.map((tool) => tool.name),
             commandNames: [...commands.keys()],
             consent: confirmations[0],
@@ -253,6 +323,20 @@ export default async function wishlistExtensionHarness() {
                 journalRecord.journal.gates?.includes("npm run check") &&
                 journalRecord.journal.gates?.includes("browser-runtime-smoke") &&
                 typeof journalRecord.journal.version === "string",
+            ),
+            contractRecorded: Boolean(
+                entries.find(
+                    (entry: any) =>
+                        entry.customType === "specpi-task-contract" &&
+                        entry.data?.kind === "set" &&
+                        entry.data.contract?.gapId === "local-browser-automation" &&
+                        entry.data.contract?.selectionId === activeSelection?.selectionId,
+                ),
+            ),
+            receiptPersisted: Boolean(
+                journalRecord?.journal?.receipt?.gapId === "local-browser-automation" &&
+                journalRecord.journal.receipt?.selectionId === activeSelection?.selectionId &&
+                journalRecord.journal.receipt?.runtime?.node === process.version,
             ),
             journalChangedFiles: journalRecord?.journal?.changedFiles,
             failedGate,

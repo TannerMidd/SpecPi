@@ -30,6 +30,8 @@ import {
     renderChallengeMarkdown,
     validateChallengeSubmission,
 } from "../extensions/workflow-controls/challenge.mjs";
+import { markdownPathLabel } from "../extensions/workflow-controls/task-contract.mjs";
+import { runWorkflowControlsSmoke } from "../extensions/workflow-controls/smoke.mjs";
 
 function run(command, args, options = {}) {
     const result = spawnSync(command, args, {
@@ -448,9 +450,18 @@ test("completion challenge facts and rendering stay bounded and explicit", () =>
     const prompt = challengePrompt("generation", facts);
     assert.match(prompt, /Which requirement remains unproven/);
     assert.match(prompt, /Pending scope drift: outside\.txt/);
+    const hostilePath = "evil\nline\u2028format\u202epercent%tick`name.ts";
+    const hostilePrompt = challengePrompt("generation", { changedPaths: [hostilePath] });
+    assert.match(hostilePrompt, new RegExp(`Changed paths: ${markdownPathLabel(hostilePath)}`));
+    assert.doesNotMatch(hostilePrompt, /evil\nline/u);
     const markdown = renderChallengeMarkdown(validateChallengeSubmission(completeSubmission()), {
         generation: "generation",
     });
     assert.match(markdown, /Ready for human review/);
     assert.match(markdown, /not independent verification/);
+});
+
+test("task contract smoke validator covers branch and path controls", async () => {
+    const message = await runWorkflowControlsSmoke("task-contract-smoke");
+    assert.match(message, /^task-contract-smoke passed:/u);
 });

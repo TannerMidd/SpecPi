@@ -18,6 +18,8 @@ import { createHash } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Key, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { describeSpecPhase, transformSpecMarkdown } from "./spec/core.mjs";
+import { canonicalRoot } from "./workflow-controls/scope.mjs";
+import { readTaskContract } from "./workflow-controls/task-contract.mjs";
 
 const specPiAgentDir = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
 const specPiStateDir = path.join(specPiAgentDir, "specpi");
@@ -68,7 +70,17 @@ if (hasValidatedSpecPiTools()) {
 
 type SpecPhase = "ready" | "thinking" | "reasoning" | "synthesizing" | `using ${string}` | `${string} failed`;
 
+interface SpecTaskState {
+    active: boolean;
+    objective: string;
+    proven: number;
+    total: number;
+    digest?: string;
+    error?: string;
+}
+
 const SPEC_STATE_ENTRY = "spec-mode";
+const CHALLENGE_ENTRY = "specpi-completion-challenge";
 const SPEC_SYSTEM_GUIDANCE = `
 
 [SPEC MODE — SPEC EXECUTION]
@@ -118,13 +130,164 @@ export default function (pi: ExtensionAPI) {
     let phase: SpecPhase = "ready";
     let turnCount = 0;
     let toolCount = 0;
-    let workflowScope: { active: boolean; pending: number; indeterminate: boolean } = {
+    let workflowScope: {
+        active: boolean;
+        pending: number;
+        indeterminate: boolean;
+        taskBound: boolean;
+        taskStale: boolean;
+    } = {
         active: false,
         pending: 0,
         indeterminate: false,
+        taskBound: false,
+        taskStale: false,
     };
+    let workflowTask: SpecTaskState = {
+        active: false,
+        objective: "",
+        proven: 0,
+        total: 0,
+    };
+    let taskRefreshPending = true;
+    let taskRefreshGeneration = 0;
     let toolsWereExpanded: boolean | undefined;
     let requestSpecRender: (() => void) | undefined;
+    let lastContext: ExtensionContext | undefined;
+
+    const resolveRoot = async (cwd: string) => {
+        try {
+            const result = await pi.exec("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: 15_000 });
+            if (result.code === 0 && typeof result.stdout === "string" && result.stdout.trim()) {
+                return canonicalRoot(path.resolve(cwd, result.stdout.trim()));
+            }
+        } catch {
+            /* A non-Git session can still display a task contract rooted at its current directory. */
+        }
+
+        return canonicalRoot(cwd);
+    };
+
+    const refreshTask = async (ctx: ExtensionContext, expectedGeneration = taskRefreshGeneration) => {
+        const cwd = ctx.cwd;
+        const sessionId = ctx.sessionManager.getSessionId();
+        const isCurrent = () =>
+            expectedGeneration === taskRefreshGeneration &&
+            cwd === ctx.cwd &&
+            sessionId === ctx.sessionManager.getSessionId();
+        const root = await resolveRoot(cwd);
+        if (!isCurrent()) {
+            return false;
+        }
+
+        let contract;
+        try {
+            contract = readTaskContract(ctx.sessionManager.getBranch?.() ?? [], root);
+        } catch (error) {
+            if (!isCurrent()) {
+                return false;
+            }
+
+            workflowTask = {
+                active: false,
+                objective: "",
+                proven: 0,
+                total: 0,
+                error:
+                    error instanceof Error
+                        ? error.message.replace(/[\u0000-\u001f\u007f]+/gu, " ").slice(0, 160)
+                        : "unavailable",
+            };
+            taskRefreshPending = false;
+
+            return true;
+        }
+
+        if (!isCurrent()) {
+            return false;
+        }
+
+        if (!contract) {
+            workflowTask = { active: false, objective: "", proven: 0, total: 0 };
+            taskRefreshPending = false;
+
+            return true;
+        }
+
+        let latestReview;
+        for (const entry of ctx.sessionManager.getBranch?.() ?? []) {
+            if (entry.type !== "custom" || entry.customType !== CHALLENGE_ENTRY) {
+                continue;
+            }
+
+            if (entry.data?.kind === "result") {
+                latestReview = entry.data;
+            } else if (entry.data?.kind === "cleared") {
+                latestReview = undefined;
+            }
+        }
+
+        if (latestReview?.facts?.taskContractDigest !== contract.digest) {
+            latestReview = undefined;
+        }
+
+        const provenIds = new Set(
+            latestReview?.result?.requirements
+                ?.filter((item: any) => item?.status === "proven" && typeof item.id === "string")
+                .map((item: any) => item.id) ?? [],
+        );
+        workflowTask = {
+            active: true,
+            objective: contract.objective,
+            proven: contract.requirements.filter((item: any) => provenIds.has(item.id)).length,
+            total: contract.requirements.length,
+            digest: contract.digest,
+        };
+        taskRefreshPending = false;
+
+        return true;
+    };
+
+    const queueTaskRefresh = (ctx = lastContext) => {
+        taskRefreshPending = true;
+        const generation = ++taskRefreshGeneration;
+        if (!ctx) {
+            requestSpecRender?.();
+
+            return;
+        }
+
+        void refreshTask(ctx, generation)
+            .then((applied) => {
+                if (applied) {
+                    requestSpecRender?.();
+                }
+            })
+            .catch(() => {
+                if (generation === taskRefreshGeneration) {
+                    requestSpecRender?.();
+                }
+            });
+        requestSpecRender?.();
+    };
+
+    const taskStatusLabel = () => {
+        if (workflowTask.error) {
+            return "INVALID";
+        }
+
+        if (!workflowTask.active) {
+            return "UNSET";
+        }
+
+        return `${workflowTask.proven}/${workflowTask.total}`;
+    };
+
+    const taskObjectiveLabel = () => {
+        const objective = workflowTask.objective.replace(/[\u0000-\u001f\u007f]+/gu, " ").trim();
+
+        return objective.length > 42 ? `${objective.slice(0, 39)}...` : objective;
+    };
 
     const updateActivity = (ctx: ExtensionContext) => {
         if (!enabled) {
@@ -226,15 +389,18 @@ export default function (pi: ExtensionAPI) {
                     const run = `${countLabel(turnCount, "T")} · ${countLabel(toolCount, "X")}`;
                     const scope = !workflowScope.active
                         ? "UNSET"
-                        : workflowScope.pending > 0 || workflowScope.indeterminate
+                        : workflowScope.pending > 0 || workflowScope.indeterminate || workflowScope.taskStale
                           ? "REVIEW"
                           : "CLEAN";
+                    const taskStatus = taskStatusLabel();
+                    const taskObjective = taskObjectiveLabel() || "UNSET";
 
                     if (width < 44) {
                         return [
                             renderEdge("┌", "┐", "─ ACTIVE SPEC ", width, (text) => theme.fg("borderAccent", text)),
                             truncateToWidth(theme.fg("accent", phaseText), width, ""),
-                            truncateToWidth(theme.fg("dim", `${run} · SCOPE ${scope} · OUTPUT HELD`), width, ""),
+                            truncateToWidth(theme.fg("dim", `${run} · TASK ${taskStatus} · SCOPE ${scope}`), width, ""),
+                            truncateToWidth(theme.fg("muted", taskObjective), width, ""),
                             renderEdge("└", "┘", "─ /spec exits ", width, (text) => theme.fg("borderMuted", text)),
                         ];
                     }
@@ -252,6 +418,7 @@ export default function (pi: ExtensionAPI) {
                             theme.fg("muted", "OUTPUT  RESPONSE HELD · TOOLS COLLAPSED"),
                             theme.fg("dim", `SCOPE  ${scope}`),
                         ),
+                        row(theme.fg("muted", `TASK  ${taskObjective}`), theme.fg("dim", `REQ  ${taskStatus}`)),
                         renderEdge("└", "┘", "─ CTRL+ALT+Z / EXIT SPEC MODE ", width, (text) =>
                             theme.fg("borderMuted", text),
                         ),
@@ -310,12 +477,26 @@ export default function (pi: ExtensionAPI) {
 
     pi.registerMarkdownTransformer((markdown, context) => transformSpecMarkdown(markdown, context, enabled));
 
-    pi.on("session_start", async (_event, ctx) => {
+    const restoreSession = async (ctx: ExtensionContext) => {
+        lastContext = ctx;
+        const generation = ++taskRefreshGeneration;
+        if (enabled) {
+            clearMode(ctx);
+        }
+
         enabled = false;
         phase = "ready";
         turnCount = 0;
         toolCount = 0;
-        workflowScope = { active: false, pending: 0, indeterminate: false };
+        workflowScope = {
+            active: false,
+            pending: 0,
+            indeterminate: false,
+            taskBound: false,
+            taskStale: false,
+        };
+        workflowTask = { active: false, objective: "", proven: 0, total: 0 };
+        taskRefreshPending = true;
         toolsWereExpanded = undefined;
         requestSpecRender = undefined;
 
@@ -330,18 +511,41 @@ export default function (pi: ExtensionAPI) {
         if (enabled) {
             applyMode(ctx);
         }
-    });
+
+        if (await refreshTask(ctx, generation)) {
+            requestSpecRender?.();
+        }
+    };
+
+    pi.on("session_start", (_event, ctx) => restoreSession(ctx));
+    pi.on("session_tree", (_event, ctx) => restoreSession(ctx));
 
     pi.events.on("specpi:workflow-status", (state: any) => {
         workflowScope = {
             active: state?.active === true,
             pending: Number.isInteger(state?.pending) ? Math.max(0, state.pending) : 0,
             indeterminate: state?.indeterminate === true,
+            taskBound: state?.taskBound === true,
+            taskStale: state?.taskStale === true,
         };
-        requestSpecRender?.();
+        if (state?.taskBound === true || state?.taskReviewChanged === true) {
+            // Scope status is also the notification used when a challenge result changes the proven requirement
+            // count. Refresh from the branch so the panel follows that result immediately while generation checks
+            // prevent a delayed root lookup from overwriting a newer session.
+            queueTaskRefresh();
+        } else {
+            taskRefreshPending = true;
+            requestSpecRender?.();
+        }
+    });
+
+    pi.events.on("specpi:task-contract-changed", () => {
+        queueTaskRefresh();
     });
 
     pi.on("session_shutdown", (_event, ctx) => {
+        taskRefreshGeneration += 1;
+        lastContext = undefined;
         if (enabled) {
             clearMode(ctx);
         } else {
@@ -397,12 +601,28 @@ export default function (pi: ExtensionAPI) {
         updateActivity(ctx);
     });
 
-    pi.on("before_agent_start", async (event) => {
+    pi.on("before_agent_start", async (event, ctx) => {
+        lastContext = ctx;
+        if (taskRefreshPending || enabled) {
+            const generation = ++taskRefreshGeneration;
+            if (!(await refreshTask(ctx, generation))) {
+                return;
+            }
+
+            requestSpecRender?.();
+        }
+
         if (!enabled || event.systemPrompt.includes("[SPEC MODE — SPEC EXECUTION]")) {
             return;
         }
 
-        return { systemPrompt: `${event.systemPrompt}${SPEC_SYSTEM_GUIDANCE}` };
+        const taskGuidance = workflowTask.active
+            ? `\n\n[SPEC TASK]\nObjective: ${taskObjectiveLabel()}\nFixed requirements proven: ${workflowTask.proven}/${workflowTask.total}. Assess the original requirement set by its stable IDs.`
+            : workflowTask.error
+              ? `\n\n[SPEC TASK]\nTask contract unavailable: ${workflowTask.error}`
+              : "";
+
+        return { systemPrompt: `${event.systemPrompt}${SPEC_SYSTEM_GUIDANCE}${taskGuidance}` };
     });
 
     pi.registerCommand("spec", {
@@ -414,6 +634,7 @@ export default function (pi: ExtensionAPI) {
             return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
         },
         handler: async (args, ctx) => {
+            lastContext = ctx;
             const action = args.trim().toLowerCase();
             if (!action) {
                 toggleMode(ctx);
@@ -434,11 +655,16 @@ export default function (pi: ExtensionAPI) {
             }
 
             if (action === "status") {
+                const generation = ++taskRefreshGeneration;
+                if (!(await refreshTask(ctx, generation))) {
+                    return;
+                }
+
                 const state = describeSpecPhase(phase);
                 const detail = state.detail ? ` · ${state.detail}` : "";
                 ctx.ui.notify(
                     enabled
-                        ? `SPEC MODE / ACTIVE · ${state.index} / ${state.label}${detail} · ${countLabel(turnCount, "T")} · ${countLabel(toolCount, "X")}`
+                        ? `SPEC MODE / ACTIVE · ${state.index} / ${state.label}${detail} · ${countLabel(turnCount, "T")} · ${countLabel(toolCount, "X")} · task: ${taskObjectiveLabel() || "unset"} · requirements: ${taskStatusLabel()}`
                         : "Spec mode is off.",
                     "info",
                 );
