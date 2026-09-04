@@ -40,6 +40,18 @@ Repository development uses these exact, project-local formatting and linting pa
 
 They are development-only dependencies, are not shipped by the SpecPi installer, and enforce the repository's JavaScript and TypeScript readability rules.
 
+The separate SpecPi Desktop development and application package uses exact versions from `desktop/package-lock.json`:
+
+- `electron@44.1.1` — MIT, with bundled Chromium, Node.js, and their generated third-party notices
+- `react@19.2.8` and `react-dom@19.2.8` — MIT
+- `@tanstack/react-virtual@3.13.18` and `@tanstack/virtual-core@3.13.18` — MIT
+- `zod@4.5.4` — MIT
+- `dompurify@3.4.14` — MPL-2.0 OR Apache-2.0
+- `marked@18.0.11` — MIT
+- `electron-builder@26.15.3`, `electron-vite@5.0.0`, `vite@7.3.6`, `@vitejs/plugin-react@5.2.0`, `vitest@4.1.11`, and their transitive build tooling — upstream licenses recorded in the lockfile
+
+Desktop dependencies and artifacts are excluded from the published `specpi` npm tarball. The application does not bundle Pi; it discovers a separately installed compatible executable. Electron installer binaries are unsigned development artifacts unless a separately authorized release process signs them.
+
 The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mono. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". The font files are distributed under the SIL Open Font License 1.1; the required license text is included at `site/fonts/LICENSE.txt`.
 
 The npm release workflow installs `npm@11.19.1` as its pinned publishing client. npm is distributed under the Artistic License 2.0 and runs only on the ephemeral GitHub-hosted release runner.

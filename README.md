@@ -136,6 +136,12 @@ Use `/experiment start` when an independent review or trial justifies a separate
 
 `/challenge` requires structured requirement evidence and checks for contradictions, false-positive validation, scope drift, missing runtime or visual checks, and residual risk. Its result supports human review and does not replace direct proof.
 
+## Desktop application
+
+The separate [`desktop/`](desktop/) package provides an Electron interface that supervises `pi --mode rpc`. It includes streaming chat and tools, standard extension dialogs, project/session controls, model and thinking selection, native SpecPi command access, a read-only Files/Changes panel, and focused Spec mode. Pi and the installed SpecPi extensions remain authoritative; the renderer is sandboxed behind a validated preload API.
+
+Desktop dependencies and installers are intentionally excluded from the `specpi` npm tarball. See the [desktop guide](desktop/README.md), [architecture](desktop/ARCHITECTURE.md), [compatibility contract](desktop/COMPATIBILITY.md), and [desktop security model](desktop/SECURITY.md).
+
 ## Data and security boundaries
 
 SpecPi does not persist command text or read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current Pi session. Wishlist reports, improvement journals, experiment metadata, and exported patches remain in private local SpecPi state and can survive uninstall. Review local artifacts before sharing.
@@ -149,6 +155,8 @@ npm install --ignore-scripts --omit=peer --no-package-lock
 npm run format
 npm run check
 ```
+
+The root check also installs the isolated desktop lockfile without lifecycle scripts and runs its types, tests, and production renderer/main/preload build. Electron runtime and installer checks use the commands documented in `desktop/README.md`.
 
 JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check enforces formatting, validates syntax, runs the Node test suite, executes registry-linked validators, and installs the exact npm tarball through an isolated lifecycle. Maintainers should follow [NPM_RELEASE.md](NPM_RELEASE.md) for release preparation and protected publication.
 

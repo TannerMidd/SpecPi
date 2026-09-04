@@ -94,6 +94,14 @@ Snapshots, screenshots, page text, downloads, console output, and visual baselin
 
 The browser is not an operating-system or network sandbox. Use a container or VM for hostile applications and dedicated test accounts instead of personal authenticated sessions.
 
+## Desktop application
+
+The optional desktop package is not part of the published `specpi` npm tarball. It supervises a user-selected Pi executable through LF-delimited JSON RPC and does not replace Pi's authority over credentials, sessions, models, extensions, or tools. Pi and Git are launched without a shell.
+
+Electron renderers are sandboxed with Node integration disabled, context isolation enabled, navigation and child windows denied, and permissions rejected. Packaged windows always load local files; development URLs are limited to unauthenticated loopback origins. A frozen preload bridge exposes only named, schema-validated IPC operations using opaque project/session/import IDs. Main verifies sender, frame, and origin; resolves canonical project, executable, and existing session paths; and, only when Pi reserves a session leaf before its first flush, realpaths the existing parent and retains the missing basename without creating or reading the file. Main also obtains per-process trust through a native dialog, owns revisioned state mutations, and confines relative-only file/Git reads to the active project. It enforces bounded RPC records, command allowlisting, safe external-link protocols, and bounded redacted diagnostics. Trust is never persisted or accepted from the renderer. Arbitrary session selection is handed opaquely to Pi as a target-project fork; Desktop never reads or writes Pi authentication, trust, or session files directly.
+
+Desktop sandboxing does not sandbox the Pi child process or trusted extensions. Those retain the current user's authority, and Command Guard remains defense in depth rather than an OS security boundary. Process supervision prevents cancelled discovery or stale child callbacks from escaping Desktop's ownership, but it does not reduce Pi's operating-system permissions. See `desktop/SECURITY.md` for the full desktop-specific contract.
+
 ## Website and automation
 
 The GitHub Pages workflow publishes the checked-in `site/` directory. Its deploy job uses read-only repository contents access plus the Pages and identity-token permissions required for deployment. The local installer does not invoke that workflow or upload local configuration or state.

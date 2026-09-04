@@ -1,0 +1,10 @@
+{"type":"extension_ui_request","id":"fixture-guard","method":"select","title":"SpecPi command guard","options":["Guard (Recommended)","Strict","Off for this session"]}
+{"type":"response","id":"fixture-state","command":"get_state","success":true,"data":{"sessionId":"fixture","thinkingLevel":"off"}}
+{"type":"agent_start"}
+{"type":"message_update","assistantMessageEvent":{"type":"text_delta","contentIndex":0,"delta":"fixture"}}
+{"type":"tool_execution_start","toolCallId":"fixture-tool","toolName":"read","args":{"path":"fixture.txt"}}
+{"type":"tool_execution_update","toolCallId":"fixture-tool","partialResult":{"content":[{"type":"text","text":"bounded fixture"}]}}
+{"type":"tool_execution_end","toolCallId":"fixture-tool","result":{"content":[{"type":"text","text":"bounded fixture"}]},"isError":false}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"fixture"}],"timestamp":1}}
+{"type":"entry_appended","entry":{"type":"custom","customType":"spec-mode","data":{"enabled":true}}}
+{"type":"agent_end"}

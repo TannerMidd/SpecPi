@@ -1,0 +1,29 @@
+# Desktop implementation audit
+
+This audit maps the production-readiness contract to shipped source and repeatable gates. It does not authorize publication or claim signed installers.
+
+| Requirement | Implementation evidence | Verification gate |
+| --- | --- | --- |
+| Explicit project and trust selection | Main canonicalizes native directory selections and resolves opaque project IDs; a native Electron dialog supplies one-process trust directly to internal launch options; state schema 2 contains no trust | `workspace-controller.test.ts`; state migration tests; native trust acceptance flow |
+| Compatible Pi discovery and diagnostics | PATH/manual discovery, safe npm-shim resolution, bounded version probe, 0.84.4 floor, main-owned native newer-version compatibility confirmation before spawn, runtime troubleshooting/export view | `runtime-discovery.test.ts`; packaged smoke |
+| Supervised strict RPC | LF-only `StringDecoder` framing, exact 4 MiB serialized-command limit, 64 MiB correlated history-response limit, 256 pending-request cap, IDs/timeouts, attempt/child identities, abortable probing, lifecycle phases, bounded stderr, process-tree shutdown, and response/event separation | `jsonl.test.ts`; cancellation/stale-child/bulk-response cases in `pi-process.test.ts`; isolated live test |
+| Complete transcript and composer | Canonical hydration plus sanitized incremental Markdown for text/thinking streams and final messages, retries/compaction/errors, prompt/steer/follow-up, clear/abort recovery, 2 MiB per-image and aggregate transport preflight, failure-preserved attachments, drafts, history recall, tail-aware scrolling, copy controls | `conversation.test.ts`; `security.test.ts`; streaming-Markdown tests; browser flows |
+| Composer command execution | Live `get_commands` discovery merged with native actions; source labels; slash autocomplete; keyboard navigation; SpecPi argument completion; direct extension-command `prompt` routing while streaming; command feedback | `commands.test.ts`; isolated live `/guard` and `/spec` execution; browser composer flow |
+| Model and thinking controls | Runtime model list grouped by provider with native type-ahead, actionable auth error, runtime thinking-level list, context/token/cost status | Typecheck/build; browser snapshot |
+| Persistent sessions and actions | Main registers Pi-reported session identity under the active project; direct resume uses matching IDs; arbitrary JSONL selection becomes a one-time Pi `--fork` import; cancelled transitions preserve state; rename uses `set_session_name`; restart and shortcuts read current IDs/drafts; background runtimes remain bounded | `workspace-controller.test.ts`; session transition/title tests; runtime-pool tests; Pi 0.84.4 live naming test; browser switch/import flow |
+| Extension and SpecPi UI | Composer-level Off/Guard/Strict selector enabled by command discovery and confirmed only by the exact Guard status projection; missing, locked, mismatched, and timed-out states do not claim success; minimal inline approvals, safe unsupported fallback, keyed status/widgets/title/editor draft, and command palette remain | Guard status unit cases; isolated command discovery; browser protection/approval/palette flow |
+| Native Files and Changes | Main-owned active root, relative-only renderer requests, lazy bounded tree, canonical/symlink confinement, fixed-argv Git status/diff, destination-correct NUL-framed rename parsing, request-generation race rejection, bounded line review comments, no mutations | `file-service.test.ts`; `git-service.test.ts`; workspace security tests; delayed browser flow |
+| Native Spec mode | First-class mid-conversation toggle, immediate focused presentation during active turns, deferred authoritative `/spec` synchronization, reconstructed `spec-mode` entries, focused banner/phases/counters/scope state, collapsed reasoning/tools, held streaming prose, final authoritative message | Conversation unit tests; renderer interaction |
+| Renderer security/privacy | Electron sandbox, no Node integration, context isolation, frozen ID-based bridge, packaged-local/loopback-development target enforcement, sender/frame/origin/schema checks, main-owned paths and state revisions, denied permissions/navigation/windows, strict CSP, no credential API, telemetry, listener, or remote service | `security.test.ts`; `workspace-controller.test.ts`; state-store tests; Electron bridge smoke |
+| Packaging and documentation | Isolated pinned lockfile, Electron Builder targets/icon/notices/checksums, unsigned labeling, three-platform CI, explicit sandbox-helper ownership on Linux without `--no-sandbox`, architecture/security/compatibility/release/rollback docs, root npm tarball isolation | Root `npm run check`; green platform CI matrix; development and packaged smoke |
+
+## Required acceptance commands
+
+```bash
+npm run check
+SPECPI_LIVE_PI=1 npm --prefix desktop test -- --run tests/integration/live-pi.test.ts
+npm --prefix desktop run smoke
+npm --prefix desktop run package
+```
+
+The live test creates a temporary `PI_CODING_AGENT_DIR`, installs repository resources there without external package/tool installation, preserves an authentication canary by metadata, starts `--no-session --offline`, verifies prompt-free Off startup and session replacement, confirms Pi-owned naming through `set_session_name`, changes Strict/Off without duplicate confirmation UI, executes `/guard` and `/spec` through Pi, and verifies the SpecPi command catalog. Release CI repeats the desktop check, isolated live Pi smoke, sandboxed Electron bridge smoke, checksummed platform artifact build, and packaged-app launch on Ubuntu, Windows, and macOS. Publishing, signing, notarization, installation, and remote release creation remain separate human-authorized operations.

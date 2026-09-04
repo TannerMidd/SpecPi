@@ -3,6 +3,27 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
+test("Desktop RPC starts with Guard off and changes mode without duplicate prompts", () => {
+    const fixture = path.resolve("tests/fixtures/command-guard-desktop-harness.ts");
+    const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], {
+        encoding: "utf8",
+        env: { ...process.env },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const line = result.stdout.split("\n").find((entry) => entry.startsWith("COMMAND_GUARD_DESKTOP="));
+    assert.ok(line, result.stdout);
+    const value = JSON.parse(line.slice("COMMAND_GUARD_DESKTOP=".length));
+    assert.equal(value.selects, 0);
+    assert.equal(value.notifications, 0);
+    assert.equal(value.confirms, 0);
+    assert.equal(value.genericRpcSelects, 0);
+    assert.equal(value.genericRpcStatus, "🛡 Guard");
+    assert.equal(value.startupStatus, "Guard Off");
+    assert.equal(value.strictStatus, "🛡 Strict");
+    assert.equal(value.finalStatus, "Guard Off");
+    assert.equal(value.safeAllowed, true);
+});
+
 test("extension blocks before executor and latches critical lock", () => {
     const fixture = path.resolve("tests/fixtures/command-guard-harness.ts");
     const result = spawnSync(process.execPath, ["--experimental-strip-types", fixture], {

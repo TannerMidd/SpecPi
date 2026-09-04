@@ -101,6 +101,14 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T, milliseconds = 3
     }
 }
 
+function isRpc(ctx: ExtensionContext): boolean {
+    return ctx.mode === "rpc";
+}
+
+function isDesktopRpc(ctx: ExtensionContext): boolean {
+    return isRpc(ctx) && process.env.SPECPI_DESKTOP === "1";
+}
+
 function startupChoice(ctx: ExtensionContext, milliseconds = 3000): Promise<string | undefined> {
     return withTimeout(
         ctx.ui.select("SpecPi command guard", ["Guard (Recommended)", "Strict", "Off for this session"]),
@@ -193,7 +201,17 @@ export default function registerCommandGuard(
     pi.on("session_start", async (_event, ctx) => {
         reset();
         try {
-            const choice = ctx.hasUI ? await startupChoice(ctx, startupTimeoutMs) : undefined;
+            // Desktop exposes this choice persistently beside its composer. Avoid an interstitial on
+            // every fast session switch and follow the host's explicit low-friction default.
+            const desktopRpc = isDesktopRpc(ctx);
+            // Pi binds extensions before its RPC stdin reader starts, so a blocking session_start
+            // prompt cannot receive a response and stalls startup until its timeout. RPC hosts use
+            // the fail-closed Guard default; Desktop exposes an explicit session-scoped selector.
+            const choice = ctx.hasUI && !isRpc(ctx) ? await startupChoice(ctx, startupTimeoutMs) : undefined;
+            if (desktopRpc) {
+                state.mode = "off";
+            }
+
             if (choice === "Strict") {
                 state.mode = "strict";
             } else if (choice === "Off for this session") {
@@ -214,12 +232,14 @@ export default function registerCommandGuard(
             state.ready = true;
             state.startupFailed = false;
             updateStatus(ctx, state);
-            ctx.ui.notify(
-                state.mode === "off"
-                    ? "Command guard is off for this session; this is not a sandbox."
-                    : `Command guard active in ${state.mode} mode.`,
-                state.mode === "off" ? "warning" : "info",
-            );
+            if (!desktopRpc) {
+                ctx.ui.notify(
+                    state.mode === "off"
+                        ? "Command guard is off for this session; this is not a sandbox."
+                        : `Command guard active in ${state.mode} mode.`,
+                    state.mode === "off" ? "warning" : "info",
+                );
+            }
         } catch {
             state.startupFailed = true;
             state.ready = false;
@@ -304,15 +324,17 @@ export default function registerCommandGuard(
 
             if (action === "off") {
                 if (
-                    !ctx.hasUI ||
-                    !(await withTimeout(
-                        ctx.ui.confirm(
-                            "Turn command guard off?",
-                            "This applies only to the current top-level session and removes defense in depth.",
-                        ),
-                        false,
-                        approvalTimeoutMs,
-                    ))
+                    state.mode !== "off" &&
+                    !isDesktopRpc(ctx) &&
+                    (!ctx.hasUI ||
+                        !(await withTimeout(
+                            ctx.ui.confirm(
+                                "Turn command guard off?",
+                                "This applies only to the current top-level session and removes defense in depth.",
+                            ),
+                            false,
+                            approvalTimeoutMs,
+                        )))
                 ) {
                     return;
                 }
@@ -330,6 +352,7 @@ export default function registerCommandGuard(
                 if (
                     action === "guard" &&
                     state.mode === "strict" &&
+                    !isDesktopRpc(ctx) &&
                     (!ctx.hasUI ||
                         !(await withTimeout(
                             ctx.ui.confirm(
