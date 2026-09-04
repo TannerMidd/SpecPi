@@ -16,6 +16,20 @@ export interface CommandSuggestion extends CommandInfo {
     detail?: string;
 }
 
+export type NewSessionTarget = "current" | "independent";
+
+export function newSessionTarget(command: string): NewSessionTarget | undefined {
+    if (command === "@new-session") {
+        return "current";
+    }
+
+    if (command === "@new-session-window") {
+        return "independent";
+    }
+
+    return undefined;
+}
+
 export const COMMAND_SUBCOMMANDS: Readonly<Record<string, readonly string[]>> = {
     spec: ["on", "off", "status"],
     guard: ["status", "guard", "strict", "off", "unlock", "clear-approvals"],

@@ -16,7 +16,7 @@ import { Icon } from "./components/Icons";
 import { ModelSelector, type ModelOption } from "./components/ModelSelector";
 import { SessionNameDialog } from "./components/SessionNameDialog";
 import { Transcript } from "./components/Transcript";
-import { commandSuggestions, composerStreamingBehavior, parseSlashCommand } from "./lib/commands";
+import { commandSuggestions, composerStreamingBehavior, newSessionTarget, parseSlashCommand } from "./lib/commands";
 import { sessionOpenAction, spinupDetail } from "./lib/spinup";
 import { stripAnsi } from "./lib/text";
 import { emptyConversation, messagesToItems, reduceRuntimeEvent } from "./state/conversation";
@@ -42,7 +42,7 @@ const DESKTOP_COMMANDS: CommandInfo[] = [
     {
         name: "new",
         label: "New session",
-        description: "Start a fresh independent session",
+        description: "Start a fresh session in this window",
         source: "desktop",
         invocation: "@new-session",
     },
@@ -986,7 +986,8 @@ export function App() {
     };
 
     const runDesktopCommand = async (command: string, args = "") => {
-        const changesSession = ["@new-session", "@clone", "@open-session"].includes(command);
+        const newSessionDestination = newSessionTarget(command);
+        const changesSession = newSessionDestination !== undefined || ["@clone", "@open-session"].includes(command);
         if (changesSession && sessionChanging) {
             return false;
         }
@@ -1006,7 +1007,13 @@ export function App() {
                 await addProject();
             } else if (command === "@abort") {
                 await window.specpi.sendRuntimeCommand({ type: "abort" });
-            } else if (command === "@new-session") {
+            } else if (newSessionDestination === "current") {
+                const saved = await saveCurrentDraft();
+                await window.specpi.sendRuntimeCommand({ type: "new_session" });
+                dispatch({ generation: runtimeRef.current.generation, record: { type: "desktop_clear" } });
+                await hydrate(selectedProject, saved, "");
+                setDraft("");
+            } else if (newSessionDestination === "independent") {
                 await openIndependentWorkspace(undefined, true);
             } else if (command === "@compact") {
                 await window.specpi.sendRuntimeCommand({
@@ -1417,10 +1424,10 @@ export function App() {
                                         <Icon name="document" size={15} />
                                     </button>
                                     <button
-                                        title="New session in an independent window (Ctrl+N)"
+                                        title="New session in an independent window"
                                         aria-label="New session in an independent window"
                                         disabled={sessionChanging}
-                                        onClick={() => void runDesktopCommand("@new-session")}
+                                        onClick={() => void runDesktopCommand("@new-session-window")}
                                     >
                                         <Icon name="plus" size={15} />
                                     </button>

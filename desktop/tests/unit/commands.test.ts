@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     commandSuggestions,
     composerStreamingBehavior,
+    newSessionTarget,
     parseSlashCommand,
     type CommandInfo,
 } from "../../src/renderer/src/lib/commands";
@@ -17,6 +18,12 @@ describe("composer commands", () => {
         expect(parseSlashCommand("  /guard strict  ")).toEqual({ name: "guard", args: "strict" });
         expect(parseSlashCommand("ordinary prompt")).toBeUndefined();
         expect(parseSlashCommand("//not-a-command")).toBeUndefined();
+    });
+
+    it("keeps ordinary new sessions in the current window", () => {
+        expect(newSessionTarget("@new-session")).toBe("current");
+        expect(newSessionTarget("@new-session-window")).toBe("independent");
+        expect(newSessionTarget("@open-session")).toBeUndefined();
     });
 
     it("discovers commands from a leading slash", () => {
