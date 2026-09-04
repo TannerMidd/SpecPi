@@ -1,18 +1,24 @@
 import type { SessionRecord } from "./domain";
 
-function normalizedPath(value: string): string {
-    return value.replaceAll("\\", "/").toLowerCase();
+function sessionPathIdentity(value: string, platform: NodeJS.Platform): string {
+    const normalized = value.replaceAll("\\", "/");
+
+    return platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
-export function mergeSessionRecord(sessions: readonly SessionRecord[], record: SessionRecord): SessionRecord[] {
-    const recordPath = normalizedPath(record.sessionPath);
+export function mergeSessionRecord(
+    sessions: readonly SessionRecord[],
+    record: SessionRecord,
+    platform: NodeJS.Platform = typeof process === "undefined" ? "linux" : process.platform,
+): SessionRecord[] {
+    const recordPath = sessionPathIdentity(record.sessionPath, platform);
     const seenIds = new Set<string>();
     const seenPaths = new Set<string>();
     const merged: SessionRecord[] = [];
     let replaced = false;
 
     for (const session of sessions) {
-        const sessionPath = normalizedPath(session.sessionPath);
+        const sessionPath = sessionPathIdentity(session.sessionPath, platform);
         if (session.id === record.id || sessionPath === recordPath) {
             if (!replaced) {
                 merged.push(record);

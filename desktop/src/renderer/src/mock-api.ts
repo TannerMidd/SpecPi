@@ -7,7 +7,8 @@ const projectPath = "F:/Development/SpecPi";
 const preview = new URLSearchParams(window.location.search).get("preview");
 const now = Date.now();
 let state: DesktopState = {
-    schema: 1,
+    schema: 2,
+    revision: 0,
     theme: preview === "light" ? "light" : "dark",
     projects: [
         {
@@ -15,9 +16,8 @@ let state: DesktopState = {
             path: projectPath,
             label: "SpecPi",
             lastOpenedAt: new Date(now).toISOString(),
-            trust: "approve",
             pinned: true,
-            lastSessionPath: "C:/demo/session.jsonl",
+            lastSessionId: "demo-session",
         },
     ],
     sessions: [
@@ -77,9 +77,19 @@ let state: DesktopState = {
 };
 let status: RuntimeStatus = { generation: 0, phase: "stopped" };
 let runtimes: RuntimeDescriptor[] = [];
+const stateListeners = new Set<(next: DesktopState) => void>();
 const eventListeners = new Set<(event: RuntimeEvent) => void>();
 const statusListeners = new Set<(next: RuntimeStatus) => void>();
 const rosterListeners = new Set<(next: RuntimeDescriptor[]) => void>();
+const runtimeNames = new Map<string, string>();
+const commitState = (next: Omit<DesktopState, "revision"> & { revision?: number }): DesktopState => {
+    state = { ...next, revision: state.revision + 1 };
+    const snapshot = structuredClone(state);
+    stateListeners.forEach((listener) => listener(snapshot));
+
+    return snapshot;
+};
+
 const emitEvent = (record: RuntimeEvent["record"]) =>
     eventListeners.forEach((listener) => listener({ generation: status.generation, record }));
 const emitRuntimeEvent = (runtimeId: string | undefined, record: RuntimeEvent["record"]) => {
@@ -121,60 +131,68 @@ const emitRuntimeStatus = (runtimeId: string | undefined, phase: RuntimeStatus["
 
 export function installMockApi(): void {
     const api: DesktopApi = {
-        chooseProject: async () => projectPath,
-        choosePi: async () => "C:/Users/example/AppData/Roaming/npm/pi.cmd",
-        chooseSession: async () => "C:/demo/session.jsonl",
+        chooseProject: async () => structuredClone(state.projects[0]),
+        choosePi: async () => commitState({ ...state, piPath: "C:/Users/example/AppData/Roaming/npm/pi.cmd" }),
+        chooseSession: async () => ({ token: crypto.randomUUID(), name: "session.jsonl" }),
         openWorkspace: async () => undefined,
         getLaunchIntent: async () =>
-            preview === "empty"
-                ? undefined
-                : { cwd: projectPath, trust: "approve", sessionPath: "C:/demo/session.jsonl" },
+            preview === "empty" ? undefined : { projectId: "specpi-project", sessionId: "demo-session" },
         getDesktopState: async () => structuredClone(state),
-        updateDesktopState: async (patch: DesktopStatePatch) => {
-            state = { ...state, ...patch, layout: { ...state.layout, ...patch.layout } };
-
-            return structuredClone(state);
-        },
-        saveSessionDraft: async (sessionId, draft) => {
-            state = {
+        updateDesktopState: async (patch: DesktopStatePatch) =>
+            commitState({ ...state, ...patch, layout: { ...state.layout, ...patch.layout } }),
+        saveSessionDraft: async (sessionId, draft) =>
+            commitState({
                 ...state,
                 sessions: state.sessions.map((session) => (session.id === sessionId ? { ...session, draft } : session)),
-            };
-
-            return structuredClone(state);
-        },
-        saveSessionTitle: async (sessionId, title) => {
-            state = {
+            }),
+        saveSessionTitle: async (sessionId, title) =>
+            commitState({
                 ...state,
                 sessions: state.sessions.map((session) =>
                     session.id === sessionId && !session.name?.trim() && !session.title?.trim()
                         ? { ...session, title }
                         : session,
                 ),
+            }),
+        saveActiveSession: async (metadata) => {
+            const activeRuntime = runtimes.find((runtime) => runtime.active);
+            const sessionId = activeRuntime?.sessionId ?? "demo-session";
+            const existing = state.sessions.find((session) => session.id === sessionId);
+            const session = {
+                id: sessionId,
+                projectId: activeRuntime?.projectId ?? "specpi-project",
+                sessionId,
+                sessionPath: activeRuntime?.sessionPath ?? existing?.sessionPath ?? "C:/demo/session.jsonl",
+                ...(existing?.name ? { name: existing.name } : {}),
+                ...(metadata.title ? { title: metadata.title } : existing?.title ? { title: existing.title } : {}),
+                ...(metadata.model ? { model: metadata.model } : existing?.model ? { model: existing.model } : {}),
+                lastOpenedAt: new Date().toISOString(),
+                draft: metadata.draft ?? existing?.draft ?? "",
             };
 
-            return structuredClone(state);
-        },
-        saveSession: async (session) => {
-            state = {
+            return commitState({
                 ...state,
-                sessions: mergeSessionRecord(state.sessions, session),
+                sessions: mergeSessionRecord(state.sessions, session, "win32"),
                 activeProjectId: session.projectId,
                 activeSessionId: session.id,
-            };
-
-            return structuredClone(state);
+            });
         },
         getRuntimeSnapshot: async () => ({ status, pendingUi: [] }),
         getRuntimeRoster: async () => structuredClone(runtimes),
         getRuntimeDiagnostics: async () => ["Pi RPC ready · no credential data collected"],
         saveRuntimeDiagnostics: async () => "C:/demo/specpi-desktop-diagnostics.txt",
-        startRuntime: async (options) => {
-            const existing = options.sessionPath
+        startRuntime: async (request) => {
+            const project = state.projects.find((item) => item.id === request.projectId);
+            if (!project) {
+                throw new Error("Mock project is missing");
+            }
+
+            const requestedSession = request.sessionId
+                ? state.sessions.find((session) => session.id === request.sessionId)
+                : undefined;
+            const existing = request.sessionId
                 ? runtimes.find(
-                      (runtime) =>
-                          runtime.sessionPath?.replaceAll("\\", "/").toLowerCase() ===
-                          options.sessionPath?.replaceAll("\\", "/").toLowerCase(),
+                      (runtime) => runtime.projectId === request.projectId && runtime.sessionId === request.sessionId,
                   )
                 : undefined;
             if (existing) {
@@ -186,26 +204,31 @@ export function installMockApi(): void {
                 statusListeners.forEach((listener) => listener(status));
                 emitRoster();
 
-                return status;
+                return { cancelled: false, status };
             }
 
+            const generatedId = request.importToken ? `import-${crypto.randomUUID()}` : crypto.randomUUID();
+            const sessionId = requestedSession?.id ?? generatedId;
+            const sessionPath = requestedSession?.sessionPath ?? `C:/demo/${sessionId}.jsonl`;
             runtimes = [
                 ...runtimes.map((runtime) => ({ ...runtime, active: false })),
                 {
                     runtimeId: crypto.randomUUID(),
-                    projectPath: options.cwd,
-                    ...(options.sessionPath ? { sessionPath: options.sessionPath } : {}),
+                    projectId: project.id,
+                    projectPath: project.path,
+                    sessionId,
+                    sessionPath,
                     active: true,
-                    status: { generation: status.generation + 1, phase: "starting", cwd: options.cwd },
+                    status: { generation: status.generation + 1, phase: "starting", cwd: project.path },
                 },
             ];
-            emitStatus({ generation: status.generation + 1, phase: "starting", cwd: options.cwd });
+            emitStatus({ generation: status.generation + 1, phase: "starting", cwd: project.path });
             await new Promise((resolve) => setTimeout(resolve, preview === "startup" ? 60_000 : 2_000));
             emitStatus({
                 generation: status.generation,
                 phase: "idle",
-                cwd: options.cwd,
-                piPath: options.piPath ?? "pi",
+                cwd: project.path,
+                piPath: state.piPath ?? "pi",
                 piVersion: "0.84.4",
             });
             emitEvent({
@@ -216,7 +239,7 @@ export function installMockApi(): void {
                 statusText: "Guard Off",
             });
 
-            return status;
+            return { cancelled: false, status };
         },
         stopRuntime: async () => {
             emitStatus({ generation: status.generation, phase: "stopped" });
@@ -225,7 +248,8 @@ export function installMockApi(): void {
         },
         sendRuntimeCommand: async (command) => {
             if (command.type === "get_state") {
-                const activePath = runtimes.find((runtime) => runtime.active)?.sessionPath ?? "C:/demo/session.jsonl";
+                const activeRuntime = runtimes.find((runtime) => runtime.active);
+                const activePath = activeRuntime?.sessionPath ?? "C:/demo/session.jsonl";
                 const session = state.sessions.find(
                     (item) =>
                         item.sessionPath.replaceAll("\\", "/").toLowerCase() ===
@@ -235,9 +259,9 @@ export function installMockApi(): void {
                 return {
                     model: { id: "gpt-5.6", provider: "openai-codex" },
                     thinkingLevel: "high",
-                    sessionId: session?.sessionId ?? "demo-session",
+                    sessionId: session?.sessionId ?? activeRuntime?.sessionId ?? "demo-session",
                     sessionFile: session?.sessionPath ?? activePath,
-                    sessionName: session?.name,
+                    sessionName: runtimeNames.get(activeRuntime?.runtimeId ?? "") ?? session?.name,
                 };
             }
 
@@ -300,6 +324,42 @@ export function installMockApi(): void {
                     cost: 0.1842,
                     contextUsage: { percent: 18, tokens: 36000, contextWindow: 200000 },
                 };
+            }
+
+            if (["new_session", "clone", "fork"].includes(command.type)) {
+                const active = runtimes.find((runtime) => runtime.active);
+                if (!active) {
+                    throw new Error("Mock Pi runtime is not active");
+                }
+
+                const sessionId = crypto.randomUUID();
+                const nextStatus: RuntimeStatus = {
+                    ...active.status,
+                    generation: status.generation + 1,
+                    phase: "idle",
+                };
+                runtimes = runtimes.map((runtime) =>
+                    runtime.runtimeId === active.runtimeId
+                        ? {
+                              ...runtime,
+                              sessionId,
+                              sessionPath: `C:/demo/${sessionId}.jsonl`,
+                              status: nextStatus,
+                          }
+                        : runtime,
+                );
+                emitStatus(nextStatus);
+
+                return command.type === "fork" ? { text: "Selected branch text" } : {};
+            }
+
+            if (command.type === "set_session_name" && typeof command.name === "string") {
+                const runtimeId = runtimes.find((runtime) => runtime.active)?.runtimeId;
+                if (runtimeId) {
+                    runtimeNames.set(runtimeId, command.name);
+                }
+
+                return {};
             }
 
             if (command.type === "prompt" || command.type === "steer" || command.type === "follow_up") {
@@ -412,7 +472,7 @@ export function installMockApi(): void {
                 message: "Command guard active in guard mode.",
                 notifyType: "info",
             }),
-        listDirectory: async (_root, relative) =>
+        listDirectory: async (_projectId, relative) =>
             relative
                 ? []
                 : [
@@ -420,19 +480,19 @@ export function installMockApi(): void {
                       { name: "README.md", relativePath: "README.md", kind: "file", size: 8000 },
                       { name: "PLAN.md", relativePath: "PLAN.md", kind: "file", size: 42000 },
                   ],
-        readFile: async (_root, relative) => ({
+        readFile: async (_projectId, relative) => ({
             relativePath: relative,
             kind: "text",
             content: `# ${relative}\n\nPreviewed securely inside the selected project.`,
             truncated: false,
             size: 80,
         }),
-        getGitStatus: async () => ({
+        getGitStatus: async (_projectId) => ({
             available: true,
             branch: "main",
             files: [{ path: "PLAN.md", index: " ", worktree: "M" }],
         }),
-        getGitDiff: async () =>
+        getGitDiff: async (_projectId, _relativePath) =>
             [
                 "diff --git a/PLAN.md b/PLAN.md",
                 "--- a/PLAN.md",
@@ -446,6 +506,11 @@ export function installMockApi(): void {
         saveExport: async () => undefined,
         copyText: async () => undefined,
         openExternal: async () => undefined,
+        onDesktopState: (listener) => {
+            stateListeners.add(listener);
+
+            return () => stateListeners.delete(listener);
+        },
         onRuntimeEvent: (listener) => {
             eventListeners.add(listener);
 

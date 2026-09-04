@@ -1,12 +1,15 @@
-import type { DesktopState, FileNode, FilePreview, GitStatus, SessionRecord } from "./domain";
+import type { DesktopState, FileNode, FilePreview, GitStatus, ProjectRecord } from "./domain";
 import type {
+    ActiveSessionMetadata,
     ExtensionUiResponse,
     RpcCommand,
     RuntimeDescriptor,
     RuntimeEvent,
     RuntimeSnapshot,
+    RuntimeStartResult,
     RuntimeStatus,
-    StartRuntimeOptions,
+    SessionImportSelection,
+    WorkspaceRequest,
 } from "./rpc";
 
 export const IPC = {
@@ -17,9 +20,10 @@ export const IPC = {
     launchIntent: "desktop:launch-intent",
     getDesktopState: "desktop:get-state",
     updateDesktopState: "desktop:update-state",
+    desktopStateChanged: "desktop:state-changed",
     saveSessionDraft: "desktop:save-session-draft",
     saveSessionTitle: "desktop:save-session-title",
-    saveSession: "desktop:save-session",
+    saveActiveSession: "desktop:save-active-session",
     runtimeSnapshot: "runtime:snapshot",
     runtimeRoster: "runtime:roster",
     runtimeDiagnostics: "runtime:diagnostics",
@@ -39,40 +43,38 @@ export const IPC = {
     openExternal: "desktop:open-external",
 } as const;
 
-export type DesktopStatePatch = Partial<
-    Pick<DesktopState, "piPath" | "theme" | "activeProjectId" | "activeSessionId">
-> & {
-    projects?: DesktopState["projects"];
-    sessions?: DesktopState["sessions"];
+export interface DesktopStatePatch {
+    theme?: DesktopState["theme"];
     layout?: Partial<DesktopState["layout"]>;
-};
+}
 
 export interface DesktopApi {
-    chooseProject(): Promise<string | undefined>;
-    choosePi(): Promise<string | undefined>;
-    chooseSession(): Promise<string | undefined>;
-    openWorkspace(options: StartRuntimeOptions): Promise<void>;
-    getLaunchIntent(): Promise<StartRuntimeOptions | undefined>;
+    chooseProject(): Promise<ProjectRecord | undefined>;
+    choosePi(): Promise<DesktopState | undefined>;
+    chooseSession(): Promise<SessionImportSelection | undefined>;
+    openWorkspace(request: WorkspaceRequest): Promise<void>;
+    getLaunchIntent(): Promise<WorkspaceRequest | undefined>;
     getDesktopState(): Promise<DesktopState>;
     updateDesktopState(patch: DesktopStatePatch): Promise<DesktopState>;
     saveSessionDraft(sessionId: string, draft: string): Promise<DesktopState>;
     saveSessionTitle(sessionId: string, title: string): Promise<DesktopState>;
-    saveSession(session: SessionRecord): Promise<DesktopState>;
+    saveActiveSession(metadata: ActiveSessionMetadata): Promise<DesktopState>;
     getRuntimeSnapshot(): Promise<RuntimeSnapshot>;
     getRuntimeRoster(): Promise<RuntimeDescriptor[]>;
     getRuntimeDiagnostics(): Promise<readonly string[]>;
     saveRuntimeDiagnostics(): Promise<string | undefined>;
-    startRuntime(options: StartRuntimeOptions): Promise<RuntimeStatus>;
+    startRuntime(request: WorkspaceRequest): Promise<RuntimeStartResult>;
     stopRuntime(): Promise<void>;
     sendRuntimeCommand(command: RpcCommand): Promise<unknown>;
     respondToExtension(request: ExtensionUiResponse): Promise<void>;
-    listDirectory(projectRoot: string, relativePath: string): Promise<FileNode[]>;
-    readFile(projectRoot: string, relativePath: string): Promise<FilePreview>;
-    getGitStatus(projectRoot: string): Promise<GitStatus>;
-    getGitDiff(projectRoot: string, relativePath?: string): Promise<string>;
+    listDirectory(projectId: string, relativePath: string): Promise<FileNode[]>;
+    readFile(projectId: string, relativePath: string): Promise<FilePreview>;
+    getGitStatus(projectId: string): Promise<GitStatus>;
+    getGitDiff(projectId: string, relativePath?: string): Promise<string>;
     saveExport(sourcePath: string): Promise<string | undefined>;
     copyText(text: string): Promise<void>;
     openExternal(url: string): Promise<void>;
+    onDesktopState(listener: (state: DesktopState) => void): () => void;
     onRuntimeEvent(listener: (event: RuntimeEvent) => void): () => void;
     onRuntimeStatus(listener: (status: RuntimeStatus) => void): () => void;
     onRuntimeRoster(listener: (runtimes: RuntimeDescriptor[]) => void): () => void;

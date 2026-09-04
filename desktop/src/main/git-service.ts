@@ -49,6 +49,36 @@ async function git(
     });
 }
 
+export function parsePorcelainStatus(output: string): Pick<GitStatus, "branch" | "files"> {
+    const records = output.split("\0").filter(Boolean);
+    const branchRecord = records[0]?.startsWith("## ") ? records.shift() : undefined;
+    const branch = branchRecord?.slice(3);
+    const files: GitFileStatus[] = [];
+    for (let index = 0; index < records.length; index += 1) {
+        const record = records[index];
+        if (!record || record.length < 4) {
+            continue;
+        }
+
+        const status = record.slice(0, 2);
+        const filePath = record.slice(3);
+        let originalPath: string | undefined;
+        if (status.includes("R") || status.includes("C")) {
+            originalPath = records[index + 1];
+            index += 1;
+        }
+
+        files.push({
+            path: filePath,
+            ...(originalPath ? { originalPath } : {}),
+            index: status[0] ?? " ",
+            worktree: status[1] ?? " ",
+        });
+    }
+
+    return { branch, files };
+}
+
 export async function readGitStatus(projectRoot: string): Promise<GitStatus> {
     try {
         const root = path.resolve(projectRoot);
@@ -57,27 +87,7 @@ export async function readGitStatus(projectRoot: string): Promise<GitStatus> {
             return { available: false, files: [], error: result.stderr.trim() || "Not a Git repository" };
         }
 
-        const records = result.stdout.split("\0").filter(Boolean);
-        const branchRecord = records.shift();
-        const branch = branchRecord?.startsWith("## ") ? branchRecord.slice(3) : undefined;
-        const files: GitFileStatus[] = [];
-        for (let index = 0; index < records.length; index += 1) {
-            const record = records[index];
-            if (!record || record.length < 4) {
-                continue;
-            }
-
-            const status = record.slice(0, 2);
-            let filePath = record.slice(3);
-            if (status.includes("R") || status.includes("C")) {
-                filePath = records[index + 1] ?? filePath;
-                index += 1;
-            }
-
-            files.push({ path: filePath, index: status[0] ?? " ", worktree: status[1] ?? " " });
-        }
-
-        return { available: true, branch, files };
+        return { available: true, ...parsePorcelainStatus(result.stdout) };
     } catch (error) {
         return { available: false, files: [], error: error instanceof Error ? error.message : String(error) };
     }

@@ -3,8 +3,12 @@
 ## Unreleased
 
 - Add SpecPi Desktop as a separate Electron + React application around Pi's documented JSONL RPC mode, with secure process supervision, sandboxed preload IPC, project/session/model controls, streamed transcripts and tools, standard extension dialogs, native SpecPi command access, read-only Files/Changes views, focused Spec mode, responsive accessible UI, and cross-platform packaging configuration.
-- Add strict runtime discovery and compatibility checks, bounded root-confined file previews, redacted diagnostics, atomic desktop-only preferences, unit/integration/live-Pi tests, packaged Electron smoke validation, three-platform CI, and desktop architecture, security, compatibility, dependency, development, and packaging documentation.
-- Implement the approved Desktop Workbench design with bundled IBM Plex typography, project/session navigation, workspace tabs, a permanent run inspector, responsive empty/chat/Spec/files states, redesigned command and trust dialogs, and a structured composer.
+- Add strict runtime discovery and main-owned pre-spawn compatibility consent, bounded root-confined file previews, redacted diagnostics, atomic desktop-only preferences, unit/integration/live-Pi tests, packaged Electron smoke validation, three-platform CI, and desktop architecture, security, compatibility, dependency, development, and packaging documentation.
+- Implement the approved Desktop Workbench design with bundled IBM Plex typography, project/session navigation, workspace tabs, a permanent run inspector, responsive empty/chat/Spec/files states, redesigned command dialogs, a native per-process trust prompt, and a structured composer.
+- Move Desktop filesystem and process authority into Electron main: use opaque project/session/import IDs, canonical active-project capabilities, loopback-only development renderers, native ephemeral trust, Pi-owned fork imports, complete schema-2 state validation, atomic collection mutations, and revision broadcasts across windows.
+- Make runtime and session transitions race-safe: cancel discovery/probes before spawn, scope callbacks to the exact child, keep correlated responses off the event stream, honor Pi's successful cancellation response as a no-op, preserve current shortcut drafts, and restart by active session ID.
+- Accept Pi-reserved session references before their JSONL leaf is first flushed by canonicalizing the existing parent only; keep every other filesystem authority strict and commit refreshed runtime identity atomically after path validation.
+- Align UI contracts with Pi and transport limits: use `set_session_name`, require authoritative Command Guard status, cap source attachments at 2 MiB and aggregate commands at 4 MiB, discard stale Files/Git responses, parse NUL-framed rename destinations correctly, and keep Linux smoke sandboxed with a validated SUID helper.
 
 ## 0.10.0 - 2026-09-02
 

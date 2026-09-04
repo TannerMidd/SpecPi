@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { DesktopState, ProjectRecord, SessionRecord } from "../../shared/domain";
+import { MAX_IMAGE_ATTACHMENT_BYTES, MAX_RPC_COMMAND_BYTES, serializedRpcCommandBytes } from "../../shared/limits";
 import type {
     ExtensionUiRequest,
     RpcCommand,
     RuntimeDescriptor,
     RuntimeEvent,
     RuntimeStatus,
-    StartRuntimeOptions,
+    WorkspaceRequest,
 } from "../../shared/rpc";
 import { sessionDisplayTitle, sessionTitleFromMessages, sessionTitleFromPrompt } from "../../shared/session-title";
 import { CommandPalette, type CommandInfo } from "./components/CommandPalette";
@@ -17,6 +18,15 @@ import { ModelSelector, type ModelOption } from "./components/ModelSelector";
 import { SessionNameDialog } from "./components/SessionNameDialog";
 import { Transcript } from "./components/Transcript";
 import { commandSuggestions, composerStreamingBehavior, newSessionTarget, parseSlashCommand } from "./lib/commands";
+import { newestDesktopState } from "./lib/desktop-state";
+import {
+    acknowledgeGuardMode,
+    guardModeFromStatus,
+    guardRequestError,
+    type SelectableGuardMode,
+} from "./lib/guard-status";
+import { invokeLatest } from "./lib/latest-command";
+import { forkDraft, SessionTransitionLock, sessionTransitionCancelled } from "./lib/session-transitions";
 import { sessionOpenAction, spinupDetail } from "./lib/spinup";
 import { stripAnsi } from "./lib/text";
 import { emptyConversation, messagesToItems, reduceRuntimeEvent } from "./state/conversation";
@@ -38,6 +48,13 @@ interface SpinupStatus {
     sessionLabel?: string;
 }
 
+interface GuardWaiter {
+    expected: SelectableGuardMode;
+    resolve(): void;
+    reject(error: Error): void;
+    timer: ReturnType<typeof setTimeout>;
+}
+
 const DESKTOP_COMMANDS: CommandInfo[] = [
     {
         name: "new",
@@ -48,8 +65,8 @@ const DESKTOP_COMMANDS: CommandInfo[] = [
     },
     {
         name: "open-session",
-        label: "Open session",
-        description: "Open a Pi JSONL session",
+        label: "Import session as fork",
+        description: "Fork a selected Pi JSONL session into this project",
         source: "desktop",
         invocation: "@open-session",
     },
@@ -104,13 +121,6 @@ const DESKTOP_COMMANDS: CommandInfo[] = [
         invocation: "@rename",
     },
     {
-        name: "label",
-        label: "Label entry",
-        description: "Label the current session-tree entry",
-        source: "desktop",
-        invocation: "@label",
-    },
-    {
         name: "export",
         label: "Export transcript",
         description: "Save the transcript as HTML",
@@ -156,23 +166,10 @@ function latestSpecMode(entries: unknown[]): boolean {
     return enabled;
 }
 
-function projectLabel(projectPath: string): string {
-    return (
-        projectPath
-            .replace(/[\\/]+$/u, "")
-            .split(/[\\/]/u)
-            .at(-1) || projectPath
-    );
-}
-
 function compactPath(projectPath: string): string {
     const home = projectPath.match(/^(.*?[\\/](?:Users|home)[\\/][^\\/]+)([\\/].*)$/iu);
 
     return home?.[2] ? `~${home[2].replaceAll("\\", "/")}` : projectPath.replaceAll("\\", "/");
-}
-
-function normalizedSessionPath(sessionPath: string): string {
-    return sessionPath.replaceAll("\\", "/").toLowerCase();
 }
 
 function sessionRuntimeLabel(status?: RuntimeStatus): string | undefined {
@@ -252,6 +249,8 @@ function statusValue(statuses: Map<string, string>, fragment: string, fallback: 
 
 export function App() {
     const [desktop, setDesktop] = useState<DesktopState>();
+    const desktopRef = useRef<DesktopState | undefined>(undefined);
+    desktopRef.current = desktop;
     const [runtime, setRuntime] = useState<RuntimeStatus>({ generation: 0, phase: "stopped" });
     const [runtimeRoster, setRuntimeRoster] = useState<RuntimeDescriptor[]>([]);
     const runtimeRef = useRef(runtime);
@@ -276,7 +275,11 @@ export function App() {
     const [autocompleteIndex, setAutocompleteIndex] = useState(0);
     const [commandFeedback, setCommandFeedback] = useState("");
     const commandFeedbackTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-    const [requestedGuardMode, setRequestedGuardMode] = useState<"off" | "guard" | "strict">();
+    const [requestedGuardMode, setRequestedGuardMode] = useState<SelectableGuardMode>();
+    const [confirmedGuardMode, setConfirmedGuardMode] = useState<"off" | "guard" | "strict" | "locked" | "unknown">(
+        "unknown",
+    );
+    const guardWaiterRef = useRef<GuardWaiter | undefined>(undefined);
     const [sessionSearch, setSessionSearch] = useState("");
     const [delivery, setDelivery] = useState<"steer" | "followUp">("steer");
     const [attachments, setAttachments] = useState<
@@ -287,16 +290,20 @@ export function App() {
             name: string;
         }>
     >([]);
+    const draftRef = useRef(draft);
+    draftRef.current = draft;
+    const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const [specMode, setSpecMode] = useState(false);
     const [pendingSpecMode, setPendingSpecMode] = useState<boolean>();
-    const [selectedProject, setSelectedProject] = useState<ProjectRecord>();
+    const [selectedProjectId, setSelectedProjectId] = useState<string>();
     const [activeSessionId, setActiveSessionId] = useState<string>();
-    const [launchIntent, setLaunchIntent] = useState<StartRuntimeOptions>();
+    const activeSessionIdRef = useRef(activeSessionId);
+    activeSessionIdRef.current = activeSessionId;
+    const [launchIntent, setLaunchIntent] = useState<WorkspaceRequest>();
     const launchHandled = useRef(false);
     const runStartedAt = useRef<number | undefined>(undefined);
     const [runElapsed, setRunElapsed] = useState(0);
     const [lastRunElapsed, setLastRunElapsed] = useState(0);
-    const [pendingProject, setPendingProject] = useState<string>();
     const [branchChoices, setBranchChoices] = useState<BranchChoice[]>();
     const [renameSessionOpen, setRenameSessionOpen] = useState(false);
     const [filesTab, setFilesTab] = useState<"files" | "changes">("files");
@@ -312,8 +319,11 @@ export function App() {
     const [spinupElapsed, setSpinupElapsed] = useState(0);
     const startGeneration = useRef(0);
     const startInFlight = useRef(false);
+    const sessionTransitionLock = useRef(new SessionTransitionLock());
     const [sessionChanging, setSessionChanging] = useState(false);
     const [error, setError] = useState("");
+    const runDesktopCommandRef = useRef<(command: string, args?: string) => Promise<boolean>>(async () => false);
+    const selectedProject = desktop?.projects.find((project) => project.id === selectedProjectId);
 
     const toast = useCallback((message: string, level: Toast["level"] = "info") => {
         const id = crypto.randomUUID();
@@ -330,15 +340,24 @@ export function App() {
         commandFeedbackTimer.current = setTimeout(() => setCommandFeedback(""), 4_000);
     }, []);
 
-    const persist = useCallback(async (patch: Parameters<typeof window.specpi.updateDesktopState>[0]) => {
-        const next = await window.specpi.updateDesktopState(patch);
-        setDesktop(next);
+    const applyDesktop = useCallback((incoming: DesktopState): DesktopState => {
+        const next = newestDesktopState(desktopRef.current, incoming);
+        if (next !== desktopRef.current) {
+            desktopRef.current = next;
+            setDesktop(next);
+        }
 
         return next;
     }, []);
 
+    const persist = useCallback(
+        async (patch: Parameters<typeof window.specpi.updateDesktopState>[0]) =>
+            applyDesktop(await window.specpi.updateDesktopState(patch)),
+        [applyDesktop],
+    );
+
     const hydrate = useCallback(
-        async (project?: ProjectRecord, desktopOverride?: DesktopState, draftOverride?: string) => {
+        async (desktopOverride?: DesktopState, draftOverride?: string, registerSession = true) => {
             const [stateValue, messagesValue, commandsValue, modelsValue, thinkingValue, entriesValue, statsValue] =
                 await Promise.all([
                     window.specpi.sendRuntimeCommand({ type: "get_state" }),
@@ -378,40 +397,27 @@ export function App() {
 
             const sessionFile = typeof stateData.sessionFile === "string" ? stateData.sessionFile : undefined;
             const sessionId = typeof stateData.sessionId === "string" ? stateData.sessionId : undefined;
-            const desktopState = desktopOverride ?? desktop;
-            if (project && desktopState && sessionFile && sessionId) {
-                const normalizedSessionPath = sessionFile.replaceAll("\\", "/").toLowerCase();
-                const existing = desktopState.sessions.find(
-                    (item) =>
-                        item.id === sessionId ||
-                        item.sessionPath.replaceAll("\\", "/").toLowerCase() === normalizedSessionPath,
+            const desktopState = desktopOverride ?? desktopRef.current;
+            if (registerSession && desktopState && sessionFile && sessionId) {
+                const existing = desktopState.sessions.find((item) => item.id === sessionId);
+                const model = object(stateData.model).id
+                    ? `${String(object(stateData.model).provider)}/${String(object(stateData.model).id)}`
+                    : existing?.model;
+                const saved = applyDesktop(
+                    await window.specpi.saveActiveSession({
+                        title: sessionTitleFromMessages(messages) ?? existing?.title,
+                        model,
+                        draft: existing?.draft ?? draftOverride ?? "",
+                    }),
                 );
-                const record: SessionRecord = {
-                    id: sessionId,
-                    projectId: project.id,
-                    sessionId,
-                    sessionPath: sessionFile,
-                    name:
-                        typeof stateData.sessionName === "string" && stateData.sessionName.trim()
-                            ? stateData.sessionName
-                            : undefined,
-                    title: sessionTitleFromMessages(messages) ?? existing?.title,
-                    model: object(stateData.model).id
-                        ? `${String(object(stateData.model).provider)}/${String(object(stateData.model).id)}`
-                        : existing?.model,
-                    lastOpenedAt: new Date().toISOString(),
-                    draft: existing?.draft ?? draftOverride ?? "",
-                };
-                setActiveSessionId(record.id);
-                const saved = await window.specpi.saveSession(record);
-                setDesktop(saved);
+                setActiveSessionId(saved.activeSessionId);
 
                 return saved;
             }
 
             return desktopState;
         },
-        [desktop],
+        [applyDesktop],
     );
 
     useEffect(() => {
@@ -426,21 +432,41 @@ export function App() {
                 return;
             }
 
-            setDesktop(state);
+            applyDesktop(state);
             runtimeRef.current = snapshot.status;
             setRuntime(snapshot.status);
             setRuntimeRoster(runtimes);
             setDialogs(snapshot.pendingUi);
-            const project = intent
-                ? state.projects.find((item) => item.path.toLowerCase() === intent.cwd.toLowerCase())
-                : state.projects.find((item) => item.id === state.activeProjectId);
-            setSelectedProject(project);
-            setActiveSessionId(intent ? undefined : state.activeSessionId);
+            setSelectedProjectId(intent?.projectId);
+            setActiveSessionId(intent?.sessionId);
             setLaunchIntent(intent);
         });
+        const offState = window.specpi.onDesktopState(applyDesktop);
         const offStatus = window.specpi.onRuntimeStatus((status) => {
+            const generationChanged = status.generation > runtimeRef.current.generation;
             runtimeRef.current = status;
             setRuntime(status);
+            if (generationChanged) {
+                dispatch({ generation: status.generation, record: { type: "desktop_clear" } });
+                setDialogs([]);
+                setStatuses(new Map());
+                setWidgets(new Map());
+                setSessionState({});
+                setSessionStats({});
+                setSpecMode(false);
+                setPendingSpecMode(undefined);
+                setRequestedGuardMode(undefined);
+                setConfirmedGuardMode("unknown");
+                setAttachments([]);
+                setBranchChoices(undefined);
+                const waiter = guardWaiterRef.current;
+                if (waiter) {
+                    clearTimeout(waiter.timer);
+                    guardWaiterRef.current = undefined;
+                    waiter.reject(new Error("The runtime changed before Guard acknowledged the request"));
+                }
+            }
+
             if (status.phase === "stopped" || status.phase === "failed") {
                 setDialogs([]);
             }
@@ -507,16 +533,40 @@ export function App() {
                             : "info",
                     );
                 } else if (request.method === "setStatus") {
-                    if (String(request.statusKey).includes("command-guard")) {
-                        setRequestedGuardMode(undefined);
+                    const statusKey = String(request.statusKey);
+                    const statusText =
+                        typeof request.statusText === "string" ? stripAnsi(request.statusText) : undefined;
+                    if (statusKey === "specpi-command-guard") {
+                        const mode = guardModeFromStatus(statusText);
+                        setConfirmedGuardMode(mode);
+                        const waiter = guardWaiterRef.current;
+                        if (waiter) {
+                            const acknowledgment = acknowledgeGuardMode(waiter.expected, mode);
+                            if (acknowledgment.outcome !== "pending") {
+                                clearTimeout(waiter.timer);
+                                guardWaiterRef.current = undefined;
+                                if (acknowledgment.outcome === "confirmed") {
+                                    waiter.resolve();
+                                } else {
+                                    waiter.reject(new Error(acknowledgment.message));
+                                }
+                            }
+                        }
                     }
 
                     setStatuses((current) => {
                         const next = new Map(current);
-                        if (typeof request.statusText === "string") {
-                            next.set(String(request.statusKey), stripAnsi(request.statusText));
+                        if (statusText !== undefined) {
+                            if (!next.has(statusKey) && next.size >= 256) {
+                                const oldest = next.keys().next().value;
+                                if (oldest !== undefined) {
+                                    next.delete(oldest);
+                                }
+                            }
+
+                            next.set(statusKey, statusText);
                         } else {
-                            next.delete(String(request.statusKey));
+                            next.delete(statusKey);
                         }
 
                         return next;
@@ -525,8 +575,16 @@ export function App() {
                     setWidgets((current) => {
                         const next = new Map(current);
                         if (Array.isArray(request.widgetLines)) {
+                            const widgetKey = String(request.widgetKey);
+                            if (!next.has(widgetKey) && next.size >= 256) {
+                                const oldest = next.keys().next().value;
+                                if (oldest !== undefined) {
+                                    next.delete(oldest);
+                                }
+                            }
+
                             next.set(
-                                String(request.widgetKey),
+                                widgetKey,
                                 request.widgetLines.map((line) => stripAnsi(String(line))),
                             );
                         } else {
@@ -560,11 +618,18 @@ export function App() {
                 cancelAnimationFrame(streamFrame);
             }
 
+            offState();
             offStatus();
             offRoster();
             offEvent();
+            const waiter = guardWaiterRef.current;
+            if (waiter) {
+                clearTimeout(waiter.timer);
+                guardWaiterRef.current = undefined;
+                waiter.reject(new Error("Command Guard acknowledgment listener was removed"));
+            }
         };
-    }, [toast]);
+    }, [applyDesktop, toast]);
 
     useEffect(() => {
         if (!desktop) {
@@ -597,15 +662,13 @@ export function App() {
                 composerRef.current?.focus();
             } else if (event.key === "Escape" && palette) {
                 setPalette(false);
-            } else if (event.key === "Escape" && pendingProject) {
-                setPendingProject(undefined);
             }
         };
 
         window.addEventListener("keydown", onKeyDown);
 
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [desktop, dialogs.length, palette, pendingProject, persist, runtime.phase]);
+    }, [desktop, dialogs.length, palette, persist, runtime.phase]);
 
     useEffect(() => {
         if (!selectedProject) {
@@ -617,7 +680,7 @@ export function App() {
 
         let active = true;
         void window.specpi
-            .getGitStatus(selectedProject.path)
+            .getGitStatus(selectedProject.id)
             .then((git) => {
                 if (active) {
                     setChangedFiles(git.files.length);
@@ -634,7 +697,7 @@ export function App() {
         return () => {
             active = false;
         };
-    }, [selectedProject?.path, conversation.toolCount]);
+    }, [selectedProject?.id, conversation.toolCount]);
 
     useEffect(() => {
         if (!activeSessionId) {
@@ -643,14 +706,24 @@ export function App() {
 
         const sessionId = activeSessionId;
         const timer = setTimeout(() => {
+            if (draftSaveTimer.current === timer) {
+                draftSaveTimer.current = undefined;
+            }
+
             void window.specpi
                 .saveSessionDraft(sessionId, draft)
-                .then(setDesktop)
+                .then(applyDesktop)
                 .catch(() => undefined);
         }, 350);
+        draftSaveTimer.current = timer;
 
-        return () => clearTimeout(timer);
-    }, [draft, activeSessionId]);
+        return () => {
+            clearTimeout(timer);
+            if (draftSaveTimer.current === timer) {
+                draftSaveTimer.current = undefined;
+            }
+        };
+    }, [activeSessionId, applyDesktop, draft]);
 
     useEffect(() => {
         if (!["streaming", "compacting", "retrying"].includes(runtime.phase)) {
@@ -678,32 +751,34 @@ export function App() {
 
     const startProject = async (
         project: ProjectRecord,
-        sessionPath?: string,
+        sessionId?: string,
         desktopOverride?: DesktopState,
         noSession = false,
-    ) => {
-        const desktopState = desktopOverride ?? desktop;
+        importToken?: string,
+    ): Promise<boolean> => {
+        const desktopState = desktopOverride ?? desktopRef.current;
         if (!desktopState) {
-            return;
+            return false;
         }
 
         if (startInFlight.current) {
             toast("Pi is still finishing the previous runtime transition.", "warning");
 
-            return;
+            return false;
         }
 
         startInFlight.current = true;
+        const previousAttachments = attachments;
+        const previousRuntimeWasUsable = !["stopped", "failed"].includes(runtimeRef.current.phase);
         const startToken = ++startGeneration.current;
-        const normalizedPath = sessionPath ? normalizedSessionPath(sessionPath) : undefined;
-        const openingSession = normalizedPath
-            ? desktopState.sessions.find((session) => normalizedSessionPath(session.sessionPath) === normalizedPath)
+        const openingSession = sessionId
+            ? desktopState.sessions.find((session) => session.id === sessionId)
             : undefined;
-        const running = normalizedPath
+        const running = sessionId
             ? runtimeRoster.some(
                   (item) =>
-                      item.sessionPath !== undefined &&
-                      normalizedSessionPath(item.sessionPath) === normalizedPath &&
+                      item.projectId === project.id &&
+                      item.sessionId === sessionId &&
                       item.status.phase !== "stopped" &&
                       item.status.phase !== "failed",
               )
@@ -714,64 +789,65 @@ export function App() {
                 : {
                       startedAt: Date.now(),
                       projectLabel: project.label,
-                      sessionLabel: openingSession?.name ?? (sessionPath ? "Selected session" : undefined),
+                      sessionLabel: openingSession?.name ?? (importToken ? "Imported session" : undefined),
                   },
         );
         setSpinupElapsed(0);
         setError("");
-        setSelectedProject(project);
-        setDialogs([]);
-        setStatuses(new Map());
-        setWidgets(new Map());
-        setSessionState({});
-        setSessionStats({});
-        setSpecMode(false);
-        setPendingSpecMode(undefined);
-        setRequestedGuardMode(undefined);
-        setAttachments([]);
-        setBranchChoices(undefined);
-        runStartedAt.current = undefined;
-        setRunElapsed(0);
-        setLastRunElapsed(0);
-        document.title = "SpecPi Desktop";
-        dispatch({ generation: runtimeRef.current.generation + 1, record: { type: "desktop_clear" } });
         try {
-            const started = await window.specpi.startRuntime({
-                cwd: project.path,
-                piPath: desktopState.piPath,
-                trust: project.trust,
-                sessionPath,
-                noSession,
+            const result = await window.specpi.startRuntime({
+                projectId: project.id,
+                ...(sessionId ? { sessionId } : {}),
+                ...(importToken ? { importToken } : {}),
+                ...(noSession ? { noSession: true } : {}),
             });
+            if (result.cancelled) {
+                setAttachments(previousAttachments);
+                if (previousRuntimeWasUsable) {
+                    await hydrate(desktopState, undefined, false);
+                }
+
+                toast("Pi start cancelled.");
+
+                return false;
+            }
+
             if (startToken !== startGeneration.current) {
                 await window.specpi.stopRuntime();
 
-                return;
+                return false;
+            }
+
+            const started = result.status;
+            if (!started) {
+                throw new Error("Pi did not return runtime status");
             }
 
             runtimeRef.current = started;
             setRuntime(started);
-            if (["streaming", "compacting", "retrying"].includes(started.phase)) {
-                runStartedAt.current = Date.now();
-            }
-
+            setSelectedProjectId(project.id);
+            setActiveSessionId(sessionId);
+            document.title = "SpecPi Desktop";
+            runStartedAt.current = ["streaming", "compacting", "retrying"].includes(started.phase)
+                ? Date.now()
+                : undefined;
+            setRunElapsed(0);
+            setLastRunElapsed(0);
             if (started.compatibilityWarning) {
-                setSpinup(undefined);
-                if (!window.confirm(`${started.compatibilityWarning}\n\nContinue?`)) {
-                    await window.specpi.stopRuntime();
-
-                    return;
-                }
+                toast(started.compatibilityWarning, "warning");
             }
 
-            const next = await persist({ activeProjectId: project.id });
-            const hydrated = await hydrate(project, next);
+            const hydrated = await hydrate(desktopRef.current);
             const activeSession = hydrated?.sessions.find((session) => session.id === hydrated.activeSessionId);
             setDraft(activeSession?.draft ?? "");
+
+            return true;
         } catch (caught) {
             if (startToken === startGeneration.current) {
                 setError(caught instanceof Error ? caught.message : String(caught));
             }
+
+            return false;
         } finally {
             startInFlight.current = false;
             if (startToken === startGeneration.current) {
@@ -785,7 +861,7 @@ export function App() {
             return;
         }
 
-        const project = desktop.projects.find((item) => item.path.toLowerCase() === launchIntent.cwd.toLowerCase());
+        const project = desktop.projects.find((item) => item.id === launchIntent.projectId);
         if (!project) {
             setError("The project for this workspace is no longer available.");
 
@@ -793,36 +869,23 @@ export function App() {
         }
 
         launchHandled.current = true;
-        void startProject(project, launchIntent.sessionPath, desktop, launchIntent.noSession === true);
+        void startProject(
+            project,
+            launchIntent.sessionId,
+            desktop,
+            launchIntent.noSession === true,
+            launchIntent.importToken,
+        );
     }, [desktop, launchIntent]);
 
     const addProject = async () => {
-        const selected = await window.specpi.chooseProject();
-        if (selected) {
-            setPendingProject(selected);
-        }
-    };
-
-    const confirmProject = async (trust: ProjectRecord["trust"]) => {
-        if (!pendingProject || !desktop) {
+        const project = await window.specpi.chooseProject();
+        if (!project) {
             return;
         }
 
-        const existing = desktop.projects.find((item) => item.path.toLowerCase() === pendingProject.toLowerCase());
-        const project: ProjectRecord = existing
-            ? { ...existing, trust }
-            : {
-                  id: crypto.randomUUID(),
-                  path: pendingProject,
-                  label: projectLabel(pendingProject),
-                  lastOpenedAt: new Date().toISOString(),
-                  trust,
-                  pinned: false,
-              };
-        const projects = [project, ...desktop.projects.filter((item) => item.id !== project.id)];
-        const next = await persist({ projects, activeProjectId: project.id });
-        setPendingProject(undefined);
-        await startProject(project, project.lastSessionPath, next);
+        const next = applyDesktop(await window.specpi.getDesktopState());
+        await startProject(project, project.lastSessionId, next);
     };
 
     const addImages = async (files: File[]) => {
@@ -833,8 +896,8 @@ export function App() {
                     throw new Error(`${file.name} is not a supported image type`);
                 }
 
-                if (file.size > 10 * 1024 * 1024) {
-                    throw new Error(`${file.name} exceeds 10 MB`);
+                if (file.size > MAX_IMAGE_ATTACHMENT_BYTES) {
+                    throw new Error(`${file.name} exceeds the 2 MB attachment limit`);
                 }
 
                 const bitmap = await createImageBitmap(file);
@@ -861,7 +924,16 @@ export function App() {
                 };
             }),
         );
-        setAttachments((current) => [...current, ...loaded].slice(0, 8));
+        const combined = [...attachments, ...loaded].slice(0, 8);
+        const images = combined.map(({ name: _name, ...image }) => image);
+        const bytes = serializedRpcCommandBytes({ type: "prompt", message: draftRef.current, images });
+        if (bytes > MAX_RPC_COMMAND_BYTES) {
+            throw new Error(
+                `These attachments would make the Pi command ${bytes - MAX_RPC_COMMAND_BYTES} bytes too large`,
+            );
+        }
+
+        setAttachments(combined);
     };
 
     const runPrompt = async (text = draft) => {
@@ -887,17 +959,25 @@ export function App() {
                 command = { ...command, streamingBehavior };
             }
 
+            const bytes = serializedRpcCommandBytes(command);
+            if (bytes > MAX_RPC_COMMAND_BYTES) {
+                throw new Error(`Pi RPC command exceeds the size limit by ${bytes - MAX_RPC_COMMAND_BYTES} bytes`);
+            }
+
             if (slash) {
                 showCommandFeedback(`Running /${slash.name}…`);
             }
 
-            setDraft("");
-            setAttachments([]);
+            const sentAttachments = attachments;
             await window.specpi.sendRuntimeCommand(command);
+            if (draftRef.current === text) {
+                setDraft("");
+            }
+
+            setAttachments((current) => current.filter((item) => !sentAttachments.includes(item)));
             if (automaticTitle && currentSession) {
                 try {
-                    const saved = await window.specpi.saveSessionTitle(currentSession.id, automaticTitle);
-                    setDesktop(saved);
+                    applyDesktop(await window.specpi.saveSessionTitle(currentSession.id, automaticTitle));
                 } catch (caught) {
                     setError(
                         `Prompt accepted, but the session title could not be saved: ${
@@ -916,7 +996,6 @@ export function App() {
                 showCommandFeedback(`/${slash.name} accepted by Pi`);
             }
         } catch (caught) {
-            setDraft(message);
             setError(caught instanceof Error ? caught.message : String(caught));
             if (slash) {
                 showCommandFeedback(`/${slash.name} failed`);
@@ -924,17 +1003,56 @@ export function App() {
         }
     };
 
-    const changeGuardMode = async (mode: "off" | "guard" | "strict") => {
+    const changeGuardMode = async (mode: SelectableGuardMode) => {
+        const guardAvailable = commands.some((command) => command.name.toLowerCase() === "guard");
+        const unavailable = guardRequestError(guardAvailable, confirmedGuardMode);
+        if (unavailable) {
+            setError(unavailable);
+
+            return;
+        }
+
+        const previous = guardWaiterRef.current;
+        if (previous) {
+            clearTimeout(previous.timer);
+            previous.reject(new Error("A newer Command Guard request replaced this one"));
+        }
+
         setRequestedGuardMode(mode);
         setError("");
         showCommandFeedback(`Setting protection to ${mode}…`);
+        let waiter: GuardWaiter;
+        const acknowledgment = new Promise<void>((resolve, reject) => {
+            waiter = {
+                expected: mode,
+                resolve,
+                reject,
+                timer: setTimeout(() => {
+                    if (guardWaiterRef.current === waiter) {
+                        guardWaiterRef.current = undefined;
+                    }
+
+                    reject(new Error("Command Guard did not acknowledge the requested mode"));
+                }, 5_000),
+            };
+            guardWaiterRef.current = waiter;
+        });
+        void acknowledgment.catch(() => undefined);
         try {
             await window.specpi.sendRuntimeCommand({ type: "prompt", message: `/guard ${mode}` });
-            showCommandFeedback(`Protection set to ${mode}`);
+            await acknowledgment;
+            showCommandFeedback(`Protection confirmed as ${mode}`);
         } catch (caught) {
-            setRequestedGuardMode(undefined);
+            if (guardWaiterRef.current === waiter!) {
+                clearTimeout(waiter!.timer);
+                guardWaiterRef.current = undefined;
+                waiter!.reject(caught instanceof Error ? caught : new Error(String(caught)));
+            }
+
             setError(caught instanceof Error ? caught.message : String(caught));
-            showCommandFeedback("Protection change failed");
+            showCommandFeedback("Protection change was not confirmed");
+        } finally {
+            setRequestedGuardMode(undefined);
         }
     };
 
@@ -944,55 +1062,61 @@ export function App() {
     };
 
     const saveCurrentDraft = async (): Promise<DesktopState | undefined> => {
-        if (!activeSessionId) {
-            return desktop;
+        if (draftSaveTimer.current) {
+            clearTimeout(draftSaveTimer.current);
+            draftSaveTimer.current = undefined;
         }
 
-        const next = await window.specpi.saveSessionDraft(activeSessionId, draft);
-        setDesktop(next);
+        const sessionId = activeSessionIdRef.current;
+        if (!sessionId) {
+            return desktopRef.current;
+        }
 
-        return next;
+        return applyDesktop(await window.specpi.saveSessionDraft(sessionId, draftRef.current));
     };
 
-    const openIndependentWorkspace = async (sessionPath?: string, newSession = false) => {
-        if (!selectedProject || !desktop) {
+    const openIndependentWorkspace = async (sessionId?: string, newSession = false, importToken?: string) => {
+        const project = desktopRef.current?.projects.find((item) => item.id === selectedProjectId);
+        if (!project) {
             return;
         }
 
-        if (
-            sessionPath &&
-            activeSession?.sessionPath.replaceAll("\\", "/").toLowerCase() ===
-                sessionPath.replaceAll("\\", "/").toLowerCase()
-        ) {
+        if (sessionId && activeSessionIdRef.current === sessionId) {
             toast("That session is already active in this window.", "warning");
 
             return;
         }
 
-        const options: StartRuntimeOptions = {
-            cwd: selectedProject.path,
-            piPath: desktop.piPath,
-            trust: selectedProject.trust,
-            sessionPath,
+        const request: WorkspaceRequest = {
+            projectId: project.id,
+            ...(sessionId ? { sessionId } : {}),
+            ...(importToken ? { importToken } : {}),
         };
-        if (runtime.phase === "stopped" || runtime.phase === "failed") {
-            await startProject(selectedProject, sessionPath, desktop);
+        if (runtimeRef.current.phase === "stopped" || runtimeRef.current.phase === "failed") {
+            await startProject(project, sessionId, desktopRef.current, false, importToken);
 
             return;
         }
 
-        await window.specpi.openWorkspace(options);
-        toast(newSession ? "New session opened in an independent window." : "Session opened in an independent window.");
+        await window.specpi.openWorkspace(request);
+        toast(
+            importToken
+                ? "Session import opened as a fork in an independent window."
+                : newSession
+                  ? "New session opened in an independent window."
+                  : "Session opened in an independent window.",
+        );
     };
 
     const runDesktopCommand = async (command: string, args = "") => {
         const newSessionDestination = newSessionTarget(command);
         const changesSession = newSessionDestination !== undefined || ["@clone", "@open-session"].includes(command);
-        if (changesSession && sessionChanging) {
+        const acquiredTransition = changesSession ? sessionTransitionLock.current.acquire() : false;
+        if (changesSession && !acquiredTransition) {
             return false;
         }
 
-        if (changesSession) {
+        if (acquiredTransition) {
             setSessionChanging(true);
         }
 
@@ -1009,9 +1133,15 @@ export function App() {
                 await window.specpi.sendRuntimeCommand({ type: "abort" });
             } else if (newSessionDestination === "current") {
                 const saved = await saveCurrentDraft();
-                await window.specpi.sendRuntimeCommand({ type: "new_session" });
+                const result = await window.specpi.sendRuntimeCommand({ type: "new_session" });
+                if (sessionTransitionCancelled(result)) {
+                    toast("New session cancelled.");
+
+                    return false;
+                }
+
                 dispatch({ generation: runtimeRef.current.generation, record: { type: "desktop_clear" } });
-                await hydrate(selectedProject, saved, "");
+                await hydrate(saved, "");
                 setDraft("");
             } else if (newSessionDestination === "independent") {
                 await openIndependentWorkspace(undefined, true);
@@ -1022,15 +1152,23 @@ export function App() {
                 });
             } else if (command === "@clone") {
                 const saved = await saveCurrentDraft();
-                await window.specpi.sendRuntimeCommand({ type: "clone" });
+                const result = await window.specpi.sendRuntimeCommand({ type: "clone" });
+                if (sessionTransitionCancelled(result)) {
+                    toast("Clone cancelled.");
+
+                    return false;
+                }
+
                 dispatch({ generation: runtimeRef.current.generation, record: { type: "desktop_clear" } });
-                await hydrate(selectedProject, saved, "");
+                await hydrate(saved, "");
                 setDraft("");
             } else if (command === "@open-session") {
-                const sessionPath = await window.specpi.chooseSession();
-                if (sessionPath) {
-                    await openIndependentWorkspace(sessionPath);
+                const selection = await window.specpi.chooseSession();
+                if (!selection) {
+                    return false;
                 }
+
+                await openIndependentWorkspace(undefined, false, selection.token);
             } else if (command === "@tree") {
                 setTreeView(await window.specpi.sendRuntimeCommand({ type: "get_tree" }));
             } else if (command === "@branch") {
@@ -1047,19 +1185,9 @@ export function App() {
             } else if (command === "@rename") {
                 if (args) {
                     await window.specpi.sendRuntimeCommand({ type: "set_session_name", name: args.slice(0, 200) });
-                    await hydrate(selectedProject);
+                    await hydrate();
                 } else {
                     setRenameSessionOpen(true);
-                }
-            } else if (command === "@label") {
-                const result = object(await window.specpi.sendRuntimeCommand({ type: "get_entries" }));
-                const label = args || window.prompt("Label for the current entry");
-                if (typeof result.leafId === "string" && label !== null) {
-                    await window.specpi.sendRuntimeCommand({
-                        type: "set_label",
-                        entryId: result.leafId,
-                        label: label.trim().slice(0, 200) || undefined,
-                    });
                 }
             } else if (command === "@runtime") {
                 await openRuntimePanel();
@@ -1078,11 +1206,14 @@ export function App() {
 
             return false;
         } finally {
-            if (changesSession) {
+            if (acquiredTransition) {
+                sessionTransitionLock.current.release();
                 setSessionChanging(false);
             }
         }
     };
+
+    runDesktopCommandRef.current = runDesktopCommand;
 
     const runComposerInput = async (text = draft) => {
         const message = text.trim();
@@ -1106,9 +1237,7 @@ export function App() {
         }
 
         if (slash && local?.invocation) {
-            setDraft("");
             setAutocompleteOpen(false);
-            setAttachments([]);
             promptHistory.current = [message, ...promptHistory.current.filter((item) => item !== message)].slice(
                 0,
                 100,
@@ -1116,7 +1245,15 @@ export function App() {
             historyIndex.current = -1;
             showCommandFeedback(`Running /${slash.name}…`);
             const succeeded = await runDesktopCommand(local.invocation, slash.args);
-            showCommandFeedback(succeeded ? `/${slash.name} complete` : `/${slash.name} failed`);
+            if (succeeded) {
+                if (draftRef.current === text) {
+                    setDraft("");
+                }
+
+                setAttachments([]);
+            }
+
+            showCommandFeedback(succeeded ? `/${slash.name} complete` : `/${slash.name} not completed`);
 
             return;
         }
@@ -1124,22 +1261,32 @@ export function App() {
         await runPrompt(message);
     };
 
-    const forkSession = async (entryId: string) => {
-        if (sessionChanging) {
+    const forkSession = async (entryId: string, selectedText: string) => {
+        if (!sessionTransitionLock.current.acquire()) {
             return;
         }
 
+        const choices = branchChoices;
         setBranchChoices(undefined);
         setSessionChanging(true);
         try {
             const saved = await saveCurrentDraft();
-            await window.specpi.sendRuntimeCommand({ type: "fork", entryId });
+            const result = await window.specpi.sendRuntimeCommand({ type: "fork", entryId });
+            if (sessionTransitionCancelled(result)) {
+                setBranchChoices(choices);
+                toast("Branch cancelled.");
+
+                return;
+            }
+
+            const nextDraft = forkDraft(result, selectedText);
             dispatch({ generation: runtimeRef.current.generation, record: { type: "desktop_clear" } });
-            await hydrate(selectedProject, saved, "");
-            setDraft("");
+            await hydrate(saved, nextDraft);
+            setDraft(nextDraft);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : String(caught));
         } finally {
+            sessionTransitionLock.current.release();
             setSessionChanging(false);
         }
     };
@@ -1150,15 +1297,15 @@ export function App() {
     };
 
     const chooseRuntime = async () => {
-        const piPath = await window.specpi.choosePi();
-        if (piPath) {
-            await persist({ piPath });
+        const next = await window.specpi.choosePi();
+        if (next) {
+            applyDesktop(next);
         }
     };
 
     const switchSession = async (session: SessionRecord) => {
         const action = sessionOpenAction(runtime.phase, session.id === activeSessionId);
-        if (sessionChanging || action === "none") {
+        if (action === "none" || !sessionTransitionLock.current.acquire()) {
             return;
         }
 
@@ -1171,11 +1318,11 @@ export function App() {
             }
 
             const saved = await saveCurrentDraft();
-            setActiveSessionId(session.id);
-            await startProject(project, session.sessionPath, saved);
+            await startProject(project, session.id, saved);
         } catch (caught) {
             setError(caught instanceof Error ? caught.message : String(caught));
         } finally {
+            sessionTransitionLock.current.release();
             setSessionChanging(false);
         }
     };
@@ -1204,13 +1351,13 @@ export function App() {
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
-            if (!(event.ctrlKey || event.metaKey) || dialogs.length > 0 || pendingProject) {
+            if (!(event.ctrlKey || event.metaKey) || dialogs.length > 0) {
                 return;
             }
 
-            if (event.key.toLowerCase() === "n" && selectedProject) {
+            if (event.key.toLowerCase() === "n" && selectedProjectId) {
                 event.preventDefault();
-                void runDesktopCommand("@new-session");
+                void invokeLatest(() => runDesktopCommandRef.current, "@new-session");
             } else if (event.key.toLowerCase() === "o") {
                 event.preventDefault();
                 void addProject();
@@ -1220,7 +1367,7 @@ export function App() {
         window.addEventListener("keydown", onKeyDown);
 
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [dialogs.length, pendingProject, selectedProject, sessionChanging]);
+    }, [dialogs.length, selectedProjectId]);
 
     const switchModel = async (value: string) => {
         const model = models.find((item) => `${item.provider}/${item.id}` === value);
@@ -1230,7 +1377,7 @@ export function App() {
 
         try {
             await window.specpi.sendRuntimeCommand({ type: "set_model", provider: model.provider, modelId: model.id });
-            await hydrate(selectedProject);
+            await hydrate();
         } catch (caught) {
             setError(
                 `Model unavailable or provider authentication is incomplete. ${caught instanceof Error ? caught.message : String(caught)}`,
@@ -1260,13 +1407,8 @@ export function App() {
             .toLowerCase()
             .includes(sessionSearch.trim().toLowerCase()),
     );
-    const runtimeBySessionPath = useMemo(
-        () =>
-            new Map(
-                runtimeRoster.flatMap((item) =>
-                    item.sessionPath ? [[normalizedSessionPath(item.sessionPath), item] as const] : [],
-                ),
-            ),
+    const runtimeBySessionId = useMemo(
+        () => new Map(runtimeRoster.flatMap((item) => (item.sessionId ? [[item.sessionId, item] as const] : []))),
         [runtimeRoster],
     );
     const activeSession = currentSessions.find((item) => item.id === activeSessionId);
@@ -1291,9 +1433,9 @@ export function App() {
         .filter(Boolean)
         .join(" · ");
     const statusText = runtime.phase === "waiting-for-user" ? "Waiting for you" : runtime.phase;
-    const guardState = statusValue(statuses, "guard", "off");
-    const guardMode =
-        requestedGuardMode ?? (/strict/iu.test(guardState) ? "strict" : /off/iu.test(guardState) ? "off" : "guard");
+    const guardAvailable = commands.some((command) => command.name.toLowerCase() === "guard");
+    const guardMode = guardAvailable ? confirmedGuardMode : "unknown";
+    const guardState = guardAvailable ? confirmedGuardMode : "update required";
     const scopeState = statusValue(statuses, "scope", "inactive");
     const wishlistState = statusValue(statuses, "wishlist", "inactive");
     const experimentState = statusValue(statuses, "experiment", "none");
@@ -1305,7 +1447,7 @@ export function App() {
     const displayElapsed = runStartedAt.current ? runElapsed : lastRunElapsed;
     const modelLabel = String(activeModel.name ?? activeModel.id ?? "Not selected");
     const scopeReady = /clean|inactive|unset/iu.test(scopeState);
-    const guardReady = guardState !== "not set" && !/off/iu.test(guardState);
+    const guardReady = confirmedGuardMode === "guard" || confirmedGuardMode === "strict";
     const specPhase =
         runtime.phase === "streaming"
             ? "REASONING"
@@ -1375,7 +1517,7 @@ export function App() {
                                             className={project.id === selectedProject.id ? "active" : ""}
                                             onClick={() => {
                                                 setProjectMenuOpen(false);
-                                                void startProject(project, project.lastSessionPath);
+                                                void startProject(project, project.lastSessionId);
                                             }}
                                         >
                                             <span>{project.label.slice(0, 1).toUpperCase()}</span>
@@ -1416,8 +1558,8 @@ export function App() {
                                 <span>Sessions</span>
                                 <div>
                                     <button
-                                        title="Open a session in an independent window"
-                                        aria-label="Open a session in an independent window"
+                                        title="Import a session as a fork in an independent window"
+                                        aria-label="Import a session as a fork in an independent window"
                                         disabled={sessionChanging}
                                         onClick={() => void runDesktopCommand("@open-session")}
                                     >
@@ -1437,9 +1579,7 @@ export function App() {
                                 {visibleSessions.map((session) => {
                                     const active = session.id === activeSessionId;
                                     const sessionTitle = sessionDisplayTitle(session.name, session.title);
-                                    const sessionRuntime = runtimeBySessionPath.get(
-                                        normalizedSessionPath(session.sessionPath),
-                                    );
+                                    const sessionRuntime = runtimeBySessionId.get(session.id);
                                     const sessionStatus = active ? runtime : sessionRuntime?.status;
                                     const runningLabel = active
                                         ? (sessionRuntimeLabel(sessionStatus) ?? "stopped")
@@ -1475,7 +1615,7 @@ export function App() {
                                                 }
                                                 aria-label={`Open ${sessionTitle} in an independent window`}
                                                 disabled={active}
-                                                onClick={() => void openIndependentWorkspace(session.sessionPath)}
+                                                onClick={() => void openIndependentWorkspace(session.id)}
                                             >
                                                 ↗
                                             </button>
@@ -1502,7 +1642,7 @@ export function App() {
                             {desktop.projects.map((project) => (
                                 <button
                                     key={project.id}
-                                    onClick={() => void startProject(project, project.lastSessionPath)}
+                                    onClick={() => void startProject(project, project.lastSessionId)}
                                 >
                                     <span>{project.label.slice(0, 1).toUpperCase()}</span>
                                     <div>
@@ -1632,7 +1772,7 @@ export function App() {
                                                 type: "set_thinking_level",
                                                 level: event.target.value,
                                             });
-                                            await hydrate(selectedProject);
+                                            await hydrate();
                                         }}
                                     >
                                         <option value="off">off</option>
@@ -1921,21 +2061,39 @@ export function App() {
                                                         />
                                                         <i className="composer-divider" aria-hidden="true" />
                                                         <label
-                                                            className={`protection-picker ${guardMode}`}
-                                                            title="Command protection for this session"
+                                                            className={`protection-picker ${guardMode}${requestedGuardMode ? " pending" : ""}`}
+                                                            title={
+                                                                !guardAvailable
+                                                                    ? "Command Guard unavailable — update SpecPi"
+                                                                    : requestedGuardMode
+                                                                      ? `Waiting for Command Guard to confirm ${requestedGuardMode}`
+                                                                      : "Command protection confirmed by this session"
+                                                            }
+                                                            aria-busy={requestedGuardMode !== undefined}
                                                         >
                                                             <Icon name="shield" size={14} />
                                                             <select
                                                                 aria-label="Command protection"
                                                                 value={guardMode}
-                                                                disabled={dialogs.length > 0}
+                                                                disabled={
+                                                                    dialogs.length > 0 ||
+                                                                    !guardAvailable ||
+                                                                    confirmedGuardMode === "unknown" ||
+                                                                    confirmedGuardMode === "locked" ||
+                                                                    requestedGuardMode !== undefined
+                                                                }
                                                                 onChange={(event) =>
                                                                     void changeGuardMode(
-                                                                        event.target.value as
-                                                                            "off" | "guard" | "strict",
+                                                                        event.target.value as SelectableGuardMode,
                                                                     )
                                                                 }
                                                             >
+                                                                {guardMode === "unknown" ? (
+                                                                    <option value="unknown">Update required</option>
+                                                                ) : null}
+                                                                {guardMode === "locked" ? (
+                                                                    <option value="locked">Locked</option>
+                                                                ) : null}
                                                                 <option value="off">Off</option>
                                                                 <option value="guard">Guard</option>
                                                                 <option value="strict">Strict</option>
@@ -2018,6 +2176,7 @@ export function App() {
                                 {filesMounted ? (
                                     <FilesPanel
                                         open={desktop.layout.filesOpen}
+                                        projectId={selectedProject.id}
                                         root={selectedProject.path}
                                         tab={filesTab}
                                         setTab={setFilesTab}
@@ -2161,7 +2320,7 @@ export function App() {
                                             {desktop.projects.slice(0, 3).map((project) => (
                                                 <button
                                                     key={project.id}
-                                                    onClick={() => void startProject(project, project.lastSessionPath)}
+                                                    onClick={() => void startProject(project, project.lastSessionId)}
                                                 >
                                                     <span>{project.label.slice(0, 1).toUpperCase()}</span>
                                                     <div>
@@ -2184,52 +2343,6 @@ export function App() {
                 </div>
             </section>
 
-            {pendingProject ? (
-                <div
-                    className="modal-backdrop trust-backdrop"
-                    onMouseDown={(event) => event.target === event.currentTarget && setPendingProject(undefined)}
-                >
-                    <section
-                        className="modal trust-modal"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="trust-title"
-                    >
-                        <header className="trust-heading">
-                            <span className="trust-icon">
-                                <Icon name="shield" size={16} />
-                            </span>
-                            <div>
-                                <h2 id="trust-title">Trust this project for one run?</h2>
-                                <span>{compactPath(pendingProject)}</span>
-                            </div>
-                        </header>
-                        <p>
-                            Pi project resources may execute code. Trust is always explicit and scoped to this session.
-                        </p>
-                        <div className="trust-actions">
-                            <button className="preferred" onClick={() => void confirmProject("approve")}>
-                                <strong>Trust this run</strong>
-                                <span>this session only</span>
-                            </button>
-                            <button onClick={() => void confirmProject("default")}>
-                                <strong>Use Pi’s decision</strong>
-                                <span>defer to its own record</span>
-                            </button>
-                            <button onClick={() => void confirmProject("deny")}>
-                                <strong>Ignore project resources</strong>
-                                <span>nothing loaded this run</span>
-                            </button>
-                        </div>
-                        <footer className="trust-footer">
-                            <span>Esc to cancel</span>
-                            <button className="secondary" onClick={() => setPendingProject(undefined)}>
-                                Cancel
-                            </button>
-                        </footer>
-                    </section>
-                </div>
-            ) : null}
             {palette ? (
                 <CommandPalette
                     commands={paletteCommands}
@@ -2249,7 +2362,7 @@ export function App() {
                     close={() => setRenameSessionOpen(false)}
                     rename={async (name) => {
                         await window.specpi.sendRuntimeCommand({ type: "set_session_name", name });
-                        await hydrate(selectedProject);
+                        await hydrate();
                     }}
                 />
             ) : null}
@@ -2260,7 +2373,10 @@ export function App() {
                         <p>Select the user message that should become the new branch tip.</p>
                         <div className="command-list">
                             {branchChoices.map((choice) => (
-                                <button key={choice.entryId} onClick={() => void forkSession(choice.entryId)}>
+                                <button
+                                    key={choice.entryId}
+                                    onClick={() => void forkSession(choice.entryId, choice.text)}
+                                >
                                     <span>{choice.text}</span>
                                 </button>
                             ))}
@@ -2353,7 +2469,7 @@ export function App() {
                                     if (selectedProject) {
                                         void window.specpi
                                             .stopRuntime()
-                                            .then(() => startProject(selectedProject, selectedProject.lastSessionPath));
+                                            .then(() => startProject(selectedProject, activeSessionIdRef.current));
                                     }
                                 }}
                             >

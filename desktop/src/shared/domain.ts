@@ -3,9 +3,8 @@ export interface ProjectRecord {
     path: string;
     label: string;
     lastOpenedAt: string;
-    trust: "default" | "approve" | "deny";
     pinned: boolean;
-    lastSessionPath?: string;
+    lastSessionId?: string;
 }
 
 export interface SessionRecord {
@@ -24,7 +23,8 @@ export interface SessionRecord {
 }
 
 export interface DesktopState {
-    schema: 1;
+    schema: 2;
+    revision: number;
     piPath?: string;
     theme: "system" | "dark" | "light";
     projects: ProjectRecord[];
@@ -58,6 +58,7 @@ export interface FilePreview {
 
 export interface GitFileStatus {
     path: string;
+    originalPath?: string;
     index: string;
     worktree: string;
 }

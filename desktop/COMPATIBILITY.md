@@ -1,18 +1,18 @@
 # Desktop Compatibility Contract
 
-The validated version is Pi `0.84.4`, matching SpecPi's installer floor. Startup rejects an older, prerelease, or unparseable executable. A newer version is identified as untested and requires explicit confirmation to continue in compatibility mode.
+The validated version is Pi `0.84.4`, matching SpecPi's installer floor. Startup rejects an older, prerelease, or unparseable executable. A newer version is identified as untested and requires explicit confirmation in an Electron-main-owned native dialog before the RPC process is spawned; renderer acknowledgment is not launch authority.
 
 ## Required Pi RPC commands
 
-Desktop emits only this reviewed set: `prompt`, `steer`, `follow_up`, `abort`, `new_session`, `get_state`, `get_messages`, `get_session_stats`, `get_available_models`, `set_model`, `cycle_model`, `get_thinking_level`, `set_thinking_level`, `cycle_thinking_level`, `get_available_thinking_levels`, `compact`, `set_auto_compaction`, `set_auto_retry`, `abort_retry`, `bash`, `abort_bash`, `get_commands`, `set_session_name`, `export_html`, `switch_session`, `fork`, `get_fork_messages`, `set_label`, `get_last_assistant_text`, and `get_entries`, plus `extension_ui_response`.
+Desktop emits only this reviewed set: `prompt`, `steer`, `follow_up`, `abort`, `clear_queue`, `new_session`, `get_state`, `get_messages`, `get_session_stats`, `get_available_models`, `set_model`, `cycle_model`, `set_thinking_level`, `cycle_thinking_level`, `get_available_thinking_levels`, `set_steering_mode`, `set_follow_up_mode`, `compact`, `set_auto_compaction`, `set_auto_retry`, `abort_retry`, `get_commands`, `set_session_name`, `export_html`, `fork`, `clone`, `get_fork_messages`, `get_tree`, `get_last_assistant_text`, `get_entries`, plus `extension_ui_response`. Renderer-supplied `switch_session` paths, `export_html.outputPath`, `new_session.parentSession`, direct shell commands, and unsupported `set_label` are rejected.
 
 Unknown renderer command types fail validation before reaching Pi. Unknown Pi events are preserved as bounded records so a newer host degrades visibly rather than crashing.
 
 ## Validated event contract
 
-Pi 0.84.4 is validated for agent/turn lifecycle, `message_start` / `message_update` / `message_end`, tool execution start/update/end, auto-compaction and auto-retry lifecycle, `extension_ui_request`, and `entry_appended`. Assistant deltas are keyed by `contentIndex`; partial tool results replace prior snapshots and `message_end` is authoritative. New/switch/fork/clone responses cause canonical state/messages/entries to be fetched again. Unknown event types remain bounded inert records and never execute renderer logic.
+Pi 0.84.4 is validated for agent/turn lifecycle, `message_start` / `message_update` / `message_end`, tool execution start/update/end, auto-compaction and auto-retry lifecycle, `extension_ui_request`, and `entry_appended`. Assistant deltas are keyed by `contentIndex`; partial tool results replace prior snapshots and `message_end` is authoritative. Successful new/fork/clone responses cause canonical state/messages/entries to be fetched again. Pi reserves a new persistent `sessionFile` before the first entry creates its JSONL leaf; Desktop realpaths the existing parent and retains the missing basename without creating or reading the file. Pi 0.84.4 can return `success: true` with `data.cancelled: true`; Desktop treats that as a no-op and preserves generation, identity, transcript, and draft. Correlated responses never appear as runtime events. Unknown event types remain bounded inert records and never execute renderer logic.
 
-Model choices come from `get_available_models`; thinking choices come from `get_available_thinking_levels`. Provider authentication errors are shown without reading credential state. Session files are only referenced through Pi RPC and native user selection.
+Model choices come from `get_available_models`; thinking choices come from `get_available_thinking_levels`. Provider authentication errors are shown without reading credential state. `set_session_name` is the validated Pi 0.84.4 naming operation. Registered session files are referenced through Pi RPC. An arbitrary native selection is passed opaquely to Pi with startup `--fork` in the active project; Desktop does not inspect its header or resume it under a renderer-selected cwd.
 
 ## SpecPi commands
 
@@ -26,7 +26,7 @@ Supported: `select`, `confirm`, `input`, `editor`, `notify`, `setStatus`, `setWi
 
 ## Operating systems
 
-CI typechecks, tests, production-builds, performs an Electron bridge smoke, and creates an unpacked application on Ubuntu, Windows, and macOS. Release targets are Windows x64, macOS universal, and Linux x64. Installer signing/notarization is a separate release authorization step.
+CI typechecks, tests, production-builds, performs development and packaged Electron bridge smoke, and creates release artifacts on Ubuntu, Windows, and macOS. Linux CI configures Electron's root-owned mode-4755 sandbox helper explicitly and does not use `--no-sandbox`. Release targets are Windows x64, macOS universal, and Linux x64. Installer signing/notarization is a separate release authorization step.
 
 ## Forward-compatibility procedure
 

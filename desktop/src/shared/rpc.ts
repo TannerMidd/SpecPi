@@ -41,13 +41,43 @@ export interface ExtensionUiRequest extends RpcRecord {
         | "set_editor_text";
 }
 
-export interface StartRuntimeOptions {
+/** Main-process-only launch authority. Never expose this shape through preload. */
+export interface RuntimeLaunchOptions {
+    projectId: string;
     cwd: string;
     piPath?: string;
     trust: "default" | "approve" | "deny";
+    sessionId?: string;
     sessionPath?: string;
+    forkSessionPath?: string;
     noSession?: boolean;
     offline?: boolean;
+    confirmCompatibility?(warning: string): Promise<boolean>;
+}
+
+/** Renderer request containing only main-owned capability identifiers. */
+export interface WorkspaceRequest {
+    projectId: string;
+    sessionId?: string;
+    importToken?: string;
+    noSession?: boolean;
+    offline?: boolean;
+}
+
+export interface RuntimeStartResult {
+    cancelled: boolean;
+    status?: RuntimeStatus;
+}
+
+export interface SessionImportSelection {
+    token: string;
+    name: string;
+}
+
+export interface ActiveSessionMetadata {
+    title?: string;
+    model?: string;
+    draft?: string;
 }
 
 export interface RuntimeSnapshot {
@@ -57,10 +87,20 @@ export interface RuntimeSnapshot {
 
 export interface RuntimeDescriptor {
     runtimeId: string;
+    projectId: string;
     projectPath: string;
+    sessionId?: string;
     sessionPath?: string;
     active: boolean;
     status: RuntimeStatus;
+}
+
+export interface RuntimeIdentity {
+    runtimeId: string;
+    projectId: string;
+    projectPath: string;
+    sessionId?: string;
+    sessionPath?: string;
 }
 
 export interface ExtensionUiResponse {

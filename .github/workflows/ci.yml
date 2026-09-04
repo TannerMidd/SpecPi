@@ -58,6 +58,12 @@ jobs:
         run: npm install --global npm@11.19.1
       - name: Install the isolated desktop dependency graph
         run: npm --prefix desktop ci --no-audit --no-fund
+      - name: Configure the Electron sandbox helper (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root desktop/node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 desktop/node_modules/electron/dist/chrome-sandbox
+          test "$(stat -c '%u:%a' desktop/node_modules/electron/dist/chrome-sandbox)" = "0:4755"
       - name: Check and build SpecPi Desktop
         run: npm --prefix desktop run check
       - name: Install the validated Pi runtime for isolated RPC smoke
@@ -74,6 +80,12 @@ jobs:
         run: xvfb-run --auto-servernum npm --prefix desktop run smoke
       - name: Build platform release artifacts and checksums
         run: npm --prefix desktop run dist
+      - name: Configure the packaged Electron sandbox helper (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo chown root:root desktop/dist/linux-unpacked/chrome-sandbox
+          sudo chmod 4755 desktop/dist/linux-unpacked/chrome-sandbox
+          test "$(stat -c '%u:%a' desktop/dist/linux-unpacked/chrome-sandbox)" = "0:4755"
       - name: Launch the packaged application
         if: runner.os != 'Linux'
         run: npm --prefix desktop run smoke:packaged

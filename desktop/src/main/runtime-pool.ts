@@ -6,19 +6,22 @@ import type {
     RpcRecord,
     RuntimeDescriptor,
     RuntimeEvent,
+    RuntimeIdentity,
+    RuntimeLaunchOptions,
     RuntimeSnapshot,
     RuntimeStatus,
-    StartRuntimeOptions,
 } from "../shared/rpc";
-import { PiProcess } from "./pi-process";
+import { canonicalPath, canonicalSessionPath, pathIdentity } from "./path-identity";
+import { PiProcess, RuntimeStartCancelledError } from "./pi-process";
 
 const MAX_RUNTIMES = 32;
+const SESSION_REPLACEMENTS = new Set(["new_session", "fork", "clone"]);
 const stoppedSnapshot = (): RuntimeSnapshot => ({ status: { generation: 0, phase: "stopped" }, pendingUi: [] });
 
 interface RuntimeProcess extends EventEmitter {
     snapshot(): RuntimeSnapshot;
     diagnostics(): readonly string[];
-    start(options: StartRuntimeOptions): Promise<RuntimeStatus>;
+    start(options: RuntimeLaunchOptions): Promise<RuntimeStatus>;
     stop(): Promise<void>;
     request(command: RpcCommand): Promise<unknown>;
     respond(response: ExtensionUiResponse): Promise<void>;
@@ -26,27 +29,35 @@ interface RuntimeProcess extends EventEmitter {
 
 interface ManagedRuntime {
     runtimeId: string;
+    projectId: string;
     projectPath: string;
+    sessionId?: string;
     sessionPath?: string;
+    sessionName?: string;
     process: RuntimeProcess;
     exportPaths: Set<string>;
     projection: Map<string, RpcRecord>;
+    lifecycleEpoch: number;
     starting?: Promise<RuntimeStatus>;
+    stopping?: Promise<void>;
 }
 
-function normalizedPath(value: string): string {
-    return value.replaceAll("\\", "/").toLowerCase();
+function cancelledTransition(result: unknown): boolean {
+    return Boolean(result && typeof result === "object" && (result as { cancelled?: unknown }).cancelled === true);
 }
 
 export class RuntimePool extends EventEmitter {
     readonly #createProcess: () => RuntimeProcess;
+    readonly #platform: NodeJS.Platform;
     readonly #runtimes = new Set<ManagedRuntime>();
     #active?: ManagedRuntime;
     #viewGeneration = 0;
+    #closed = false;
 
-    constructor(createProcess: () => RuntimeProcess = () => new PiProcess()) {
+    constructor(createProcess: () => RuntimeProcess = () => new PiProcess(), platform = process.platform) {
         super();
         this.#createProcess = createProcess;
+        this.#platform = platform;
     }
 
     snapshot(): RuntimeSnapshot {
@@ -62,35 +73,91 @@ export class RuntimePool extends EventEmitter {
     roster(): RuntimeDescriptor[] {
         return [...this.#runtimes].map((runtime) => ({
             runtimeId: runtime.runtimeId,
+            projectId: runtime.projectId,
             projectPath: runtime.projectPath,
+            ...(runtime.sessionId ? { sessionId: runtime.sessionId } : {}),
             ...(runtime.sessionPath ? { sessionPath: runtime.sessionPath } : {}),
             active: runtime === this.#active,
             status: runtime.process.snapshot().status,
         }));
     }
 
+    activeIdentity(): (RuntimeIdentity & { sessionName?: string }) | undefined {
+        const runtime = this.#active;
+        if (!runtime) {
+            return undefined;
+        }
+
+        return {
+            runtimeId: runtime.runtimeId,
+            projectId: runtime.projectId,
+            projectPath: runtime.projectPath,
+            ...(runtime.sessionId ? { sessionId: runtime.sessionId } : {}),
+            ...(runtime.sessionPath ? { sessionPath: runtime.sessionPath } : {}),
+            ...(runtime.sessionName ? { sessionName: runtime.sessionName } : {}),
+        };
+    }
+
     diagnostics(): readonly string[] {
         return this.#active?.process.diagnostics() ?? [];
     }
 
-    async activate(options: StartRuntimeOptions): Promise<RuntimeStatus> {
-        const sessionPath = options.sessionPath;
-        const existing = sessionPath
+    hasUsableRuntime(projectId: string, sessionId?: string): boolean {
+        if (!sessionId) {
+            return false;
+        }
+
+        return [...this.#runtimes].some((runtime) => {
+            const phase = runtime.process.snapshot().status.phase;
+
+            return (
+                runtime.projectId === projectId &&
+                runtime.sessionId === sessionId &&
+                phase !== "stopped" &&
+                phase !== "failed"
+            );
+        });
+    }
+
+    async activate(options: RuntimeLaunchOptions): Promise<RuntimeStatus> {
+        if (this.#closed) {
+            throw new Error("The Pi runtime pool is closed");
+        }
+
+        const existing = options.sessionId
             ? [...this.#runtimes].find(
-                  (runtime) =>
-                      runtime.sessionPath !== undefined &&
-                      normalizedPath(runtime.sessionPath) === normalizedPath(sessionPath),
+                  (runtime) => runtime.projectId === options.projectId && runtime.sessionId === options.sessionId,
               )
-            : undefined;
+            : options.sessionPath
+              ? [...this.#runtimes].find(
+                    (runtime) =>
+                        runtime.projectId === options.projectId &&
+                        runtime.sessionPath !== undefined &&
+                        pathIdentity(runtime.sessionPath, this.#platform) ===
+                            pathIdentity(options.sessionPath!, this.#platform),
+                )
+              : undefined;
         const runtime = existing ?? this.#createManagedRuntime(options);
-        const phase = runtime.process.snapshot().status.phase;
-        const changed = runtime !== this.#active;
+        const activationEpoch = ++runtime.lifecycleEpoch;
+        await runtime.stopping;
+        if (runtime.lifecycleEpoch !== activationEpoch) {
+            throw new Error("The Pi runtime activation was superseded");
+        }
+
+        let phase = runtime.process.snapshot().status.phase;
+        const previousActive = this.#active;
+        const changed = runtime !== previousActive;
         if (changed || phase === "stopped" || phase === "failed") {
             this.#viewGeneration += 1;
         }
 
         this.#active = runtime;
+        runtime.projectId = options.projectId;
         runtime.projectPath = options.cwd;
+        if (options.sessionId) {
+            runtime.sessionId = options.sessionId;
+        }
+
         if (options.sessionPath) {
             runtime.sessionPath = options.sessionPath;
         }
@@ -102,7 +169,23 @@ export class RuntimePool extends EventEmitter {
         this.#publishRoster();
 
         if (runtime.starting) {
-            return this.#viewStatus(await runtime.starting);
+            const inFlight = runtime.starting;
+            try {
+                return this.#viewStatus(await inFlight);
+            } catch (error) {
+                if (
+                    runtime.lifecycleEpoch !== activationEpoch ||
+                    !["stopped", "failed"].includes(runtime.process.snapshot().status.phase)
+                ) {
+                    throw error;
+                }
+
+                if (runtime.starting === inFlight) {
+                    runtime.starting = undefined;
+                }
+
+                phase = runtime.process.snapshot().status.phase;
+            }
         }
 
         if (phase !== "stopped" && phase !== "failed") {
@@ -114,8 +197,32 @@ export class RuntimePool extends EventEmitter {
         runtime.starting = starting;
         try {
             return this.#viewStatus(await starting);
+        } catch (error) {
+            if (error instanceof RuntimeStartCancelledError && this.#active === runtime) {
+                if (!existing) {
+                    this.#runtimes.delete(runtime);
+                }
+
+                this.#active = previousActive;
+                if (changed) {
+                    this.#viewGeneration += 1;
+                    if (previousActive) {
+                        this.#publishActiveSnapshot(previousActive);
+                    } else {
+                        this.emit("status", {
+                            generation: this.#viewGeneration,
+                            phase: "stopped",
+                        } satisfies RuntimeStatus);
+                    }
+                }
+            }
+
+            throw error;
         } finally {
-            runtime.starting = undefined;
+            if (runtime.starting === starting) {
+                runtime.starting = undefined;
+            }
+
             this.#publishRoster();
         }
     }
@@ -126,18 +233,43 @@ export class RuntimePool extends EventEmitter {
             return;
         }
 
-        await runtime.process.stop();
+        const stopEpoch = ++runtime.lifecycleEpoch;
+        const starting = runtime.starting;
+        const stopping = (async () => {
+            await runtime.process.stop();
+            await starting?.catch(() => undefined);
+        })();
+        runtime.stopping = stopping;
+        await stopping;
+        if (runtime.stopping === stopping) {
+            runtime.stopping = undefined;
+        }
+
+        if (runtime.lifecycleEpoch !== stopEpoch) {
+            return;
+        }
+
         runtime.exportPaths.clear();
         this.#runtimes.delete(runtime);
-        this.#active = undefined;
-        this.#viewGeneration += 1;
-        this.emit("status", { ...stoppedSnapshot().status, generation: this.#viewGeneration });
+        if (this.#active === runtime) {
+            this.#active = undefined;
+            this.#viewGeneration += 1;
+            this.emit("status", { ...stoppedSnapshot().status, generation: this.#viewGeneration });
+        }
+
         this.#publishRoster();
     }
 
     async stopAll(): Promise<void> {
+        this.#closed = true;
         const runtimes = [...this.#runtimes];
+        for (const runtime of runtimes) {
+            runtime.lifecycleEpoch += 1;
+        }
+
         await Promise.all(runtimes.map((runtime) => runtime.process.stop()));
+        await Promise.all(runtimes.map((runtime) => runtime.starting?.catch(() => undefined)));
+        await Promise.all(runtimes.map((runtime) => runtime.stopping?.catch(() => undefined)));
         this.#runtimes.clear();
         this.#active = undefined;
         this.#publishRoster();
@@ -145,12 +277,59 @@ export class RuntimePool extends EventEmitter {
 
     async request(command: RpcCommand): Promise<unknown> {
         const runtime = this.#requireActive();
+        const priorProjection = SESSION_REPLACEMENTS.has(command.type) ? new Map(runtime.projection) : undefined;
         const result = await runtime.process.request(command);
+        if (SESSION_REPLACEMENTS.has(command.type) && !cancelledTransition(result)) {
+            if (runtime === this.#active) {
+                this.#viewGeneration += 1;
+            }
+
+            runtime.sessionId = undefined;
+            runtime.sessionPath = undefined;
+            runtime.sessionName = undefined;
+            runtime.exportPaths.clear();
+            for (const [key, record] of priorProjection ?? []) {
+                if (runtime.projection.get(key) === record) {
+                    runtime.projection.delete(key);
+                }
+            }
+
+            if (runtime === this.#active) {
+                this.#publishActiveSnapshot(runtime);
+            }
+
+            this.#publishRoster();
+        }
+
         if (command.type === "get_state" && result && typeof result === "object") {
-            const sessionFile = (result as { sessionFile?: unknown }).sessionFile;
-            if (typeof sessionFile === "string" && sessionFile.length > 0) {
-                runtime.sessionPath = sessionFile;
-                this.#publishRoster();
+            const data = result as { sessionId?: unknown; sessionFile?: unknown; sessionName?: unknown };
+            const sessionId =
+                typeof data.sessionId === "string" && data.sessionId.length > 0 ? data.sessionId : runtime.sessionId;
+            const sessionPath =
+                typeof data.sessionFile === "string" && data.sessionFile.length > 0
+                    ? await canonicalSessionPath(data.sessionFile)
+                    : runtime.sessionPath;
+            const sessionName =
+                typeof data.sessionName === "string" && data.sessionName.trim() ? data.sessionName.trim() : undefined;
+            runtime.sessionId = sessionId;
+            runtime.sessionPath = sessionPath;
+            runtime.sessionName = sessionName;
+            this.#publishRoster();
+        }
+
+        if (runtime !== this.#active) {
+            throw new Error("The active Pi runtime changed before the command completed");
+        }
+
+        if (command.type === "export_html" && result && typeof result === "object") {
+            const sourcePath = (result as { path?: unknown }).path;
+            if (typeof sourcePath === "string") {
+                const canonicalSource = await canonicalPath(sourcePath);
+                if (runtime !== this.#active) {
+                    throw new Error("The active Pi runtime changed before export authorization completed");
+                }
+
+                runtime.exportPaths.add(canonicalSource);
             }
         }
 
@@ -173,17 +352,20 @@ export class RuntimePool extends EventEmitter {
         return [...this.#runtimes].some((runtime) => runtime.process.snapshot().status.phase !== "stopped");
     }
 
-    #createManagedRuntime(options: StartRuntimeOptions): ManagedRuntime {
+    #createManagedRuntime(options: RuntimeLaunchOptions): ManagedRuntime {
         if (this.#runtimes.size >= MAX_RUNTIMES) {
             throw new Error(`A desktop window can run at most ${MAX_RUNTIMES} Pi sessions at once`);
         }
 
         const runtime: ManagedRuntime = {
             runtimeId: randomUUID(),
+            projectId: options.projectId,
             projectPath: options.cwd,
+            ...(options.sessionId ? { sessionId: options.sessionId } : {}),
             ...(options.sessionPath ? { sessionPath: options.sessionPath } : {}),
             process: this.#createProcess(),
             exportPaths: new Set(),
+            lifecycleEpoch: 0,
             projection: new Map(),
         };
         this.#runtimes.add(runtime);

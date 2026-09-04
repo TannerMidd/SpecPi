@@ -1,38 +1,53 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from "electron";
-import { copyFile, realpath, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { copyFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { IPC, type DesktopStatePatch } from "../shared/ipc";
 import {
+    absolutePathSchema,
+    activeSessionMetadataSchema,
     desktopStatePatchSchema,
     diffRequestSchema,
     extensionUiResponseSchema,
     externalUrlSchema,
     fileRequestSchema,
+    projectCapabilitySchema,
     rpcCommandSchema,
     sessionDraftSchema,
-    sessionRecordSchema,
     sessionTitleSchema,
-    startRuntimeSchema,
+    workspaceRequestSchema,
 } from "../shared/schemas";
-import type { RpcCommand, RuntimeEvent, RuntimeStatus, StartRuntimeOptions } from "../shared/rpc";
+import type { DesktopState } from "../shared/domain";
+import type { RpcCommand, RuntimeEvent, RuntimeStatus, WorkspaceRequest } from "../shared/rpc";
 import { listDirectory, previewFile } from "./file-service";
 import { readGitDiff, readGitStatus } from "./git-service";
+import { canonicalPath, displayNativePath } from "./path-identity";
+import { isTrustedRendererUrl, resolveRendererTarget, type RendererTarget } from "./renderer-origin";
 import { RuntimePool } from "./runtime-pool";
 import { StateStore } from "./state-store";
 import { TITLE_BAR_HEIGHT, windowThemeColors } from "./window-theme";
+import {
+    WorkspaceController,
+    type ConfirmCompatibility,
+    type TrustChoice,
+    type WorkspaceContext,
+} from "./workspace-controller";
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const rendererFile = path.join(currentDirectory, "../renderer/index.html");
+const smokeMode = process.env.SPECPI_DESKTOP_SMOKE === "1" || process.argv.includes("--smoke");
 
-interface WindowContext {
+interface WindowContext extends WorkspaceContext {
     window: BrowserWindow;
-    runtimes: RuntimePool;
-    launchIntent?: StartRuntimeOptions;
+    rendererTarget: RendererTarget;
+    launchIntent?: WorkspaceRequest;
     closing: boolean;
 }
 
 const windows = new Map<number, WindowContext>();
 let store: StateStore;
+let workspaces: WorkspaceController;
 let quitting = false;
 
 function send(context: WindowContext, channel: string, payload: unknown): void {
@@ -41,8 +56,14 @@ function send(context: WindowContext, channel: string, payload: unknown): void {
     }
 }
 
-function applyWindowTheme(): void {
-    const colors = windowThemeColors(store.get().theme, nativeTheme.shouldUseDarkColors);
+function broadcastState(state: DesktopState): void {
+    for (const context of windows.values()) {
+        send(context, IPC.desktopStateChanged, state);
+    }
+}
+
+function applyWindowTheme(state = store.get()): void {
+    const colors = windowThemeColors(state.theme, nativeTheme.shouldUseDarkColors);
     for (const context of windows.values()) {
         if (context.window.isDestroyed()) {
             continue;
@@ -59,7 +80,12 @@ function applyWindowTheme(): void {
     }
 }
 
-async function createWindow(launchIntent?: StartRuntimeOptions): Promise<WindowContext> {
+async function createWindow(launchIntent?: WorkspaceRequest, importSource?: WindowContext): Promise<WindowContext> {
+    const rendererTarget = resolveRendererTarget({
+        packaged: app.isPackaged,
+        rendererFile,
+        developmentUrl: process.env.ELECTRON_RENDERER_URL,
+    });
     const colors = windowThemeColors(store.get().theme, nativeTheme.shouldUseDarkColors);
     const browserWindow = new BrowserWindow({
         width: 1440,
@@ -79,22 +105,34 @@ async function createWindow(launchIntent?: StartRuntimeOptions): Promise<WindowC
             contextIsolation: true,
             nodeIntegration: false,
             webSecurity: true,
-            devTools: Boolean(process.env.ELECTRON_RENDERER_URL),
+            devTools: rendererTarget.devTools,
         },
     });
     const context: WindowContext = {
+        id: randomUUID(),
         window: browserWindow,
+        rendererTarget,
         runtimes: new RuntimePool(),
         launchIntent,
         closing: false,
     };
     const webContentsId = browserWindow.webContents.id;
     windows.set(webContentsId, context);
+    try {
+        if (launchIntent?.importToken && importSource) {
+            workspaces.transferSessionImport(launchIntent.importToken, importSource.id, context.id);
+        }
+    } catch (error) {
+        windows.delete(webContentsId);
+        browserWindow.destroy();
+        throw error;
+    }
+
     context.runtimes.on("event", (event: RuntimeEvent) => send(context, IPC.runtimeEvent, event));
     context.runtimes.on("status", (status: RuntimeStatus) => send(context, IPC.runtimeStatus, status));
     context.runtimes.on("roster", () => send(context, IPC.runtimeRoster, context.runtimes.roster()));
 
-    if (!process.env.ELECTRON_RENDERER_URL && process.platform !== "darwin") {
+    if (rendererTarget.kind === "file" && process.platform !== "darwin") {
         browserWindow.removeMenu();
     }
 
@@ -117,10 +155,10 @@ async function createWindow(launchIntent?: StartRuntimeOptions): Promise<WindowC
         void context.runtimes.stopAll();
     });
 
-    if (process.env.ELECTRON_RENDERER_URL) {
-        await browserWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+    if (rendererTarget.kind === "development") {
+        await browserWindow.loadURL(rendererTarget.url);
     } else {
-        await browserWindow.loadFile(path.join(currentDirectory, "../renderer/index.html"));
+        await browserWindow.loadFile(rendererTarget.filePath);
     }
 
     return context;
@@ -131,12 +169,59 @@ function contextFor(event: IpcMainInvokeEvent): WindowContext {
     if (
         !context ||
         event.sender !== context.window.webContents ||
-        event.senderFrame !== context.window.webContents.mainFrame
+        event.senderFrame !== context.window.webContents.mainFrame ||
+        !isTrustedRendererUrl(event.senderFrame.url, context.rendererTarget)
     ) {
         throw new Error("Rejected IPC from an untrusted frame");
     }
 
     return context;
+}
+
+const confirmCompatibility = async (context: WindowContext, warning: string): Promise<boolean> => {
+    if (smokeMode) {
+        return false;
+    }
+
+    const result = await dialog.showMessageBox(context.window, {
+        type: "warning",
+        title: "Use an unvalidated Pi version?",
+        message: warning,
+        detail: "SpecPi Desktop has not validated this Pi protocol version. Continue only if you accept compatibility risk for this process.",
+        buttons: ["Cancel", "Continue"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+    });
+
+    return result.response === 1;
+};
+
+async function chooseTrust(context: WindowContext, projectPath: string): Promise<TrustChoice | undefined> {
+    if (smokeMode) {
+        return "deny";
+    }
+
+    const result = await dialog.showMessageBox(context.window, {
+        type: "warning",
+        title: "Start Pi in this project?",
+        message: "Choose project-resource trust for this Pi run",
+        detail: `${displayNativePath(projectPath)}\n\nProject resources may execute code. This choice applies only to the new Pi process and is not saved.`,
+        buttons: ["Use Pi's decision", "Ignore project resources", "Trust this run", "Cancel"],
+        defaultId: 0,
+        cancelId: 3,
+        noLink: true,
+    });
+    const choices: Array<TrustChoice | undefined> = ["default", "deny", "approve", undefined];
+
+    return choices[result.response];
+}
+
+function publishState(state: DesktopState): DesktopState {
+    broadcastState(state);
+    applyWindowTheme(state);
+
+    return state;
 }
 
 function registerIpc(): void {
@@ -147,7 +232,7 @@ function registerIpc(): void {
             return undefined;
         }
 
-        return realpath(result.filePaths[0]);
+        return workspaces.registerProject(result.filePaths[0]);
     });
     ipcMain.handle(IPC.choosePi, async (event) => {
         const context = contextFor(event);
@@ -158,8 +243,11 @@ function registerIpc(): void {
                     ? [{ name: "Pi executable", extensions: ["exe", "cmd"] }]
                     : [{ name: "Pi executable", extensions: ["*"] }],
         });
+        if (result.canceled || !result.filePaths[0]) {
+            return undefined;
+        }
 
-        return result.canceled ? undefined : result.filePaths[0];
+        return workspaces.setPiExecutable(result.filePaths[0]);
     });
     ipcMain.handle(IPC.chooseSession, async (event) => {
         const context = contextFor(event);
@@ -172,13 +260,20 @@ function registerIpc(): void {
             return undefined;
         }
 
-        return realpath(result.filePaths[0]);
+        return workspaces.createSessionImport(context, result.filePaths[0]);
     });
-    ipcMain.handle(IPC.openWorkspace, async (event, options) => {
-        contextFor(event);
-        await createWindow(startRuntimeSchema.parse(options));
+    ipcMain.handle(IPC.openWorkspace, async (event, request) => {
+        const context = contextFor(event);
+        const safe = workspaceRequestSchema.parse(request);
+        await createWindow(safe, safe.importToken ? context : undefined);
     });
-    ipcMain.handle(IPC.launchIntent, (event) => contextFor(event).launchIntent);
+    ipcMain.handle(IPC.launchIntent, (event) => {
+        const context = contextFor(event);
+        const intent = context.launchIntent;
+        context.launchIntent = undefined;
+
+        return intent;
+    });
     ipcMain.handle(IPC.getDesktopState, (event) => {
         contextFor(event);
 
@@ -187,29 +282,25 @@ function registerIpc(): void {
     ipcMain.handle(IPC.updateDesktopState, async (event, patch: DesktopStatePatch) => {
         contextFor(event);
         const safe = desktopStatePatchSchema.parse(patch);
-        const next = await store.update(safe);
-        if (safe.theme) {
-            applyWindowTheme();
-        }
 
-        return next;
+        return publishState(await store.updatePreferences(safe));
     });
     ipcMain.handle(IPC.saveSessionDraft, async (event, request) => {
-        contextFor(event);
+        const context = contextFor(event);
         const safe = sessionDraftSchema.parse(request);
 
-        return store.updateSessionDraft(safe.sessionId, safe.draft);
+        return workspaces.saveSessionDraft(context, safe.sessionId, safe.draft);
     });
     ipcMain.handle(IPC.saveSessionTitle, async (event, request) => {
-        contextFor(event);
+        const context = contextFor(event);
         const safe = sessionTitleSchema.parse(request);
 
-        return store.updateSessionTitle(safe.sessionId, safe.title);
+        return workspaces.saveSessionTitle(context, safe.sessionId, safe.title);
     });
-    ipcMain.handle(IPC.saveSession, async (event, session) => {
-        contextFor(event);
+    ipcMain.handle(IPC.saveActiveSession, async (event, metadata) => {
+        const context = contextFor(event);
 
-        return store.saveSession(sessionRecordSchema.parse(session));
+        return workspaces.saveActiveSession(context, activeSessionMetadataSchema.parse(metadata));
     });
     ipcMain.handle(IPC.runtimeSnapshot, (event) => contextFor(event).runtimes.snapshot());
     ipcMain.handle(IPC.runtimeRoster, (event) => contextFor(event).runtimes.roster());
@@ -231,60 +322,51 @@ function registerIpc(): void {
 
         return result.filePath;
     });
-    ipcMain.handle(IPC.runtimeStart, async (event, options) => {
+    ipcMain.handle(IPC.runtimeStart, async (event, request) => {
         const context = contextFor(event);
-        const safe = startRuntimeSchema.parse(options);
+        const safe = workspaceRequestSchema.parse(request);
 
-        return context.runtimes.activate(safe);
-    });
-    ipcMain.handle(IPC.runtimeStop, (event) => {
-        const context = contextFor(event);
+        const confirm: ConfirmCompatibility = (warning) => confirmCompatibility(context, warning);
 
-        return context.runtimes.stopActive();
+        return workspaces.activate(context, safe, (project) => chooseTrust(context, project.path), confirm);
     });
+    ipcMain.handle(IPC.runtimeStop, (event) => contextFor(event).runtimes.stopActive());
     ipcMain.handle(IPC.runtimeCommand, async (event, command: RpcCommand) => {
         const context = contextFor(event);
         const safe = rpcCommandSchema.parse(command) as RpcCommand;
-        const result = await context.runtimes.request(safe);
-        if (safe.type === "export_html" && result && typeof result === "object" && "path" in result) {
-            const sourcePath = (result as { path?: unknown }).path;
-            if (typeof sourcePath === "string") {
-                context.runtimes.authorizeExport(await realpath(sourcePath));
-            }
-        }
 
-        return result;
+        return context.runtimes.request(safe);
     });
     ipcMain.handle(IPC.runtimeUiResponse, async (event, response) => {
         await contextFor(event).runtimes.respond(extensionUiResponseSchema.parse(response));
     });
     ipcMain.handle(IPC.listDirectory, async (event, request) => {
-        contextFor(event);
+        const context = contextFor(event);
         const safe = fileRequestSchema.parse(request);
 
-        return listDirectory(safe.projectRoot, safe.relativePath);
+        return listDirectory(await workspaces.activeProjectRoot(context, safe.projectId), safe.relativePath);
     });
     ipcMain.handle(IPC.readFile, async (event, request) => {
-        contextFor(event);
+        const context = contextFor(event);
         const safe = fileRequestSchema.parse(request);
 
-        return previewFile(safe.projectRoot, safe.relativePath);
+        return previewFile(await workspaces.activeProjectRoot(context, safe.projectId), safe.relativePath);
     });
-    ipcMain.handle(IPC.gitStatus, async (event, projectRoot: string) => {
-        contextFor(event);
-        const safe = fileRequestSchema.shape.projectRoot.parse(projectRoot);
+    ipcMain.handle(IPC.gitStatus, async (event, request) => {
+        const context = contextFor(event);
+        const safe = projectCapabilitySchema.parse(request);
 
-        return readGitStatus(safe);
+        return readGitStatus(await workspaces.activeProjectRoot(context, safe.projectId));
     });
     ipcMain.handle(IPC.gitDiff, async (event, request) => {
-        contextFor(event);
+        const context = contextFor(event);
         const safe = diffRequestSchema.parse(request);
 
-        return readGitDiff(safe.projectRoot, safe.relativePath);
+        return readGitDiff(await workspaces.activeProjectRoot(context, safe.projectId), safe.relativePath);
     });
     ipcMain.handle(IPC.saveExport, async (event, sourcePath: string) => {
         const context = contextFor(event);
-        const source = await realpath(fileRequestSchema.shape.projectRoot.parse(sourcePath));
+        const source = await canonicalPath(absolutePathSchema.parse(sourcePath));
         if (!context.runtimes.isExportAuthorized(source)) {
             throw new Error("The file was not produced by this Pi runtime");
         }
@@ -295,6 +377,10 @@ function registerIpc(): void {
         });
         if (result.canceled || !result.filePath) {
             return undefined;
+        }
+
+        if (!context.runtimes.isExportAuthorized(source)) {
+            throw new Error("The active Pi runtime changed before the export was saved");
         }
 
         await copyFile(source, result.filePath);
@@ -318,18 +404,16 @@ function registerIpc(): void {
 app.whenReady().then(async () => {
     store = new StateStore(app.getPath("userData"));
     await store.load();
+    workspaces = new WorkspaceController(store, { stateChanged: publishState });
     registerIpc();
-    nativeTheme.on("updated", applyWindowTheme);
+    nativeTheme.on("updated", () => applyWindowTheme());
     const context = await createWindow();
-    if (process.env.SPECPI_DESKTOP_SMOKE === "1" || process.argv.includes("--smoke")) {
+    if (smokeMode) {
         const smoke = await context.window.webContents.executeJavaScript(
             "({ title: document.title, hasBridge: typeof window.specpi?.getDesktopState === 'function' })",
             true,
         );
-        await context.window.webContents.executeJavaScript(
-            `window.specpi.openWorkspace({ cwd: ${JSON.stringify(process.cwd())}, trust: "deny", noSession: true })`,
-            true,
-        );
+        await createWindow();
         const windowCount = BrowserWindow.getAllWindows().length;
         if (smoke.title !== "SpecPi Desktop" || smoke.hasBridge !== true || windowCount !== 2) {
             console.error("SPECPI_DESKTOP_SMOKE_FAILED", JSON.stringify({ ...smoke, windowCount }));

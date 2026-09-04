@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FileNode, FilePreview, GitFileStatus, GitStatus } from "../../../shared/domain";
 import { parseDiff } from "../lib/diff";
+import { LatestRequest } from "../lib/latest-request";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
 
@@ -26,12 +27,12 @@ function statusLabel(file?: GitFileStatus): string {
 }
 
 function FileList({
-    root,
+    projectId,
     directory,
     selected,
     select,
 }: {
-    root: string;
+    projectId: string;
     directory: string;
     selected?: string;
     select(path: string): void;
@@ -40,15 +41,17 @@ function FileList({
     const [open, setOpen] = useState(new Set<string>());
     useEffect(() => {
         let active = true;
+        setNodes([]);
+        setOpen(new Set());
         void window.specpi
-            .listDirectory(root, directory)
+            .listDirectory(projectId, directory)
             .then((value) => active && setNodes(value))
             .catch(() => active && setNodes([]));
 
         return () => {
             active = false;
         };
-    }, [root, directory]);
+    }, [projectId, directory]);
 
     return (
         <ul className="file-list">
@@ -76,7 +79,7 @@ function FileList({
                             </button>
                             {open.has(node.relativePath) ? (
                                 <FileList
-                                    root={root}
+                                    projectId={projectId}
                                     directory={node.relativePath}
                                     selected={selected}
                                     select={select}
@@ -158,6 +161,7 @@ function DiffView({
 
 export function FilesPanel({
     open,
+    projectId,
     root,
     tab,
     setTab: _setTab,
@@ -167,6 +171,7 @@ export function FilesPanel({
     onGitStatus,
 }: {
     open: boolean;
+    projectId: string;
     root: string;
     tab: "files" | "changes";
     setTab(tab: "files" | "changes"): void;
@@ -184,25 +189,44 @@ export function FilesPanel({
     const [lineStart, setLineStart] = useState(1);
     const [lineEnd, setLineEnd] = useState(1);
     const [error, setError] = useState("");
+    const requestScope = `${projectId}\0${root}`;
+    const requestScopeRef = useRef(requestScope);
+    requestScopeRef.current = requestScope;
+    const previewRequests = useRef(new LatestRequest());
+    const diffRequests = useRef(new LatestRequest());
+    const gitRequests = useRef(new LatestRequest());
+    const onGitStatusRef = useRef(onGitStatus);
+    onGitStatusRef.current = onGitStatus;
 
     const selectFile = useCallback(
         async (relativePath: string) => {
+            const request = previewRequests.current.begin(requestScope);
+            diffRequests.current.invalidate();
             setError("");
             setSelectedPath(relativePath);
             setSelectedChange(git?.files.find((file) => file.path === relativePath));
             setView("preview");
             try {
-                setPreview(await window.specpi.readFile(root, relativePath));
+                const nextPreview = await window.specpi.readFile(projectId, relativePath);
+                if (!previewRequests.current.isCurrent(request, requestScopeRef.current)) {
+                    return;
+                }
+
+                setPreview(nextPreview);
                 setDiff("");
             } catch (caught) {
-                setError(caught instanceof Error ? caught.message : String(caught));
+                if (previewRequests.current.isCurrent(request, requestScopeRef.current)) {
+                    setError(caught instanceof Error ? caught.message : String(caught));
+                }
             }
         },
-        [git?.files, root],
+        [git?.files, projectId, root],
     );
 
     const selectChangeFile = useCallback(
         async (file: GitFileStatus) => {
+            const request = diffRequests.current.begin(requestScope);
+            previewRequests.current.invalidate();
             setError("");
             setPreview(undefined);
             setSelectedPath(file.path);
@@ -211,7 +235,11 @@ export function FilesPanel({
             setLineEnd(1);
             setView("diff");
             try {
-                const nextDiff = await window.specpi.getGitDiff(root, file.path);
+                const nextDiff = await window.specpi.getGitDiff(projectId, file.path);
+                if (!diffRequests.current.isCurrent(request, requestScopeRef.current)) {
+                    return;
+                }
+
                 const firstLine = parseDiff(nextDiff).find(
                     (line) => line.newLine !== undefined || line.oldLine !== undefined,
                 );
@@ -220,46 +248,77 @@ export function FilesPanel({
                 setLineStart(line);
                 setLineEnd(line);
             } catch (caught) {
-                setDiff("");
-                setError(caught instanceof Error ? caught.message : String(caught));
+                if (diffRequests.current.isCurrent(request, requestScopeRef.current)) {
+                    setDiff("");
+                    setError(caught instanceof Error ? caught.message : String(caught));
+                }
             }
         },
-        [root],
+        [projectId, root],
     );
 
-    const refreshGit = useCallback(async () => {
-        const status = await window.specpi.getGitStatus(root);
-        setGit(status);
-        onGitStatus(status);
+    const refreshGit = useCallback(async (): Promise<GitStatus | undefined> => {
+        const request = gitRequests.current.begin(requestScope);
+        try {
+            const status = await window.specpi.getGitStatus(projectId);
+            if (!gitRequests.current.isCurrent(request, requestScopeRef.current)) {
+                return undefined;
+            }
 
-        return status;
-    }, [onGitStatus, root]);
+            setGit(status);
+            onGitStatusRef.current(status);
+
+            return status;
+        } catch (caught) {
+            if (gitRequests.current.isCurrent(request, requestScopeRef.current)) {
+                setError(caught instanceof Error ? caught.message : String(caught));
+            }
+
+            return undefined;
+        }
+    }, [projectId, root]);
+
+    useEffect(() => {
+        previewRequests.current.invalidate();
+        diffRequests.current.invalidate();
+        gitRequests.current.invalidate();
+        setPreview(undefined);
+        setGit(undefined);
+        setDiff("");
+        setSelectedPath(undefined);
+        setSelectedChange(undefined);
+        setLineStart(1);
+        setLineEnd(1);
+        setError("");
+        setView(tab === "changes" ? "diff" : "preview");
+    }, [root]);
 
     useEffect(() => {
         if (tab === "files") {
+            diffRequests.current.invalidate();
             setView("preview");
             if (selectedPath) {
                 void selectFile(selectedPath);
             }
+        } else {
+            previewRequests.current.invalidate();
         }
-    }, [tab]);
+    }, [selectFile, selectedPath, tab]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            void refreshGit()
-                .then((status) => {
-                    if (tab === "changes" && status.files.length > 0) {
-                        const next = status.files.find((file) => file.path === selectedPath) ?? status.files[0];
-                        if (next) {
-                            void selectChangeFile(next);
-                        }
+            void refreshGit().then((status) => {
+                if (status && tab === "changes" && status.files.length > 0) {
+                    const next = status.files.find((file) => file.path === selectedPath) ?? status.files[0];
+                    if (next) {
+                        void selectChangeFile(next);
                     }
-                })
-                .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)));
+                }
+            });
         }, 150);
 
         return () => clearTimeout(timer);
-    }, [root, refreshToken, tab]);
+    }, [refreshGit, refreshToken, root, selectChangeFile, selectedPath, tab]);
 
     const lineLabel = lineStart === lineEnd ? `line ${lineStart}` : `lines ${lineStart}–${lineEnd}`;
     const reviewSelection = () => {
@@ -307,7 +366,7 @@ export function FilesPanel({
                                 <span>Project files</span>
                             </div>
                             <FileList
-                                root={root}
+                                projectId={projectId}
                                 directory=""
                                 selected={selectedPath}
                                 select={(path) => void selectFile(path)}

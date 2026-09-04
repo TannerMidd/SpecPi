@@ -35,6 +35,12 @@ describe("JsonlDecoder", () => {
         expect(records.map((record) => record.type)).toContain("entry_appended");
     });
 
+    it("rejects invalid UTF-8 instead of rewriting protocol data", () => {
+        const decoder = new JsonlDecoder();
+
+        expect(() => decoder.push(Buffer.from([0x7b, 0x22, 0xff, 0x22, 0x7d, 0x0a]))).toThrow("invalid UTF-8");
+    });
+
     it("rejects an oversized unterminated record", () => {
         const decoder = new JsonlDecoder(8);
 

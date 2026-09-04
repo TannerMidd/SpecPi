@@ -1,7 +1,5 @@
-import { StringDecoder } from "node:string_decoder";
-
 export class JsonlDecoder {
-    readonly #decoder = new StringDecoder("utf8");
+    readonly #decoder = new TextDecoder("utf-8", { fatal: true });
     readonly #maxBytes: number;
     #buffer = "";
     #bufferBytes = 0;
@@ -11,14 +9,27 @@ export class JsonlDecoder {
     }
 
     push(chunk: Buffer | string): string[] {
-        const text = typeof chunk === "string" ? chunk : this.#decoder.write(chunk);
+        let text: string;
+        try {
+            text = typeof chunk === "string" ? chunk : this.#decoder.decode(chunk, { stream: true });
+        } catch {
+            throw new Error("RPC stream contains invalid UTF-8");
+        }
+
         this.#append(text);
 
         return this.#drain(false);
     }
 
     end(): string[] {
-        this.#append(this.#decoder.end());
+        let text: string;
+        try {
+            text = this.#decoder.decode();
+        } catch {
+            throw new Error("RPC stream contains invalid UTF-8");
+        }
+
+        this.#append(text);
 
         return this.#drain(true);
     }

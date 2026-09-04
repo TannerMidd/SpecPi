@@ -14,7 +14,7 @@ function session(id: string, sessionPath: string): SessionRecord {
 }
 
 describe("session registry", () => {
-    it("replaces duplicate IDs and normalized paths while preserving distinct unnamed sessions", () => {
+    it("replaces duplicate IDs and Windows path aliases while preserving distinct sessions", () => {
         const current = session("current", "C:\\sessions\\current.jsonl");
         const sessions = mergeSessionRecord(
             [
@@ -24,8 +24,19 @@ describe("session registry", () => {
                 session("other-copy", "C:\\sessions\\other.jsonl"),
             ],
             current,
+            "win32",
         );
 
         expect(sessions.map((item) => item.id)).toEqual(["current", "other"]);
+    });
+
+    it("preserves case-distinct POSIX session paths", () => {
+        const sessions = mergeSessionRecord(
+            [session("upper", "/tmp/Session.jsonl")],
+            session("lower", "/tmp/session.jsonl"),
+            "linux",
+        );
+
+        expect(sessions.map((item) => item.id)).toEqual(["lower", "upper"]);
     });
 });

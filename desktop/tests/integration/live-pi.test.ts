@@ -39,7 +39,13 @@ describe("installed Pi RPC", () => {
             const events: RuntimeEvent[] = [];
             runtime.on("event", (event: RuntimeEvent) => events.push(event));
             try {
-                await runtime.start({ cwd: repository, trust: "approve", noSession: true, offline: true });
+                await runtime.start({
+                    projectId: "live-project",
+                    cwd: repository,
+                    trust: "approve",
+                    noSession: true,
+                    offline: true,
+                });
                 expect(runtime.snapshot().pendingUi).toEqual([]);
                 expect(
                     events.some(
@@ -91,6 +97,9 @@ describe("installed Pi RPC", () => {
                 await runtime.request({ type: "new_session" });
                 await new Promise((resolve) => setTimeout(resolve, 250));
                 expect(runtime.snapshot().pendingUi).toEqual([]);
+                await runtime.request({ type: "set_session_name", name: "Desktop live contract" });
+                const renamed = (await runtime.request({ type: "get_state" })) as { sessionName?: string };
+                expect(renamed.sessionName).toBe("Desktop live contract");
                 expect(
                     events.some(
                         (event) =>

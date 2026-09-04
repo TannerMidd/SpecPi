@@ -2993,16 +2993,14 @@ pre {
         monospace;
 }
 
-.option-list,
-.trust-actions {
+.option-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
     margin: 18px 0 0;
 }
 
-.option-list button,
-.trust-actions button {
+.option-list button {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3012,16 +3010,14 @@ pre {
     border-radius: 10px;
 }
 
-.option-list button strong,
-.trust-actions button strong {
+.option-list button strong {
     color: var(--text-high);
     font-size: 12.5px;
     font-weight: 500;
     line-height: 1.2;
 }
 
-.option-list button span,
-.trust-actions button span {
+.option-list button span {
     color: var(--muted);
     font:
         400 10.5px/1.2 "IBM Plex Mono",
@@ -3058,82 +3054,6 @@ pre {
     font-weight: 600;
     background: var(--accent);
     border-color: var(--accent);
-}
-
-.trust-modal {
-    width: min(520px, 92vw);
-    padding: 24px;
-    border-radius: 16px;
-}
-
-.trust-heading {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-}
-
-.trust-icon {
-    display: grid;
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
-    color: var(--warning);
-    background: rgba(215, 179, 106, 0.12);
-    border-radius: 9px;
-    place-items: center;
-}
-
-.trust-heading > div > span {
-    display: block;
-    margin-top: 4px;
-    color: var(--muted);
-    font:
-        400 10.5px/1 "IBM Plex Mono",
-        monospace;
-}
-
-.trust-modal > p {
-    margin: 16px 0 0;
-    color: var(--muted-high);
-    font-size: 13.5px;
-    line-height: 1.65;
-    text-wrap: pretty;
-}
-
-.trust-actions button:hover:not(:disabled) {
-    background: var(--panel-hover);
-}
-
-.trust-actions .preferred strong,
-.trust-actions .preferred span {
-    color: var(--bg);
-}
-
-.trust-actions .preferred span {
-    opacity: 0.72;
-}
-
-.trust-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 18px;
-}
-
-.trust-footer > span {
-    color: var(--muted-low);
-    font:
-        400 10px/1 "IBM Plex Mono",
-        monospace;
-}
-
-.trust-footer button {
-    height: 30px;
-    padding: 0 12px;
-    color: var(--muted-high);
-    font:
-        400 11px/1 "IBM Plex Mono",
-        monospace;
 }
 
 .runtime-details {
