@@ -2164,6 +2164,14 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.ok(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")));
+        for (const file of ["diagnostics.ts", "interactions.ts", "lifecycle.ts"]) {
+            assert.deepEqual(
+                fs.readFileSync(path.join(agentDir, "extensions", "browser", file)),
+                fs.readFileSync(path.join(repoRoot, "extensions", "browser", file)),
+                `installed browser helper differs: ${file}`,
+            );
+        }
+
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "smoke.mjs")));
         assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
@@ -2341,6 +2349,9 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "diagnostics.ts")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "interactions.ts")), false);
+        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "lifecycle.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "themes", "specpi-spec.json")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);

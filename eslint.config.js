@@ -1,7 +1,7 @@
 import stylistic from "@stylistic/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 
-const sourceFiles = ["**/*.js", "**/*.mjs", "**/*.ts", "**/*.tsx"];
+const sourceFiles = ["**/*.js", "**/*.mjs", "**/*.ts", "**/*.mts", "**/*.tsx"];
 
 export default [
     {

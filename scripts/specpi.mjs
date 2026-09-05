@@ -808,6 +808,21 @@ function managedFiles(includeShell) {
             0o644,
         ],
         [
+            path.join(repoRoot, "extensions", "browser", "diagnostics.ts"),
+            path.join(agentDir, "extensions", "browser", "diagnostics.ts"),
+            0o644,
+        ],
+        [
+            path.join(repoRoot, "extensions", "browser", "lifecycle.ts"),
+            path.join(agentDir, "extensions", "browser", "lifecycle.ts"),
+            0o644,
+        ],
+        [
+            path.join(repoRoot, "extensions", "browser", "interactions.ts"),
+            path.join(agentDir, "extensions", "browser", "interactions.ts"),
+            0o644,
+        ],
+        [
             path.join(repoRoot, "extensions", "browser", "smoke.mjs"),
             path.join(agentDir, "extensions", "browser", "smoke.mjs"),
             0o755,
@@ -1126,6 +1141,9 @@ function assertSources() {
         "extensions/files/core.mjs",
         "extensions/browser/index.ts",
         "extensions/browser/core.mjs",
+        "extensions/browser/diagnostics.ts",
+        "extensions/browser/interactions.ts",
+        "extensions/browser/lifecycle.ts",
         "extensions/browser/smoke.mjs",
         "browser-runtime/package.json",
         "browser-runtime/package-lock.json",

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true
+  },
+  "files": [
+    "extensions/browser/index.ts",
+    "extensions/browser/core.d.mts",
+    "extensions/browser/diagnostics.ts",
+    "extensions/browser/interactions.ts",
+    "extensions/browser/lifecycle.ts"
+  ]
+}

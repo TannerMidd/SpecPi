@@ -120,7 +120,7 @@ Direct `pi install npm:specpi` loads extensions, skills, and themes only. It doe
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `/spec`             | Replace normal chrome with a technical run panel, seal live reasoning, hold streaming prose until complete, and keep tools collapsed. |
 | `/guard`            | Deny confirmed host-wide destructive calls and request approval for bounded risk classes.                                             |
-| Browser tools       | Open an isolated Chromium context for rendered inspection and screenshots.                                                            |
+| Browser tools       | Inspect isolated Chromium, diagnose errors, exercise keyboard/select/wait flows, and capture screenshots.                              |
 | `specpi-spec` theme | Bring blueprint blue, technical greys, layered surfaces, and restrained semantic states into Pi.                                      |
 | `specpi` CLI        | Plan, install, update, verify, and uninstall managed state with backups and rollback.                                                 |
 
@@ -226,6 +226,10 @@ npm run format
 npm run check
 ```
 
-JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check enforces formatting, validates syntax, runs the Node test suite, executes registry-linked validators, and installs the exact npm tarball through an isolated lifecycle. Maintainers should follow [NPM_RELEASE.md](NPM_RELEASE.md) for release preparation and protected publication.
+JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check enforces formatting, validates syntax, strictly type-checks the browser extension, runs the Node test suite, executes registry-linked validators, and installs the exact npm tarball through an isolated lifecycle. Maintainers should follow [NPM_RELEASE.md](NPM_RELEASE.md) for release preparation and protected publication.
+
+For application testing, use `browser_diagnostics` alongside rendered inspection, and `browser_press`, `browser_select_option`, and `browser_wait_for` for keyboard, native dropdown, and asynchronous flows. Diagnostics are bounded and best-effort sanitized, not guaranteed secret-free or proof of application health.
+
+Provision repository-local Chromium with `npm run setup:browser`, then run `npm run test:browser` and `npm run test:site:browser`. The required CI browser commands reject skipped coverage; Pages deployment waits for the same rendered check. See [browser testing](docs/browser-testing.md) for tool contracts, privacy limits, type-check scope, and the semantic-navigation assessment.
 
 MIT licensed.
