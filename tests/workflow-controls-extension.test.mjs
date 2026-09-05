@@ -38,6 +38,7 @@ test("workflow-controls extension composes scope and completion challenge lifecy
         "taskImportPreservedPending",
         "taskImportBoundDigest",
         "taskChallengeExactIds",
+        "taskChallengeRequiresDigest",
         "handoffRendered",
         "handoffDidNotTriggerTurn",
         "taskRevisionKeepsId",

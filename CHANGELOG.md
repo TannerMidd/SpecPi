@@ -2,6 +2,8 @@
 
 ## 0.11.0 - 2026-09-04
 
+- Reject shared temporary roots before Pi test launches, ignore generated desktop builds in Git, require the active task digest in card-backed review submissions, and treat unavailable foreign task roots as absent. Keep npm configuration trust assumptions explicit.
+- Resolve equivalent project-root aliases during scope checks while preserving relative-path traversal semantics and rejecting symlink escapes.
 - Refine the README and GitHub Pages with clearer installation guidance, a Pi relationship diagram, responsive reading layouts, and versioned feature guidance. Keep local assets and human-controlled workflow boundaries.
 - Add optional session-branch task contracts shared by the specification view, explicit scope import, experiment cards, completion review, and human-directed review packets. Preserve fixed requirement IDs and reject stale or incomplete card-backed reviews.
 - Bind selected harness improvements to a source checkout, selection generation, and immutable recorded card. Preserve verification policy, restrict test discovery, and verify the supported source inputs before and after executable gates. Retain bounded verification receipts separately from model-reported acceptance evidence.

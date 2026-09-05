@@ -98,7 +98,7 @@ function getIsolationRoot(agentDir) {
     const temporaryDirectory = fs.realpathSync(os.tmpdir());
     const canonicalAgentDir = fs.realpathSync(agentDir);
     const relative = path.relative(temporaryDirectory, canonicalAgentDir);
-    if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    if (relative.split(path.sep).length < 2 || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
         throw new Error(`Pi harness agentDir must be a dedicated directory under ${temporaryDirectory}`);
     }
 

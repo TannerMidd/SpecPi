@@ -156,9 +156,7 @@ function normalizeNonGoals(values) {
         throw new Error(`Task contract supports at most ${MAX_TASK_NON_GOALS} non-goals`);
     }
 
-    return values
-        .map((value, index) => plainText(value, `Task contract non-goal ${index + 1}`, MAX_NON_GOAL_LENGTH))
-        .filter(Boolean);
+    return values.map((value, index) => plainText(value, `Task contract non-goal ${index + 1}`, MAX_NON_GOAL_LENGTH));
 }
 
 function contractPayload(contract) {
@@ -326,13 +324,28 @@ export function readTaskContract(entries, root) {
         throw new Error("Malformed task contract branch entry");
     }
 
-    const contract = validateTaskContract(latest.contract);
     const requestedRoot = canonicalRoot(root);
-    if (contract.root !== requestedRoot) {
+    assertRecord(latest.contract, "Task contract");
+    if (typeof latest.contract.root !== "string" || !latest.contract.root.trim()) {
+        throw new Error("Task contract root is required");
+    }
+
+    let recordedRoot;
+    try {
+        recordedRoot = canonicalRoot(latest.contract.root);
+    } catch (error) {
+        if (latest.contract.root !== requestedRoot && (error?.code === "ENOENT" || error?.code === "ENOTDIR")) {
+            return undefined;
+        }
+
+        throw error;
+    }
+
+    if (recordedRoot !== requestedRoot) {
         return undefined;
     }
 
-    return contract;
+    return validateTaskContract(latest.contract);
 }
 
 export function taskContractScopeViolations(contract, relativePaths) {

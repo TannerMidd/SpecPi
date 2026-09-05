@@ -367,6 +367,7 @@ const genericActiveReviewInvalidated =
     taskActivation?.generation !== genericActivation?.generation;
 const taskChallengeSubmission = {
     generation: taskActivation.generation,
+    taskContractDigest: taskActivation.facts.taskContractDigest,
     verdict: "incomplete",
     requirements: [
         { id: "R1", status: "partial", evidence: "Card renderer observed" },
@@ -379,6 +380,21 @@ const taskChallengeSubmission = {
     residualRisks: ["Model-authored"],
     nextAction: "Run the repository tests",
 };
+let taskChallengeRequiresDigest = false;
+try {
+    await tools
+        .get("submit_completion_challenge")
+        .execute(
+            "task-challenge-missing-digest",
+            { ...taskChallengeSubmission, taskContractDigest: undefined },
+            undefined,
+            undefined,
+            ctx,
+        );
+} catch (error) {
+    taskChallengeRequiresDigest = /Task contract digest is stale/u.test(String(error));
+}
+
 const taskChallengeResult = await tools
     .get("submit_completion_challenge")
     .execute("task-challenge-tool", taskChallengeSubmission, undefined, undefined, ctx);
@@ -432,6 +448,7 @@ await tools.get("submit_completion_challenge").execute(
     "post-revision-challenge-tool",
     {
         generation: postRevisionActivation.generation,
+        taskContractDigest: postRevisionActivation.facts.taskContractDigest,
         verdict: "incomplete",
         requirements: [
             { id: "R1", status: "partial", evidence: "Revised card observed" },
@@ -768,6 +785,7 @@ process.stdout.write(
         taskImportPreservedPending,
         taskImportBoundDigest,
         taskChallengeExactIds,
+        taskChallengeRequiresDigest,
         handoffRendered,
         handoffDidNotTriggerTurn,
         taskRevisionKeepsId,

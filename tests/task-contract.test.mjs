@@ -104,6 +104,61 @@ test("task contract branch reads only the latest valid set and distinguishes mal
     }
 });
 
+test("task branch reads ignore unavailable foreign roots without adopting a moved card", () => {
+    const root = createRoot();
+    try {
+        const recordedRoot = path.join(root, "src", "components");
+        const contract = createTaskContract(card({ paths: [] }), { root: recordedRoot, origin: "human" });
+        const branch = [{ type: "custom", customType: TASK_CONTRACT_ENTRY, data: { kind: "set", contract } }];
+        const sourceDirectory = path.join(root, "src");
+        const movedDirectory = path.join(root, "moved-src");
+        fs.renameSync(sourceDirectory, movedDirectory);
+        assert.equal(readTaskContract(branch, root), undefined);
+        assert.equal(readTaskContract(branch, path.join(movedDirectory, "components")), undefined);
+        assert.throws(() => readTaskContract(branch, recordedRoot), { code: "ENOENT" });
+
+        fs.writeFileSync(sourceDirectory, "a file now occupies the old parent path\n");
+        assert.equal(readTaskContract(branch, root), undefined);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test("task branch reads preserve current-card validation and recorded-root access errors", (context) => {
+    const root = createRoot();
+    try {
+        const contract = createTaskContract(card(), { root, origin: "human" });
+        const branchWith = (value) => [
+            { type: "custom", customType: TASK_CONTRACT_ENTRY, data: { kind: "set", contract: value } },
+        ];
+        assert.throws(() => readTaskContract(branchWith({ ...contract, schema: 2 }), root), /Unsupported/);
+        assert.throws(
+            () => readTaskContract(branchWith({ ...contract, objective: "tampered" }), root),
+            /digest mismatch/,
+        );
+        assert.throws(() => readTaskContract(branchWith({ ...contract, root: "" }), root), /root is required/);
+
+        const foreignRoot = path.join(root, "src");
+        const foreignContract = createTaskContract(card({ paths: [] }), { root: foreignRoot, origin: "human" });
+        const originalStat = fs.statSync;
+        const accessError = Object.assign(new Error("recorded root cannot be accessed"), { code: "EACCES" });
+        const statMock = context.mock.method(fs, "statSync", (candidate, ...args) => {
+            if (candidate === foreignContract.root) {
+                throw accessError;
+            }
+
+            return originalStat(candidate, ...args);
+        });
+        try {
+            assert.throws(() => readTaskContract(branchWith(foreignContract), root), accessError);
+        } finally {
+            statMock.mock.restore();
+        }
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test("improvement contracts require explicit bounded scope and provenance", () => {
     const root = createRoot();
     try {
@@ -173,6 +228,7 @@ test("card-backed completion challenges require the exact original requirement I
         };
         const valid = {
             generation: "generation-one",
+            taskContractDigest: contract.digest,
             verdict: "ready-for-human-review",
             requirements: [
                 { id: "R1", status: "proven", evidence: "digest check passed" },
@@ -186,6 +242,14 @@ test("card-backed completion challenges require the exact original requirement I
             nextAction: "Human reviews the evidence",
         };
         assert.equal(validateChallengeSubmission(valid, facts).requirements[0].id, "R1");
+
+        for (const taskContractDigest of [undefined, null, "", "0".repeat(64)]) {
+            assert.throws(
+                () => validateChallengeSubmission({ ...valid, taskContractDigest }, facts),
+                /Task contract digest is stale/,
+            );
+        }
+
         assert.throws(
             () => validateChallengeSubmission({ ...valid, generation: "stale-generation" }, facts),
             /generation is stale/,

@@ -89,7 +89,7 @@ export function validateChallengeSubmission(value, facts = {}) {
         throw new Error("Completion challenge generation is stale");
     }
 
-    if (facts.taskContractDigest && value.taskContractDigest && value.taskContractDigest !== facts.taskContractDigest) {
+    if (facts.taskContractDigest && value.taskContractDigest !== facts.taskContractDigest) {
         throw new Error("Task contract digest is stale");
     }
 
@@ -262,6 +262,7 @@ export function challengePrompt(generation, facts) {
     if (bounded.taskContract) {
         lines.push(
             `Task contract: ${bounded.taskContract.id} (digest ${bounded.taskContract.digest})`,
+            "Include this exact task contract digest as taskContractDigest in the submission.",
             "The task contract requirements are fixed. Use every original requirement ID exactly once and do not rewrite requirement text.",
             "Fixed requirements:",
             ...bounded.taskContract.requirements.map(
