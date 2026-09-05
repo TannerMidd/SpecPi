@@ -1,6 +1,6 @@
 {
   "name": "specpi",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "An explicit, privacy-conscious, self-improving harness for the Pi coding agent",
   "author": "Tanner Middleton",
   "repository": {

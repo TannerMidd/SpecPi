@@ -24,7 +24,7 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-This README documents `0.11.0`, including task cards, verification receipts, and human outcome assessments. See the [release notes](CHANGELOG.md#0110---2026-09-04) for the complete change list.
+This README documents `0.11.1`, including task cards, verification receipts, and human outcome assessments. See the [release notes](CHANGELOG.md#0111---2026-09-04) for the complete change list.
 
 ## Install
 
@@ -47,14 +47,14 @@ specpi doctor
 Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
 
 ```bash
-npm install --global specpi@0.11.0
-npx --package specpi@0.11.0 specpi plan
+npm install --global specpi@0.11.1
+npx --package specpi@0.11.1 specpi plan
 ```
 
 For a source-audited installation, clone the exact release:
 
 ```bash
-git clone --branch v0.11.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+git clone --branch v0.11.1 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
