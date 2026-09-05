@@ -2,6 +2,10 @@
 
 When Pi is absent, SpecPi can install the reviewed `@earendil-works/pi-coding-agent@0.84.4` npm package globally after confirmation. The package provides the `pi` executable, is installed with lifecycle scripts disabled, retains its upstream license, and remains external system state after SpecPi uninstall.
 
+The experimental `specpi agent` launcher also consumes the **public Pi SDK 0.84.4 exactly** from the supported installed package or an explicitly selected absolute package directory. It does not install or vendor another runtime. It uses Pi's public session services, resource loader, runtime host and interactive UI, plus the parent Agent's configured stream/context/payload/response callbacks. Pi retains provider authentication and OAuth handling. Native CLI built-in extensions and private proxy bootstrap helpers are outside this adapter's contract; unsupported proxy policy fails closed. No direct `pi-agent-core` dependency or additional runtime library is introduced. The narrower experimental version gate does not change the ordinary installer's minimum-version rule.
+
+Architecture charts are committed static SVG/CSV/JSON assets. Their optional authoring script uses ReportLab 4.4.9 (BSD license); it is not installed by SpecPi or shipped as a runtime dependency. The site runs without a plotting library or remote chart service.
+
 SpecPi pins but does not vendor these Pi packages:
 
 - `pi-web-access@0.25.0`

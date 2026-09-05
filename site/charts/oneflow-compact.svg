@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<svg width="320" height="900" preserveAspectRatio="xMinYMin meet" viewBox="0 0 320 900" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink"><title>Workflow execution: pass rate and latency</title><desc>AFlow: single-conversation pass rate 90.5% versus stateless calls 86.8%; latency 53.53 versus 54.98 seconds. OneFlow: 87.4% versus 87.0%; latency 4.83 versus 4.31 seconds. Single-conversation execution is slightly slower for OneFlow. Qwen3 8B on HumanEval; vLLM, 16k context, three-run means. Table 4 reports no uncertainty intervals. Compare execution methods within each workflow. Token budgets are not matched; latency and pass rate have separate axes.</desc><metadata data-study="oneflow" data-sha256="214a2d9b0feddcd764f886e82211703713cf915704f513ee93a04d7f0a9853e2">https://arxiv.org/html/2601.12307v1 | Section 4.2.4, Table 4; v1, 18 January 2026</metadata>
+
+
+	<clipPath id="clip">
+		<rect x="0" y="0" width="320" height="900"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-900)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="0" width="320" height="900" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,11%,13%); fill-rule: evenodd;"/>
+			<text x="16.0" y="868" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1736) scale(1,-1)">AFlow / Pass rate</text>
+			<text x="16.0" y="845" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1690) scale(1,-1)">HumanEval pass@1</text>
+			<text x="16.0" y="824" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1648) scale(1,-1)">Percent / higher is better</text>
+			<path d="M 16,793 L 16,727 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="708" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1416) scale(1,-1)">0</text>
+			<path d="M 160,793 L 160,727 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="153.328" y="708" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1416) scale(1,-1)">50</text>
+			<path d="M 304,793 L 304,727 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="283.984" y="708" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1416) scale(1,-1)">100</text>
+			<text x="16.0" y="797" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1594) scale(1,-1)">Single conversation</text>
+			<text x="264.31" y="797" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1594) scale(1,-1)">90.5%</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="779.0" width="260.64" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="753" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1506) scale(1,-1)">Stateless calls</text>
+			<text x="264.31" y="753" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1506) scale(1,-1)">86.8%</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="735.0" width="249.98399999999998" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="660" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1320) scale(1,-1)">AFlow / Latency</text>
+			<text x="16.0" y="637" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1274) scale(1,-1)">Measured runtime</text>
+			<text x="16.0" y="616" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1232) scale(1,-1)">Seconds / lower is better</text>
+			<path d="M 16,585 L 16,519 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="500" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1000) scale(1,-1)">0</text>
+			<path d="M 160,585 L 160,519 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="153.328" y="500" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1000) scale(1,-1)">30</text>
+			<path d="M 304,585 L 304,519 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="290.656" y="500" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1000) scale(1,-1)">60</text>
+			<text x="16.0" y="589" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1178) scale(1,-1)">Single conversation</text>
+			<text x="257.296" y="589" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1178) scale(1,-1)">53.53 s</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="571.0" width="256.944" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="545" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1090) scale(1,-1)">Stateless calls</text>
+			<text x="257.296" y="545" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1090) scale(1,-1)">54.98 s</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="527.0" width="263.904" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="452" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,904) scale(1,-1)">OneFlow / Pass rate</text>
+			<text x="16.0" y="429" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,858) scale(1,-1)">HumanEval pass@1</text>
+			<text x="16.0" y="408" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,816) scale(1,-1)">Percent / higher is better</text>
+			<path d="M 16,377 L 16,311 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="292" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,584) scale(1,-1)">0</text>
+			<path d="M 160,377 L 160,311 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="153.328" y="292" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,584) scale(1,-1)">50</text>
+			<path d="M 304,377 L 304,311 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="283.984" y="292" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,584) scale(1,-1)">100</text>
+			<text x="16.0" y="381" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,762) scale(1,-1)">Single conversation</text>
+			<text x="264.31" y="381" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,762) scale(1,-1)">87.4%</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="363.0" width="251.712" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="337" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,674) scale(1,-1)">Stateless calls</text>
+			<text x="264.31" y="337" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,674) scale(1,-1)">87.0%</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="319.0" width="250.56" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="244" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,488) scale(1,-1)">OneFlow / Latency</text>
+			<text x="16.0" y="221" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,442) scale(1,-1)">Measured runtime</text>
+			<text x="16.0" y="200" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,400) scale(1,-1)">Seconds / lower is better</text>
+			<path d="M 16,169 L 16,103 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="84" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,168) scale(1,-1)">0</text>
+			<path d="M 160,169 L 160,103 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="153.328" y="84" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,168) scale(1,-1)">30</text>
+			<path d="M 304,169 L 304,103 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="290.656" y="84" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,168) scale(1,-1)">60</text>
+			<text x="16.0" y="173" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,346) scale(1,-1)">Single conversation</text>
+			<text x="265.08" y="173" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,346) scale(1,-1)">4.83 s</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="155.0" width="23.183999999999997" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="129" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,258) scale(1,-1)">Stateless calls</text>
+			<text x="265.08" y="129" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,258) scale(1,-1)">4.31 s</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="111.0" width="20.688000000000002" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<path d="M 16,62 L 304,62 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16" y="43" style="font-family: Arial, Helvetica, sans-serif; font-size: 11px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,86) scale(1,-1)">Source: Xu et al. / arXiv:2601.12307v1 / 2026</text>
+		</g>
+	</g>
+</svg>

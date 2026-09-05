@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Add an opt-in `specpi agent` SDK host and a bounded read-only delegation runtime: explicit activation, same-model review/consultation/investigation over selected text, structured evidence, source freshness, one follow-up, parent adjudication, and shared call/time quotas. Keep the parent as sole writer and disable delegation by default.
+- Bind Strict Command Guard approval to the effective delegation envelope; revoke workers on guard, task, scope, model and session changes. Hold cancelled provider requests in their concurrency slots until settlement. Preserve disabled project discovery and reject unsupported SDK/proxy policies in the new host.
+- Document the experimental calls/time contract, supported Pi SDK 0.84.4, provider buffering and accounting limits, deeper research, and remaining empirical evaluation. Add isolated synthetic-provider, lifecycle, broker, guard and package regressions without new runtime dependencies.
+- Add static, responsive vector charts for all seven architecture research sources, with accessible data tables, source conditions, and SVG/CSV downloads. Keep distinct metrics and cost denominators separate.
+- Use a dark default site theme with restrained accents, smaller headings, and technical descriptions of the execution and improvement workflows.
+- Rebuild the static GitHub Pages homepage and guide around one strong agent and evidence-led harness improvement, with an interactive improvement loop and responsive reading layouts.
+- Add a sourced architecture article covering current single-agent and multi-agent research, coordination costs, human-directed improvement, and optional bounded delegation. Keep the site self-contained with local fonts and no new dependencies.
+- Align the command-guard illustration with the current policy and check its displayed decisions against the policy engine without executing the example commands.
+
 ## 0.11.2 - 2026-09-04
 
 - Publish the validated tarball through an absolute local path. npm interpreted the previous relative path as a GitHub repository, so 0.11.1 stopped before npm publication despite passing artifact validation.

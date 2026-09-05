@@ -4,6 +4,20 @@ This document describes SpecPi's architecture-level security assumptions, enforc
 
 ## Threat model
 
+### Experimental delegation host
+
+`specpi agent` is a separate, opt-in interactive SDK host for Pi 0.84.4 exactly. Ordinary `pi` extension discovery does not start workers. The launcher loads bundled Command Guard and workflow controls exactly once, preserves supported installed policy extensions, and refuses partial loading. It disables project settings/resources and AGENTS discovery unless `--trust-project` is explicitly supplied for the launch root. It does not persist trust or install missing packages. Unsupported versions and configured/environment proxy policies are rejected because the public SDK bootstrap does not reproduce native Pi's complete CLI initialization.
+
+The parent SDK session owns provider configuration, authentication and normal parent session storage. A closure exposes only its public inference pipeline to delegation, with the exact parent model and captured lifecycle lease. Child context is constructed explicitly; parent transcripts, turn preparation/compaction, shell tools, write tools, arbitrary plugin tools and recursive delegation are not inherited. Trusted Pi extensions remain privileged and may transform request context, payloads or headers. This is an application boundary inside one process, not an OS sandbox against malicious extensions.
+
+Human `/delegate on` activates the displayed experimental calls/time policy. Command Guard still intercepts the parent tool; Strict approval includes a host-generated capability summary bound to the exact call and policy generation. Guard, task, scope, model, session and branch changes revoke old worker generations. Normal leaf advancement does not. Model requests cannot enable delegation, change models, raise ceilings or grant tools. Parent result acceptance does not mint human authorization, actual verification, or wishlist selection.
+
+The broker reads only explicitly selected, bounded regular text files under the launch root, with private-path, traversal, symlink/junction, hardlink, binary and size checks. It rechecks source identity/content and validates evidence line ranges. Each job sees only its selected IDs. These checks assume a trusted local filesystem: portable Node APIs do not establish an atomic OS snapshot against hostile filesystem races, and filenames cannot reveal secrets embedded in ordinary source files. No live web adapter is included.
+
+Quotas cover model invocations, logical job/batch deadlines, tool calls, returned tool bytes, selected snapshot bytes, final report bytes and observed parsed responses. They are not hard invoice, raw-transport, underlying-provider-attempt or process-memory caps. Adapters can allocate buffers before events and can perform hidden transport fallback. Configurable retries are disabled; one parent follow-up keeps original quotas and deadlines. Missing usage is explicit. Cancellation revokes broker grants and aborts requests, but cancelled requests retain concurrency slots until settlement. Non-cooperative adapters can require ending the launcher; late results do not revive a job.
+
+Worker state and a bounded idempotency journal are memory-only for the launcher lifetime. Normal parent tool results may be retained by Pi, and selected context is sent to the configured model provider. No child session store, raw metrics journal, credential copy, automatic resume, automatic policy learning, or secure memory-erasure guarantee is provided. See the [implemented protocol](docs/delegation/protocol.md) for precise states and receipts. Isolated synthetic-provider tests establish these tested code paths; production-provider parity and empirical outcome gains remain unproven.
+
 ### Assets
 
 SpecPi aims to preserve:

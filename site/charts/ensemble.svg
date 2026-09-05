@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<svg width="720" height="318" preserveAspectRatio="xMinYMin meet" viewBox="0 0 720 318" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink"><title>Accuracy at comparable modeled compute</title><desc>Accuracy is 68.7% for self-consistency, 70.0% for debate, and 71.4% for mixture of agents. Approximate individual 95% intervals overlap. Mixture of agents gains 2.7 percentage points over self-consistency. Llama 3.1 70B; 1,000 MMLU-Pro questions. Best reported configurations within the tested compute range. Whiskers are approximate 95% binomial intervals, calculated using the paper&#x27;s formula. These are not intervals on the differences.</desc><metadata data-study="ensemble" data-sha256="da18f3ef3ec02764d68b36926b30b9bba774755f4109dc54b43a2f330f080c9e">https://aclanthology.org/2026.acl-srw.1.pdf | Section 4.1 and Section 8; ACL SRW, July 2026</metadata>
+
+
+	<clipPath id="clip">
+		<rect x="0" y="0" width="720" height="318"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-318)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="0" width="720" height="318" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,11%,13%); fill-rule: evenodd;"/>
+			<text x="16.0" y="286" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,572) scale(1,-1)">MMLU-Pro</text>
+			<text x="16.0" y="263" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,526) scale(1,-1)">Accuracy (%) / higher is better</text>
+			<text x="16.0" y="242" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,484) scale(1,-1)">Zero baseline / 0–100%</text>
+			<path d="M 16,211 L 16,101 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="82" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,164) scale(1,-1)">0</text>
+			<path d="M 360,211 L 360,101 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="353.328" y="82" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,164) scale(1,-1)">50</text>
+			<path d="M 704,211 L 704,101 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="683.984" y="82" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,164) scale(1,-1)">100</text>
+			<text x="16.0" y="215" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,430) scale(1,-1)">Self-consistency</text>
+			<text x="664.31" y="215" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,430) scale(1,-1)">68.7%</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="197.0" width="472.656" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<path d="M 468.881976,203 L 508.430024,203 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 468.881976,208 L 468.881976,198 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 508.430024,208 L 508.430024,198 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 468.881976,203 L 508.430024,203 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<path d="M 468.881976,208 L 468.881976,198 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<path d="M 508.430024,208 L 508.430024,198 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<text x="16.0" y="171" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,342) scale(1,-1)">Debate</text>
+			<text x="664.31" y="171" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,342) scale(1,-1)">70.0%</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="153.0" width="481.59999999999997" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(83%,73%,51%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<path d="M 478.058668,159 L 517.141332,159 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 478.058668,164 L 478.058668,154 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 517.141332,164 L 517.141332,154 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 478.058668,159 L 517.141332,159 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<path d="M 478.058668,164 L 478.058668,154 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<path d="M 517.141332,164 L 517.141332,154 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<text x="16.0" y="127" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,254) scale(1,-1)">Mixture of agents</text>
+			<text x="664.31" y="127" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,254) scale(1,-1)">71.4%</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="109.0" width="491.232" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<path d="M 487.962226,115 L 526.501774,115 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 487.962226,120 L 487.962226,110 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 526.501774,120 L 526.501774,110 Z" style="stroke: rgb(9%,11%,13%); stroke-linecap: butt; stroke-width: 4;"/>
+			<path d="M 487.962226,115 L 526.501774,115 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<path d="M 487.962226,120 L 487.962226,110 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<path d="M 526.501774,120 L 526.501774,110 Z" style="stroke: rgb(87%,90%,91%); stroke-linecap: butt; stroke-width: 2;"/>
+			<path d="M 16,62 L 704,62 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16" y="43" style="font-family: Arial, Helvetica, sans-serif; font-size: 11px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,86) scale(1,-1)">Source: Wunderlich et al. / ACL SRW / 2026</text>
+		</g>
+	</g>
+</svg>

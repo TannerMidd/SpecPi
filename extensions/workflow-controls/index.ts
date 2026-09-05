@@ -417,7 +417,11 @@ export default function workflowControls(pi: ExtensionAPI) {
                   taskStale,
               }
             : { active: false, pending: 0, entries: 0, indeterminate: false, taskBound: false, taskStale: false };
-        pi.events.emit("specpi:workflow-status", taskReviewChanged ? { ...summary, taskReviewChanged: true } : summary);
+        pi.events.emit("specpi:workflow-status", {
+            ...summary,
+            generation: scope.generation,
+            ...(taskReviewChanged ? { taskReviewChanged: true } : {}),
+        });
         if (!scope.active) {
             ctx.ui.setStatus(SCOPE_STATUS, undefined);
             ctx.ui.setWidget(SCOPE_STATUS, undefined);

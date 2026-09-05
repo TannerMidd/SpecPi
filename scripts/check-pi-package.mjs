@@ -253,6 +253,8 @@ try {
             path.join(repoRoot, "tests", "workflow-controls-extension.test.mjs"),
             path.join(repoRoot, "tests", "spec-task-extension.test.mjs"),
             path.join(repoRoot, "tests", "wishlist-verification-extension.test.mjs"),
+            path.join(repoRoot, "tests", "delegation-provider.test.mjs"),
+            path.join(repoRoot, "tests", "delegation-launcher.test.mjs"),
         ],
         { cwd: repoRoot, env: fixtureTestEnvironment, timeout: 120_000 },
     );

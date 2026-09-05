@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<svg width="320" height="568" preserveAspectRatio="xMinYMin meet" viewBox="0 0 320 568" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink"><title>Research performance and typical token use</title><desc>Internal research performance: single-agent index 100, multi-agent index 190.2, derived from a 90.2% relative gain. Separate typical token-use observation: chat about 1×, single agent about 4×, multi-agent about 15×. Neither index is an accuracy percentage. Two separate observations, not a paired efficiency experiment. Performance uses an Opus 4 lead with Sonnet 4 workers against one Opus 4 agent. Absolute evaluation scores are undisclosed. Token multiples describe typical use relative to chat.</desc><metadata data-study="anthropic" data-sha256="6057878ea4995e2af7fe129e50520fe571819e6ecb2eccb89122a4a682731def">https://www.anthropic.com/engineering/multi-agent-research-system | Internal research evaluation and token-use observations; 13 June 2025</metadata>
+
+
+	<clipPath id="clip">
+		<rect x="0" y="0" width="320" height="568"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-568)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="0" width="320" height="568" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,11%,13%); fill-rule: evenodd;"/>
+			<text x="16.0" y="536" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1072) scale(1,-1)">A / Research evaluation</text>
+			<text x="16.0" y="513" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1026) scale(1,-1)">Derived index / single agent = 100</text>
+			<text x="16.0" y="492" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,984) scale(1,-1)">Index / higher is better</text>
+			<path d="M 16,461 L 16,395 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="376" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,752) scale(1,-1)">0</text>
+			<path d="M 160,461 L 160,395 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="149.992" y="376" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,752) scale(1,-1)">100</text>
+			<path d="M 304,461 L 304,395 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="283.984" y="376" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,752) scale(1,-1)">200</text>
+			<text x="16.0" y="465" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,930) scale(1,-1)">Single agent</text>
+			<text x="268.972" y="465" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,930) scale(1,-1)">100.0</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="447.0" width="144.0" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="421" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,842) scale(1,-1)">Multi-agent</text>
+			<text x="268.972" y="421" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,842) scale(1,-1)">190.2</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="403.0" width="273.888" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="286" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,572) scale(1,-1)">B / Typical token use</text>
+			<text x="16.0" y="263" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,526) scale(1,-1)">Approximate / chat = 1×</text>
+			<text x="16.0" y="242" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,484) scale(1,-1)">Tokens relative to chat</text>
+			<path d="M 16,211 L 16,101 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="82" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,164) scale(1,-1)">0</text>
+			<path d="M 160,211 L 160,101 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="153.328" y="82" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,164) scale(1,-1)">10</text>
+			<path d="M 304,211 L 304,101 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="290.656" y="82" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,164) scale(1,-1)">20</text>
+			<text x="16.0" y="215" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,430) scale(1,-1)">Chat</text>
+			<text x="288.04" y="215" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,430) scale(1,-1)">1×</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="197.0" width="14.399999999999999" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="171" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,342) scale(1,-1)">Single agent</text>
+			<text x="288.04" y="171" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,342) scale(1,-1)">4×</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="153.0" width="57.599999999999994" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="127" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,254) scale(1,-1)">Multi-agent</text>
+			<text x="280.256" y="127" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,254) scale(1,-1)">15×</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="109.0" width="216.0" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<path d="M 16,62 L 304,62 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16" y="43" style="font-family: Arial, Helvetica, sans-serif; font-size: 11px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,86) scale(1,-1)">Source: Anthropic / Engineering report / 2025</text>
+		</g>
+	</g>
+</svg>

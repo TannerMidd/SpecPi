@@ -1,247 +1,458 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#121519">
-  <meta name="description" content="SpecPi records recurring Pi capability gaps and supports explicitly approved, verified improvements.">
-  <meta property="og:title" content="SpecPi">
-  <meta property="og:description" content="A local, human-directed improvement harness for the Pi coding agent.">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="SpecPi">
-  <meta property="og:url" content="https://tannermidd.github.io/SpecPi/">
-  <meta name="twitter:card" content="summary">
-  <link rel="canonical" href="https://tannermidd.github.io/SpecPi/">
-  <title>SpecPi</title>
-  <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
-  <script type="module" src="cycle.js"></script>
-</head>
-<body class="home-page">
-  <a class="skip-link" href="#overview">Skip to content</a>
-
-  <header class="site-header">
-    <a class="brand" href="#overview" aria-label="SpecPi home">
-      <img class="brand-logo" src="logo.svg" width="28" height="28" alt="">
-      <strong>SpecPi</strong>
-      <span class="brand-separator">/</span>
-      <span>v0.11.2</span>
-    </a>
-    <nav class="header-nav" aria-label="Primary navigation">
-      <a class="active" href="#overview" aria-current="page">Overview</a>
-      <a href="wiki/">Documentation</a>
-      <a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
-    </nav>
-  </header>
-
-  <div class="page-layout">
-    <aside class="section-index" aria-label="Page sections">
-      <p>Contents</p>
-      <nav>
-        <a href="#overview"><span>00</span>Overview</a>
-        <a href="#loop"><span>01</span>The loop</a>
-        <a href="#session"><span>02</span>One session</a>
-        <a href="#guard"><span>03</span>Command guard</a>
-        <a href="#writer"><span>04</span>One writer</a>
-        <a href="#install"><span>05</span>Install</a>
-      </nav>
-      <div class="index-meta">
-        <span>MIT · Node 22.19+</span>
-        <span>Pi 0.84.4+ · local evidence</span>
-      </div>
-    </aside>
-
-    <main id="main" class="content">
-      <section class="hero" id="overview" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span>Human-directed improvement for Pi</p>
-          <h1 id="hero-title">Better tools.<br><span>On your terms.</span></h1>
-          <p class="hero-summary">Turn recurring friction into small, verified improvements. SpecPi adds local evidence, explicit choices, and clear boundaries to the Pi coding agent.</p>
-          <div class="hero-actions">
-            <a class="button primary" href="#install">Install SpecPi <span aria-hidden="true">↓</span></a>
-            <a class="button" href="#loop">Explore the loop <span aria-hidden="true">↓</span></a>
-          </div>
-          <p class="hero-boundary">Collection is disabled by default.<br>Every improvement starts with your choice.</p>
-        </div>
-
-        <figure class="architecture" aria-labelledby="architecture-title">
-          <figcaption><span id="architecture-title">SpecPi &amp; Pi</span><span>01 / Architecture</span></figcaption>
-          <div class="human-node"><span class="node-symbol" aria-hidden="true">◇</span><strong>You</strong><span>Goals · scope · decisions</span></div>
-          <div class="diagram-connector" aria-hidden="true"><span>↓</span></div>
-          <div class="pi-frame">
-            <div class="runtime-heading"><strong>Pi</strong><span>The agent runtime</span></div>
-            <div class="runtime-parts"><span>Agent loop</span><span>Tools</span><span>Sessions</span></div>
-            <div class="extension-seam"><span aria-hidden="true">↕</span> Extension hooks</div>
-            <div class="specpi-layer">
-              <div><strong>SpecPi</strong><span>Your local harness</span></div>
-              <p>Working agreement · workflow controls<br>Evidence · review · improvement</p>
-            </div>
-          </div>
-          <p class="architecture-note">Pi connects to your chosen model provider.<br>SpecPi keeps its improvement records local.</p>
-        </figure>
-      </section>
-
-      <dl class="facts" aria-label="SpecPi operating constraints">
-        <div><dt>01 / Evidence</dt><dd>Observed friction</dd></div>
-        <div><dt>02 / Privacy</dt><dd>Local improvement records</dd></div>
-        <div><dt>03 / Authority</dt><dd>One explicit choice</dd></div>
-        <div><dt>04 / Changes</dt><dd>Bounded &amp; reversible</dd></div>
-      </dl>
-
-      <section class="content-section" id="loop" aria-labelledby="loop-title">
-        <header class="section-heading">
-          <span>01</span>
-          <h2 id="loop-title">Small changes. A complete loop.</h2>
-          <small>Seven stages · two gates</small>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#111619" />
+        <meta
+            name="description"
+            content="Task scope, command policy, verification records, and human-selected harness improvements for the Pi coding agent."
+        />
+        <meta property="og:title" content="SpecPi · Single-agent harness for Pi" />
+        <meta
+            property="og:description"
+            content="Technical reference for SpecPi: single-agent execution, validation, and the harness improvement workflow."
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/" />
+        <link rel="icon" href="logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="styles.css" />
+        <title>SpecPi · Single-agent harness for Pi</title>
+    </head>
+    <body>
+        <a class="skip-link" href="#overview">Skip to content</a>
+        <header class="site-header wrap">
+            <a class="brand" href="./" aria-label="SpecPi home"
+                ><img src="logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="#loop">Workflow</a><a href="single-agent/">Architecture</a><a href="wiki/">Reference</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
+            </nav>
         </header>
-        <p class="section-summary">Notice a gap. Establish a pattern. Choose one improvement. Each step leaves something you can inspect, and the work pauses at two explicit gates.</p>
+        <main>
+            <section class="hero wrap" id="overview" aria-labelledby="hero-title">
+                <div class="hero-meta">
+                    <p class="eyebrow">
+                        <span class="signal" aria-hidden="true"></span>Specification / Pi coding-agent harness
+                    </p>
+                    <a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.11.2"
+                        >Release / v0.11.2 <span aria-hidden="true">↗</span></a
+                    >
+                </div>
+                <div class="hero-grid">
+                    <div class="hero-copy">
+                        <h1 id="hero-title">Single-agent<br />harness for Pi.</h1>
+                        <p class="hero-summary">
+                            SpecPi adds task scope, command policy, verification records, and a human-selected
+                            improvement workflow to Pi. One agent owns implementation and integration. Harness changes
+                            require observed evidence and executable checks.
+                        </p>
+                        <div class="hero-actions">
+                            <a class="button" href="#install">Installation <span aria-hidden="true">↗</span></a
+                            ><a class="text-link" href="single-agent/"
+                                >Architecture rationale <span aria-hidden="true">→</span></a
+                            >
+                        </div>
+                    </div>
+                    <figure
+                        class="system-diagram"
+                        aria-label="You direct one accountable agent. Its work is checked, and evidence informs human-selected harness improvements."
+                    >
+                        <figcaption><span>01 / Operating model</span><span>Human-directed</span></figcaption>
+                        <div class="human-node">
+                            <span class="node-tag">YOU</span>
+                            <div>
+                                <strong>Task definition</strong>
+                                <p>Requirements, scope, and approval</p>
+                            </div>
+                        </div>
+                        <div class="connector" aria-hidden="true">↓</div>
+                        <div class="agent-core">
+                            <div class="core-label"><span>Pi + SpecPi</span><span>One context</span></div>
+                            <div class="core-number">1 agent / 1 writer</div>
+                            <strong>Implementation and verification</strong>
+                            <p>One owner for edits and integration</p>
+                        </div>
+                        <div class="connector" aria-hidden="true">↓</div>
+                        <div class="output-node">
+                            <span class="check-mark" aria-hidden="true">✓</span>
+                            <div>
+                                <strong>Review artifacts</strong>
+                                <p>Diff, check results, and remaining risk</p>
+                            </div>
+                        </div>
+                        <div class="feedback-node">
+                            <span aria-hidden="true">↺</span>
+                            <div>
+                                <strong>Harness improvement workflow</strong>
+                                <p>Observation → selection → validation</p>
+                            </div>
+                        </div>
+                    </figure>
+                </div>
+                <div class="principles" aria-label="Design principles">
+                    <p><span>01</span>Single-agent execution</p>
+                    <p><span>02</span>Executable verification</p>
+                    <p><span>03</span>Human-selected improvements</p>
+                    <p><span>04</span>Local improvement records</p>
+                </div>
+            </section>
 
-        <div class="loop-table" role="table" aria-label="Improvement loop stages">
-          <div class="table-head" role="row"><span role="columnheader">#</span><span role="columnheader">Stage</span><span role="columnheader">Action</span><span role="columnheader">Authority</span></div>
-          <div role="row"><span role="cell">01</span><strong role="cell">Friction</strong><span role="cell">A task encounters a missing local capability.</span><span role="cell">one local signal</span></div>
-          <div role="row"><span role="cell">02</span><strong role="cell">Repeat</strong><span role="cell">Distinct tasks and projects establish recurrence.</span><span role="cell">recurrence · reach</span></div>
-          <div class="gate" role="row"><span role="cell">03</span><strong role="cell">Choose</strong><span role="cell"><code>/harness-improvement</code> selects one exact item.</span><span role="cell">◆ human gate</span></div>
-          <div role="row"><span role="cell">04</span><strong role="cell">Build</strong><span role="cell"><code>specpi-improve</code> implements the narrowest sufficient change.</span><span role="cell">approved scope</span></div>
-          <div class="gate" role="row"><span role="cell">05</span><strong role="cell">Prove</strong><span role="cell">Repository checks and closed offline validators run.</span><span role="cell">◆ automated gate</span></div>
-          <div role="row"><span role="cell">06</span><strong role="cell">Retire</strong><span role="cell">The journal records evidence, gates, changed files, and version.</span><span role="cell">only on pass</span></div>
-          <div role="row"><span role="cell">07</span><strong role="cell">Return</strong><span role="cell">Later friction returns the item to the review menu.</span><span role="cell">human review</span></div>
-        </div>
-        <p class="section-note">A failed check leaves the item selected. <code>retired</code> means integrated and verified. <code>review-needed</code> means later evidence requires another decision.</p>
-      </section>
+            <section class="loop-section" id="loop" aria-labelledby="loop-title">
+                <div class="wrap">
+                    <div class="section-kicker">
+                        <span>01 / Harness improvement</span><span>Selection and verification gates</span>
+                    </div>
+                    <div class="section-heading">
+                        <h2 id="loop-title">Harness improvement workflow</h2>
+                        <p>
+                            Opt-in gap records identify recurring limitations. Human selection authorizes a specific
+                            change. Required validators check the implementation; later outcome feedback records whether
+                            it helped.
+                        </p>
+                    </div>
+                    <div class="cycle-tabs" role="tablist" aria-label="Improvement stages">
+                        <button
+                            id="cycle-friction"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="cycle-panel"
+                            tabindex="-1"
+                            data-cycle-step="0"
+                        >
+                            <span>01</span>Notice
+                        </button>
+                        <button
+                            id="cycle-repeat"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="cycle-panel"
+                            tabindex="-1"
+                            data-cycle-step="1"
+                        >
+                            <span>02</span>Qualify
+                        </button>
+                        <button
+                            id="cycle-choose"
+                            role="tab"
+                            aria-selected="true"
+                            aria-controls="cycle-panel"
+                            data-cycle-step="2"
+                        >
+                            <span>03 / Human gate</span>Choose
+                        </button>
+                        <button
+                            id="cycle-build"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="cycle-panel"
+                            tabindex="-1"
+                            data-cycle-step="3"
+                        >
+                            <span>04</span>Build
+                        </button>
+                        <button
+                            id="cycle-prove"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="cycle-panel"
+                            tabindex="-1"
+                            data-cycle-step="4"
+                        >
+                            <span>05</span>Verify
+                        </button>
+                        <button
+                            id="cycle-retire"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="cycle-panel"
+                            tabindex="-1"
+                            data-cycle-step="5"
+                        >
+                            <span>06</span>Retire
+                        </button>
+                        <button
+                            id="cycle-return"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="cycle-panel"
+                            tabindex="-1"
+                            data-cycle-step="6"
+                        >
+                            <span>07 / Feedback</span>Revisit
+                        </button>
+                    </div>
+                    <div
+                        class="cycle-panel"
+                        id="cycle-panel"
+                        role="tabpanel"
+                        aria-labelledby="cycle-choose"
+                        tabindex="0"
+                    >
+                        <span class="cycle-number" data-cycle-number aria-hidden="true">03</span>
+                        <div class="cycle-explanation">
+                            <p class="eyebrow" data-cycle-authority>Human gate</p>
+                            <h3 data-cycle-title>Authorize a specific improvement</h3>
+                            <p data-cycle-description>
+                                An exact human selection in /harness-improvement authorizes one item. Wishlist evidence
+                                alone does not authorize implementation.
+                            </p>
+                            <code data-cycle-command>/harness-improvement</code>
+                        </div>
+                        <div class="cycle-state">
+                            <span class="eyebrow">Recorded state</span><strong data-cycle-status>selected</strong>
+                            <p data-cycle-note>Selection authorizes only the chosen item.</p>
+                        </div>
+                    </div>
+                    <noscript
+                        ><p class="noscript-note">
+                            The full cycle: notice friction, qualify a gap, choose a change, build, verify, retire, then
+                            revisit with human feedback. Read every stage in the
+                            <a href="wiki/#workflows">improvement guide</a>.
+                        </p></noscript
+                    >
+                    <div class="loop-notes">
+                        <p>
+                            <strong>Local evidence collection.</strong> Collection is disabled by default. Opt-in gap
+                            records stay local; they are sanitized, bounded, and deduplicated.
+                        </p>
+                        <p>
+                            <strong>Verification and follow-up.</strong> A failed check cannot close the loop. Later
+                            human feedback can reopen a retired item for review.
+                        </p>
+                        <a class="text-link" href="wiki/#workflows"
+                            >Workflow reference <span aria-hidden="true">↗</span></a
+                        >
+                    </div>
+                </div>
+            </section>
 
-      <section class="content-section" id="session" aria-labelledby="session-title">
-        <header class="section-heading">
-          <span>02</span>
-          <h2 id="session-title">Follow one change, end to end.</h2>
-          <small>Illustrative session</small>
-        </header>
-        <p class="section-summary">A qualified gap becomes a bounded task, then a checked change. The local journal keeps the evidence and rollback context available for review.</p>
+            <section class="work-section wrap" id="session" aria-labelledby="work-title">
+                <div class="section-kicker">
+                    <span>02 / Execution state</span><span>Task cards, scope, and checks</span>
+                </div>
+                <div class="section-heading">
+                    <h2 id="work-title">Task state and verification</h2>
+                    <p>
+                        The agent carries the task from understanding to verification. The harness keeps the original
+                        ask, working boundaries, and evidence close to the work.
+                    </p>
+                </div>
+                <div class="work-grid">
+                    <article>
+                        <span class="step-index">01 / Define</span>
+                        <h3>Task contract</h3>
+                        <p>
+                            A task card preserves the original goal, acceptance criteria, constraints, and evidence as
+                            work progresses.
+                        </p>
+                        <a href="wiki/#task-records"><code>/task set</code><span aria-hidden="true">↗</span></a>
+                    </article>
+                    <article>
+                        <span class="step-index">02 / Bound</span>
+                        <h3>Working scope</h3>
+                        <p>
+                            Declare task scope. Keep one writer in each working directory. Use an isolated worktree when
+                            an experiment needs its own space.
+                        </p>
+                        <a href="wiki/#work-ownership"><code>/scope task</code><span aria-hidden="true">↗</span></a>
+                    </article>
+                    <article>
+                        <span class="step-index">03 / Challenge</span>
+                        <h3>Completion review</h3>
+                        <p>
+                            Question assumptions and run the relevant checks. A model's confidence is a claim;
+                            executable evidence makes the result reviewable.
+                        </p>
+                        <a href="wiki/#reference"><code>/challenge</code><span aria-hidden="true">↗</span></a>
+                    </article>
+                </div>
+            </section>
 
-        <div class="session-layout">
-        <div class="terminal">
-          <div class="terminal-bar"><span><i class="terminal-indicator" aria-hidden="true"></i>Pi session</span><span>Example · not live data</span></div>
-          <pre><code><span class="accent">›</span> /wishlist status
+            <section class="reason-section wrap" id="writer" aria-labelledby="reason-title">
+                <a class="article-feature" href="single-agent/">
+                    <div class="article-stamp">
+                        <span>Engineering note</span><strong>01</strong><span>Architecture / Research</span>
+                    </div>
+                    <div class="article-feature-copy">
+                        <p class="eyebrow">Architecture decision</p>
+                        <h2 id="reason-title">Single-agent architecture</h2>
+                        <p>
+                            An analysis of coordination overhead, context loss, and cost per accepted outcome. Includes
+                            current research, the experimental bounded delegation protocol, and criteria for measuring
+                            its effect on accepted outcomes.
+                        </p>
+                        <span class="text-link">Research and evaluation criteria <span aria-hidden="true">↗</span></span
+                        ><span class="article-date">Evidence reviewed 04 Sep 2026 · 10 min read</span>
+                    </div>
+                </a>
+                <div class="writer-note">
+                    <strong>One writer per working directory.</strong>
+                    <p>
+                        The default is one agent. The explicit experimental SDK host can add bounded read-only workers;
+                        the parent keeps ownership of changes, integration and acceptance.
+                    </p>
+                    <a href="wiki/#delegation">Delegation boundaries <span aria-hidden="true">↗</span></a>
+                </div>
+            </section>
 
-  collection   <span class="pass">on</span> · local only · never uploaded
-  queue        1 qualified
+            <section class="guard-section wrap" id="guard" aria-labelledby="guard-title">
+                <div class="section-kicker">
+                    <span>03 / Command policy</span><span>Representative Bash classifications</span>
+                </div>
+                <div class="section-heading">
+                    <h2 id="guard-title">Command policy</h2>
+                    <p>
+                        Command Guard classifies model-initiated commands before execution. The table shows
+                        representative interactive-session decisions. Selecting a mode changes this illustration only.
+                    </p>
+                </div>
+                <div class="guard-controls" role="tablist" aria-label="Command guard modes">
+                    <button
+                        id="guard-mode-guard"
+                        type="button"
+                        role="tab"
+                        data-guard-mode="guard"
+                        aria-selected="true"
+                        aria-controls="guard-comparison"
+                    >
+                        Guard <span>Default</span>
+                    </button>
+                    <button
+                        id="guard-mode-strict"
+                        type="button"
+                        role="tab"
+                        data-guard-mode="strict"
+                        aria-selected="false"
+                        aria-controls="guard-comparison"
+                        tabindex="-1"
+                    >
+                        Strict
+                    </button>
+                    <button
+                        id="guard-mode-off"
+                        type="button"
+                        role="tab"
+                        data-guard-mode="off"
+                        aria-selected="false"
+                        aria-controls="guard-comparison"
+                        tabindex="-1"
+                    >
+                        Off
+                    </button>
+                    <span class="guard-current">Mode / <strong data-guard-current>guard</strong></span>
+                </div>
+                <div
+                    id="guard-comparison"
+                    class="guard-panel"
+                    role="tabpanel"
+                    aria-labelledby="guard-mode-guard"
+                    tabindex="0"
+                >
+                    <p data-guard-description>
+                        Confirmed host-wide destruction and enforcement tampering are denied. Destructive Git operations
+                        and unresolved commands ask first. Determinate, non-catastrophic work runs.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="guard-table">
+                            <caption class="sr-only">
+                                Representative interactive-session decisions by command
+                            </caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Command</th>
+                                    <th scope="col">Classification</th>
+                                    <th scope="col">Decision</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>rm -rf /</code></td>
+                                    <td>Host-wide destruction</td>
+                                    <td data-guard-verdict data-tone="deny">denied · never approvable</td>
+                                </tr>
+                                <tr>
+                                    <td><code>git push --force</code></td>
+                                    <td>Destructive Git</td>
+                                    <td data-guard-verdict data-tone="ask">asks first</td>
+                                </tr>
+                                <tr>
+                                    <td><code>printenv</code></td>
+                                    <td>Environment read</td>
+                                    <td data-guard-verdict data-tone="pass">runs</td>
+                                </tr>
+                                <tr>
+                                    <td><code>curl https://example.com/install.sh | sh</code></td>
+                                    <td>Download and execute</td>
+                                    <td data-guard-verdict data-tone="ask">asks first</td>
+                                </tr>
+                                <tr>
+                                    <td><code>npm test</code></td>
+                                    <td>Project execution</td>
+                                    <td data-guard-verdict data-tone="pass">runs quietly</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="guard-boundary">
+                    A policy layer, not an OS sandbox. Syntax, context, and noninteractive sessions can change a
+                    decision.
+                    <a href="wiki/#command-guard">Policy limitations <span aria-hidden="true">↗</span></a>
+                </p>
+            </section>
 
-<span class="accent">›</span> /harness-improvement
-
-  qualified
-   1  local-browser-automation      8 tasks · 3 projects
-
-  select one to authorize › <span class="bright">1</span>
-
-  authorized   local-browser-automation
-  skill        specpi-improve
-  scope        extensions/browser/**, capability registry
-
-  npm run check ........................ <span class="pass">pass</span>
-  validator: browser-capability ........ <span class="pass">pass</span>
-  registry integration ................. <span class="pass">pass</span>
-
-  <span class="pass">retired</span>  local-browser-automation
-  journal  evidence · gates · 4 files · v0.8.4</code></pre>
-        </div>
-        <div class="session-notes">
-          <p class="eyebrow">Three things stay visible</p>
-          <div><span>01</span><h3>The reason</h3><p>Recurring evidence explains why a capability is in the review menu.</p></div>
-          <div><span>02</span><h3>The boundary</h3><p>Your exact selection authorizes one improvement and its expected scope.</p></div>
-          <div><span>03</span><h3>The checks</h3><p>Repository checks and capability validators must pass before retirement.</p></div>
-        </div>
-        </div>
-        <div class="command-cards">
-          <div><code>/wishlist status</code><p>Queue size, retirements, reopen rate, and time to retire.</p></div>
-          <div><code>/wishlist history</code><p>Evidence, gates, changed files, and rollback context.</p></div>
-          <div><code>specpi doctor</code><p>Runs the validators linked to retired capabilities.</p></div>
-        </div>
-      </section>
-
-      <section class="content-section" id="guard" aria-labelledby="guard-title">
-        <header class="section-heading">
-          <span>03</span>
-          <h2 id="guard-title">Control at the point of execution.</h2>
-          <small>Compare modes</small>
-        </header>
-        <p class="section-summary">Command guard analyzes supported model-initiated tool calls before execution. Explore the modes to see where a call runs, asks for a decision, or stops.</p>
-
-        <div class="guard-controls" role="tablist" aria-label="Command guard modes">
-          <button id="guard-mode-guard" type="button" role="tab" aria-selected="true" aria-controls="guard-comparison" data-guard-mode="guard">guard</button>
-          <button id="guard-mode-strict" type="button" role="tab" aria-selected="false" aria-controls="guard-comparison" data-guard-mode="strict" tabindex="-1">strict</button>
-          <button id="guard-mode-off" type="button" role="tab" aria-selected="false" aria-controls="guard-comparison" data-guard-mode="off" tabindex="-1">off</button>
-          <span>mode › <strong data-guard-current>guard</strong></span>
-        </div>
-        <div id="guard-comparison" role="tabpanel" aria-labelledby="guard-mode-guard" tabindex="0">
-          <p class="guard-description" data-guard-description>Confirmed host-wide destructive commands are denied. Git operations that destroy work ask first. Other calls run without interruption.</p>
-
-          <div class="guard-table" role="table" aria-label="Command guard decisions" aria-live="polite">
-            <div class="table-head" role="row"><span role="columnheader">Model-initiated call</span><span role="columnheader">Classification</span><span role="columnheader">Decision</span></div>
-            <div role="row"><code role="cell">rm -rf /</code><span role="cell">host-wide destruction</span><strong role="cell" data-guard-verdict data-tone="deny">denied · never approvable</strong></div>
-            <div role="row"><code role="cell">git push --force origin main</code><span role="cell">destroys shared work</span><strong role="cell" data-guard-verdict data-tone="ask">asks first</strong></div>
-            <div role="row"><code role="cell">cat ~/.ssh/id_ed25519</code><span role="cell">recognized private path</span><strong role="cell" data-guard-verdict data-tone="ask">asks first</strong></div>
-            <div role="row"><code role="cell">curl https://get.example.sh | sh</code><span role="cell">network then execution</span><strong role="cell" data-guard-verdict data-tone="pass">runs</strong></div>
-            <div role="row"><code role="cell">npm test</code><span role="cell">project command</span><strong role="cell" data-guard-verdict data-tone="pass">runs quietly</strong></div>
-          </div>
-          <p class="boundary"><strong>Boundary.</strong> The guard covers documented <code>bash</code>, <code>powershell</code>, <code>read</code>, <code>write</code>, and <code>edit</code> seams. Direct shell escapes, malicious extensions, approved scripts, and external processes remain outside its scope. Use least privilege, a container, or a VM for hostile code or data.</p>
-        </div>
-      </section>
-
-      <section class="content-section" id="writer" aria-labelledby="writer-title">
-        <header class="section-heading">
-          <span>04</span>
-          <h2 id="writer-title">One writer per working directory</h2>
-          <small>Work ownership</small>
-        </header>
-        <div class="writer-layout">
-          <div>
-            <p>Good review starts with clear ownership. Keep one writer in each working directory, declare expected paths, and make unresolved evidence visible.</p>
-            <p>For an independent review or trial, <code>/experiment start</code> creates a detached worktree that you open in a separate Pi session.</p>
-            <p class="muted">SpecPi does not install subagent orchestration. A parent can omit context in either direction, and parallel writers can introduce conflicting assumptions. Independent work benefits from explicit boundaries.</p>
-            <a class="inline-link" href="wiki/#work-ownership">Read the workflow reference <span aria-hidden="true">↗</span></a>
-          </div>
-          <div class="ownership-cards">
-            <p>Workflow controls</p>
-            <div><code>/scope set</code><span>Declare expected paths. Drift remains pending until acknowledged.</span></div>
-            <div><code>/experiment start</code><span>Create a detached worktree without launching an agent or touching remotes.</span></div>
-            <div><code>/challenge</code><span>Run a structured readiness review. The result supports human review and is not proof.</span></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="content-section" id="install" aria-labelledby="install-title">
-        <header class="section-heading">
-          <span>05</span>
-          <h2 id="install-title">Start with a plan.</h2>
-          <small>Node 22.19+ · npm · Git</small>
-        </header>
-        <p class="section-summary">Run the non-mutating plan first. Confirm the install after reviewing the printed changes, then run the doctor check. If Pi 0.84.4+ is missing, the confirmed install adds the reviewed pinned package.</p>
-
-        <div class="terminal install-terminal">
-          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.11.2</span></div>
-          <pre><code>npm install --global specpi@latest
-specpi plan      <span class="comment"># preview changes</span>
-specpi install   <span class="comment"># confirm before mutation</span>
-specpi doctor    <span class="comment"># verify managed state and validators</span></code></pre>
-          <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-          <pre><code>npm install --global specpi@0.11.2</code></pre>
-          <div class="terminal-bar secondary"><span>Update · two explicit steps</span></div>
-          <pre><code>npm install --global specpi@latest
-specpi update
+            <section class="install-section" id="install" aria-labelledby="install-title">
+                <div class="wrap install-grid">
+                    <div>
+                        <p class="eyebrow">04 / Installation</p>
+                        <h2 id="install-title">Installation and validation</h2>
+                        <p>
+                            The CLI previews managed changes before installation and checks the resulting configuration.
+                        </p>
+                        <p class="install-requirements">
+                            Node.js 22.19+ · npm · Git<br />Pi 0.84.4+; the confirmed install can add Pi if missing.
+                        </p>
+                        <a class="text-link" href="wiki/#getting-started"
+                            >Installer lifecycle reference <span aria-hidden="true">↗</span></a
+                        >
+                    </div>
+                    <div>
+                        <div class="terminal">
+                            <div class="terminal-bar">
+                                <span>Terminal / pinned release v0.11.2</span
+                                ><button type="button" data-copy-target="install-command" hidden>Copy commands</button>
+                            </div>
+                            <pre><code id="install-command">npm install --global specpi@0.11.2
+specpi plan
+specpi install
 specpi doctor</code></pre>
-        </div>
-        <p class="section-note">After installation, run <code>/reload</code> in Pi. SpecPi backs up managed files before mutation and supports uninstall.</p>
-        <p class="section-note">Pi still sends model requests to your chosen provider. Local improvement records do not make the whole agent offline. <a class="inline-link" href="wiki/#security">Read the security boundaries <span aria-hidden="true">↗</span></a></p>
-      </section>
-
-      <footer>
-        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>SpecPi</span></a>
-        <div>
-          <a href="https://github.com/TannerMidd/SpecPi">Source</a>
-          <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a>
-          <a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
-        </div>
-      </footer>
-    </main>
-  </div>
-</body>
+                        </div>
+                        <p class="copy-status" data-copy-status role="status"></p>
+                        <p class="install-detail">
+                            For the latest published release: <code>npm install --global specpi@latest</code>. Already
+                            in Pi? Run <code>/reload</code> after installation.
+                        </p>
+                        <p class="install-detail">
+                            Managed changes are backed up. Unrelated configuration is preserved. Local improvement
+                            records stay on your machine; model requests still follow your configured provider.
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <footer class="site-footer wrap">
+            <a class="brand" href="./"><img src="logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a>
+            <p>Pi harness / v0.11.2</p>
+            <nav aria-label="Footer navigation">
+                <a href="wiki/">Reference</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
+            </nav>
+        </footer>
+        <script type="module" src="cycle.js"></script>
+    </body>
 </html>

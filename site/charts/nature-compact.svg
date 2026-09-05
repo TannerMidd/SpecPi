@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<svg width="320" height="1316" preserveAspectRatio="xMinYMin meet" viewBox="0 0 320 1316" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink"><title>Benchmark scores by task</title><desc>Single-agent and best multi-agent mean scores across six benchmarks. Multi-agent scores are higher on Finance Agent, WorkBench, BrowseComp-Plus, and Terminal-Bench; single-agent scores are higher on PlanCraft and SWE-bench Verified. Mean scores across tested models. The best multi-agent architecture is selected separately for each benchmark. Matched system token ceilings; actual spending can differ. No pooled score or significance claim.</desc><metadata data-study="nature" data-sha256="1a2530243b1dba2181eb32d9be603190ab38fdaf3010e94b25a1c9fe0f7d6f61">https://www.nature.com/articles/s42256-026-01268-y | Results: domain-dependent performance; July 2026 version of record</metadata>
+
+
+	<clipPath id="clip">
+		<rect x="0" y="0" width="320" height="1316"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-1316)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="0" width="320" height="1316" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,11%,13%); fill-rule: evenodd;"/>
+			<text x="16.0" y="1284" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2568) scale(1,-1)">Finance Agent</text>
+			<text x="16.0" y="1261" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,2522) scale(1,-1)">Centralized / 50 instances</text>
+			<text x="16.0" y="1240" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,2480) scale(1,-1)">Mean score / higher is better</text>
+			<path d="M 16,1209 L 16,1143 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="1124" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,2248) scale(1,-1)">0</text>
+			<path d="M 160,1209 L 160,1143 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="151.66" y="1124" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,2248) scale(1,-1)">0.5</text>
+			<path d="M 304,1209 L 304,1143 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="297.328" y="1124" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,2248) scale(1,-1)">1</text>
+			<text x="16.0" y="1213" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2426) scale(1,-1)">Single agent</text>
+			<text x="268.972" y="1213" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2426) scale(1,-1)">0.349</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="1195.0" width="100.512" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="1169" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2338) scale(1,-1)">Best multi-agent</text>
+			<text x="268.972" y="1169" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2338) scale(1,-1)">0.631</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="1151.0" width="181.728" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="1076" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2152) scale(1,-1)">WorkBench</text>
+			<text x="16.0" y="1053" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,2106) scale(1,-1)">Decentralized / 100 instances</text>
+			<text x="16.0" y="1032" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,2064) scale(1,-1)">Mean score / higher is better</text>
+			<path d="M 16,1001 L 16,935 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="916" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1832) scale(1,-1)">0</text>
+			<path d="M 160,1001 L 160,935 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="151.66" y="916" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1832) scale(1,-1)">0.5</text>
+			<path d="M 304,1001 L 304,935 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="297.328" y="916" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1832) scale(1,-1)">1</text>
+			<text x="16.0" y="1005" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2010) scale(1,-1)">Single agent</text>
+			<text x="268.972" y="1005" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,2010) scale(1,-1)">0.629</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="987.0" width="181.152" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="961" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1922) scale(1,-1)">Best multi-agent</text>
+			<text x="268.972" y="961" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1922) scale(1,-1)">0.664</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="943.0" width="191.232" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="868" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1736) scale(1,-1)">BrowseComp-Plus</text>
+			<text x="16.0" y="845" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1690) scale(1,-1)">Decentralized / 100 instances</text>
+			<text x="16.0" y="824" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1648) scale(1,-1)">Mean score / higher is better</text>
+			<path d="M 16,793 L 16,727 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="708" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1416) scale(1,-1)">0</text>
+			<path d="M 160,793 L 160,727 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="151.66" y="708" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1416) scale(1,-1)">0.5</text>
+			<path d="M 304,793 L 304,727 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="297.328" y="708" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1416) scale(1,-1)">1</text>
+			<text x="16.0" y="797" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1594) scale(1,-1)">Single agent</text>
+			<text x="268.972" y="797" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1594) scale(1,-1)">0.318</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="779.0" width="91.584" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="753" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1506) scale(1,-1)">Best multi-agent</text>
+			<text x="268.972" y="753" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1506) scale(1,-1)">0.347</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="735.0" width="99.93599999999999" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="660" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1320) scale(1,-1)">PlanCraft</text>
+			<text x="16.0" y="637" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1274) scale(1,-1)">Hybrid / 100 instances</text>
+			<text x="16.0" y="616" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1232) scale(1,-1)">Mean score / higher is better</text>
+			<path d="M 16,585 L 16,519 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="500" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1000) scale(1,-1)">0</text>
+			<path d="M 160,585 L 160,519 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="151.66" y="500" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1000) scale(1,-1)">0.5</text>
+			<path d="M 304,585 L 304,519 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="297.328" y="500" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,1000) scale(1,-1)">1</text>
+			<text x="16.0" y="589" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1178) scale(1,-1)">Single agent</text>
+			<text x="268.972" y="589" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1178) scale(1,-1)">0.568</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="571.0" width="163.58399999999997" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="545" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1090) scale(1,-1)">Best multi-agent</text>
+			<text x="268.972" y="545" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,1090) scale(1,-1)">0.346</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="527.0" width="99.648" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="452" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,904) scale(1,-1)">SWE-bench Verified</text>
+			<text x="16.0" y="429" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,858) scale(1,-1)">Hybrid / 20 instances</text>
+			<text x="16.0" y="408" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,816) scale(1,-1)">Mean score / higher is better</text>
+			<path d="M 16,377 L 16,311 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="292" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,584) scale(1,-1)">0</text>
+			<path d="M 160,377 L 160,311 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="151.66" y="292" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,584) scale(1,-1)">0.5</text>
+			<path d="M 304,377 L 304,311 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="297.328" y="292" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,584) scale(1,-1)">1</text>
+			<text x="16.0" y="381" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,762) scale(1,-1)">Single agent</text>
+			<text x="268.972" y="381" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,762) scale(1,-1)">0.488</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="363.0" width="140.54399999999998" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="337" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,674) scale(1,-1)">Best multi-agent</text>
+			<text x="268.972" y="337" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,674) scale(1,-1)">0.481</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="319.0" width="138.528" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="244" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,488) scale(1,-1)">Terminal-Bench</text>
+			<text x="16.0" y="221" style="font-family: Arial, Helvetica, sans-serif; font-size: 13px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,442) scale(1,-1)">Independent / 20 instances</text>
+			<text x="16.0" y="200" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,400) scale(1,-1)">Mean score / higher is better</text>
+			<path d="M 16,169 L 16,103 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16.0" y="84" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,168) scale(1,-1)">0</text>
+			<path d="M 160,169 L 160,103 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="151.66" y="84" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,168) scale(1,-1)">0.5</text>
+			<path d="M 304,169 L 304,103 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="297.328" y="84" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,168) scale(1,-1)">1</text>
+			<text x="16.0" y="173" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,346) scale(1,-1)">Single agent</text>
+			<text x="268.972" y="173" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,346) scale(1,-1)">0.312</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="155.0" width="89.856" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(64%,76%,71%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<text x="16.0" y="129" style="font-family: Arial, Helvetica, sans-serif; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,258) scale(1,-1)">Best multi-agent</text>
+			<text x="268.972" y="129" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 14px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,258) scale(1,-1)">0.331</text>
+			<g transform="">
+				<g transform="">
+					<rect x="16.0" y="111.0" width="95.328" height="12.0" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(60%,71%,83%); fill-rule: evenodd;"/>
+					<g transform=""/>
+				</g>
+				<g transform=""/>
+				<g transform=""/>
+			</g>
+			<path d="M 16,62 L 304,62 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16" y="43" style="font-family: Arial, Helvetica, sans-serif; font-size: 11px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,86) scale(1,-1)">Source: Kim et al. / Nature Machine Intelligence / 2026</text>
+		</g>
+	</g>
+</svg>

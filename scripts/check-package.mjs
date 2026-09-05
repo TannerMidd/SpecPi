@@ -40,6 +40,12 @@ const requiredFiles = [
     "THIRD_PARTY.md",
     "browser-runtime/package-lock.json",
     "browser-runtime/package.json",
+    "docs/delegation/README.md",
+    "docs/delegation/design.md",
+    "docs/delegation/design-protocol.md",
+    "docs/delegation/evaluation.md",
+    "docs/delegation/protocol.md",
+    "docs/delegation/research.md",
     "extensions/browser/core.mjs",
     "extensions/browser/index.ts",
     "extensions/browser/smoke.mjs",
@@ -55,6 +61,12 @@ const requiredFiles = [
     "extensions/command-guard/rules.mjs",
     "extensions/command-guard/smoke.mjs",
     "extensions/files/core.mjs",
+    "extensions/delegation/core.mjs",
+    "extensions/delegation/extension.mjs",
+    "extensions/delegation/protocol.mjs",
+    "extensions/delegation/provider.mjs",
+    "extensions/delegation/snapshot.mjs",
+    "extensions/delegation/worker.mjs",
     "extensions/files/index.ts",
     "extensions/spec.ts",
     "extensions/spec/core.mjs",
@@ -73,6 +85,7 @@ const requiredFiles = [
     "extensions/workflow-controls/task-contract.mjs",
     "package.json",
     "scripts/check-package.mjs",
+    "scripts/agent.mjs",
     "scripts/check-pi-package.mjs",
     "scripts/check-release-order.mjs",
     "scripts/lib.mjs",
@@ -329,6 +342,9 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     const help = runCli(["help"]);
     const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"));
     assert.match(help.stdout, new RegExp(`SpecPi ${packageJson.version.replaceAll(".", "\\.")}`));
+    const agentHelp = runCli(["agent", "--help"]);
+    assert.match(agentHelp.stdout, /Usage: specpi agent/u);
+    assert.equal(fs.existsSync(agentDir), false, "agent help mutated the isolated Pi directory");
 
     runCli(["plan", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"]);
     assert.equal(fs.existsSync(agentDir), false, "plan mutated the isolated agent directory");
@@ -427,8 +443,8 @@ try {
     assert.deepEqual(packResult.bundled || [], [], "packed artifact unexpectedly bundles dependencies");
     assert.ok(packResult.size < 300_000, `packed artifact unexpectedly exceeds 300 KB: ${packResult.size}`);
     assert.ok(
-        packResult.unpackedSize < 1_000_000,
-        `unpacked artifact unexpectedly exceeds 1 MB: ${packResult.unpackedSize}`,
+        packResult.unpackedSize < 1_300_000,
+        `unpacked artifact unexpectedly exceeds 1.3 MB (including delegation runtime and protocol docs): ${packResult.unpackedSize}`,
     );
 
     assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");

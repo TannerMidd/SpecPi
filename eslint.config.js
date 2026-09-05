@@ -5,7 +5,7 @@ const sourceFiles = ["**/*.js", "**/*.mjs", "**/*.ts", "**/*.tsx"];
 
 export default [
     {
-        ignores: ["node_modules/**", "desktop/out/**", "desktop/dist/**"],
+        ignores: ["node_modules/**", ".specpi-test/**", "desktop/out/**", "desktop/dist/**"],
     },
     {
         files: sourceFiles,

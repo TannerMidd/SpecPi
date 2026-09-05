@@ -498,7 +498,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /name="viewport"/);
     assert.match(html, /href="styles\.css"/);
     assert.match(html, /href="logo\.svg"/);
-    assert.match(html, /class="section-index"/);
+    assert.match(html, /aria-label="Primary navigation"/);
+    assert.match(html, /href="single-agent\/"/);
     assert.match(html, /id="overview"/);
     assert.match(html, /id="loop"/);
     assert.match(html, /id="session"/);
@@ -506,15 +507,13 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /id="writer"/);
     assert.match(html, /id="install"/);
     assert.match(html, /type="module" src="cycle\.js"/);
-    assert.match(html, /role="tablist" aria-label="Command guard modes"/);
+    assert.match(html, /role="tablist"\s+aria-label="Command guard modes"/);
     assert.equal(html.match(/data-guard-mode=/g)?.length, 3);
     assert.equal(html.match(/data-guard-verdict/g)?.length, 5);
     assert.match(html, /npm install --global specpi@latest/);
     assert.match(html, /specpi install/);
     assert.match(html, /Collection is disabled by default/);
     assert.match(html, /One writer per working directory/);
-    assert.match(css, /grid-template-columns: 13\.375rem minmax\(0, 1fr\)/);
-    assert.match(css, /\.section-index/);
     assert.match(css, /\.guard-controls button\[aria-selected="true"\]/);
     assert.match(css, /prefers-reduced-motion: reduce/);
     assert.doesNotMatch(css, /url\(["']https?:/i);

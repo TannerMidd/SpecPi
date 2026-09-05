@@ -83,6 +83,7 @@ Usage:
   ${CLI} install [--yes] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
   ${CLI} update [--yes] [--force] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
   ${CLI} doctor
+  ${CLI} agent [--trust-project] [--pi-sdk <absolute-package-directory>]
   ${CLI} uninstall [--yes]
 
 Options:
@@ -2032,6 +2033,13 @@ async function doctor() {
 }
 
 async function main() {
+    if (process.argv[2] === "agent") {
+        const { runAgent } = await import("./agent.mjs");
+        await runAgent(process.argv.slice(3));
+
+        return;
+    }
+
     const options = parseArgs(process.argv.slice(2));
     switch (options.command) {
         case "help":

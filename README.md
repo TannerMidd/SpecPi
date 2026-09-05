@@ -24,7 +24,17 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-This README documents `0.11.2`, including task cards, verification receipts, and human outcome assessments. See the [release notes](CHANGELOG.md#0112---2026-09-04) for the complete change list.
+The released baseline is `0.11.2`, including task cards, verification receipts, and human outcome assessments. This checkout also contains the unreleased experimental delegation host described below. See the [release notes](CHANGELOG.md) for the change list.
+
+## Optional delegation
+
+The unreleased `specpi agent` launcher adds bounded, read-only workers while the parent remains the sole writer. It supports **Pi SDK 0.84.4 exactly** and starts delegation disabled. In its interactive UI, run `/delegate on` to enable the displayed calls/time envelope; `/delegate off` revokes outstanding work. Ordinary `pi` startup is unchanged.
+
+Review and consultation use supplied context. Investigation and research can read exact selected text snapshots; workers have no shell, writes, recursive delegation, or live web access. All workers use the parent's exact model. There are at most two active workers, four batches and 48 model invocations per launcher. Cancellation does not release a slot until the provider settles.
+
+Project resources and AGENTS discovery are disabled by default in this launcher; `--trust-project` explicitly enables them. Unsupported SDK versions and proxy policies fail closed. The experimental limits are not a hard invoice, provider-attempt, transport-byte or process-memory cap. No measured quality or cost benefit is claimed yet.
+
+See the [delegation guide](docs/delegation/README.md), [tool protocol](docs/delegation/protocol.md), [research](docs/delegation/research.md), and [evaluation plan](docs/delegation/evaluation.md) for setup, examples, boundaries and evidence.
 
 ## Install
 
