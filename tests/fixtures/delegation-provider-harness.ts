@@ -3,13 +3,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as sdk from "@earendil-works/pi-coding-agent";
+import { clampThinkingLevel } from "@earendil-works/pi-ai/compat";
 import {
     createProvider,
     createAssistantMessageEventStream,
     InMemoryCredentialStore,
     InMemoryModelsStore,
 } from "@earendil-works/pi-ai";
-import { createNativePiHost } from "../../extensions/delegation/provider.mjs";
+import { createNativePiHost, SUPPORTED_PI_VERSIONS } from "../../extensions/delegation/provider.mjs";
+import { runWorker } from "../../extensions/delegation/worker.mjs";
+import { LIMITS } from "../../extensions/delegation/protocol.mjs";
 
 const usage = {
     input: 7,
@@ -19,9 +22,49 @@ const usage = {
     totalTokens: 13,
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
+const report = {
+    status: "complete",
+    answer: "Synthetic evidence reviewed.",
+    requirements: [{ id: "r1", status: "addressed", evidence: [{ sourceId: "p1", lineStart: 1, lineEnd: 1 }] }],
+    findings: [],
+    missing: [],
+    nextStep: "Parent integrates the evidence.",
+};
+const final = () => ({
+    content: [{ type: "text", text: JSON.stringify(report), textSignature: "synthetic-signature" }],
+    stopReason: "stop",
+});
+const readCall = (name = "read_source", args: any = { sourceId: "s1", startLine: 1, maxLines: 1 }) => ({
+    content: [{ type: "toolCall", id: "call-fixture", name, arguments: args }],
+    stopReason: "toolUse",
+});
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function fixtureProvider(observe: (value: any) => void) {
-    const model = {
+async function fixture(root: string, label: string, script: any, settings: any = {}) {
+    const cwd = path.join(root, label);
+    const agentDir = path.join(root, label + "-agent");
+    fs.mkdirSync(cwd);
+    fs.mkdirSync(agentDir);
+    // These canaries must never be loaded by a child resource loader.
+    fs.writeFileSync(path.join(cwd, "AGENTS.md"), "AMBIENT_PROJECT_CANARY");
+    fs.mkdirSync(path.join(cwd, ".pi", "extensions"), { recursive: true });
+    fs.writeFileSync(path.join(cwd, ".pi", "extensions", "canary.ts"), "throw new Error('AMBIENT_EXTENSION_CANARY')");
+    const observed: any[] = [];
+    const sessions: any[] = [];
+    const hookCalls = { context: 0, headers: 0, payload: 0, response: 0 };
+    let refreshes = 0;
+    let childRuntimes = 0;
+    const credentials = new InMemoryCredentialStore();
+    if (settings.oauth) {
+        await credentials.modify("specpi-fixture", async () => ({
+            type: "oauth",
+            access: "synthetic-expired",
+            refresh: "synthetic-refresh",
+            expires: 1,
+        }));
+    }
+
+    const model: any = {
         id: "fixture-model",
         provider: "specpi-fixture",
         api: "specpi-fixture-api",
@@ -30,17 +73,17 @@ function fixtureProvider(observe: (value: any) => void) {
         reasoning: true,
         input: ["text", "image"],
         cost: usage.cost,
-        contextWindow: 32_768,
+        contextWindow: 32768,
         maxTokens: 4096,
-    } as any;
+    };
     const stream = (requestModel: any, context: any, options: any, route: string) => {
         const events = createAssistantMessageEventStream();
         const message: any = {
             role: "assistant",
-            content: [{ type: "text", text: "fixture complete", textSignature: "synthetic-signature" }],
             api: requestModel.api,
             provider: requestModel.provider,
             model: requestModel.id,
+            content: [],
             usage,
             stopReason: "stop",
             timestamp: Date.now(),
@@ -48,15 +91,22 @@ function fixtureProvider(observe: (value: any) => void) {
         };
         void (async () => {
             try {
-                let payload: any = { messages: context.messages, marker: "original" };
-                payload = (await options.onPayload?.(payload, requestModel)) ?? payload;
-                observe({ requestModel, context, options, payload, route });
+                const payload =
+                    (await options.onPayload?.({ messages: context.messages, marker: "original" }, requestModel)) ?? {};
+                const observation = { requestModel, context, options, payload, route };
+                observed.push(observation);
                 await options.onResponse?.({ status: 200, headers: { "x-fixture-response": "yes" } }, requestModel);
-                events.push({ type: "start", partial: message });
-                events.push({ type: "done", reason: "stop", message });
+                Object.assign(message, await script(observation, observed.length));
+                events.push({ type: "start", partial: { ...message, content: [] } });
+                events.push({ type: "text_delta", contentIndex: 0, delta: "fixture", partial: message });
+                if (["error", "aborted"].includes(message.stopReason)) {
+                    events.push({ type: "error", reason: message.stopReason, error: message });
+                } else {
+                    events.push({ type: "done", reason: message.stopReason, message });
+                }
             } catch (error) {
                 message.stopReason = options.signal?.aborted ? "aborted" : "error";
-                message.errorMessage = error instanceof Error ? error.message : "fixture failure";
+                message.errorMessage = error instanceof Error ? error.message : "fixture failed";
                 events.push({ type: "error", reason: message.stopReason, error: message });
             }
         })();
@@ -69,63 +119,64 @@ function fixtureProvider(observe: (value: any) => void) {
         models: [model],
         baseUrl: "https://provider.invalid",
         headers: { "x-provider": "configured" },
-        auth: {
-            apiKey: {
-                name: "Synthetic keyless fixture",
-                resolve: async () => ({
-                    auth: { baseUrl: "https://configured.invalid/route", headers: { "x-fixture-auth": "synthetic" } },
-                }),
-            },
-        },
+        auth: settings.oauth
+            ? {
+                  oauth: {
+                      name: "Synthetic OAuth",
+                      async login() {
+                          throw new Error("No interactive fixture login");
+                      },
+                      async refresh(credential: any, signal: AbortSignal) {
+                          assert.equal(credential.refresh, "synthetic-refresh");
+                          assert.equal(signal.aborted, false);
+                          refreshes += 1;
+
+                          return { ...credential, access: "synthetic-fresh", expires: Date.now() + 3600000 };
+                      },
+                      async toAuth(credential: any) {
+                          return {
+                              apiKey: credential.access,
+                              baseUrl: "https://oauth-fixture.invalid/adapted",
+                              headers: { "x-oauth-adapter": "retained" },
+                          };
+                      },
+                  },
+              }
+            : {
+                  apiKey: {
+                      name: "Synthetic keyless fixture",
+                      resolve: async () => ({
+                          auth: {
+                              baseUrl: "https://configured.invalid/route",
+                              headers: { "x-fixture-auth": "synthetic" },
+                          },
+                      }),
+                  },
+              },
         api: {
-            stream: (requestModel, context, options) => stream(requestModel, context, options, "stream"),
-            streamSimple: (requestModel, context, options) => stream(requestModel, context, options, "streamSimple"),
+            stream: (m, c, o) => stream(m, c, o, "stream"),
+            streamSimple: (m, c, o) => stream(m, c, o, "streamSimple"),
         },
     });
+    const createRuntime = async () => {
+        const runtime = await sdk.ModelRuntime.create({
+            credentials,
+            modelsPath: null,
+            modelsStore: new InMemoryModelsStore(),
+            allowModelNetwork: false,
+            refreshOnCreate: false,
+        });
+        runtime.registerNativeProvider(provider);
 
-    return { provider, model };
-}
+        return runtime;
+    };
 
-async function consume(host: any, context: any) {
-    const stream = await host.stream(context, {
-        signal: new AbortController().signal,
-        sessionId: "child-fixture",
-        maxTokens: 128,
-        timeoutMs: 5000,
-    });
-    const events = [];
-    for await (const event of stream) {
-        events.push(event);
-    }
-
-    return { events, result: await stream.result() };
-}
-
-async function createFixtureSession(
-    root: string,
-    label: string,
-    provider: any,
-    configure: any = () => {},
-    credentials = new InMemoryCredentialStore(),
-) {
-    const cwd = path.join(root, label);
-    const agentDir = path.join(root, label + "-agent");
-    fs.mkdirSync(cwd);
-    fs.mkdirSync(agentDir);
-    const modelRuntime = await sdk.ModelRuntime.create({
-        credentials,
-        modelsPath: null,
-        modelsStore: new InMemoryModelsStore(),
-        allowModelNetwork: false,
-    });
+    const parentRuntime = await createRuntime();
     const services = await sdk.createAgentSessionServices({
         cwd,
         agentDir,
-        modelRuntime,
-        settingsManager: sdk.SettingsManager.inMemory(
-            { images: { blockImages: true }, transport: "sse", thinkingBudgets: { low: 19 } },
-            { projectTrusted: false },
-        ),
+        modelRuntime: parentRuntime,
+        settingsManager: sdk.SettingsManager.inMemory({ images: { blockImages: true } }, { projectTrusted: false }),
         resourceLoaderOptions: {
             noExtensions: true,
             noSkills: true,
@@ -134,219 +185,482 @@ async function createFixtureSession(
             noContextFiles: true,
             extensionFactories: [
                 (pi) => {
-                    if (provider.config) {
-                        pi.registerProvider(provider.name, provider.config);
-                    } else {
-                        pi.registerProvider(provider);
-                    }
+                    pi.on("context", (event) => {
+                        hookCalls.context += 1;
 
-                    configure(pi);
+                        return {
+                            messages: [
+                                ...event.messages,
+                                { role: "user", content: "PARENT_CONTEXT_CANARY", timestamp: 1 },
+                            ],
+                        };
+                    });
+                    pi.on("before_provider_headers", (event) => {
+                        hookCalls.headers += 1;
+                        event.headers["x-parent-policy"] = "parent-only";
+                    });
+                    pi.on("before_provider_request", (event) => {
+                        hookCalls.payload += 1;
+
+                        return { ...event.payload, marker: "parent-payload" };
+                    });
+                    pi.on("after_provider_response", () => {
+                        hookCalls.response += 1;
+                    });
                 },
             ],
         },
     });
-    await modelRuntime.getAvailable(undefined, { signal: AbortSignal.timeout(5000) });
-    const { session } = await sdk.createAgentSessionFromServices({
+    const { session: parent } = await sdk.createAgentSessionFromServices({
         services,
+        model: parentRuntime.getModel(model.provider, model.id),
+        thinkingLevel: "low",
         sessionManager: sdk.SessionManager.inMemory(cwd),
-        model: modelRuntime.getModel("specpi-fixture", "fixture-model"),
+    });
+    const parentCtx = parent.extensionRunner!.createContext();
+    let current = true;
+    const injectedSdk = {
+        ...sdk,
+        clampThinkingLevel,
+        SettingsManager: {
+            ...sdk.SettingsManager,
+            create: (_cwd: any, _dir: any, options: any) => {
+                assert.deepEqual(options, { projectTrusted: false });
+
+                return sdk.SettingsManager.inMemory({
+                    transport: "sse",
+                    thinkingBudgets: { low: 19 },
+                    ...settings.settings,
+                });
+            },
+            inMemory: sdk.SettingsManager.inMemory,
+        },
+        ModelRuntime: {
+            create: async (options: any) => {
+                assert.deepEqual(options, { allowModelNetwork: false, refreshOnCreate: false });
+                childRuntimes += 1;
+
+                return createRuntime();
+            },
+        },
+        createAgentSession: async (options: any) => {
+            assert.deepEqual(options.resourceLoader.getAgentsFiles(), { agentsFiles: [] });
+            assert.equal(options.resourceLoader.getExtensions().extensions.length, 0);
+            assert.equal(options.sessionManager.getSessionFile(), undefined);
+            const result = await sdk.createAgentSession(options);
+            sessions.push(result.session);
+            if (settings.delaySetup) {
+                const original = result.session.agent.streamFunction;
+                result.session.agent.streamFunction = async (...args: any[]) => {
+                    const stream = await original(...args);
+                    await settings.delaySetup;
+
+                    return stream;
+                };
+            }
+
+            return result;
+        },
+    };
+    // This fixture deliberately supplies a synthetic configured-provider service seam.
+    // Stock models.json/native startup is exercised in delegation-native.test.mjs.
+    const ctx: any = {
+        cwd,
+        model: parentCtx.model,
+        modelRegistry: {
+            getRegisteredProviderIds: () => [],
+            getProviderAuthStatus: () => ({ source: settings.oauth ? "stored" : "environment" }),
+        },
+    };
+    for (const name of [
+        "runtime",
+        "getProviderAuth",
+        "getApiKeyAndHeaders",
+        "complete",
+        "getRegisteredProviderConfig",
+    ]) {
+        Object.defineProperty(ctx.modelRegistry, name, {
+            get() {
+                throw new Error("Forbidden credential or private-runtime access");
+            },
+        });
+    }
+
+    const host = createNativePiHost(ctx, {
+        id: label,
+        isCurrent: () => current,
+        sdk: injectedSdk,
         thinkingLevel: "low",
     });
+    const wrongHost = createNativePiHost(parentCtx, {
+        id: label + "-registered",
+        isCurrent: () => true,
+        sdk: injectedSdk,
+        thinkingLevel: "low",
+    });
+    await assert.rejects(async () => wrongHost.ready(), /runtime provider override/u);
 
-    return session;
+    return {
+        host,
+        parent,
+        ctx,
+        observed,
+        sessions,
+        hookCalls,
+        refreshes: () => refreshes,
+        runtimes: () => childRuntimes,
+        revoke: () => {
+            current = false;
+        },
+        close: () => {
+            parent.dispose();
+        },
+    };
 }
 
-async function providerProof(root: string) {
-    const observed: any[] = [];
-    const hookCalls = { context: 0, headers: 0, payload: 0, response: 0 };
-    const fixture = fixtureProvider((value) => observed.push(value));
-    const session = await createFixtureSession(root, "provider", fixture.provider, (pi: any) => {
-        pi.on("context", (event: any) => {
-            hookCalls.context += 1;
+function controls(overrides: any = {}) {
+    const controller = new AbortController();
+    let calls = 0;
+    const usages: any[] = [];
 
-            return { messages: [...event.messages, { role: "user", content: "configured context", timestamp: 1 }] };
-        });
-        pi.on("before_provider_headers", (event: any) => {
-            hookCalls.headers += 1;
-            event.headers["x-parent-policy"] = "parent-only";
-        });
-        pi.on("before_provider_request", (event: any) => {
-            hookCalls.payload += 1;
+    return {
+        controller,
+        calls: () => calls,
+        usages,
+        value: {
+            signal: controller.signal,
+            deadline: Date.now() + 5000,
+            assertLive: () => {},
+            abort: () => controller.abort(),
+            admitCall: () => {
+                if (calls >= 4) {
+                    throw new Error("Call allowance exhausted");
+                }
 
-            return { ...event.payload, marker: "configured payload" };
-        });
-        pi.on("after_provider_response", () => {
-            hookCalls.response += 1;
-        });
-    });
+                calls += 1;
+            },
+            onUsage: (value: any) => usages.push(value),
+            limits: { ...LIMITS, outputTokens: 8192 },
+            ...overrides,
+        },
+    };
+}
+
+async function pipelineProof(root: string) {
+    const state = await fixture(root, "pipeline", (_request: any, call: number) => (call === 2 ? readCall() : final()));
     try {
-        // A real parent turn proves these policy handlers are active, not merely registered.
-        await session.prompt("PARENT_TRANSCRIPT_MUST_NOT_LEAK");
-        assert.deepEqual(hookCalls, { context: 1, headers: 1, payload: 1, response: 1 });
-        assert.equal(observed[0].route, "streamSimple");
-        assert.equal(observed[0].options.headers["x-parent-policy"], "parent-only");
-        const ctx = session.extensionRunner!.createContext();
-        const host = createNativePiHost(ctx, { id: "owner-fixture", isCurrent: () => true });
-        const context = {
-            systemPrompt: "child packet",
-            messages: [
+        await state.parent.prompt("PARENT_TRANSCRIPT_CANARY");
+        assert.deepEqual(state.hookCalls, { context: 1, headers: 1, payload: 1, response: 1 });
+        const toolCalls: any[] = [];
+        const handle = await state.host.openSession({
+            systemPrompt: "Only child packet",
+            tools: [
                 {
-                    role: "user",
-                    content: [
-                        { type: "text", text: "child input" },
-                        { type: "image", data: "AA==", mimeType: "image/png" },
-                    ],
-                    timestamp: 1,
+                    name: "read_source",
+                    label: "read_source",
+                    description: "Read snapshot",
+                    parameters: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                            sourceId: { type: "string" },
+                            startLine: { type: "integer" },
+                            maxLines: { type: "integer" },
+                        },
+                        required: ["sourceId", "startLine", "maxLines"],
+                    },
+                    execute: async (_id: string, args: any) => {
+                        toolCalls.push(args);
+
+                        return { content: [{ type: "text", text: "SNAPSHOT_TOOL_EVIDENCE" }], details: {} };
+                    },
                 },
             ],
-            tools: [
-                { name: "snapshot_read", description: "fixture tool", parameters: { type: "object", properties: {} } },
-            ],
-        };
-        const completion = await consume(host, context);
-        assert.equal(completion.events.length, 1);
-        assert.equal(completion.events[0].type, "done");
-        assert.deepEqual(completion.result.usage, usage);
-        assert.deepEqual(hookCalls, { context: 1, headers: 1, payload: 1, response: 1 });
-        assert.equal(observed.length, 2);
-        const request = observed[1];
-        assert.equal(request.route, "stream");
-        assert.equal(request.requestModel.baseUrl, "https://configured.invalid/route");
-        assert.equal(request.requestModel.id, ctx.model!.id);
-        assert.equal(request.requestModel.provider, ctx.model!.provider);
-        assert.equal(request.options.headers["x-fixture-auth"], "synthetic");
-        assert.equal(request.options.headers["x-parent-policy"], undefined);
-        assert.equal(request.options.sessionId, "child-fixture");
-        assert.notEqual(request.options.sessionId, session.agent.sessionId);
-        for (const key of [
-            "reasoning",
-            "thinkingBudgets",
-            "transport",
-            "onPayload",
-            "onResponse",
-            "transformHeaders",
-        ]) {
-            assert.equal(request.options[key], undefined, key);
+        });
+        const first = controls();
+        const result = await handle.run("child packet", first.value);
+        assert.equal(state.sessions.length, 1);
+        assert.equal(state.runtimes(), 1);
+        assert.equal(state.sessions[0].autoCompactionEnabled, false);
+        assert.equal(state.sessions[0].autoRetryEnabled, false);
+        assert.equal(first.calls(), 2);
+        assert.equal(first.usages.length, 2);
+        assert.deepEqual(first.usages[0], usage);
+        assert.equal(toolCalls.length, 1);
+        assert.equal(result.content[0].textSignature, "synthetic-signature");
+        assert.equal(result.providerMetadata.replay, "synthetic-opaque-metadata");
+        assert.equal(state.observed[2].context.messages[1].providerMetadata.replay, "synthetic-opaque-metadata");
+        assert.equal(state.observed[2].context.messages[2].content[0].text, "SNAPSHOT_TOOL_EVIDENCE");
+        for (const request of state.observed.slice(1)) {
+            assert.equal(request.route, "streamSimple");
+            assert.equal(request.options.reasoning, "low");
+            assert.equal(request.options.thinkingBudgets.low, 19);
+            assert.equal(request.options.transport, "sse");
+            assert.equal(request.options.maxRetries, 0);
+            assert.equal(request.options.maxTokens, 4096);
+            assert.equal(request.options.headers["x-fixture-auth"], "synthetic");
+            assert.equal(request.options.headers["x-parent-policy"], undefined);
+            assert.equal(request.requestModel.baseUrl, "https://configured.invalid/route");
+            assert.equal(request.payload.marker, "original");
+            assert.notEqual(request.options.sessionId, state.parent.agent.sessionId);
+            assert.doesNotMatch(JSON.stringify(request.context), /PARENT_|AMBIENT_/u);
         }
 
-        assert.equal(request.options.maxRetries, 0);
-        assert.equal(request.options.maxTokens, 128);
-        assert.equal(request.payload.marker, "original");
-        assert.deepEqual(request.context, context);
-        assert.doesNotMatch(JSON.stringify(request.context), /PARENT_|configured context/u);
-        assert.equal(completion.result.content[0].textSignature, "synthetic-signature");
-        assert.equal(completion.result.providerMetadata.replay, "synthetic-opaque-metadata");
-
-        await consume(host, { ...context, messages: [completion.result] });
-        assert.deepEqual(observed[2].context.messages[0], completion.result);
-        assert.deepEqual(Object.keys(host).sort(), ["id", "isCurrent", "model", "stream"]);
-        const originalModel = session.agent.state.model;
-        session.agent.state.model = { ...originalModel };
-        assert.equal(host.isCurrent(), false);
-        await assert.rejects(consume(host, context), /lease/u);
+        assert.deepEqual(state.hookCalls, { context: 1, headers: 1, payload: 1, response: 1 });
+        first.controller.abort(); // The completed run's signal must already be detached.
+        const followUp = controls();
+        await handle.run("Changed-input follow-up", followUp.value);
+        assert.equal(state.sessions.length, 1);
+        assert.match(JSON.stringify(state.observed[3].context), /child packet.*Changed-input follow-up/u);
+        assert.equal(state.observed[3].options.sessionId, state.observed[1].options.sessionId);
+        state.ctx.model = { ...state.ctx.model };
+        await assert.rejects(handle.run("stale", controls().value), /lease/u);
+        handle.release();
+        handle.release();
     } finally {
-        await session.abort();
-        session.dispose();
+        state.close();
     }
+}
+
+async function boundsProof(root: string) {
+    for (const kind of [
+        "unknown-tool",
+        "bad-args",
+        "oversize",
+        "tool-throw",
+        "admission",
+        "context",
+        "provider-error",
+    ]) {
+        let executions = 0;
+        const state = await fixture(root, kind, () => {
+            if (kind === "unknown-tool") {
+                return readCall("bash");
+            }
+
+            if (kind === "bad-args") {
+                return readCall("read_source", { sourceId: 7 });
+            }
+
+            if (kind === "tool-throw") {
+                return readCall();
+            }
+
+            if (kind === "oversize") {
+                return { content: [{ type: "text", text: "x".repeat(256 * 1024) }], stopReason: "stop" };
+            }
+
+            if (kind === "provider-error") {
+                return { content: [], stopReason: "error", errorMessage: "429 overloaded" };
+            }
+
+            return final();
+        });
+        const run = controls(
+            kind === "admission"
+                ? {
+                      admitCall: () => {
+                          throw new Error("No calls left");
+                      },
+                  }
+                : {},
+        );
+        const handle = await state.host.openSession({
+            systemPrompt: "child",
+            tools: [
+                {
+                    name: "read_source",
+                    label: "read_source",
+                    description: "Read",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            sourceId: { type: "string" },
+                            startLine: { type: "integer" },
+                            maxLines: { type: "integer" },
+                        },
+                        required: ["sourceId", "startLine", "maxLines"],
+                    },
+                    execute: async () => {
+                        executions += 1;
+                        throw new Error("Denied fixture tool");
+                    },
+                },
+            ],
+        });
+        try {
+            await assert.rejects(handle.run(kind === "context" ? "x".repeat(256 * 1024) : "child", run.value));
+            assert.equal(state.observed.length, ["admission", "context"].includes(kind) ? 0 : 1, kind);
+            assert.equal(executions, kind === "tool-throw" ? 1 : 0, kind);
+        } finally {
+            handle.release();
+            state.close();
+        }
+    }
+}
+
+async function settlementProof(root: string) {
+    for (const kind of ["abort", "revoke", "release", "deadline"]) {
+        let finish: any;
+        const gate = new Promise((resolve) => {
+            finish = resolve;
+        });
+        const state = await fixture(root, "settlement-" + kind, async () => {
+            await gate;
+
+            return final();
+        });
+        const handle = await state.host.openSession({ systemPrompt: "child", tools: [] });
+        const run = controls(kind === "deadline" ? { deadline: Date.now() + 50 } : {});
+        let settled = false;
+        const pending = handle.run("child", run.value).finally(() => {
+            settled = true;
+        });
+        const rejection = assert.rejects(pending);
+        while (!state.observed.length) {
+            await sleep(1);
+        }
+
+        if (kind === "abort") {
+            run.controller.abort();
+        }
+
+        if (kind === "revoke") {
+            state.revoke();
+        }
+
+        if (kind === "release") {
+            handle.release();
+        }
+
+        await sleep(70);
+        assert.equal(settled, false, kind);
+        finish();
+        await rejection;
+        assert.equal(run.usages.length, 1);
+        handle.release();
+        state.close();
+    }
+
+    let finishSetup: any;
+    let finishRequest: any;
+    const setup = new Promise((resolve) => {
+        finishSetup = resolve;
+    });
+    const request = new Promise((resolve) => {
+        finishRequest = resolve;
+    });
+    const state = await fixture(
+        root,
+        "late-stream-setup",
+        async () => {
+            await request;
+
+            return final();
+        },
+        { delaySetup: setup },
+    );
+    const handle = await state.host.openSession({ systemPrompt: "child", tools: [] });
+    const run = controls();
+    let settled = false;
+    const pending = handle.run("child", run.value).finally(() => {
+        settled = true;
+    });
+    const rejection = assert.rejects(pending);
+    while (!state.observed.length) {
+        await sleep(1);
+    }
+
+    run.controller.abort();
+    await sleep(10);
+    assert.equal(settled, false, "A live stream has not yet been returned to the bridge");
+    finishSetup();
+    await sleep(10);
+    assert.equal(settled, false, "Late stream setup must not release the original request");
+    finishRequest();
+    await rejection;
+    assert.equal(run.usages.length, 1);
+    handle.release();
+    state.close();
 }
 
 async function oauthProof(root: string) {
-    const credentials = new InMemoryCredentialStore();
-    await credentials.modify("specpi-fixture", async () => ({
-        type: "oauth",
-        access: "synthetic-expired",
-        refresh: "synthetic-refresh",
-        expires: 1,
-    }));
-    let refreshes = 0;
-    const observed: any[] = [];
-    const fixture = fixtureProvider((value) => observed.push(value));
-    const provider = {
-        ...fixture.provider,
-        auth: {
-            oauth: {
-                name: "Synthetic OAuth adapter",
-                async login() {
-                    throw new Error("Interactive login must not run");
-                },
-                async refresh(credential: any, signal: AbortSignal) {
-                    assert.equal(credential.refresh, "synthetic-refresh");
-                    assert.equal(signal.aborted, false);
-                    refreshes += 1;
-
-                    return { ...credential, access: "synthetic-fresh", expires: Date.now() + 3_600_000 };
-                },
-                async toAuth(credential: any) {
-                    return {
-                        apiKey: credential.access,
-                        baseUrl: "https://oauth-fixture.invalid/adapted",
-                        headers: { "x-oauth-adapter": "retained" },
-                    };
-                },
-            },
-        },
-    };
-    const session = await createFixtureSession(root, "oauth", provider, undefined, credentials);
+    const state = await fixture(root, "oauth", final, { oauth: true });
     try {
-        assert.equal(refreshes, 0, "The child registry call must exercise the synthetic OAuth refresh");
-        const host = createNativePiHost(session.extensionRunner!.createContext(), {
-            id: "oauth-owner",
-            isCurrent: () => true,
-        });
-        const completion = await consume(host, { systemPrompt: "child", messages: [], tools: [] });
-        assert.equal(completion.result.stopReason, "stop");
-        assert.equal(refreshes, 1);
-        assert.equal(observed[0].requestModel.baseUrl, "https://oauth-fixture.invalid/adapted");
-        assert.equal(observed[0].options.apiKey, "synthetic-fresh");
-        assert.equal(observed[0].options.headers["x-oauth-adapter"], "retained");
-        assert.deepEqual(Object.keys(host).sort(), ["id", "isCurrent", "model", "stream"]);
+        assert.equal(state.refreshes(), 0);
+        const handle = await state.host.openSession({ systemPrompt: "child", tools: [] });
+        await handle.run("child", controls().value);
+        assert.equal(state.refreshes(), 1);
+        assert.equal(state.observed[0].options.apiKey, "synthetic-fresh");
+        assert.equal(state.observed[0].options.headers["x-oauth-adapter"], "retained");
+        assert.equal(state.observed[0].requestModel.baseUrl, "https://oauth-fixture.invalid/adapted");
+        handle.release();
     } finally {
-        session.dispose();
+        state.close();
     }
 }
 
-async function configuredHeadersProof(root: string) {
-    const observed: any[] = [];
-    const fixture = fixtureProvider((value) => observed.push(value));
-    const session = await createFixtureSession(root, "configured-headers", {
-        name: "specpi-fixture",
-        config: {
-            api: "specpi-fixture-api",
-            apiKey: "synthetic-fixture-key",
-            baseUrl: "https://configured-provider.invalid",
-            headers: { "x-configured-provider": "retained" },
-            models: [fixture.model],
-            streamSimple: (model: any, context: any, options: any) => fixture.provider.stream(model, context, options),
+async function workerProof(root: string) {
+    const state = await fixture(root, "worker", (_request: any, call: number) => (call === 1 ? readCall() : final()));
+    const packet = {
+        objective: "Review selected evidence",
+        requirements: [
+            { id: "r1", text: "Review evidence" },
+            { id: "r2", text: "Other parent concern" },
+        ],
+        decisions: [],
+        nonGoals: [],
+    };
+    const job: any = {
+        spec: {
+            id: "j1",
+            mode: "review",
+            requirements: ["r1"],
+            question: "Is the evidence sufficient?",
+            context: "Inline evidence",
+            sources: ["source.txt"],
         },
-    });
+        deadline: Date.now() + 5000,
+        toolCalls: 0,
+        toolBytes: 0,
+    };
+    const snapshot = {
+        sources: [{ id: "s1", path: "source.txt", lineCount: 1 }],
+        assertFresh() {},
+        read: () => "Selected evidence",
+        search: () => [],
+    };
+    const run = controls();
     try {
-        const host = createNativePiHost(session.extensionRunner!.createContext(), {
-            id: "headers-owner",
-            isCurrent: () => true,
-        });
-        await consume(host, { systemPrompt: "child", messages: [], tools: [] });
-        assert.equal(observed.length, 1);
-        assert.equal(observed[0].options.headers["x-configured-provider"], "retained");
-        assert.equal(observed[0].options.apiKey, "synthetic-fixture-key");
+        const result = await runWorker({ packet, job, host: state.host, snapshot, ...run.value });
+        assert.equal(result.status, "complete");
+        assert.equal(job.toolCalls, 1);
+        assert.equal(state.sessions.length, 1);
+        assert.doesNotMatch(JSON.stringify(state.observed[0].context), /Other parent concern/u);
+        job.release();
+        job.followUpPrompt = "Changed input after released failure";
+        const next = controls();
+        await runWorker({ packet, job, host: state.host, snapshot, ...next.value });
+        const prompt = JSON.stringify(state.observed.at(-1).context);
+        assert.match(prompt, /Is the evidence sufficient/u);
+        assert.match(prompt, /Changed input after released failure/u);
+        job.release();
     } finally {
-        session.dispose();
+        state.close();
     }
 }
 
 export default async function () {
-    assert.equal(sdk.VERSION, "0.84.4", "Run this fixture against the pinned isolated SDK");
+    assert.ok(SUPPORTED_PI_VERSIONS.includes(sdk.VERSION));
     const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-fixture-")));
     try {
-        await providerProof(root);
+        await pipelineProof(root);
+        await boundsProof(root);
+        await settlementProof(root);
         await oauthProof(root);
-        await configuredHeadersProof(root);
+        await workerProof(root);
         console.log(
-            `DELEGATION_FIXTURE=${JSON.stringify({
-                sdkVersion: sdk.VERSION,
-                nativeRegistry: true,
-                oauth: true,
-                parentHooksExcluded: true,
-            })}`,
+            `DELEGATION_FIXTURE=${JSON.stringify({ sdkVersion: sdk.VERSION, realSessions: true, streaming: true, toolReplay: true, thinking: true, oauth: true, noAmbientResources: true, parentHooksExcluded: true, settlement: true })}`,
         );
     } finally {
         fs.rmSync(root, { recursive: true, force: true });

@@ -67,7 +67,7 @@ export function createDelegationController({
     });
     const status = () => ({
         enabled,
-        policy: "experimental-calls-time-v1",
+        policy: "bounded-pi-sessions-v1",
         generation,
         active,
         limits: policy,
@@ -87,8 +87,17 @@ export function createDelegationController({
         job.error = error;
         job.revision += 1;
         job.cursor = ++batch.cursor;
-        clearTimeout(job.timer);
+        if (!result) {
+            clearTimeout(job.timer);
+        }
+
         changed();
+    };
+
+    const releaseJob = (job) => {
+        job.release?.();
+        job.release = undefined;
+        clearTimeout(job.timer);
     };
 
     const cancelJob = (batch, job, state = "cancelled") => {
@@ -103,6 +112,7 @@ export function createDelegationController({
         }
 
         job.controller?.abort();
+        releaseJob(job);
         changed();
     };
 
@@ -236,9 +246,8 @@ export function createDelegationController({
                             limits: policy,
                             admitCall: () => {
                                 assertJobLive();
-                                const maxCalls = ["review", "consult"].includes(job.spec.mode) ? 2 : 4;
                                 if (
-                                    job.calls >= maxCalls ||
+                                    job.calls >= policy.jobCalls ||
                                     batch.calls >= policy.batchCalls ||
                                     totalCalls >= policy.sessionCalls
                                 ) {
@@ -281,6 +290,10 @@ export function createDelegationController({
                     } finally {
                         job.controller.abort();
                         job.settling = false;
+                        if (!job.result || quiet.has(job.state)) {
+                            releaseJob(job);
+                        }
+
                         active -= 1;
                         changed();
                         pump();
@@ -293,9 +306,15 @@ export function createDelegationController({
     };
 
     const armDeadline = (batch, job) => {
+        clearTimeout(job.timer);
         job.timer = setTimeout(
             () => {
-                cancelJob(batch, job, "expired");
+                if (terminal.has(job.state) && !job.settling) {
+                    releaseJob(job);
+                } else {
+                    cancelJob(batch, job, "expired");
+                }
+
                 pump();
             },
             Math.max(1, Math.min(job.deadline, batch.deadline) - Date.now()),
@@ -402,12 +421,7 @@ export function createDelegationController({
             }
 
             job.followUps += 1;
-            job.messages ??= [];
-            job.messages.push({
-                role: "user",
-                content: [{ type: "text", text: `Parent follow-up (same scope and limits): ${input.prompt}` }],
-                timestamp: Date.now(),
-            });
+            job.followUpPrompt = input.prompt;
             job.attemptId = randomUUID();
             job.state = "queued";
             job.result = undefined;
@@ -446,7 +460,7 @@ export function createDelegationController({
         };
         if (input.decision !== "needs_check") {
             job.disposition = disposition;
-            job.messages = undefined;
+            releaseJob(job);
         }
 
         return { ...binding(batch, job), disposition };
@@ -576,7 +590,7 @@ export function createDelegationController({
             const guard = getGuard();
             if (!host?.isCurrent() || !["guard", "strict"].includes(guard)) {
                 throw new Error(
-                    "Pi's public model registry, a selected model, the original working directory and active Command Guard are required",
+                    "A supported Pi child-session provider, a selected model, the original working directory and active Command Guard are required",
                 );
             }
 
@@ -603,9 +617,9 @@ export function createDelegationController({
                     enabled,
                     model: enabledHost?.model ?? null,
                     policy,
-                    inference: "native-registry-v1",
+                    inference: "pi-agent-session-v1",
                 }),
-                summary: `Delegation ${input.operation}; experimental calls/time policy; enabled=${enabled}; generation=${generation}; exact parent model ${enabledHost?.model?.provider ?? "unavailable"}/${enabledHost?.model?.id ?? "unavailable"}; up to ${policy.concurrency} read-only workers, ${policy.sessionCalls} registry invocations per Pi process, ${policy.jobMs / 1000}s per job. Pi owns authentication and provider configuration. Child calls use provider defaults without parent context/header/payload/response hooks, thinking settings, transport policy or session settings. Selected text may be sent to the configured provider. No shell, writes, recursive delegation, live web or invoice/transport-memory cap. Output is checked after completion; hidden provider attempts may occur.`,
+                summary: `Delegation ${input.operation}; bounded Pi sessions; enabled=${enabled}; generation=${generation}; selected model ${enabledHost?.model?.provider ?? "unavailable"}/${enabledHost?.model?.id ?? "unavailable"}; up to ${policy.concurrency} read-only workers, ${policy.sessionCalls} SDK inference invocations per Pi process, ${policy.jobMs / 1000}s per job. Pi owns configured authentication; temporary parent provider/auth overrides are unsupported. Child sessions use explicit thinking and selected text, without parent hooks or ambient extensions. Review and scout only. No shell, writes, recursive delegation or live web. Cancellation is best effort; SDK settlement does not establish remote termination or invoice bounds.`,
             };
         },
     };

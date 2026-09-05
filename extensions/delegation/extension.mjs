@@ -32,17 +32,34 @@ export const DELEGATE_SCHEMA = {
                 requirements: { type: "array", items: object({ id: string, text: string }) },
                 decisions: strings,
                 nonGoals: strings,
-                reason: object({ deliverable: string, consumer: string, independence: string, parentWork: string }),
+                reason: object({
+                    benefit: {
+                        type: "string",
+                        enum: ["independent_review", "parallel_analysis", "context_isolation"],
+                    },
+                    why: string,
+                    parentWork: {
+                        type: "string",
+                        description:
+                            "Useful independent parent work; required for parallel_analysis, otherwise may be empty.",
+                    },
+                }),
                 jobs: {
                     type: "array",
                     minItems: 1,
-                    maxItems: 4,
+                    maxItems: 2,
                     items: object({
                         id: string,
-                        mode: { type: "string", enum: ["review", "investigate", "consult", "research"] },
+                        mode: { type: "string", enum: ["review", "scout"] },
                         question: string,
                         context: string,
                         sources: strings,
+                        requirements: {
+                            type: "array",
+                            minItems: 1,
+                            items: string,
+                            description: "Only the requirement IDs assigned to this worker.",
+                        },
                     }),
                 },
             }),
@@ -70,7 +87,7 @@ export const DELEGATE_SCHEMA = {
     ],
 };
 
-/** The native entry supplies a public model-registry capability for the active context. */
+/** The native entry supplies a preflighted Pi child-session host for the active context. */
 export function createDelegationExtension(
     getHost,
     { root = process.cwd(), controllerOptions = {}, prepareContext = () => {} } = {},
@@ -223,7 +240,7 @@ export function createDelegationExtension(
                     message: {
                         customType: "specpi-delegation-policy",
                         content:
-                            "Delegation is explicitly enabled under experimental calls/time limits. Prefer your own execution unless an independent bounded question pays for handoff and verification. Use delegate run while you do useful parent work, then collect (waitMs up to 30000 if needed), verify evidence, and resolve every report. Workers have only inline context or selected text snapshots; research has no live web. You remain the sole writer. No transcript inheritance, automatic routing, recursive delegation, or automatic retries. Cancellation can leave requests settling. Parent assessment is not human approval or task completion. Use status to inspect remaining limits.",
+                            "Delegation is enabled for independent review of frozen work or substantial selected-source analysis. Stay with one agent for small edits, routine searches, sequential debugging, unsettled interfaces or duplicate opinions. Prefer parallel tools for straightforward retrieval. Give each worker a distinct question and only its requirement IDs, relevant constraints and evidence, without your reasoning or verdict. Use one worker unless two questions are independently useful. State independent parent work only when claiming parallelism; a final review may wait. collect can wait up to 30000ms. Verify source references and resolve findings. You remain the sole writer; delegation is experimental and no SpecPi quality/cost improvement has been measured.",
                         display: false,
                     },
                 };
@@ -255,10 +272,18 @@ export function createDelegationExtension(
                         }
 
                         prepareContext(ctx);
+                        const host = getHost();
+                        await host?.ready?.();
+                        if (!isBound() || getHost() !== host) {
+                            throw new Error(
+                                "Pi changed during delegation setup; enable delegation in the current session",
+                            );
+                        }
+
                         const state = controller.enable();
                         syncActiveTool(true);
                         ctx.ui.notify(
-                            `Delegation enabled: experimental calls/time policy, exact parent model ${state.model.provider}/${state.model.id}, at most 2 read-only workers, 4 batches and 48 registry calls per Pi process. Jobs expire after 120 seconds. Pi owns authentication and provider configuration. Child calls use provider defaults, without parent context, header, payload or response hooks, thinking settings, transport policy or session settings. Selected text is sent to the configured provider. Responses are checked after completion; provider buffering, hidden retries and billing are not hard-bounded. /delegate off revokes workers; unsettled requests keep their slots across reloads.`,
+                            `Delegation enabled: Pi child sessions for review and scout, ${state.model.provider}/${state.model.id}, thinking ${state.model.thinkingLevel ?? "Pi configured"}. At most 2 workers, 4 batches and 32 SDK inference calls per Pi process; 120 seconds per job. Workers see only supplied text and selected snapshots. Pi owns configured authentication; temporary parent provider/auth overrides and parent hooks are not inherited. No shell, edits, recursion, automatic retries or compaction. /delegate off cancels workers; SDK requests still settling retain their slots. These limits do not guarantee remote termination or a billing cap.`,
                             "info",
                         );
                     } else if (action === "off") {
@@ -288,7 +313,7 @@ export function createDelegationExtension(
             name: "delegate",
             label: "Delegate",
             description:
-                "Bounded read-only workers, only after human /delegate on. Same parent model. Four profiles: tool-free review/consult; investigate/research read selected immutable repository text (no live web). run requires explicit requirements, non-goals, reason and source filenames. Return immediately and continue useful parent work; collect returns structured advisory results with receipts. Resolve each finding after checking evidence. One changed-input follow-up retains budgets and deadline. Cancellation revokes tools but may leave provider settlement pending. Never a source of write permission or verified completion.",
+                "Delegate an independent frozen review or substantial selected-source analysis to a real Pi child session. Only after human /delegate on. review: check artifacts against assigned requirements in fresh context; scout: answer a distinct evidence question over selected sources. Prefer one worker and parent-only execution for small, sequential or routine work. No shell, edits or live web. run returns immediately; collect waits for advisory evidence, then resolve findings after verification. One changed-input follow_up shares the original budget/deadline. Never grants permission or proves task completion.",
             parameters: DELEGATE_SCHEMA,
             execute: async (_id, input, signal, _update, ctx) => {
                 try {

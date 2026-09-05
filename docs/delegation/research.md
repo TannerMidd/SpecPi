@@ -131,35 +131,71 @@ of standing routing heuristics to every SpecPi session.
 **Limits:** this is model- and harness-specific engineering guidance. It is not evidence
 that deleting arbitrary safety checks, context, or instructions helps every model.
 
+## Narrow admission policy
+
+The implemented purposes are `review` of a frozen artifact and `scout` analysis of a
+bounded evidence question. Both may use selected-source tools. A review gets original
+requirements, relevant constraints and actual validation facts without the parent's
+reasoning or verdict. A scout needs selected sources and an independently checkable
+answer. A claimed parallel benefit also needs useful concurrent parent work; a fresh
+review or context-isolated analysis may run while the parent waits.
+
+These are **promising experimental scenarios, not measured SpecPi improvements**.
+SwarmBench's cost-matched gains on three of four task types do not establish an
+advantage for every investigation or this same-model snapshot-only implementation.
+Cognition's cross-frontier consultation does not validate a separate generic same-model
+consultation mode. Investigation and supplied-source research therefore share `scout`;
+there is no live-web or model-routing route.
+
+Small edits, routine lookups, coupled mutable work, repeated role answers, writing
+teams and blind retries remain outside this policy. Parallel parent tool calls remain
+an alternative to creating a worker. Mode/benefit checks and rejection of duplicate
+normalized questions constrain structure; they cannot certify semantic independence.
+The two-worker ceiling and all numeric quotas are engineering choices awaiting local
+evaluation, not empirical optima extracted from the papers.
+
 ## Pi compatibility evidence
 
-Pi 0.84.4 is the native extension's compatibility-test floor; admission checks for
-public `ctx.modelRegistry.complete`, rather than imposing an exact-version gate or
-assuming all later versions work. The original investigation inspected public tagged
-source and official documentation without calling a real provider or inspecting private
-Pi state or credentials. The implemented bridge uses that registry completion API
-with explicit bounded context. Pi owns authentication and provider routing, but parent
-request hooks, transport/thinking settings and session affinity are not inherited;
-reasoning uses provider defaults. Complete responses are checked only after completion.
-These are accepted limits of the native experiment, not full parent-pipeline parity
-or satisfaction of the stronger transport and cost guarantees in the archived design.
+The experimental SDK integration explicitly allows Pi 0.84.4 and 0.85.0. Other versions
+require fresh review before this route is enabled. The installer still bootstraps
+0.84.4; runtime compatibility review does not authorize a package-pin upgrade. The investigation used
+public tagged source and official documentation without live provider calls or private
+Pi state inspection. The current implementation uses public SDK `createAgentSession`,
+in-memory sessions and a fresh Pi `ModelRuntime` with standard authentication,
+environment and `models.json` resolution. Child transport/thinking budgets use configured
+global settings without project settings. Parent model/thinking are explicit, with Pi
+clamping; unsupported runtime-only authentication, selected extension-provider overrides,
+model-specific headers, startup proxy configuration and safe descriptor mismatches fail
+preflight. These integration limits leave the parent's setup unchanged.
 
-| Contract                                     | Primary source                                                                                                                     | Design consequence                                                                      |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Credential-blind completion facade           | [ModelRegistry at v0.84.4](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/model-registry.ts#L59) | Useful building block; does not expose the configured streaming pipeline                |
-| Runtime auth and request preparation         | [ModelRuntime](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/model-runtime.ts#L541)             | Keep credential handling inside Pi; preserve composed provider behavior                 |
-| Host request policy and thinking translation | [SDK](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/sdk.ts#L283)                                | Native completion does not inherit full parent policy; document the narrower contract   |
-| Tool interception                            | [AgentSession](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/agent-session.ts#L451)             | Built-in factories and `pi.exec()` do not automatically inherit Command Guard           |
-| Resource discovery                           | [ResourceLoader](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/resource-loader.ts#L36)          | In-memory session storage alone does not create a sterile child                         |
-| Tool scheduling                              | [Agent defaults](https://github.com/earendil-works/pi/blob/v0.84.4/packages/agent/src/agent.ts#L205)                               | Explicitly select execution policy and enforce each limit before work                   |
-| Error and usage semantics                    | [Message types](https://github.com/earendil-works/pi/blob/v0.84.4/packages/ai/src/types.ts#L332)                                   | Inspect terminal status; do not double-count reasoning output or assume errors are free |
-| Session identity and navigation              | [Extension types](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/extensions/types.ts#L522)       | Invalidate actual navigation and task revisions, not every advancing leaf               |
+Pi runs the child loop. SpecPi admits each SDK invocation, disables retries/compaction
+and checks SDK-visible streaming. No ambient child resources or parent transcript are
+loaded. Parent request hooks, ephemeral runtime settings and session affinity are not
+automatically transferred. Full parent parity and hard raw-transport, hidden-attempt,
+memory or invoice bounds are not claimed. SDK contract tests and comparative outcomes
+remain distinct evidence requirements.
+
+| Contract                                | Primary source                                                                                                                     | Design consequence                                                                      |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Credential-blind completion facade      | [ModelRegistry at v0.84.4](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/model-registry.ts#L59) | Useful building block; does not expose the configured streaming pipeline                |
+| Runtime auth and request preparation    | [ModelRuntime](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/model-runtime.ts#L541)             | Keep credential handling inside Pi; preserve composed provider behavior                 |
+| Agent sessions and thinking translation | [SDK](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/sdk.ts#L283)                                | Use the Pi agent loop with explicit model/thinking; full parent policy is not automatic |
+| Tool interception                       | [AgentSession](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/agent-session.ts#L451)             | Built-in factories and `pi.exec()` do not automatically inherit Command Guard           |
+| Resource discovery                      | [ResourceLoader](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/resource-loader.ts#L36)          | In-memory session storage alone does not create a sterile child                         |
+| Tool scheduling                         | [Agent defaults](https://github.com/earendil-works/pi/blob/v0.84.4/packages/agent/src/agent.ts#L205)                               | Explicitly select execution policy and enforce each limit before work                   |
+| Error and usage semantics               | [Message types](https://github.com/earendil-works/pi/blob/v0.84.4/packages/ai/src/types.ts#L332)                                   | Inspect terminal status; do not double-count reasoning output or assume errors are free |
+| Session identity and navigation         | [Extension types](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/extensions/types.ts#L522)       | Invalidate actual navigation and task revisions, not every advancing leaf               |
 
 [Latest SDK](https://pi.dev/docs/latest/sdk), [latest extensions](https://pi.dev/docs/latest/extensions)
 and [latest provider documentation](https://pi.dev/docs/latest/custom-provider) were
-cross-checked. These are moving references, not proof of compatibility with the pinned
-version. Public `main` identified itself as 0.85.0 during investigation; this is not a
-verified npm dist-tag and does not authorize a dependency upgrade.
+cross-checked. These are moving references, not proof of compatibility with a specific
+version. The [Pi 0.85.0 release notes](https://github.com/earendil-works/pi/releases/tag/v0.85.0)
+confirm its 4 September 2026 release. An isolated installation also reported CLI version
+0.85.0, prompting review of that released SDK alongside the tagged 0.84.4 baseline cited
+above. Isolated native and provider integration checks have passed on 0.85.0. These
+prove the exercised fixtures, not every provider/setup or comparative task benefit.
+Full repository and package validation remain separate release checks; the allowlist
+and a successful CLI version check cannot replace them.
 
 ## What remains unproven
 

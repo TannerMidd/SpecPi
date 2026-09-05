@@ -8,10 +8,13 @@ per-provider-attempt or monetary admission guarantees, live web adapter, or alte
 model routes. The schemas and command examples below must not be submitted as if they
 were the implemented protocol.
 
-The current native completion bridge also does not meet the target's full-parent
-pipeline or streaming requirements. It uses Pi's public model registry, provider-default
-reasoning and post-completion output checks. Its process-wide controller survives
-reloads; the implemented guide specifies the restart and fixed-root boundaries.
+The current `bounded-pi-sessions-v1` implementation allows Pi 0.84.4 and 0.85.0 and uses actual Pi AgentSession workers,
+fresh standard ModelRuntime configuration, explicit parent model/thinking and SDK-visible
+streaming. It does not claim full parent-hook/ephemeral-setting inheritance or hard
+raw-transport, hidden-attempt or invoice limits. It admits only `review` and `scout`,
+with assigned requirement subsets. Its controller survives reloads; the implemented
+guide specifies restart, fixed-root and SDK-settlement boundaries. The custom loop,
+four-profile schema and stronger port contracts below remain historical proposals.
 
 See the [archived architecture](design.md) for target policy and
 [evaluation](evaluation.md) for the distinction between current fixtures and unmet

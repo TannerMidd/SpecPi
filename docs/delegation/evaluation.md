@@ -1,16 +1,17 @@
 # Delegation evaluation and implementation gates
 
 This is an experiment specification, not a report of comparative outcomes. The
-[experimental implementation](README.md) and [calls/time protocol](protocol.md) now
-have deterministic runtime, broker, lifecycle and synthetic-provider fixtures. Those
-tests do not establish better task quality, cost or latency, or parity with every live
-provider. No comparative outcome experiment is reported here. The numeric criteria
+[experimental implementation](README.md) uses Pi AgentSession workers under the
+[bounded session protocol](protocol.md). Runtime, broker, lifecycle and synthetic-provider
+fixtures require a fresh run against this SDK integration before they support a passing
+contract claim. Tests do not establish better task quality, cost or latency, or parity
+with every live provider. No comparative outcome experiment is reported here. The numeric criteria
 below remain proposed hypotheses, not research-derived constants or achieved results.
 
 The [archived architecture](design.md) and [target protocol](design-protocol.md) retain
 stronger proof obligations. In particular, full parent request-pipeline parity,
 midstream/raw-transport bounds, admission of every underlying provider attempt and
-monetary admission remain unmet by the native `experimental-calls-time-v1` contract.
+monetary admission remain unmet by the native `bounded-pi-sessions-v1` contract.
 
 ## 1. Decide what improvement means before a run
 
@@ -43,6 +44,19 @@ Do not run all six arms on every case before establishing which question matters
 For stage 1, A/B/D on frozen reviews is sufficient. Add C/E for investigation and F
 only when alternative models are authorized. Use the same exact provider/model version
 and tools where the comparison calls for it. A mixed-model arm must disclose composition.
+
+Start with the implemented `review` and `scout` purposes, not all archived profiles.
+Compare frozen review against both normal parent review and an additional parent pass
+under the same total envelope. Include clean changes so false positives carry a cost.
+For scouts, compare parent-only and structured serial analysis before attributing gains
+to fresh context or parallelism. Evaluate one versus two workers only when independent
+source partitions justify that question.
+
+Record the parent's and child's effective thinking settings and model clamping. The
+child uses a fresh standard Pi ModelRuntime; parent hooks and ephemeral settings are
+not inherited. Control these differences when isolating architecture, or disclose them
+as part of an end-to-end workflow comparison. Same model IDs alone do not establish
+equal inference configuration.
 
 Use total task spending, not only worker spending. Include preparation, parent reasoning,
 worker requests, tools, retries, synthesis and validation. When actual dollar cost is
@@ -152,11 +166,19 @@ The implementation includes deterministic fake-provider and broker fixtures. Run
 relevant suites and record their actual results before live inference; this checklist
 is not itself a passing receipt. The supported calls/time contract requires coverage for:
 
-- Native Pi package discovery, public completion availability at the reviewed 0.84.4
-  floor, and deterministic rejection when that capability is absent.
-- Exact active-model and registry binding, explicit bounded text context, validated
-  options and provider-default reasoning; no parent request hooks, transport/thinking
-  settings or session-affinity inheritance is claimed.
+- Native Pi package discovery and actual SDK AgentSession creation on each allowed
+  version, Pi 0.84.4 and 0.85.0, with in-memory sessions and rejection of other versions
+  and unsupported routes. An allowlist entry or CLI version check is not suite completion.
+- Explicit parent model/thinking with Pi clamping; fresh standard ModelRuntime
+  configuration; configured global transport/thinking budgets without project settings;
+  rejection of runtime-only authentication, selected extension-provider overrides,
+  model-specific headers, startup proxy configuration and safe descriptor mismatches.
+  Parent hooks, ephemeral runtime settings
+  and session affinity are not implicitly inherited.
+- No ambient child extensions, skills, AGENTS files or parent session history; the SDK
+  owns the agent/tool loop, with only selected-source tools exposed.
+- Review/scout mode and benefit compatibility, required evidence, assigned requirement
+  subsets, duplicate-question rejection and parentWork required only for parallel claims.
 - Normal Pi ownership of resource discovery, trust, proxy policy and authentication,
   without a separate SDK host or bootstrap override.
 - Native and legacy provider composition using synthetic credentials only; no secrets
@@ -166,9 +188,14 @@ is not itself a passing receipt. The supported calls/time contract requires cove
   a broker operation; non-cooperative provider settlement and late output rejection.
 - Concurrent call-slot accounting, duplicate submissions, aggregate counters and
   non-resetting follow-up limits; cancelled requests keep slots until settlement.
-- Oversized complete responses rejected after the Promise resolves, bounded reports
-  and tool output, and correct settlement state; requested output tokens do not
-  establish a midstream, allocation or raw-response guarantee.
+- Admission before every SDK model invocation, including tool continuations; provider
+  and session retries and automatic compaction disabled; requested output clamped to
+  the model maximum. Follow-up does not reset allowances.
+- Pi-owned authentication preflight before model-invocation accounting, without
+  claiming that the inference counter bounds authentication/OAuth preparation.
+- Oversized SDK-visible streaming responses, bounded reports/tool output and correct
+  settlement state. Hold slots through stream/result and prompt settlement; do not infer
+  physical remote termination or a raw-response/allocation guarantee from SDK events.
 - Lost collection responses, cursor replay, idempotent follow-up and resolution,
   stale result revisions, conflicting idempotency payloads and cancelled-job revival.
 - Asynchronous job leases surviving normal `run` return without retaining stale
@@ -181,6 +208,8 @@ is not itself a passing receipt. The supported calls/time contract requires cove
   retained across reloads, session switches and off/on within the Pi process.
 - Fixed canonical working root, with a Pi restart required for a new root or runtime
   version rather than loading changed implementation code through `/reload`.
+- Completed reports remain source-bound after the deadline; child sessions release at
+  the deadline and subsequent follow-up fails.
 - No worker writes, recursion, arbitrary process execution or copied parent-tool bypass.
 - Normal parent-tool-result retention through Pi versus in-memory worker state, accurate
   privacy disclosure, bounded retained data, cleanup and no automatic resume.
@@ -190,9 +219,9 @@ is not itself a passing receipt. The supported calls/time contract requires cove
 The following remain requirements before claiming the corresponding guarantees in
 the [target protocol](design-protocol.md):
 
-- Full parent inference-pipeline parity, including context/header/payload/response hooks,
-  transport/thinking settings and session affinity. The native public completion
-  bridge does not supply this contract.
+- Full parent inference-pipeline parity, including request hooks, ephemeral runtime
+  settings and session affinity. Explicit model/thinking and standard child configuration
+  do not supply that broader contract.
 - Every underlying inference attempt, including transport fallback or an internal SDK
   retry, receives pre-dispatch admission; opaque attempts are rejected and initial
   dispatch is not double-debited.

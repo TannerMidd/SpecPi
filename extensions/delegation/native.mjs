@@ -2,10 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createDelegationExtension } from "./extension.mjs";
-import { createNativePiHost } from "./provider.mjs";
+import { createNativePiHost, SUPPORTED_PI_VERSIONS } from "./provider.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 1;
+const revision = 2;
 
 function canonical(directory) {
     return fs.realpathSync.native(path.resolve(directory));
@@ -15,11 +15,13 @@ function sameRoot(left, right) {
     return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
-function createState(root) {
+function createState(root, sdk) {
+    let getThinkingLevel = () => undefined;
     let host;
     let epoch = 0;
     let boundRegistry;
     let boundModel;
+    let boundThinking;
     const matchesRoot = (context) => {
         try {
             return typeof context?.cwd === "string" && sameRoot(canonical(context.cwd), root);
@@ -34,14 +36,24 @@ function createState(root) {
             host = undefined;
         }
 
-        if (!matchesRoot(context) || !context?.model || typeof context?.modelRegistry?.complete !== "function") {
+        if (
+            !matchesRoot(context) ||
+            !context?.model ||
+            typeof context?.modelRegistry?.getProviderAuthStatus !== "function"
+        ) {
             epoch += 1;
             host = undefined;
 
             return;
         }
 
-        if (host?.isCurrent() && boundRegistry === context.modelRegistry && boundModel === context.model) {
+        const thinkingLevel = getThinkingLevel();
+        if (
+            host?.isCurrent() &&
+            boundRegistry === context.modelRegistry &&
+            boundModel === context.model &&
+            boundThinking === thinkingLevel
+        ) {
             return;
         }
 
@@ -49,28 +61,48 @@ function createState(root) {
         const issuedEpoch = epoch;
         boundRegistry = context.modelRegistry;
         boundModel = context.model;
-        host = createNativePiHost(context, {
-            id: randomUUID(),
-            isCurrent: () => epoch === issuedEpoch && matchesRoot(context),
-        });
+        boundThinking = thinkingLevel;
+        const id = randomUUID();
+        const isCurrent = () => epoch === issuedEpoch && matchesRoot(context) && getThinkingLevel() === thinkingLevel;
+        if (!SUPPORTED_PI_VERSIONS.includes(sdk?.VERSION)) {
+            const unavailable = async () => {
+                throw new Error(
+                    `Delegation SDK sessions require a reviewed Pi version: ${SUPPORTED_PI_VERSIONS.join(" or ")}`,
+                );
+            };
+
+            host = Object.freeze({
+                id,
+                isCurrent,
+                model: Object.freeze({ id: context.model.id, provider: context.model.provider, thinkingLevel }),
+                ready: unavailable,
+                openSession: unavailable,
+            });
+        } else {
+            host = createNativePiHost(context, { id, isCurrent, sdk, thinkingLevel });
+        }
     };
 
-    const factory = createDelegationExtension(() => host, { root, prepareContext });
+    const extensionFactory = createDelegationExtension(() => host, { root, prepareContext });
+    const factory = (pi) => {
+        getThinkingLevel = () => pi.getThinkingLevel();
+        extensionFactory(pi);
+    };
 
     return Object.freeze({ revision, root, factory });
 }
 
 /**
  * Pi reloads extension code, so process memory retains the original controller and
- * pending completion promises. A reload cannot reset quotas or free occupied slots.
+ * pending SDK requests. A reload cannot reset quotas or free occupied slots.
  * Restart Pi to load a different runtime revision or change the working root.
  * Trusted extensions share this process; this is not a security boundary against them.
  */
-export function registerNativeDelegation(pi) {
+export function registerNativeDelegation(pi, sdk) {
     const root = canonical(process.cwd());
     let state = globalThis[stateKey];
     if (state === undefined) {
-        state = createState(root);
+        state = createState(root, sdk);
         Object.defineProperty(globalThis, stateKey, { value: state });
     } else if (
         state.revision !== revision ||

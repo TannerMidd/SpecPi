@@ -83,12 +83,20 @@ function packet() {
         decisions: [],
         nonGoals: ["No file changes"],
         reason: {
-            deliverable: "Assessment",
-            consumer: "Parent",
-            independence: "Separate analysis",
+            benefit: "independent_review",
+            why: "An independent review of the frozen fixture",
             parentWork: "Review integration",
         },
-        jobs: [{ id: "j1", mode: "consult", question: "Assess fixture", context: "public text", sources: [] }],
+        jobs: [
+            {
+                id: "j1",
+                mode: "review",
+                question: "Assess fixture",
+                context: "public text",
+                sources: [],
+                requirements: ["r1"],
+            },
+        ],
     };
 }
 
@@ -109,8 +117,7 @@ function publicHostBridge() {
         id: "fixture-owner",
         model: { provider: "fixture", id: "fixture-parent" },
         isCurrent: () => true,
-        async stream() {
-            calls += 1;
+        async openSession() {
             const terminal = {
                 role: "assistant",
                 content: [{ type: "text", text: JSON.stringify(result()) }],
@@ -119,10 +126,14 @@ function publicHostBridge() {
             };
 
             return {
-                async *[Symbol.asyncIterator]() {
-                    yield { type: "done", message: terminal };
+                release() {},
+                async run(_prompt, controls) {
+                    controls.admitCall();
+                    calls += 1;
+                    controls.onUsage(terminal.usage);
+
+                    return terminal;
                 },
-                result: async () => terminal,
             };
         },
     };
@@ -168,9 +179,33 @@ test("extension stays off until a human UI command and exposes closed operations
     assert.ok(DELEGATE_SCHEMA.anyOf.every((branch) => branch.additionalProperties === false));
     await pi.command("on");
     assert.equal((await state(pi)).enabled, true);
-    assert.match(pi.notices.at(-1).text, /exact parent model fixture\/fixture-parent/);
+    assert.match(pi.notices.at(-1).text, /Pi child sessions for review and scout, fixture\/fixture-parent/);
     assert.equal((await pi.fire("before_agent_start"))[0].message.display, false);
     assert.equal(bridge.calls(), 0);
+});
+
+test("activation cannot outlive the extension binding that started provider preflight", async (t) => {
+    let finish;
+    const ready = new Promise((resolve) => {
+        finish = resolve;
+    });
+    const bridge = publicHostBridge();
+    bridge.host.ready = () => ready;
+    const factory = createDelegationExtension(() => bridge.host, { root: project(t) });
+    const oldPi = mockPi();
+    factory(oldPi);
+    await oldPi.fire("session_start");
+    const pendingActivation = oldPi.command("on");
+    const currentPi = mockPi();
+    factory(currentPi);
+    await currentPi.fire("session_start");
+    t.after(() => currentPi.fire("session_shutdown"));
+    finish();
+    await pendingActivation;
+    assert.equal((await state(currentPi)).enabled, false);
+    assert.match(oldPi.notices.at(-1).text, /changed during delegation setup/);
+    await currentPi.command("on");
+    assert.equal((await state(currentPi)).enabled, true);
 });
 
 test("ordinary leaf and turn advances preserve a collected result generation", async (t) => {
@@ -256,7 +291,7 @@ test("policy replies are bound to live state and subscriptions are removed on sh
     });
     assert.notEqual(before.fingerprint, after.fingerprint);
     assert.match(after.summary, /enabled=true/);
-    assert.match(after.summary, /No .*invoice\/transport-memory cap/i);
+    assert.match(after.summary, /SDK settlement does not establish remote termination or invoice bounds/);
     let invalid = "unanswered";
     pi.events.emit("specpi:delegation-policy", {
         input: { operation: "status", arbitrary: true },

@@ -507,9 +507,8 @@ npm run check</code></pre>
                         normal Pi package discovery and the existing SpecPi install/update lifecycle. Start
                         <code>pi</code> normally, then use <code>/delegate on</code> to enable the fixed calls/time
                         envelope. The parent remains the sole writer.
-                        <strong>Pi 0.84.4 is the compatibility-test floor</strong>, not an exact-version gate or
-                        guarantee for all later versions. Delegation fails closed if the public completion capability is
-                        absent.
+                        <strong>This SDK integration supports Pi 0.84.4 and 0.85.0</strong>; other versions require
+                        compatibility review. The delegation schema is absent from model requests while off.
                     </p>
                     <div class="terminal doc-terminal">
                         <pre><code>pi
@@ -521,34 +520,43 @@ npm run check</code></pre>
 /delegate off</code></pre>
                     </div>
                     <p>
-                        <code>review</code> and <code>consult</code> use supplied context without tools.
-                        <code>investigate</code> and <code>research</code> can list, read and search exact selected text
-                        files through the snapshot broker. All use the exact parent model through Pi's public model
-                        registry. Research does not browse the web. Workers have no shell, writes or nested delegation.
+                        Workers are actual SDK <code>AgentSession</code> instances with in-memory storage.
+                        <code>review</code> examines a frozen artifact; <code>scout</code> answers a bounded evidence
+                        question. Both can list, read and search exact selected text files; a review may instead use
+                        nonempty inline context without tools. Scouts require selected files. Children load no ambient
+                        extensions, skills, AGENTS files or parent history, and have no shell, writes, live web or
+                        nested delegation.
                     </p>
                     <p>
-                        The Pi process allows at most two active requests, four batches and 48 model invocations. Jobs
-                        have a 120-second deadline; one changed-input follow-up shares the original counters and
-                        deadline. Cancelled requests retain their slots until the underlying Promise settles. Reloads,
-                        session switches and off/on preserve the controller and counters. Task, scope, model, session,
-                        reload or guard changes revoke the current generation; ordinary parent turns do not. Guard Off
-                        and Locked modes cannot activate delegation.
+                        The packet assigns requirements to each job and declares independent review, parallel analysis
+                        or context isolation. Explain the benefit; concurrent parent work is required only for parallel
+                        analysis. These checks constrain structure, not prove useful independence. Each batch has at
+                        most two jobs. The Pi process permits two active workers, four batches and 32 SDK invocations;
+                        each job gets four invocations and 120 seconds including one follow-up. These are experimental
+                        ceilings. Cancelled workers retain slots through SDK-visible stream/result and prompt
+                        settlement. Reloads, session switches and off/on preserve the controller and counters. Task,
+                        scope, model, session, reload or guard changes revoke the current generation; ordinary parent
+                        turns do not. Guard Off and Locked modes cannot activate delegation.
                     </p>
                     <p class="doc-boundary">
-                        <strong>Completion boundary.</strong> Inputs are bounded before dispatch, but responses are
-                        checked only after the complete-message Promise resolves. The entire response may already be
-                        buffered. There is no midstream, raw-transport, provider-attempt, invoice or process-memory cap.
-                        Cost is unavailable; missing usage is explicit. The parent must verify findings. Host receipts
-                        and parent acceptance do not grant human authority or prove task completion.
+                        <strong>SDK boundary.</strong> Pi runs the model/tool loop; SpecPi admits every SDK invocation
+                        before dispatch and checks SDK-visible streaming. Provider/session retries and compaction are
+                        disabled. SDK events do not establish hard raw-transport, hidden-provider-attempt, invoice or
+                        memory caps, or prove remote execution has ended. Cost is unavailable; missing usage is
+                        explicit. The parent must verify findings. Receipts and parent acceptance do not grant human
+                        authority or prove task completion.
                     </p>
                     <p>
-                        Pi owns normal resource discovery, trust, proxy policy, authentication and OAuth. The native
-                        completion call does not inherit parent context/header/payload/response hooks,
-                        transport/thinking settings or session affinity; reasoning uses provider defaults. Keep
-                        delegation disabled when those inherited controls are required. Selected context reaches the
-                        configured provider, and normal parent tool results may persist in Pi's session. Snapshot access
-                        is a trusted-local-filesystem boundary, not an OS sandbox. Its canonical working root is fixed
-                        for the Pi process; restart Pi to change it or load a new delegation runtime version.
+                        A fresh child Pi ModelRuntime uses standard authentication, environment and model definitions.
+                        Transport/thinking budgets use configured global settings without project settings. Parent
+                        model/thinking are explicit with Pi clamping. Runtime-only authentication, selected
+                        extension-provider overrides, model headers, startup proxy configuration and safe descriptor
+                        mismatches fail preflight. Parent hooks, ephemeral settings and session affinity are not
+                        inherited; keep delegation disabled when those controls are required. Parent Pi resources and
+                        trust remain unchanged. Selected context reaches the configured provider, and normal parent tool
+                        results may persist in Pi's session. Snapshot access is a trusted-local-filesystem boundary, not
+                        an OS sandbox. Its canonical working root is fixed for the Pi process; restart Pi to change it
+                        or load a new delegation runtime version.
                     </p>
                     <p>
                         Read the

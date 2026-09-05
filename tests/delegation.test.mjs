@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDelegationController } from "../extensions/delegation/core.mjs";
-import { LIMITS } from "../extensions/delegation/protocol.mjs";
+import { LIMITS, validatePacket } from "../extensions/delegation/protocol.mjs";
 
 const usage = { input: 3, output: 5, cacheRead: 0, cacheWrite: 0 };
 
@@ -30,7 +30,7 @@ function project(t, files = {}) {
 }
 
 function packet(
-    jobs = [{ id: "j1", mode: "consult", question: "Assess the fixture", context: "ordinary fixture", sources: [] }],
+    jobs = [{ id: "j1", mode: "review", question: "Assess the fixture", context: "ordinary fixture", sources: [] }],
 ) {
     return {
         objective: "Assess a public fixture",
@@ -38,12 +38,15 @@ function packet(
         decisions: ["Use only the supplied sources"],
         nonGoals: ["Do not modify files"],
         reason: {
-            deliverable: "A bounded assessment",
-            consumer: "Parent reviewer",
-            independence: "Separate source analysis",
+            benefit: jobs.every((job) => job.mode === "review") ? "independent_review" : "context_isolation",
+            why: "A separate evidence question with an independently checkable answer",
             parentWork: "Inspect integration boundaries",
         },
-        jobs,
+        jobs: jobs.map((job) => ({
+            ...job,
+            question: `${job.question} (${job.id})`,
+            requirements: job.requirements ?? ["r1"],
+        })),
     };
 }
 
@@ -94,18 +97,85 @@ function stream(terminal, events = [{ type: "done", message: terminal }], settle
     };
 }
 
-// This synthetic public host bridge has no credentials, session data, or network.
+// A scripted session double exercises the controller. Real Pi's loop is verified
+// separately by the provider and ordinary-startup integration fixtures.
 function hostBridge(respond = () => message(JSON.stringify(result()))) {
     const calls = [];
     const host = {
         id: "fixture-host",
         model: { provider: "fixture", id: "exact-parent-model" },
         isCurrent: () => true,
-        async stream(context, options) {
-            calls.push({ context: structuredClone(context), options });
-            const response = await respond(context, options, calls.length);
+        async openSession({ systemPrompt, tools }) {
+            const messages = [];
 
-            return response?.[Symbol.asyncIterator] ? response : stream(response);
+            return {
+                release() {},
+                async run(prompt, controls) {
+                    messages.push({ role: "user", content: [{ type: "text", text: prompt }] });
+                    for (;;) {
+                        controls.assertLive();
+                        const context = {
+                            systemPrompt,
+                            messages,
+                            tools: tools.map(({ name, description, parameters }) => ({
+                                name,
+                                description,
+                                parameters,
+                            })),
+                        };
+                        if (Buffer.byteLength(JSON.stringify(context)) > controls.limits.contextBytes) {
+                            throw new Error("Context limit");
+                        }
+
+                        controls.admitCall();
+                        calls.push({ context: structuredClone(context), options: controls });
+                        const response = await respond(context, controls, calls.length);
+                        const events = response?.[Symbol.asyncIterator] ? response : stream(response);
+                        let terminal;
+                        try {
+                            for await (const event of events) {
+                                controls.assertLive();
+                                if (
+                                    Buffer.byteLength(JSON.stringify(event.partial ?? event.message ?? {})) >
+                                    controls.limits.retainedResponseBytes
+                                ) {
+                                    throw new Error("Response limit");
+                                }
+                            }
+
+                            terminal = await events.result();
+                            controls.onUsage(terminal.usage);
+                            controls.assertLive();
+                        } catch (error) {
+                            controls.abort();
+                            await events.result();
+                            throw error;
+                        }
+
+                        messages.push(terminal);
+                        const requested = terminal.content.filter((part) => part.type === "toolCall");
+                        if (!requested.length) {
+                            return terminal;
+                        }
+
+                        for (const call of requested) {
+                            const tool = tools.find((item) => item.name === call.name);
+                            if (!tool) {
+                                throw new Error("Unavailable tool");
+                            }
+
+                            const output = await tool.execute(call.id, call.arguments, controls.signal);
+                            messages.push({
+                                role: "toolResult",
+                                toolCallId: call.id,
+                                toolName: call.name,
+                                content: output.content,
+                                isError: false,
+                            });
+                        }
+                    }
+                },
+            };
         },
     };
 
@@ -163,7 +233,11 @@ test("controller defaults off, validates closed inputs, and rejects raised ceili
         { operation: "run", requestId: "jobextra", packet: packet([{ ...packet().jobs[0], tools: ["read"] }]) },
         { operation: "collect", batchId: "unknown", waitMs: 30001 },
         { operation: "run", requestId: "wrongmode", packet: packet([{ ...packet().jobs[0], mode: "write" }]) },
-        { operation: "run", requestId: "inlineonly", packet: packet([{ ...packet().jobs[0], sources: ["demo.md"] }]) },
+        {
+            operation: "run",
+            requestId: "empty-evidence",
+            packet: packet([{ ...packet().jobs[0], context: "", sources: [] }]),
+        },
     ]) {
         await assert.rejects(value.execute(input));
     }
@@ -175,6 +249,173 @@ test("controller defaults off, validates closed inputs, and rejects raised ceili
     );
     const locked = controller(t, root, bridge, { getGuard: () => "locked" });
     assert.throws(() => locked.enable(), /Guard/);
+});
+
+test("admission permits only evidenced review and scoped analysis with valid requirement assignments", () => {
+    const review = packet();
+    review.reason.parentWork = "";
+    assert.deepEqual(validatePacket(review), review, "final review need not invent concurrent parent work");
+    const scout = packet([{ ...review.jobs[0], mode: "scout", sources: ["public.md"] }]);
+    scout.reason.benefit = "parallel_analysis";
+    assert.deepEqual(validatePacket(scout), scout);
+    const invalid = [
+        (value) => {
+            value.jobs[0].mode = "consult";
+        },
+        (value) => {
+            value.jobs[0].requirements = [];
+        },
+        (value) => {
+            value.jobs[0].requirements = ["unknown"];
+        },
+        (value) => {
+            value.jobs[0].requirements = ["r1", "r1"];
+        },
+        (value) => {
+            value.reason.benefit = "faster";
+        },
+        (value) => {
+            value.reason.benefit = "context_isolation";
+        },
+        (value) => {
+            value.jobs.push({ ...value.jobs[0], id: "j2", question: ` ${value.jobs[0].question.toUpperCase()} ` });
+        },
+        (value) => {
+            value.jobs.push(...["j2", "j3"].map((id) => ({ ...value.jobs[0], id, question: id })));
+        },
+    ];
+    for (const mutate of invalid) {
+        const value = structuredClone(review);
+        mutate(value);
+        assert.throws(() => validatePacket(value));
+    }
+
+    const ungrounded = structuredClone(scout);
+    ungrounded.jobs[0].sources = [];
+    assert.throws(() => validatePacket(ungrounded), /selected source files/);
+    scout.reason.parentWork = "";
+    assert.throws(() => validatePacket(scout), /text/);
+});
+
+test("each child sees and answers only its assigned requirements", async (t) => {
+    const selected = packet();
+    selected.requirements.push({ id: "r2", text: "A separate parent-owned requirement" });
+    const bridge = hostBridge((context) => {
+        const handoff = JSON.parse(context.messages[0].content[0].text);
+        assert.deepEqual(handoff.requirements, [selected.requirements[0]]);
+
+        return message(JSON.stringify(result()));
+    });
+    const value = controller(t, project(t), bridge);
+    value.enable();
+    const collected = await complete(value, selected);
+    assert.equal(collected.results[0].receipt.state, "complete");
+    assert.equal(bridge.calls.length, 1);
+});
+
+test("completed child sessions release at disposition or the original deadline while reports remain collectable", async (t) => {
+    for (const action of ["accept", "discard", "deadline", "invalidate"]) {
+        let releases = 0;
+        const worker = async ({ job, admitCall }) => {
+            admitCall();
+            job.release = () => {
+                releases += 1;
+            };
+
+            return result();
+        };
+
+        const value = controller(t, project(t), hostBridge(), { worker, limits: { jobMs: 80 } });
+        value.enable();
+        const collected = await complete(value);
+        assert.equal(releases, 0, `${action}: keep a successful session for one follow-up`);
+        const receipt = collected.results[0].receipt;
+        if (action === "deadline") {
+            await waitFor(() => releases === 1);
+            const retained = await value.execute({ operation: "collect", batchId: receipt.batchId });
+            assert.equal(retained.results[0].receipt.state, "complete");
+            await assert.rejects(
+                value.execute({
+                    operation: "follow_up",
+                    requestId: "late",
+                    ...binding(receipt),
+                    prompt: "New evidence",
+                }),
+                /unavailable/,
+            );
+        } else if (action === "invalidate") {
+            value.invalidate();
+        } else {
+            await value.execute({
+                operation: "resolve",
+                requestId: "final",
+                ...binding(receipt),
+                decision: action,
+                findings: [],
+            });
+        }
+
+        assert.equal(releases, 1, action);
+        value.invalidate();
+        assert.equal(releases, 1, `${action}: release remains idempotent`);
+    }
+});
+
+test("cancellation while Pi opens a child releases the late session without inference", async (t) => {
+    const opened = deferred();
+    let releases = 0;
+    let runs = 0;
+    const bridge = hostBridge();
+    bridge.host.openSession = () => opened.promise;
+    const value = controller(t, project(t), bridge);
+    value.enable();
+    const batch = await value.execute({ operation: "run", requestId: "opening", packet: packet() });
+    value.invalidate();
+    assert.equal(value.status().active, 1);
+    opened.resolve({
+        release: () => {
+            releases += 1;
+        },
+        run: () => {
+            runs += 1;
+        },
+    });
+    await waitFor(() => value.status().active === 0);
+    assert.equal(releases, 1);
+    assert.equal(runs, 0);
+    assert.equal(value.status().batches.find((item) => item.batchId === batch.batchId).jobs[0].state, "stale");
+});
+
+test("a failed child follow-up restores the original handoff while preserving spent calls", async (t) => {
+    const bridge = hostBridge((context, _options, number) => {
+        if (number === 1) {
+            return message("malformed report");
+        }
+
+        const prompt = context.messages[0].content[0].text;
+        assert.match(prompt, /Assess a public fixture/);
+        assert.match(prompt, /Explain the fixture/);
+        assert.match(prompt, /ordinary fixture/);
+        assert.match(prompt, /New evidence: fixture is documented/);
+
+        return message(JSON.stringify(result()));
+    });
+    const value = controller(t, project(t), bridge);
+    value.enable();
+    const failed = await complete(value);
+    assert.equal(failed.results[0].receipt.state, "failed");
+    const receipt = failed.results[0].receipt;
+    await value.execute({
+        operation: "follow_up",
+        requestId: "corrected",
+        ...binding(receipt),
+        prompt: "New evidence: fixture is documented",
+    });
+    await waitFor(() => value.status().active === 0);
+    const collected = await value.execute({ operation: "collect", batchId: receipt.batchId });
+    assert.equal(collected.results[0].receipt.state, "complete");
+    assert.equal(collected.results[0].receipt.calls, 2);
+    assert.equal(bridge.calls.length, 2);
 });
 
 test("equal run requests are immutable idempotent receipts and changed payloads cannot spend calls", async (t) => {
@@ -255,13 +496,13 @@ test("two worker slots stay occupied until non-cooperative cancellation settles"
     t.after(() => pending.forEach((item) => item.gate.resolve()));
     const value = controller(t, root, hostBridge(), { worker });
     value.enable();
-    const jobs = Array.from({ length: 4 }, (_, index) => ({ ...packet().jobs[0], id: `j${index}` }));
+    const jobs = Array.from({ length: 2 }, (_, index) => ({ ...packet().jobs[0], id: `j${index}` }));
     const batch = await value.execute({ operation: "run", requestId: "concurrent", packet: packet(jobs) });
     assert.equal(value.status().active, 2);
     assert.equal(pending.length, 2);
     assert.deepEqual(
         batch.jobs.map((job) => job.state),
-        ["running", "running", "queued", "queued"],
+        ["running", "running"],
     );
     await value.execute({ operation: "cancel", requestId: "cancel1", batchId: batch.batchId, jobId: "j0" });
     const cancelled = await value.execute({ operation: "collect", batchId: batch.batchId });
@@ -270,14 +511,10 @@ test("two worker slots stay occupied until non-cooperative cancellation settles"
     assert.equal(pending[0].signal.aborted, true);
     assert.equal(pending.length, 2);
     pending[0].gate.resolve();
-    await waitFor(() => pending.length === 3);
-    assert.equal(value.status().active, 2);
+    await waitFor(() => value.status().active === 1);
     pending[1].gate.resolve();
-    await waitFor(() => pending.length === 4);
-    pending[2].gate.resolve();
-    pending[3].gate.resolve();
     await waitFor(() => value.status().active === 0);
-    assert.equal(value.status().sessionCalls, 4);
+    assert.equal(value.status().sessionCalls, 2);
 });
 
 test("off/on and host rebind preserve consumed calls, batch counts, and held worker slots", async (t) => {
@@ -480,7 +717,7 @@ test("source edits reject collect and resolve and stale generations reject repla
     const input = {
         operation: "run",
         requestId: "source-run",
-        packet: packet([{ ...packet().jobs[0], mode: "investigate", sources: ["demo.md"] }]),
+        packet: packet([{ ...packet().jobs[0], mode: "scout", sources: ["demo.md"] }]),
     };
     const batch = await value.execute(input);
     await waitFor(() => value.status().active === 0);
@@ -630,7 +867,7 @@ test("actual workers normalize selected paths and use only their selected litera
             ["sources\\a.md", "sources/b.md"].map((source, index) => ({
                 ...packet().jobs[0],
                 id: `j${index}`,
-                mode: "investigate",
+                mode: "scout",
                 sources: [source],
             })),
         ),
@@ -645,9 +882,6 @@ test("actual workers normalize selected paths and use only their selected litera
             call.context.tools.map((tool) => tool.name),
             ["list_sources", "read_source", "search_sources"],
         );
-        assert.ok(call.options.maxTokens <= LIMITS.outputTokens);
-        assert.ok(call.options.timeoutMs <= LIMITS.jobMs);
-        assert.match(call.options.sessionId, /^specpi-delegation-/);
     }
 });
 
@@ -676,7 +910,7 @@ test("foreign source IDs fail before returning sibling content", async (t) => {
             ["a.md", "b.md"].map((source, index) => ({
                 ...packet().jobs[0],
                 id: `j${index}`,
-                mode: "investigate",
+                mode: "scout",
                 sources: [source],
             })),
         ),
@@ -731,20 +965,23 @@ test("invalid final JSON, coverage, confidence, and source evidence fail without
 
 test("tool-free profiles and unavailable recursive tools fail without a retry", async (t) => {
     for (const [mode, name] of [
-        ["consult", "list_sources"],
+        ["review", "list_sources"],
         ["review", "read_source"],
-        ["research", "delegate"],
-        ["investigate", "bash"],
+        ["scout", "delegate"],
+        ["scout", "bash"],
     ]) {
         await t.test(`${mode} rejects ${name}`, async (child) => {
-            const root = project(child);
+            const root = project(child, { "demo.md": "selected evidence" });
             const bridge = hostBridge(() => message([{ type: "toolCall", id: "bad", name, arguments: {} }]));
             const value = controller(child, root, bridge);
             value.enable();
-            const output = await complete(value, packet([{ ...packet().jobs[0], mode }]));
+            const output = await complete(
+                value,
+                packet([{ ...packet().jobs[0], mode, sources: mode === "scout" ? ["demo.md"] : [] }]),
+            );
             assert.equal(output.results[0].receipt.state, "failed");
             assert.equal(bridge.calls.length, 1);
-            if (["consult", "review"].includes(mode)) {
+            if (mode === "review") {
                 assert.deepEqual(bridge.calls[0].context.tools, []);
             }
         });
@@ -752,13 +989,13 @@ test("tool-free profiles and unavailable recursive tools fail without a retry", 
 });
 
 test("tool conversations consume call bounds and never recurse past four calls", async (t) => {
-    const root = project(t);
+    const root = project(t, { "demo.md": "selected evidence" });
     const bridge = hostBridge((_context, _options, call) =>
         message([{ type: "toolCall", id: `list${call}`, name: "list_sources", arguments: {} }]),
     );
     const value = controller(t, root, bridge);
     value.enable();
-    const output = await complete(value, packet([{ ...packet().jobs[0], mode: "research" }]));
+    const output = await complete(value, packet([{ ...packet().jobs[0], mode: "scout", sources: ["demo.md"] }]));
     assert.equal(bridge.calls.length, 4);
     assert.equal(output.results[0].receipt.calls, 4);
     assert.equal(output.results[0].receipt.state, "failed");
@@ -821,7 +1058,7 @@ test("tool count and serialized output quotas stop the conversation before anoth
             value.enable();
             const output = await complete(
                 value,
-                packet([{ ...packet().jobs[0], mode: "investigate", sources: ["demo.md"] }]),
+                packet([{ ...packet().jobs[0], mode: "scout", sources: ["demo.md"] }]),
             );
             assert.equal(output.results[0].receipt.state, "failed");
             assert.equal(bridge.calls.length, 1);

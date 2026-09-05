@@ -10,6 +10,10 @@ alternative-model, monetary, raw-transport and underlying-attempt guarantees. It
 normative requirements, command sketches and delivery stages are targets, not runtime
 promises or evidence that the experiment has passed outcome evaluation.
 
+The current implementation uses actual Pi AgentSession workers with only `review` and
+`scout` admission, explicit parent model/thinking, selected-source tools and in-memory
+sessions. It supersedes the proposed custom loop and four-profile sequence below.
+
 Research reviewed through 5 September 2026. The original working name
 `specpi-delegation` below was a design placeholder, not a separate published or reserved
 npm package.
@@ -325,10 +329,13 @@ spend counter must not be presented as the total task budget.
 ## 8. Pi runtime and package boundary
 
 The following records the original compatibility analysis and its stronger target.
-The current native experiment instead uses public `ctx.modelRegistry.complete`, with
-Pi 0.84.4 as its compatibility-test floor and a capability check. It deliberately does
-not promise full parent inference parity: parent hooks, transport/thinking settings
-and session affinity are not inherited, and output is checked after completion only.
+The current native experiment instead uses public SDK `createAgentSession` with a fresh
+standard Pi `ModelRuntime`, explicit parent model/thinking, in-memory sessions and
+admission before each SDK invocation. Delegation currently allows the reviewed
+Pi 0.84.4 and 0.85.0 SDK versions; the normal installer floor and bootstrap pin are
+separate contracts. See the compatibility record for completed validation.
+SDK-visible streams are checked, but full parent-hook/ephemeral-setting parity and
+hard raw-transport, hidden-attempt and monetary bounds remain unclaimed.
 See the [implemented guide](README.md). The target `InferencePort` below is not an
 exported Pi API or a claim that the experiment supplies these stronger guarantees.
 
@@ -488,8 +495,8 @@ evaluation cohorts remain interpretable.
 ## 11. Delivery sequence and decisions
 
 This is the original proposed sequence, not an implementation-status table. The
-current experiment exposes four same-parent-model profiles under a narrower calls/time
-contract. Their implementation does not establish the comparative benefits required
+current experiment exposes two purposes, `review` and `scout`, through actual Pi
+AgentSession instances under `bounded-pi-sessions-v1`. Their implementation does not establish the comparative benefits required
 by the stages below.
 
 | Stage                | Build                                                                             | Required evidence before proceeding                                                                     |

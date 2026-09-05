@@ -3,9 +3,10 @@ import { createHash } from "node:crypto";
 export const LIMITS = Object.freeze({
     concurrency: 2,
     sessionBatches: 4,
-    sessionCalls: 48,
-    batchJobs: 4,
-    batchCalls: 12,
+    sessionCalls: 32,
+    batchJobs: 2,
+    batchCalls: 8,
+    jobCalls: 4,
     jobMs: 120_000,
     batchMs: 300_000,
     contextBytes: 256 * 1024,
@@ -13,7 +14,7 @@ export const LIMITS = Object.freeze({
     toolBytes: 64 * 1024,
     toolCalls: 12,
     resultBytes: 16 * 1024,
-    outputTokens: 2048,
+    outputTokens: 8192,
 });
 
 export function bytes(value) {
@@ -108,20 +109,42 @@ export function validatePacket(packet) {
 
     list(packet.decisions, 24, (item) => text(item, 2000));
     list(packet.nonGoals, 24, (item) => text(item, 2000));
-    record(packet.reason, ["deliverable", "consumer", "independence", "parentWork"]);
-    Object.values(packet.reason).forEach((item) => text(item, 2000));
+    record(packet.reason, ["benefit", "why", "parentWork"]);
+    if (!["independent_review", "parallel_analysis", "context_isolation"].includes(packet.reason.benefit)) {
+        throw new Error("Delegation is limited to independent review or selected-source analysis");
+    }
+
+    text(packet.reason.why, 2000);
+    text(packet.reason.parentWork, 2000, packet.reason.benefit !== "parallel_analysis");
     list(packet.jobs, LIMITS.batchJobs, (job) => {
-        record(job, ["id", "mode", "question", "context", "sources"]);
+        record(job, ["id", "mode", "question", "context", "sources", "requirements"]);
         identifier(job.id);
-        if (!["review", "investigate", "consult", "research"].includes(job.mode)) {
+        if (!["review", "scout"].includes(job.mode)) {
             throw new Error("Unsupported delegation mode");
         }
 
         text(job.question, 8000);
         text(job.context, 128 * 1024, true);
         list(job.sources, 200, (source) => text(source, 500));
-        if (["review", "consult"].includes(job.mode) && job.sources.length) {
-            throw new Error("Tool-free modes accept inline context only");
+        list(job.requirements, packet.requirements.length, identifier);
+        if (
+            !job.requirements.length ||
+            new Set(job.requirements).size !== job.requirements.length ||
+            job.requirements.some((id) => !packet.requirements.some((requirement) => requirement.id === id))
+        ) {
+            throw new Error("Each worker needs a unique subset of the packet requirement IDs");
+        }
+
+        if ((packet.reason.benefit === "independent_review") !== (job.mode === "review")) {
+            throw new Error("The worker mode must match the declared delegation benefit");
+        }
+
+        if (!job.context.trim() && !job.sources.length) {
+            throw new Error("A worker needs a frozen artifact or selected evidence to examine");
+        }
+
+        if (job.mode === "scout" && !job.sources.length) {
+            throw new Error("A scout requires explicitly selected source files");
         }
     });
     if (
@@ -130,6 +153,10 @@ export function validatePacket(packet) {
         bytes(packet) > LIMITS.contextBytes
     ) {
         throw new Error("Delegation packet exceeds its bound or repeats job identifiers");
+    }
+
+    if (new Set(packet.jobs.map((job) => job.question.trim().toLowerCase())).size !== packet.jobs.length) {
+        throw new Error("Assign distinct worker questions instead of duplicate answers");
     }
 
     return structuredClone(packet);

@@ -1,20 +1,33 @@
-# Delegation protocol: experimental-calls-time-v1
+# Delegation protocol: bounded-pi-sessions-v1
 
 This is the implemented in-process API. It has no HTTP listener, daemon, child process,
 or child session store. The broader [target protocol](design-protocol.md) remains a
 proposal; its stronger transport/attempt/cost gates are not supplied by this version.
 
 The extension loads through normal `pi` package discovery and remains disabled until
-the human runs `/delegate on`. Pi 0.84.4 is the compatibility-test floor; runtime
-admission checks the public `modelRegistry.complete` capability. This native bridge
-uses the parent model through Pi-owned authentication and provider routing, but does
-not inherit parent request hooks, transport/thinking settings or session affinity.
-It uses provider-default reasoning. Inputs are bounded before dispatch; complete
-responses can only be checked after the returned Promise resolves.
+the human runs `/delegate on`. The SDK version allowlist is **Pi 0.84.4 and 0.85.0**;
+other versions fail the delegation support gate pending compatibility review. Allowlist
+membership does not itself establish a passing provider or native integration suite.
+Workers are SDK `createAgentSession` instances using in-memory session storage and a
+fresh Pi `ModelRuntime`. The parent model and thinking level are passed explicitly,
+subject to Pi's clamping. Standard Pi authentication, environment and `models.json`
+resolution apply. Child transport/thinking budgets come from configured global settings;
+project settings are not loaded. Runtime-only authentication, selected extension-provider
+overrides, model-specific headers, startup proxy configuration and safe model-descriptor
+mismatches fail preflight. Parent request hooks,
+ephemeral runtime settings, session affinity and ambient resources are not inherited.
+
+The SDK runs the conversation and selected-source tool loop. SpecPi admits each SDK
+invocation before dispatch and observes the SDK stream; provider/session retries and
+automatic compaction are disabled. This does not establish hard raw-transport,
+hidden-provider-attempt, invoice or process-memory limits.
+Pi authentication preflight precedes the model-invocation counter; its preparation
+is not a model invocation or an operation bounded by that counter.
 
 Every object is closed: unknown fields, duplicate IDs, malformed values and oversized
 data are rejected. The host creates identities and receipts; workers cannot supply them.
-The protocol identifier is returned by `status`. It is not a model-selected option.
+The protocol identifier `bounded-pi-sessions-v1` and inference contract
+`pi-agent-session-v1` describe the host implementation, not model-selected options.
 
 ## Submit a batch
 
@@ -23,22 +36,22 @@ After the human runs `/delegate on`, the parent calls the `delegate` tool:
 ```json
 {
     "operation": "run",
-    "requestId": "investigate-routing-1",
+    "requestId": "scout-routing-1",
     "packet": {
         "objective": "Explain how model selection reaches the request pipeline",
         "requirements": [{ "id": "R1", "text": "Identify the route binding and its invalidation behavior" }],
         "decisions": ["The parent remains the sole writer"],
         "nonGoals": ["Do not implement or change providers"],
         "reason": {
-            "deliverable": "A source-backed explanation of route binding",
-            "consumer": "The parent will compare it with the lifecycle tests",
-            "independence": "Reading this module is independent of inspecting test coverage",
+            "benefit": "parallel_analysis",
+            "why": "Source analysis can proceed independently of the parent's lifecycle-test inspection",
             "parentWork": "Inspect the lifecycle tests while the worker reads"
         },
         "jobs": [
             {
                 "id": "route",
-                "mode": "investigate",
+                "mode": "scout",
+                "requirements": ["R1"],
                 "question": "Where is the model captured, and when is that capability revoked?",
                 "context": "Return evidence for R1, including missing or contrary evidence.",
                 "sources": ["extensions/delegation/provider.mjs"]
@@ -56,8 +69,23 @@ authentication configuration. Those can change behind the same public identities
 the extension cannot observe every such change or certify an unchanged provider route.
 IDs are short alphanumeric/hyphen/underscore strings. The host batch and attempt IDs
 are UUIDs. Source paths are exact relative filenames, not directories, globs or commands.
-`review` and `consult` require an empty `sources` array; their only evidence is inline
-context. All modes require the same explicit packet fields, even when an array is empty.
+Modes are `review` and `scout`. Either can use the selected-source list/read/literal-search
+tools when files are supplied. A scout requires at least one selected file. A review
+requires nonempty inline context or selected files; with an empty `sources` array it
+uses inline context without tools. Source selection never grants ambient filesystem
+or web access. Questions that are identical after trimming and case normalization are
+rejected; distinct text does not establish distinct reasoning work.
+
+`reason` contains exactly `benefit`, `why` and `parentWork`. `why` is nonempty.
+`independent_review` requires review jobs; `parallel_analysis` and `context_isolation`
+require scout jobs. `parentWork` must describe useful concurrent work for
+`parallel_analysis` and may be empty otherwise. These are structural admission checks,
+not proof that delegation improves the task.
+
+Each job's nonempty `requirements` list names unique IDs from the packet's global
+requirements. The child receives only its assigned requirements, plus the global
+decisions and non-goals. A batch contains at most two jobs. All modes require the same
+explicit packet fields, even when an allowed array or string is empty.
 
 ## Inspect and collect
 
@@ -99,7 +127,7 @@ Workers return this exact shape, without Markdown fences:
 }
 ```
 
-Statuses are `complete`, `partial`, or `needs_context`. Every requirement appears
+Statuses are `complete`, `partial`, or `needs_context`. Every assigned requirement appears
 exactly once as `addressed` or `unaddressed`. Each finding has `id`, `claim`, `confidence`
 (`observed`, `inferred`, `unverified`), `evidence` and `contraryEvidence`. Evidence entries
 contain exactly `sourceId`, `lineStart`, `lineEnd`. References must resolve within the
@@ -170,20 +198,25 @@ apply when replaying successful operations. No idempotency record resets account
 Omit `jobId` to cancel the batch. Cancellation remains available after invalidation.
 Job states are `queued`, `running`, the three report statuses, `failed`, `cancelled`,
 `expired`, and `stale`. Terminal job state and `settling` are separate. Cancellation
-revokes tool access and requests provider abort; a request keeps its global slot until
-the provider settles. Old payloads are discarded. Terminal receipt delivery does not
-imply that network activity has already ended.
+revokes tool access and requests SDK abort. A worker keeps its global slot through
+SDK-visible stream/result and prompt settlement. Old payloads are discarded. Neither
+terminal receipt delivery nor SDK settlement proves physical remote execution has ended.
 
 The same in-memory controller survives `/reload` and session switches within the Pi
-process. Its ceilings are two active requests, four batches and 48 model invocations
-per process. Human off/on, task changes,
+process. Its ceilings are two active workers, four batches and 32 SDK model invocations
+per process, with two jobs and 8 invocations per batch and four invocations per logical
+job including one follow-up. Requested output is 8,192 tokens clamped to the model
+maximum. These are experiment limits, not research-derived optimal values.
+Human off/on, task changes,
 branch navigation, model selection, guard changes and reloads revoke old generations;
 they do not create a new resource allowance. Normal parent turns do not revoke a job.
 The canonical working root remains fixed for that process. Restart Pi to change the
 root or load a new delegation runtime version. There is no retry on process restart
-and no durable worker queue. These limits do not bound midstream output or allocation;
-an oversized complete response is rejected only after it has been returned.
+and no durable worker queue. Completed reports retain their original source bindings
+after the deadline; child sessions are released at the deadline and subsequent
+follow-up is rejected. SDK-visible response checks can reject oversized observed
+content during the stream, but bytes can already be buffered before an SDK event.
 
 The enforced [resource envelope and limitations](README.md#enforced-resource-envelope)
-define `experimental-calls-time-v1`. Unsupported hard billing, raw transport, provider
+define `bounded-pi-sessions-v1`. Unsupported hard billing, raw transport, provider
 attempt and process-memory policies are not accepted through this API.

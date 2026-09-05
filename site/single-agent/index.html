@@ -1016,32 +1016,37 @@
                         >
                         <h2>05 / Bounded delegation</h2>
                         <p>
-                            The source now includes a native Pi extension. Use normal <code>pi</code> startup and the
-                            existing SpecPi install/update lifecycle, then explicitly enable the fixed calls/time
-                            envelope with <code>/delegate on</code>. Pi 0.84.4 is the compatibility-test floor; a
-                            missing public completion capability disables delegation. The parent remains the sole writer
-                            and owns integration and acceptance.
+                            The unreleased source creates actual Pi <code>AgentSession</code> subagents through the
+                            native extension. Use normal <code>pi</code> startup and the existing SpecPi install/update
+                            lifecycle. Human <code>/delegate on</code> enables the fixed envelope; its tool schema is
+                            absent from model requests while off. This experimental SDK integration supports
+                            <strong>Pi 0.84.4 and 0.85.0</strong>; other versions require compatibility review. The
+                            parent remains the sole writer and owns acceptance.
                         </p>
                         <p>
-                            Four profiles use the exact parent model through Pi's public model registry.
-                            <code>review</code> and <code>consult</code> receive supplied context with no tools.
-                            <code>investigate</code> and <code>research</code> can list, read and search only exact
-                            selected text files in a checked source snapshot. Research has no live web access; the
-                            parent obtains and selects the source material. Workers cannot run a shell, write files or
-                            create more workers.
+                            Two purposes are supported: <code>review</code> of a frozen artifact and
+                            <code>scout</code> analysis of a bounded evidence question. Both can list, read and search
+                            exact selected text snapshots; a review can also use inline context without tools. Scouts
+                            require selected files. Children have in-memory sessions, with no ambient extensions,
+                            skills, AGENTS files, parent history, shell, writes, live web or nested delegation. The
+                            research supports testing these uses; it does not establish a SpecPi improvement.
                         </p>
                         <ul>
                             <li>
-                                <strong>Explicit work packet.</strong> Transfer the requirements, relevant decisions,
-                                non-goals, bounded question and selected evidence. State why the work is independent and
-                                what the parent will do meanwhile. The scheduler cannot prove that independence.
+                                <strong>Specific admission.</strong> Each job receives assigned requirements, fixed
+                                constraints, a bounded question and selected evidence. Declare independent review,
+                                parallel analysis or context isolation and explain why. Only parallel analysis requires
+                                concurrent parent work. Mode checks and duplicate-question rejection constrain the
+                                request; they cannot prove independence or benefit. Routine lookup and coupled mutable
+                                work stay with the parent.
                             </li>
                             <li>
-                                <strong>Fixed resource limits.</strong> At most two worker requests are active across
-                                the Pi process, with four batches and 48 model invocations per process. A job has a
-                                120-second deadline; follow-up shares its original deadline and counters. Reloads,
-                                session switches and off/on do not reset quotas. Cancellation revokes source access, but
-                                keeps the request's slot occupied until its completion Promise settles.
+                                <strong>Fixed resource limits.</strong> At most two workers are active, with two jobs
+                                per batch, four batches and 32 SDK model invocations per Pi process. Each job has four
+                                invocations and 120 seconds including one follow-up. Reloads, session switches and
+                                off/on do not reset quotas. Cancellation holds slots through SDK-visible stream/result
+                                and prompt settlement; that does not prove remote execution has ended. These ceilings
+                                are engineering choices awaiting evaluation.
                             </li>
                             <li>
                                 <strong>Evidence and uncertainty.</strong> Reports include requirement coverage,
@@ -1050,16 +1055,20 @@
                                 parent acceptance is neither human permission nor proof of task completion.
                             </li>
                             <li>
-                                <strong>Honest accounting.</strong> Inputs are checked before dispatch. The public API
-                                returns a complete message, so output limits are checked only after completion. There is
-                                no midstream, raw-network, provider-attempt, invoice or process-memory cap. Cost is
-                                unavailable, and incomplete usage is not reported as zero.
+                                <strong>SDK execution and accounting.</strong> Pi runs the child conversation and tool
+                                loop. Each SDK invocation is admitted before dispatch; provider/session retries and
+                                compaction are disabled. SDK-visible streaming checks do not establish hard raw-network,
+                                hidden-provider-attempt, invoice or process-memory caps. Cost is unavailable, and
+                                incomplete usage is not reported as zero.
                             </li>
                             <li>
-                                <strong>Completion boundary.</strong> Pi owns authentication, OAuth and registry
-                                provider routing. Workers do not inherit parent context/header/payload/response hooks,
-                                transport/thinking settings or session affinity. Reasoning uses provider defaults; this
-                                is not full parent inference parity.
+                                <strong>Inference boundary.</strong> A fresh Pi ModelRuntime uses standard
+                                authentication, environment and model definitions. Child transport/thinking budgets use
+                                configured global settings without project settings. Parent model/thinking are explicit
+                                with Pi clamping. Runtime-only authentication, selected extension-provider overrides,
+                                model headers, startup proxy configuration and safe descriptor mismatches fail
+                                preflight. Parent hooks, ephemeral runtime settings and session affinity are not
+                                inherited; full parent parity is not claimed.
                             </li>
                             <li>
                                 <strong>Selected context.</strong> The parent transcript is not automatically inherited.
@@ -1069,10 +1078,10 @@
                             </li>
                         </ul>
                         <p>
-                            Normal Pi resource discovery, trust and proxy policy remain Pi-owned. The broker's canonical
-                            working root stays fixed for the process; restart Pi to change it or load a new delegation
-                            runtime version. Workflows requiring inherited parent hooks or settings must keep delegation
-                            disabled. Read the
+                            Normal parent Pi resource discovery, trust and proxy policy remain Pi-owned. The broker's
+                            canonical working root stays fixed for the process; restart Pi to change it or load a new
+                            delegation runtime version. Workflows requiring inherited parent hooks or settings must keep
+                            delegation disabled. Read the
                             <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
                                 >implementation guide</a
                             >
