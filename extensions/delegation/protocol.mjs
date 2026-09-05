@@ -1,6 +1,18 @@
 import { DelegationError } from "./errors.mjs";
 import { createHash } from "node:crypto";
 
+export const DEFAULT_TIMEOUT_MINUTES = 10;
+export const MAX_TIMEOUT_MINUTES = 60;
+export const MAX_JOB_MS = MAX_TIMEOUT_MINUTES * 60_000;
+
+export function timeoutLimits(minutes) {
+    if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES) {
+        throw new DelegationError(`Delegation timeout must be a whole number from 1 to ${MAX_TIMEOUT_MINUTES} minutes`);
+    }
+
+    return { jobMs: minutes * 60_000, batchMs: minutes * 120_000 };
+}
+
 export const LIMITS = Object.freeze({
     concurrency: 2,
     sessionBatches: 4,
@@ -8,8 +20,7 @@ export const LIMITS = Object.freeze({
     batchJobs: 2,
     batchCalls: 8,
     jobCalls: 4,
-    jobMs: 120_000,
-    batchMs: 300_000,
+    ...timeoutLimits(DEFAULT_TIMEOUT_MINUTES),
     contextBytes: 256 * 1024,
     retainedResponseBytes: 256 * 1024,
     toolBytes: 64 * 1024,

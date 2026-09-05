@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 - 2026-09-05
+
+- Raise delegation's default job timeout from 2 to 10 minutes, including the provider adapter. Add `/delegate timeout <minutes>` (1–60) and `reset` with an atomic, backed-up preference across restarts. Batch timeouts scale with the job window; call quotas, original follow-up deadlines and settling ownership remain unchanged. Restart Pi after updating the delegation runtime.
+- Support platform aliases in the selected Pi agent-directory path while rejecting links inside preference state. Bound encoded backups separately so every accepted settings file can be saved repeatedly.
+- Keep `.mts` declarations on LF checkouts and validate Pages permissions with either LF or CRLF input so release checks remain portable on Windows.
+- Run timeout persistence fixtures across release platforms, isolate the package help probe, and verify that settings survive failed updates and every managed delegation file is removed on uninstall.
+
 ## 0.13.0 - 2026-09-05
 
 - Add bounded, best-effort sanitized browser exceptions, console errors, failed requests, and HTTP error diagnostics with explicit cursor/loss/clear semantics and ephemeral retention.

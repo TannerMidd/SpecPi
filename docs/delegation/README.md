@@ -1,6 +1,6 @@
 # Bounded delegation
 
-Status: experimental in SpecPi 0.13.0. Disabled by default.
+Status: experimental in SpecPi 0.14.0. Disabled by default.
 The package remains `specpi`; no separate npm package or background service is required.
 
 SpecPi keeps one agent responsible for changes and acceptance. This extension adds
@@ -94,8 +94,8 @@ structured tool responses and do not mount terminal widgets. The UI uses Pi's pu
 [widget and tool-rendering APIs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md).
 
 `on` grants the displayed experimental calls/time envelope. There is no model-call
-permission toggle in the model-facing tool. `limits` is read-only; the shipped ceilings
-cannot be raised by prompts. Turning delegation off, changing guard policy, switching
+permission toggle in the model-facing tool. `limits` is read-only; prompts cannot
+change timeouts or raise other ceilings. Turning delegation off, changing guard policy, switching
 sessions or models, navigating branches, and changing task/scope bindings revoke the
 current generation. Off/on, `/reload` and session switches do not reset the Pi process's
 counters or free requests that are still settling. The same in-memory controller remains
@@ -122,6 +122,42 @@ the exact call. A locked, unready or ambiguous installed Guard still blocks acti
 the error identifies that state. `/delegate status` reports the observed Guard state.
 Worker tool restrictions and resource limits are enforced independently of Guard. A worker result
 cannot authorize a write, a commit, a deployment, or an improvement.
+
+## Configure the timeout
+
+The default is **10 minutes per logical job** (previously 2 minutes). In Pi:
+
+```text
+/delegate off
+/delegate timeout 15
+/delegate on
+```
+
+`/delegate timeout` shows the current value; `/delegate timeout reset` saves the
+10-minute default. Tab completion suggests common values. Use whole minutes from
+**1 to 60**; there is no unlimited setting. The batch deadline is twice the job
+timeout (20 minutes by default), so it does not truncate the configured job window.
+Both deadlines start at batch admission and include queue and follow-up time; a
+follow-up never gets a fresh timeout. Provider requests use the remaining job window,
+not a separate two-minute cap. Provider-side limits may still end requests sooner.
+
+Changes require delegation to be off, including when model setup is pending or paused.
+They apply to this process and future Pi starts; they cannot extend old jobs, reset
+call quotas or free requests still settling. `/delegate on`, `status`, `limits` and
+Strict Guard policy summaries display the effective timeout. Only the human command
+can configure it; the model-facing tool has no timeout-setting operation.
+
+The preference is stored in `<agent-dir>/specpi/delegation/settings.json`, where
+`<agent-dir>` is `PI_CODING_AGENT_DIR` or `~/.pi/agent`. It contains only
+`{"schema":1,"timeoutMinutes":15}`. Saves atomically replace this file and keep the
+previous contents plus their SHA-256 in `settings.json.bak`. No Pi settings,
+authentication, sessions or history are read or changed by this preference store.
+The human-selected agent directory is resolved once, supporting platform path aliases.
+Preference files and SpecPi subdirectories must not be links. Malformed, oversized or
+unreadable settings block activation rather than silently using another timeout. Repair them manually
+and restart Pi. Manual edits and changes from another Pi process take effect on
+restart; `/reload` preserves the current process policy and counters. The preference
+survives uninstall as user-owned configuration.
 
 ## Admit a specific purpose
 
@@ -165,7 +201,7 @@ and counters. [Protocol and executable examples](protocol.md) define the exact f
 | Batches / jobs            | 4 batches per Pi process; one unresolved batch; 2 jobs per batch             |
 | SDK model invocations     | 32 per Pi process, 8 per batch; 4 per logical job including follow-up        |
 | Follow-ups / retries      | 1 changed-input follow-up per job; provider and session retries disabled     |
-| Time                      | 120 seconds per logical job; 300 seconds per batch, including follow-up time |
+| Time                      | 10 minutes per job by default (human configurable 1–60); batch twice that; queue/follow-up included |
 | Packet / child context    | 256 KiB, checked before dispatch                                             |
 | Selected sources          | 200 files and 8 MiB per batch                                                |
 | Tools                     | 12 calls and 64 KiB total returned JSON per logical job                      |

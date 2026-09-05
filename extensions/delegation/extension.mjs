@@ -1,7 +1,10 @@
 import { DelegationError, publicErrorMessage } from "./errors.mjs";
 import { randomUUID } from "node:crypto";
 import { createDelegationController } from "./core.mjs";
+import { DEFAULT_TIMEOUT_MINUTES, timeoutLimits } from "./protocol.mjs";
 import { createLivePanel, createToolRenderers, readableLimits, readableStatus } from "./presentation.mjs";
+
+const USAGE = "Usage: /delegate [on|off|status|limits|timeout [<minutes>|reset]|cancel <batchId>]";
 
 const integer = { type: "integer", minimum: 0 };
 const string = { type: "string" };
@@ -92,7 +95,7 @@ export const DELEGATE_SCHEMA = {
 /** The native entry supplies a preflighted Pi child-session host for the active context. */
 export function createDelegationExtension(
     getHost,
-    { root = process.cwd(), controllerOptions = {}, prepareContext = () => {}, presentation } = {},
+    { root = process.cwd(), controllerOptions = {}, prepareContext = () => {}, presentation, timeoutStore } = {},
 ) {
     let currentPi;
     let currentContext;
@@ -130,6 +133,14 @@ export function createDelegationExtension(
         getGuard,
         onChange: updatePresentation,
     });
+    let timeoutLoaded = !timeoutStore;
+    const loadTimeout = () => {
+        if (!timeoutLoaded) {
+            controller.setTimeoutMinutes(timeoutStore.load());
+            timeoutLoaded = true;
+        }
+    };
+
     const panel = presentation ? createLivePanel(() => controller.presentation(), presentation) : undefined;
 
     const status = () => ({
@@ -335,6 +346,7 @@ export function createDelegationExtension(
             panel?.bind(ctx);
             invalidate("session started or resources reloaded");
             try {
+                loadTimeout();
                 prepareContext(ctx, true);
             } catch (error) {
                 pauseReason = publicErrorMessage(error);
@@ -368,9 +380,22 @@ export function createDelegationExtension(
             }
         });
         pi.registerCommand("delegate", {
-            description: "Enable bounded read-only delegation or inspect its session limits",
+            description: "Enable read-only delegation, inspect limits, or save timeout <minutes> (1–60; reset: 10)",
             getArgumentCompletions: (prefix) =>
-                ["on", "off", "status", "limits", "cancel"]
+                [
+                    "on",
+                    "off",
+                    "status",
+                    "limits",
+                    "timeout",
+                    "timeout 5",
+                    "timeout 10",
+                    "timeout 15",
+                    "timeout 30",
+                    "timeout 60",
+                    "timeout reset",
+                    "cancel",
+                ]
                     .filter((value) => value.startsWith(prefix.trim()))
                     .map((value) => ({ value, label: value })),
             handler: async (args, ctx) => {
@@ -383,8 +408,8 @@ export function createDelegationExtension(
                 currentContext = ctx;
                 const [action = "status", id, extra] = args.trim().split(/\s+/u).filter(Boolean);
                 try {
-                    if (extra || (id && action !== "cancel")) {
-                        throw new DelegationError("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
+                    if (extra || (id && !["cancel", "timeout"].includes(action))) {
+                        throw new DelegationError(USAGE);
                     }
 
                     if (action === "on") {
@@ -392,6 +417,7 @@ export function createDelegationExtension(
                             throw new DelegationError("Delegation activation requires a human interactive command");
                         }
 
+                        loadTimeout();
                         requested = true;
                         requestedGuard = getGuard();
                         await refreshSelection(ctx);
@@ -408,7 +434,38 @@ export function createDelegationExtension(
 
                         syncActiveTool(true);
                         ctx.ui.notify(
-                            `Delegation enabled: Pi child sessions for review and scout, ${state.model.provider}/${state.model.id}, thinking ${state.model.thinkingLevel ?? "Pi configured"}. At most 2 workers, 4 batches and 32 SDK inference calls per Pi process; 120 seconds per job. Workers see only supplied text and selected snapshots. Pi owns configured authentication; temporary parent provider/auth overrides and parent hooks are not inherited. No shell, edits, recursion, automatic retries or compaction. /delegate off cancels workers; SDK requests still settling retain their slots. These limits do not guarantee remote termination or a billing cap.`,
+                            `Delegation enabled: Pi child sessions for review and scout, ${state.model.provider}/${state.model.id}, thinking ${state.model.thinkingLevel ?? "Pi configured"}. At most 2 workers, 4 batches and 32 SDK inference calls per Pi process; ${state.limits.jobMs / 60_000} minutes per job, ${state.limits.batchMs / 60_000} minutes per batch. Configure with /delegate timeout <minutes> while off (saved across restarts). Workers see only supplied text and selected snapshots. Pi owns configured authentication; temporary parent provider/auth overrides and parent hooks are not inherited. No shell, edits, recursion, automatic retries or compaction. /delegate off cancels workers; SDK requests still settling retain their slots. These limits do not guarantee remote termination or a billing cap.`,
+                            "info",
+                        );
+                    } else if (action === "timeout") {
+                        if (id) {
+                            if (!ctx.hasUI) {
+                                throw new DelegationError("Timeout changes require a human interactive command");
+                            }
+
+                            if (requested || pending || controller.status().enabled) {
+                                throw new DelegationError(
+                                    "Turn delegation off before changing its timeout: /delegate off",
+                                );
+                            }
+
+                            const minutes =
+                                id === "reset" ? DEFAULT_TIMEOUT_MINUTES : /^\d+$/u.test(id) ? Number(id) : NaN;
+                            timeoutLimits(minutes);
+                            if (!timeoutStore) {
+                                throw new DelegationError("Persistent delegation settings are unavailable");
+                            }
+
+                            timeoutStore.save(minutes);
+                            controller.setTimeoutMinutes(minutes);
+                            timeoutLoaded = true;
+                        } else {
+                            loadTimeout();
+                        }
+
+                        const limits = controller.status().limits;
+                        ctx.ui.notify(
+                            `Delegation timeout: ${limits.jobMs / 60_000} minutes per job; ${limits.batchMs / 60_000} minutes per batch, including queue and follow-up time. ${id ? "Saved for this process and future Pi starts. " : ""}Use /delegate timeout <minutes> (1–60) or /delegate timeout reset (10). Changes require /delegate off; call budgets do not reset.`,
                             "info",
                         );
                     } else if (action === "off") {
@@ -428,7 +485,7 @@ export function createDelegationExtension(
                         const state = status();
                         ctx.ui.notify(action === "limits" ? readableLimits(state) : readableStatus(state), "info");
                     } else {
-                        throw new DelegationError("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
+                        throw new DelegationError(USAGE);
                     }
                 } catch (error) {
                     ctx.ui.notify(publicErrorMessage(error), "error");

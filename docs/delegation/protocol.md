@@ -36,6 +36,19 @@ data are rejected. The host creates identities and receipts; workers cannot supp
 The protocol identifier `bounded-pi-sessions-v1` and inference contract
 `pi-agent-session-v1` describe the host implementation, not model-selected options.
 
+## Human timeout preference
+
+Logical jobs default to 10 minutes; batches default to 20 minutes. Human
+`/delegate timeout <minutes>` saves a whole-minute value from 1 to 60 while delegation
+is off; `timeout reset` saves 10. The batch window is twice the job window.
+Deadlines start at admission and include queue and the single follow-up. Provider
+request timeouts and the adapter abort timer honor the remaining job window, capped
+at 60 minutes. Settings changes invalidate old policy bindings without resetting
+quotas or settling slots. No tool operation or packet field can change the timeout.
+See the [configuration guide](README.md#configure-the-timeout) for persistence and
+recovery. Status limits, packet digests and Guard fingerprints bind the effective
+policy rather than assuming the shipped default.
+
 ## Submit a batch
 
 After the human runs `/delegate on`, the parent calls the `delegate` tool:

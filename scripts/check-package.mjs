@@ -367,6 +367,28 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     runCli(["install", ...lifecycleFlags]);
     runCli(["doctor"], { timeout: 300_000 });
 
+    const privateEvidence = new Map([
+        [path.join(agentDir, "specpi", "delegation", "settings.json"), '{"schema":1,"timeoutMinutes":15}\n'],
+        [
+            path.join(agentDir, "specpi", "delegation", "settings.json.bak"),
+            `${JSON.stringify({
+                content: '{"schema":1,"timeoutMinutes":10}\n',
+                sha256: createHash("sha256").update('{"schema":1,"timeoutMinutes":10}\n').digest("hex"),
+            })}\n`,
+        ],
+        [path.join(agentDir, "specpi", "wishlist", "observations.jsonl"), '{"private":true}\n'],
+        [
+            path.join(agentDir, "specpi", "wishlist", "decisions.jsonl"),
+            '{"action":"retire","journal":{"schema":1,"evidence":["private proof"],"gates":["npm run check"],"version":"0.10.0"}}\n',
+        ],
+        [path.join(agentDir, "specpi", "experiments", "registry.json"), '{"private":true}\n'],
+        [path.join(agentDir, "specpi", "experiments", "patches", "package-smoke.patch"), "private patch\n"],
+    ]);
+    for (const [file, content] of privateEvidence) {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, content, { mode: 0o600 });
+    }
+
     const guardDirectory = path.join(agentDir, "extensions", "command-guard");
     const driftedGuardPath = path.join(guardDirectory, "index.ts");
     fs.appendFileSync(driftedGuardPath, "\n// package-check rollback drift\n");
@@ -386,20 +408,6 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         "failed update did not restore the complete managed tree",
     );
 
-    const privateEvidence = new Map([
-        [path.join(agentDir, "specpi", "wishlist", "observations.jsonl"), '{"private":true}\n'],
-        [
-            path.join(agentDir, "specpi", "wishlist", "decisions.jsonl"),
-            '{"action":"retire","journal":{"schema":1,"evidence":["private proof"],"gates":["npm run check"],"version":"0.10.0"}}\n',
-        ],
-        [path.join(agentDir, "specpi", "experiments", "registry.json"), '{"private":true}\n'],
-        [path.join(agentDir, "specpi", "experiments", "patches", "package-smoke.patch"), "private patch\n"],
-    ]);
-    for (const [file, content] of privateEvidence) {
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, content, { mode: 0o600 });
-    }
-
     runCli(["update", ...lifecycleFlags, "--force"]);
     runCli(["doctor"], { timeout: 300_000 });
     runCli(["uninstall", "--yes"]);
@@ -409,11 +417,14 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         false,
         "uninstall left a managed extension behind",
     );
-    assert.equal(
-        fs.existsSync(path.join(agentDir, "extensions", "delegation", "index.ts")),
-        false,
-        "uninstall left native delegation installed",
-    );
+    for (const file of DELEGATION_MANAGED_FILES) {
+        assert.equal(
+            fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
+            false,
+            `uninstall left a managed delegation file: ${file}`,
+        );
+    }
+
     for (const [file, expected] of privateEvidence) {
         assert.equal(fs.existsSync(file), true, `uninstall removed private SpecPi evidence: ${file}`);
         assert.equal(fs.readFileSync(file, "utf8"), expected, `uninstall changed private SpecPi evidence: ${file}`);
@@ -460,7 +471,12 @@ try {
     assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");
     assertArtifactMatchesManifest(tarball, packResult);
 
-    const installEnv = { ...process.env, npm_config_audit: "false", npm_config_fund: "false" };
+    const installEnv = {
+        ...process.env,
+        PI_CODING_AGENT_DIR: path.join(temporaryRoot, "install-agent"),
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+    };
     runNpm(
         [
             "install",

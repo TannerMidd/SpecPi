@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDelegationExtension, DELEGATE_SCHEMA } from "../extensions/delegation/extension.mjs";
+import { createTimeoutStore } from "../extensions/delegation/settings.mjs";
 import { createToolRenderers, panelLines } from "../extensions/delegation/presentation.mjs";
 
 const presentation = {
@@ -420,9 +421,9 @@ function publicHostBridge() {
     return { host, calls: () => calls };
 }
 
-async function fixture(t, controllerOptions = {}) {
+async function fixture(t, controllerOptions = {}, options = {}) {
     const bridge = publicHostBridge();
-    const factory = createDelegationExtension(() => bridge.host, { root: project(t), controllerOptions });
+    const factory = createDelegationExtension(() => bridge.host, { root: project(t), controllerOptions, ...options });
     const pi = mockPi();
     factory(pi);
     await pi.fire("session_start");
@@ -430,6 +431,143 @@ async function fixture(t, controllerOptions = {}) {
 
     return { bridge, factory, pi };
 }
+
+test("human timeout command saves, reloads, resets and displays the effective policy", async (t) => {
+    const agentDir = project(t);
+    const timeoutStore = createTimeoutStore(agentDir);
+    const { pi, factory } = await fixture(t, {}, { timeoutStore });
+    await pi.command("timeout");
+    assert.match(pi.notices.at(-1).text, /10 minutes per job; 20 minutes per batch/);
+    const completions = pi.commands.get("delegate").getArgumentCompletions("timeout ");
+    assert.ok(completions.some((item) => item.value === "timeout reset"));
+    await pi.command("timeout 15");
+    assert.match(pi.notices.at(-1).text, /Saved/);
+    assert.equal(timeoutStore.load(), 15);
+    await pi.command("on");
+    assert.match(pi.notices.at(-1).text, /15 minutes per job, 30 minutes per batch/);
+    let policy;
+    pi.events.emit("specpi:delegation-policy", {
+        input: { operation: "status" },
+        reply: (value) => {
+            policy = value;
+        },
+    });
+    assert.match(policy.summary, /900s per job/);
+    await pi.command("off");
+    await pi.command("timeout 60");
+    let nextPolicy;
+    pi.events.emit("specpi:delegation-policy", {
+        input: { operation: "status" },
+        reply: (value) => {
+            nextPolicy = value;
+        },
+    });
+    assert.notEqual(nextPolicy.fingerprint, policy.fingerprint);
+    assert.equal((await state(pi)).limits.jobMs, 3_600_000);
+    const reloaded = mockPi();
+    factory(reloaded);
+    await reloaded.fire("session_start");
+    t.after(() => reloaded.fire("session_shutdown"));
+    assert.equal((await state(reloaded)).limits.jobMs, 3_600_000);
+    const restarted = await fixture(t, {}, { timeoutStore: createTimeoutStore(agentDir) });
+    assert.equal((await state(restarted.pi)).limits.jobMs, 3_600_000);
+    await restarted.pi.command("timeout reset");
+    assert.equal(timeoutStore.load(), 10);
+    assert.equal((await state(restarted.pi)).limits.jobMs, 600_000);
+});
+
+test("invalid, noninteractive, enabled and model-facing timeout changes are rejected", async (t) => {
+    const timeoutStore = createTimeoutStore(project(t));
+    const { pi } = await fixture(t, {}, { timeoutStore });
+    for (const args of [
+        "timeout 0",
+        "timeout -1",
+        "timeout 61",
+        "timeout 1.5",
+        "timeout Infinity",
+        "timeout 1e1",
+        "timeout 15 extra",
+    ]) {
+        await pi.command(args);
+        assert.equal(pi.notices.at(-1).kind, "error", args);
+        assert.equal((await state(pi)).limits.jobMs, 600_000);
+    }
+
+    await pi.command("timeout 15", { ...pi.context, hasUI: false });
+    assert.match(pi.notices.at(-1).text, /human interactive/);
+    await pi.command("on");
+    const before = await state(pi);
+    await pi.command("timeout 15");
+    assert.match(pi.notices.at(-1).text, /Turn delegation off/);
+    assert.equal((await state(pi)).generation, before.generation);
+    assert.equal((await state(pi)).limits.jobMs, before.limits.jobMs);
+    assert.equal(timeoutStore.load(), 10);
+    assert.equal((await pi.tool({ operation: "timeout", minutes: 15 })).isError, true);
+});
+
+test("settings failures block activation or preserve the existing policy without leaking errors", async (t) => {
+    const { pi } = await fixture(
+        t,
+        {},
+        {
+            timeoutStore: {
+                load() {
+                    throw new Error("private sentinel");
+                },
+                save() {
+                    throw new Error("private sentinel");
+                },
+            },
+        },
+    );
+    await pi.command("on");
+    assert.equal((await state(pi)).enabled, false);
+    await pi.command("timeout 15");
+    assert.equal(pi.notices.at(-1).kind, "error");
+    assert.equal((await state(pi)).limits.jobMs, 600_000);
+    assert.ok(pi.notices.every((notice) => !notice.text.includes("private sentinel")));
+});
+
+test("configured deadlines expire at admission time and timeout changes preserve settling slots and quotas", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 10_000 });
+    let settle;
+    let job;
+    const held = new Promise((resolve) => {
+        settle = resolve;
+    });
+    const { pi } = await fixture(
+        t,
+        {
+            async worker(controls) {
+                job = controls.job;
+                controls.admitCall();
+                await held;
+
+                return result();
+            },
+        },
+        { timeoutStore: createTimeoutStore(project(t)) },
+    );
+    await pi.command("timeout 15");
+    await pi.command("on");
+    await pi.tool({ operation: "run", requestId: "timeout-run", packet: packet() });
+    assert.equal(job.deadline, 910_000);
+    t.mock.timers.tick(120_001);
+    assert.equal(job.state, "running");
+    t.mock.timers.tick(779_999);
+    assert.equal(job.state, "expired");
+    assert.equal(job.controller.signal.aborted, true);
+    await pi.command("off");
+    await pi.command("timeout 30");
+    const current = await state(pi);
+    assert.equal(current.active, 1);
+    assert.equal(current.sessionCalls, 1);
+    assert.equal(current.sessionBatches, 1);
+    assert.equal(job.deadline, 910_000);
+    settle();
+    await new Promise(setImmediate);
+    assert.equal((await state(pi)).active, 0);
+});
 
 async function state(pi) {
     return (await pi.tool({ operation: "status" })).details;

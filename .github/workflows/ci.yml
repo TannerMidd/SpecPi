@@ -41,6 +41,8 @@ jobs:
           node-version: "22.19.0"
       - name: Install pinned repository development tools
         run: npm install --ignore-scripts --omit=peer --no-package-lock
+      - name: Validate timeout preference portability
+        run: node --test tests/delegation-settings.test.mjs tests/delegation-settings-review.test.mjs
       - name: Exercise packed npm artifact and installer lifecycle
         run: npm run check:package
       - name: Load the packed resources through pinned Pi

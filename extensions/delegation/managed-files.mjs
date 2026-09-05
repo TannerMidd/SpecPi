@@ -4,6 +4,7 @@ export const DELEGATION_MANAGED_FILES = Object.freeze([
     "extension.mjs",
     "core.mjs",
     "protocol.mjs",
+    "settings.mjs",
     "provider.mjs",
     "snapshot.mjs",
     "worker.mjs",

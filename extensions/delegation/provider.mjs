@@ -1,4 +1,5 @@
 import { DelegationError } from "./errors.mjs";
+import { MAX_JOB_MS } from "./protocol.mjs";
 
 const MAX_CONTEXT_BYTES = 256 * 1024;
 const MAX_OUTPUT_TOKENS = 8192;
@@ -513,7 +514,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                         ),
                         maxTokens: Math.min(MAX_OUTPUT_TOKENS, childModel.maxTokens, run.controls.limits.outputTokens),
                         maxRetries: 0,
-                        timeoutMs: Math.max(1, Math.min(120_000, run.controls.deadline - Date.now())),
+                        timeoutMs: Math.max(1, Math.min(MAX_JOB_MS, run.controls.deadline - Date.now())),
                         onPayload: async (payload, providerModel) => {
                             assertRun();
                             const result = (await options.onPayload?.(payload, providerModel)) ?? payload;
@@ -637,7 +638,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                     active = run;
                     const cancel = () => fail(new DelegationError("Delegation session was cancelled or expired"));
                     controls.signal.addEventListener("abort", cancel, { once: true });
-                    const timer = setTimeout(cancel, Math.max(1, Math.min(120_000, controls.deadline - Date.now())));
+                    const timer = setTimeout(cancel, Math.max(1, Math.min(MAX_JOB_MS, controls.deadline - Date.now())));
                     timer.unref?.();
                     try {
                         assertRun();
