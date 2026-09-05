@@ -25,7 +25,7 @@
       <img class="brand-logo" src="../logo.svg" width="28" height="28" alt="">
       <strong>SpecPi</strong>
       <span class="brand-separator">/</span>
-      <span>v0.11.1</span>
+      <span>v0.11.2</span>
     </a>
     <nav class="header-nav" aria-label="Primary navigation">
       <a href="../">Overview</a>
@@ -50,36 +50,36 @@
         <a href="#security"><span>10</span>Security</a>
         <a href="#development"><span>11</span>Development</a>
       </nav>
-      <div class="index-meta"><span>Reference · v0.11.1</span></div>
+      <div class="index-meta"><span>Reference · v0.11.2</span></div>
     </aside>
 
     <main id="main" class="content wiki-content">
       <header class="wiki-intro" id="overview">
-        <p class="eyebrow">Documentation / v0.11.1</p>
+        <p class="eyebrow">Documentation / v0.11.2</p>
         <h1>Reference</h1>
         <p class="wiki-summary">Set up SpecPi, keep work accountable, and understand the boundaries of each tool.</p>
-        <p class="wiki-release-note">Release reference · v0.11.1. <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the task, its checks, and later human feedback connected.</p>
+        <p class="wiki-release-note">Release reference · v0.11.2. <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the task, its checks, and later human feedback connected.</p>
       </header>
 
       <section class="doc-section" id="getting-started" aria-labelledby="install-doc-title">
         <header><span>01</span><h2 id="install-doc-title">Install</h2></header>
         <p>Requirements: Node.js 22.19 or newer, npm, and Git. SpecPi uses Pi 0.84.4 or newer. If Pi is missing, the confirmed install adds the reviewed pinned Pi package. Uninstalling SpecPi leaves that package installed.</p>
         <div class="terminal doc-terminal">
-          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.11.1</span></div>
+          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.11.2</span></div>
           <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
           <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-          <pre><code>npm install --global specpi@0.11.1</code></pre>
+          <pre><code>npm install --global specpi@0.11.2</code></pre>
           <div class="terminal-bar secondary"><span>Source-audited release · Linux, macOS, Git Bash</span></div>
-          <pre><code>git clone --branch v0.11.1 --depth 1 https://github.com/TannerMidd/SpecPi.git
+          <pre><code>git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
 ./specpi doctor</code></pre>
           <div class="terminal-bar secondary"><span>Source-audited release · Windows PowerShell / cmd</span></div>
-          <pre><code>git clone --branch v0.11.1 --depth 1 https://github.com/TannerMidd/SpecPi.git
+          <pre><code>git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
@@ -134,7 +134,7 @@ specpi doctor</code></pre>
 
       <section class="doc-section" id="task-records" aria-labelledby="task-records-title">
         <header><span>05</span><h2 id="task-records-title">Tasks and evidence</h2></header>
-        <p class="doc-boundary release-boundary"><strong>New in v0.11.1.</strong> Optional task cards, verification receipts, and human outcome feedback make the boundaries and evidence of a change easier to review.</p>
+        <p class="doc-boundary release-boundary"><strong>New in v0.11.2.</strong> Optional task cards, verification receipts, and human outcome feedback make the boundaries and evidence of a change easier to review.</p>
         <p>Use an optional task card when a shared contract would improve continuity. It records the objective, fixed requirement IDs, acceptance checks, expected paths, hypothesis, rollback, and non-goals on the current session branch.</p>
         <div class="definition-list wide-keys">
           <div><code>/task set</code><span>Record a task card. Human edits create a new revision and invalidate a review of the earlier card. Use <code>/task clear</code> before an unrelated task.</span></div>

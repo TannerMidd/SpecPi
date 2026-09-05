@@ -417,7 +417,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
-    assert.equal(manifest.version, "0.11.1");
+    assert.equal(manifest.version, "0.11.2");
     assert.equal(manifest.publishConfig.access, "public");
     assert.equal(manifest.publishConfig.provenance, true);
     assert.equal(manifest.scripts.preinstall, undefined);
@@ -436,9 +436,12 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);
     assert.match(publish, /RELEASE_NPM_VERSION: "11\.19\.1"/);
     assert.equal(publish.match(/npm@\$\{RELEASE_NPM_VERSION\}/g)?.length, 3);
+    assert.match(publish, /NPM_CONFIG_REGISTRY: "https:\/\/registry\.npmjs\.org"/);
+    assert.doesNotMatch(publish, /^\s+registry-url:/m);
     assert.match(publish, /id-token: write/);
     assert.match(publish, /npm publish --dry-run --ignore-scripts --provenance=false/);
     assert.match(publish, /npm publish --ignore-scripts --access public --provenance/);
+    assert.match(publish, /TARBALL="\$\{GITHUB_WORKSPACE\}\/dist\/specpi-\$\{VERSION\}\.tgz"/);
     assert.equal(publish.match(/node scripts\/verify-artifact\.mjs/g)?.length, 2);
     assert.match(publish, /os: \[ubuntu-latest, windows-latest, macos-latest\]/);
     assert.match(publish, /--artifact "\$\{TARBALL\}" --manifest "\$\{MANIFEST\}"/);
@@ -565,7 +568,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /pi install npm:specpi/);
     assert.match(wikiHtml, /\.\/specpi doctor/);
     assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
-    assert.equal(wikiHtml.match(/git clone --branch v0\.11\.1/g)?.length, 2);
+    assert.equal(wikiHtml.match(/git clone --branch v0\.11\.2/g)?.length, 2);
     assert.match(wikiHtml, /npm run check/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
     assert.match(wikiCss, /\.definition-list/);
