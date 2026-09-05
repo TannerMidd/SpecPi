@@ -420,7 +420,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
-    assert.equal(manifest.version, "0.12.0");
+    assert.equal(manifest.version, "0.13.0");
     assert.equal(manifest.publishConfig.access, "public");
     assert.equal(manifest.publishConfig.provenance, true);
     assert.equal(manifest.scripts.preinstall, undefined);

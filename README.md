@@ -24,7 +24,7 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-Version `0.12.0` adds experimental native delegation and a new technical site. Task cards, verification receipts and human outcome assessments remain part of the single-agent workflow. See the [release notes](CHANGELOG.md) for the change list.
+Version `0.13.0` adds browser diagnostics, keyboard and native dropdown interactions, bounded condition waits, scoped TypeScript checking, and repeatable rendered-site tests. Experimental delegation, task cards, verification receipts and human outcome assessments remain part of the single-agent workflow. See the [release notes](CHANGELOG.md) for the change list.
 
 ## Optional delegation
 
@@ -55,14 +55,14 @@ specpi doctor
 Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
 
 ```bash
-npm install --global specpi@0.12.0
-npx --package specpi@0.12.0 specpi plan
+npm install --global specpi@0.13.0
+npx --package specpi@0.13.0 specpi plan
 ```
 
 For a source-audited installation, clone the exact release:
 
 ```bash
-git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+git clone --branch v0.13.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install

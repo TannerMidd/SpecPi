@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 - 2026-09-05
 
 - Add bounded, best-effort sanitized browser exceptions, console errors, failed requests, and HTTP error diagnostics with explicit cursor/loss/clear semantics and ephemeral retention.
 - Add keyboard/chord input, native dropdown selection, and deadline-bounded page-condition waits; invalidate snapshot refs on application-driven navigation and preserve isolated cancellation cleanup.

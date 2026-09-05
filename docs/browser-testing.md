@@ -59,7 +59,7 @@ The shared browser workflow runs for CI and is a prerequisite of Pages deploymen
 
 ### Capability-registry boundary
 
-The existing `local-browser-automation` registry entry and `browser-runtime-smoke` prove their historical rendering/image-comparison contract only. They are not expanded into claims that diagnostics or keyboard behavior have passed that closed validator. This unreleased change is evidenced by dedicated registered-tool/Chromium tests and CI; no wishlist item is automatically selected or retired and no invented shipped version is entered in the registry.
+The existing `local-browser-automation` registry entry and `browser-runtime-smoke` prove their historical rendering/image-comparison contract only. They are not expanded into claims that diagnostics or keyboard behavior have passed that closed validator. Browser diagnostics and interactions in SpecPi 0.13.0 are evidenced by dedicated registered-tool/Chromium tests and CI; no wishlist item is automatically selected or retired and no invented shipped version is entered in the registry.
 
 ## Semantic navigation assessment (R6)
 
