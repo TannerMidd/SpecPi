@@ -1,0 +1,285 @@
+{
+    "reviewed": "2026-09-04",
+    "studies": [
+        {
+            "id": "nature",
+            "title": "Benchmark scores by task",
+            "source": "https://www.nature.com/articles/s42256-026-01268-y",
+            "locator": "Results: domain-dependent performance; July 2026 version of record",
+            "credit": "Kim et al. / Nature Machine Intelligence / 2026",
+            "kind": "pairs",
+            "series": ["Single agent", "Best multi-agent"],
+            "note": "Mean scores across tested models. The best multi-agent architecture is selected separately for each benchmark. Matched system token ceilings; actual spending can differ. No pooled score or significance claim.",
+            "alt": "Single-agent and best multi-agent mean scores across six benchmarks. Multi-agent scores are higher on Finance Agent, WorkBench, BrowseComp-Plus, and Terminal-Bench; single-agent scores are higher on PlanCraft and SWE-bench Verified.",
+            "headers": [
+                "Benchmark",
+                "Single agent",
+                "Best multi-agent",
+                "Selected architecture",
+                "Instances per configuration"
+            ],
+            "panels": [
+                {
+                    "title": "Finance Agent",
+                    "subtitle": "Centralized / 50 instances",
+                    "unit": "Mean score / higher is better",
+                    "max": 1,
+                    "digits": 3,
+                    "values": [0.349, 0.631],
+                    "detail": ["Centralized", 50]
+                },
+                {
+                    "title": "WorkBench",
+                    "subtitle": "Decentralized / 100 instances",
+                    "unit": "Mean score / higher is better",
+                    "max": 1,
+                    "digits": 3,
+                    "values": [0.629, 0.664],
+                    "detail": ["Decentralized", 100]
+                },
+                {
+                    "title": "BrowseComp-Plus",
+                    "subtitle": "Decentralized / 100 instances",
+                    "unit": "Mean score / higher is better",
+                    "max": 1,
+                    "digits": 3,
+                    "values": [0.318, 0.347],
+                    "detail": ["Decentralized", 100]
+                },
+                {
+                    "title": "PlanCraft",
+                    "subtitle": "Hybrid / 100 instances",
+                    "unit": "Mean score / higher is better",
+                    "max": 1,
+                    "digits": 3,
+                    "values": [0.568, 0.346],
+                    "detail": ["Hybrid", 100]
+                },
+                {
+                    "title": "SWE-bench Verified",
+                    "subtitle": "Hybrid / 20 instances",
+                    "unit": "Mean score / higher is better",
+                    "max": 1,
+                    "digits": 3,
+                    "values": [0.488, 0.481],
+                    "detail": ["Hybrid", 20]
+                },
+                {
+                    "title": "Terminal-Bench",
+                    "subtitle": "Independent / 20 instances",
+                    "unit": "Mean score / higher is better",
+                    "max": 1,
+                    "digits": 3,
+                    "values": [0.312, 0.331],
+                    "detail": ["Independent", 20]
+                }
+            ]
+        },
+        {
+            "id": "reasoning",
+            "title": "Accuracy across requested token budgets",
+            "source": "https://arxiv.org/html/2604.02460v2",
+            "locator": "Table 1, Average rows; v2, 11 April 2026",
+            "credit": "Tran & Kiela / arXiv:2604.02460v2 / 2026",
+            "kind": "lines",
+            "series": ["Single agent", "Sequential agents", "Debate"],
+            "note": "Table 1 averages over four models × two datasets (FRAMES and MuSiQue). Requested token ceilings, not identical actual consumption. The token axis is logarithmic. Three of the seven evaluated methods are shown.",
+            "alt": "Debate leads at 100 requested thinking tokens. The single-agent average leads the three displayed methods at every budget from 500 to 10,000 tokens. At 1,000 tokens: 41.8% single agent, 37.9% sequential agents, 38.8% debate.",
+            "headers": [
+                "Requested thinking tokens",
+                "Single agent accuracy (%)",
+                "Sequential agents accuracy (%)",
+                "Debate accuracy (%)"
+            ],
+            "budgets": [100, 500, 1000, 2000, 5000, 10000],
+            "values": [
+                [29.0, 39.0, 41.8, 42.1, 42.7, 42.6],
+                [36.4, 37.6, 37.9, 38.9, 38.6, 38.7],
+                [37.0, 38.0, 38.8, 40.3, 42.0, 42.0]
+            ]
+        },
+        {
+            "id": "ensemble",
+            "title": "Accuracy at comparable modeled compute",
+            "source": "https://aclanthology.org/2026.acl-srw.1.pdf",
+            "locator": "Section 4.1 and Section 8; ACL SRW, July 2026",
+            "credit": "Wunderlich et al. / ACL SRW / 2026",
+            "kind": "bars",
+            "series": ["Self-consistency", "Debate", "Mixture of agents"],
+            "note": "Llama 3.1 70B; 1,000 MMLU-Pro questions. Best reported configurations within the tested compute range. Whiskers are approximate 95% binomial intervals, calculated using the paper's formula. These are not intervals on the differences.",
+            "alt": "Accuracy is 68.7% for self-consistency, 70.0% for debate, and 71.4% for mixture of agents. Approximate individual 95% intervals overlap. Mixture of agents gains 2.7 percentage points over self-consistency.",
+            "headers": ["Method", "Accuracy (%)", "Configuration"],
+            "panels": [
+                {
+                    "title": "MMLU-Pro",
+                    "subtitle": "Accuracy (%) / higher is better",
+                    "unit": "Zero baseline / 0–100%",
+                    "max": 100,
+                    "digits": 1,
+                    "suffix": "%",
+                    "values": [68.7, 70.0, 71.4],
+                    "n": 1000,
+                    "colors": ["single", "third", "multi"]
+                }
+            ],
+            "configurations": ["10 iterations", "4 agents, 2 layers", "5 models, 4 layers"],
+            "derivation": "Individual 95% interval: 100 × [p ± 1.96 × sqrt(p × (1 − p) / 1000)], p = reported accuracy / 100. Rounded source estimates; no paired significance inference."
+        },
+        {
+            "id": "swarm",
+            "title": "The four cost-matched SwarmBench tasks",
+            "source": "https://arxiv.org/html/2608.30661v1",
+            "locator": "Table 7, Appendix D.1; metrics in Appendix C.1; v1, 31 August 2026",
+            "credit": "SwarmBench / arXiv:2608.30661v1 / 2026",
+            "kind": "pairs",
+            "series": ["Single agent", "Swarm"],
+            "note": "Haiku 4.5 single agent and orchestrator; heterogeneous workers; 50 examples per task. Single-agent spending is capped at each task's mean swarm cost. Different metrics and axis ranges; no combined accuracy. No comparison intervals are supplied.",
+            "alt": "At matched cost ceilings, swarm scores exceed single-agent scores for multi-text understanding, long-text generation, and wide search. Single-agent root-cause analysis scores are higher. Only four of the eight benchmark tasks have this comparison.",
+            "headers": ["Task", "Single agent", "Swarm", "Metric"],
+            "panels": [
+                {
+                    "title": "Multi-text understanding",
+                    "subtitle": "Judge score",
+                    "unit": "Score / higher is better",
+                    "max": 50,
+                    "digits": 2,
+                    "values": [28.0, 40.36],
+                    "detail": ["Judge score"]
+                },
+                {
+                    "title": "Root-cause analysis",
+                    "subtitle": "OpenRCA score",
+                    "unit": "Score / higher is better",
+                    "max": 5,
+                    "digits": 2,
+                    "values": [3.11, 2.0],
+                    "detail": ["OpenRCA score"]
+                },
+                {
+                    "title": "Long-text generation",
+                    "subtitle": "Document-quality composite",
+                    "unit": "Score / higher is better",
+                    "max": 50,
+                    "digits": 2,
+                    "values": [31.25, 40.5],
+                    "detail": ["Document-quality composite"]
+                },
+                {
+                    "title": "Wide search",
+                    "subtitle": "Item F1",
+                    "unit": "Score / higher is better",
+                    "max": 25,
+                    "digits": 2,
+                    "values": [16.3, 19.05],
+                    "detail": ["Item F1"]
+                }
+            ]
+        },
+        {
+            "id": "anthropic",
+            "title": "Research performance and typical token use",
+            "source": "https://www.anthropic.com/engineering/multi-agent-research-system",
+            "locator": "Internal research evaluation and token-use observations; 13 June 2025",
+            "credit": "Anthropic / Engineering report / 2025",
+            "kind": "pairs",
+            "note": "Two separate observations, not a paired efficiency experiment. Performance uses an Opus 4 lead with Sonnet 4 workers against one Opus 4 agent. Absolute evaluation scores are undisclosed. Token multiples describe typical use relative to chat.",
+            "alt": "Internal research performance: single-agent index 100, multi-agent index 190.2, derived from a 90.2% relative gain. Separate typical token-use observation: chat about 1×, single agent about 4×, multi-agent about 15×. Neither index is an accuracy percentage.",
+            "headers": ["Observation", "System", "Value", "Unit"],
+            "panels": [
+                {
+                    "title": "A / Research evaluation",
+                    "subtitle": "Derived index / single agent = 100",
+                    "unit": "Index / higher is better",
+                    "max": 200,
+                    "digits": 1,
+                    "values": [100, 190.2],
+                    "series": ["Single agent", "Multi-agent"],
+                    "detail": ["Performance index"]
+                },
+                {
+                    "title": "B / Typical token use",
+                    "subtitle": "Approximate / chat = 1×",
+                    "unit": "Tokens relative to chat",
+                    "max": 20,
+                    "digits": 0,
+                    "suffix": "×",
+                    "values": [1, 4, 15],
+                    "series": ["Chat", "Single agent", "Multi-agent"],
+                    "colors": ["neutral", "single", "multi"],
+                    "detail": ["Token multiple vs. chat"]
+                }
+            ],
+            "derivation": "Performance index: 100 × (1 + 90.2 / 100) = 190.2. This is a normalized illustration of the reported relative improvement, not a reported absolute score. Do not combine with the separate typical token-use observation to calculate evaluation efficiency."
+        },
+        {
+            "id": "oneflow",
+            "title": "Workflow execution: pass rate and latency",
+            "source": "https://arxiv.org/html/2601.12307v1",
+            "locator": "Section 4.2.4, Table 4; v1, 18 January 2026",
+            "credit": "Xu et al. / arXiv:2601.12307v1 / 2026",
+            "kind": "pairs",
+            "series": ["Single conversation", "Stateless calls"],
+            "note": "Qwen3 8B on HumanEval; vLLM, 16k context, three-run means. Table 4 reports no uncertainty intervals. Compare execution methods within each workflow. Token budgets are not matched; latency and pass rate have separate axes.",
+            "alt": "AFlow: single-conversation pass rate 90.5% versus stateless calls 86.8%; latency 53.53 versus 54.98 seconds. OneFlow: 87.4% versus 87.0%; latency 4.83 versus 4.31 seconds. Single-conversation execution is slightly slower for OneFlow.",
+            "headers": ["Workflow / measure", "Single conversation", "Stateless calls", "Unit"],
+            "panels": [
+                {
+                    "title": "AFlow / Pass rate",
+                    "subtitle": "HumanEval pass@1",
+                    "unit": "Percent / higher is better",
+                    "max": 100,
+                    "digits": 1,
+                    "suffix": "%",
+                    "values": [90.5, 86.8],
+                    "detail": ["Percent"]
+                },
+                {
+                    "title": "AFlow / Latency",
+                    "subtitle": "Measured runtime",
+                    "unit": "Seconds / lower is better",
+                    "max": 60,
+                    "digits": 2,
+                    "suffix": " s",
+                    "values": [53.53, 54.98],
+                    "detail": ["Seconds"]
+                },
+                {
+                    "title": "OneFlow / Pass rate",
+                    "subtitle": "HumanEval pass@1",
+                    "unit": "Percent / higher is better",
+                    "max": 100,
+                    "digits": 1,
+                    "suffix": "%",
+                    "values": [87.4, 87.0],
+                    "detail": ["Percent"]
+                },
+                {
+                    "title": "OneFlow / Latency",
+                    "subtitle": "Measured runtime",
+                    "unit": "Seconds / lower is better",
+                    "max": 60,
+                    "digits": 2,
+                    "suffix": " s",
+                    "values": [4.83, 4.31],
+                    "detail": ["Seconds"]
+                }
+            ]
+        },
+        {
+            "id": "mast",
+            "title": "Fourteen failure modes, grouped by category",
+            "source": "https://papers.nips.cc/paper_files/paper/2025/file/b1041e52d3be19f0a9bc491657488e4a-Paper-Datasets_and_Benchmarks_Track.pdf",
+            "locator": "Appendix A.1–A.3, printed pages 24–25; final NeurIPS 2025 paper",
+            "credit": "MAST / NeurIPS Datasets and Benchmarks / 2025",
+            "kind": "taxonomy",
+            "note": "Each square represents one distinct taxonomy label. Counts describe the taxonomy's structure, not failure frequency, severity, or production reliability. There is no single-agent control group.",
+            "alt": "The MAST taxonomy has five system-design modes, six inter-agent misalignment modes, and three task-verification modes. These are counts of identified categories, not counts of observed failures.",
+            "headers": ["Category", "Distinct modes", "Taxonomy IDs"],
+            "rows": [
+                ["System design", 5, "1.1–1.5"],
+                ["Inter-agent misalignment", 6, "2.1–2.6"],
+                ["Task verification", 3, "3.1–3.3"]
+            ]
+        }
+    ]
+}

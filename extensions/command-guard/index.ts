@@ -18,6 +18,7 @@ type State = {
     categories: Record<string, number>;
     rules: Record<string, number>;
     criticalRule?: string;
+    onModeChanged?: () => void;
 };
 
 function validRecord(value: unknown): value is Record<string, unknown> {
@@ -138,12 +139,17 @@ function decisionPrompt(decision: any, cwd: string, affected: string): string {
     return boundedReason(fields, 1200);
 }
 
+function lockSession(state: State): void {
+    state.mode = "locked";
+    state.generation += 1;
+    state.sessionApprovals.clear();
+    state.onModeChanged?.();
+}
+
 function deny(state: State, reason: string, critical = false): { block: true; reason: string } {
     state.blocks += 1;
     if (critical) {
-        state.mode = "locked";
-        state.generation += 1;
-        state.sessionApprovals.clear();
+        lockSession(state);
     }
 
     return { block: true, reason: boundedReason(reason) };
@@ -175,6 +181,34 @@ export default function registerCommandGuard(
         categories: {},
         rules: {},
     };
+    state.onModeChanged = () => pi.events?.emit("specpi:guard-policy-changed", { reason: "guard policy changed" });
+    let guardStateSubscription: (() => void) | undefined;
+    const subscribeGuardState = () => {
+        if (!guardStateSubscription) {
+            guardStateSubscription = pi.events?.on?.("specpi:guard-state", (request: any) => {
+                request.reply({ mode: state.ready && !state.startupFailed ? state.mode : undefined });
+            });
+        }
+    };
+
+    subscribeGuardState();
+    const delegationPolicy = (input: unknown): { fingerprint: string; summary: string } | undefined => {
+        let replies = 0;
+        let policy: any;
+        pi.events?.emit("specpi:delegation-policy", {
+            input,
+            reply(value: any) {
+                replies += 1;
+                policy = value;
+            },
+        });
+        if (replies !== 1 || !/^[a-f0-9]{64}$/u.test(policy?.fingerprint) || typeof policy?.summary !== "string") {
+            return undefined;
+        }
+
+        return { fingerprint: policy.fingerprint, summary: boundedReason(policy.summary, 1600) };
+    };
+
     const reset = () => {
         clearAnalysisCache();
         state.mode = "guard";
@@ -192,10 +226,17 @@ export default function registerCommandGuard(
 
     pi.on("session_start", async (_event, ctx) => {
         reset();
+        const startupGeneration = state.generation;
         try {
+            subscribeGuardState();
             const choice = ctx.hasUI ? await startupChoice(ctx, startupTimeoutMs) : undefined;
+            if (state.generation !== startupGeneration) {
+                return;
+            }
+
+            let mode: "guard" | "strict" | "off" = "guard";
             if (choice === "Strict") {
-                state.mode = "strict";
+                mode = "strict";
             } else if (choice === "Off for this session") {
                 const confirmed = ctx.hasUI
                     ? await withTimeout(
@@ -207,10 +248,15 @@ export default function registerCommandGuard(
                           startupTimeoutMs,
                       )
                     : false;
-                state.mode = confirmed ? "off" : "guard";
+                if (state.generation !== startupGeneration) {
+                    return;
+                }
+
+                mode = confirmed ? "off" : "guard";
             }
 
-            state.baseMode = state.mode;
+            state.mode = mode;
+            state.baseMode = mode;
             state.ready = true;
             state.startupFailed = false;
             updateStatus(ctx, state);
@@ -221,6 +267,10 @@ export default function registerCommandGuard(
                 state.mode === "off" ? "warning" : "info",
             );
         } catch {
+            if (state.generation !== startupGeneration) {
+                return;
+            }
+
             state.startupFailed = true;
             state.ready = false;
             try {
@@ -232,6 +282,11 @@ export default function registerCommandGuard(
     });
     pi.on("session_shutdown", (_event, ctx) => {
         reset();
+        if (typeof guardStateSubscription === "function") {
+            guardStateSubscription();
+            guardStateSubscription = undefined;
+        }
+
         try {
             ctx.ui.setStatus("specpi-command-guard", undefined);
         } catch {
@@ -256,6 +311,12 @@ export default function registerCommandGuard(
                 return;
             }
 
+            if (!["guard", "strict", "off", "unlock", "clear-approvals"].includes(action)) {
+                ctx.ui.notify("Usage: /guard [status|guard|strict|off|unlock|clear-approvals]", "error");
+
+                return;
+            }
+
             if (state.mode === "locked" && action !== "unlock") {
                 ctx.ui.notify(
                     "The command guard is locked. Use /guard unlock after reviewing the critical rule.",
@@ -268,6 +329,7 @@ export default function registerCommandGuard(
             if (action === "clear-approvals") {
                 state.sessionApprovals.clear();
                 state.generation += 1;
+                state.onModeChanged?.();
                 ctx.ui.notify("Session approvals cleared.", "info");
 
                 return;
@@ -280,6 +342,7 @@ export default function registerCommandGuard(
                     return;
                 }
 
+                const approvalGeneration = state.generation;
                 const ok =
                     ctx.hasUI &&
                     (await withTimeout(
@@ -290,11 +353,12 @@ export default function registerCommandGuard(
                         false,
                         approvalTimeoutMs,
                     ));
-                if (ok) {
+                if (ok && state.generation === approvalGeneration) {
                     state.mode = state.baseMode;
                     state.generation += 1;
                     state.sessionApprovals.clear();
                     state.criticalRule = undefined;
+                    state.onModeChanged?.();
                     updateStatus(ctx, state);
                     ctx.ui.notify(`Command guard unlocked in ${state.baseMode} mode.`, "warning");
                 }
@@ -303,6 +367,11 @@ export default function registerCommandGuard(
             }
 
             if (action === "off") {
+                if (state.mode === "off") {
+                    return;
+                }
+
+                const approvalGeneration = state.generation;
                 if (
                     !ctx.hasUI ||
                     !(await withTimeout(
@@ -312,7 +381,8 @@ export default function registerCommandGuard(
                         ),
                         false,
                         approvalTimeoutMs,
-                    ))
+                    )) ||
+                    state.generation !== approvalGeneration
                 ) {
                     return;
                 }
@@ -321,24 +391,31 @@ export default function registerCommandGuard(
                 state.baseMode = "off";
                 state.generation += 1;
                 state.sessionApprovals.clear();
+                state.onModeChanged?.();
                 updateStatus(ctx, state);
 
                 return;
             }
 
             if (action === "strict" || action === "guard") {
+                if (state.mode === action) {
+                    return;
+                }
+
+                const approvalGeneration = state.generation;
                 if (
-                    action === "guard" &&
-                    state.mode === "strict" &&
-                    (!ctx.hasUI ||
-                        !(await withTimeout(
-                            ctx.ui.confirm(
-                                "Switch to Guard mode?",
-                                "This weakens protection for the rest of this session.",
-                            ),
-                            false,
-                            approvalTimeoutMs,
-                        )))
+                    (action === "guard" &&
+                        state.mode === "strict" &&
+                        (!ctx.hasUI ||
+                            !(await withTimeout(
+                                ctx.ui.confirm(
+                                    "Switch to Guard mode?",
+                                    "This weakens protection for the rest of this session.",
+                                ),
+                                false,
+                                approvalTimeoutMs,
+                            )))) ||
+                    state.generation !== approvalGeneration
                 ) {
                     return;
                 }
@@ -347,12 +424,11 @@ export default function registerCommandGuard(
                 state.baseMode = action;
                 state.generation += 1;
                 state.sessionApprovals.clear();
+                state.onModeChanged?.();
                 updateStatus(ctx, state);
 
                 return;
             }
-
-            ctx.ui.notify("Usage: /guard [status|guard|strict|off|unlock|clear-approvals]", "error");
         },
     });
 
@@ -462,9 +538,7 @@ export default function registerCommandGuard(
                     }
 
                     if (answer === "Lock session") {
-                        state.mode = "locked";
-                        state.generation += 1;
-                        state.sessionApprovals.clear();
+                        lockSession(state);
                         updateStatus(ctx, state);
 
                         return deny(state, "The session was locked by command-guard approval.");
@@ -557,9 +631,7 @@ export default function registerCommandGuard(
                     }
 
                     if (answer === "Lock session") {
-                        state.mode = "locked";
-                        state.generation += 1;
-                        state.sessionApprovals.clear();
+                        lockSession(state);
                         updateStatus(ctx, state);
 
                         return deny(state, "The session was locked by command-guard approval.");
@@ -573,7 +645,15 @@ export default function registerCommandGuard(
 
             if (state.mode === "strict") {
                 recordDecision(state, { category: "unknown", ruleIds: ["tool.unknown-capability"] });
-                const approvalFingerprint = toolFingerprint(name, input, ctx.cwd, state.mode);
+                const capability = name === "delegate" ? delegationPolicy(input) : undefined;
+                if (name === "delegate" && !capability) {
+                    return deny(state, "Delegation policy is unavailable or ambiguous; execution is denied.");
+                }
+
+                const effectiveInput = capability
+                    ? { input, delegationPolicyFingerprint: capability.fingerprint }
+                    : input;
+                const approvalFingerprint = toolFingerprint(name, effectiveInput, ctx.cwd, state.mode);
                 if (!approvalFingerprint) {
                     return deny(state, "Unknown-tool approval input is malformed or exceeds the safety bound.");
                 }
@@ -589,7 +669,7 @@ export default function registerCommandGuard(
                 const approvalGeneration = state.generation;
                 const answer = await withTimeout(
                     ctx.ui.select(
-                        `Unknown tool approval — name: ${boundedReason(name, 96)}; mode: ${state.mode}; capability is not in the reviewed command-guard catalog.`,
+                        `Unknown tool approval — name: ${boundedReason(name, 96)}; mode: ${state.mode}; ${capability?.summary ?? "capability is not in the reviewed command-guard catalog."}`,
                         ["Deny (Recommended)", "Allow once", "Allow exact call for session", "Lock session"],
                     ),
                     undefined,
@@ -598,7 +678,14 @@ export default function registerCommandGuard(
                 if (
                     state.generation !== approvalGeneration ||
                     state.mode === "locked" ||
-                    toolFingerprint(name, input, ctx.cwd, state.mode) !== approvalFingerprint
+                    toolFingerprint(
+                        name,
+                        capability
+                            ? { input, delegationPolicyFingerprint: delegationPolicy(input)?.fingerprint }
+                            : input,
+                        ctx.cwd,
+                        state.mode,
+                    ) !== approvalFingerprint
                 ) {
                     return deny(state, "Command-guard state or input changed during approval; execution is denied.");
                 }
@@ -619,9 +706,7 @@ export default function registerCommandGuard(
                 }
 
                 if (answer === "Lock session") {
-                    state.mode = "locked";
-                    state.generation += 1;
-                    state.sessionApprovals.clear();
+                    lockSession(state);
                     updateStatus(ctx, state);
                 }
 

@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#111619" />
+        <meta
+            name="description"
+            content="Why SpecPi starts with one strong agent and improves its harness through evidence. A technical assessment of coordination costs, current research, and carefully scoped exceptions."
+        />
+        <meta property="og:title" content="Single-agent architecture · SpecPi" />
+        <meta
+            property="og:description"
+            content="Research on agent coordination, cost per accepted outcome, and human-directed harness improvement."
+        />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/single-agent/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/single-agent/" />
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+        <link rel="stylesheet" href="../charts.css" />
+        <title>Single-agent architecture · SpecPi</title>
+    </head>
+    <body class="article-page">
+        <a class="skip-link" href="#article">Skip to article</a>
+        <header class="site-header wrap">
+            <a class="brand" href="../" aria-label="SpecPi home"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="../#loop">Workflow</a><a href="./" aria-current="page">Architecture</a
+                ><a href="../wiki/">Reference</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
+            </nav>
+        </header>
+        <main id="article">
+            <header class="article-heading wrap">
+                <div class="article-meta">
+                    <span>Engineering note / 01</span
+                    ><span>Evidence reviewed <time datetime="2026-09-04">04 Sep 2026</time> · 10 min read</span>
+                </div>
+                <h1>Single-agent architecture</h1>
+                <p class="article-deck">
+                    The rationale for SpecPi's single-agent default: coordination costs, research findings, verification
+                    boundaries, and evaluation criteria for optional delegation.
+                </p>
+            </header>
+            <div class="decision-strip">
+                <div class="wrap">
+                    <strong>CURRENT DEFAULT</strong>
+                    <p>
+                        One agent owns implementation and integration. Harness changes require human selection and
+                        validation.
+                    </p>
+                </div>
+            </div>
+            <div class="article-layout wrap">
+                <aside class="wiki-sidebar" aria-label="Article navigation">
+                    <p>Inside this note</p>
+                    <nav aria-label="Article sections">
+                        <a href="#outcomes"><span>01</span>Evaluation metric</a
+                        ><a href="#evidence"><span>02</span>Research evidence</a
+                        ><a href="#ownership"><span>03</span>Execution ownership</a
+                        ><a href="#improvement"><span>04</span>Harness improvement</a
+                        ><a href="#exceptions"><span>05</span>Experimental delegation</a>
+                    </nav>
+                    <div class="index-meta">
+                        Architecture decision<br />SpecPi v0.12.0<br /><br />Seven primary sources.<br />Research is
+                        evidence,<br />not a product benchmark.
+                    </div>
+                </aside>
+                <article class="article-body" aria-label="Single-agent architecture">
+                    <p class="lead">
+                        SpecPi starts with one strong agent and one writer. The harness can improve, but those
+                        improvements follow observed behavior and an explicit human decision.
+                    </p>
+                    <p>
+                        These choices belong together. A smaller system makes behavior easier to observe. A single owner
+                        makes edits and validation easier to inspect. When something repeatedly gets in the way, we can
+                        identify a narrow intervention and determine whether it helped.
+                    </p>
+                    <p>
+                        This is our starting architecture, with a burden of proof for additional machinery. Independent
+                        research, fresh context, and a second review can be useful. Their value depends on measurable
+                        improvements in accepted outcomes.
+                    </p>
+                    <section id="outcomes">
+                        <h2>01 / Cost per accepted outcome</h2>
+                        <p>A model response is easy to count. A useful result takes more work to establish.</p>
+                        <p>
+                            For a coding task, acceptance might require correct behavior, appropriate tests, a
+                            comprehensible diff, and reasonable human review. Finishing quickly while introducing a
+                            regression moves work downstream. A reviewer that raises ten plausible concerns can create
+                            more work than one that identifies a single material defect.
+                        </p>
+                        <p>
+                            We therefore care about <strong>cost per accepted outcome</strong>: the resources spent
+                            obtaining a result that survives its checks and human review.
+                        </p>
+                        <figure class="cost-model">
+                            <figcaption>Evaluation lens / conceptual, not a measured SpecPi result</figcaption>
+                            <div class="cost-fraction">
+                                <span>Model + tool + coordination + review + correction cost</span
+                                ><span>Accepted outcomes</span>
+                            </div>
+                            <p>Track elapsed time separately. A faster run can still perform more total work.</p>
+                        </figure>
+                        <p>
+                            Repeated context, reasoning tokens, cache behavior, failed attempts, integration, and human
+                            correction all belong in the accounting. Equal token ceilings do not guarantee equal
+                            consumption. Equal spending does not guarantee equal latency. Parallel execution may save
+                            time while increasing resource use.
+                        </p>
+                        <p>
+                            The comparison we want is a strong single agent against a carefully scoped alternative, with
+                            comparable total resources. Giving extra compute to a team and comparing it with one short
+                            attempt does not isolate the value of coordination.
+                        </p>
+                    </section>
+                    <section id="evidence">
+                        <h2>02 / Research findings and limits</h2>
+                        <p>
+                            Recent work supports restraint, and provides useful counterexamples. None of these studies
+                            benchmarks SpecPi. Our architecture decision is an inference from their findings and this
+                            project's requirements.
+                        </p>
+                        <div class="evidence-card">
+                            <p class="source-meta">01 / Nature Machine Intelligence · Published 24 Jul 2026</p>
+                            <h3>Task-dependent coordination results</h3>
+                            <p>
+                                Kim et al. compare <strong>260 configurations across six benchmarks</strong>, matching
+                                system reasoning-token ceilings and tool access. Centralized coordination improves
+                                financial reasoning by <strong>80.8% relative</strong> to the single-agent baseline; the
+                                multi-agent variants reduce PlanCraft performance by <strong>39–70% relative</strong>.
+                                On SWE-bench Verified, the single-agent mean is 0.488 and the best multi-agent mean is
+                                0.481. That coding comparison uses only <strong>20 instances per configuration</strong>,
+                                and workers share a Docker filesystem. The roughly 45% capability threshold is a
+                                study-specific selection rule, not a universal boundary. Matched ceilings also do not
+                                imply identical billed cost.
+                            </p>
+                            <!-- research-chart:nature -->
+                            <figure class="research-chart" id="chart-nature" aria-labelledby="chart-nature-title">
+                                <figcaption id="chart-nature-title">Benchmark scores by task</figcaption>
+                                <picture>
+                                    <source
+                                        media="(max-width: 600px), (min-width: 801px) and (max-width: 1100px)"
+                                        srcset="../charts/nature-compact.svg"
+                                    />
+                                    <img
+                                        src="../charts/nature.svg"
+                                        width="720"
+                                        height="692"
+                                        loading="lazy"
+                                        decoding="async"
+                                        alt="Single-agent and best multi-agent mean scores across six benchmarks. Multi-agent scores are higher on Finance Agent, WorkBench, BrowseComp-Plus, and Terminal-Bench; single-agent scores are higher on PlanCraft and SWE-bench Verified."
+                                    />
+                                </picture>
+                                <p class="chart-note">
+                                    Mean scores across tested models. The best multi-agent architecture is selected
+                                    separately for each benchmark. Matched system token ceilings; actual spending can
+                                    differ. No pooled score or significance claim.
+                                </p>
+                                <details class="chart-data">
+                                    <summary>Data and source details</summary>
+                                    <div
+                                        class="table-scroll"
+                                        role="region"
+                                        aria-label="Benchmark scores by task data"
+                                        tabindex="0"
+                                    >
+                                        <table>
+                                            <caption>
+                                                Benchmark scores by task
+                                            </caption>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">Benchmark</th>
+                                                    <th scope="col">Single agent</th>
+                                                    <th scope="col">Best multi-agent</th>
+                                                    <th scope="col">Selected architecture</th>
+                                                    <th scope="col">Instances per configuration</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">Finance Agent</th>
+                                                    <td>0.349</td>
+                                                    <td>0.631</td>
+                                                    <td>Centralized</td>
+                                                    <td>50</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">WorkBench</th>
+                                                    <td>0.629</td>
+                                                    <td>0.664</td>
+                                                    <td>Decentralized</td>
+                                                    <td>100</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">BrowseComp-Plus</th>
+                                                    <td>0.318</td>
+                                                    <td>0.347</td>
+                                                    <td>Decentralized</td>
+                                                    <td>100</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">PlanCraft</th>
+                                                    <td>0.568</td>
+                                                    <td>0.346</td>
+                                                    <td>Hybrid</td>
+                                                    <td>100</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">SWE-bench Verified</th>
+                                                    <td>0.488</td>
+                                                    <td>0.481</td>
+                                                    <td>Hybrid</td>
+                                                    <td>20</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Terminal-Bench</th>
+                                                    <td>0.312</td>
+                                                    <td>0.331</td>
+                                                    <td>Independent</td>
+                                                    <td>20</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p>
+                                        Results: domain-dependent performance; July 2026 version of record.
+                                        <a href="https://www.nature.com/articles/s42256-026-01268-y"
+                                            >Primary source ↗</a
+                                        >
+                                    </p>
+                                </details>
+                                <div class="chart-downloads" aria-label="Download Benchmark scores by task">
+                                    <a href="../charts/nature.svg" download="specpi-nature.svg">SVG figure ↓</a>
+                                    <a href="../charts/nature.csv" download="specpi-nature.csv">CSV data ↓</a>
+                                </div>
+                            </figure>
+                            <!-- /research-chart:nature -->
+                            <p class="source-link">
+                                <a href="https://www.nature.com/articles/s42256-026-01268-y"
+                                    >Capable language models can outgrow the benefits of collaboration ↗</a
+                                >
+                            </p>
+                        </div>
+                        <div class="evidence-card">
+                            <p class="source-meta">02 / Preprint · Revised 11 Apr 2026</p>
+                            <h3>Reasoning under matched requested budgets</h3>
+                            <p>
+                                Tran and Kiela test FRAMES and MuSiQue multi-hop questions. At a requested budget of
+                                <strong>1,000 thinking tokens</strong>, averages across eight model–dataset combinations
+                                are <strong>41.8% for the single agent</strong>, 37.9% for sequential agents, and 38.8%
+                                for debate. At larger budgets, some differences narrow; at the smallest tested budget,
+                                debate wins on average. The authors also identify imperfect API token accounting. These
+                                are text-only reasoning results under matched requested ceilings. They do not settle the
+                                comparison for tool-using coding workflows.
+                            </p>
+                            <!-- research-chart:reasoning -->
+                            <figure class="research-chart" id="chart-reasoning" aria-labelledby="chart-reasoning-title">
+                                <figcaption id="chart-reasoning-title">
+                                    Accuracy across requested token budgets
+                                </figcaption>
+                                <picture>
+                                    <source
+                                        media="(max-width: 600px), (min-width: 801px) and (max-width: 1100px)"
+                                        srcset="../charts/reasoning-compact.svg"
+                                    />
+                                    <img
+                                        src="../charts/reasoning.svg"
+                                        width="720"
+                                        height="440"
+                                        loading="lazy"
+                                        decoding="async"
+                                        alt="Debate leads at 100 requested thinking tokens. The single-agent average leads the three displayed methods at every budget from 500 to 10,000 tokens. At 1,000 tokens: 41.8% single agent, 37.9% sequential agents, 38.8% debate."
+                                    />
+                                </picture>
+                                <p class="chart-note">
+                                    Table 1 averages over four models × two datasets (FRAMES and MuSiQue). Requested
+                                    token ceilings, not identical actual consumption. The token axis is logarithmic.
+                                    Three of the seven evaluated methods are shown.
+                                </p>
+                                <details class="chart-data">
+                                    <summary>Data and source details</summary>
+                                    <div
+                                        class="table-scroll"
+                                        role="region"
+                                        aria-label="Accuracy across requested token budgets data"
+                                        tabindex="0"
+                                    >
+                                        <table>
+                                            <caption>
+                                                Accuracy across requested token budgets
+                                            </caption>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">Requested thinking tokens</th>
+                                                    <th scope="col">Single agent accuracy (%)</th>
+                                                    <th scope="col">Sequential agents accuracy (%)</th>
+                                                    <th scope="col">Debate accuracy (%)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">100</th>
+                                                    <td>29.0</td>
+                                                    <td>36.4</td>
+                                                    <td>37.0</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">500</th>
+                                                    <td>39.0</td>
+                                                    <td>37.6</td>
+                                                    <td>38.0</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">1000</th>
+                                                    <td>41.8</td>
+                                                    <td>37.9</td>
+                                                    <td>38.8</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">2000</th>
+                                                    <td>42.1</td>
+                                                    <td>38.9</td>
+                                                    <td>40.3</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">5000</th>
+                                                    <td>42.7</td>
+                                                    <td>38.6</td>
+                                                    <td>42.0</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">10000</th>
+                                                    <td>42.6</td>
+                                                    <td>38.7</td>
+                                                    <td>42.0</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p>
+                                        Table 1, Average rows; v2, 11 April 2026.
+                                        <a href="https://arxiv.org/html/2604.02460v2">Primary source ↗</a>
+                                    </p>
+                                </details>
+                                <div
+                                    class="chart-downloads"
+                                    aria-label="Download Accuracy across requested token budgets"
+                                >
+                                    <a href="../charts/reasoning.svg" download="specpi-reasoning.svg">SVG figure ↓</a>
+                                    <a href="../charts/reasoning.csv" download="specpi-reasoning.csv">CSV data ↓</a>
+                                </div>
+                            </figure>
+                            <!-- /research-chart:reasoning -->
+                            <p class="source-link">
+                                <a href="https://arxiv.org/html/2604.02460v2"
+                                    >Single-agent and multi-agent reasoning comparison ↗</a
+                                >
+                            </p>
+                        </div>
+                        <div class="evidence-card">
+                            <p class="source-meta">03 / ACL Student Research Workshop · Jul 2026</p>
+                            <h3>Ensemble accuracy and compute estimates</h3>
+                            <p>
+                                Wunderlich et al. evaluate <strong>1,000 MMLU-Pro questions</strong>, primarily with
+                                Llama 3.1 70B. Mixture-of-agents reaches <strong>71.4%</strong>, compared with
+                                <strong>68.7% for self-consistency</strong> at comparable modeled compute: a gain of
+                                <strong>2.7 percentage points</strong>. Individual accuracy estimates have uncertainty
+                                of roughly three points. Compute is estimated from arithmetic and memory transfer,
+                                rather than measured production latency. Non-reasoning models and static questions are
+                                useful evidence for configured ensembles, with limited transfer to today's coding
+                                agents.
+                            </p>
+                            <!-- research-chart:ensemble -->
+                            <figure class="research-chart" id="chart-ensemble" aria-labelledby="chart-ensemble-title">
+                                <figcaption id="chart-ensemble-title">
+                                    Accuracy at comparable modeled compute
+                                </figcaption>
+                                <picture>
+                                    <source
+                                        media="(max-width: 600px), (min-width: 801px) and (max-width: 1100px)"
+                                        srcset="../charts/ensemble-compact.svg"
+                                    />
+                                    <img
+                                        src="../charts/ensemble.svg"
+                                        width="720"
+                                        height="318"
+                                        loading="lazy"
+                                        decoding="async"
+                                        alt="Accuracy is 68.7% for self-consistency, 70.0% for debate, and 71.4% for mixture of agents. Approximate individual 95% intervals overlap. Mixture of agents gains 2.7 percentage points over self-consistency."
+                                    />
+                                </picture>
+                                <p class="chart-note">
+                                    Llama 3.1 70B; 1,000 MMLU-Pro questions. Best reported configurations within the
+                                    tested compute range. Whiskers are approximate 95% binomial intervals, calculated
+                                    using the paper&#x27;s formula. These are not intervals on the differences.
+                                </p>
+                                <details class="chart-data">
+                                    <summary>Data and source details</summary>
+                                    <div
+                                        class="table-scroll"
+                                        role="region"
+                                        aria-label="Accuracy at comparable modeled compute data"
+                                        tabindex="0"
+                                    >
+                                        <table>
+                                            <caption>
+                                                Accuracy at comparable modeled compute
+                                            </caption>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">Method</th>
+                                                    <th scope="col">Accuracy (%)</th>
+                                                    <th scope="col">Configuration</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">Self-consistency</th>
+                                                    <td>68.7</td>
+                                                    <td>10 iterations</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Debate</th>
+                                                    <td>70.0</td>
+                                                    <td>4 agents, 2 layers</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Mixture of agents</th>
+                                                    <td>71.4</td>
+                                                    <td>5 models, 4 layers</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p>
+                                        Section 4.1 and Section 8; ACL SRW, July 2026.
+                                        <a href="https://aclanthology.org/2026.acl-srw.1.pdf">Primary source ↗</a>
+                                    </p>
+                                    <p>
+                                        Individual 95% interval: 100 × [p ± 1.96 × sqrt(p × (1 − p) / 1000)], p =
+                                        reported accuracy / 100. Rounded source estimates; no paired significance
+                                        inference.
+                                    </p>
+                                </details>
+                                <div
+                                    class="chart-downloads"
+                                    aria-label="Download Accuracy at comparable modeled compute"
+                                >
+                                    <a href="../charts/ensemble.svg" download="specpi-ensemble.svg">SVG figure ↓</a>
+                                    <a href="../charts/ensemble.csv" download="specpi-ensemble.csv">CSV data ↓</a>
+                                </div>
+                            </figure>
+                            <!-- /research-chart:ensemble -->
+                            <p class="source-link">
+                                <a href="https://aclanthology.org/2026.acl-srw.1/"
+                                    >Multi-Agent Reasoning Improves Compute Efficiency ↗</a
+                                >
+                            </p>
+                        </div>
+                        <div class="evidence-card">
+                            <p class="source-meta">04 / SwarmBench preprint · Submitted 31 Aug 2026</p>
+                            <h3>Orchestration on context-intensive tasks</h3>
+                            <p>
+                                SwarmBench contains <strong>400 samples across eight task types</strong>. Its
+                                cost-matched comparison covers four tasks and uses <strong>Claude Haiku 4.5</strong> for
+                                both the single agent and swarm orchestrator. The swarm scores higher on multi-text
+                                understanding, long-text generation, and wide search; the single agent scores higher on
+                                root-cause analysis. The swarm has a heterogeneous worker pool, and the tasks
+                                deliberately exercise orchestration. That makes this evidence for specific delegation
+                                opportunities, without establishing superiority over a stronger single-agent baseline.
+                                Task scores use different metrics and should not be combined into one success-rate
+                                chart.
+                            </p>
+                            <!-- research-chart:swarm -->
+                            <figure class="research-chart" id="chart-swarm" aria-labelledby="chart-swarm-title">
+                                <figcaption id="chart-swarm-title">The four cost-matched SwarmBench tasks</figcaption>
+                                <picture>
+                                    <source
+                                        media="(max-width: 600px), (min-width: 801px) and (max-width: 1100px)"
+                                        srcset="../charts/swarm-compact.svg"
+                                    />
+                                    <img
+                                        src="../charts/swarm.svg"
+                                        width="720"
+                                        height="484"
+                                        loading="lazy"
+                                        decoding="async"
+                                        alt="At matched cost ceilings, swarm scores exceed single-agent scores for multi-text understanding, long-text generation, and wide search. Single-agent root-cause analysis scores are higher. Only four of the eight benchmark tasks have this comparison."
+                                    />
+                                </picture>
+                                <p class="chart-note">
+                                    Haiku 4.5 single agent and orchestrator; heterogeneous workers; 50 examples per
+                                    task. Single-agent spending is capped at each task&#x27;s mean swarm cost. Different
+                                    metrics and axis ranges; no combined accuracy. No comparison intervals are supplied.
+                                </p>
+                                <details class="chart-data">
+                                    <summary>Data and source details</summary>
+                                    <div
+                                        class="table-scroll"
+                                        role="region"
+                                        aria-label="The four cost-matched SwarmBench tasks data"
+                                        tabindex="0"
+                                    >
+                                        <table>
+                                            <caption>
+                                                The four cost-matched SwarmBench tasks
+                                            </caption>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">Task</th>
+                                                    <th scope="col">Single agent</th>
+                                                    <th scope="col">Swarm</th>
+                                                    <th scope="col">Metric</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">Multi-text understanding</th>
+                                                    <td>28.00</td>
+                                                    <td>40.36</td>
+                                                    <td>Judge score</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Root-cause analysis</th>
+                                                    <td>3.11</td>
+                                                    <td>2.00</td>
+                                                    <td>OpenRCA score</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Long-text generation</th>
+                                                    <td>31.25</td>
+                                                    <td>40.50</td>
+                                                    <td>Document-quality composite</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Wide search</th>
+                                                    <td>16.30</td>
+                                                    <td>19.05</td>
+                                                    <td>Item F1</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p>
+                                        Table 7, Appendix D.1; metrics in Appendix C.1; v1, 31 August 2026.
+                                        <a href="https://arxiv.org/html/2608.30661v1">Primary source ↗</a>
+                                    </p>
+                                </details>
+                                <div
+                                    class="chart-downloads"
+                                    aria-label="Download The four cost-matched SwarmBench tasks"
+                                >
+                                    <a href="../charts/swarm.svg" download="specpi-swarm.svg">SVG figure ↓</a>
+                                    <a href="../charts/swarm.csv" download="specpi-swarm.csv">CSV data ↓</a>
+                                </div>
+                            </figure>
+                            <!-- /research-chart:swarm -->
+                            <p class="source-link">
+                                <a href="https://arxiv.org/html/2608.30661v1"
+                                    >SwarmBench: Can Large Language Models Act as Agent Swarm Orchestrators? ↗</a
+                                >
+                            </p>
+                        </div>
+                        <div class="evidence-card">
+                            <p class="source-meta">05 / Anthropic engineering report · 13 Jun 2025</p>
+                            <h3>Parallel research in a production system</h3>
+                            <p>
+                                Anthropic reports a <strong>90.2% relative improvement</strong> on its internal research
+                                evaluation using an Opus 4 lead and Sonnet 4 workers versus one Opus 4 agent. This is a
+                                product engineering report, not a matched-budget coding study. Its token-cost comparison
+                                is often misread: multi-agent systems use about <strong>15 times chat tokens</strong>,
+                                while single agents use about <strong>four times chat tokens</strong>. The denominator
+                                is chat, not a single agent. The report makes a practical case for parallel exploration
+                                when independent lines of inquiry justify the expense.
+                            </p>
+                            <!-- research-chart:anthropic -->
+                            <figure class="research-chart" id="chart-anthropic" aria-labelledby="chart-anthropic-title">
+                                <figcaption id="chart-anthropic-title">
+                                    Research performance and typical token use
+                                </figcaption>
+                                <picture>
+                                    <source
+                                        media="(max-width: 600px), (min-width: 801px) and (max-width: 1100px)"
+                                        srcset="../charts/anthropic-compact.svg"
+                                    />
+                                    <img
+                                        src="../charts/anthropic.svg"
+                                        width="720"
+                                        height="318"
+                                        loading="lazy"
+                                        decoding="async"
+                                        alt="Internal research performance: single-agent index 100, multi-agent index 190.2, derived from a 90.2% relative gain. Separate typical token-use observation: chat about 1×, single agent about 4×, multi-agent about 15×. Neither index is an accuracy percentage."
+                                    />
+                                </picture>
+                                <p class="chart-note">
+                                    Two separate observations, not a paired efficiency experiment. Performance uses an
+                                    Opus 4 lead with Sonnet 4 workers against one Opus 4 agent. Absolute evaluation
+                                    scores are undisclosed. Token multiples describe typical use relative to chat.
+                                </p>
+                                <details class="chart-data">
+                                    <summary>Data and source details</summary>
+                                    <div
+                                        class="table-scroll"
+                                        role="region"
+                                        aria-label="Research performance and typical token use data"
+                                        tabindex="0"
+                                    >
+                                        <table>
+                                            <caption>
+                                                Research performance and typical token use
+                                            </caption>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">Observation</th>
+                                                    <th scope="col">System</th>
+                                                    <th scope="col">Value</th>
+                                                    <th scope="col">Unit</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">A / Research evaluation</th>
+                                                    <td>Single agent</td>
+                                                    <td>100.0</td>
+                                                    <td>Performance index</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">A / Research evaluation</th>
+                                                    <td>Multi-agent</td>
+                                                    <td>190.2</td>
+                                                    <td>Performance index</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">B / Typical token use</th>
+                                                    <td>Chat</td>
+                                                    <td>1</td>
+                                                    <td>Token multiple vs. chat</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">B / Typical token use</th>
+                                                    <td>Single agent</td>
+                                                    <td>4</td>
+                                                    <td>Token multiple vs. chat</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">B / Typical token use</th>
+                                                    <td>Multi-agent</td>
+                                                    <td>15</td>
+                                                    <td>Token multiple vs. chat</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p>
+                                        Internal research evaluation and token-use observations; 13 June 2025.
+                                        <a href="https://www.anthropic.com/engineering/multi-agent-research-system"
+                                            >Primary source ↗</a
+                                        >
+                                    </p>
+                                    <p>
+                                        Performance index: 100 × (1 + 90.2 / 100) = 190.2. This is a normalized
+                                        illustration of the reported relative improvement, not a reported absolute
+                                        score. Do not combine with the separate typical token-use observation to
+                                        calculate evaluation efficiency.
+                                    </p>
+                                </details>
+                                <div
+                                    class="chart-downloads"
+                                    aria-label="Download Research performance and typical token use"
+                                >
+                                    <a href="../charts/anthropic.svg" download="specpi-anthropic.svg">SVG figure ↓</a>
+                                    <a href="../charts/anthropic.csv" download="specpi-anthropic.csv">CSV data ↓</a>
+                                </div>
+                            </figure>
+                            <!-- /research-chart:anthropic -->
+                            <p class="source-link">
+                                <a href="https://www.anthropic.com/engineering/multi-agent-research-system"
+                                    >How we built our multi-agent research system ↗</a
+                                >
+                            </p>
+                        </div>
+                        <div class="evidence-card">
+                            <p class="source-meta">06 / OneFlow preprint · 18 Jan 2026</p>
+                            <h3>Single-agent execution of structured workflows</h3>
+                            <p>
+                                Xu et al. examine running homogeneous multi-agent workflows within one model's
+                                multi-turn conversation. In their Qwen3 8B HumanEval experiment, single-agent execution
+                                of AFlow improves pass rate from <strong>86.8% to 90.5%</strong>, with similar latency.
+                                Another tested workflow becomes slightly slower. Cache reuse and execution structure
+                                matter alongside agent count. The question for SpecPi is which parts of a workflow
+                                provide value, and whether separate contexts are necessary to retain them.
+                            </p>
+                            <!-- research-chart:oneflow -->
+                            <figure class="research-chart" id="chart-oneflow" aria-labelledby="chart-oneflow-title">
+                                <figcaption id="chart-oneflow-title">
+                                    Workflow execution: pass rate and latency
+                                </figcaption>
+                                <picture>
+                                    <source
+                                        media="(max-width: 600px), (min-width: 801px) and (max-width: 1100px)"
+                                        srcset="../charts/oneflow-compact.svg"
+                                    />
+                                    <img
+                                        src="../charts/oneflow.svg"
+                                        width="720"
+                                        height="484"
+                                        loading="lazy"
+                                        decoding="async"
+                                        alt="AFlow: single-conversation pass rate 90.5% versus stateless calls 86.8%; latency 53.53 versus 54.98 seconds. OneFlow: 87.4% versus 87.0%; latency 4.83 versus 4.31 seconds. Single-conversation execution is slightly slower for OneFlow."
+                                    />
+                                </picture>
+                                <p class="chart-note">
+                                    Qwen3 8B on HumanEval; vLLM, 16k context, three-run means. Table 4 reports no
+                                    uncertainty intervals. Compare execution methods within each workflow. Token budgets
+                                    are not matched; latency and pass rate have separate axes.
+                                </p>
+                                <details class="chart-data">
+                                    <summary>Data and source details</summary>
+                                    <div
+                                        class="table-scroll"
+                                        role="region"
+                                        aria-label="Workflow execution: pass rate and latency data"
+                                        tabindex="0"
+                                    >
+                                        <table>
+                                            <caption>
+                                                Workflow execution: pass rate and latency
+                                            </caption>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">Workflow / measure</th>
+                                                    <th scope="col">Single conversation</th>
+                                                    <th scope="col">Stateless calls</th>
+                                                    <th scope="col">Unit</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">AFlow / Pass rate</th>
+                                                    <td>90.5</td>
+                                                    <td>86.8</td>
+                                                    <td>Percent</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">AFlow / Latency</th>
+                                                    <td>53.53</td>
+                                                    <td>54.98</td>
+                                                    <td>Seconds</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">OneFlow / Pass rate</th>
+                                                    <td>87.4</td>
+                                                    <td>87.0</td>
+                                                    <td>Percent</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">OneFlow / Latency</th>
+                                                    <td>4.83</td>
+                                                    <td>4.31</td>
+                                                    <td>Seconds</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p>
+                                        Section 4.2.4, Table 4; v1, 18 January 2026.
+                                        <a href="https://arxiv.org/html/2601.12307v1">Primary source ↗</a>
+                                    </p>
+                                </details>
+                                <div
+                                    class="chart-downloads"
+                                    aria-label="Download Workflow execution: pass rate and latency"
+                                >
+                                    <a href="../charts/oneflow.svg" download="specpi-oneflow.svg">SVG figure ↓</a>
+                                    <a href="../charts/oneflow.csv" download="specpi-oneflow.csv">CSV data ↓</a>
+                                </div>
+                            </figure>
+                            <!-- /research-chart:oneflow -->
+                            <p class="source-link">
+                                <a href="https://arxiv.org/html/2601.12307v1"
+                                    >Rethinking the Value of Multi-Agent Workflow ↗</a
+                                >
+                            </p>
+                        </div>
+                        <div class="evidence-card">
+                            <p class="source-meta">07 / NeurIPS Datasets and Benchmarks · 2025</p>
+                            <h3>Coordination and verification failure modes</h3>
+                            <p>
+                                MAST examines <strong>1,642 traces across seven frameworks</strong> and identifies
+                                <strong>14 failure modes</strong> in system design, coordination, and verification,
+                                including repeated work, lost history, ignored input, and inadequate checks. Its
+                                taxonomy starts from a smaller human-reviewed set; large-scale annotation uses an LLM.
+                                The benchmark failure rates are not production statistics, and this is not a
+                                budget-matched single-agent comparison. Its value here is a vocabulary for inspecting
+                                what goes wrong between agents.
+                            </p>
+                            <!-- research-chart:mast -->
+                            <figure class="research-chart" id="chart-mast" aria-labelledby="chart-mast-title">
+                                <figcaption id="chart-mast-title">
+                                    Fourteen failure modes, grouped by category
+                                </figcaption>
+                                <picture>
+                                    <source
+                                        media="(max-width: 600px), (min-width: 801px) and (max-width: 1100px)"
+                                        srcset="../charts/mast-compact.svg"
+                                    />
+                                    <img
+                                        src="../charts/mast.svg"
+                                        width="720"
+                                        height="360"
+                                        loading="lazy"
+                                        decoding="async"
+                                        alt="The MAST taxonomy has five system-design modes, six inter-agent misalignment modes, and three task-verification modes. These are counts of identified categories, not counts of observed failures."
+                                    />
+                                </picture>
+                                <p class="chart-note">
+                                    Each square represents one distinct taxonomy label. Counts describe the
+                                    taxonomy&#x27;s structure, not failure frequency, severity, or production
+                                    reliability. There is no single-agent control group.
+                                </p>
+                                <details class="chart-data">
+                                    <summary>Data and source details</summary>
+                                    <div
+                                        class="table-scroll"
+                                        role="region"
+                                        aria-label="Fourteen failure modes, grouped by category data"
+                                        tabindex="0"
+                                    >
+                                        <table>
+                                            <caption>
+                                                Fourteen failure modes, grouped by category
+                                            </caption>
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">Category</th>
+                                                    <th scope="col">Distinct modes</th>
+                                                    <th scope="col">Taxonomy IDs</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">System design</th>
+                                                    <td>5</td>
+                                                    <td>1.1–1.5</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Inter-agent misalignment</th>
+                                                    <td>6</td>
+                                                    <td>2.1–2.6</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Task verification</th>
+                                                    <td>3</td>
+                                                    <td>3.1–3.3</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p>
+                                        Appendix A.1–A.3, printed pages 24–25; final NeurIPS 2025 paper.
+                                        <a
+                                            href="https://papers.nips.cc/paper_files/paper/2025/file/b1041e52d3be19f0a9bc491657488e4a-Paper-Datasets_and_Benchmarks_Track.pdf"
+                                            >Primary source ↗</a
+                                        >
+                                    </p>
+                                </details>
+                                <div
+                                    class="chart-downloads"
+                                    aria-label="Download Fourteen failure modes, grouped by category"
+                                >
+                                    <a href="../charts/mast.svg" download="specpi-mast.svg">SVG figure ↓</a>
+                                    <a href="../charts/mast.csv" download="specpi-mast.csv">CSV data ↓</a>
+                                </div>
+                            </figure>
+                            <!-- /research-chart:mast -->
+                            <p class="source-link">
+                                <a
+                                    href="https://papers.nips.cc/paper_files/paper/2025/hash/b1041e52d3be19f0a9bc491657488e4a-Abstract-Datasets_and_Benchmarks_Track.html"
+                                    >Why Do Multi-Agent LLM Systems Fail? ↗</a
+                                >
+                            </p>
+                        </div>
+                    </section>
+                    <section id="ownership">
+                        <h2>03 / Context and integration overhead</h2>
+                        <p>
+                            A handoff creates a new boundary. The receiving agent sees a task description and selected
+                            context, then forms its own interpretation. An invariant, a failed experiment, an unusual
+                            caller, or the reason an obvious fix is unsuitable can disappear during selection or
+                            summarization.
+                        </p>
+                        <p>
+                            Copying the entire conversation can carry stale assumptions into every worker. A fresh
+                            context can focus attention, but someone still has to assemble the packet and verify what
+                            returns.
+                        </p>
+                        <p>
+                            Agreement also needs careful interpretation. Two instances of the same model can share blind
+                            spots. Different role names do not guarantee different errors. A fresh reviewer may notice a
+                            defect, or confidently object to correct code.
+                            <strong>Independent context is not independent proof.</strong>
+                        </p>
+                        <p>
+                            One writer keeps integration and acceptance in one place. Other agents, when justified, can
+                            contribute evidence without independently changing the shared result.
+                        </p>
+                        <div class="table-scroll" role="region" aria-label="Delegation decision table" tabindex="0">
+                            <table class="article-table">
+                                <caption>
+                                    Our starting choices, subject to evaluation
+                                </caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Task shape</th>
+                                        <th scope="col">Starting approach</th>
+                                        <th scope="col">Possible reason to delegate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Small, understood fix</td>
+                                        <td>One agent implements and checks</td>
+                                        <td>A demonstrated review gap</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Tightly coupled change</td>
+                                        <td>One owner maintains relevant state</td>
+                                        <td>A separable investigation</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Independent research</td>
+                                        <td>Gather evidence in bounded pieces</td>
+                                        <td>Better coverage or useful time savings</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Large source collection</td>
+                                        <td>Select and organize relevant context</td>
+                                        <td>Measured context overload</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Frozen change review</td>
+                                        <td>Explicit review with actual checks</td>
+                                        <td>More confirmed defects at acceptable cost</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p>
+                            Parallel tool calls remain available within a single-agent workflow. Searching independent
+                            sources concurrently does not inherently require separate agent identities or another
+                            coordination protocol.
+                        </p>
+                    </section>
+                    <section id="improvement">
+                        <h2>04 / Harness improvement protocol</h2>
+                        <p>
+                            The single-agent default should become more useful as we learn where it struggles. In
+                            SpecPi,
+                            <strong
+                                >self-improvement means changing the harness through evidence and human
+                                selection</strong
+                            >. It does not mean retraining the model or granting it open-ended authority to rewrite its
+                            own rules.
+                        </p>
+                        <p>
+                            Collection is opt-in. Local, sanitized capability-gap records capture observed friction. A
+                            recurring gap can qualify for investigation, but a wishlist entry does not authorize
+                            implementation. An exact human selection through
+                            <a href="../wiki/#workflows"><code>/harness-improvement</code></a> establishes the change to
+                            pursue.
+                        </p>
+                        <figure class="feedback-figure">
+                            <figcaption>Improvement sequence / human selection required</figcaption>
+                            <ol>
+                                <li>Observe recurring friction</li>
+                                <li>Qualify a capability gap</li>
+                                <li class="human-gate">Human selects one change</li>
+                                <li>Implement a narrow fix</li>
+                                <li>Run required validation</li>
+                                <li class="human-gate">Record later human outcome</li>
+                            </ol>
+                            <p>
+                                Failed verification keeps work open. Later negative evidence returns a retired item to
+                                review; a new implementation still needs human selection.
+                            </p>
+                        </figure>
+                        <p>
+                            The implementation should be small enough to inspect and reverse. Closing it requires actual
+                            validation: <code>npm run check</code>, the item's closed, allowlisted validators, and
+                            source fingerprints connecting the result to the evaluated files. Retirement rejects failed
+                            gates or changed source inputs. A claim that a check would pass is insufficient; the command
+                            must run. These receipts establish a bounded check result, not universal correctness.
+                        </p>
+                        <p>
+                            Retirement closes the implementation loop, but the human outcome still matters. Did it help?
+                            Did it fail, remain unexercised, or get reverted? Those answers are evidence about the
+                            harness, including evidence that an intervention was unnecessary. A failed outcome can
+                            reopen a question for review. It does not authorize another autonomous modification.
+                        </p>
+                        <p>
+                            This feedback loop gives us a way to improve without treating every plausible feature as
+                            progress. The <a href="../wiki/#task-records">task and evidence guide</a> explains the
+                            implemented commands and receipt boundaries.
+                        </p>
+                    </section>
+                    <section id="exceptions">
+                        <span class="proposal-label"
+                            >Experimental implementation / v0.12.0 / disabled by default</span
+                        >
+                        <h2>05 / Bounded delegation</h2>
+                        <p>
+                            SpecPi creates actual Pi <code>AgentSession</code> subagents through the
+                            native extension. Use normal <code>pi</code> startup and the existing SpecPi install/update
+                            lifecycle. Human <code>/delegate on</code> enables the fixed envelope; its tool schema is
+                            absent from model requests while off. <strong>SDK capability checks</strong> allow
+                            compatible Pi updates without an exact-version gate. Missing APIs prevent activation
+                            and are named in the error. Command Guard is optional; delegation enforces its own
+                            read-only tools and limits. Active Guard approvals and locks still apply. The parent
+                            remains the sole writer and owns acceptance.
+                        </p>
+                        <p>
+                            Once enabled, delegation follows the parent's provider, model and thinking level without
+                            another toggle. Selection changes revoke old results and preflight the new host, retaining
+                            quotas and unsettled requests. Unsupported selections pause; a compatible selection resumes
+                            automatically. Explicit <code>/delegate off</code> stays off.
+                        </p>
+                        <p>
+                            Two purposes are supported: <code>review</code> of a frozen artifact and
+                            <code>scout</code> analysis of a bounded evidence question. Both can list, read and search
+                            exact selected text snapshots; a review can also use inline context without tools. Scouts
+                            require selected files. Children have in-memory sessions, with no ambient extensions,
+                            skills, AGENTS files, parent history, shell, writes, live web or nested delegation. The
+                            research supports testing these uses; it does not establish a SpecPi improvement.
+                        </p>
+                        <ul>
+                            <li>
+                                <strong>Specific admission.</strong> Each job receives assigned requirements, fixed
+                                constraints, a bounded question and selected evidence. Declare independent review,
+                                parallel analysis or context isolation and explain why. Only parallel analysis requires
+                                concurrent parent work. Mode checks and duplicate-question rejection constrain the
+                                request; they cannot prove independence or benefit. Routine lookup and coupled mutable
+                                work stay with the parent.
+                            </li>
+                            <li>
+                                <strong>Fixed resource limits.</strong> At most two workers are active, with two jobs
+                                per batch, four batches and 32 SDK model invocations per Pi process. Each job has four
+                                invocations and 120 seconds including one follow-up. Reloads, session switches and
+                                off/on do not reset quotas. Cancellation holds slots through SDK-visible stream/result
+                                and prompt settlement; that does not prove remote execution has ended. These ceilings
+                                are engineering choices awaiting evaluation.
+                            </li>
+                            <li>
+                                <strong>Evidence and uncertainty.</strong> Reports include requirement coverage,
+                                findings, contrary evidence and missing context. The host checks source identity and
+                                line ranges; the parent checks whether the evidence supports the claim. A receipt or
+                                parent acceptance is neither human permission nor proof of task completion.
+                            </li>
+                            <li>
+                                <strong>SDK execution and accounting.</strong> Pi runs the child conversation and tool
+                                loop. Each SDK invocation is admitted before dispatch; provider/session retries and
+                                compaction are disabled. SDK-visible streaming checks do not establish hard raw-network,
+                                hidden-provider-attempt, invoice or process-memory caps. Cost is unavailable, and
+                                incomplete usage is not reported as zero.
+                            </li>
+                            <li>
+                                <strong>Inference boundary.</strong> A fresh Pi ModelRuntime uses standard
+                                authentication, environment and model definitions. Child transport/thinking budgets use
+                                configured global settings without project settings. Parent model/thinking are explicit
+                                with Pi clamping. Runtime-only authentication, selected extension-provider overrides,
+                                model headers, startup proxy configuration and safe descriptor mismatches fail
+                                preflight. Parent hooks, ephemeral runtime settings and session affinity are not
+                                inherited; full parent parity is not claimed.
+                            </li>
+                            <li>
+                                <strong>Selected context.</strong> The parent transcript is not automatically inherited.
+                                Selected material goes to the configured provider. Worker state stays in memory, while
+                                ordinary parent tool results may enter Pi's session record. This is not an OS sandbox;
+                                trusted Pi extensions remain privileged.
+                            </li>
+                        </ul>
+                        <p>
+                            Normal parent Pi resource discovery, trust and proxy policy remain Pi-owned. The broker's
+                            canonical working root stays fixed for the process; restart Pi to change it or load a new
+                            delegation runtime version. Workflows requiring inherited parent hooks or settings must keep
+                            delegation disabled. Read the
+                            <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
+                                >implementation guide</a
+                            >
+                            and
+                            <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/protocol.md"
+                                >calls/time protocol</a
+                            >
+                            before enabling the experiment.
+                        </p>
+                        <p>
+                            Subsequent evidence adds constraints:
+                            <a href="https://arxiv.org/html/2601.13295v2">CooperBench</a> separates clean merges from
+                            successful integration;
+                            <a href="https://aclanthology.org/2026.acl-long.2045/">MTRouter</a> evaluates learned
+                            sequential routing; <a href="https://arxiv.org/html/2608.24188v1">Paritok-4B</a> measures
+                            information loss under compression; and
+                            <a href="https://arxiv.org/html/2608.05263v1">OrchestraBench</a>
+                            tests recovery from injected faults. The
+                            <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/research.md"
+                                >expanded research ledger</a
+                            >
+                            records their methods, limitations and design implications.
+                        </p>
+                        <p>
+                            Deterministic fixtures exercise the runtime contract; they do not establish better outcomes.
+                            The
+                            <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/evaluation.md"
+                                >evaluation plan</a
+                            >
+                            compares selective delegation with a capable single agent given the same additional
+                            resources. A 30–50-case pilot would debug the protocol and estimate variance; a separate
+                            holdout must assess confirmed findings, missed defects, false positives, correction time,
+                            actual resource use and elapsed time. These experiments have not been reported.
+                        </p>
+                        <p class="article-callout">
+                            One agent and one writer remain the default. The delegation implementation is an opt-in
+                            experiment; promotion requires measured improvement on a defined class of work.
+                        </p>
+                    </section>
+                    <div class="article-endnote">
+                        <p>
+                            Seven-study comparison cutoff: 4 September 2026; the expanded research ledger was reviewed
+                            through 5 September. This note uses the July Nature version of record and distinguishes
+                            workshop papers, preprints, and vendor engineering reports. Findings can change with models,
+                            budgets, task design, and tooling. The architecture and evaluation criteria are SpecPi's
+                            interpretation; no comparative SpecPi delegation outcomes are reported.
+                        </p>
+                        <p>
+                            Implementation reference:
+                            <a href="https://github.com/TannerMidd/SpecPi/blob/v0.12.0/README.md">v0.12.0 README</a> and
+                            <a href="https://github.com/TannerMidd/SpecPi/blob/v0.12.0/SECURITY_MODEL.md"
+                                >security model</a
+                            >.
+                        </p>
+                    </div>
+                    <a class="article-next" href="../wiki/#workflows"
+                        ><span>Harness improvement reference</span><span aria-hidden="true">↗</span></a
+                    >
+                </article>
+            </div>
+        </main>
+        <footer class="site-footer wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
+            >
+            <p>Pi harness / v0.12.0</p>
+            <nav aria-label="Footer navigation">
+                <a href="../wiki/">Reference</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
+            </nav>
+        </footer>
+    </body>
+</html>

@@ -1,9 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
-  <title id="title">SpecPi</title>
-  <desc id="desc">A blueprint-blue Pi mark inside a precise technical frame</desc>
-  <rect width="128" height="128" fill="#121519"/>
-  <rect x="15" y="15" width="98" height="98" fill="#181c22" stroke="#39424f" stroke-width="2"/>
-  <path d="M15 37V15h22M91 15h22v22M113 91v22H91M37 113H15V91" fill="none" stroke="#8fb6d9" stroke-width="3"/>
-  <path d="M29 36h70v14h-9v26c0 11 4 16 13 16v14c-18 0-27-11-27-30V50H53v47H39V50H29z" fill="#8fb6d9"/>
-  <path d="M29 103h36" stroke="#5d6876" stroke-width="2"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="12" fill="#202a2f"/><path d="M15 20h36v7H23v-7Zm5 7h7v21h-7V27Zm20 0h7v14c0 1.5.6 2 2 2h2v6h-4c-5 0-7-3-7-8V27Z" fill="#a4c3b7"/></svg>

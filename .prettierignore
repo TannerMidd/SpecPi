@@ -1,4 +1,5 @@
 node_modules/
+.specpi-test/
 site/vendor/
 desktop/out/
 desktop/dist/

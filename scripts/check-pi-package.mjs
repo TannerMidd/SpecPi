@@ -192,6 +192,7 @@ try {
     for (const expected of [
         "/extensions/browser/index.ts",
         "/extensions/command-guard/index.ts",
+        "/extensions/delegation/index.ts",
         "/extensions/files/index.ts",
         "/extensions/spec.ts",
         "/extensions/tool-wishlist/index.ts",
@@ -253,6 +254,8 @@ try {
             path.join(repoRoot, "tests", "workflow-controls-extension.test.mjs"),
             path.join(repoRoot, "tests", "spec-task-extension.test.mjs"),
             path.join(repoRoot, "tests", "wishlist-verification-extension.test.mjs"),
+            path.join(repoRoot, "tests", "delegation-provider.test.mjs"),
+            path.join(repoRoot, "tests", "delegation-native.test.mjs"),
         ],
         { cwd: repoRoot, env: fixtureTestEnvironment, timeout: 120_000 },
     );
@@ -301,6 +304,7 @@ try {
     assert.equal(stateResponse?.success, true, `Pi RPC get_state failed:\n${rpcResult.stdout}`);
     const registeredCommands = commandsResponse.data?.commands?.map((command) => command.name) ?? [];
     assert.ok(registeredCommands.includes("guard"), JSON.stringify(registeredCommands));
+    assert.ok(registeredCommands.includes("delegate"), JSON.stringify(registeredCommands));
     assert.ok(registeredCommands.includes("scope"), JSON.stringify(registeredCommands));
     assert.ok(registeredCommands.includes("task"), JSON.stringify(registeredCommands));
     assert.equal(stateResponse.data?.isStreaming, false, JSON.stringify(stateResponse));

@@ -7,6 +7,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -40,6 +41,12 @@ const requiredFiles = [
     "THIRD_PARTY.md",
     "browser-runtime/package-lock.json",
     "browser-runtime/package.json",
+    "docs/delegation/README.md",
+    "docs/delegation/design.md",
+    "docs/delegation/design-protocol.md",
+    "docs/delegation/evaluation.md",
+    "docs/delegation/protocol.md",
+    "docs/delegation/research.md",
     "extensions/browser/core.mjs",
     "extensions/browser/index.ts",
     "extensions/browser/smoke.mjs",
@@ -55,6 +62,7 @@ const requiredFiles = [
     "extensions/command-guard/rules.mjs",
     "extensions/command-guard/smoke.mjs",
     "extensions/files/core.mjs",
+    ...DELEGATION_MANAGED_FILES.map((name) => `extensions/delegation/${name}`),
     "extensions/files/index.ts",
     "extensions/spec.ts",
     "extensions/spec/core.mjs",
@@ -75,6 +83,7 @@ const requiredFiles = [
     "scripts/check-package.mjs",
     "scripts/check-pi-package.mjs",
     "scripts/check-release-order.mjs",
+    "scripts/check-syntax.mjs",
     "scripts/lib.mjs",
     "scripts/lock.mjs",
     "scripts/pi-test-harness.mjs",
@@ -329,6 +338,10 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     const help = runCli(["help"]);
     const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"));
     assert.match(help.stdout, new RegExp(`SpecPi ${packageJson.version.replaceAll(".", "\\.")}`));
+    assert.doesNotMatch(help.stdout, /specpi agent/u);
+    const retiredLauncher = runCli(["agent"], { expectFailure: true });
+    assert.match(`${retiredLauncher.stdout}\n${retiredLauncher.stderr}`, /Unknown command: agent/u);
+    assert.equal(fs.existsSync(agentDir), false, "unsupported launcher mutated the isolated Pi directory");
 
     runCli(["plan", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"]);
     assert.equal(fs.existsSync(agentDir), false, "plan mutated the isolated agent directory");
@@ -388,6 +401,11 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         false,
         "uninstall left a managed extension behind",
     );
+    assert.equal(
+        fs.existsSync(path.join(agentDir, "extensions", "delegation", "index.ts")),
+        false,
+        "uninstall left native delegation installed",
+    );
     for (const [file, expected] of privateEvidence) {
         assert.equal(fs.existsSync(file), true, `uninstall removed private SpecPi evidence: ${file}`);
         assert.equal(fs.readFileSync(file, "utf8"), expected, `uninstall changed private SpecPi evidence: ${file}`);
@@ -425,10 +443,10 @@ try {
     assert.equal(packResult.name, sourcePackage.name);
     assert.equal(packResult.version, sourcePackage.version);
     assert.deepEqual(packResult.bundled || [], [], "packed artifact unexpectedly bundles dependencies");
-    assert.ok(packResult.size < 300_000, `packed artifact unexpectedly exceeds 300 KB: ${packResult.size}`);
+    assert.ok(packResult.size < 310_000, `packed artifact unexpectedly exceeds 310 KB: ${packResult.size}`);
     assert.ok(
-        packResult.unpackedSize < 1_000_000,
-        `unpacked artifact unexpectedly exceeds 1 MB: ${packResult.unpackedSize}`,
+        packResult.unpackedSize < 1_300_000,
+        `unpacked artifact unexpectedly exceeds 1.3 MB (including delegation runtime and protocol docs): ${packResult.unpackedSize}`,
     );
 
     assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.0 - 2026-09-05
+
+- Add experimental, opt-in delegation for independent reviews and selected-source analysis through native Pi sessions. The parent remains the sole writer; workers have no shell, edits, live web, nested delegation or ambient extensions.
+- Show live worker state, elapsed time and call counts above the editor, with expandable findings and evidence in tool results.
+- Follow parent model and thinking changes after one activation. Check public SDK capabilities, preserve process budgets and cancellation settlement, and document unsupported parent hooks and provider overrides.
+- Bound snapshot retention, source-tool responses and replay records. Preserve spending receipts while pruning recent cancellation and nonfinal assessment responses.
+- Fix Command Guard state notifications across reused sessions, stale approval dialogs and session locking. Keep Guard optional for delegation while respecting active policy and locks.
+- Share the delegation install inventory across installer and package checks, test imports from the installed tree, and exclude nested dependencies from source syntax checks.
+- Rebuild the technical site with a dark default theme, workflow documentation, and a sourced architecture article with comparison charts explaining the single-agent default and selective delegation.
+
+After updating the npm CLI, run `specpi update` and restart Pi to load the new delegation runtime. See [the delegation guide](docs/delegation/README.md) for its experimental limits.
+
 ## 0.11.2 - 2026-09-04
 
 - Publish the validated tarball through an absolute local path. npm interpreted the previous relative path as a GitHub repository, so 0.11.1 stopped before npm publication despite passing artifact validation.
@@ -93,7 +105,7 @@
 - Match every PowerShell parameter prefix, not only full spellings: `-enc` runs the same code as `-EncodedCommand`, so an abbreviated flag used to carry a base64 payload past the guard with no approval when the invocation arrived through the Bash or cmd parser. Bash- and cmd-hosted `powershell`/`pwsh` invocations now decode and classify their `-Command`/`-EncodedCommand` payload instead of seeing one opaque argument, including recursive `cmd /c powershell.exe` dispatch, and an absent PowerShell parser downgrades to an approval rather than locking the session over an interpreter the command could not have used.
 - Remove routine Guard approvals for determinate non-catastrophic work, including project or user-data deletion, force push, publication, installation, network transfer, process termination, service and registry changes, and out-of-workspace targets. Keep those broader prompts in Strict. Narrow Guard's protected mutation boundary to host-root/key system targets and, inside the installed agent, command-guard enforcement sources, `settings.json`, and `specpi/manifest.json`.
 - Identify Pi and SpecPi private state by location rather than by name. `specpi/manifest.json`, `specpi/backups`, `specpi/wishlist` and `extensions/command-guard` were matched as bare relative segments, so reviewing SpecPi's own repository denied a file read critically and locked the session, and `guard.self-tamper` fired on any mutation whose arguments merely contained "specpi" or "command-guard" — `mkdir specpi-experiment` was a critical denial. On POSIX the rule was an unanchored `/(?:specpi|pi).*(?:auth|session|…)/`, so everyday files such as `src/api/session.ts` and `lib/api/auth.py` ("pi" inside "api") were denied critically too. These now key on the resolved `PI_CODING_AGENT_DIR`; Guard protects only enforcement-critical installed state while Strict retains the wider private-path policy.
-- Stop latching the session lock when a *read* is refused. Blocking the read is the protection; locking additionally refused every later call — including read-only ones — until `/guard unlock`, so one blocked file ended the session. Critical mutation attempts still lock.
+- Stop latching the session lock when a _read_ is refused. Blocking the read is the protection; locking additionally refused every later call — including read-only ones — until `/guard unlock`, so one blocked file ended the session. Critical mutation attempts still lock.
 - Stop treating a plain `find` as a deletion. `find` sits in the delete family for `-delete`/`-exec`, but `hasRecursiveFlag` matches any predicate containing an "r", so `find src -type f -print` was reported as "Recursive deletion needs approval", `find /etc -name '*.conf'` denied critically, and `find . -name specpi` tripped guard self-tamper. Mutating `find` now reaches `filesystem.find-mutation`, which was unreachable behind the delete-family branch, and `clearlyReadOnly` shares the same predicate list.
 - Classify complete environment enumeration however it is spelled (`printenv`, `declare -x`, `export -p`, `compgen -v`, bare `declare`) and recognize `/proc/<pid>/environ` and `/proc/<pid>/mem` shell reads. Strict asks about those findings; Guard does not claim comprehensive credential-read protection.
 - Protect macOS system roots (`/System`, `/Library`, `/Applications`, `/Users/<name>`, `/Volumes/<name>`, `/private/etc`, `/cores`) and `.bash_profile`/`.zshenv`/`.zlogin`, without capturing the firmlinked `/System/Volumes/Data` user tree.

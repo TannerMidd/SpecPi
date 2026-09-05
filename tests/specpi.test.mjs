@@ -20,6 +20,7 @@ import {
 } from "../extensions/tool-wishlist/core.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
+import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
 import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
 import { acquireSpecPiLock } from "../scripts/lock.mjs";
 import { describeSpecPhase, transformSpecMarkdown } from "../extensions/spec/core.mjs";
@@ -413,11 +414,13 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const changelog = fs.readFileSync(path.join(repoRoot, "CHANGELOG.md"), "utf8");
     const site = fs.readFileSync(path.join(repoRoot, "site", "index.html"), "utf8");
     const wiki = fs.readFileSync(path.join(repoRoot, "site", "wiki", "index.html"), "utf8");
+    const architecture = fs.readFileSync(path.join(repoRoot, "site", "single-agent", "index.html"), "utf8");
+    const delegationGuide = fs.readFileSync(path.join(repoRoot, "docs", "delegation", "README.md"), "utf8");
     const publish = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "npm-publish.yml"), "utf8");
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
-    assert.equal(manifest.version, "0.11.2");
+    assert.equal(manifest.version, "0.12.0");
     assert.equal(manifest.publishConfig.access, "public");
     assert.equal(manifest.publishConfig.provenance, true);
     assert.equal(manifest.scripts.preinstall, undefined);
@@ -431,6 +434,12 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(site, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(wiki, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(wiki, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(architecture, new RegExp(`SpecPi v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.ok(delegationGuide.includes(`experimental in SpecPi ${manifest.version}`));
+    for (const documentation of [readme, site, wiki, architecture, delegationGuide]) {
+        assert.doesNotMatch(documentation, /unreleased/i);
+    }
+
     assert.match(publish, /release:\s*\n\s*types: \[published\]/);
     assert.match(publish, /environment: npm/);
     assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);
@@ -498,7 +507,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /name="viewport"/);
     assert.match(html, /href="styles\.css"/);
     assert.match(html, /href="logo\.svg"/);
-    assert.match(html, /class="section-index"/);
+    assert.match(html, /aria-label="Primary navigation"/);
+    assert.match(html, /href="single-agent\/"/);
     assert.match(html, /id="overview"/);
     assert.match(html, /id="loop"/);
     assert.match(html, /id="session"/);
@@ -506,15 +516,13 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(html, /id="writer"/);
     assert.match(html, /id="install"/);
     assert.match(html, /type="module" src="cycle\.js"/);
-    assert.match(html, /role="tablist" aria-label="Command guard modes"/);
+    assert.match(html, /role="tablist"\s+aria-label="Command guard modes"/);
     assert.equal(html.match(/data-guard-mode=/g)?.length, 3);
     assert.equal(html.match(/data-guard-verdict/g)?.length, 5);
     assert.match(html, /npm install --global specpi@latest/);
     assert.match(html, /specpi install/);
     assert.match(html, /Collection is disabled by default/);
     assert.match(html, /One writer per working directory/);
-    assert.match(css, /grid-template-columns: 13\.375rem minmax\(0, 1fr\)/);
-    assert.match(css, /\.section-index/);
     assert.match(css, /\.guard-controls button\[aria-selected="true"\]/);
     assert.match(css, /prefers-reduced-motion: reduce/);
     assert.doesNotMatch(css, /url\(["']https?:/i);
@@ -568,7 +576,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /pi install npm:specpi/);
     assert.match(wikiHtml, /\.\/specpi doctor/);
     assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
-    assert.equal(wikiHtml.match(/git clone --branch v0\.11\.2/g)?.length, 2);
+    const releaseVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
+    assert.equal(wikiHtml.split(`git clone --branch v${releaseVersion}`).length - 1, 2);
     assert.match(wikiHtml, /npm run check/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
     assert.match(wikiCss, /\.definition-list/);
@@ -2090,6 +2099,18 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         }
 
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
+        assert.deepEqual(
+            fs.readdirSync(path.resolve("extensions/delegation")).sort(),
+            [...DELEGATION_MANAGED_FILES].sort(),
+            "Every delegation source must be in the managed inventory",
+        );
+        for (const file of DELEGATION_MANAGED_FILES) {
+            assert.ok(
+                fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
+                `Missing installed delegation source: ${file}`,
+            );
+        }
+
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
@@ -2122,6 +2143,23 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             .map((target) => path.basename(target))
             .sort();
         assert.deepEqual(manifestGuardFiles, [...COMMAND_GUARD_MANAGED_FILES].sort());
+        const installedDelegationDirectory = path.join(agentDir, "extensions", "delegation");
+        const manifestDelegationFiles = Object.keys(installedManifest.files || {})
+            .filter((target) => path.dirname(target) === installedDelegationDirectory)
+            .map((target) => path.basename(target))
+            .sort();
+        assert.deepEqual(manifestDelegationFiles, [...DELEGATION_MANAGED_FILES].sort());
+        const installedDelegationImport = spawnSync(
+            process.execPath,
+            [
+                "--input-type=module",
+                "-e",
+                "import(process.argv[1])",
+                pathToFileURL(path.join(installedDelegationDirectory, "native.mjs")).href,
+            ],
+            { cwd: root, encoding: "utf8" },
+        );
+        assert.equal(installedDelegationImport.status, 0, installedDelegationImport.stderr);
 
         assert.ok(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
@@ -2273,6 +2311,23 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "challenge.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "smoke.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")), false);
+        for (const file of [
+            "index.ts",
+            "native.mjs",
+            "extension.mjs",
+            "core.mjs",
+            "protocol.mjs",
+            "provider.mjs",
+            "snapshot.mjs",
+            "worker.mjs",
+        ]) {
+            assert.equal(
+                fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
+                false,
+                `Delegation source survived uninstall: ${file}`,
+            );
+        }
+
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);

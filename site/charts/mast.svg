@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<svg width="720" height="360" preserveAspectRatio="xMinYMin meet" viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" version="1.0" fill-rule="evenodd" xmlns:xlink="http://www.w3.org/1999/xlink"><title>Fourteen failure modes, grouped by category</title><desc>The MAST taxonomy has five system-design modes, six inter-agent misalignment modes, and three task-verification modes. These are counts of identified categories, not counts of observed failures. Each square represents one distinct taxonomy label. Counts describe the taxonomy&#x27;s structure, not failure frequency, severity, or production reliability. There is no single-agent control group.</desc><metadata data-study="mast" data-sha256="73feed4b24af99634d925a92fb1c1c27a0aa7d609f49f34c999630693f962cf7">https://papers.nips.cc/paper_files/paper/2025/file/b1041e52d3be19f0a9bc491657488e4a-Paper-Datasets_and_Benchmarks_Track.pdf | Appendix A.1–A.3, printed pages 24–25; final NeurIPS 2025 paper</metadata>
+
+
+	<clipPath id="clip">
+		<rect x="0" y="0" width="720" height="360"/>
+	</clipPath>
+	<g id="group" transform="scale(1,-1) translate(0,-360)" style="clip-path: url(#clip)">
+		<g transform="">
+			<rect x="0" y="0" width="720" height="360" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(9%,11%,13%); fill-rule: evenodd;"/>
+			<text x="16" y="330" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,660) scale(1,-1)">Distinct taxonomy modes</text>
+			<text x="16" y="287" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 15px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,574) scale(1,-1)">System design</text>
+			<text x="695.104" y="286" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,572) scale(1,-1)">5</text>
+			<rect x="16" y="256" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="44" y="256" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="72" y="256" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="100" y="256" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="128" y="256" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<text x="583.28" y="262" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,524) scale(1,-1)">Taxonomy IDs 1.1–1.5</text>
+			<text x="16" y="207" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 15px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,414) scale(1,-1)">Inter-agent misalignment</text>
+			<text x="695.104" y="206" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,412) scale(1,-1)">6</text>
+			<rect x="16" y="176" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="44" y="176" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="72" y="176" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="100" y="176" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="128" y="176" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="156" y="176" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<text x="583.28" y="182" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,364) scale(1,-1)">Taxonomy IDs 2.1–2.6</text>
+			<text x="16" y="127" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 15px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,254) scale(1,-1)">Task verification</text>
+			<text x="695.104" y="126" style="font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 16px;fill: rgb(87%,90%,91%); stroke:none;" transform="translate(0,252) scale(1,-1)">3</text>
+			<rect x="16" y="96" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="44" y="96" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<rect x="72" y="96" width="18" height="18" style="stroke: none; stroke-linecap: butt; stroke-width: 1; fill: rgb(65%,70%,73%); fill-rule: evenodd;"/>
+			<text x="583.28" y="102" style="font-family: Arial, Helvetica, sans-serif; font-size: 12px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,204) scale(1,-1)">Taxonomy IDs 3.1–3.3</text>
+			<path d="M 16,59 L 704,59 Z" style="stroke: rgb(20%,25%,28%); stroke-linecap: butt; stroke-width: 1;"/>
+			<text x="16" y="40" style="font-family: Arial, Helvetica, sans-serif; font-size: 11px;fill: rgb(65%,70%,73%); stroke:none;" transform="translate(0,80) scale(1,-1)">Source: MAST / NeurIPS Datasets and Benchmarks / 2025</text>
+		</g>
+	</g>
+</svg>

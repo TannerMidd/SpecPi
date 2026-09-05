@@ -24,7 +24,17 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-This README documents `0.11.2`, including task cards, verification receipts, and human outcome assessments. See the [release notes](CHANGELOG.md#0112---2026-09-04) for the complete change list.
+Version `0.12.0` adds experimental native delegation and a new technical site. Task cards, verification receipts and human outcome assessments remain part of the single-agent workflow. See the [release notes](CHANGELOG.md) for the change list.
+
+## Optional delegation
+
+The native extension creates actual Pi `AgentSession` subagents while the parent remains the sole writer. Use normal `pi` startup and the existing SpecPi install/update lifecycle. Delegation starts disabled, with its tool schema absent from model requests; human `/delegate on` enables the displayed envelope and `/delegate off` revokes outstanding work. Delegation checks required public SDK capabilities rather than an exact Pi version list, so compatible Pi updates do not require a SpecPi release. The installer bootstrap remains pinned to 0.84.4, and runtime validation is recorded separately.
+
+Only `review` of a frozen artifact and `scout` analysis of a bounded evidence question are supported. Both can list, read and search exact selected text snapshots. Children have in-memory sessions and no ambient extensions, skills, AGENTS files, parent history, shell, writes, recursive delegation or live web access. Each receives assigned requirements and fixed constraints. There are at most two active workers, two jobs per batch, four batches and 32 SDK model invocations per Pi process. Reloads, session switches and off/on preserve counters; cancellation holds slots through SDK-visible stream/result and prompt settlement. Restart Pi to change the fixed working root or load a changed delegation runtime.
+
+Pi owns the agent loop, authentication and OAuth. A fresh child `ModelRuntime` uses standard environment and `models.json` resolution; child transport/thinking budgets come from configured global settings, without project settings. Parent model/thinking are explicit with Pi clamping. Runtime-only authentication, selected extension-provider overrides, model-specific headers, startup proxy configuration and safe descriptor mismatches fail preflight without changing parent setup. Parent hooks, ephemeral settings and session affinity are not inherited. Each SDK invocation is admitted before dispatch; retries and compaction are disabled. SDK-visible streaming checks do not establish raw-transport, hidden-provider-attempt, invoice or memory caps, or prove remote execution has ended. Cost is unavailable. Research supports testing these purposes; no measured SpecPi quality, cost or speed advantage is claimed.
+
+See the [delegation guide](docs/delegation/README.md), [tool protocol](docs/delegation/protocol.md), [research](docs/delegation/research.md), and [evaluation plan](docs/delegation/evaluation.md) for setup, examples, boundaries and evidence.
 
 ## Install
 
@@ -39,7 +49,7 @@ specpi install
 specpi doctor
 ```
 
-`plan` does not mutate the system. Install, update, and uninstall require confirmation unless `--yes` is supplied. After installation, run `/reload` in Pi.
+`plan` does not mutate the system. Install, update, and uninstall require confirmation unless `--yes` is supplied. Restart Pi after installation or updating SpecPi to load the delegation runtime.
 
 <details>
 <summary><strong>Pin a release or install from audited source</strong></summary>
@@ -47,14 +57,14 @@ specpi doctor
 Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
 
 ```bash
-npm install --global specpi@0.11.2
-npx --package specpi@0.11.2 specpi plan
+npm install --global specpi@0.12.0
+npx --package specpi@0.12.0 specpi plan
 ```
 
 For a source-audited installation, clone the exact release:
 
 ```bash
-git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
+git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -91,30 +101,30 @@ Direct `pi install npm:specpi` loads extensions, skills, and themes only. It doe
 
 ### Define and review work
 
-| Interface | Purpose |
-| --- | --- |
-| `/task` | Record the objective, fixed requirements, acceptance checks, expected paths, hypothesis, rollback, and non-goals on the current session branch. |
-| `/scope` | Declare expected paths and report unacknowledged drift. |
-| `/files` | Browse source, rendered Markdown, Git diffs, and bounded review comments. |
-| `/experiment` | Create detached worktrees with keep, binary patch export, and confirmed discard outcomes. |
-| `/challenge` | Review readiness through structured evidence, gaps, contradictions, and residual risk. |
+| Interface     | Purpose                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/task`       | Record the objective, fixed requirements, acceptance checks, expected paths, hypothesis, rollback, and non-goals on the current session branch. |
+| `/scope`      | Declare expected paths and report unacknowledged drift.                                                                                         |
+| `/files`      | Browse source, rendered Markdown, Git diffs, and bounded review comments.                                                                       |
+| `/experiment` | Create detached worktrees with keep, binary patch export, and confirmed discard outcomes.                                                       |
+| `/challenge`  | Review readiness through structured evidence, gaps, contradictions, and residual risk.                                                          |
 
 ### Improve from evidence
 
-| Interface | Purpose |
-| --- | --- |
-| `/wishlist` | Store and curate privacy-minimized local capability-gap reports. |
+| Interface              | Purpose                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `/wishlist`            | Store and curate privacy-minimized local capability-gap reports.                     |
 | `/harness-improvement` | Select one qualified or review-needed item and authorize its bounded implementation. |
 
 ### Work inside Pi
 
-| Interface | Purpose |
-| --- | --- |
-| `/spec` | Replace normal chrome with a technical run panel, seal live reasoning, hold streaming prose until complete, and keep tools collapsed. |
-| `/guard` | Deny confirmed host-wide destructive calls and request approval for bounded risk classes. |
-| Browser tools | Open an isolated Chromium context for rendered inspection and screenshots. |
-| `specpi-spec` theme | Bring blueprint blue, technical greys, layered surfaces, and restrained semantic states into Pi. |
-| `specpi` CLI | Plan, install, update, verify, and uninstall managed state with backups and rollback. |
+| Interface           | Purpose                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `/spec`             | Replace normal chrome with a technical run panel, seal live reasoning, hold streaming prose until complete, and keep tools collapsed. |
+| `/guard`            | Deny confirmed host-wide destructive calls and request approval for bounded risk classes.                                             |
+| Browser tools       | Open an isolated Chromium context for rendered inspection and screenshots.                                                            |
+| `specpi-spec` theme | Bring blueprint blue, technical greys, layered surfaces, and restrained semantic states into Pi.                                      |
+| `specpi` CLI        | Plan, install, update, verify, and uninstall managed state with backups and rollback.                                                 |
 
 `specpi-spec` is the default Pi theme, carrying the site's specification design through message surfaces, tools, Markdown, diffs, syntax highlighting, search, and the full thinking-level scale. **Existing valid theme preferences survive installation and updates.** The original `tea-house` theme remains bundled and selectable from `/settings`.
 
@@ -159,7 +169,7 @@ Use `/task clear` before recording an unrelated task. Within a session, repeated
 
 Use `/experiment start` when an independent review or trial justifies a separate worktree. Open the reported path in another Pi session. SpecPi does not launch an agent, copy dirty base changes, commit, merge, or touch remotes.
 
-SpecPi does not install subagent orchestration. Keep one writer per working directory. A parent agent determines what context a child receives and summarizes what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
+SpecPi keeps one writer per working directory. Its experimental delegation adds bounded read-only Pi sessions. A parent determines what context a child receives and verifies what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
 
 ## Improvement loop
 
@@ -190,11 +200,11 @@ With collection enabled, `/wishlist outcome <gap-id>` records an explicit human 
 
 Every supported model-initiated Pi tool call is classified before execution. Select one mode at session start:
 
-| Mode | Behavior |
-| --- | --- |
-| **Guard** | Denies confirmed host-wide catastrophe and guard tampering, asks before Git destroys work, and otherwise remains quiet. |
-| **Strict** | Adds approval requests for mutation, execution, sensitive reads, and network activity. |
-| **Off** | Requires confirmation and applies only to the current session. |
+| Mode       | Behavior                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Guard**  | Denies confirmed host-wide catastrophe and guard tampering, asks before Git destroys work, and otherwise remains quiet. |
+| **Strict** | Adds approval requests for mutation, execution, sensitive reads, and network activity.                                  |
+| **Off**    | Requires confirmation and applies only to the current session.                                                          |
 
 Approvals apply to one exact call and one session. Only a structurally proven critical mutation locks the session. Parser uncertainty and invalid cleanup syntax are denied without locking later work.
 

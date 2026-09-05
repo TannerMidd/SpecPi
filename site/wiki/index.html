@@ -1,230 +1,600 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#121519">
-  <meta name="description" content="SpecPi installation, command, workflow, browser, and security reference.">
-  <meta property="og:title" content="SpecPi reference">
-  <meta property="og:description" content="Technical documentation for the SpecPi coding-agent harness.">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="SpecPi">
-  <meta property="og:url" content="https://tannermidd.github.io/SpecPi/wiki/">
-  <meta name="twitter:card" content="summary">
-  <link rel="canonical" href="https://tannermidd.github.io/SpecPi/wiki/">
-  <title>SpecPi reference</title>
-  <link rel="icon" href="../logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../styles.css">
-  <link rel="stylesheet" href="../wiki.css">
-</head>
-<body class="wiki-page">
-  <a class="skip-link" href="#overview">Skip to documentation</a>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#111619" />
+        <meta name="description" content="SpecPi installation, command, workflow, browser, and security reference." />
+        <meta property="og:title" content="SpecPi reference" />
+        <meta property="og:description" content="Technical documentation for the SpecPi coding-agent harness." />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="SpecPi" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/wiki/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/wiki/" />
+        <title>Technical reference · SpecPi</title>
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+    </head>
+    <body class="wiki-page">
+        <a class="skip-link" href="#overview">Skip to documentation</a>
 
-  <header class="site-header">
-    <a class="brand" href="../" aria-label="SpecPi home">
-      <img class="brand-logo" src="../logo.svg" width="28" height="28" alt="">
-      <strong>SpecPi</strong>
-      <span class="brand-separator">/</span>
-      <span>v0.11.2</span>
-    </a>
-    <nav class="header-nav" aria-label="Primary navigation">
-      <a href="../">Overview</a>
-      <a class="active" href="./" aria-current="page">Documentation</a>
-      <a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
-    </nav>
-  </header>
+        <header class="site-header wrap">
+            <a class="brand" href="../" aria-label="SpecPi home"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="../#loop">Workflow</a><a href="../single-agent/">Architecture</a
+                ><a href="./" aria-current="page">Reference</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
+            </nav>
+        </header>
 
-  <div class="page-layout wiki-layout">
-    <aside class="section-index wiki-sidebar" aria-label="Wiki navigation">
-      <p>On this page</p>
-      <nav aria-label="Documentation sections">
-        <a href="#getting-started"><span>01</span>Install</a>
-        <a href="#first-session"><span>02</span>First session</a>
-        <a href="#workflows"><span>03</span>Improvement loop</a>
-        <a href="#work-ownership"><span>04</span>Work ownership</a>
-        <a href="#task-records"><span>05</span>Tasks &amp; evidence</a>
-        <a href="#command-guard"><span>06</span>Command guard</a>
-        <a href="#file-review"><span>07</span>Files &amp; browser</a>
-        <a href="#reference"><span>08</span>Commands</a>
-        <a href="#configuration"><span>09</span>Configuration</a>
-        <a href="#security"><span>10</span>Security</a>
-        <a href="#development"><span>11</span>Development</a>
-      </nav>
-      <div class="index-meta"><span>Reference · v0.11.2</span></div>
-    </aside>
+        <div class="wiki-layout wrap">
+            <aside class="wiki-sidebar" aria-label="Wiki navigation">
+                <p>On this page</p>
+                <nav aria-label="Documentation sections">
+                    <a href="#getting-started"><span>01</span>Install</a>
+                    <a href="#first-session"><span>02</span>First session</a>
+                    <a href="#workflows"><span>03</span>Improvement loop</a>
+                    <a href="#work-ownership"><span>04</span>Work ownership</a>
+                    <a href="#task-records"><span>05</span>Tasks &amp; evidence</a>
+                    <a href="#command-guard"><span>06</span>Command guard</a>
+                    <a href="#file-review"><span>07</span>Files &amp; browser</a>
+                    <a href="#reference"><span>08</span>Commands</a>
+                    <a href="#configuration"><span>09</span>Configuration</a>
+                    <a href="#security"><span>10</span>Security</a>
+                    <a href="#development"><span>11</span>Development</a>
+                    <a href="#delegation"><span>12</span>Experimental delegation</a>
+                </nav>
+                <div class="index-meta"><span>Reference · v0.12.0</span></div>
+            </aside>
 
-    <main id="main" class="content wiki-content">
-      <header class="wiki-intro" id="overview">
-        <p class="eyebrow">Documentation / v0.11.2</p>
-        <h1>Reference</h1>
-        <p class="wiki-summary">Set up SpecPi, keep work accountable, and understand the boundaries of each tool.</p>
-        <p class="wiki-release-note">Release reference · v0.11.2. <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the task, its checks, and later human feedback connected.</p>
-      </header>
+            <main id="main" class="wiki-content">
+                <header class="wiki-intro" id="overview">
+                    <p class="eyebrow">Documentation / v0.12.0</p>
+                    <h1>Technical reference</h1>
+                    <p class="wiki-summary">
+                        Install with a plan. Keep one agent focused. Verify the work, then improve the harness from
+                        evidence.
+                    </p>
+                    <p class="wiki-release-note">
+                        Release reference · v0.12.0.
+                        <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
+                        task, its checks, and later human feedback connected. The
+                        <a href="#delegation">delegation experiment</a> is optional and disabled by default.
+                    </p>
+                </header>
 
-      <section class="doc-section" id="getting-started" aria-labelledby="install-doc-title">
-        <header><span>01</span><h2 id="install-doc-title">Install</h2></header>
-        <p>Requirements: Node.js 22.19 or newer, npm, and Git. SpecPi uses Pi 0.84.4 or newer. If Pi is missing, the confirmed install adds the reviewed pinned Pi package. Uninstalling SpecPi leaves that package installed.</p>
-        <div class="terminal doc-terminal">
-          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.11.2</span></div>
-          <pre><code>npm install --global specpi@latest
+                <section class="doc-section" id="getting-started" aria-labelledby="install-doc-title">
+                    <header>
+                        <span>01</span>
+                        <h2 id="install-doc-title">Install</h2>
+                    </header>
+                    <p>
+                        Requirements: Node.js 22.19 or newer, npm, and Git. SpecPi uses Pi 0.84.4 or newer. If Pi is
+                        missing, the confirmed install adds the reviewed pinned Pi package. Uninstalling SpecPi leaves
+                        that package installed.
+                    </p>
+                    <div class="terminal doc-terminal">
+                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.12.0</span></div>
+                        <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
-          <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-          <pre><code>npm install --global specpi@0.11.2</code></pre>
-          <div class="terminal-bar secondary"><span>Source-audited release · Linux, macOS, Git Bash</span></div>
-          <pre><code>git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
+                        <pre><code>npm install --global specpi@0.12.0</code></pre>
+                        <div class="terminal-bar secondary">
+                            <span>Source-audited release · Linux, macOS, Git Bash</span>
+                        </div>
+                        <pre><code>git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
 ./specpi doctor</code></pre>
-          <div class="terminal-bar secondary"><span>Source-audited release · Windows PowerShell / cmd</span></div>
-          <pre><code>git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <div class="terminal-bar secondary">
+                            <span>Source-audited release · Windows PowerShell / cmd</span>
+                        </div>
+                        <pre><code>git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
 .\specpi.cmd doctor</code></pre>
-          <div class="terminal-bar secondary"><span>Update · two explicit steps</span></div>
-          <pre><code>npm install --global specpi@latest
+                        <div class="terminal-bar secondary"><span>Update · two explicit steps</span></div>
+                        <pre><code>npm install --global specpi@latest
 specpi update
 specpi doctor</code></pre>
-        </div>
-        <p class="doc-boundary"><strong>Native Pi package mode is limited.</strong> <code>pi install npm:specpi</code> loads extensions, skills, and themes, but does not run the managed installer or provide its browser runtime, supporting packages, instructions, shell integration, backups, or ownership records.</p>
-        <div class="definition-list">
-          <div><code>plan</code><span>Prints intended changes without mutating the system.</span></div>
-          <div><code>install</code><span>Confirms, backs up, writes atomically, and rolls configuration back if setup fails.</span></div>
-          <div><code>doctor</code><span>Checks managed files, settings, dependencies, profiles, browser readiness, and registry-linked validators.</span></div>
-          <div><code>update</code><span>Refreshes managed resources while preserving unrelated settings and user-tunable state.</span></div>
-          <div><code>uninstall</code><span>Removes managed integration while retaining local evidence, profiles, and external packages.</span></div>
-        </div>
-      </section>
+                    </div>
+                    <p class="doc-boundary">
+                        <strong>Native Pi package mode is limited.</strong> <code>pi install npm:specpi</code> loads
+                        extensions, skills, and themes, but does not run the managed installer or provide its browser
+                        runtime, supporting packages, instructions, shell integration, backups, or ownership records.
+                    </p>
+                    <div class="definition-list">
+                        <div><code>plan</code><span>Prints intended changes without mutating the system.</span></div>
+                        <div>
+                            <code>install</code
+                            ><span
+                                >Confirms, backs up, writes atomically, and rolls configuration back if setup
+                                fails.</span
+                            >
+                        </div>
+                        <div>
+                            <code>doctor</code
+                            ><span
+                                >Checks managed files, settings, dependencies, profiles, browser readiness, and
+                                registry-linked validators.</span
+                            >
+                        </div>
+                        <div>
+                            <code>update</code
+                            ><span
+                                >Refreshes managed resources while preserving unrelated settings and user-tunable
+                                state.</span
+                            >
+                        </div>
+                        <div>
+                            <code>uninstall</code
+                            ><span
+                                >Removes managed integration while retaining local evidence, profiles, and external
+                                packages.</span
+                            >
+                        </div>
+                    </div>
+                </section>
 
-      <section class="doc-section" id="first-session" aria-labelledby="first-session-title">
-        <header><span>02</span><h2 id="first-session-title">First session</h2></header>
-        <ol class="step-list">
-          <li><span>1</span><p><strong>Reload Pi.</strong> Run <code>/reload</code> so Pi loads SpecPi's extensions, skills, theme, and managed settings.</p></li>
-          <li><span>2</span><p><strong>Enter focused mode.</strong> Run <code>/spec</code> to switch to the focused execution surface. Run it again to leave.</p></li>
-          <li><span>3</span><p><strong>Choose collection.</strong> The wishlist asks once whether capability-gap collection is enabled. Reports are local, sanitized, bounded, and deduplicated by task.</p></li>
-        </ol>
-        <p class="doc-boundary"><strong>No automatic implementation.</strong> Evidence can qualify an item, but only a selection in <code>/harness-improvement</code> authorizes a change.</p>
-      </section>
+                <section class="doc-section" id="first-session" aria-labelledby="first-session-title">
+                    <header>
+                        <span>02</span>
+                        <h2 id="first-session-title">First session</h2>
+                    </header>
+                    <ol class="step-list">
+                        <li>
+                            <span>1</span>
+                            <p>
+                                <strong>Restart Pi.</strong> Restart so Pi loads SpecPi's extensions,
+                                skills, theme, and managed settings.
+                            </p>
+                        </li>
+                        <li>
+                            <span>2</span>
+                            <p>
+                                <strong>Enter focused mode.</strong> Run <code>/spec</code> to switch to the focused
+                                execution surface. Run it again to leave.
+                            </p>
+                        </li>
+                        <li>
+                            <span>3</span>
+                            <p>
+                                <strong>Choose collection.</strong> The wishlist asks once whether capability-gap
+                                collection is enabled. Reports are local, sanitized, bounded, and deduplicated by task.
+                            </p>
+                        </li>
+                    </ol>
+                    <p class="doc-boundary">
+                        <strong>No automatic implementation.</strong> Evidence can qualify an item, but only a selection
+                        in <code>/harness-improvement</code> authorizes a change.
+                    </p>
+                </section>
 
-      <section class="doc-section" id="workflows" aria-labelledby="workflows-title">
-        <header><span>03</span><h2 id="workflows-title">Improvement loop</h2></header>
-        <p>Recurring capability gaps enter the review menu. A person selects one item. Repository checks and capability validators determine whether the item can retire. A failed gate leaves it selected. Later evidence returns it as <code>review-needed</code>.</p>
-        <div class="definition-list wide-keys">
-          <div><code>/harness-improvement</code><span>Lists qualified and review-needed items. Selecting one authorizes that exact improvement.</span></div>
-          <div><code>/wishlist</code><span>Inspects and curates the local list, including duplicate cleanup, issue drafts, archives, and resets.</span></div>
-          <div><code>/wishlist status</code><span>Reports queue size, retirements, reopen rate, open reviews, time to retire, and qualification rate.</span></div>
-          <div><code>/wishlist history [gap-id]</code><span>Shows retirement evidence, validators, changed files, reopen signals, and rollback context.</span></div>
-        </div>
-      </section>
+                <section class="doc-section" id="workflows" aria-labelledby="workflows-title">
+                    <header>
+                        <span>03</span>
+                        <h2 id="workflows-title">Improvement loop</h2>
+                    </header>
+                    <p>
+                        Recurring capability gaps enter the review menu. A person selects one item. Repository checks
+                        and capability validators determine whether the item can retire. A failed gate leaves it
+                        selected. Later evidence returns it as <code>review-needed</code>.
+                    </p>
+                    <div class="definition-list wide-keys">
+                        <div>
+                            <code>/harness-improvement</code
+                            ><span
+                                >Lists qualified and review-needed items. Selecting one authorizes that exact
+                                improvement.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/wishlist</code
+                            ><span
+                                >Inspects and curates the local list, including duplicate cleanup, issue drafts,
+                                archives, and resets.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/wishlist status</code
+                            ><span
+                                >Reports queue size, retirements, reopen rate, open reviews, time to retire, and
+                                qualification rate.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/wishlist history [gap-id]</code
+                            ><span
+                                >Shows retirement evidence, validators, changed files, reopen signals, and rollback
+                                context.</span
+                            >
+                        </div>
+                    </div>
+                </section>
 
-      <section class="doc-section" id="work-ownership" aria-labelledby="ownership-title">
-        <header><span>04</span><h2 id="ownership-title">Work ownership</h2></header>
-        <p>SpecPi keeps implementation in one accountable working context. Scope, experiment, and challenge controls make path expectations and review evidence visible.</p>
-        <div class="definition-list wide-keys">
-          <div><code>/scope set</code><span>Declares expected paths. Headless and shell-detected drift remains advisory and pending until acknowledged.</span></div>
-          <div><code>/scope accept</code><span>Acknowledges one finding without changing the declared contract. Use <code>/scope add</code> to widen the contract.</span></div>
-          <div><code>/experiment start</code><span>Creates a detached worktree from <code>HEAD</code>. It does not copy dirty base changes, launch an agent, commit, merge, or touch remotes.</span></div>
-          <div><code>/experiment close</code><span>Keeps the worktree, exports tracked and untracked changes as a binary patch, or discards it after confirmation.</span></div>
-          <div><code>/challenge</code><span>Runs a structured readiness review. The result is model-authored and does not replace direct proof.</span></div>
-        </div>
-      </section>
+                <section class="doc-section" id="work-ownership" aria-labelledby="ownership-title">
+                    <header>
+                        <span>04</span>
+                        <h2 id="ownership-title">Work ownership</h2>
+                    </header>
+                    <p>
+                        SpecPi keeps implementation in one accountable working context. Scope, experiment, and challenge
+                        controls make path expectations and review evidence visible.
+                    </p>
+                    <div class="definition-list wide-keys">
+                        <div>
+                            <code>/scope set</code
+                            ><span
+                                >Declares expected paths. Headless and shell-detected drift remains advisory and pending
+                                until acknowledged.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/scope accept</code
+                            ><span
+                                >Acknowledges one finding without changing the declared contract. Use
+                                <code>/scope add</code> to widen the contract.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/experiment start</code
+                            ><span
+                                >Creates a detached worktree from <code>HEAD</code>. It does not copy dirty base
+                                changes, launch an agent, commit, merge, or touch remotes.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/experiment close</code
+                            ><span
+                                >Keeps the worktree, exports tracked and untracked changes as a binary patch, or
+                                discards it after confirmation.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/challenge</code
+                            ><span
+                                >Runs a structured readiness review. The result is model-authored and does not replace
+                                direct proof.</span
+                            >
+                        </div>
+                    </div>
+                </section>
 
-      <section class="doc-section" id="task-records" aria-labelledby="task-records-title">
-        <header><span>05</span><h2 id="task-records-title">Tasks and evidence</h2></header>
-        <p class="doc-boundary release-boundary"><strong>New in v0.11.2.</strong> Optional task cards, verification receipts, and human outcome feedback make the boundaries and evidence of a change easier to review.</p>
-        <p>Use an optional task card when a shared contract would improve continuity. It records the objective, fixed requirement IDs, acceptance checks, expected paths, hypothesis, rollback, and non-goals on the current session branch.</p>
-        <div class="definition-list wide-keys">
-          <div><code>/task set</code><span>Record a task card. Human edits create a new revision and invalidate a review of the earlier card. Use <code>/task clear</code> before an unrelated task.</span></div>
-          <div><code>/scope task</code><span>Explicitly import the card's expected paths while preserving pending findings. Recording a card alone never widens scope.</span></div>
-          <div><code>/task handoff</code><span>Display the card, observed changes, matching completion review, and unresolved facts in the conversation. Review before sharing; it does not launch an agent or export a file.</span></div>
-        </div>
-        <h3>Verification receipts</h3>
-        <p>Improvement verification records actual gate results and fingerprints supported source and validation inputs. A changed source snapshot invalidates the evidence. Receipts retain hashes and runtime metadata, separately from model explanations; they retain neither source contents nor raw command output. A receipt describes what was checked and is not independent proof that the change meets its acceptance checks.</p>
-        <h3>Outcome feedback</h3>
-        <p>With collection enabled, <code>/wishlist outcome &lt;gap-id&gt;</code> records a human assessment of the latest local retirement with a receipt: helped, failed, not exercised, or reverted. Corrections preserve history. Negative feedback can surface a review need; it never authorizes implementation or performs a revert. Older retirements without receipts remain unassessed.</p>
-      </section>
+                <section class="doc-section" id="task-records" aria-labelledby="task-records-title">
+                    <header>
+                        <span>05</span>
+                        <h2 id="task-records-title">Tasks and evidence</h2>
+                    </header>
+                    <p class="doc-boundary release-boundary">
+                        Optional task cards, verification receipts, and human outcome
+                        feedback make the boundaries and evidence of a change easier to review.
+                    </p>
+                    <p>
+                        Use an optional task card when a shared contract would improve continuity. It records the
+                        objective, fixed requirement IDs, acceptance checks, expected paths, hypothesis, rollback, and
+                        non-goals on the current session branch.
+                    </p>
+                    <div class="definition-list wide-keys">
+                        <div>
+                            <code>/task set</code
+                            ><span
+                                >Record a task card. Human edits create a new revision and invalidate a review of the
+                                earlier card. Use <code>/task clear</code> before an unrelated task.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/scope task</code
+                            ><span
+                                >Explicitly import the card's expected paths while preserving pending findings.
+                                Recording a card alone never widens scope.</span
+                            >
+                        </div>
+                        <div>
+                            <code>/task handoff</code
+                            ><span
+                                >Display the card, observed changes, matching completion review, and unresolved facts in
+                                the conversation. Review before sharing; it does not launch an agent or export a
+                                file.</span
+                            >
+                        </div>
+                    </div>
+                    <h3>Verification receipts</h3>
+                    <p>
+                        Improvement verification records actual gate results and fingerprints supported source and
+                        validation inputs. A changed source snapshot invalidates the evidence. Receipts retain hashes
+                        and runtime metadata, separately from model explanations; they retain neither source contents
+                        nor raw command output. A receipt describes what was checked and is not independent proof that
+                        the change meets its acceptance checks.
+                    </p>
+                    <h3>Outcome feedback</h3>
+                    <p>
+                        With collection enabled, <code>/wishlist outcome &lt;gap-id&gt;</code> records a human
+                        assessment of the latest local retirement with a receipt: helped, failed, not exercised, or
+                        reverted. Corrections preserve history. Negative feedback can surface a review need; it never
+                        authorizes implementation or performs a revert. Older retirements without receipts remain
+                        unassessed.
+                    </p>
+                </section>
 
-      <section class="doc-section" id="command-guard" aria-labelledby="guard-doc-title">
-        <header><span>06</span><h2 id="guard-doc-title">Command guard</h2></header>
-        <p>Choose a mode at session start. Approvals apply to one exact call and one session. Only a structurally proven critical mutation locks the session. Parser uncertainty and invalid cleanup syntax are denied without locking later work.</p>
-        <div class="definition-list">
-          <div><code>guard</code><span>Recommended. Denies confirmed host-wide catastrophe and guard tampering, asks before Git destroys work, and stays quiet otherwise.</span></div>
-          <div><code>strict</code><span>Also asks before mutation, execution, sensitive reads, and network activity.</span></div>
-          <div><code>off</code><span>Requires confirmation and applies only to the current session.</span></div>
-        </div>
-        <p>Use <code>/guard</code> to inspect or change the mode. Available actions include <code>status</code>, <code>guard</code>, <code>strict</code>, <code>off</code>, <code>unlock</code>, and <code>clear-approvals</code>.</p>
-      </section>
+                <section class="doc-section" id="command-guard" aria-labelledby="guard-doc-title">
+                    <header>
+                        <span>06</span>
+                        <h2 id="guard-doc-title">Command guard</h2>
+                    </header>
+                    <p>
+                        Choose a mode at session start. Approvals apply to one exact call and one session. Only a
+                        structurally proven critical mutation locks the session. Parser uncertainty and invalid cleanup
+                        syntax are denied without locking later work.
+                    </p>
+                    <div class="definition-list">
+                        <div>
+                            <code>guard</code
+                            ><span
+                                >Recommended. Denies confirmed host-wide catastrophe and guard tampering, asks before
+                                Git destroys work, and stays quiet otherwise.</span
+                            >
+                        </div>
+                        <div>
+                            <code>strict</code
+                            ><span>Also asks before mutation, execution, sensitive reads, and network activity.</span>
+                        </div>
+                        <div>
+                            <code>off</code><span>Requires confirmation and applies only to the current session.</span>
+                        </div>
+                    </div>
+                    <p>
+                        Use <code>/guard</code> to inspect or change the mode. Available actions include
+                        <code>status</code>, <code>guard</code>, <code>strict</code>, <code>off</code>,
+                        <code>unlock</code>, and <code>clear-approvals</code>.
+                    </p>
+                </section>
 
-      <section class="doc-section" id="file-review" aria-labelledby="files-title">
-        <header><span>07</span><h2 id="files-title">Files and browser</h2></header>
-        <p><code>/files</code> opens the project browser for source, rendered Markdown, Git diffs, and bounded review comments.</p>
-        <div class="key-list" aria-label="File browser shortcuts">
-          <span><kbd>j</kbd> <kbd>k</kbd> move</span>
-          <span><kbd>Enter</kbd> open</span>
-          <span><kbd>/</kbd> search</span>
-          <span><kbd>c</kbd> changed files</span>
-          <span><kbd>v</kbd> select lines</span>
-          <span><kbd>Ctrl+Enter</kbd> submit</span>
-        </div>
-        <h3 id="browser-qa">Browser QA</h3>
-        <p>Browser tools open a fresh isolated Chromium context. Load the page, inspect rendered structure, test interactions, resize across desktop, tablet, and mobile viewports, then capture bounded evidence. Source inspection does not verify rendered appearance.</p>
-        <p class="doc-boundary"><strong>Isolation boundary.</strong> The browser does not attach to a personal Chrome profile, cookies, passwords, or extensions. It runs as a separate process and does not provide operating-system isolation.</p>
-      </section>
+                <section class="doc-section" id="file-review" aria-labelledby="files-title">
+                    <header>
+                        <span>07</span>
+                        <h2 id="files-title">Files and browser</h2>
+                    </header>
+                    <p>
+                        <code>/files</code> opens the project browser for source, rendered Markdown, Git diffs, and
+                        bounded review comments.
+                    </p>
+                    <div class="key-list" aria-label="File browser shortcuts">
+                        <span><kbd>j</kbd> <kbd>k</kbd> move</span>
+                        <span><kbd>Enter</kbd> open</span>
+                        <span><kbd>/</kbd> search</span>
+                        <span><kbd>c</kbd> changed files</span>
+                        <span><kbd>v</kbd> select lines</span>
+                        <span><kbd>Ctrl+Enter</kbd> submit</span>
+                    </div>
+                    <h3 id="browser-qa">Browser QA</h3>
+                    <p>
+                        Browser tools open a fresh isolated Chromium context. Load the page, inspect rendered structure,
+                        test interactions, resize across desktop, tablet, and mobile viewports, then capture bounded
+                        evidence. Source inspection does not verify rendered appearance.
+                    </p>
+                    <p class="doc-boundary">
+                        <strong>Isolation boundary.</strong> The browser does not attach to a personal Chrome profile,
+                        cookies, passwords, or extensions. It runs as a separate process and does not provide
+                        operating-system isolation.
+                    </p>
+                </section>
 
-      <section class="doc-section" id="reference" aria-labelledby="commands-title">
-        <header><span>08</span><h2 id="commands-title">Commands</h2></header>
-        <div class="definition-list command-reference">
-          <div><code>/spec [on|off|status]</code><span>Toggle or inspect focused execution mode.</span></div>
-          <div><code>/files [path]</code><span>Open the file browser at the repository root or a selected path.</span></div>
-          <div><code>/scope [set|add|accept|...]</code><span>Declare expected paths and review scope drift.</span></div>
-          <div><code>/experiment [start|close|...]</code><span>Manage detached worktree experiments.</span></div>
-          <div><code>/challenge [status|clear]</code><span>Run or inspect a structured completion-readiness review.</span></div>
-          <div><code>/wishlist [status|history|off]</code><span>Inspect, curate, and audit the local capability list.</span></div>
-          <div><code>/harness-improvement</code><span>Select and begin one improvement.</span></div>
-          <div><code>/guard [status|strict|off|...]</code><span>Inspect or change session command protection.</span></div>
-          <div><code>/reload</code><span>Reload Pi after installation or startup-loaded changes.</span></div>
-        </div>
-        <p class="muted">The <a class="text-link" href="#task-records">task and evidence reference</a> covers task cards, handoff packets, and outcome feedback.</p>
-      </section>
+                <section class="doc-section" id="reference" aria-labelledby="commands-title">
+                    <header>
+                        <span>08</span>
+                        <h2 id="commands-title">Commands</h2>
+                    </header>
+                    <div class="definition-list command-reference">
+                        <div>
+                            <code>/spec [on|off|status]</code><span>Toggle or inspect focused execution mode.</span>
+                        </div>
+                        <div>
+                            <code>/files [path]</code
+                            ><span>Open the file browser at the repository root or a selected path.</span>
+                        </div>
+                        <div>
+                            <code>/scope [set|add|accept|...]</code
+                            ><span>Declare expected paths and review scope drift.</span>
+                        </div>
+                        <div>
+                            <code>/experiment [start|close|...]</code><span>Manage detached worktree experiments.</span>
+                        </div>
+                        <div>
+                            <code>/challenge [status|clear]</code
+                            ><span>Run or inspect a structured completion-readiness review.</span>
+                        </div>
+                        <div>
+                            <code>/wishlist [status|history|off]</code
+                            ><span>Inspect, curate, and audit the local capability list.</span>
+                        </div>
+                        <div><code>/harness-improvement</code><span>Select and begin one improvement.</span></div>
+                        <div>
+                            <code>/guard [status|strict|off|...]</code
+                            ><span>Inspect or change session command protection.</span>
+                        </div>
+                        <div>
+                            <code>/reload</code><span>Reload ordinary resources. Restart Pi after updating SpecPi's delegation runtime.</span>
+                        </div>
+                        <div>
+                            <code>/delegate [on|off|status|limits|cancel]</code
+                            ><span>Control the experimental bounded read-only workers in native Pi.</span>
+                        </div>
+                    </div>
+                    <p class="muted">
+                        The <a class="text-link" href="#task-records">task and evidence reference</a> covers task cards,
+                        handoff packets, and outcome feedback.
+                    </p>
+                </section>
 
-      <section class="doc-section" id="configuration" aria-labelledby="configuration-title">
-        <header><span>09</span><h2 id="configuration-title">Configuration</h2></header>
-        <p>The installer merges documented settings paths and preserves unrelated configuration. SpecPi manages global instructions and shell integration only inside marked blocks. Plan output is non-mutating. Install, update, and uninstall require confirmation unless <code>--yes</code> is supplied.</p>
-      </section>
+                <section class="doc-section" id="configuration" aria-labelledby="configuration-title">
+                    <header>
+                        <span>09</span>
+                        <h2 id="configuration-title">Configuration</h2>
+                    </header>
+                    <p>
+                        The installer merges documented settings paths and preserves unrelated configuration. SpecPi
+                        manages global instructions and shell integration only inside marked blocks. Plan output is
+                        non-mutating. Install, update, and uninstall require confirmation unless <code>--yes</code> is
+                        supplied.
+                    </p>
+                </section>
 
-      <section class="doc-section" id="security" aria-labelledby="security-title">
-        <header><span>10</span><h2 id="security-title">Security</h2></header>
-        <div class="security-list">
-          <p><strong>Local state.</strong> Wishlist reports, journals, experiment metadata, and exported patches stay in private local SpecPi state. Review local artifacts before sharing.</p>
-          <p><strong>No persisted command text.</strong> SpecPi does not read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current session.</p>
-          <p><strong>Explicit authority.</strong> Improving SpecPi, installing software, and publishing require approval.</p>
-          <p><strong>Bounded guard.</strong> Direct shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside guard scope.</p>
-        </div>
-        <p class="muted">Pi extensions run with user permissions. Use OS permissions, a least-privilege account, a container, or a VM for hostile code or data. Read the <a class="text-link" href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md">security model <span aria-hidden="true">↗</span></a>.</p>
-      </section>
+                <section class="doc-section" id="security" aria-labelledby="security-title">
+                    <header>
+                        <span>10</span>
+                        <h2 id="security-title">Security</h2>
+                    </header>
+                    <div class="security-list">
+                        <p>
+                            <strong>Local state.</strong> Wishlist reports, journals, experiment metadata, and exported
+                            patches stay in private local SpecPi state. Review local artifacts before sharing.
+                        </p>
+                        <p>
+                            <strong>No persisted command text.</strong> SpecPi does not read Pi credentials, unrelated
+                            sessions, or history. Scope and challenge records are bounded entries in the current
+                            session.
+                        </p>
+                        <p>
+                            <strong>Explicit authority.</strong> Improving SpecPi, installing software, and publishing
+                            require approval.
+                        </p>
+                        <p>
+                            <strong>Bounded guard.</strong> Direct shell escapes, malicious extensions, unclassified
+                            custom tools, approved scripts, TOCTOU changes, and external processes remain outside guard
+                            scope.
+                        </p>
+                    </div>
+                    <p class="muted">
+                        Pi extensions run with user permissions. Use OS permissions, a least-privilege account, a
+                        container, or a VM for hostile code or data. Read the
+                        <a class="text-link" href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md"
+                            >security model <span aria-hidden="true">↗</span></a
+                        >.
+                    </p>
+                </section>
 
-      <section class="doc-section" id="development" aria-labelledby="development-title">
-        <header><span>11</span><h2 id="development-title">Development</h2></header>
-        <div class="terminal doc-terminal">
-          <pre><code>npm install --ignore-scripts --omit=peer --no-package-lock
+                <section class="doc-section" id="development" aria-labelledby="development-title">
+                    <header>
+                        <span>11</span>
+                        <h2 id="development-title">Development</h2>
+                    </header>
+                    <div class="terminal doc-terminal">
+                        <pre><code>npm install --ignore-scripts --omit=peer --no-package-lock
 npm run format
 npm run check</code></pre>
+                    </div>
+                    <p>
+                        JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one
+                        statement per line. The repository check validates formatting and syntax, runs the Node test
+                        suite, and executes registry-linked validators with isolated prerequisites.
+                    </p>
+                </section>
+                <section class="doc-section" id="delegation" aria-labelledby="delegation-title">
+                    <header>
+                        <span>12</span>
+                        <h2 id="delegation-title">Experimental delegation</h2>
+                    </header>
+                    <p>
+                        Available in v0.12.0 and disabled by default. The native extension loads through
+                        normal Pi package discovery and the existing SpecPi install/update lifecycle. Start
+                        <code>pi</code> normally, then use <code>/delegate on</code> to enable the fixed calls/time
+                        envelope. The parent remains the sole writer.
+                        <strong>Compatibility uses SDK capability checks</strong>, so compatible Pi updates can run
+                        without a SpecPi release. Missing APIs are named in the activation error. The delegation
+                        schema is absent from model requests while off.
+                    </p>
+                    <div class="terminal doc-terminal">
+                        <pre><code>pi
+# Then, in the interactive session:
+/delegate on
+/delegate status
+/delegate limits
+/delegate cancel &lt;batchId&gt;
+/delegate off</code></pre>
+                    </div>
+                    <p>
+                        Workers are actual SDK <code>AgentSession</code> instances with in-memory storage.
+                        <code>review</code> examines a frozen artifact; <code>scout</code> answers a bounded evidence
+                        question. Both can list, read and search exact selected text files; a review may instead use
+                        nonempty inline context without tools. Scouts require selected files. Children load no ambient
+                        extensions, skills, AGENTS files or parent history, and have no shell, writes, live web or
+                        nested delegation.
+                    </p>
+                    <p>
+                        The packet assigns requirements to each job and declares independent review, parallel analysis
+                        or context isolation. Explain the benefit; concurrent parent work is required only for parallel
+                        analysis. These checks constrain structure, not prove useful independence. Each batch has at
+                        most two jobs. The Pi process permits two active workers, four batches and 32 SDK invocations;
+                        each job gets four invocations and 120 seconds including one follow-up. These are experimental
+                        ceilings. Cancelled workers retain slots through SDK-visible stream/result and prompt
+                        settlement. Reloads, session switches and off/on preserve the controller and counters. Task,
+                        scope, model, session, reload or guard changes revoke the current generation; ordinary parent
+                        turns do not. Command Guard is optional: delegation works with Guard absent or Off. Active
+                        Strict approvals and explicit locks still apply. Delegation enforces its own read-only tools
+                        and resource limits.
+                    </p>
+                    <p>
+                        Once enabled, delegation follows the parent's provider, model and thinking level without
+                        another toggle. A change revokes old results and checks the new host before dispatch resumes.
+                        Unsupported selections pause with a reason; a compatible selection resumes automatically.
+                        Quotas and settling slots remain consumed. Explicit <code>/delegate off</code> stays off.
+                    </p>
+                    <p class="doc-boundary">
+                        <strong>SDK boundary.</strong> Pi runs the model/tool loop; SpecPi admits every SDK invocation
+                        before dispatch and checks SDK-visible streaming. Provider/session retries and compaction are
+                        disabled. SDK events do not establish hard raw-transport, hidden-provider-attempt, invoice or
+                        memory caps, or prove remote execution has ended. Cost is unavailable; missing usage is
+                        explicit. The parent must verify findings. Receipts and parent acceptance do not grant human
+                        authority or prove task completion.
+                    </p>
+                    <p>
+                        A fresh child Pi ModelRuntime uses standard authentication, environment and model definitions.
+                        Transport/thinking budgets use configured global settings without project settings. Parent
+                        model/thinking are explicit with Pi clamping. Runtime-only authentication, selected
+                        extension-provider overrides, model headers, startup proxy configuration and safe descriptor
+                        mismatches fail preflight. Parent hooks, ephemeral settings and session affinity are not
+                        inherited; keep delegation disabled when those controls are required. Parent Pi resources and
+                        trust remain unchanged. Selected context reaches the configured provider, and normal parent tool
+                        results may persist in Pi's session. Snapshot access is a trusted-local-filesystem boundary, not
+                        an OS sandbox. Its canonical working root is fixed for the Pi process; restart Pi to change it
+                        or load a new delegation runtime version.
+                    </p>
+                    <p>
+                        Read the
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
+                            >implementation guide</a
+                        >,
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/protocol.md"
+                            >implemented protocol</a
+                        >, and
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/research.md"
+                            >research ledger</a
+                        >. Runtime fixtures do not establish quality, cost or speed gains; those require the separate
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/evaluation.md"
+                            >outcome evaluation</a
+                        >.
+                    </p>
+                </section>
+            </main>
         </div>
-        <p>JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check validates formatting and syntax, runs the Node test suite, and executes registry-linked validators with isolated prerequisites.</p>
-      </section>
-
-      <footer>
-        <a class="footer-brand" href="#overview"><span class="brand-mark" aria-hidden="true">π</span><span>SpecPi</span></a>
-        <div>
-          <a href="../">Overview</a>
-          <a href="https://github.com/TannerMidd/SpecPi">Source</a>
-          <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a>
-        </div>
-      </footer>
-    </main>
-  </div>
-</body>
+        <footer class="site-footer wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
+            >
+            <p>Pi harness / v0.12.0</p>
+            <nav aria-label="Footer navigation">
+                <a href="../single-agent/">Architecture</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
+            </nav>
+        </footer>
+    </body>
 </html>
