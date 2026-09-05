@@ -287,15 +287,158 @@ test("ordinary leaf and turn advances preserve a collected result generation", a
     assert.equal(collected.details.results[0].receipt.state, "complete");
 });
 
-test("actual navigation, session lifecycle, and model selection invalidate delegation", async (t) => {
+test("model and thinking changes follow the parent without resetting workers or quotas", async (t) => {
+    const executions = [];
+    const worker = async ({ host, signal, admitCall }) => {
+        admitCall();
+        await new Promise((resolve) => executions.push({ host, signal, resolve }));
+
+        return result();
+    };
+
+    t.after(() => executions.forEach((entry) => entry.resolve()));
+    const { pi, bridge } = await fixture(t, { worker, limits: { concurrency: 1, sessionCalls: 2 } });
+    await pi.command("on");
+    const first = await pi.tool({ operation: "run", requestId: "old-model", packet: packet() });
+    const oldGeneration = (await state(pi)).generation;
+    bridge.host = {
+        ...bridge.host,
+        id: "new-owner",
+        model: { provider: "other", id: "new-model", thinkingLevel: "high" },
+    };
+    await pi.fire("model_select");
+    assert.equal((await state(pi)).enabled, true);
+    assert.equal((await state(pi)).requested, true);
+    assert.deepEqual((await state(pi)).model, bridge.host.model);
+    assert.ok((await state(pi)).generation > oldGeneration);
+    assert.equal(executions[0].signal.aborted, true);
+    assert.equal((await state(pi)).active, 1, "old request owns its slot until settlement");
+    assert.equal((await state(pi)).sessionCalls, 1);
+    assert.equal((await pi.tool({ operation: "collect", batchId: first.details.batchId })).isError, true);
+    const second = await pi.tool({ operation: "run", requestId: "new-model", packet: packet() });
+    assert.equal(second.details.jobs[0].state, "queued");
+    executions[0].resolve();
+    await waitFor(() => executions.length === 2);
+    assert.equal(executions[1].host, bridge.host);
+    executions[1].resolve();
+    await waitFor(async () => (await state(pi)).active === 0);
+    bridge.host = { ...bridge.host, id: "new-thinking", model: { ...bridge.host.model, thinkingLevel: "low" } };
+    await pi.fire("thinking_level_select");
+    assert.equal((await state(pi)).enabled, true);
+    assert.equal((await state(pi)).model.thinkingLevel, "low");
+    assert.equal((await state(pi)).sessionCalls, 2);
+    assert.equal((await state(pi)).sessionBatches, 2);
+    await pi.tool({ operation: "run", requestId: "exhausted", packet: packet() });
+    await waitFor(async () => (await state(pi)).active === 0);
+    assert.equal(executions.length, 2);
+    await pi.command("off");
+    await pi.fire("model_select");
+    assert.equal((await state(pi)).requested, false);
+    assert.equal((await state(pi)).enabled, false);
+});
+
+test("an unsupported selected model pauses delegation and a compatible selection resumes it", async (t) => {
+    const { pi, bridge } = await fixture(t);
+    await pi.command("on");
+    const supported = bridge.host;
+    bridge.host = {
+        ...supported,
+        id: "unsupported",
+        ready: async () => {
+            throw new Error("Unsupported fixture provider");
+        },
+    };
+    await pi.fire("model_select");
+    assert.equal((await state(pi)).enabled, false);
+    assert.equal((await state(pi)).requested, true);
+    assert.equal((await state(pi)).updating, false);
+    assert.match((await state(pi)).pauseReason, /Unsupported fixture provider/);
+    assert.equal(bridge.calls(), 0);
+    bridge.host = { ...supported, id: "compatible" };
+    await pi.fire("model_select");
+    assert.equal((await state(pi)).enabled, true);
+    assert.equal((await state(pi)).pauseReason, null);
+    assert.equal(bridge.calls(), 0);
+});
+
+test("rapid selections coalesce the same setup and a late setup cannot restore an old model", async (t) => {
+    const { pi, bridge } = await fixture(t);
+    await pi.command("on");
+    let finish;
+    let setups = 0;
+    const readiness = new Promise((resolve) => {
+        finish = resolve;
+    });
+    bridge.host = {
+        ...bridge.host,
+        id: "slow",
+        ready: () => {
+            setups += 1;
+
+            return readiness;
+        },
+    };
+    const slow = pi.fire("model_select");
+    const duplicate = pi.fire("thinking_level_select");
+    assert.equal(setups, 1);
+    assert.equal((await state(pi)).updating, true);
+    bridge.host = {
+        ...bridge.host,
+        id: "fast",
+        model: { provider: "fixture", id: "fast-model" },
+        ready: async () => {},
+    };
+    await pi.fire("model_select");
+    finish();
+    await Promise.all([slow, duplicate]);
+    assert.equal((await state(pi)).enabled, true);
+    assert.equal((await state(pi)).updating, false);
+    assert.equal((await state(pi)).model.id, "fast-model");
+});
+
+test("off, guard changes and new sessions cannot be undone by pending model setup", async (t) => {
+    for (const change of ["off", "guard", "session_start"]) {
+        const { pi, bridge } = await fixture(t);
+        await pi.command("on");
+        let finish;
+        const readiness = new Promise((resolve) => {
+            finish = resolve;
+        });
+        bridge.host = { ...bridge.host, id: "pending", ready: () => readiness };
+        const selection = pi.fire("model_select");
+        if (change === "off") {
+            await pi.command("off");
+        } else if (change === "guard") {
+            pi.events.emit("specpi:guard-policy-changed", {});
+        } else {
+            await pi.fire(change);
+        }
+
+        finish();
+        await selection;
+        assert.equal((await state(pi)).requested, false, change);
+        assert.equal((await state(pi)).enabled, false, change);
+        assert.equal(bridge.calls(), 0);
+    }
+});
+
+test("the next turn refreshes a changed host when no selection notification was observed", async (t) => {
+    const { pi, bridge } = await fixture(t);
+    await pi.command("on");
+    bridge.host = { ...bridge.host, id: "unannounced", model: { provider: "fixture", id: "unannounced" } };
+    const events = await pi.fire("before_agent_start");
+    assert.equal(events[0].message.display, false);
+    assert.equal((await state(pi)).enabled, true);
+    assert.equal((await state(pi)).model.id, "unannounced");
+});
+
+test("actual navigation and session lifecycle invalidate delegation", async (t) => {
     const { pi } = await fixture(t);
     for (const event of [
         "session_before_switch",
         "session_before_fork",
         "session_before_tree",
         "session_tree",
-        "model_select",
-        "thinking_level_select",
         "session_start",
     ]) {
         await pi.command("on");

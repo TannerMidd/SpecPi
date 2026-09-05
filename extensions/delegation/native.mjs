@@ -5,7 +5,7 @@ import { createDelegationExtension } from "./extension.mjs";
 import { createNativePiHost, getPiSessionCompatibilityError } from "./provider.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 3;
+const revision = 4;
 
 function canonical(directory) {
     return fs.realpathSync.native(path.resolve(directory));

@@ -55,6 +55,16 @@ function runNativeFixture(context, mode = "main") {
             },
         }),
     );
+    if (mode === "model-selection") {
+        const modelsPath = path.join(agentDir, "models.json");
+        const models = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
+        models.providers["specpi-native-next-fixture"] = {
+            ...models.providers[provider],
+            models: [{ ...models.providers[provider].models[0], id: "native-next" }],
+        };
+        fs.writeFileSync(modelsPath, JSON.stringify(models));
+    }
+
     const args = [
         "--offline",
         "--no-session",
@@ -72,8 +82,8 @@ function runNativeFixture(context, mode = "main") {
     ];
     if (mode === "reload") {
         args.push("--print", "/native-fixture-reload", "/native-fixture-replace");
-    } else if (mode.startsWith("guard-")) {
-        args.push("--print", "/native-fixture-optional-guard");
+    } else if (mode.startsWith("guard-") || mode === "model-selection") {
+        args.push("--print", "/native-fixture-command");
     } else {
         args.push("--mode", "rpc");
     }
@@ -87,7 +97,7 @@ function runNativeFixture(context, mode = "main") {
             cwd,
             agentDir,
             args,
-            input: mode === "reload" || mode.startsWith("guard-") ? "" : undefined,
+            input: mode === "reload" || mode.startsWith("guard-") || mode === "model-selection" ? "" : undefined,
             env: {
                 SPECPI_NATIVE_FIXTURE_MODE: mode,
                 HTTP_PROXY: "",
@@ -220,3 +230,19 @@ for (const mode of ["absent", "off"]) {
         });
     });
 }
+
+test("native delegation follows public Pi provider, model and thinking selections without another toggle", (context) => {
+    const result = runNativeFixture(context, "model-selection");
+    if (!result) {
+        return;
+    }
+
+    assert.deepEqual(report(result, "NATIVE_MODEL_SELECTION_FIXTURE"), {
+        providerModelFollowed: true,
+        thinkingFollowed: true,
+        staleApprovalRejected: true,
+        offPreserved: true,
+        calls: 4,
+        batches: 3,
+    });
+});

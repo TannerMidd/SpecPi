@@ -98,6 +98,12 @@ export function createDelegationExtension(
     let bindingEpoch = 0;
     let detach = () => {};
 
+    let requested = false;
+    let requestedGuard;
+    let boundHost;
+    let pending;
+    let pauseReason;
+
     const getGuard = () => {
         let replies = 0;
         let mode;
@@ -120,17 +126,38 @@ export function createDelegationExtension(
         getHost,
         root,
         getGuard,
-        onChange() {
-            const state = controller.status();
-            syncActiveTool(state.enabled);
-            currentContext?.ui?.setStatus?.(
-                "specpi-delegation",
-                state.enabled
-                    ? `Delegate ${state.active}/${state.limits.concurrency} · ${state.sessionCalls}/${state.limits.sessionCalls} calls`
-                    : undefined,
-            );
-        },
+        onChange: updatePresentation,
     });
+
+    const status = () => ({
+        ...controller.status(),
+        requested,
+        updating: Boolean(pending),
+        pauseReason: pauseReason ?? null,
+    });
+
+    function updatePresentation() {
+        const state = controller.status();
+        syncActiveTool(state.enabled);
+        currentContext?.ui?.setStatus?.(
+            "specpi-delegation",
+            state.enabled
+                ? `Delegate ${state.active}/${state.limits.concurrency} · ${state.sessionCalls}/${state.limits.sessionCalls} calls`
+                : requested
+                  ? pending
+                      ? "Delegate updating model"
+                      : "Delegate paused"
+                  : undefined,
+        );
+    }
+
+    function invalidate(reason) {
+        requested = false;
+        pending = undefined;
+        boundHost = undefined;
+        pauseReason = undefined;
+        controller.invalidate(reason);
+    }
 
     function syncActiveTool(enabled) {
         if (
@@ -154,9 +181,82 @@ export function createDelegationExtension(
         const isBound = () => issuedEpoch === bindingEpoch;
         toolsReady = false;
         prepareContext(undefined, true);
-        controller.invalidate("runtime factory rebound");
+        invalidate("runtime factory rebound");
         currentPi = pi;
         currentContext = undefined;
+        const refreshSelection = async (ctx) => {
+            if (!isBound() || !requested) {
+                return;
+            }
+
+            currentContext = ctx;
+            if (getGuard() !== requestedGuard) {
+                invalidate("guard policy changed");
+
+                return;
+            }
+
+            let host;
+            try {
+                prepareContext(ctx);
+                host = getHost();
+            } catch (error) {
+                pending = undefined;
+                boundHost = undefined;
+                pauseReason = error.message;
+                controller.invalidate("model setup failed");
+
+                return;
+            }
+
+            if (boundHost === host && controller.status().enabled) {
+                return;
+            }
+
+            if (pending && pending.host === host) {
+                return pending.promise;
+            }
+
+            const attempt = { host, promise: undefined };
+            pending = attempt;
+            boundHost = undefined;
+            pauseReason = undefined;
+            controller.invalidate("model or thinking level changed");
+            const isCurrent = () => isBound() && requested && pending === attempt;
+            attempt.promise = (async () => {
+                try {
+                    await host?.ready?.();
+                    if (!isCurrent()) {
+                        return;
+                    }
+
+                    if (getGuard() !== requestedGuard) {
+                        invalidate("guard policy changed during model setup");
+
+                        return;
+                    }
+
+                    if (getHost() !== host) {
+                        throw new Error("Pi changed during model setup; delegation will refresh before the next turn.");
+                    }
+
+                    controller.enable();
+                    boundHost = host;
+                } catch (error) {
+                    if (isCurrent()) {
+                        pauseReason = error.message;
+                    }
+                } finally {
+                    if (pending === attempt) {
+                        pending = undefined;
+                        updatePresentation();
+                    }
+                }
+            })();
+
+            return attempt.promise;
+        };
+
         const subscriptions = [];
         detach = () => {
             for (const off of subscriptions.splice(0)) {
@@ -182,10 +282,10 @@ export function createDelegationExtension(
                 request.reply(undefined);
             }
         });
-        subscribe("specpi:guard-policy-changed", () => controller.invalidate("guard policy changed"));
+        subscribe("specpi:guard-policy-changed", () => invalidate("guard policy changed"));
         subscribe("specpi:task-contract-changed", (event) => {
             if (event?.digest !== event?.previousDigest) {
-                controller.invalidate("task contract changed");
+                invalidate("task contract changed");
             }
         });
         let scopeBinding;
@@ -196,22 +296,24 @@ export function createDelegationExtension(
                 taskStale: event?.taskStale,
             });
             if (scopeBinding !== undefined && scopeBinding !== next) {
-                controller.invalidate("workflow scope changed");
+                invalidate("workflow scope changed");
             }
 
             scopeBinding = next;
         });
-        for (const event of [
-            "session_before_switch",
-            "session_before_fork",
-            "session_before_tree",
-            "session_tree",
-            "model_select",
-            "thinking_level_select",
-        ]) {
+        for (const event of ["session_before_switch", "session_before_fork", "session_before_tree", "session_tree"]) {
             pi.on(event, () => {
                 if (isBound()) {
-                    controller.invalidate(event);
+                    invalidate(event);
+                }
+            });
+        }
+
+        for (const event of ["model_select", "thinking_level_select"]) {
+            pi.on(event, async (_event, ctx) => {
+                await refreshSelection(ctx);
+                if (isBound() && requested && pauseReason) {
+                    ctx.ui.notify(`Delegation paused: ${pauseReason}`, "warning");
                 }
             });
         }
@@ -224,21 +326,22 @@ export function createDelegationExtension(
             currentContext = ctx;
             prepareContext(ctx, true);
             toolsReady = true;
-            controller.invalidate("session started or resources reloaded");
+            invalidate("session started or resources reloaded");
         });
         pi.on("session_shutdown", () => {
             if (!isBound()) {
                 return;
             }
 
-            controller.invalidate("session shutdown");
+            invalidate("session shutdown");
             prepareContext(undefined, true);
             detach();
             currentContext = undefined;
             toolsReady = false;
             bindingEpoch += 1;
         });
-        pi.on("before_agent_start", () => {
+        pi.on("before_agent_start", async (_event, ctx) => {
+            await refreshSelection(ctx);
             if (isBound() && controller.status().enabled) {
                 return {
                     message: {
@@ -275,23 +378,27 @@ export function createDelegationExtension(
                             throw new Error("Delegation activation requires a human interactive command");
                         }
 
-                        prepareContext(ctx);
-                        const host = getHost();
-                        await host?.ready?.();
-                        if (!isBound() || getHost() !== host) {
+                        requested = true;
+                        requestedGuard = getGuard();
+                        await refreshSelection(ctx);
+                        if (!isBound() || !requested) {
                             throw new Error(
                                 "Pi changed during delegation setup; enable delegation in the current session",
                             );
                         }
 
-                        const state = controller.enable();
+                        const state = controller.status();
+                        if (!state.enabled) {
+                            throw new Error(pauseReason ?? "Delegation model setup is still pending.");
+                        }
+
                         syncActiveTool(true);
                         ctx.ui.notify(
                             `Delegation enabled: Pi child sessions for review and scout, ${state.model.provider}/${state.model.id}, thinking ${state.model.thinkingLevel ?? "Pi configured"}. At most 2 workers, 4 batches and 32 SDK inference calls per Pi process; 120 seconds per job. Workers see only supplied text and selected snapshots. Pi owns configured authentication; temporary parent provider/auth overrides and parent hooks are not inherited. No shell, edits, recursion, automatic retries or compaction. /delegate off cancels workers; SDK requests still settling retain their slots. These limits do not guarantee remote termination or a billing cap.`,
                             "info",
                         );
                     } else if (action === "off") {
-                        controller.invalidate("disabled by human");
+                        invalidate("disabled by human");
                         ctx.ui.notify(
                             "Delegation disabled. Existing requests are aborted; budgets remain consumed.",
                             "info",
@@ -304,7 +411,7 @@ export function createDelegationExtension(
                         });
                         ctx.ui.notify("Batch cancelled. Provider settlement may still be pending.", "info");
                     } else if (["status", "limits"].includes(action)) {
-                        ctx.ui.notify(JSON.stringify(controller.status(), null, 2), "info");
+                        ctx.ui.notify(JSON.stringify(status(), null, 2), "info");
                     } else {
                         throw new Error("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
                     }
@@ -327,7 +434,8 @@ export function createDelegationExtension(
 
                     currentContext = ctx;
                     prepareContext(ctx);
-                    const output = await controller.execute(input, signal);
+                    const result = await controller.execute(input, signal);
+                    const output = input.operation === "status" ? status() : result;
 
                     return { content: [{ type: "text", text: JSON.stringify(output) }], details: output };
                 } catch (error) {

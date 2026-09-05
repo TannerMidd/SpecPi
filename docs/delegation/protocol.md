@@ -217,6 +217,14 @@ maximum. These are experiment limits, not research-derived optimal values.
 Human off/on, task changes,
 branch navigation, model selection, guard changes and reloads revoke old generations;
 they do not create a new resource allowance. Normal parent turns do not revoke a job.
+Model and thinking selections retain the human's activation choice. The extension
+preflights the latest selected host and resumes dispatch automatically, without
+replaying old jobs. Unsupported selections pause dispatch and report `pauseReason`;
+a compatible selection resumes it. Status exposes `requested`, `updating` and
+`pauseReason` alongside the controller's `enabled` flag. Concurrent notifications
+for the same host share setup, and a late setup cannot overwrite a newer selection,
+explicit off command, Guard revocation or session change. A turn-start refresh also
+catches a changed host before the next parent turn.
 The canonical working root remains fixed for that process. Restart Pi to change the
 root or load a new delegation runtime version. There is no retry on process restart
 and no durable worker queue. Completed reports retain their original source bindings

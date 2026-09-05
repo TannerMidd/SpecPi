@@ -188,7 +188,7 @@ async function configuredServer() {
                 id: `chatcmpl-fixture-${state.requests.length}`,
                 object: "chat.completion.chunk",
                 created: 1,
-                model: MODEL,
+                model: body.model,
                 choices,
                 ...(usage ? { usage } : {}),
             });
@@ -212,7 +212,10 @@ async function configuredServer() {
     state.url = `http://127.0.0.1:${address.port}/v1`;
     const modelsPath = path.join(process.env.PI_CODING_AGENT_DIR!, "models.json");
     const models = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
-    models.providers[PROVIDER].baseUrl = state.url;
+    for (const provider of Object.values(models.providers) as any[]) {
+        provider.baseUrl = state.url;
+    }
+
     fs.writeFileSync(modelsPath, JSON.stringify(models));
     state.release = () => {
         for (const item of state.held) {
@@ -473,6 +476,79 @@ export default async function nativeEntryFixture(pi: any) {
             return;
         }
 
+        if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "model-selection") {
+            try {
+                await guard.commands.get("guard").handler("strict", ctx);
+                await tools.command("on");
+                assert.equal((await tools.status()).enabled, true, JSON.stringify(notices));
+                const first = await tools.execute({
+                    operation: "run",
+                    requestId: "original",
+                    packet: packet([job("j1", "Read the source", "scout", ["fixture.md"])]),
+                });
+                await finishBatch(tools, first);
+                assert.equal(server.requests.length, 2);
+                const next = ctx.modelRegistry.find("specpi-native-next-fixture", "native-next");
+                assert.ok(next);
+                const switching = fixtureContext(actual, notices, approvals, async () => {
+                    assert.equal(await pi.setModel(next), true);
+
+                    return "Allow once";
+                });
+                const denied = await guard.emit(
+                    "tool_call",
+                    {
+                        toolName: "delegate",
+                        toolCallId: "old-model-approval",
+                        input: { operation: "run", requestId: "old-approval", packet: packet() },
+                    },
+                    switching,
+                );
+                assert.ok(
+                    denied.some((entry: any) => entry?.block),
+                    JSON.stringify(denied),
+                );
+                assert.equal(server.requests.length, 2);
+                const selected = await tools.status();
+                assert.equal(selected.enabled, true, JSON.stringify(notices));
+                assert.equal(selected.requested, true);
+                assert.equal(selected.model.provider, next.provider);
+                assert.equal(selected.model.id, next.id);
+                assert.equal(pi.getActiveTools().includes("delegate"), true);
+                assert.equal((await tools.raw({ operation: "collect", batchId: first.batchId })).isError, true);
+                const second = await tools.execute({ operation: "run", requestId: "new-provider", packet: packet() });
+                await finishBatch(tools, second);
+                assert.equal(server.requests[2].body.model, next.id);
+                assert.equal(server.requests[2].authenticated, true);
+                pi.setThinkingLevel("low");
+                await waitFor(async () => {
+                    const state = await tools.status();
+
+                    return state.enabled && state.model?.thinkingLevel === "low";
+                }, "thinking selection refresh");
+                const third = await tools.execute({ operation: "run", requestId: "new-thinking", packet: packet() });
+                await finishBatch(tools, third);
+                assert.equal(server.requests[3].body.model, next.id);
+                assert.equal(server.requests[3].body.reasoning_effort, "low");
+                const final = await tools.status();
+                assert.equal(final.sessionCalls, 4);
+                assert.equal(final.sessionBatches, 3);
+                await tools.command("off");
+                assert.equal(await pi.setModel(ctx.modelRegistry.find(PROVIDER, MODEL)), true);
+                assert.equal((await tools.status()).enabled, false);
+                assert.equal((await tools.status()).requested, false);
+                assert.equal(pi.getActiveTools().includes("delegate"), false);
+                assert.deepEqual(server.errors, []);
+                console.log(
+                    `NATIVE_MODEL_SELECTION_FIXTURE=${JSON.stringify({ providerModelFollowed: true, thinkingFollowed: true, staleApprovalRejected: true, offPreserved: true, calls: final.sessionCalls, batches: final.sessionBatches })}`,
+                );
+            } finally {
+                await active.emit("session_shutdown", { reason: "fixture cleanup" }, ctx);
+            }
+
+            return;
+        }
+
         if (["guard-absent", "guard-off"].includes(process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "")) {
             const mode = process.env.SPECPI_NATIVE_FIXTURE_MODE === "guard-off" ? "off" : "absent";
             try {
@@ -684,10 +760,10 @@ export default async function nativeEntryFixture(pi: any) {
         }
     };
 
-    if (["guard-absent", "guard-off"].includes(process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "")) {
+    if (["guard-absent", "guard-off", "model-selection"].includes(process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "")) {
         // Exercise activation after startup through the public command lifecycle.
-        pi.registerCommand("native-fixture-optional-guard", {
-            description: "Exercise native delegation with an optional Command Guard",
+        pi.registerCommand("native-fixture-command", {
+            description: "Exercise native delegation through a public Pi command",
             handler: (args: string, ctx: any) => executeFixture({}, ctx),
         });
     } else {

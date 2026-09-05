@@ -83,6 +83,15 @@ counters or free requests that are still settling. The same in-memory controller
 in use; restart Pi to load changed runtime code. Normal conversation leaf advancement
 does not invalidate workers.
 
+Once enabled, delegation follows changes to the parent's provider, model and thinking
+level without another `/delegate on`. Each change revokes old worker results, retains
+unsettled slots and consumed quotas, and checks the new host before resuming dispatch.
+Old jobs are not retried. An unsupported selection pauses delegation with a reason;
+selecting a compatible model resumes it automatically. `/delegate off` remains off
+through later model changes. Guard, task/scope and session lifecycle changes still
+revoke activation. Status separates the user's `requested` choice from `enabled`
+dispatch, with `updating` and `pauseReason` for model setup.
+
 While delegation is off, its tool is removed from the parent's active tool list.
 The command remains available, but the delegation tool schema is included in model
 requests only after activation. Other active tools are preserved.

@@ -541,6 +541,12 @@ npm run check</code></pre>
                         Strict approvals and explicit locks still apply. Delegation enforces its own read-only tools
                         and resource limits.
                     </p>
+                    <p>
+                        Once enabled, delegation follows the parent's provider, model and thinking level without
+                        another toggle. A change revokes old results and checks the new host before dispatch resumes.
+                        Unsupported selections pause with a reason; a compatible selection resumes automatically.
+                        Quotas and settling slots remain consumed. Explicit <code>/delegate off</code> stays off.
+                    </p>
                     <p class="doc-boundary">
                         <strong>SDK boundary.</strong> Pi runs the model/tool loop; SpecPi admits every SDK invocation
                         before dispatch and checks SDK-visible streaming. Provider/session retries and compaction are
