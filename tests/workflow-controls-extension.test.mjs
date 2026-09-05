@@ -1,42 +1,24 @@
 import assert from "node:assert/strict";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { runPiFixture } from "../scripts/pi-test-harness.mjs";
 
 const fixture = path.resolve("tests/fixtures/workflow-controls-harness.ts");
 
-function quoteWindows(value) {
-    return `"${String(value).replaceAll("%", "%%").replaceAll('"', '""')}"`;
-}
-
 test("workflow-controls extension composes scope and completion challenge lifecycle", (context) => {
-    const args = ["--offline", "--no-extensions", "--no-skills", "-e", fixture, "--list-models"];
-    const result =
-        process.platform === "win32"
-            ? spawnSync(["pi.cmd", ...args].map(quoteWindows).join(" "), {
-                  cwd: process.cwd(),
-                  env: { ...process.env, PI_OFFLINE: "1" },
-                  encoding: "utf8",
-                  timeout: 120000,
-                  shell: process.env.ComSpec || "cmd.exe",
-              })
-            : spawnSync("pi", args, {
-                  cwd: process.cwd(),
-                  env: { ...process.env, PI_OFFLINE: "1" },
-                  encoding: "utf8",
-                  timeout: 120000,
-              });
-    if (result.error?.code === "ENOENT") {
-        context.skip("Pi is not available for the extension harness");
+    const result = runPiFixture(fixture);
+    if (result.unavailable) {
+        context.skip(result.error?.message ?? "Pi is not available for the extension harness");
 
         return;
     }
 
     assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
-    const match = result.stdout.match(/WORKFLOW_CONTROLS_HARNESS=(.+)/u);
-    assert.ok(match, result.stdout);
+    const output = `${result.stdout}\n${result.stderr}`;
+    const match = output.match(/WORKFLOW_CONTROLS_HARNESS=(.+)/u);
+    assert.ok(match, output);
     const report = JSON.parse(match[1]);
-    assert.deepEqual(report.commands, ["challenge", "experiment", "guard", "scope"]);
+    assert.deepEqual(report.commands, ["challenge", "experiment", "guard", "scope", "task"]);
     assert.equal(report.toolRegistered, true);
     assert.equal(report.nestedCwdOutOfScopeDenied, true);
     assert.equal(report.nestedCwdInScopeAllowed, true);
@@ -49,6 +31,43 @@ test("workflow-controls extension composes scope and completion challenge lifecy
     assert.equal(report.challengeTerminated, true);
     assert.equal(report.challengeVerdict, "incomplete");
     assert.equal(report.staleChallengeRejected, true);
+    for (const observation of [
+        "genericChallengeTriggered",
+        "legacyReviewInvalidated",
+        "genericActiveReviewInvalidated",
+        "taskImportPreservedPending",
+        "taskImportBoundDigest",
+        "taskChallengeExactIds",
+        "taskChallengeRequiresDigest",
+        "handoffRendered",
+        "handoffDidNotTriggerTurn",
+        "taskRevisionKeepsId",
+        "taskRevisionChangedDigest",
+        "taskRevisionInvalidatedReview",
+        "taskScopeReportedStale",
+        "taskReimportUpdatedDigest",
+        "taskRevisionEmittedStaleImmediately",
+        "taskClearEmittedStaleImmediately",
+        "malformedTaskChallengeBlocked",
+        "malformedTaskRendererSafe",
+        "stickyChallengeIndeterminate",
+        "stickyReadyRejected",
+        "scopeRecheckClearedUncertainty",
+        "handoffStickyUncertainty",
+        "treeClearedChallengeBeforeRoot",
+        "treeOldStateCleared",
+        "treeOlderRestoreIgnored",
+        "treeArmedGenericChallengeCleared",
+        "treeDelayedChallengeRootIgnored",
+        "treeDelayedChallengeSnapshotIgnored",
+        "treeDelayedTaskEditorIgnored",
+        "treeDelayedHandoffIgnored",
+        "treeDelayedRecheckIgnored",
+        "shutdownDelayedChallengeIgnored",
+    ]) {
+        assert.equal(report[observation], true, observation);
+    }
+
     assert.equal(report.acceptClearedPending, true);
     assert.equal(report.acceptKeptScope, true);
     assert.equal(report.addWidenedScope, true);

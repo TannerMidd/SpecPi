@@ -2,9 +2,24 @@
   padding-bottom: 0;
 }
 
+.wiki-sidebar {
+  max-height: calc(100dvh - var(--header-height));
+  overflow-y: auto;
+}
+
+.wiki-sidebar nav a {
+  min-height: 2.375rem;
+  line-height: 1.5;
+}
+
+.wiki-sidebar nav a:hover span,
+.wiki-sidebar nav a:focus-visible span {
+  color: var(--accent);
+}
+
 .wiki-intro {
-  max-width: 43.75rem;
-  padding-block: 3.25rem 2.375rem;
+  max-width: 47.5rem;
+  padding-block: clamp(3rem, 6vw, 4.5rem) 2.75rem;
 }
 
 .wiki-intro .eyebrow {
@@ -13,24 +28,40 @@
 
 .wiki-intro h1 {
   margin-bottom: 1.125rem;
-  font-size: 2.125rem;
+  font-size: clamp(2.25rem, 4vw, 3.125rem);
 }
 
-.wiki-intro > p:last-child {
-  margin: 0;
+.wiki-summary {
+  max-width: 36rem;
+  margin-bottom: 1.5rem;
+  color: var(--text);
+  font-size: 1.125rem;
+  line-height: 1.65;
+}
+
+.wiki-release-note {
+  max-width: 40rem;
+  margin-bottom: 0;
   color: var(--text-soft);
-  font-size: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+}
+
+.wiki-release-note a {
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.2em;
 }
 
 .doc-section {
-  max-width: 45rem;
-  padding-block: 2.125rem;
+  max-width: 47.5rem;
+  padding-block: 2.75rem;
   border-top: 1px solid var(--line);
 }
 
 .doc-section > header {
   display: flex;
-  margin-bottom: 1rem;
+  margin-bottom: 1.375rem;
   align-items: baseline;
   gap: 0.9375rem;
 }
@@ -42,11 +73,12 @@
 }
 
 .doc-section h2 {
-  font-size: 1.0625rem;
+  font-size: 1.25rem;
+  line-height: 1.4;
 }
 
 .doc-section h3 {
-  margin: 1.75rem 0 0.75rem;
+  margin: 2rem 0 0.75rem;
   color: var(--bright);
   font: 600 0.9375rem var(--mono);
 }
@@ -55,8 +87,13 @@
 .step-list p,
 .security-list p {
   color: var(--text-soft);
-  font-size: 0.9375rem;
-  line-height: 1.68;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.doc-section > p {
+  max-width: 43rem;
+  margin-bottom: 1.375rem;
 }
 
 .doc-section > p:last-child {
@@ -64,8 +101,9 @@
 }
 
 .doc-section code {
-  color: #d6dce6;
-  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  color: var(--bright);
+  font-size: 0.875em;
 }
 
 .doc-terminal {
@@ -73,45 +111,57 @@
 }
 
 .doc-terminal pre {
-  color: #e9edf4;
+  color: var(--bright);
+  font-size: 0.8125rem;
+}
+
+.doc-terminal pre code {
+  overflow-wrap: normal;
+  font-size: inherit;
+}
+
+.doc-terminal .terminal-bar.secondary {
+  border-top: 1px solid var(--line);
 }
 
 .definition-list {
+  margin-block: 1.5rem;
   border-top: 1px solid var(--line);
   font-family: var(--mono);
 }
 
 .definition-list > div {
   display: grid;
-  padding: 0.6875rem 0;
+  padding: 1rem 0;
   grid-template-columns: 6.875rem minmax(0, 1fr);
-  gap: 1.125rem;
+  gap: 1.5rem;
+  align-items: baseline;
   border-bottom: 1px solid var(--line-soft);
 }
 
 .definition-list code {
-  color: #e9edf4;
+  color: var(--bright);
   font-size: 0.8125rem;
 }
 
 .definition-list span {
   color: var(--text-soft);
-  font: 0.90625rem/1.55 var(--sans);
+  font: 0.9375rem/1.65 var(--sans);
 }
 
 .definition-list.wide-keys > div {
-  grid-template-columns: 12rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
 }
 
 .command-reference > div {
-  grid-template-columns: 15.625rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
 }
 
 .step-list {
   display: grid;
   margin: 0;
   padding: 0;
-  gap: 0.75rem;
+  gap: 1.125rem;
   list-style: none;
 }
 
@@ -139,7 +189,7 @@
 
 .doc-boundary {
   margin-top: 1.25rem !important;
-  padding: 0.875rem 1rem;
+  padding: 1rem 1.25rem;
   color: var(--text-soft) !important;
   border-left: 2px solid var(--line-strong);
   background: var(--surface);
@@ -149,6 +199,10 @@
 .doc-boundary strong {
   color: #e9edf4;
   font-weight: 500;
+}
+
+.release-boundary {
+  border-left-color: var(--accent);
 }
 
 .key-list {
@@ -190,13 +244,42 @@ kbd {
   font-size: 0.85em;
 }
 
+@media (min-width: 761px) and (max-width: 1060px) {
+  .definition-list.wide-keys > div,
+  .command-reference > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.375rem;
+  }
+}
+
 @media (max-width: 760px) {
+  .wiki-sidebar {
+    max-height: none;
+    padding-block: 0.875rem;
+  }
+
+  .wiki-sidebar > p {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.625rem;
+  }
+
   .wiki-sidebar nav {
     width: max-content;
+    gap: 1.5rem;
+  }
+
+  .wiki-sidebar nav a {
+    min-height: 2.75rem;
+    align-items: center;
   }
 
   .wiki-intro {
-    padding-top: 2.75rem;
+    padding-block: 2.5rem;
+  }
+
+  .doc-section {
+    padding-block: 2.25rem;
   }
 }
 
@@ -206,11 +289,5 @@ kbd {
   .command-reference > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.375rem;
-  }
-}
-
-@media (max-width: 520px) {
-  .wiki-intro h1 {
-    font-size: 1.875rem;
   }
 }

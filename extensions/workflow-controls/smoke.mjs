@@ -14,6 +14,12 @@ import {
     inspectRepository,
 } from "./experiments.mjs";
 import { validateChallengeSubmission } from "./challenge.mjs";
+import {
+    TASK_CONTRACT_ENTRY,
+    createTaskContract,
+    readTaskContract,
+    taskContractScopeViolations,
+} from "./task-contract.mjs";
 
 function run(command, args, options = {}) {
     const result = spawnSync(command, args, {
@@ -170,6 +176,51 @@ async function challengeSmoke() {
     return "completion-challenge-smoke passed: structured readiness and deterministic rejection gates verified";
 }
 
+async function taskContractSmoke() {
+    const root = repositoryFixture("specpi-task-contract-smoke-");
+    try {
+        const contract = createTaskContract(
+            {
+                objective: "Keep a bounded task card",
+                requirements: [
+                    { id: "R1", description: "Render the objective", acceptance: "The card is visible" },
+                    { id: "R2", description: "Keep paths explicit", acceptance: "Only declared paths are imported" },
+                ],
+                paths: ["src/"],
+                nonGoals: ["No automatic scope expansion"],
+            },
+            { root, origin: "human" },
+        );
+        const setEntry = {
+            type: "custom",
+            customType: TASK_CONTRACT_ENTRY,
+            data: { kind: "set", contract },
+        };
+        const restored = readTaskContract([setEntry], root);
+        assert.deepEqual(restored, contract);
+        assert.deepEqual(taskContractScopeViolations(contract, ["src/inside.txt", "outside.txt"]), ["outside.txt"]);
+        assert.equal(readTaskContract([setEntry, { ...setEntry, data: { kind: "cleared" } }], root), undefined);
+        assert.throws(
+            () =>
+                createTaskContract(
+                    {
+                        objective: "unsafe",
+                        hypothesis: "The bounded card is safe",
+                        requirements: [{ description: "r", acceptance: "a" }],
+                        paths: ["."],
+                        rollback: "Clear the card",
+                    },
+                    { root, origin: "improvement", gapId: "gap", selectionId: "selection" },
+                ),
+            /project root/,
+        );
+
+        return "task-contract-smoke passed: canonical digest, branch clear, scope boundary, and improvement path gates verified";
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+}
+
 export async function runWorkflowControlsSmoke(name) {
     if (name === "scope-drift-monitor-smoke") {
         return scopeSmoke();
@@ -181,6 +232,10 @@ export async function runWorkflowControlsSmoke(name) {
 
     if (name === "completion-challenge-smoke") {
         return challengeSmoke();
+    }
+
+    if (name === "task-contract-smoke") {
+        return taskContractSmoke();
     }
 
     throw new Error(`Unknown workflow-controls smoke: ${name}`);

@@ -30,6 +30,8 @@ import {
     renderChallengeMarkdown,
     validateChallengeSubmission,
 } from "../extensions/workflow-controls/challenge.mjs";
+import { markdownPathLabel } from "../extensions/workflow-controls/task-contract.mjs";
+import { runWorkflowControlsSmoke } from "../extensions/workflow-controls/smoke.mjs";
 
 function run(command, args, options = {}) {
     const result = spawnSync(command, args, {
@@ -111,6 +113,128 @@ test("scope entries are bounded project-relative exact files and directory prefi
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
         fs.rmSync(outside, { recursive: true, force: true });
+    }
+});
+
+test("scope mutation paths accept project root aliases without admitting outside targets", (context) => {
+    const temporaryRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-scope-alias-test-")));
+    const root = path.join(temporaryRoot, "repo");
+    const rootAlias = path.join(temporaryRoot, "repo-alias");
+    const outside = path.join(temporaryRoot, "outside");
+    const escapeLink = path.join(root, "escape");
+    try {
+        fs.mkdirSync(path.join(root, "packages", "app", "src"), { recursive: true });
+        fs.mkdirSync(outside);
+        fs.writeFileSync(path.join(root, "packages", "app", "src", "existing.txt"), "fixture\n");
+        try {
+            fs.symlinkSync(root, rootAlias, process.platform === "win32" ? "junction" : "dir");
+            fs.symlinkSync(outside, escapeLink, process.platform === "win32" ? "junction" : "dir");
+        } catch (error) {
+            if (error?.code !== "EPERM" && error?.code !== "EACCES") {
+                throw error;
+            }
+
+            context.skip("Directory aliases are unavailable on this filesystem");
+
+            return;
+        }
+
+        const nestedCwd = path.join(rootAlias, "packages", "app");
+        const entries = normalizeScopeEntries(root, ["packages/app/src/"]);
+        for (const input of ["src/new/deep.txt", path.join(nestedCwd, "src", "new", "deep.txt")]) {
+            const mutation = relativeMutationPath(root, input, { cwd: nestedCwd });
+            assert.equal(mutation, "packages/app/src/new/deep.txt");
+            assert.equal(scopeMatches(entries, mutation), true);
+            assert.equal(scopeMatches(normalizeScopeEntries(root, ["src/"]), mutation), false);
+        }
+
+        assert.equal(
+            relativeMutationPath(root, path.join(nestedCwd, "src", "existing.txt")),
+            "packages/app/src/existing.txt",
+        );
+        assert.throws(() => relativeMutationPath(root, "../outside/new.txt", { cwd: rootAlias }), /escapes/);
+        assert.throws(() => relativeMutationPath(root, "escape/new.txt", { cwd: rootAlias }), /symlink/);
+        assert.throws(() => relativeMutationPath(root, path.join(escapeLink, "new.txt")), /symlink/);
+        assert.throws(() => relativeMutationPath(root, "new.txt", { cwd: path.join(outside, "missing") }), /escapes/);
+        for (const input of [undefined, "", "bad\u0000path"]) {
+            assert.throws(() => relativeMutationPath(root, input, { cwd: nestedCwd }), /non-empty text/);
+        }
+    } finally {
+        fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+});
+
+test("scope mutation paths preserve lexical traversal and labels beneath in-root aliases", (context) => {
+    const temporaryRoot = fs.realpathSync.native(
+        fs.mkdtempSync(path.join(os.tmpdir(), "specpi-scope-traversal-test-")),
+    );
+    const root = path.join(temporaryRoot, "repo");
+    const rootAlias = path.join(temporaryRoot, "repo-alias");
+    const subdirAlias = path.join(temporaryRoot, "subdir-alias");
+    const outside = path.join(temporaryRoot, "outside");
+    const alias = path.join(root, "alias");
+    try {
+        fs.mkdirSync(path.join(root, "allowed", "deep"), { recursive: true });
+        fs.mkdirSync(outside);
+        fs.writeFileSync(path.join(root, "secret.txt"), "fixture\n");
+        try {
+            for (const [target, link] of [
+                [path.join(root, "allowed", "deep"), alias],
+                [root, rootAlias],
+                [path.join(root, "allowed", "deep"), subdirAlias],
+                [root, path.join(root, "back")],
+                [outside, path.join(root, "allowed", "deep", "escape")],
+            ]) {
+                fs.symlinkSync(target, link, process.platform === "win32" ? "junction" : "dir");
+            }
+        } catch (error) {
+            if (error?.code !== "EPERM" && error?.code !== "EACCES") {
+                throw error;
+            }
+
+            context.skip("Directory aliases are unavailable on this filesystem");
+
+            return;
+        }
+
+        for (const base of [root, rootAlias]) {
+            const cwd = path.join(base, "alias");
+            // Pi write/edit tools call path.resolve on the original cwd before following filesystem links.
+            const actualTarget = path.resolve(cwd, "../secret.txt");
+            assert.equal(actualTarget, path.join(base, "secret.txt"));
+            const traversal = relativeMutationPath(root, "../secret.txt", { cwd });
+            assert.equal(traversal, "secret.txt");
+            assert.equal(scopeMatches(normalizeScopeEntries(root, ["allowed/"]), traversal), false);
+            assert.equal(scopeMatches(normalizeScopeEntries(root, ["secret.txt"]), traversal), true);
+
+            for (const input of ["new/deep.txt", path.join(cwd, "new", "deep.txt")]) {
+                const aliasedPath = relativeMutationPath(root, input, { cwd });
+                assert.equal(aliasedPath, "alias/new/deep.txt");
+                assert.equal(scopeMatches(normalizeScopeEntries(root, ["alias/"]), aliasedPath), true);
+                assert.equal(scopeMatches(normalizeScopeEntries(root, ["allowed/"]), aliasedPath), false);
+            }
+
+            const directPath = relativeMutationPath(root, "allowed/deep/new.txt", { cwd: base });
+            assert.equal(directPath, "allowed/deep/new.txt");
+            assert.equal(scopeMatches(normalizeScopeEntries(root, ["allowed/"]), directPath), true);
+            assert.equal(scopeMatches(normalizeScopeEntries(root, ["alias/"]), directPath), false);
+            for (const label of ["back", "back/back"]) {
+                const returnCwd = path.join(base, label);
+                const returnPath = relativeMutationPath(root, "new.txt", { cwd: returnCwd });
+                assert.equal(returnPath, `${label}/new.txt`);
+                assert.equal(scopeMatches(normalizeScopeEntries(root, [`${label}/`]), returnPath), true);
+                assert.equal(scopeMatches(normalizeScopeEntries(root, ["new.txt"]), returnPath), false);
+            }
+
+            assert.equal(relativeMutationPath(root, "../secret.txt", { cwd: path.join(base, "back") }), "secret.txt");
+            assert.throws(() => relativeMutationPath(root, "../../escape.txt", { cwd }), /escapes/);
+            assert.throws(() => relativeMutationPath(root, "escape/new.txt", { cwd }), /symlink/);
+        }
+
+        assert.throws(() => relativeMutationPath(root, "new.txt", { cwd: subdirAlias }), /escapes/);
+        assert.throws(() => relativeMutationPath(root, path.join(subdirAlias, "new.txt")), /escapes/);
+    } finally {
+        fs.rmSync(temporaryRoot, { recursive: true, force: true });
     }
 });
 
@@ -448,9 +572,18 @@ test("completion challenge facts and rendering stay bounded and explicit", () =>
     const prompt = challengePrompt("generation", facts);
     assert.match(prompt, /Which requirement remains unproven/);
     assert.match(prompt, /Pending scope drift: outside\.txt/);
+    const hostilePath = "evil\nline\u2028format\u202epercent%tick`name.ts";
+    const hostilePrompt = challengePrompt("generation", { changedPaths: [hostilePath] });
+    assert.match(hostilePrompt, new RegExp(`Changed paths: ${markdownPathLabel(hostilePath)}`));
+    assert.doesNotMatch(hostilePrompt, /evil\nline/u);
     const markdown = renderChallengeMarkdown(validateChallengeSubmission(completeSubmission()), {
         generation: "generation",
     });
     assert.match(markdown, /Ready for human review/);
     assert.match(markdown, /not independent verification/);
+});
+
+test("task contract smoke validator covers branch and path controls", async () => {
+    const message = await runWorkflowControlsSmoke("task-contract-smoke");
+    assert.match(message, /^task-contract-smoke passed:/u);
 });

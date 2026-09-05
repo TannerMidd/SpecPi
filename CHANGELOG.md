@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 - 2026-09-04
+
+- Reject shared temporary roots before Pi test launches, ignore generated desktop builds in Git, require the active task digest in card-backed review submissions, and treat unavailable foreign task roots as absent. Keep npm configuration trust assumptions explicit.
+- Resolve equivalent project-root aliases during scope checks while preserving relative-path traversal semantics and rejecting symlink escapes.
+- Refine the README and GitHub Pages with clearer installation guidance, a Pi relationship diagram, responsive reading layouts, and versioned feature guidance. Keep local assets and human-controlled workflow boundaries.
+- Add optional session-branch task contracts shared by the specification view, explicit scope import, experiment cards, completion review, and human-directed review packets. Preserve fixed requirement IDs and reject stale or incomplete card-backed reviews.
+- Bind selected harness improvements to a source checkout, selection generation, and immutable recorded card. Preserve verification policy, restrict test discovery, and verify the supported source inputs before and after executable gates. Retain bounded verification receipts separately from model-reported acceptance evidence.
+- Add explicit local post-retirement outcome feedback, preserve correction history, and distinguish shipped-baseline reviews from the local retirement cohorts used to calculate reopen rates.
+- Preserve valid user theme choices through installation, update, doctor, and uninstall. Explain SpecPi, Pi, model-provider, and browser privacy boundaries without changing upstream preferences.
+- Isolate Pi extension test launches before startup, distinguish a missing runtime from a failing runtime, and extend the pinned package compatibility checks. Exclude generated desktop output from source formatting and linting.
 
 ## 0.10.0 - 2026-09-02
 

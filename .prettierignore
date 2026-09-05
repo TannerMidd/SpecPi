@@ -1,2 +1,4 @@
 node_modules/
 site/vendor/
+desktop/out/
+desktop/dist/
