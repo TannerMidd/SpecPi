@@ -417,7 +417,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
-    assert.equal(manifest.version, "0.11.0");
+    assert.equal(manifest.version, "0.11.1");
     assert.equal(manifest.publishConfig.access, "public");
     assert.equal(manifest.publishConfig.provenance, true);
     assert.equal(manifest.scripts.preinstall, undefined);
@@ -565,7 +565,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /pi install npm:specpi/);
     assert.match(wikiHtml, /\.\/specpi doctor/);
     assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
-    assert.equal(wikiHtml.match(/git clone --branch v0\.11\.0/g)?.length, 2);
+    assert.equal(wikiHtml.match(/git clone --branch v0\.11\.1/g)?.length, 2);
     assert.match(wikiHtml, /npm run check/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
     assert.match(wikiCss, /\.definition-list/);
