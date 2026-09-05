@@ -48,19 +48,19 @@
                     <a href="#development"><span>11</span>Development</a>
                     <a href="#delegation"><span>12</span>Experimental delegation</a>
                 </nav>
-                <div class="index-meta"><span>Reference · v0.12.0</span></div>
+                <div class="index-meta"><span>Reference · v0.13.0</span></div>
             </aside>
 
             <main id="main" class="wiki-content">
                 <header class="wiki-intro" id="overview">
-                    <p class="eyebrow">Documentation / v0.12.0</p>
+                    <p class="eyebrow">Documentation / v0.13.0</p>
                     <h1>Technical reference</h1>
                     <p class="wiki-summary">
                         Install with a plan. Keep one agent focused. Verify the work, then improve the harness from
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.12.0.
+                        Release reference · v0.13.0.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
                         <a href="#delegation">delegation experiment</a> is optional and disabled by default.
@@ -78,17 +78,17 @@
                         that package installed.
                     </p>
                     <div class="terminal doc-terminal">
-                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.12.0</span></div>
+                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.13.0</span></div>
                         <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
                         <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-                        <pre><code>npm install --global specpi@0.12.0</code></pre>
+                        <pre><code>npm install --global specpi@0.13.0</code></pre>
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Linux, macOS, Git Bash</span>
                         </div>
-                        <pre><code>git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.13.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -96,7 +96,7 @@ cd SpecPi
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Windows PowerShell / cmd</span>
                         </div>
-                        <pre><code>git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.13.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
@@ -380,6 +380,18 @@ specpi doctor</code></pre>
                         test interactions, resize across desktop, tablet, and mobile viewports, then capture bounded
                         evidence. Source inspection does not verify rendered appearance.
                     </p>
+                    <p>
+                        Use <code>browser_diagnostics</code> for active-page JavaScript exceptions, console errors,
+                        failed requests, and HTTP errors. Output is bounded and best-effort sanitized, not guaranteed
+                        secret-free. Empty results do not prove application health. Close discards the buffer;
+                        explicit clear discards all retained records, including filtered or unreturned ones.
+                    </p>
+                    <p>
+                        <code>browser_press</code> exercises keys and chords; <code>browser_select_option</code>
+                        selects native dropdown options by value, label, or index; <code>browser_wait_for</code>
+                        waits for an element state, exact text, or exact URL. These tools default to a five-second
+                        deadline (maximum thirty seconds). Refresh snapshot refs after mutations or navigation.
+                    </p>
                     <p class="doc-boundary">
                         <strong>Isolation boundary.</strong> The browser does not attach to a personal Chrome profile,
                         cookies, passwords, or extensions. It runs as a separate process and does not provide
@@ -489,12 +501,18 @@ specpi doctor</code></pre>
                     <div class="terminal doc-terminal">
                         <pre><code>npm install --ignore-scripts --omit=peer --no-package-lock
 npm run format
-npm run check</code></pre>
+npm run check
+npm run setup:browser
+npm run test:browser
+npm run test:site:browser</code></pre>
                     </div>
                     <p>
                         JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one
-                        statement per line. The repository check validates formatting and syntax, runs the Node test
-                        suite, and executes registry-linked validators with isolated prerequisites.
+                        statement per line. The repository check validates formatting and syntax, strictly type-checks
+                        the browser extension, runs the Node test suite, and executes registry-linked validators with
+                        isolated prerequisites. Browser tests use repository-local Chromium and cover the public pages
+                        at desktop, tablet, and mobile sizes. Required CI browser commands reject skipped coverage;
+                        Pages deployment waits for the same rendered check. No visual baseline is automatically created.
                     </p>
                 </section>
                 <section class="doc-section" id="delegation" aria-labelledby="delegation-title">
@@ -549,7 +567,7 @@ npm run check</code></pre>
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.12.0</p>
+            <p>Pi harness / v0.13.0</p>
             <nav aria-label="Footer navigation">
                 <a href="../single-agent/">Architecture</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a

@@ -33,7 +33,7 @@ The published `specpi` npm package declares the Pi host runtime modules its exte
 - `@earendil-works/pi-tui` — terminal component, key, and width primitives
 - `typebox` — the unscoped TypeBox package Pi bundles, used for tool input schemas
 
-They retain their own copyright and license terms. SpecPi never vendors, bundles, or installs them; the Pi host supplies them at extension load time through loader aliases. Pi disables peer resolution for managed package installs, so a peer range would not enforce the host version there. Marking the peers optional also keeps an ordinary npm CLI installation from adding a second copy beside or inside SpecPi. The full managed installation enforces its supported Pi floor through the installer's `MIN_PI_VERSION` compatibility check, and the limited direct Pi mode documents the same host prerequisite.
+They retain their own copyright and license terms. SpecPi never vendors, bundles, or installs them for end users; the Pi host supplies them at extension load time through loader aliases. Repository development additionally pins local copies for type checking and isolated test launches, as listed below. Pi disables peer resolution for managed package installs, so a peer range would not enforce the host version there. Marking the peers optional also keeps an ordinary npm CLI installation from adding a second copy beside or inside SpecPi. The full managed installation enforces its supported Pi floor through the installer's `MIN_PI_VERSION` compatibility check, and the limited direct Pi mode documents the same host prerequisite.
 
 SpecPi also installs these exact browser-runtime packages from the reviewed `browser-runtime/package-lock.json`:
 
@@ -52,7 +52,9 @@ Repository development uses these exact, project-local formatting and linting pa
 - `@typescript-eslint/parser@8.68.0` — MIT
 - `typescript@6.0.3` — Apache-2.0
 
-They are development-only dependencies, are not shipped by the SpecPi installer, and enforce the repository's JavaScript and TypeScript readability rules.
+They are development-only dependencies, are not shipped by the SpecPi installer, and enforce the repository's JavaScript and TypeScript readability rules. TypeScript also runs strict no-emit checking for the browser extension and a bounded semantic-navigation fixture.
+
+Browser type checking and registered-tool tests additionally use exact project-local development dependencies: `@earendil-works/pi-coding-agent@0.84.4`, `@earendil-works/pi-ai@0.84.4`, `@earendil-works/pi-tui@0.84.4` (MIT), `typebox@1.3.7` (MIT), `@types/node@22.20.1` (MIT), and `playwright@1.62.1` (Apache-2.0). These reuse the reviewed Pi/runtime versions, do not alter the optional production-peer contract, and are not bundled or installed by SpecPi. Direct development dependencies are pinned; this is not a claim that the development transitive graph is locked. The browser executable test runtime still uses the separately reviewed lockfile. `setup:browser` provisions only `.specpi-test/browser-runtime/`; its explicit `--with-deps` option invokes Playwright OS dependency setup on disposable Linux CI runners. No language-server executable or additional automation framework was added.
 
 The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mono. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". The font files are distributed under the SIL Open Font License 1.1; the required license text is included at `site/fonts/LICENSE.txt`.
 

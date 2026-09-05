@@ -41,6 +41,7 @@ const requiredFiles = [
     "THIRD_PARTY.md",
     "browser-runtime/package-lock.json",
     "browser-runtime/package.json",
+    "docs/browser-testing.md",
     "docs/delegation/README.md",
     "docs/delegation/design.md",
     "docs/delegation/design-protocol.md",
@@ -48,6 +49,10 @@ const requiredFiles = [
     "docs/delegation/protocol.md",
     "docs/delegation/research.md",
     "extensions/browser/core.mjs",
+    "extensions/browser/core.d.mts",
+    "extensions/browser/diagnostics.ts",
+    "extensions/browser/interactions.ts",
+    "extensions/browser/lifecycle.ts",
     "extensions/browser/index.ts",
     "extensions/browser/smoke.mjs",
     "extensions/command-guard/bash.mjs",
@@ -87,6 +92,9 @@ const requiredFiles = [
     "scripts/lib.mjs",
     "scripts/lock.mjs",
     "scripts/pi-test-harness.mjs",
+    "scripts/run-browser-tests.mjs",
+    "scripts/setup-browser-tests.mjs",
+    "scripts/site-browser.mjs",
     "scripts/specpi.mjs",
     "scripts/verify-artifact.mjs",
     "shell/pi-profiles.sh",
@@ -443,10 +451,10 @@ try {
     assert.equal(packResult.name, sourcePackage.name);
     assert.equal(packResult.version, sourcePackage.version);
     assert.deepEqual(packResult.bundled || [], [], "packed artifact unexpectedly bundles dependencies");
-    assert.ok(packResult.size < 310_000, `packed artifact unexpectedly exceeds 310 KB: ${packResult.size}`);
+    assert.ok(packResult.size < 340_000, `packed artifact unexpectedly exceeds 340 KB: ${packResult.size}`);
     assert.ok(
-        packResult.unpackedSize < 1_300_000,
-        `unpacked artifact unexpectedly exceeds 1.3 MB (including delegation runtime and protocol docs): ${packResult.unpackedSize}`,
+        packResult.unpackedSize < 1_400_000,
+        `unpacked artifact unexpectedly exceeds 1.4 MB (including browser tools and testing documentation): ${packResult.unpackedSize}`,
     );
 
     assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");

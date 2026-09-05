@@ -44,6 +44,7 @@ export const SOURCE_ROOT_FILES = Object.freeze([
     "eslint.config.js",
     "package.json",
     "prettier.config.mjs",
+    "tsconfig.browser.json",
     "specpi",
     "specpi.cmd",
 ]);

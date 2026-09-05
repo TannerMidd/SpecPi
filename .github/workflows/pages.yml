@@ -5,6 +5,15 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "extensions/browser/**"
+      - "browser-runtime/**"
+      - "tests/*browser*"
+      - "tests/site*"
+      - "tests/fixtures/browser*"
+      - "scripts/*browser*"
+      - "package.json"
+      - "tsconfig.browser.json"
+      - ".github/workflows/browser-tests.yml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -16,7 +25,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  rendered-check:
+    uses: ./.github/workflows/browser-tests.yml
+
   deploy:
+    needs: rendered-check
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

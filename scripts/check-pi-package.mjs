@@ -251,6 +251,7 @@ try {
         [
             "--test",
             "--test-reporter=tap",
+            path.join(repoRoot, "tests", "browser-registration.test.mjs"),
             path.join(repoRoot, "tests", "workflow-controls-extension.test.mjs"),
             path.join(repoRoot, "tests", "spec-task-extension.test.mjs"),
             path.join(repoRoot, "tests", "wishlist-verification-extension.test.mjs"),
