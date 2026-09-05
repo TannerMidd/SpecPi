@@ -6,7 +6,9 @@ import test from "node:test";
 import { runPiFixture } from "../scripts/pi-test-harness.mjs";
 
 function runNativeFixture(context, mode = "main") {
-    const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-native-child-")));
+    // Preserve the temp path spelling: the harness resolves both sides consistently,
+    // including Windows runners whose TEMP uses an 8.3 short-name alias.
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-native-child-"));
     const cwd = path.join(root, "project");
     const agentDir = path.join(root, "agent");
     const fixture = path.resolve("tests/fixtures/delegation-native-harness.ts");
