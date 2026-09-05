@@ -8,7 +8,8 @@ import { createTimeoutStore } from "../extensions/delegation/settings.mjs";
 import { LIMITS, timeoutLimits } from "../extensions/delegation/protocol.mjs";
 
 function fixture(t) {
-    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-settings-")));
+    // Match the store's spelling, including Windows short/long TEMP path aliases.
+    const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-settings-")));
     t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
     return { dir, file: path.join(dir, "specpi", "delegation", "settings.json"), store: createTimeoutStore(dir) };
@@ -71,8 +72,10 @@ test("failed backup or settings promotion preserves previous bytes and cleans st
     const previous = fs.readFileSync(file, "utf8");
     const rename = fs.renameSync;
     let rejectedPath;
+    let injectedFailures = 0;
     t.mock.method(fs, "renameSync", (from, to) => {
         if (to === rejectedPath) {
+            injectedFailures += 1;
             throw new Error("synthetic failure");
         }
 
@@ -80,7 +83,9 @@ test("failed backup or settings promotion preserves previous bytes and cleans st
     });
     for (const target of [`${file}.bak`, file]) {
         rejectedPath = target;
+        injectedFailures = 0;
         assert.throws(() => store.save(30), /active timeout is unchanged/);
+        assert.equal(injectedFailures, 1, "the intended promotion must trigger the injected failure");
         assert.equal(fs.readFileSync(file, "utf8"), previous);
         assert.equal(store.load(), 15);
         assert.deepEqual(
