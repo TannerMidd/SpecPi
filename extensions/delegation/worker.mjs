@@ -1,4 +1,5 @@
 import { bytes, LIMITS, record, integer, text, validateResult } from "./protocol.mjs";
+import { DelegationError, publicErrorMessage } from "./errors.mjs";
 
 const object = (properties, required = Object.keys(properties)) => ({
     type: "object",
@@ -62,7 +63,7 @@ export async function runWorker({
     const allowed = new Set(sources.map((source) => source.id));
     const check = () => {
         if (signal.aborted) {
-            throw new Error("Worker cancelled");
+            throw new DelegationError("Worker cancelled");
         }
 
         assertLive();
@@ -75,10 +76,10 @@ export async function runWorker({
         const executeTool = (name, args) => {
             try {
                 continuation.check();
-                snapshot.assertFresh();
+                snapshot.assertBindings();
                 job.toolCalls += 1;
                 if (job.toolCalls > limits.toolCalls || !sources.length) {
-                    throw new Error("Worker tool allowance exhausted");
+                    throw new DelegationError("Worker tool allowance exhausted");
                 }
 
                 let output;
@@ -88,7 +89,7 @@ export async function runWorker({
                 } else if (name === "read_source") {
                     record(args, ["sourceId", "startLine", "maxLines"]);
                     if (!allowed.has(args.sourceId)) {
-                        throw new Error("Source is not selected for this job");
+                        throw new DelegationError("Source is not selected for this job");
                     }
 
                     integer(args.startLine, 1, Number.MAX_SAFE_INTEGER);
@@ -100,13 +101,13 @@ export async function runWorker({
                     integer(args.limit, 1, 20);
                     output = snapshot.search(args.query, args.limit, allowed);
                 } else {
-                    throw new Error("Worker requested an unavailable tool");
+                    throw new DelegationError("Worker requested an unavailable tool");
                 }
 
                 const serialized = JSON.stringify(output);
                 job.toolBytes += bytes(serialized);
                 if (job.toolBytes > limits.toolBytes) {
-                    throw new Error("Worker tool output allowance exhausted");
+                    throw new DelegationError("Worker tool output allowance exhausted");
                 }
 
                 continuation.check();
@@ -115,8 +116,13 @@ export async function runWorker({
             } catch (error) {
                 // Pi normally offers tool errors back to the model. A policy error instead
                 // aborts this job, so it cannot buy another inference or tool attempt.
-                continuation.abort();
-                throw error;
+                try {
+                    continuation.abort();
+                } catch {
+                    // Cancellation is best effort; never expose an SDK error to the child.
+                }
+
+                throw new DelegationError(publicErrorMessage(error));
             }
         };
 
@@ -143,8 +149,8 @@ export async function runWorker({
         job.release = () => {
             if (!continuation.released) {
                 continuation.released = true;
-                handle.release();
                 job.child = undefined;
+                handle.release();
             }
         };
     }
@@ -152,9 +158,9 @@ export async function runWorker({
     const continuation = job.child;
     continuation.check = check;
     continuation.abort = abort;
-    const original = createConversation(packet, job.spec, sources)[0].content[0].text;
     const prompt = newSession
-        ? original + (job.followUpPrompt ? `\n\nChanged-input follow-up:\n${job.followUpPrompt}` : "")
+        ? createConversation(packet, job.spec, sources)[0].content[0].text +
+          (job.followUpPrompt ? `\n\nChanged-input follow-up:\n${job.followUpPrompt}` : "")
         : job.followUpPrompt;
     job.followUpPrompt = undefined;
     check();
@@ -173,7 +179,7 @@ export async function runWorker({
         .map((part) => part.text)
         .join("");
     if (bytes(answer) > limits.resultBytes) {
-        throw new Error("Worker final result exceeds its allowance");
+        throw new DelegationError("Worker final result exceeds its allowance");
     }
 
     return validateResult(JSON.parse(answer), {

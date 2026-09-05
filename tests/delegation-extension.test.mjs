@@ -165,6 +165,91 @@ async function waitFor(predicate, label = "extension state") {
     }
 }
 
+test("SDK setup failures never expose messages, causes or non-Error thrown values", async (t) => {
+    for (const thrown of [
+        new Error("secret-token https://private.example/prompt", { cause: "private cause" }),
+        "secret-token",
+        { message: "secret-token" },
+        null,
+    ]) {
+        const { pi, bridge } = await fixture(t);
+        bridge.host.ready = async () => {
+            throw thrown;
+        };
+
+        await pi.command("on");
+        const paused = await state(pi);
+        assert.equal(paused.enabled, false);
+        assert.equal(paused.requested, true);
+        assert.equal(paused.pauseReason, "Delegation operation failed. Retry after checking Pi configuration.");
+        await pi.command("status");
+        await pi.fire("model_select");
+        assert.doesNotMatch(
+            JSON.stringify({ paused, notices: pi.notices }),
+            /secret-token|private\.example|private cause/,
+        );
+    }
+});
+
+test("unexpected context setup failures are redacted for activation, status and tool calls", async (t) => {
+    const bridge = publicHostBridge();
+    let broken = false;
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        prepareContext() {
+            if (broken) {
+                throw new Error("secret-context canary");
+            }
+        },
+    });
+    const pi = mockPi();
+    factory(pi);
+    await pi.fire("session_start");
+    t.after(() => {
+        broken = false;
+
+        return pi.fire("session_shutdown");
+    });
+    broken = true;
+    await pi.command("on");
+    const failed = await pi.tool({ operation: "status" });
+    assert.equal(failed.isError, true);
+    broken = false;
+    const paused = await state(pi);
+    assert.match(paused.pauseReason, /Delegation operation failed/);
+    assert.doesNotMatch(JSON.stringify({ failed, paused, notices: pi.notices }), /secret-context/);
+});
+
+test("startup setup failures revoke old work, redact SDK errors and allow later activation", async (t) => {
+    const bridge = publicHostBridge();
+    let broken = false;
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        prepareContext(ctx) {
+            if (ctx && broken) {
+                throw new Error("private-startup-canary", { cause: "private-startup-cause" });
+            }
+        },
+    });
+    const pi = mockPi();
+    factory(pi);
+    await pi.fire("session_start");
+    t.after(() => pi.fire("session_shutdown"));
+    await pi.command("on");
+    assert.equal((await state(pi)).enabled, true);
+    broken = true;
+    await pi.fire("session_start");
+    broken = false;
+    const paused = await state(pi);
+    assert.equal(paused.enabled, false);
+    assert.equal(paused.requested, false);
+    assert.match(paused.pauseReason, /Delegation operation failed/);
+    assert.doesNotMatch(JSON.stringify({ paused, notices: pi.notices }), /private-startup/);
+    await pi.command("on");
+    assert.equal((await state(pi)).enabled, true);
+    assert.equal((await state(pi)).pauseReason, null);
+});
+
 test("extension stays off until a human UI command and exposes closed operations", async (t) => {
     const { pi, bridge } = await fixture(t);
     assert.deepEqual([...pi.commands.keys()], ["delegate"]);
@@ -352,7 +437,7 @@ test("an unsupported selected model pauses delegation and a compatible selection
     assert.equal((await state(pi)).enabled, false);
     assert.equal((await state(pi)).requested, true);
     assert.equal((await state(pi)).updating, false);
-    assert.match((await state(pi)).pauseReason, /Unsupported fixture provider/);
+    assert.match((await state(pi)).pauseReason, /Delegation operation failed/);
     assert.equal(bridge.calls(), 0);
     bridge.host = { ...supported, id: "compatible" };
     await pi.fire("model_select");

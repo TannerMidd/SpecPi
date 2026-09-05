@@ -163,8 +163,17 @@ do not count or bound Pi's authentication/OAuth preparation.
 
 The native SDK stream is observed while the child runs. Its response checks are not
 hard bounds on raw transport, hidden provider attempts, billing or process memory.
-Bytes may already be buffered before an SDK event becomes visible. Cost is unavailable;
-missing usage is never represented as zero. This version cannot satisfy a policy
+Bytes may already be buffered before an SDK event becomes visible. Stream checks count
+recognized deltas incrementally; full response validation occurs at content/terminal
+boundaries, before tool execution and before publication. This relies on Pi's parsed
+stream contract, not arbitrary inconsistent partial objects. Cheap lease checks run
+per event; full root, model and provider-policy checks run at protected boundaries.
+The parsed stream allows at most 64 content blocks, 512 structural nodes per partial,
+65,536 events and 130 non-delta boundaries per invocation. These are implementation
+ceilings, not empirically optimal values.
+Cost is unavailable; available token fields are retained even when others are missing.
+Never-reported fields are `null`, and per-field `usageReportedCalls` distinguishes
+partial totals from complete accounting. This version cannot satisfy a policy
 requiring those unsupported guarantees.
 
 Cancellation revokes broker access and requests SDK abort. Slots remain held through
@@ -180,8 +189,11 @@ Snapshots contain only exact selected regular text files under the fixed canonic
 working root of the Pi process. The broker rejects traversal, symlinks/junctions,
 hardlinks, binary content, private path
 names, unknown source IDs, and oversized reads. Each worker can search only its own
-selection. The broker rechecks identity and content when capturing, accessing and
-consuming evidence. Changed source bindings require a fresh batch.
+selection. Capture verifies content digests. Each tool call checks canonical paths,
+file identity and change metadata against the immutable capture, without rereading
+all selected bytes. Publication, collection, follow-up and disposition also recheck
+content digests. Changed source bindings require a fresh batch. A content change that
+evades filesystem metadata is detected at the next digest check, not by each tool call.
 
 This is a trusted-local-filesystem contract, not an operating-system sandbox or an
 atomic filesystem snapshot. Filename restrictions cannot detect secrets embedded in
@@ -196,10 +208,18 @@ Source references are validated for identity and line range; their truth is stil
 verification question for the parent. `accept` records a parent assessment, not human
 approval or verified task completion.
 
-Child conversations use in-memory sessions and are released when their job is disposed
-or reaches its deadline, after active SDK work settles. Snapshots, reports and the bounded
-idempotency journal can remain in memory for the Pi process lifetime, including `/reload`
-and session switches.
+Child conversations use in-memory sessions. A final disposition, cancellation, exhausted
+follow-up or original deadline releases the child; active SDK work retains its slot until
+settlement. Teardown failures do not escape into Pi's event loop. Shared snapshot text
+is destroyed once no job can continue, including failed jobs at their original deadline.
+Packet and job-input references are dropped when owned workers settle. Source metadata
+and digests still validate completed reports after text is destroyed. Starting the next
+accepted batch retires the previous batch's reports; invalidation retires old generations
+after their workers settle. Retired batches cannot be collected or followed up.
+Only bounded state summaries, quota counters and the idempotency journal remain for
+the Pi process lifetime, including `/reload` and session switches. They cannot recreate
+retired work. SDK setup errors are replaced with generic diagnostics before reaching
+status, command notices or model-facing errors; code-owned policy errors stay specific.
 There is no child session database, raw metrics log,
 credential copy, automatic resume, or secure memory-erasure claim. Normal Pi parent
 tool results may be retained in its ordinary session. Turning delegation off does not

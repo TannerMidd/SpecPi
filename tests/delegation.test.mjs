@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDelegationController } from "../extensions/delegation/core.mjs";
+import { createSnapshot } from "../extensions/delegation/snapshot.mjs";
 import { LIMITS, validatePacket } from "../extensions/delegation/protocol.mjs";
 
 const usage = { input: 3, output: 5, cacheRead: 0, cacheWrite: 0 };
@@ -219,6 +220,255 @@ function binding(receipt) {
         ]),
     );
 }
+
+function trackedSnapshot() {
+    let snapshot;
+    let destroyed = 0;
+
+    return {
+        factory(root, paths) {
+            snapshot = createSnapshot(root, paths);
+
+            return {
+                ...snapshot,
+                destroy() {
+                    destroyed += 1;
+                    snapshot.destroy();
+                },
+            };
+        },
+        get snapshot() {
+            return snapshot;
+        },
+        get destroyed() {
+            return destroyed;
+        },
+    };
+}
+
+test("deadline cleanup drops captured text and inputs but keeps verifiable receipts", async (t) => {
+    const root = project(t, { "demo.md": "ordinary selected text" });
+    const tracking = trackedSnapshot();
+    let ownedJob;
+    const value = controller(t, root, hostBridge(), {
+        snapshotFactory: tracking.factory,
+        limits: { jobMs: 250, batchMs: 100 },
+        worker: async ({ job, admitCall }) => {
+            ownedJob = job;
+            admitCall();
+
+            return result();
+        },
+    });
+    value.enable();
+    const initial = await complete(value, packet([{ ...packet().jobs[0], sources: ["demo.md"] }]));
+    assert.equal(tracking.destroyed, 0, "eligible follow-up still owns its inputs");
+    await waitFor(() => tracking.destroyed === 1, "input expiry");
+    assert.deepEqual(ownedJob.spec, { id: "j1" });
+    assert.equal(ownedJob.child, undefined);
+    assert.throws(() => tracking.snapshot.read("s1"), /closed/);
+    const collected = await value.execute({ operation: "collect", batchId: initial.batchId });
+    assert.equal(collected.results[0].result.status, "complete");
+    await assert.rejects(
+        value.execute({
+            operation: "follow_up",
+            requestId: "late",
+            ...binding(collected.results[0].receipt),
+            prompt: "Late input",
+        }),
+        /unavailable/,
+    );
+    fs.writeFileSync(path.join(root, "demo.md"), "different selected text");
+    await assert.rejects(value.execute({ operation: "collect", batchId: initial.batchId }), /source bindings changed/);
+});
+
+test("one resolved sibling cannot destroy another job's follow-up snapshot", async (t) => {
+    const root = project(t, { "demo.md": "shared selected text" });
+    const tracking = trackedSnapshot();
+    const value = controller(t, root, hostBridge(), { snapshotFactory: tracking.factory });
+    value.enable();
+    const original = await complete(
+        value,
+        packet([
+            { ...packet().jobs[0], sources: ["demo.md"] },
+            { ...packet().jobs[0], id: "j2", sources: ["demo.md"] },
+        ]),
+    );
+    const resolve = {
+        operation: "resolve",
+        requestId: "resolve-first",
+        ...binding(original.results[0].receipt),
+        decision: "discard",
+        findings: [],
+    };
+    const first = await value.execute(resolve);
+    assert.equal(tracking.destroyed, 0);
+    assert.equal(tracking.snapshot.read("s1").text, "shared selected text");
+    await value.execute({
+        operation: "follow_up",
+        requestId: "follow-sibling",
+        ...binding(original.results[1].receipt),
+        prompt: "Check the same evidence again",
+    });
+    await waitFor(() => value.status().active === 0);
+    assert.equal(tracking.destroyed, 1, "no further follow-up remains after the second attempt");
+    assert.deepEqual(await value.execute(resolve), first, "replay remains metadata-only and idempotent");
+    const current = await value.execute({ operation: "collect", batchId: original.batchId });
+    await value.execute({
+        operation: "resolve",
+        requestId: "resolve-sibling",
+        ...binding(current.results[1].receipt),
+        decision: "discard",
+        findings: [],
+    });
+    assert.equal(tracking.destroyed, 1);
+});
+
+test("retired batches release content while quotas, summaries and replay fingerprints survive", async (t) => {
+    const root = project(t);
+    const value = controller(t, root, hostBridge(), { limits: { sessionBatches: 2 } });
+    value.enable();
+    const firstInput = { operation: "run", requestId: "first", packet: packet() };
+    const first = await complete(value, firstInput.packet, firstInput.requestId);
+    await value.execute({
+        operation: "resolve",
+        requestId: "discard-first",
+        ...binding(first.results[0].receipt),
+        decision: "discard",
+        findings: [],
+    });
+    const second = await complete(value, packet(), "second");
+    assert.equal(value.status().batches.find((batch) => batch.batchId === first.batchId).retired, true);
+    await assert.rejects(value.execute({ operation: "collect", batchId: first.batchId }), /retired/);
+    await assert.rejects(value.execute(firstInput), /retired/);
+    await assert.rejects(
+        value.execute({ ...firstInput, packet: { ...firstInput.packet, objective: "Changed payload" } }),
+        /different payload/,
+    );
+    await value.execute({ operation: "cancel", requestId: "cancel-second", batchId: second.batchId });
+    value.invalidate();
+    value.enable();
+    assert.equal(value.status().sessionBatches, 2);
+    assert.equal(value.status().sessionCalls, 2);
+    await assert.rejects(value.execute({ operation: "run", requestId: "third", packet: packet() }), /batch limits/);
+});
+
+test("cancellation destroys snapshots without freeing an uncooperative worker's slot", async (t) => {
+    const root = project(t, { "demo.md": "cancelled selected text" });
+    const tracking = trackedSnapshot();
+    const gate = deferred();
+    t.after(() => gate.resolve());
+    let ownedJob;
+    let releases = 0;
+    const value = controller(t, root, hostBridge(), {
+        snapshotFactory: tracking.factory,
+        worker: async ({ job, admitCall }) => {
+            ownedJob = job;
+            admitCall();
+            job.release = () => {
+                releases += 1;
+                throw new Error("private cancellation teardown failure");
+            };
+
+            await gate.promise;
+
+            return result();
+        },
+    });
+    value.enable();
+    const batch = await value.execute({
+        operation: "run",
+        requestId: "cancel-inputs",
+        packet: packet([{ ...packet().jobs[0], sources: ["demo.md"] }]),
+    });
+    value.invalidate();
+    assert.equal(tracking.destroyed, 1);
+    assert.throws(() => tracking.snapshot.read("s1"), /closed/);
+    assert.equal(value.status().active, 1);
+    assert.equal(value.status().sessionCalls, 1);
+    assert.equal(releases, 1);
+    gate.resolve();
+    await waitFor(() => value.status().active === 0);
+    assert.deepEqual(ownedJob.spec, { id: "j1" });
+    assert.equal(value.status().batches.find((item) => item.batchId === batch.batchId).retired, true);
+    assert.equal(tracking.destroyed, 1);
+});
+
+test("throwing and rejecting teardown cannot escape deadline or cancellation cleanup", async (t) => {
+    for (const asyncFailure of [false, true]) {
+        await t.test(asyncFailure ? "rejected teardown" : "synchronous teardown", async (t) => {
+            const root = project(t);
+            const tracking = trackedSnapshot();
+            let releases = 0;
+            let ownedJob;
+            const value = controller(t, root, hostBridge(), {
+                snapshotFactory: tracking.factory,
+                limits: { jobMs: 80 },
+                worker: async ({ job, admitCall }) => {
+                    ownedJob = job;
+                    admitCall();
+                    job.child = { fixture: true };
+                    job.release = () => {
+                        releases += 1;
+                        assert.equal(job.release, undefined);
+                        assert.equal(job.child, undefined);
+                        if (asyncFailure) {
+                            return Promise.reject(new Error("private SDK teardown error"));
+                        }
+
+                        throw new Error("private SDK teardown error");
+                    };
+
+                    return result();
+                },
+            });
+            value.enable();
+            const batch = await complete(value);
+            await waitFor(() => tracking.destroyed === 1, "deadline teardown");
+            assert.equal(releases, 1);
+            assert.equal(ownedJob.release, undefined);
+            assert.equal(value.status().active, 0);
+            await value.execute({ operation: "cancel", requestId: "cancel-after-teardown", batchId: batch.batchId });
+            assert.equal(releases, 1);
+        });
+    }
+});
+
+test("failed attempts still expire retained follow-up inputs under the original timer", async (t) => {
+    const root = project(t);
+    const tracking = trackedSnapshot();
+    const value = controller(t, root, hostBridge(), {
+        snapshotFactory: tracking.factory,
+        limits: { jobMs: 80 },
+        worker: async () => {
+            throw new Error("private failure");
+        },
+    });
+    value.enable();
+    await complete(value);
+    assert.equal(tracking.destroyed, 0);
+    await waitFor(() => tracking.destroyed === 1, "failed-attempt expiry");
+    assert.equal(value.status().active, 0);
+});
+
+test("usage preserves partial token fields and distinguishes unknown values from reported zero", async (t) => {
+    const root = project(t);
+    const value = controller(t, root, hostBridge(), {
+        worker: async ({ admitCall, onUsage }) => {
+            admitCall();
+            onUsage({ input: 3, output: 5 });
+            admitCall();
+            onUsage({ input: 7, output: -1, cacheRead: 0, cacheWrite: NaN });
+
+            return result();
+        },
+    });
+    value.enable();
+    const receipt = (await complete(value)).results[0].receipt;
+    assert.deepEqual(receipt.usage, { input: 10, output: 5, cacheRead: 0, cacheWrite: null });
+    assert.deepEqual(receipt.usageReportedCalls, { input: 2, output: 1, cacheRead: 1, cacheWrite: 0 });
+    assert.equal(receipt.usageComplete, false);
+});
 
 test("controller defaults off, validates closed inputs, and rejects raised ceilings", async (t) => {
     const root = project(t);

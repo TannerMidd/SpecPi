@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { DelegationError } from "./errors.mjs";
 
 const MAX_FILES = 200;
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -82,7 +83,7 @@ const PRIVATE_DIRECTORY = /^(?:\.git|\.pi|\.codex|\.ssh|\.aws|\.azure|\.gnupg)$/
 const DEVICE_NAME = /^(?:con|prn|aux|nul|clock\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i;
 
 function fail(label) {
-    throw new Error(`Snapshot ${label}.`);
+    throw new DelegationError(`Snapshot ${label}.`);
 }
 
 function isPrivate(segment) {
@@ -399,13 +400,14 @@ export function createSnapshot(root, paths, options = {}) {
                 text: "",
                 truncated: false,
             };
+            const lines = [];
+            const overhead = responseBytes(result) - String(result.endLine).length;
+            let textBytes = 0;
             for (let index = startLine - 1; index < requestedEnd; index += 1) {
-                const candidate = {
-                    ...result,
-                    endLine: index + 1,
-                    text: result.text + (index > startLine - 1 ? "\n" : "") + record.lines[index],
-                };
-                if (responseBytes(candidate) > MAX_RESPONSE_BYTES) {
+                // JSON encodes a separator newline as two bytes. Encode each line once,
+                // including escapes and UTF-8, instead of repeatedly encoding its prefix.
+                const nextBytes = textBytes + responseBytes(record.lines[index]) - 2 + (lines.length ? 2 : 0);
+                if (overhead + String(index + 1).length + nextBytes > MAX_RESPONSE_BYTES) {
                     if (index === startLine - 1) {
                         fail("line exceeds response quota");
                     }
@@ -414,8 +416,12 @@ export function createSnapshot(root, paths, options = {}) {
                     break;
                 }
 
-                Object.assign(result, candidate);
+                lines.push(record.lines[index]);
+                textBytes = nextBytes;
+                result.endLine = index + 1;
             }
+
+            result.text = lines.join("\n");
 
             return result;
         },
@@ -446,6 +452,7 @@ export function createSnapshot(root, paths, options = {}) {
             }
 
             const results = [];
+            let resultBytes = 2;
             for (const [id, record] of byId) {
                 if (selectedIds && !selectedIds.has(id)) {
                     continue;
@@ -457,7 +464,8 @@ export function createSnapshot(root, paths, options = {}) {
                     }
 
                     const match = { sourceId: id, line: index + 1, text: line };
-                    if (responseBytes([...results, match]) > MAX_RESPONSE_BYTES) {
+                    const nextBytes = resultBytes + responseBytes(match) + (results.length ? 1 : 0);
+                    if (nextBytes > MAX_RESPONSE_BYTES) {
                         if (results.length === 0) {
                             fail("line exceeds response quota");
                         }
@@ -466,6 +474,7 @@ export function createSnapshot(root, paths, options = {}) {
                     }
 
                     results.push(match);
+                    resultBytes = nextBytes;
                     if (results.length === limit) {
                         return results;
                     }
@@ -474,8 +483,18 @@ export function createSnapshot(root, paths, options = {}) {
 
             return results;
         },
+        assertBindings() {
+            try {
+                for (const record of records) {
+                    if (!bindingEqual(record.original, binding(canonicalRoot, record.relative))) {
+                        fail("source changed");
+                    }
+                }
+            } catch {
+                fail("source unavailable or changed");
+            }
+        },
         assertFresh() {
-            ensureOpen();
             try {
                 for (const record of records) {
                     const bytes = readBoundFile(canonicalRoot, record.relative, record.original, MAX_BYTES);
@@ -504,8 +523,8 @@ export function createSnapshot(root, paths, options = {}) {
                 }
 
                 byId.clear();
-                records.length = 0;
-                canonicalRoot = undefined;
+                // Retain only identity, path and digest metadata for later receipt checks.
+                // Captured text is no longer available after the worker deadline.
                 closed = true;
             }
         },

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createSnapshot } from "./snapshot.mjs";
-import { LIMITS, digest, validateOperation, validatePacket } from "./protocol.mjs";
+import { LIMITS, digest, validateOperation } from "./protocol.mjs";
 import { runWorker } from "./worker.mjs";
+import { DelegationError, publicErrorMessage } from "./errors.mjs";
 
 const terminal = new Set(["complete", "partial", "needs_context", "failed", "cancelled", "expired", "stale"]);
 const quiet = new Set(["cancelled", "expired", "stale"]);
@@ -21,7 +22,7 @@ export function createDelegationController({
             Object.entries(LIMITS).map(([key, maximum]) => {
                 const value = limits[key] ?? maximum;
                 if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
-                    throw new Error("Limits may only lower the fixed delegation ceilings");
+                    throw new DelegationError("Limits may only lower the fixed delegation ceilings");
                 }
 
                 return [key, value];
@@ -34,8 +35,10 @@ export function createDelegationController({
     let enabledGuard;
     let active = 0;
     let totalCalls = 0;
+    let totalBatches = 0;
     let currentBatch;
     const batches = new Map();
+    const history = new Map();
     const requests = new Map();
     const listeners = new Set();
     const changed = () => {
@@ -72,11 +75,11 @@ export function createDelegationController({
         active,
         limits: policy,
         sessionCalls: totalCalls,
-        sessionBatches: batches.size,
+        sessionBatches: totalBatches,
         guard: getGuard() ?? "unavailable",
         model: enabledHost?.model ?? null,
         cost: "unavailable; no invoice cap",
-        batches: [...batches.values()].map(summary),
+        batches: [...[...history.values()].map((item) => structuredClone(item)), ...[...batches.values()].map(summary)],
     });
     const finish = (batch, job, state, result, error) => {
         if (terminal.has(job.state)) {
@@ -88,17 +91,77 @@ export function createDelegationController({
         job.error = error;
         job.revision += 1;
         job.cursor = ++batch.cursor;
-        if (!result) {
-            clearTimeout(job.timer);
-        }
-
         changed();
     };
 
     const releaseJob = (job) => {
-        job.release?.();
+        const release = job.release;
         job.release = undefined;
-        clearTimeout(job.timer);
+        job.child = undefined;
+        try {
+            // Cleanup is best effort, including an unexpected async SDK teardown.
+            // This never releases the slot: original worker settlement owns that.
+            void Promise.resolve(release?.()).catch(() => {});
+        } catch {
+            // Do not expose or retain SDK teardown errors.
+        }
+    };
+
+    const needsInput = (batch, job) =>
+        !batch.retired &&
+        !quiet.has(job.state) &&
+        !job.disposition &&
+        Date.now() < Math.min(job.deadline, batch.deadline) &&
+        (!terminal.has(job.state) || job.followUps < 1);
+
+    const cleanupBatch = (batch) => {
+        if (batch.archived) {
+            return;
+        }
+
+        for (const job of batch.jobs.values()) {
+            if (!needsInput(batch, job)) {
+                if (!terminal.has(job.state)) {
+                    const state = batch.retired ? "stale" : "expired";
+                    finish(batch, job, state, undefined, state);
+                    job.controller?.abort();
+                }
+
+                clearTimeout(job.timer);
+                releaseJob(job);
+                if (!job.settling) {
+                    job.spec = { id: job.spec.id };
+                    job.followUpPrompt = undefined;
+                    job.controller = undefined;
+                }
+            }
+        }
+
+        if ([...batch.jobs.values()].some((job) => needsInput(batch, job))) {
+            return;
+        }
+
+        if (!batch.inputClosed) {
+            batch.inputClosed = true;
+            batch.snapshot.destroy();
+        }
+
+        if ([...batch.jobs.values()].some((job) => job.settling)) {
+            return;
+        }
+
+        batch.packet = undefined;
+        batch.host = undefined;
+        if (batch.retired) {
+            batch.archived = true;
+            history.set(batch.id, { ...summary(batch), retired: true });
+            batches.delete(batch.id);
+            batch.snapshot = undefined;
+            for (const job of batch.jobs.values()) {
+                job.result = undefined;
+                job.disposition = undefined;
+            }
+        }
     };
 
     const cancelJob = (batch, job, state = "cancelled") => {
@@ -114,6 +177,7 @@ export function createDelegationController({
 
         job.controller?.abort();
         releaseJob(job);
+        cleanupBatch(batch);
         changed();
     };
 
@@ -121,6 +185,7 @@ export function createDelegationController({
         enabled = false;
         generation += 1;
         for (const batch of batches.values()) {
+            batch.retired = true;
             for (const job of batch.jobs.values()) {
                 cancelJob(batch, job, "stale");
             }
@@ -133,23 +198,24 @@ export function createDelegationController({
         return { enabled: false, generation, reason };
     };
 
-    const assertLive = (batch) => {
+    const assertLive = (batch, streaming = false) => {
+        const guard = getGuard();
         if (
             !enabled ||
-            !enabledHost?.isCurrent() ||
+            !enabledHost?.isCurrent(streaming) ||
             getHost()?.id !== enabledHost.id ||
-            getGuard() !== enabledGuard ||
-            getGuard() === "locked"
+            guard !== enabledGuard ||
+            guard === "locked"
         ) {
             if (enabled) {
                 invalidate("session, model, or guard changed");
             }
 
-            throw new Error("Delegation is disabled or its host lease is stale");
+            throw new DelegationError("Delegation is disabled or its host lease is stale");
         }
 
         if (batch && batch.generation !== generation) {
-            throw new Error("Delegation result belongs to a stale generation");
+            throw new DelegationError("Delegation result belongs to a stale generation");
         }
     };
 
@@ -161,14 +227,16 @@ export function createDelegationController({
                 cancelJob(batch, job, "stale");
             }
 
-            throw new Error("Selected source bindings changed; create a fresh batch");
+            throw new DelegationError("Selected source bindings changed; create a fresh batch");
         }
     };
 
     const findBatch = (id) => {
         const batch = batches.get(id);
         if (!batch) {
-            throw new Error("Unknown delegation batch");
+            throw new DelegationError(
+                history.has(id) ? "Delegation batch was retired; its generation is stale" : "Unknown delegation batch",
+            );
         }
 
         return batch;
@@ -192,7 +260,7 @@ export function createDelegationController({
             !terminal.has(job.state) ||
             Object.entries(binding(batch, job)).some(([key, value]) => input[key] !== value)
         ) {
-            throw new Error("Delegation receipt is missing or stale");
+            throw new DelegationError("Delegation receipt is missing or stale");
         }
 
         return { batch, job };
@@ -222,15 +290,15 @@ export function createDelegationController({
                 job.settling = true;
                 job.controller = new AbortController();
                 active += 1;
-                const assertJobLive = () => {
-                    assertLive(batch);
+                const assertJobLive = (streaming = false) => {
+                    assertLive(batch, streaming);
                     if (
                         terminal.has(job.state) ||
                         job.controller.signal.aborted ||
                         Date.now() >= job.deadline ||
                         Date.now() >= batch.deadline
                     ) {
-                        throw new Error("Worker lease expired or was revoked");
+                        throw new DelegationError("Worker lease expired or was revoked");
                     }
                 };
 
@@ -252,7 +320,7 @@ export function createDelegationController({
                                     batch.calls >= policy.batchCalls ||
                                     totalCalls >= policy.sessionCalls
                                 ) {
-                                    throw new Error("Delegation model-call allowance exhausted");
+                                    throw new DelegationError("Delegation model-call allowance exhausted");
                                 }
 
                                 job.calls += 1;
@@ -260,20 +328,17 @@ export function createDelegationController({
                                 totalCalls += 1;
                             },
                             onUsage: (usage) => {
-                                const numbers = ["input", "output", "cacheRead", "cacheWrite"].map(
-                                    (key) => usage?.[key],
-                                );
-                                if (numbers.some((number) => !Number.isFinite(number) || number < 0)) {
-                                    job.usageUnknown = true;
-
-                                    return;
+                                for (const key of Object.keys(job.usage)) {
+                                    const number = usage?.[key];
+                                    if (
+                                        Number.isSafeInteger(number) &&
+                                        number >= 0 &&
+                                        Number.isSafeInteger(job.usage[key] + number)
+                                    ) {
+                                        job.usage[key] += number;
+                                        job.usageReportedCalls[key] += 1;
+                                    }
                                 }
-
-                                for (const [index, key] of ["input", "output", "cacheRead", "cacheWrite"].entries()) {
-                                    job.usage[key] += numbers[index];
-                                }
-
-                                job.accountedCalls += 1;
                             },
                         });
                         assertJobLive();
@@ -296,6 +361,7 @@ export function createDelegationController({
                         }
 
                         active -= 1;
+                        cleanupBatch(batch);
                         changed();
                         pump();
                     }
@@ -310,12 +376,19 @@ export function createDelegationController({
         clearTimeout(job.timer);
         job.timer = setTimeout(
             () => {
+                if (Date.now() < Math.min(job.deadline, batch.deadline)) {
+                    armDeadline(batch, job);
+
+                    return;
+                }
+
                 if (terminal.has(job.state) && !job.settling) {
                     releaseJob(job);
                 } else {
                     cancelJob(batch, job, "expired");
                 }
 
+                cleanupBatch(batch);
                 pump();
             },
             Math.max(1, Math.min(job.deadline, batch.deadline) - Date.now()),
@@ -326,15 +399,16 @@ export function createDelegationController({
     const run = (input) => {
         assertLive();
         if (
-            batches.size >= policy.sessionBatches ||
+            totalBatches >= policy.sessionBatches ||
             (currentBatch && [...currentBatch.jobs.values()].some((job) => !quiet.has(job.state) && !job.disposition))
         ) {
-            throw new Error("Finish or cancel the active batch; session batch limits do not reset");
+            throw new DelegationError("Finish or cancel the active batch; session batch limits do not reset");
         }
 
-        const packet = validatePacket(input.packet);
+        // validateOperation already validated and cloned the complete handoff.
+        const packet = input.packet;
         if (packet.jobs.length > policy.batchJobs) {
-            throw new Error("Delegation batch job allowance exhausted");
+            throw new DelegationError("Delegation batch job allowance exhausted");
         }
 
         const paths = [...new Set(packet.jobs.flatMap((job) => job.sources))];
@@ -354,6 +428,7 @@ export function createDelegationController({
             }),
             snapshot,
             host: enabledHost,
+            model: enabledHost.model,
             deadline: now + policy.batchMs,
             calls: 0,
             cursor: 0,
@@ -373,14 +448,19 @@ export function createDelegationController({
                 deadline: now + policy.jobMs,
                 attemptId: randomUUID(),
                 usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-                accountedCalls: 0,
-                usageUnknown: false,
+                usageReportedCalls: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
             };
             batch.jobs.set(spec.id, job);
             armDeadline(batch, job);
         }
 
+        if (currentBatch) {
+            currentBatch.retired = true;
+            cleanupBatch(currentBatch);
+        }
+
         batches.set(batch.id, batch);
+        totalBatches += 1;
         currentBatch = batch;
         pump();
 
@@ -395,7 +475,7 @@ export function createDelegationController({
         if (input.operation === "cancel") {
             const batch = findBatch(input.batchId);
             if (input.jobId && !batch.jobs.has(input.jobId)) {
-                throw new Error("Unknown delegation job");
+                throw new DelegationError("Unknown delegation job");
             }
 
             for (const job of batch.jobs.values()) {
@@ -416,9 +496,9 @@ export function createDelegationController({
                 job.followUps >= 1 ||
                 job.disposition ||
                 quiet.has(job.state) ||
-                Date.now() >= job.deadline
+                Date.now() >= Math.min(job.deadline, batch.deadline)
             ) {
-                throw new Error("Follow-up is unavailable for this receipt");
+                throw new DelegationError("Follow-up is unavailable for this receipt");
             }
 
             job.followUps += 1;
@@ -434,7 +514,7 @@ export function createDelegationController({
         }
 
         if (job.disposition) {
-            throw new Error("This result already has a final parent disposition");
+            throw new DelegationError("This result already has a final parent disposition");
         }
 
         const expected = job.result?.findings.map((finding) => finding.id) ?? [];
@@ -444,14 +524,14 @@ export function createDelegationController({
             new Set(supplied).size !== expected.length ||
             supplied.some((id) => !expected.includes(id))
         ) {
-            throw new Error("Disposition must account for each returned finding exactly once");
+            throw new DelegationError("Disposition must account for each returned finding exactly once");
         }
 
         if (
             input.decision === "accept" &&
             (!job.result || input.findings.some((finding) => finding.decision === "needs_check"))
         ) {
-            throw new Error("Acceptance requires a result and checked finding dispositions");
+            throw new DelegationError("Acceptance requires a result and checked finding dispositions");
         }
 
         const disposition = {
@@ -462,6 +542,7 @@ export function createDelegationController({
         if (input.decision !== "needs_check") {
             job.disposition = disposition;
             releaseJob(job);
+            cleanupBatch(batch);
         }
 
         return { ...binding(batch, job), disposition };
@@ -487,7 +568,7 @@ export function createDelegationController({
             checkSources(batch);
             const cursor = input.afterCursor ?? 0;
             if (cursor > batch.cursor) {
-                throw new Error("Collection cursor is ahead of the batch");
+                throw new DelegationError("Collection cursor is ahead of the batch");
             }
 
             if (
@@ -523,14 +604,22 @@ export function createDelegationController({
                     .map((job) => ({
                         receipt: {
                             ...binding(batch, job),
-                            model: batch.host.model,
+                            model: batch.model,
                             state: job.state,
                             settling: job.settling,
                             calls: job.calls,
                             toolCalls: job.toolCalls,
                             toolBytes: job.toolBytes,
-                            usage: job.usage,
-                            usageComplete: !job.usageUnknown && job.accountedCalls === job.calls,
+                            usage: Object.fromEntries(
+                                Object.entries(job.usage).map(([key, value]) => [
+                                    key,
+                                    job.usageReportedCalls[key] ? value : null,
+                                ]),
+                            ),
+                            usageReportedCalls: job.usageReportedCalls,
+                            usageComplete:
+                                job.calls > 0 &&
+                                Object.values(job.usageReportedCalls).every((count) => count === job.calls),
                             cost: null,
                         },
                         result: job.result ?? null,
@@ -544,13 +633,13 @@ export function createDelegationController({
         const previous = requests.get(input.requestId);
         if (previous) {
             if (previous.fingerprint !== fingerprint) {
-                throw new Error("A request identifier cannot be reused with a different payload");
+                throw new DelegationError("A request identifier cannot be reused with a different payload");
             }
 
             if (input.operation !== "cancel") {
                 assertLive();
                 if (previous.generation !== generation) {
-                    throw new Error("Idempotent request belongs to a stale generation");
+                    throw new DelegationError("Idempotent request belongs to a stale generation");
                 }
 
                 const batchId = input.batchId ?? previous.value?.batchId;
@@ -560,14 +649,14 @@ export function createDelegationController({
             }
 
             if (previous.error) {
-                throw new Error(previous.error);
+                throw new DelegationError(previous.error);
             }
 
             return structuredClone(previous.value);
         }
 
         if (requests.size >= 128) {
-            throw new Error("Session idempotency journal is full");
+            throw new DelegationError("Session idempotency journal is full");
         }
 
         const entry = { fingerprint, generation };
@@ -577,8 +666,8 @@ export function createDelegationController({
 
             return structuredClone(entry.value);
         } catch (error) {
-            entry.error = error.message;
-            throw error;
+            entry.error = publicErrorMessage(error);
+            throw new DelegationError(entry.error);
         }
     };
 
@@ -590,25 +679,31 @@ export function createDelegationController({
             const host = getHost();
             const guard = getGuard();
             if (!host) {
-                throw new Error("Delegation has no Pi child-session host. Select a model before enabling delegation.");
+                throw new DelegationError(
+                    "Delegation has no Pi child-session host. Select a model before enabling delegation.",
+                );
             }
 
             if (!host.isCurrent()) {
-                throw new Error(
+                throw new DelegationError(
                     "The Pi model or working directory changed during delegation setup. Restart Pi in the intended working directory.",
                 );
             }
 
             if (guard === "locked") {
-                throw new Error("Command Guard is locked. Review /guard status and unlock it before delegating.");
+                throw new DelegationError(
+                    "Command Guard is locked. Review /guard status and unlock it before delegating.",
+                );
             }
 
             if (guard === "ambiguous") {
-                throw new Error("Multiple Command Guard instances replied. Load only one instance and restart Pi.");
+                throw new DelegationError(
+                    "Multiple Command Guard instances replied. Load only one instance and restart Pi.",
+                );
             }
 
             if (!["absent", "off", "guard", "strict"].includes(guard)) {
-                throw new Error(
+                throw new DelegationError(
                     "Command Guard has not reported a ready policy. Check /guard status and its startup errors.",
                 );
             }

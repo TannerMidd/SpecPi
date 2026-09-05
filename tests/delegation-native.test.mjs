@@ -82,7 +82,7 @@ function runNativeFixture(context, mode = "main") {
     ];
     if (mode === "reload") {
         args.push("--print", "/native-fixture-reload", "/native-fixture-replace");
-    } else if (mode.startsWith("guard-") || mode === "model-selection") {
+    } else if (mode.startsWith("guard-") || ["model-selection", "stream-performance"].includes(mode)) {
         args.push("--print", "/native-fixture-command");
     } else {
         args.push("--mode", "rpc");
@@ -97,7 +97,12 @@ function runNativeFixture(context, mode = "main") {
             cwd,
             agentDir,
             args,
-            input: mode === "reload" || mode.startsWith("guard-") || mode === "model-selection" ? "" : undefined,
+            input:
+                mode === "reload" ||
+                mode.startsWith("guard-") ||
+                ["model-selection", "stream-performance"].includes(mode)
+                    ? ""
+                    : undefined,
             env: {
                 SPECPI_NATIVE_FIXTURE_MODE: mode,
                 HTTP_PROXY: "",
@@ -212,6 +217,19 @@ test("native child-session activation rejects a parent CLI runtime credential ov
         enabled: false,
         requests: 0,
     });
+});
+
+test("native root lookup recovers and streamed deltas do not repeat filesystem checks", (context) => {
+    const result = runNativeFixture(context, "stream-performance");
+    if (!result) {
+        return;
+    }
+
+    const observed = report(result, "NATIVE_STREAM_FIXTURE");
+    assert.equal(observed.transientRootRecovered, true);
+    assert.equal(observed.completed, true);
+    assert.equal(observed.calls, 1);
+    assert.ok(observed.rootChecks > 0 && observed.rootChecks < 160);
 });
 
 for (const mode of ["absent", "off"]) {

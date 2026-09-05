@@ -1,3 +1,4 @@
+import { DelegationError, publicErrorMessage } from "./errors.mjs";
 import { randomUUID } from "node:crypto";
 import { createDelegationController } from "./core.mjs";
 
@@ -203,7 +204,7 @@ export function createDelegationExtension(
             } catch (error) {
                 pending = undefined;
                 boundHost = undefined;
-                pauseReason = error.message;
+                pauseReason = publicErrorMessage(error);
                 controller.invalidate("model setup failed");
 
                 return;
@@ -237,14 +238,16 @@ export function createDelegationExtension(
                     }
 
                     if (getHost() !== host) {
-                        throw new Error("Pi changed during model setup; delegation will refresh before the next turn.");
+                        throw new DelegationError(
+                            "Pi changed during model setup; delegation will refresh before the next turn.",
+                        );
                     }
 
                     controller.enable();
                     boundHost = host;
                 } catch (error) {
                     if (isCurrent()) {
-                        pauseReason = error.message;
+                        pauseReason = publicErrorMessage(error);
                     }
                 } finally {
                     if (pending === attempt) {
@@ -324,9 +327,14 @@ export function createDelegationExtension(
             }
 
             currentContext = ctx;
-            prepareContext(ctx, true);
             toolsReady = true;
             invalidate("session started or resources reloaded");
+            try {
+                prepareContext(ctx, true);
+            } catch (error) {
+                pauseReason = publicErrorMessage(error);
+                ctx.ui.notify(`Delegation unavailable: ${pauseReason}`, "warning");
+            }
         });
         pi.on("session_shutdown", () => {
             if (!isBound()) {
@@ -370,26 +378,26 @@ export function createDelegationExtension(
                 const [action = "status", id, extra] = args.trim().split(/\s+/u).filter(Boolean);
                 try {
                     if (extra || (id && action !== "cancel")) {
-                        throw new Error("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
+                        throw new DelegationError("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
                     }
 
                     if (action === "on") {
                         if (!ctx.hasUI) {
-                            throw new Error("Delegation activation requires a human interactive command");
+                            throw new DelegationError("Delegation activation requires a human interactive command");
                         }
 
                         requested = true;
                         requestedGuard = getGuard();
                         await refreshSelection(ctx);
                         if (!isBound() || !requested) {
-                            throw new Error(
+                            throw new DelegationError(
                                 "Pi changed during delegation setup; enable delegation in the current session",
                             );
                         }
 
                         const state = controller.status();
                         if (!state.enabled) {
-                            throw new Error(pauseReason ?? "Delegation model setup is still pending.");
+                            throw new DelegationError(pauseReason ?? "Delegation model setup is still pending.");
                         }
 
                         syncActiveTool(true);
@@ -413,10 +421,10 @@ export function createDelegationExtension(
                     } else if (["status", "limits"].includes(action)) {
                         ctx.ui.notify(JSON.stringify(status(), null, 2), "info");
                     } else {
-                        throw new Error("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
+                        throw new DelegationError("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
                     }
                 } catch (error) {
-                    ctx.ui.notify(error.message, "error");
+                    ctx.ui.notify(publicErrorMessage(error), "error");
                 }
             },
         });
@@ -429,7 +437,7 @@ export function createDelegationExtension(
             execute: async (_id, input, signal, _update, ctx) => {
                 try {
                     if (!isBound()) {
-                        throw new Error("Delegation was reloaded; use the current tool");
+                        throw new DelegationError("Delegation was reloaded; use the current tool");
                     }
 
                     currentContext = ctx;
@@ -440,7 +448,7 @@ export function createDelegationExtension(
                     return { content: [{ type: "text", text: JSON.stringify(output) }], details: output };
                 } catch (error) {
                     return {
-                        content: [{ type: "text", text: `Delegation: ${error.message}` }],
+                        content: [{ type: "text", text: `Delegation: ${publicErrorMessage(error)}` }],
                         details: { error: true },
                         isError: true,
                     };

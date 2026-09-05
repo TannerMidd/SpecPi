@@ -62,6 +62,7 @@ const requiredFiles = [
     "extensions/command-guard/smoke.mjs",
     "extensions/files/core.mjs",
     "extensions/delegation/core.mjs",
+    "extensions/delegation/errors.mjs",
     "extensions/delegation/extension.mjs",
     "extensions/delegation/index.ts",
     "extensions/delegation/native.mjs",
@@ -89,6 +90,7 @@ const requiredFiles = [
     "scripts/check-package.mjs",
     "scripts/check-pi-package.mjs",
     "scripts/check-release-order.mjs",
+    "scripts/check-syntax.mjs",
     "scripts/lib.mjs",
     "scripts/lock.mjs",
     "scripts/pi-test-harness.mjs",
@@ -448,7 +450,7 @@ try {
     assert.equal(packResult.name, sourcePackage.name);
     assert.equal(packResult.version, sourcePackage.version);
     assert.deepEqual(packResult.bundled || [], [], "packed artifact unexpectedly bundles dependencies");
-    assert.ok(packResult.size < 300_000, `packed artifact unexpectedly exceeds 300 KB: ${packResult.size}`);
+    assert.ok(packResult.size < 310_000, `packed artifact unexpectedly exceeds 310 KB: ${packResult.size}`);
     assert.ok(
         packResult.unpackedSize < 1_300_000,
         `unpacked artifact unexpectedly exceeds 1.3 MB (including delegation runtime and protocol docs): ${packResult.unpackedSize}`,

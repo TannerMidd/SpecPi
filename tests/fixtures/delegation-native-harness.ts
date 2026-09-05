@@ -192,7 +192,16 @@ async function configuredServer() {
                 choices,
                 ...(usage ? { usage } : {}),
             });
-            response.write(`data: ${JSON.stringify(event([{ index: 0, delta, finish_reason: null }]))}\n\n`);
+            if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "stream-performance" && !needsRead) {
+                for (const character of delta.content) {
+                    response.write(
+                        `data: ${JSON.stringify(event([{ index: 0, delta: { content: character }, finish_reason: null }]))}\n\n`,
+                    );
+                }
+            } else {
+                response.write(`data: ${JSON.stringify(event([{ index: 0, delta, finish_reason: null }]))}\n\n`);
+            }
+
             response.write(
                 `data: ${JSON.stringify(event([{ index: 0, delta: {}, finish_reason: needsRead ? "tool_calls" : "stop" }]))}\n\n`,
             );
@@ -472,6 +481,55 @@ export default async function nativeEntryFixture(pi: any) {
             console.log(
                 `NATIVE_RUNTIME_AUTH_FIXTURE=${JSON.stringify({ runtimeAuthRejected: true, enabled: false, requests: 0 })}`,
             );
+
+            return;
+        }
+
+        if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "stream-performance") {
+            const originalRealpath = fs.realpathSync.native;
+            let failed = false;
+            fs.realpathSync.native = ((filename: any, ...args: any[]) => {
+                if (!failed && filename === ctx.cwd) {
+                    failed = true;
+                    throw new Error("Synthetic transient root lookup failure");
+                }
+
+                return originalRealpath(filename, ...args);
+            }) as any;
+            try {
+                await tools.command("on");
+                assert.equal(failed, true);
+                assert.match(notices.at(-1).message, /working directory differs/);
+            } finally {
+                fs.realpathSync.native = originalRealpath;
+            }
+
+            await tools.command("on");
+            assert.equal((await tools.status()).enabled, true, JSON.stringify(notices));
+            let rootChecks = 0;
+            fs.realpathSync.native = ((filename: any, ...args: any[]) => {
+                if (filename === ctx.cwd) {
+                    rootChecks += 1;
+                }
+
+                return originalRealpath(filename, ...args);
+            }) as any;
+            try {
+                const collected = await finishBatch(
+                    tools,
+                    await tools.execute({ operation: "run", requestId: "stream-performance", packet: packet() }),
+                );
+                assert.equal(collected.results[0].receipt.calls, 1);
+                assert.ok(rootChecks < 160, `${rootChecks} root checks for one streamed result`);
+                assert.equal(server.requests.length, 1);
+                assert.deepEqual(server.errors, []);
+                console.log(
+                    `NATIVE_STREAM_FIXTURE=${JSON.stringify({ transientRootRecovered: true, completed: true, calls: 1, rootChecks })}`,
+                );
+            } finally {
+                fs.realpathSync.native = originalRealpath;
+                await active.emit("session_shutdown", { reason: "fixture cleanup" }, ctx);
+            }
 
             return;
         }
@@ -760,7 +818,11 @@ export default async function nativeEntryFixture(pi: any) {
         }
     };
 
-    if (["guard-absent", "guard-off", "model-selection"].includes(process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "")) {
+    if (
+        ["guard-absent", "guard-off", "model-selection", "stream-performance"].includes(
+            process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "",
+        )
+    ) {
         // Exercise activation after startup through the public command lifecycle.
         pi.registerCommand("native-fixture-command", {
             description: "Exercise native delegation through a public Pi command",

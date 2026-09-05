@@ -1,3 +1,5 @@
+import { DelegationError } from "./errors.mjs";
+
 const MAX_CONTEXT_BYTES = 256 * 1024;
 const MAX_OUTPUT_TOKENS = 8192;
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -37,11 +39,11 @@ function bounded(value, maximum = MAX_CONTEXT_BYTES) {
     try {
         serialized = JSON.stringify(value);
     } catch {
-        throw new Error("Delegation data is not serializable");
+        throw new DelegationError("Delegation data is not serializable");
     }
 
     if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > maximum) {
-        throw new Error("Delegation data exceeds its retained data allowance");
+        throw new DelegationError("Delegation data exceeds its retained data allowance");
     }
 
     return serialized;
@@ -98,9 +100,159 @@ function emptyResources(sdk, systemPrompt) {
         getAppendSystemPrompt: () => [],
         getAppendSystemPromptSources: () => [],
         extendResources() {
-            throw new Error("Delegation resources are closed");
+            throw new DelegationError("Delegation resources are closed");
         },
         async reload() {},
+    };
+}
+
+function bestEffort(action) {
+    try {
+        Promise.resolve(action()).catch(() => {});
+    } catch {
+        // Cleanup failures must not prevent the remaining independent cleanup stages.
+    }
+}
+
+function streamBudget(maximum) {
+    let events = 0;
+    let boundaries = 0;
+    let deltaBytes = 0;
+    const messageKeys = [
+        "role",
+        "content",
+        "api",
+        "provider",
+        "model",
+        "responseModel",
+        "responseId",
+        "diagnostics",
+        "usage",
+        "stopReason",
+        "deferred",
+        "errorMessage",
+        "rawStopReason",
+        "endTurn",
+        "timestamp",
+        "providerMetadata",
+    ];
+    const shapes = {
+        start: ["type", "partial"],
+        done: ["type", "reason", "message"],
+        error: ["type", "reason", "error"],
+    };
+    for (const kind of ["text", "thinking", "toolcall"]) {
+        shapes[`${kind}_start`] = ["type", "contentIndex", "partial"];
+        shapes[`${kind}_delta`] = ["type", "contentIndex", "delta", "partial"];
+        shapes[`${kind}_end`] = ["type", "contentIndex", kind === "toolcall" ? "toolCall" : "content", "partial"];
+    }
+
+    return (event) => {
+        events += 1;
+        if (
+            events > 65_536 ||
+            !Object.hasOwn(shapes, event?.type) ||
+            !closed(event, shapes[event.type]) ||
+            shapes[event.type].some((key) => !Object.hasOwn(event, key))
+        ) {
+            throw new DelegationError("Provider returned an unsupported or excessive stream event");
+        }
+
+        if (!event.type.endsWith("_delta")) {
+            boundaries += 1;
+            if (boundaries > 130) {
+                throw new DelegationError("Provider returned excessive stream boundaries");
+            }
+        }
+
+        const message = event.partial ?? event.message ?? event.error;
+        if (
+            !closed(message, messageKeys) ||
+            message.role !== "assistant" ||
+            !Array.isArray(message.content) ||
+            message.content.length > 64
+        ) {
+            throw new DelegationError("Provider returned an unsupported partial response");
+        }
+
+        if (
+            event.type.includes("_") &&
+            (!Number.isInteger(event.contentIndex) || event.contentIndex < 0 || event.contentIndex >= 64)
+        ) {
+            throw new DelegationError("Provider returned an invalid content index");
+        }
+
+        if (event.type.endsWith("_delta")) {
+            if (typeof event.delta !== "string") {
+                throw new DelegationError("Provider returned an invalid stream delta");
+            }
+
+            deltaBytes += Buffer.byteLength(bounded(event.delta, maximum), "utf8") - 2;
+            if (deltaBytes > maximum) {
+                throw new DelegationError("Delegation stream exceeds its retained data allowance");
+            }
+        }
+
+        if ((event.type === "text_end" || event.type === "thinking_end") && typeof event.content !== "string") {
+            throw new DelegationError("Provider returned invalid stream content");
+        }
+
+        if (event.type === "toolcall_end" && event.toolCall?.type !== "toolCall") {
+            throw new DelegationError("Provider returned an invalid stream tool call");
+        }
+
+        if (
+            (event.type === "done" && !["stop", "length", "toolUse", "deferred"].includes(event.reason)) ||
+            (event.type === "error" && !["error", "aborted"].includes(event.reason))
+        ) {
+            throw new DelegationError("Provider returned an invalid stream termination");
+        }
+
+        // Pi owns already-parsed objects. These bounded structural/length checks do
+        // not serialize growing prefixes. Linear accounting relies on Pi keeping
+        // partials consistent with deltas; it is not a bound on arbitrary provider
+        // allocations. Exact full checks still precede tools and terminal results.
+        let nodes = 0;
+        let units = 0;
+        const inspect = (value) => {
+            nodes += 1;
+            if (nodes > 512) {
+                throw new DelegationError("Provider response metadata exceeds its structural allowance");
+            }
+
+            if (typeof value === "string") {
+                units += value.length;
+            } else if (value && typeof value === "object") {
+                for (const key of Object.keys(value)) {
+                    units += key.length;
+                    inspect(value[key]);
+                }
+            }
+
+            if (units > maximum) {
+                throw new DelegationError("Delegation partial response exceeds its retained data allowance");
+            }
+        };
+
+        inspect(message);
+        for (const part of message.content) {
+            if (!["text", "thinking", "toolCall"].includes(part?.type)) {
+                throw new DelegationError("Provider returned unsupported content");
+            }
+
+            if (part.type !== "toolCall") {
+                const value = part[part.type === "text" ? "text" : "thinking"];
+                if (typeof value !== "string") {
+                    throw new DelegationError("Provider returned invalid text content");
+                }
+            }
+        }
+
+        if (!event.type.endsWith("_delta")) {
+            bounded(message, maximum);
+            const { partial: _partial, message: _message, error: _error, ...metadata } = event;
+            bounded(metadata, maximum);
+        }
     };
 }
 
@@ -124,44 +276,45 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
         typeof registry?.getProviderAuthStatus !== "function" ||
         typeof registry?.getRegisteredProviderIds !== "function"
     ) {
-        throw new Error("Delegation requires the supported Pi SDK and an explicit thinking level");
+        throw new DelegationError("Delegation requires the supported Pi SDK and an explicit thinking level");
     }
 
     const compatibilityError = getPiSessionCompatibilityError(sdk);
     if (compatibilityError) {
-        throw new Error(compatibilityError);
+        throw new DelegationError(compatibilityError);
     }
 
     thinkingLevel = sdk.clampThinkingLevel(model, thinkingLevel);
     if (!THINKING_LEVELS.includes(thinkingLevel)) {
-        throw new Error("Pi returned an unsupported effective thinking level");
+        throw new DelegationError("Pi returned an unsupported effective thinking level");
     }
 
     const selected = descriptor(model);
-    const current = () => {
+    const current = (streaming = false) => {
         try {
             return (
-                isCurrent() === true &&
+                isCurrent(streaming) === true &&
                 ctx.modelRegistry === registry &&
                 ctx.model === model &&
-                sameValue(descriptor(model), selected)
+                (streaming || sameValue(descriptor(model), selected))
             );
         } catch {
             return false;
         }
     };
 
-    const check = () => {
-        if (!current()) {
-            throw new Error("Delegation parent lease is no longer current");
+    const check = (streaming = false) => {
+        if (!current(streaming)) {
+            throw new DelegationError("Delegation parent lease is no longer current");
         }
 
         if (
-            registry.getProviderAuthStatus(model.provider)?.source === "runtime" ||
-            registry.getRegisteredProviderIds().includes(model.provider) ||
-            model.headers !== undefined
+            !streaming &&
+            (registry.getProviderAuthStatus(model.provider)?.source === "runtime" ||
+                registry.getRegisteredProviderIds().includes(model.provider) ||
+                model.headers !== undefined)
         ) {
-            throw new Error("Delegation cannot inherit this parent runtime provider override");
+            throw new DelegationError("Delegation cannot inherit this parent runtime provider override");
         }
     };
 
@@ -178,7 +331,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                     (key) => process.env[key],
                 )
             ) {
-                throw new Error("Delegation SDK sessions do not support startup proxy configuration");
+                throw new DelegationError("Delegation SDK sessions do not support startup proxy configuration");
             }
 
             const settings = {
@@ -197,15 +350,28 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 !childModel ||
                 !sameValue(descriptor(childModel), selected)
             ) {
-                throw new Error("The configured child provider or model does not match the selected parent model");
+                throw new DelegationError(
+                    "The configured child provider or model does not match the selected parent model",
+                );
             }
 
             return { runtime, childModel, settings };
         })();
 
-        return initialization.then(() => {
-            check();
-        });
+        const attempt = initialization;
+
+        return attempt.then(
+            () => {
+                check();
+            },
+            (error) => {
+                if (initialization === attempt) {
+                    initialization = undefined;
+                }
+
+                throw error;
+            },
+        );
     };
 
     return Object.freeze({
@@ -219,7 +385,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 typeof input.systemPrompt !== "string" ||
                 !Array.isArray(input.tools)
             ) {
-                throw new Error("Invalid closed delegation session options");
+                throw new DelegationError("Invalid closed delegation session options");
             }
 
             bounded({
@@ -234,7 +400,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 new Set(names).size !== names.length ||
                 names.some((name) => !["list_sources", "read_source", "search_sources"].includes(name))
             ) {
-                throw new Error("Delegation tools must be selected snapshot capabilities");
+                throw new DelegationError("Delegation tools must be selected snapshot capabilities");
             }
 
             const { session } = await sdk.createAgentSession({
@@ -249,6 +415,20 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 tools: names,
                 customTools: input.tools,
             });
+            let disposed = false;
+            const dispose = () => {
+                if (disposed) {
+                    return;
+                }
+
+                disposed = true;
+                // Pi cleanup uses the original child ID. Failure in one stage must
+                // not retain the transcript or prevent the other stages.
+                bestEffort(() => session.dispose());
+                bestEffort(() => session.agent.reset());
+                bestEffort(() => session.sessionManager.newSession());
+            };
+
             try {
                 check();
                 session.setAutoCompactionEnabled(false);
@@ -258,10 +438,10 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                     typeof session.agent.streamFunction !== "function" ||
                     session.getActiveToolNames().some((name) => !names.includes(name))
                 ) {
-                    throw new Error("Pi could not apply the closed delegation session policy");
+                    throw new DelegationError("Pi could not apply the closed delegation session policy");
                 }
             } catch (error) {
-                session.dispose();
+                dispose();
                 throw error;
             }
 
@@ -269,15 +449,8 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
             let active;
             const originalStream = session.agent.streamFunction;
             const beforeToolCall = session.agent.beforeToolCall;
-            const dispose = () => {
-                // Pi must clean provider resources under the original child session ID.
-                session.dispose();
-                session.agent.reset();
-                session.sessionManager.newSession();
-            };
-
-            const assertRun = () => {
-                check();
+            const assertRun = (streaming = false) => {
+                check(streaming);
                 if (
                     released ||
                     !active ||
@@ -285,18 +458,18 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                     active.controls.signal.aborted ||
                     Date.now() >= active.controls.deadline
                 ) {
-                    throw new Error("Delegation session was cancelled or expired");
+                    throw new DelegationError("Delegation session was cancelled or expired");
                 }
 
-                active.controls.assertLive();
+                active.controls.assertLive(streaming);
             };
 
             const fail = (error) => {
                 if (active) {
                     active.failure ??= error;
-                    active.controller.abort();
-                    active.controls.abort();
-                    void session.abort().catch(() => {});
+                    bestEffort(() => active.controller.abort());
+                    bestEffort(() => active.controls.abort());
+                    bestEffort(() => session.abort());
                 }
             };
 
@@ -304,7 +477,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 try {
                     assertRun();
                     if (!names.includes(call.toolCall.name)) {
-                        throw new Error("Delegation requested an unavailable tool");
+                        throw new DelegationError("Delegation requested an unavailable tool");
                     }
 
                     const result = await beforeToolCall?.call(session.agent, call, signal);
@@ -328,7 +501,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                         context.tools?.some((tool) => !names.includes(tool.name)) ||
                         context.messages.some((message) => message.role === "toolResult" && message.isError)
                     ) {
-                        throw new Error("Delegation inference policy changed");
+                        throw new DelegationError("Delegation inference policy changed");
                     }
 
                     bounded(context, run.controls.limits.contextBytes);
@@ -370,7 +543,9 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                                         (part) => part.type === "toolCall" && !names.includes(part.name),
                                     )
                                 ) {
-                                    throw new Error("Provider returned an invalid response or unavailable tool");
+                                    throw new DelegationError(
+                                        "Provider returned an invalid response or unavailable tool",
+                                    );
                                 }
 
                                 return result;
@@ -385,6 +560,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                     });
                     run.pending.push(settlement);
                     const stream = await streamReady;
+                    const inspectEvent = streamBudget(run.controls.limits.retainedResponseBytes);
                     try {
                         assertRun();
                     } catch (error) {
@@ -397,11 +573,8 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                         async *[Symbol.asyncIterator]() {
                             try {
                                 for await (const event of stream) {
-                                    assertRun();
-                                    const partial = event.partial ?? event.message ?? event.error;
-                                    if (partial) {
-                                        bounded(partial, run.controls.limits.retainedResponseBytes);
-                                    }
+                                    assertRun(event.type?.endsWith("_delta") === true);
+                                    inspectEvent(event);
 
                                     yield event;
                                 }
@@ -457,12 +630,12 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                                 controls.limits[key] > MAX_CONTEXT_BYTES,
                         )
                     ) {
-                        throw new Error("Invalid bounded delegation session run");
+                        throw new DelegationError("Invalid bounded delegation session run");
                     }
 
                     const run = { controls, controller: new AbortController(), pending: [], failure: undefined };
                     active = run;
-                    const cancel = () => fail(new Error("Delegation session was cancelled or expired"));
+                    const cancel = () => fail(new DelegationError("Delegation session was cancelled or expired"));
                     controls.signal.addEventListener("abort", cancel, { once: true });
                     const timer = setTimeout(cancel, Math.max(1, Math.min(120_000, controls.deadline - Date.now())));
                     timer.unref?.();
@@ -482,7 +655,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                             !Array.isArray(result.content) ||
                             !["stop", "length"].includes(result.stopReason)
                         ) {
-                            throw new Error("Pi worker session did not return a complete assistant response");
+                            throw new DelegationError("Pi worker session did not return a complete assistant response");
                         }
 
                         bounded(result, controls.limits.retainedResponseBytes);
@@ -505,7 +678,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
 
                     released = true;
                     if (active) {
-                        fail(new Error("Delegation session was released"));
+                        fail(new DelegationError("Delegation session was released"));
                     } else {
                         dispose();
                     }

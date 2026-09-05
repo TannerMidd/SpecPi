@@ -98,7 +98,13 @@ async function fixture(root: string, label: string, script: any, settings: any =
                 await options.onResponse?.({ status: 200, headers: { "x-fixture-response": "yes" } }, requestModel);
                 Object.assign(message, await script(observation, observed.length));
                 events.push({ type: "start", partial: { ...message, content: [] } });
-                events.push({ type: "text_delta", contentIndex: 0, delta: "fixture", partial: message });
+                const block = message.content[0];
+                events.push({
+                    type: block?.type === "toolCall" ? "toolcall_delta" : "text_delta",
+                    contentIndex: 0,
+                    delta: block?.type === "toolCall" ? JSON.stringify(block.arguments) : (block?.text ?? ""),
+                    partial: message,
+                });
                 if (["error", "aborted"].includes(message.stopReason)) {
                     events.push({ type: "error", reason: message.stopReason, error: message });
                 } else {
@@ -627,6 +633,7 @@ async function workerProof(root: string) {
     const snapshot = {
         sources: [{ id: "s1", path: "source.txt", lineCount: 1 }],
         assertFresh() {},
+        assertBindings() {},
         read: () => "Selected evidence",
         search: () => [],
     };

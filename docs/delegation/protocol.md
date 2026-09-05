@@ -106,6 +106,10 @@ explicit packet fields, even when an allowed array or string is empty.
 
 `status` is compact and available while disabled. `collect` returns reports whose
 completion cursor is newer than `afterCursor`; omitting it replays retained reports.
+An accepted next batch retires the previous batch's reports. Old generations retire
+after their workers settle. `status` retains bounded summaries marked `retired: true`,
+but retired batches reject collect and follow-up. Quotas and request fingerprints survive
+retirement, so replay cannot reopen a batch or replenish the process allowance.
 `waitMs` defaults to zero and cannot exceed 30 seconds. There is no destructive dequeue
 and no automatic parent turn. A cursor ahead of the batch is invalid.
 
@@ -115,9 +119,12 @@ cannot be repaired by presenting an old receipt or idempotency key.
 
 Each returned item has `receipt`, `result`, `error`, and `disposition`. A host receipt
 contains `batchId`, `jobId`, `attemptId`, `packetDigest`, `generation`, `resultRevision`,
-`model`, `state`, `settling`, call/tool counters, token usage, `usageComplete`, and
+`model`, `state`, `settling`, call/tool counters, token usage, `usageReportedCalls`, `usageComplete`, and
 `cost: null`. Copy the six binding fields when following up or resolving. The
 `collectionCursor` belongs to delivery ordering, not result identity.
+Each usage field sums its valid reported values independently; never-reported fields
+are `null`. `usageReportedCalls` counts reports for each field. A positive subtotal may
+still be incomplete; `usageComplete` requires all four fields for every admitted call.
 
 ## Worker report
 
@@ -229,8 +236,24 @@ The canonical working root remains fixed for that process. Restart Pi to change 
 root or load a new delegation runtime version. There is no retry on process restart
 and no durable worker queue. Completed reports retain their original source bindings
 after the deadline; child sessions are released at the deadline and subsequent
-follow-up is rejected. SDK-visible response checks can reject oversized observed
-content during the stream, but bytes can already be buffered before an SDK event.
+follow-up is rejected. Snapshot text is destroyed when every job loses continuation
+eligibility. Failed first attempts retain the original expiry timer. After settlement,
+packet and job-input references are dropped; only source metadata/digests remain to
+validate completed reports until retirement.
+
+Per-event lease checks use model/context identities and generation. Full canonical-root,
+safe model-descriptor and provider-policy checks run at request, tool and publication
+boundaries. Snapshot tools check canonical/stat bindings; full digest checks run at
+capture, publication, collect, follow-up and resolve. These cheaper checks assume a
+trusted local filesystem and Pi's parsed stream contract. Streaming uses incremental
+recognized-delta accounting and bounded structure checks, with exact response checks
+at content/terminal boundaries. It does not promise an exact per-event size bound for
+inconsistent SDK partial objects. Bytes may already be allocated before an event.
+Per invocation the parser permits 64 content blocks, 512 structural nodes per partial,
+65,536 events and 130 non-delta boundaries. These fixed engineering ceilings also bound
+repeated whole-message validation for malformed event sequences.
+Unexpected SDK errors are redacted before status/tool/UI output; teardown failures
+cannot escape timer callbacks or reset settling ownership.
 
 The enforced [resource envelope and limitations](README.md#enforced-resource-envelope)
 define `bounded-pi-sessions-v1`. Unsupported hard billing, raw transport, provider

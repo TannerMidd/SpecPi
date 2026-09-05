@@ -3,9 +3,10 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createDelegationExtension } from "./extension.mjs";
 import { createNativePiHost, getPiSessionCompatibilityError } from "./provider.mjs";
+import { DelegationError } from "./errors.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 4;
+const revision = 5;
 
 function canonical(directory) {
     return fs.realpathSync.native(path.resolve(directory));
@@ -22,6 +23,7 @@ function createState(root, sdk) {
     let boundRegistry;
     let boundModel;
     let boundThinking;
+    let available = false;
     const matchesRoot = (context) => {
         try {
             return typeof context?.cwd === "string" && sameRoot(canonical(context.cwd), root);
@@ -62,6 +64,7 @@ function createState(root, sdk) {
 
         if (
             !compatibilityError &&
+            available &&
             host?.isCurrent() &&
             boundRegistry === context.modelRegistry &&
             boundModel === context.model &&
@@ -75,11 +78,19 @@ function createState(root, sdk) {
         boundRegistry = context.modelRegistry;
         boundModel = context.model;
         boundThinking = thinkingLevel;
+        const boundCwd = context.cwd;
         const id = randomUUID();
-        const isCurrent = () => epoch === issuedEpoch && matchesRoot(context) && getThinkingLevel() === thinkingLevel;
+        const isCurrent = (streaming = false) =>
+            epoch === issuedEpoch &&
+            context.cwd === boundCwd &&
+            context.modelRegistry === boundRegistry &&
+            context.model === boundModel &&
+            getThinkingLevel() === thinkingLevel &&
+            (streaming || matchesRoot(context));
+        available = !compatibilityError;
         if (compatibilityError) {
             const unavailable = async () => {
-                throw new Error(compatibilityError);
+                throw new DelegationError(compatibilityError);
             };
 
             host = Object.freeze({
@@ -121,7 +132,7 @@ export function registerNativeDelegation(pi, sdk) {
         typeof state.root !== "string" ||
         !sameRoot(state.root, root)
     ) {
-        throw new Error("Restart Pi before changing the delegation runtime or working directory");
+        throw new DelegationError("Restart Pi before changing the delegation runtime or working directory");
     }
 
     state.factory(pi);

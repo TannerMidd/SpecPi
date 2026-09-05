@@ -383,14 +383,57 @@ test("freshness checks directory identity without rejecting unrelated sibling ch
     assert.throws(() => value.assertFresh(), /Snapshot/);
 });
 
-test("destroy is idempotent and revokes all content operations without writing artifacts", (t) => {
+test("destroy revokes content while retaining metadata-only freshness checks without writing artifacts", (t) => {
     const root = project(t, { "demo.md": "retained fixture" });
     const value = snapshot(t, root, ["demo.md"]);
     value.destroy();
     value.destroy();
     assert.throws(() => value.read("s1"), /Snapshot closed/);
     assert.throws(() => value.search("fixture"), /Snapshot closed/);
-    assert.throws(() => value.assertFresh(), /Snapshot closed/);
+    value.assertFresh();
+    value.assertBindings();
+    fs.writeFileSync(path.join(root, "demo.md"), "modified fixture");
+    assert.throws(() => value.assertFresh(), /Snapshot source unavailable or changed/);
     assert.deepEqual(Object.keys(value.sources[0]), ["id", "path", "digest", "bytes", "lineCount"]);
     assert.deepEqual(fs.readdirSync(root), ["demo.md"]);
+});
+
+test("tool binding checks avoid content reads while terminal freshness still hashes every source", (t) => {
+    const root = project(t, { "src/one.md": "one", "src/two.md": "two" });
+    const value = snapshot(t, root, ["src/one.md", "src/two.md"]);
+    const originalRead = fs.readSync;
+    const read = t.mock.method(fs, "readSync", (...args) => originalRead(...args));
+    value.assertBindings();
+    value.read("s1");
+    value.search("two");
+    assert.equal(read.mock.callCount(), 0);
+    value.assertFresh();
+    assert.equal(read.mock.callCount(), 4);
+    fs.writeFileSync(path.join(root, "src/one.md"), "edit");
+    assert.throws(() => value.assertBindings(), /Snapshot/);
+});
+
+test("read and search serialize each escaped UTF-8 line once instead of growing prefixes", (t) => {
+    const lines = Array.from({ length: 200 }, (_, index) => `match ${index} \"\\\t🍎 é`);
+    const root = project(t, { "lines.txt": lines.join("\n") });
+    const value = snapshot(t, root, ["lines.txt"]);
+    const stringify = JSON.stringify;
+    let encoded = 0;
+    const spy = t.mock.method(JSON, "stringify", (...args) => {
+        const result = stringify(...args);
+        encoded += Buffer.byteLength(result);
+
+        return result;
+    });
+    const result = value.read("s1");
+    assert.equal(result.text, lines.join("\n"));
+    const resultBytes = Buffer.byteLength(stringify(result));
+    assert.ok(encoded <= resultBytes + lines.length * 2 + 10, `${encoded} bytes for ${resultBytes} result`);
+    encoded = 0;
+    const matches = value.search("match");
+    assert.equal(matches.length, 20);
+    assert.ok(encoded <= Buffer.byteLength(stringify(matches)));
+    spy.mock.restore();
+    bounded(result);
+    bounded(matches);
 });

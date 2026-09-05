@@ -211,9 +211,45 @@ is not itself a passing receipt. The supported calls/time contract requires cove
   version rather than loading changed implementation code through `/reload`.
 - Completed reports remain source-bound after the deadline; child sessions release at
   the deadline and subsequent follow-up fails.
+- Reused Guard instances restore exactly one state responder; invalid, declined and
+  stale-confirmation commands cannot revoke or downgrade policy.
+- SDK errors with synthetic secret canaries never enter status, notices or tool output.
+  Throwing/rejecting teardown is contained across cancellation and deadline callbacks.
+- Shared snapshot text survives an eligible sibling follow-up, then is destroyed;
+  failed jobs still expire inputs, and retired batches preserve quotas and replay keys.
+- Partial usage retains known fields and per-field reporting coverage; missing fields
+  are distinct from reported zero, including unsuccessful calls.
+- Operation-count probes cover per-event root/model checks, snapshot tool reads and
+  linear serialized-byte work. Overflow and source/model drift remain rejected at
+  protected boundaries. These probes measure implementation work, not user-visible
+  latency, production model quality, or dollar savings.
+- Recursive source syntax checks discover new nested modules and TypeScript syntax,
+  including negative fixtures; they do not rely on a maintained filename list.
 - No worker writes, recursion, arbitrary process execution or copied parent-tool bypass.
 - Normal parent-tool-result retention through Pi versus in-memory worker state, accurate
   privacy disclosure, bounded retained data, cleanup and no automatic resume.
+
+### Local regression measurements: September 5, 2026
+
+The review-fix probe used identical source bytes from
+`d49fe9bc227cac480fea825932795e6db57e2127:extensions/delegation/worker.mjs`
+as a selected fixture, comparing the old snapshot broker with the corrected broker.
+Read used `read("s1", 1, 200)`; search used `search("a", 20)`. Returned objects were equal.
+
+| Operation                  | Before: bytes serialized | After: bytes serialized | Returned JSON bytes |
+| -------------------------- | -----------------------: | ----------------------: | ------------------: |
+| Read 183 lines             |                  809,549 |                   8,220 |               8,220 |
+| Literal search, 20 matches |                   25,485 |                   2,741 |               2,762 |
+
+This counts work inside `JSON.stringify`, including intermediate prefixes, not network
+traffic. The read path now encodes each line once; search encodes each match once and
+adds array punctuation arithmetically. Per-tool binding checks performed zero file
+reads; full freshness checks still reread and hash the source. A synthetic 1,000-delta
+provider regression requires fewer than 40 full lease checks and less than 100 KB of
+serialization, while every delta still receives cheap lease and bounded-data checks.
+The actual Pi fixture also exercises fragmented localhost SSE and transient root lookup
+recovery. These are reproducible workload checks in the snapshot/provider/native test
+suites, not measured UI-latency improvements or production-provider benchmarks.
 
 ### Stronger target gates: not met by the calls/time experiment
 
@@ -232,8 +268,8 @@ the [target protocol](design-protocol.md):
   retries and settlement, with honest unknown-cost behavior.
 
 The current runtime disables configurable retries, counts model invocations, enforces
-logical deadlines, validates inputs before dispatch and checks complete responses only
-after the returned Promise resolves. It reports cost as unavailable. These controls do
+logical deadlines, validates inputs before dispatch, counts observed stream deltas and
+validates complete parsed responses at protected boundaries. It reports cost as unavailable. These controls do
 not pass the stronger gates: adapters may buffer the whole response or make transport
 attempts before SpecPi observes completion. The narrower experiment must reject policies requiring unsupported
 guarantees. Its fixture tests cannot be presented as transport, invoice or process-memory
