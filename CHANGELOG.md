@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add bounded, best-effort sanitized browser exceptions, console errors, failed requests, and HTTP error diagnostics with explicit cursor/loss/clear semantics and ephemeral retention.
+- Add keyboard/chord input, native dropdown selection, and deadline-bounded page-condition waits; invalidate snapshot refs on application-driven navigation and preserve isolated cancellation cleanup.
+- Strictly type-check the browser extension against pinned development Pi, TypeBox, Node, and Playwright declarations without eagerly loading the browser runtime or changing production optional peers.
+- Add real registered-tool Chromium fixtures, repeatable responsive-site checks with fault-injection tests, and a shared CI browser gate required before Pages deployment. Preserve the pinned-Pi no-skips coverage gate.
+- Document privacy/testing contracts and an evidence-backed decision to retain project-native TypeScript semantic navigation rather than add an LSP tool now.
+
 ## 0.12.0 - 2026-09-05
 
 - Add experimental, opt-in delegation for independent reviews and selected-source analysis through native Pi sessions. The parent remains the sole writer; workers have no shell, edits, live web, nested delegation or ambient extensions.

@@ -82,6 +82,8 @@ test("the real checkout inventory includes check inputs and excludes local/gener
     assert.ok(paths.includes(".gitattributes"));
     assert.ok(paths.includes(".gitignore"));
     assert.ok(paths.includes(".prettierignore"));
+    assert.ok(paths.includes("tsconfig.browser.json"));
+    assert.ok(paths.includes("extensions/browser/core.d.mts"));
     assert.ok(paths.some((value) => value.startsWith(".github/workflows/")));
     assert.ok(paths.includes("tests/fixtures/command-guard-session-approval-harness.ts"));
     assert.equal(

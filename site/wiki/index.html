@@ -380,6 +380,18 @@ specpi doctor</code></pre>
                         test interactions, resize across desktop, tablet, and mobile viewports, then capture bounded
                         evidence. Source inspection does not verify rendered appearance.
                     </p>
+                    <p>
+                        Use <code>browser_diagnostics</code> for active-page JavaScript exceptions, console errors,
+                        failed requests, and HTTP errors. Output is bounded and best-effort sanitized, not guaranteed
+                        secret-free. Empty results do not prove application health. Close discards the buffer;
+                        explicit clear discards all retained records, including filtered or unreturned ones.
+                    </p>
+                    <p>
+                        <code>browser_press</code> exercises keys and chords; <code>browser_select_option</code>
+                        selects native dropdown options by value, label, or index; <code>browser_wait_for</code>
+                        waits for an element state, exact text, or exact URL. These tools default to a five-second
+                        deadline (maximum thirty seconds). Refresh snapshot refs after mutations or navigation.
+                    </p>
                     <p class="doc-boundary">
                         <strong>Isolation boundary.</strong> The browser does not attach to a personal Chrome profile,
                         cookies, passwords, or extensions. It runs as a separate process and does not provide
@@ -489,12 +501,18 @@ specpi doctor</code></pre>
                     <div class="terminal doc-terminal">
                         <pre><code>npm install --ignore-scripts --omit=peer --no-package-lock
 npm run format
-npm run check</code></pre>
+npm run check
+npm run setup:browser
+npm run test:browser
+npm run test:site:browser</code></pre>
                     </div>
                     <p>
                         JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one
-                        statement per line. The repository check validates formatting and syntax, runs the Node test
-                        suite, and executes registry-linked validators with isolated prerequisites.
+                        statement per line. The repository check validates formatting and syntax, strictly type-checks
+                        the browser extension, runs the Node test suite, and executes registry-linked validators with
+                        isolated prerequisites. Browser tests use repository-local Chromium and cover the public pages
+                        at desktop, tablet, and mobile sizes. Required CI browser commands reject skipped coverage;
+                        Pages deployment waits for the same rendered check. No visual baseline is automatically created.
                     </p>
                 </section>
                 <section class="doc-section" id="delegation" aria-labelledby="delegation-title">

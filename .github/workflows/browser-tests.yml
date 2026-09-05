@@ -1,0 +1,32 @@
+name: browser-tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+      - name: Install pinned development dependencies
+        run: npm install --ignore-scripts --omit=peer --no-package-lock
+      - name: Provision locked Chromium in disposable repository test state
+        run: npm run setup:browser -- --with-deps
+      - run: npm run check:types
+      - run: npm run test:browser
+      - run: npm run test:site:browser
+      - name: Upload public-site failure screenshots only
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-site-failures
+          path: .specpi-test/browser-artifacts/*.png
+          if-no-files-found: ignore
+          retention-days: 3

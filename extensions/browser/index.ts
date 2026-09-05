@@ -1,9 +1,23 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { Browser, BrowserContext, Page } from "playwright";
+import { Check } from "typebox/value";
+import { BrowserDiagnostics, DIAGNOSTIC_CATEGORIES } from "./diagnostics.ts";
+import { BrowserCleanupError, settleBrowserCleanup } from "./lifecycle.ts";
+import {
+    PressParams,
+    SelectionParams,
+    WaitParams,
+    interactionTimeout,
+    selectionOptions,
+    validateKey,
+    validateWait,
+    waitForCondition,
+} from "./interactions.ts";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { Type } from "typebox";
+import { Type, type TSchema } from "typebox";
 import {
     MAX_CAPTURE_DIMENSION,
     MAX_CAPTURE_PIXELS,
@@ -75,10 +89,25 @@ const CompareParams = Type.Object({
     maxDiffPixelRatio: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
 });
 
+const DiagnosticsParams = Type.Object(
+    {
+        maxEntries: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+        maxChars: Type.Optional(Type.Integer({ minimum: 1000, maximum: 30000 })),
+        category: Type.Optional(StringEnum(DIAGNOSTIC_CATEGORIES)),
+        cursor: Type.Optional(Type.String({ maxLength: 80 })),
+        clear: Type.Optional(
+            Type.Boolean({
+                description: "Atomically read then clear ALL retained records, including filtered/unreturned records.",
+            }),
+        ),
+    },
+    { additionalProperties: false },
+);
+
 type BrowserState = {
-    browser?: any;
-    context?: any;
-    page?: any;
+    browser?: Browser;
+    context?: BrowserContext;
+    page?: Page;
     runtime?: Awaited<ReturnType<typeof loadBrowserRuntime>>;
     acceptedRefs: Set<string>;
     assignedRefs: Set<string>;
@@ -105,6 +134,12 @@ function imageContent(file: string, data: Buffer, note: string) {
 export default function browserExtension(pi: ExtensionAPI) {
     const state: BrowserState = { acceptedRefs: new Set(), assignedRefs: new Set() };
     let operationTail: Promise<unknown> = Promise.resolve();
+    const diagnostics = new BrowserDiagnostics();
+    let detachPageListeners: (() => void) | undefined;
+    let shutdownTask: Promise<void> | undefined;
+    let cleanupFailure: BrowserCleanupError | undefined;
+    const sessionAbort = new AbortController();
+    const lateDiscards = new Set<() => Promise<unknown>>();
 
     function serialized<T>(operation: () => Promise<T>): Promise<T> {
         const result = operationTail.then(operation, operation);
@@ -113,15 +148,51 @@ export default function browserExtension(pi: ExtensionAPI) {
         return result;
     }
 
-    async function shutdownNow() {
+    function shutdownNow(): Promise<void> {
+        if (shutdownTask) {
+            return shutdownTask;
+        }
+
         const context = state.context;
         const browser = state.browser;
+        detachPageListeners?.();
+        detachPageListeners = undefined;
+        diagnostics.reset();
         state.page = undefined;
         state.context = undefined;
         state.browser = undefined;
         state.acceptedRefs.clear();
         state.assignedRefs.clear();
-        await Promise.allSettled([context?.close(), browser?.close()].filter(Boolean));
+        // Defer one microtask so all nested abort handlers can register pending launch disposal.
+        const task = Promise.resolve().then(async () => {
+            const discards = [...lateDiscards];
+            try {
+                // Closing the browser closes its contexts too; concurrent closes race in Chromium.
+                await settleBrowserCleanup([
+                    ...(browser ? [browser.close()] : context ? [context.close()] : []),
+                    ...discards.map((discard) => discard()),
+                ]);
+                for (const discard of discards) {
+                    lateDiscards.delete(discard);
+                }
+
+                cleanupFailure = undefined;
+            } catch (error) {
+                cleanupFailure = error instanceof BrowserCleanupError ? error : new BrowserCleanupError();
+                // Retain only teardown handles for an explicit close retry, including late launch handles.
+                state.context = context;
+                state.browser = browser;
+                throw cleanupFailure;
+            }
+        });
+        shutdownTask = task;
+        void task
+            .finally(() => {
+                shutdownTask = undefined;
+            })
+            .catch(() => {});
+
+        return task;
     }
 
     async function cancellable<T>(
@@ -130,6 +201,7 @@ export default function browserExtension(pi: ExtensionAPI) {
         discard?: (value: T) => Promise<unknown>,
     ): Promise<T> {
         if (signal?.aborted) {
+            await shutdownNow();
             throw abortedError();
         }
 
@@ -148,7 +220,8 @@ export default function browserExtension(pi: ExtensionAPI) {
 
                 settled = true;
                 if (discard && operation) {
-                    void operation.then(discard).catch(() => {});
+                    const pending = operation;
+                    lateDiscards.add(() => pending.then(discard, () => undefined));
                 }
 
                 void shutdownNow().then(() => reject(abortedError()), reject);
@@ -195,8 +268,17 @@ export default function browserExtension(pi: ExtensionAPI) {
         });
     }
 
-    async function ensurePage(signal?: AbortSignal) {
+    async function ensurePage(signal?: AbortSignal): Promise<Page> {
+        if (shutdownTask) {
+            await shutdownTask;
+        }
+
+        if (cleanupFailure) {
+            throw cleanupFailure;
+        }
+
         if (signal?.aborted) {
+            await shutdownNow();
             throw abortedError();
         }
 
@@ -204,17 +286,17 @@ export default function browserExtension(pi: ExtensionAPI) {
             state.runtime = await cancellable(() => loadBrowserRuntime(runtimeDir), signal);
         }
 
-        if (!state.browser?.isConnected()) {
+        if (!state.browser?.isConnected() || !state.page || state.page.isClosed()) {
             await shutdownNow();
             try {
                 state.browser = await cancellable(
                     () => state.runtime!.playwright.chromium.launch({ headless: true }),
                     signal,
-                    (browser: any) => browser.close(),
+                    (browser) => browser.close(),
                 );
                 state.context = await cancellable(
                     () =>
-                        state.browser.newContext({
+                        state.browser!.newContext({
                             viewport: resolveViewport({ preset: "desktop" }),
                             reducedMotion: "reduce",
                             colorScheme: "light",
@@ -222,22 +304,37 @@ export default function browserExtension(pi: ExtensionAPI) {
                         }),
                     signal,
                 );
-                state.page = await cancellable(() => state.context.newPage(), signal);
+                state.page = await cancellable(() => state.context!.newPage(), signal);
+                const page = state.page;
+                const detachDiagnostics = diagnostics.attach(page);
+                const navigated = (frame: import("playwright").Frame) => {
+                    if (frame === page.mainFrame()) {
+                        state.acceptedRefs.clear();
+                        state.assignedRefs.clear();
+                        diagnostics.navigated();
+                    }
+                };
+
+                page.on("framenavigated", navigated);
+                detachPageListeners = () => {
+                    detachDiagnostics();
+                    page.off("framenavigated", navigated);
+                };
             } catch (error) {
                 await shutdownNow();
                 throw error;
             }
         }
 
-        return state.page;
+        return state.page!;
     }
 
-    async function stabilize(page: any, signal?: AbortSignal) {
+    async function stabilize(page: Page, signal?: AbortSignal) {
         await cancellable(() => page.addStyleTag({ content: deterministicStyle }), signal);
         await cancellable(() => page.evaluate(() => document.fonts?.ready), signal);
     }
 
-    async function assertCaptureBounds(page: any, fullPage: boolean, signal?: AbortSignal) {
+    async function assertCaptureBounds(page: Page, fullPage: boolean, signal?: AbortSignal) {
         const dimensions = fullPage
             ? await cancellable(
                   () =>
@@ -293,7 +390,7 @@ export default function browserExtension(pi: ExtensionAPI) {
             : makeArtifactPath(agentDir, process.env.PI_SESSION_ID, kind);
     }
 
-    function targetLocator(page: any, target: string) {
+    function targetLocator(page: Page, target: string) {
         const value = target.trim();
         if (value.startsWith("@spec-")) {
             if (!state.acceptedRefs.has(value)) {
@@ -310,14 +407,104 @@ export default function browserExtension(pi: ExtensionAPI) {
         return page.locator(value);
     }
 
-    const register = (definition: any) => {
+    const register = <T extends TSchema>(definition: ToolDefinition<T, unknown>) => {
         const execute = definition.execute;
         pi.registerTool({
             ...definition,
             executionMode: "sequential",
-            execute: (...args: any[]) => serialized(() => execute(...args)),
+            async execute(...args) {
+                if (!Check(definition.parameters, args[1])) {
+                    throw new Error("Invalid browser tool parameters.");
+                }
+
+                const bounded = ["browser_press", "browser_select_option", "browser_wait_for"].includes(
+                    definition.name,
+                );
+                const controller = new AbortController();
+                const originalSignal = args[2];
+                const signal = AbortSignal.any([
+                    sessionAbort.signal,
+                    controller.signal,
+                    ...(originalSignal ? [originalSignal] : []),
+                ]);
+                const timer = bounded
+                    ? setTimeout(
+                          () => controller.abort(),
+                          interactionTimeout((args[1] as { timeoutMs?: number }).timeoutMs),
+                      )
+                    : undefined;
+                try {
+                    return await cancellable(
+                        () =>
+                            serialized(() => {
+                                if (signal.aborted) {
+                                    throw abortedError();
+                                }
+
+                                return execute(args[0], args[1], signal, args[3], args[4]);
+                            }),
+                        signal,
+                    );
+                } catch (error) {
+                    if (error instanceof BrowserCleanupError) {
+                        throw error;
+                    }
+
+                    if (controller.signal.aborted && !originalSignal?.aborted) {
+                        throw new Error("Browser condition/action timed out before its deadline.");
+                    }
+
+                    throw error;
+                } finally {
+                    clearTimeout(timer);
+                }
+            },
         });
     };
+
+    async function interaction<T>(
+        timeout: number,
+        signal: AbortSignal | undefined,
+        operation: (page: Page, signal: AbortSignal) => Promise<T>,
+    ): Promise<T> {
+        const controller = new AbortController();
+        let expired = false;
+        const abort = () => controller.abort();
+        signal?.addEventListener("abort", abort, { once: true });
+        if (signal?.aborted) {
+            controller.abort();
+        }
+
+        const timer = setTimeout(() => {
+            expired = true;
+            controller.abort();
+        }, timeout);
+        try {
+            const page = await ensurePage(controller.signal);
+
+            return await cancellable(() => operation(page, controller.signal), controller.signal);
+        } catch (error) {
+            if (error instanceof BrowserCleanupError) {
+                throw error;
+            }
+
+            // Never expose Playwright call logs: these can echo input values, selectors, or URLs.
+            if (expired || (error instanceof Error && error.name === "TimeoutError")) {
+                throw new Error("Browser condition/action timed out before its deadline.");
+            }
+
+            if (signal?.aborted) {
+                throw abortedError();
+            }
+
+            throw new Error(
+                "Browser action failed. Check the target, state, key/options, and runtime setup; refresh the snapshot if refs are stale.",
+            );
+        } finally {
+            clearTimeout(timer);
+            signal?.removeEventListener("abort", abort);
+        }
+    }
 
     register({
         name: "browser_open",
@@ -327,13 +514,13 @@ export default function browserExtension(pi: ExtensionAPI) {
         promptSnippet: "Open local or remote web pages in an isolated browser for rendered validation",
         promptGuidelines: ["Use browser_open and browser_snapshot before claiming a web UI renders correctly."],
         parameters: OpenParams,
-        async execute(_id: string, params: any, signal: AbortSignal | undefined) {
+        async execute(_id, params, signal) {
             const page = await ensurePage(signal);
+            state.acceptedRefs.clear();
             const response = await cancellable(
                 () => page.goto(normalizeBrowserUrl(params.url), { waitUntil: params.waitUntil ?? "domcontentloaded" }),
                 signal,
             );
-            state.acceptedRefs.clear();
             const title = await cancellable(() => page.title(), signal);
 
             return {
@@ -353,11 +540,11 @@ export default function browserExtension(pi: ExtensionAPI) {
         label: "Browser Viewport",
         description: "Set the active browser viewport to desktop, tablet, mobile, or bounded explicit dimensions.",
         parameters: ViewportParams,
-        async execute(_id: string, params: any, signal: AbortSignal | undefined) {
+        async execute(_id, params, signal) {
             const page = await ensurePage(signal);
             const viewport = resolveViewport(params);
-            await cancellable(() => page.setViewportSize(viewport), signal);
             state.acceptedRefs.clear();
+            await cancellable(() => page.setViewportSize(viewport), signal);
 
             return {
                 content: [{ type: "text", text: `Viewport set to ${viewport.width}x${viewport.height}.` }],
@@ -370,10 +557,10 @@ export default function browserExtension(pi: ExtensionAPI) {
         name: "browser_snapshot",
         label: "Browser Snapshot",
         description:
-            "Inspect bounded rendered page text and interactive elements. Returns namespaced refs usable by browser_click and browser_fill.",
+            "Inspect bounded rendered page text and interactive elements. Returns namespaced refs usable by click, fill, press, select_option, and wait_for browser tools.",
         promptSnippet: "Inspect rendered DOM text and interactive controls",
         parameters: SnapshotParams,
-        async execute(_id: string, params: any, signal: AbortSignal | undefined) {
+        async execute(_id, params, signal) {
             const page = await ensurePage(signal);
             const maxChars = params.maxChars ?? 30000;
             const namespace = crypto.randomUUID();
@@ -381,10 +568,10 @@ export default function browserExtension(pi: ExtensionAPI) {
             const snapshot = await cancellable(
                 () =>
                     page.evaluate(
-                        ({ namespace, bodyLimit, priorRefs }: any) => {
+                        ({ namespace, bodyLimit, priorRefs }) => {
                             const prior = new Set(priorRefs);
                             document.querySelectorAll("[data-specpi-ref]").forEach((element) => {
-                                if (prior.has(element.getAttribute("data-specpi-ref"))) {
+                                if (prior.has(element.getAttribute("data-specpi-ref") ?? "")) {
                                     element.removeAttribute("data-specpi-ref");
                                 }
                             });
@@ -500,8 +687,8 @@ export default function browserExtension(pi: ExtensionAPI) {
                 snapshot.controls.pop();
             }
 
-            state.assignedRefs = new Set(snapshot.controls.map((control: any) => control.ref.slice(1)));
-            state.acceptedRefs = new Set(snapshot.controls.map((control: any) => control.ref));
+            state.assignedRefs = new Set(snapshot.controls.map((control) => control.ref.slice(1)));
+            state.acceptedRefs = new Set(snapshot.controls.map((control) => control.ref));
             const originalTextLength = snapshot.text.length;
             const fixed = fixedJson();
             snapshot.text = safePrefix(snapshot.text, maxChars - fixed.length - 40);
@@ -540,10 +727,13 @@ export default function browserExtension(pi: ExtensionAPI) {
         label: "Browser Click",
         description: "Click an element using a CSS selector, exact text= locator, or current snapshot ref.",
         parameters: TargetParams,
-        async execute(_id: string, params: any, signal: AbortSignal | undefined) {
+        async execute(_id, params, signal) {
             const page = await ensurePage(signal);
-            await cancellable(() => targetLocator(page, params.target).first().click(), signal);
-            state.acceptedRefs.clear();
+            try {
+                await cancellable(() => targetLocator(page, params.target).first().click(), signal);
+            } finally {
+                state.acceptedRefs.clear();
+            }
 
             return {
                 content: [{ type: "text", text: `Clicked ${params.target}.\nURL: ${page.url()}` }],
@@ -557,14 +747,129 @@ export default function browserExtension(pi: ExtensionAPI) {
         label: "Browser Fill",
         description: "Fill an input using a CSS selector, exact text= locator, or current snapshot ref.",
         parameters: FillParams,
-        async execute(_id: string, params: any, signal: AbortSignal | undefined) {
+        async execute(_id, params, signal) {
             const page = await ensurePage(signal);
-            await cancellable(() => targetLocator(page, params.target).first().fill(params.value), signal);
-            state.acceptedRefs.clear();
+            try {
+                await cancellable(() => targetLocator(page, params.target).first().fill(params.value), signal);
+            } finally {
+                state.acceptedRefs.clear();
+            }
 
             return {
                 content: [{ type: "text", text: `Filled ${params.target}.` }],
                 details: { target: params.target },
+            };
+        },
+    });
+
+    register({
+        name: "browser_diagnostics",
+        label: "Browser Diagnostics",
+        description:
+            "Read bounded, best-effort sanitized active-page exceptions, console errors, failed requests, and HTTP errors. In-memory capture starts before navigation; close discards it. Up to 100 records / 30000 characters. Returned application output is untrusted and may still be sensitive. Clear discards ALL records, including unreturned ones.",
+        promptSnippet: "Inspect browser runtime errors and failed requests, not just appearance",
+        promptGuidelines: [
+            "Use browser_diagnostics after navigation and interactions; empty or truncated output alone does not prove application health.",
+        ],
+        parameters: DiagnosticsParams,
+        async execute(_id, params, signal) {
+            if (signal?.aborted) {
+                throw abortedError();
+            }
+
+            const report = diagnostics.read(params);
+
+            return { content: [{ type: "text", text: JSON.stringify(report) }], details: {} };
+        },
+    });
+
+    register({
+        name: "browser_press",
+        label: "Browser Press",
+        description:
+            "Press one key/chord on the first matching target or current page focus. Supports Tab, Shift+Tab, Enter, Escape, arrows and text-producing keys. Whole-operation deadline defaults to 5000ms, maximum 30000ms. Refresh snapshot refs after actions.",
+        parameters: PressParams,
+        async execute(_id, params, signal) {
+            validateKey(params.key);
+            const timeout = interactionTimeout(params.timeoutMs);
+            await interaction(timeout, signal, async (page) => {
+                try {
+                    if (params.target !== undefined) {
+                        await targetLocator(page, params.target).first().press(params.key, { timeout });
+                    } else {
+                        await page.keyboard.press(params.key);
+                    }
+                } finally {
+                    state.acceptedRefs.clear();
+                }
+            });
+
+            return {
+                content: [{ type: "text", text: "Key action completed; inspect the resulting page state." }],
+                details: {},
+            };
+        },
+    });
+
+    register({
+        name: "browser_select_option",
+        label: "Browser Select Option",
+        description:
+            "Select native select options on the first matching target, by exactly one value, label, or index per option. Up to 50 options. Not for custom dropdowns. Deadline defaults to 5000ms, maximum 30000ms; refresh snapshot refs afterward.",
+        parameters: SelectionParams,
+        async execute(_id, params, signal) {
+            const options = selectionOptions(params);
+            const timeout = interactionTimeout(params.timeoutMs);
+            const count = await interaction(timeout, signal, async (page) => {
+                try {
+                    const target = targetLocator(page, params.target).first();
+                    if (options.length > 1) {
+                        const multiple = await target.evaluate(
+                            (element) => element instanceof HTMLSelectElement && element.multiple,
+                            undefined,
+                            { timeout },
+                        );
+                        if (!multiple) {
+                            throw new Error("Multiple options require a native multiple select.");
+                        }
+                    }
+
+                    const selected = await target.selectOption(options, { timeout });
+
+                    return selected.length;
+                } finally {
+                    state.acceptedRefs.clear();
+                }
+            });
+
+            return {
+                content: [{ type: "text", text: `Selected ${count} option(s); inspect the resulting page state.` }],
+                details: { count },
+            };
+        },
+    });
+
+    register({
+        name: "browser_wait_for",
+        label: "Browser Wait For",
+        description:
+            "Wait for one explicit state: first matching target attached/detached/visible/hidden, exact target text, or exact normalized HTTP(S) URL. No scripts or sleep mode. Whole-operation deadline defaults to 5000ms, maximum 30000ms. Timeout is not success.",
+        parameters: WaitParams,
+        async execute(_id, params, signal) {
+            validateWait(params);
+            const timeout = interactionTimeout(params.timeoutMs);
+            await interaction(timeout, signal, (page) =>
+                waitForCondition(
+                    page,
+                    params.target ? targetLocator(page, params.target).first() : undefined,
+                    params,
+                    timeout,
+                ),
+            );
+
+            return {
+                content: [{ type: "text", text: `Observed requested ${params.condition} condition.` }],
+                details: { condition: params.condition },
             };
         },
     });
@@ -575,13 +880,7 @@ export default function browserExtension(pi: ExtensionAPI) {
         description: "Capture a bounded rendered PNG and return it inline when conservatively sized.",
         promptSnippet: "Capture rendered desktop, tablet, or mobile screenshots for visual QA",
         parameters: ScreenshotParams,
-        async execute(
-            _id: string,
-            params: any,
-            signal: AbortSignal | undefined,
-            _update: unknown,
-            ctx: ExtensionContext,
-        ) {
+        async execute(_id, params, signal, _update, ctx) {
             const shot = await captureMemory(signal, params.fullPage ?? false);
             const file = outputPath(ctx, params.path, "screenshot");
             await publishBuffer(file, shot.data, { overwrite: params.overwrite === true, signal });
@@ -605,13 +904,7 @@ export default function browserExtension(pi: ExtensionAPI) {
         description:
             "Explicitly create a visual-regression baseline PNG. Existing baselines are replaced only when overwrite=true.",
         parameters: BaselineParams,
-        async execute(
-            _id: string,
-            params: any,
-            signal: AbortSignal | undefined,
-            _update: unknown,
-            ctx: ExtensionContext,
-        ) {
+        async execute(_id, params, signal, _update, ctx) {
             const file = resolveUserPath(ctx.cwd, params.path, "baseline path");
             const shot = await captureMemory(signal, params.fullPage ?? false);
             await publishBuffer(file, shot.data, { overwrite: params.overwrite === true, signal });
@@ -630,13 +923,7 @@ export default function browserExtension(pi: ExtensionAPI) {
             "Capture the current page and compare it with an explicit baseline PNG without changing the baseline.",
         promptSnippet: "Compare rendered output against an explicit PNG baseline with a pixel threshold",
         parameters: CompareParams,
-        async execute(
-            _id: string,
-            params: any,
-            signal: AbortSignal | undefined,
-            _update: unknown,
-            ctx: ExtensionContext,
-        ) {
+        async execute(_id, params, signal, _update, ctx) {
             const baselinePath = resolveUserPath(ctx.cwd, params.baselinePath, "baseline path");
             const currentPath = outputPath(ctx, params.currentPath, "current");
             const diffPath = outputPath(ctx, params.diffPath, "diff");
@@ -719,5 +1006,10 @@ export default function browserExtension(pi: ExtensionAPI) {
         },
     });
 
-    pi.on("session_shutdown", () => serialized(shutdownNow));
+    pi.on("session_shutdown", () => {
+        // Teardown preempts queued/active work, including waits without their own Playwright timeout.
+        sessionAbort.abort();
+
+        return shutdownNow();
+    });
 }

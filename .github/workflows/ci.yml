@@ -8,6 +8,9 @@ permissions:
   contents: read
 
 jobs:
+  browser:
+    uses: ./.github/workflows/browser-tests.yml
+
   test:
     runs-on: ubuntu-latest
     steps:
