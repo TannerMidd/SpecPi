@@ -11,55 +11,69 @@ function boundedJson(value, label) {
     }
 
     if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > MAX_CONTEXT_BYTES) {
-        throw new Error(`Delegation ${label} exceeds the 256 KiB retained input limit`);
+        throw new Error(`Delegation ${label} exceeds the 256 KiB retained data limit`);
     }
 
-    return JSON.parse(serialized);
+    return serialized;
+}
+
+function recordWithKeys(value, keys) {
+    return (
+        value !== null &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        Reflect.ownKeys(value).every((key) => keys.includes(key))
+    );
+}
+
+function validContext(value) {
+    return (
+        recordWithKeys(value, ["systemPrompt", "messages", "tools"]) &&
+        typeof value.systemPrompt === "string" &&
+        Array.isArray(value.messages) &&
+        Array.isArray(value.tools)
+    );
 }
 
 function abortError() {
     return new DOMException("Delegation request was cancelled", "AbortError");
 }
 
-/** A credential-blind capability over the public request pipeline of an owned Pi parent. */
-export function createPiHost(session, { id, isCurrent }) {
-    const owner = session?.agent;
-    const model = owner?.state?.model;
-    const thinkingLevel = owner?.state?.thinkingLevel;
+/** Native registry calls keep credentials in Pi; they do not inherit parent inference hooks or settings. */
+export function createNativePiHost(ctx, { id, isCurrent } = {}) {
+    const registry = ctx?.modelRegistry;
+    const model = ctx?.model;
     if (
         typeof id !== "string" ||
         !id ||
         typeof isCurrent !== "function" ||
         !model ||
         typeof model.id !== "string" ||
+        !model.id ||
         typeof model.provider !== "string" ||
-        typeof owner.streamFunction !== "function" ||
-        typeof owner.convertToLlm !== "function"
+        !model.provider ||
+        typeof registry?.complete !== "function"
     ) {
-        throw new Error("Delegation requires a compatible owned Pi parent");
+        throw new Error("Delegation requires a compatible native Pi model registry");
     }
 
     const modelId = model.id;
     const providerId = model.provider;
-    const streamFunction = owner.streamFunction;
-    const transformContext = owner.transformContext;
-    const convertToLlm = owner.convertToLlm;
-    const onPayload = owner.onPayload;
-    const onResponse = owner.onResponse;
-    const parentSessionId = owner.sessionId;
-    const current = () =>
-        isCurrent() === true &&
-        session.agent === owner &&
-        owner.state.model === model &&
-        model.id === modelId &&
-        model.provider === providerId &&
-        owner.state.thinkingLevel === thinkingLevel &&
-        owner.streamFunction === streamFunction &&
-        owner.transformContext === transformContext &&
-        owner.convertToLlm === convertToLlm &&
-        owner.onPayload === onPayload &&
-        owner.onResponse === onResponse &&
-        owner.sessionId === parentSessionId;
+    const complete = registry.complete;
+    const current = () => {
+        try {
+            return (
+                isCurrent() === true &&
+                ctx.modelRegistry === registry &&
+                ctx.model === model &&
+                registry.complete === complete &&
+                model.id === modelId &&
+                model.provider === providerId
+            );
+        } catch {
+            return false;
+        }
+    };
 
     function assertCurrent(signal) {
         if (signal?.aborted) {
@@ -74,11 +88,9 @@ export function createPiHost(session, { id, isCurrent }) {
     return Object.freeze({
         id,
         model: Object.freeze({ id: modelId, provider: providerId }),
-        thinkingLevel,
         isCurrent: current,
         async stream(context, options = {}) {
-            const allowedOptions = new Set(["signal", "maxTokens", "timeoutMs", "sessionId"]);
-            if (Object.keys(options).some((key) => !allowedOptions.has(key))) {
+            if (!recordWithKeys(options, ["signal", "maxTokens", "timeoutMs", "sessionId"])) {
                 throw new Error("Unsupported delegation inference option");
             }
 
@@ -92,104 +104,68 @@ export function createPiHost(session, { id, isCurrent }) {
                 timeoutMs < 1 ||
                 timeoutMs > MAX_TIMEOUT_MS ||
                 typeof sessionId !== "string" ||
-                !/^[a-zA-Z0-9_-]{1,128}$/u.test(sessionId) ||
-                sessionId === parentSessionId
+                !/^[a-zA-Z0-9_-]{1,128}$/u.test(sessionId)
             ) {
                 throw new Error("Invalid bounded delegation inference options");
             }
 
-            const requestController = new AbortController();
-            const requestSignal = AbortSignal.any([signal, requestController.signal, AbortSignal.timeout(timeoutMs)]);
+            const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
             assertCurrent(requestSignal);
-            if (
-                !context ||
-                typeof context !== "object" ||
-                Object.keys(context).some((key) => !["systemPrompt", "messages", "tools"].includes(key)) ||
-                typeof context.systemPrompt !== "string" ||
-                !Array.isArray(context.messages) ||
-                !Array.isArray(context.tools)
-            ) {
+            if (!validContext(context)) {
                 throw new Error("Invalid delegation context");
             }
 
-            const input = boundedJson(context, "context");
-            let messages = input.messages;
-            if (transformContext) {
-                messages = await transformContext.call(owner, messages, requestSignal);
-                assertCurrent(requestSignal);
-                boundedJson({ ...input, messages }, "transformed context");
+            const input = JSON.parse(boundedJson(context, "context"));
+            if (!validContext(input)) {
+                throw new Error("Invalid delegation context");
             }
 
-            messages = await convertToLlm.call(owner, messages);
             assertCurrent(requestSignal);
-            const converted = boundedJson({ ...input, messages }, "converted context");
-            if (!Array.isArray(converted.messages)) {
-                throw new Error("Delegation context conversion did not return messages");
-            }
-
-            const stream = await streamFunction.call(owner, model, converted, {
-                signal: requestSignal,
-                maxTokens,
-                timeoutMs,
-                sessionId,
-                reasoning: thinkingLevel === "off" ? undefined : thinkingLevel,
-                transport: owner.transport,
-                thinkingBudgets: owner.thinkingBudgets,
-                maxRetryDelayMs: owner.maxRetryDelayMs,
-                maxRetries: 0,
-                onPayload: async (payload, requestModel) => {
-                    assertCurrent(requestSignal);
-                    boundedJson(payload, "provider payload");
-                    const replacement = onPayload ? await onPayload.call(owner, payload, requestModel) : undefined;
-                    assertCurrent(requestSignal);
-                    boundedJson(replacement ?? payload, "provider payload");
-
-                    return replacement;
-                },
-                onResponse: async (response, requestModel) => {
-                    assertCurrent(requestSignal);
-                    if (onResponse) {
-                        await onResponse.call(owner, response, requestModel);
-                    }
-
-                    assertCurrent(requestSignal);
-                },
-            });
-            try {
+            // One invocation of Pi's registry. Common options request limits where adapters
+            // support them; no parent thinking, transport, context, or request hooks are copied.
+            const pending = Promise.resolve(
+                complete.call(registry, model, input, {
+                    signal: requestSignal,
+                    maxTokens,
+                    timeoutMs,
+                    sessionId,
+                    maxRetries: 0,
+                }),
+            ).then((result) => {
+                // Never race cancellation or revocation against settlement: the caller keeps
+                // its slot until the original registry promise finishes, even after abort.
                 assertCurrent(requestSignal);
+                // The registry exposes only the final parsed response. This limit cannot
+                // prevent allocations made earlier by Pi, its provider, or the transport.
+                boundedJson(result, "response");
                 if (
-                    !stream ||
-                    typeof stream[Symbol.asyncIterator] !== "function" ||
-                    typeof stream.result !== "function"
+                    result?.role !== "assistant" ||
+                    !Array.isArray(result.content) ||
+                    !["stop", "length", "toolUse", "deferred", "error", "aborted"].includes(result.stopReason)
                 ) {
-                    throw new Error("Pi did not return a supported inference stream");
-                }
-            } catch (error) {
-                requestController.abort();
-                // Dispatch already happened. Keep the caller's slot occupied until the
-                // provider settles, even when it ignores cancellation or returns late.
-                if (typeof stream?.result === "function") {
-                    try {
-                        await stream.result();
-                    } catch {
-                        // Preserve the original lease/validation error after settlement.
-                    }
+                    throw new Error("Pi returned an invalid delegation response");
                 }
 
-                throw error;
-            }
+                // Keep all original assistant fields, including provider signatures and
+                // opaque metadata needed when a later tool turn replays this message.
+                return result;
+            });
+            // A caller may consume the stream later. Keep rejection handling attached while
+            // preserving the original rejection for both public consumers below.
+            void pending.catch(() => {});
 
-            // This bounds our inputs, not provider buffers or raw transport bytes. The worker
-            // separately limits retained output and aborts when it observes oversized events.
             return {
                 async *[Symbol.asyncIterator]() {
-                    for await (const event of stream) {
-                        assertCurrent(requestSignal);
-                        yield event;
+                    const result = await pending;
+                    assertCurrent(requestSignal);
+                    if (["error", "aborted"].includes(result.stopReason)) {
+                        yield { type: "error", reason: result.stopReason, error: result };
+                    } else {
+                        yield { type: "done", reason: result.stopReason, message: result };
                     }
                 },
                 async result() {
-                    const result = await stream.result();
+                    const result = await pending;
                     assertCurrent(requestSignal);
 
                     return result;

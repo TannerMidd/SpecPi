@@ -4,7 +4,7 @@ Status: archived target architecture, not the implemented runtime contract.
 
 The experimental implementation is part of `specpi` and is disabled by default.
 Read the [implemented guide](README.md) and [calls/time protocol](protocol.md) for
-supported commands, exact SDK compatibility, limits and trust assumptions. This
+supported commands, tested API compatibility, limits and trust assumptions. This
 document preserves the original broader proposal, including unimplemented live-web,
 alternative-model, monetary, raw-transport and underlying-attempt guarantees. Its
 normative requirements, command sketches and delivery stages are targets, not runtime
@@ -324,11 +324,13 @@ spend counter must not be presented as the total task budget.
 
 ## 8. Pi runtime and package boundary
 
-The following records the original compatibility analysis. The current experiment
-uses the explicit `specpi agent` SDK host at Pi 0.84.4 exactly; its supported pipeline
-and remaining transport limitations are documented in the [implemented guide](README.md).
-The target `InferencePort` contract below is not an exported Pi API or a claim that
-the experiment enforces every underlying provider attempt or raw response byte.
+The following records the original compatibility analysis and its stronger target.
+The current native experiment instead uses public `ctx.modelRegistry.complete`, with
+Pi 0.84.4 as its compatibility-test floor and a capability check. It deliberately does
+not promise full parent inference parity: parent hooks, transport/thinking settings
+and session affinity are not inherited, and output is checked after completion only.
+See the [implemented guide](README.md). The target `InferencePort` below is not an
+exported Pi API or a claim that the experiment supplies these stronger guarantees.
 
 **Production is gated on a supported host request capability.** Inspection of Pi
 `v0.84.4`, SpecPi's reviewed host floor, found an important distinction:

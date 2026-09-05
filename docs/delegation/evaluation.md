@@ -8,9 +8,9 @@ provider. No comparative outcome experiment is reported here. The numeric criter
 below remain proposed hypotheses, not research-derived constants or achieved results.
 
 The [archived architecture](design.md) and [target protocol](design-protocol.md) retain
-stronger proof obligations. In particular, raw-transport bounds, admission of every
-underlying provider attempt and monetary admission remain unmet by the implemented
-`experimental-calls-time-v1` contract.
+stronger proof obligations. In particular, full parent request-pipeline parity,
+midstream/raw-transport bounds, admission of every underlying provider attempt and
+monetary admission remain unmet by the native `experimental-calls-time-v1` contract.
 
 ## 1. Decide what improvement means before a run
 
@@ -152,10 +152,13 @@ The implementation includes deterministic fake-provider and broker fixtures. Run
 relevant suites and record their actual results before live inference; this checklist
 is not itself a passing receipt. The supported calls/time contract requires coverage for:
 
-- Exact host-version exports, extension-loader aliases and controlled resource discovery
-  at startup, reload and session replacement, including the explicit project-trust flag.
-- Host-versus-child request parity for effective provider route, headers, endpoint,
-  request hooks, thinking options, transport, retry settings and attribution.
+- Native Pi package discovery, public completion availability at the reviewed 0.84.4
+  floor, and deterministic rejection when that capability is absent.
+- Exact active-model and registry binding, explicit bounded text context, validated
+  options and provider-default reasoning; no parent request hooks, transport/thinking
+  settings or session-affinity inheritance is claimed.
+- Normal Pi ownership of resource discovery, trust, proxy policy and authentication,
+  without a separate SDK host or bootstrap override.
 - Native and legacy provider composition using synthetic credentials only; no secrets
   returned to the extension, logged, or copied into packets.
 - Errors represented as resolved terminal messages, setup failure and missing usage.
@@ -163,8 +166,9 @@ is not itself a passing receipt. The supported calls/time contract requires cove
   a broker operation; non-cooperative provider settlement and late output rejection.
 - Concurrent call-slot accounting, duplicate submissions, aggregate counters and
   non-resetting follow-up limits; cancelled requests keep slots until settlement.
-- Retained parsed response overflow, bounded reports and tool output, and correct
-  settlement state; requested output tokens are not a raw-response guarantee.
+- Oversized complete responses rejected after the Promise resolves, bounded reports
+  and tool output, and correct settlement state; requested output tokens do not
+  establish a midstream, allocation or raw-response guarantee.
 - Lost collection responses, cursor replay, idempotent follow-up and resolution,
   stale result revisions, conflicting idempotency payloads and cancelled-job revival.
 - Asynchronous job leases surviving normal `run` return without retaining stale
@@ -173,7 +177,10 @@ is not itself a passing receipt. The supported calls/time contract requires cove
 - Path traversal, encoded paths, symlinks/reparse points, private files, source changes,
   invalid line ranges and oversized input/output.
 - Actual branch navigation versus ordinary leaf advancement; model, task, scope and
-  policy changes during queued and active work.
+  policy changes during queued and active work; controller and aggregate quotas
+  retained across reloads, session switches and off/on within the Pi process.
+- Fixed canonical working root, with a Pi restart required for a new root or runtime
+  version rather than loading changed implementation code through `/reload`.
 - No worker writes, recursion, arbitrary process execution or copied parent-tool bypass.
 - Normal parent-tool-result retention through Pi versus in-memory worker state, accurate
   privacy disclosure, bounded retained data, cleanup and no automatic resume.
@@ -183,6 +190,9 @@ is not itself a passing receipt. The supported calls/time contract requires cove
 The following remain requirements before claiming the corresponding guarantees in
 the [target protocol](design-protocol.md):
 
+- Full parent inference-pipeline parity, including context/header/payload/response hooks,
+  transport/thinking settings and session affinity. The native public completion
+  bridge does not supply this contract.
 - Every underlying inference attempt, including transport fallback or an internal SDK
   retry, receives pre-dispatch admission; opaque attempts are rejected and initial
   dispatch is not double-debited.
@@ -191,10 +201,11 @@ the [target protocol](design-protocol.md):
 - Monetary reservations account conservatively for provider pricing, uncertain dispatch,
   retries and settlement, with honest unknown-cost behavior.
 
-The current runtime disables configurable retries, counts model invocations, bounds
-time and retained parsed output, and reports cost as unavailable. These controls do not
-pass the stronger gates: adapters may buffer an event or make transport attempts before
-SpecPi observes them. The narrower experiment must reject policies requiring unsupported
+The current runtime disables configurable retries, counts model invocations, enforces
+logical deadlines, validates inputs before dispatch and checks complete responses only
+after the returned Promise resolves. It reports cost as unavailable. These controls do
+not pass the stronger gates: adapters may buffer the whole response or make transport
+attempts before SpecPi observes completion. The narrower experiment must reject policies requiring unsupported
 guarantees. Its fixture tests cannot be presented as transport, invoice or process-memory
 proof. The unimplemented recovery/retry policy also needs separate fault-class tests.
 

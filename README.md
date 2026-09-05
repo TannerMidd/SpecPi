@@ -24,15 +24,15 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-The released baseline is `0.11.2`, including task cards, verification receipts, and human outcome assessments. This checkout also contains the unreleased experimental delegation host described below. See the [release notes](CHANGELOG.md) for the change list.
+The released baseline is `0.11.2`, including task cards, verification receipts, and human outcome assessments. This checkout also contains the unreleased experimental native delegation extension described below. See the [release notes](CHANGELOG.md) for the change list.
 
 ## Optional delegation
 
-The unreleased `specpi agent` launcher adds bounded, read-only workers while the parent remains the sole writer. It supports **Pi SDK 0.84.4 exactly** and starts delegation disabled. In its interactive UI, run `/delegate on` to enable the displayed calls/time envelope; `/delegate off` revokes outstanding work. Ordinary `pi` startup is unchanged.
+The unreleased native extension adds bounded, read-only workers while the parent remains the sole writer. Use normal `pi` startup and the existing SpecPi install/update lifecycle. Delegation starts disabled; `/delegate on` enables the displayed calls/time envelope and `/delegate off` revokes outstanding work. Pi 0.84.4 is the compatibility-test floor, not an exact-version gate or a guarantee for all future versions. The extension fails closed if the public completion capability is absent.
 
-Review and consultation use supplied context. Investigation and research can read exact selected text snapshots; workers have no shell, writes, recursive delegation, or live web access. All workers use the parent's exact model. There are at most two active workers, four batches and 48 model invocations per launcher. Cancellation does not release a slot until the provider settles.
+Review and consultation use supplied context. Investigation and research can read exact selected text snapshots; workers have no shell, writes, recursive delegation, or live web access. All workers use the parent's exact model through Pi's public model registry. There are at most two active requests, four batches and 48 model invocations per Pi process. Reloads, session switches and off/on do not reset counters; cancellation holds a slot until the underlying Promise settles. Restart Pi to change the fixed working root or load a new delegation runtime version.
 
-Project resources and AGENTS discovery are disabled by default in this launcher; `--trust-project` explicitly enables them. Unsupported SDK versions and proxy policies fail closed. The experimental limits are not a hard invoice, provider-attempt, transport-byte or process-memory cap. No measured quality or cost benefit is claimed yet.
+Pi continues to own resource discovery, trust, proxy policy, authentication and OAuth. Delegated completions do not inherit the parent's context/header/payload/response hooks, transport/thinking settings or session affinity; reasoning uses provider defaults. Inputs are checked before dispatch, but final responses can only be checked after completion. There is no midstream, raw-transport, provider-attempt, invoice or process-memory cap. Cost is unavailable, and no measured quality or cost benefit is claimed yet.
 
 See the [delegation guide](docs/delegation/README.md), [tool protocol](docs/delegation/protocol.md), [research](docs/delegation/research.md), and [evaluation plan](docs/delegation/evaluation.md) for setup, examples, boundaries and evidence.
 
@@ -101,30 +101,30 @@ Direct `pi install npm:specpi` loads extensions, skills, and themes only. It doe
 
 ### Define and review work
 
-| Interface | Purpose |
-| --- | --- |
-| `/task` | Record the objective, fixed requirements, acceptance checks, expected paths, hypothesis, rollback, and non-goals on the current session branch. |
-| `/scope` | Declare expected paths and report unacknowledged drift. |
-| `/files` | Browse source, rendered Markdown, Git diffs, and bounded review comments. |
-| `/experiment` | Create detached worktrees with keep, binary patch export, and confirmed discard outcomes. |
-| `/challenge` | Review readiness through structured evidence, gaps, contradictions, and residual risk. |
+| Interface     | Purpose                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/task`       | Record the objective, fixed requirements, acceptance checks, expected paths, hypothesis, rollback, and non-goals on the current session branch. |
+| `/scope`      | Declare expected paths and report unacknowledged drift.                                                                                         |
+| `/files`      | Browse source, rendered Markdown, Git diffs, and bounded review comments.                                                                       |
+| `/experiment` | Create detached worktrees with keep, binary patch export, and confirmed discard outcomes.                                                       |
+| `/challenge`  | Review readiness through structured evidence, gaps, contradictions, and residual risk.                                                          |
 
 ### Improve from evidence
 
-| Interface | Purpose |
-| --- | --- |
-| `/wishlist` | Store and curate privacy-minimized local capability-gap reports. |
+| Interface              | Purpose                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `/wishlist`            | Store and curate privacy-minimized local capability-gap reports.                     |
 | `/harness-improvement` | Select one qualified or review-needed item and authorize its bounded implementation. |
 
 ### Work inside Pi
 
-| Interface | Purpose |
-| --- | --- |
-| `/spec` | Replace normal chrome with a technical run panel, seal live reasoning, hold streaming prose until complete, and keep tools collapsed. |
-| `/guard` | Deny confirmed host-wide destructive calls and request approval for bounded risk classes. |
-| Browser tools | Open an isolated Chromium context for rendered inspection and screenshots. |
-| `specpi-spec` theme | Bring blueprint blue, technical greys, layered surfaces, and restrained semantic states into Pi. |
-| `specpi` CLI | Plan, install, update, verify, and uninstall managed state with backups and rollback. |
+| Interface           | Purpose                                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `/spec`             | Replace normal chrome with a technical run panel, seal live reasoning, hold streaming prose until complete, and keep tools collapsed. |
+| `/guard`            | Deny confirmed host-wide destructive calls and request approval for bounded risk classes.                                             |
+| Browser tools       | Open an isolated Chromium context for rendered inspection and screenshots.                                                            |
+| `specpi-spec` theme | Bring blueprint blue, technical greys, layered surfaces, and restrained semantic states into Pi.                                      |
+| `specpi` CLI        | Plan, install, update, verify, and uninstall managed state with backups and rollback.                                                 |
 
 `specpi-spec` is the default Pi theme, carrying the site's specification design through message surfaces, tools, Markdown, diffs, syntax highlighting, search, and the full thinking-level scale. **Existing valid theme preferences survive installation and updates.** The original `tea-house` theme remains bundled and selectable from `/settings`.
 
@@ -200,11 +200,11 @@ With collection enabled, `/wishlist outcome <gap-id>` records an explicit human 
 
 Every supported model-initiated Pi tool call is classified before execution. Select one mode at session start:
 
-| Mode | Behavior |
-| --- | --- |
-| **Guard** | Denies confirmed host-wide catastrophe and guard tampering, asks before Git destroys work, and otherwise remains quiet. |
-| **Strict** | Adds approval requests for mutation, execution, sensitive reads, and network activity. |
-| **Off** | Requires confirmation and applies only to the current session. |
+| Mode       | Behavior                                                                                                                |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Guard**  | Denies confirmed host-wide catastrophe and guard tampering, asks before Git destroys work, and otherwise remains quiet. |
+| **Strict** | Adds approval requests for mutation, execution, sensitive reads, and network activity.                                  |
+| **Off**    | Requires confirmation and applies only to the current session.                                                          |
 
 Approvals apply to one exact call and one session. Only a structurally proven critical mutation locks the session. Parser uncertainty and invalid cleanup syntax are denied without locking later work.
 

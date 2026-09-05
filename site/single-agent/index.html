@@ -1016,13 +1016,14 @@
                         >
                         <h2>05 / Bounded delegation</h2>
                         <p>
-                            The source now includes an explicit SDK host: <code>specpi agent</code>, supporting
-                            <strong>Pi SDK 0.84.4 exactly</strong>. Within that host, the human can enable the fixed
-                            calls/time envelope with <code>/delegate on</code>. Stock <code>pi</code> does not load this
-                            runtime. The parent remains the sole writer and owns integration and acceptance.
+                            The source now includes a native Pi extension. Use normal <code>pi</code> startup and the
+                            existing SpecPi install/update lifecycle, then explicitly enable the fixed calls/time
+                            envelope with <code>/delegate on</code>. Pi 0.84.4 is the compatibility-test floor; a
+                            missing public completion capability disables delegation. The parent remains the sole writer
+                            and owns integration and acceptance.
                         </p>
                         <p>
-                            Four profiles use the exact parent model and configured provider pipeline.
+                            Four profiles use the exact parent model through Pi's public model registry.
                             <code>review</code> and <code>consult</code> receive supplied context with no tools.
                             <code>investigate</code> and <code>research</code> can list, read and search only exact
                             selected text files in a checked source snapshot. Research has no live web access; the
@@ -1037,9 +1038,10 @@
                             </li>
                             <li>
                                 <strong>Fixed resource limits.</strong> At most two worker requests are active across
-                                the launcher. A job has a 120-second deadline; follow-up shares its original deadline
-                                and counters. Automatic retries are disabled. Cancellation revokes source access, but
-                                keeps the request's slot occupied until the provider settles.
+                                the Pi process, with four batches and 48 model invocations per process. A job has a
+                                120-second deadline; follow-up shares its original deadline and counters. Reloads,
+                                session switches and off/on do not reset quotas. Cancellation revokes source access, but
+                                keeps the request's slot occupied until its completion Promise settles.
                             </li>
                             <li>
                                 <strong>Evidence and uncertainty.</strong> Reports include requirement coverage,
@@ -1048,10 +1050,16 @@
                                 parent acceptance is neither human permission nor proof of task completion.
                             </li>
                             <li>
-                                <strong>Honest accounting.</strong> Limits bound model invocations, time and retained
-                                parsed output. They are not hard raw-network, provider-attempt, invoice or
-                                process-memory caps. Cost is unavailable, and incomplete usage is not reported as zero.
-                                Policies requiring stronger guarantees are unsupported.
+                                <strong>Honest accounting.</strong> Inputs are checked before dispatch. The public API
+                                returns a complete message, so output limits are checked only after completion. There is
+                                no midstream, raw-network, provider-attempt, invoice or process-memory cap. Cost is
+                                unavailable, and incomplete usage is not reported as zero.
+                            </li>
+                            <li>
+                                <strong>Completion boundary.</strong> Pi owns authentication, OAuth and registry
+                                provider routing. Workers do not inherit parent context/header/payload/response hooks,
+                                transport/thinking settings or session affinity. Reasoning uses provider defaults; this
+                                is not full parent inference parity.
                             </li>
                             <li>
                                 <strong>Selected context.</strong> The parent transcript is not automatically inherited.
@@ -1061,9 +1069,10 @@
                             </li>
                         </ul>
                         <p>
-                            The launcher disables project resource discovery by default. Its explicit
-                            <code>--trust-project</code> option permits those resources for a trusted launch. Proxy
-                            policies the SDK bootstrap cannot preserve are rejected. Read the
+                            Normal Pi resource discovery, trust and proxy policy remain Pi-owned. The broker's canonical
+                            working root stays fixed for the process; restart Pi to change it or load a new delegation
+                            runtime version. Workflows requiring inherited parent hooks or settings must keep delegation
+                            disabled. Read the
                             <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
                                 >implementation guide</a
                             >

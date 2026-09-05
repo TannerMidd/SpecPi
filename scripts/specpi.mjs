@@ -83,7 +83,6 @@ Usage:
   ${CLI} install [--yes] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
   ${CLI} update [--yes] [--force] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
   ${CLI} doctor
-  ${CLI} agent [--trust-project] [--pi-sdk <absolute-package-directory>]
   ${CLI} uninstall [--yes]
 
 Options:
@@ -845,6 +844,20 @@ function managedFiles(includeShell) {
         ...COMMAND_GUARD_MANAGED_FILES.map((name) => [
             path.join(repoRoot, "extensions", "command-guard", name),
             path.join(agentDir, "extensions", "command-guard", name),
+            0o644,
+        ]),
+        ...[
+            "index.ts",
+            "native.mjs",
+            "extension.mjs",
+            "core.mjs",
+            "protocol.mjs",
+            "provider.mjs",
+            "snapshot.mjs",
+            "worker.mjs",
+        ].map((name) => [
+            path.join(repoRoot, "extensions", "delegation", name),
+            path.join(agentDir, "extensions", "delegation", name),
             0o644,
         ]),
         [
@@ -2033,13 +2046,6 @@ async function doctor() {
 }
 
 async function main() {
-    if (process.argv[2] === "agent") {
-        const { runAgent } = await import("./agent.mjs");
-        await runAgent(process.argv.slice(3));
-
-        return;
-    }
-
     const options = parseArgs(process.argv.slice(2));
     switch (options.command) {
         case "help":

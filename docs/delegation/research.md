@@ -133,19 +133,22 @@ that deleting arbitrary safety checks, context, or instructions helps every mode
 
 ## Pi compatibility evidence
 
-The ordinary installer supports Pi 0.84.4 or later; the experimental `specpi agent`
-launcher supports SDK 0.84.4 exactly. The original investigation inspected public tagged
+Pi 0.84.4 is the native extension's compatibility-test floor; admission checks for
+public `ctx.modelRegistry.complete`, rather than imposing an exact-version gate or
+assuming all later versions work. The original investigation inspected public tagged
 source and official documentation without calling a real provider or inspecting private
-Pi state or credentials. The implemented launcher now supplies a host-owned pipeline
-closure through the public SDK, with synthetic-provider compatibility fixtures. That
-does not establish every production provider's behavior or the stronger transport and
-cost guarantees retained in the target design.
+Pi state or credentials. The implemented bridge uses that registry completion API
+with explicit bounded context. Pi owns authentication and provider routing, but parent
+request hooks, transport/thinking settings and session affinity are not inherited;
+reasoning uses provider defaults. Complete responses are checked only after completion.
+These are accepted limits of the native experiment, not full parent-pipeline parity
+or satisfaction of the stronger transport and cost guarantees in the archived design.
 
 | Contract                                     | Primary source                                                                                                                     | Design consequence                                                                      |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Credential-blind completion facade           | [ModelRegistry at v0.84.4](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/model-registry.ts#L59) | Useful building block; does not expose the configured streaming pipeline                |
 | Runtime auth and request preparation         | [ModelRuntime](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/model-runtime.ts#L541)             | Keep credential handling inside Pi; preserve composed provider behavior                 |
-| Host request policy and thinking translation | [SDK](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/sdk.ts#L283)                                | A direct completion is not full host-request parity; require a supported bridge         |
+| Host request policy and thinking translation | [SDK](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/sdk.ts#L283)                                | Native completion does not inherit full parent policy; document the narrower contract   |
 | Tool interception                            | [AgentSession](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/agent-session.ts#L451)             | Built-in factories and `pi.exec()` do not automatically inherit Command Guard           |
 | Resource discovery                           | [ResourceLoader](https://github.com/earendil-works/pi/blob/v0.84.4/packages/coding-agent/src/core/resource-loader.ts#L36)          | In-memory session storage alone does not create a sterile child                         |
 | Tool scheduling                              | [Agent defaults](https://github.com/earendil-works/pi/blob/v0.84.4/packages/agent/src/agent.ts#L205)                               | Explicitly select execution policy and enforce each limit before work                   |

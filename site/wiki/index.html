@@ -425,10 +425,7 @@ specpi doctor</code></pre>
                         </div>
                         <div>
                             <code>/delegate [on|off|status|limits|cancel]</code
-                            ><span
-                                >Control bounded read-only workers in the experimental
-                                <code>specpi agent</code> host.</span
-                            >
+                            ><span>Control the experimental bounded read-only workers in native Pi.</span>
                         </div>
                     </div>
                     <p class="muted">
@@ -506,15 +503,16 @@ npm run check</code></pre>
                         <h2 id="delegation-title">Experimental delegation</h2>
                     </header>
                     <p>
-                        Implemented in unreleased source and disabled by default. Start the explicit SDK host with
-                        <code>specpi agent</code>, then use <code>/delegate on</code> to enable its fixed calls/time
-                        envelope. The parent remains the sole writer. This host supports
-                        <strong>Pi SDK 0.84.4 exactly</strong>; the installer's broader Pi version range does not imply
-                        host compatibility. Stock <code>pi</code> does not automatically load the delegation runtime.
+                        Implemented in unreleased source and disabled by default. The native extension loads through
+                        normal Pi package discovery and the existing SpecPi install/update lifecycle. Start
+                        <code>pi</code> normally, then use <code>/delegate on</code> to enable the fixed calls/time
+                        envelope. The parent remains the sole writer.
+                        <strong>Pi 0.84.4 is the compatibility-test floor</strong>, not an exact-version gate or
+                        guarantee for all later versions. Delegation fails closed if the public completion capability is
+                        absent.
                     </p>
                     <div class="terminal doc-terminal">
-                        <pre><code>specpi agent --help
-specpi agent
+                        <pre><code>pi
 # Then, in the interactive session:
 /delegate on
 /delegate status
@@ -525,28 +523,32 @@ specpi agent
                     <p>
                         <code>review</code> and <code>consult</code> use supplied context without tools.
                         <code>investigate</code> and <code>research</code> can list, read and search exact selected text
-                        files through the snapshot broker. All use the exact parent model and provider route. Research
-                        does not browse the web. Workers have no shell, writes or nested delegation.
+                        files through the snapshot broker. All use the exact parent model through Pi's public model
+                        registry. Research does not browse the web. Workers have no shell, writes or nested delegation.
                     </p>
                     <p>
-                        At most two requests run across the launcher. Jobs have a 120-second deadline; one changed-input
-                        follow-up shares the original counters and deadline. Cancelled requests retain their slots until
-                        the provider settles. Changing task, scope, model, session or guard policy revokes the current
-                        generation; ordinary parent turns do not. Guard Off and Locked modes cannot activate delegation.
+                        The Pi process allows at most two active requests, four batches and 48 model invocations. Jobs
+                        have a 120-second deadline; one changed-input follow-up shares the original counters and
+                        deadline. Cancelled requests retain their slots until the underlying Promise settles. Reloads,
+                        session switches and off/on preserve the controller and counters. Task, scope, model, session,
+                        reload or guard changes revoke the current generation; ordinary parent turns do not. Guard Off
+                        and Locked modes cannot activate delegation.
                     </p>
                     <p class="doc-boundary">
-                        <strong>Accounting boundary.</strong> The experiment bounds calls, time and retained parsed
-                        output, not raw transport bytes, every underlying provider attempt, invoice cost or process
-                        memory. Cost is unavailable; missing usage is explicit. The parent must verify findings. Host
-                        receipts and parent acceptance do not grant human authority or prove task completion.
+                        <strong>Completion boundary.</strong> Inputs are bounded before dispatch, but responses are
+                        checked only after the complete-message Promise resolves. The entire response may already be
+                        buffered. There is no midstream, raw-transport, provider-attempt, invoice or process-memory cap.
+                        Cost is unavailable; missing usage is explicit. The parent must verify findings. Host receipts
+                        and parent acceptance do not grant human authority or prove task completion.
                     </p>
                     <p>
-                        Project resource discovery is disabled by default, including global AGENTS context discovery.
-                        Use <code>--trust-project</code> only to load a trusted project's executable resources and
-                        instructions for that launch. Unsupported configured or environment proxy policies are rejected.
-                        Pi owns authentication; SpecPi does not extract credentials. Selected context reaches the
-                        configured model provider, and normal parent tool results may persist in Pi's session. Snapshot
-                        access is a trusted-local-filesystem boundary, not an OS sandbox.
+                        Pi owns normal resource discovery, trust, proxy policy, authentication and OAuth. The native
+                        completion call does not inherit parent context/header/payload/response hooks,
+                        transport/thinking settings or session affinity; reasoning uses provider defaults. Keep
+                        delegation disabled when those inherited controls are required. Selected context reaches the
+                        configured provider, and normal parent tool results may persist in Pi's session. Snapshot access
+                        is a trusted-local-filesystem boundary, not an OS sandbox. Its canonical working root is fixed
+                        for the Pi process; restart Pi to change it or load a new delegation runtime version.
                     </p>
                     <p>
                         Read the

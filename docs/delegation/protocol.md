@@ -4,6 +4,14 @@ This is the implemented in-process API. It has no HTTP listener, daemon, child p
 or child session store. The broader [target protocol](design-protocol.md) remains a
 proposal; its stronger transport/attempt/cost gates are not supplied by this version.
 
+The extension loads through normal `pi` package discovery and remains disabled until
+the human runs `/delegate on`. Pi 0.84.4 is the compatibility-test floor; runtime
+admission checks the public `modelRegistry.complete` capability. This native bridge
+uses the parent model through Pi-owned authentication and provider routing, but does
+not inherit parent request hooks, transport/thinking settings or session affinity.
+It uses provider-default reasoning. Inputs are bounded before dispatch; complete
+responses can only be checked after the returned Promise resolves.
+
 Every object is closed: unknown fields, duplicate IDs, malformed values and oversized
 data are rejected. The host creates identities and receipts; workers cannot supply them.
 The protocol identifier is returned by `status`. It is not a model-selected option.
@@ -14,33 +22,38 @@ After the human runs `/delegate on`, the parent calls the `delegate` tool:
 
 ```json
 {
-  "operation": "run",
-  "requestId": "investigate-routing-1",
-  "packet": {
-    "objective": "Explain how model selection reaches the request pipeline",
-    "requirements": [{ "id": "R1", "text": "Identify the route binding and its invalidation behavior" }],
-    "decisions": ["The parent remains the sole writer"],
-    "nonGoals": ["Do not implement or change providers"],
-    "reason": {
-      "deliverable": "A source-backed explanation of route binding",
-      "consumer": "The parent will compare it with the lifecycle tests",
-      "independence": "Reading this module is independent of inspecting test coverage",
-      "parentWork": "Inspect the lifecycle tests while the worker reads"
-    },
-    "jobs": [{
-      "id": "route",
-      "mode": "investigate",
-      "question": "Where is the model captured, and when is that capability revoked?",
-      "context": "Return evidence for R1, including missing or contrary evidence.",
-      "sources": ["extensions/delegation/provider.mjs"]
-    }]
-  }
+    "operation": "run",
+    "requestId": "investigate-routing-1",
+    "packet": {
+        "objective": "Explain how model selection reaches the request pipeline",
+        "requirements": [{ "id": "R1", "text": "Identify the route binding and its invalidation behavior" }],
+        "decisions": ["The parent remains the sole writer"],
+        "nonGoals": ["Do not implement or change providers"],
+        "reason": {
+            "deliverable": "A source-backed explanation of route binding",
+            "consumer": "The parent will compare it with the lifecycle tests",
+            "independence": "Reading this module is independent of inspecting test coverage",
+            "parentWork": "Inspect the lifecycle tests while the worker reads"
+        },
+        "jobs": [
+            {
+                "id": "route",
+                "mode": "investigate",
+                "question": "Where is the model captured, and when is that capability revoked?",
+                "context": "Return evidence for R1, including missing or contrary evidence.",
+                "sources": ["extensions/delegation/provider.mjs"]
+            }
+        ]
+    }
 }
 ```
 
 `run` returns immediately with `batchId`, `packetDigest`, `generation`, a collection
 cursor and job states. It does not return invented findings while work is pending.
-The digest binds the packet, source descriptors, host identity, route and resource policy.
+The digest binds the packet, source descriptors, host identity, selected model/provider
+IDs and resource policy. It does not freeze the registry's endpoint, headers or
+authentication configuration. Those can change behind the same public identities;
+the extension cannot observe every such change or certify an unchanged provider route.
 IDs are short alphanumeric/hyphen/underscore strings. The host batch and attempt IDs
 are UUIDs. Source paths are exact relative filenames, not directories, globs or commands.
 `review` and `consult` require an empty `sources` array; their only evidence is inline
@@ -77,12 +90,12 @@ Workers return this exact shape, without Markdown fences:
 
 ```json
 {
-  "status": "partial",
-  "answer": "The selected context is insufficient to establish runtime behavior.",
-  "requirements": [{ "id": "R1", "status": "unaddressed", "evidence": [] }],
-  "findings": [],
-  "missing": ["A provider implementation or runtime fixture"],
-  "nextStep": "The parent should inspect the provider fixture before making a claim."
+    "status": "partial",
+    "answer": "The selected context is insufficient to establish runtime behavior.",
+    "requirements": [{ "id": "R1", "status": "unaddressed", "evidence": [] }],
+    "findings": [],
+    "missing": ["A provider implementation or runtime fixture"],
+    "nextStep": "The parent should inspect the provider fixture before making a claim."
 }
 ```
 
@@ -102,15 +115,15 @@ or content. Missing usage is explicit; failed calls still consume invocation all
 
 ```json
 {
-  "operation": "follow_up",
-  "requestId": "route-correction-1",
-  "batchId": "HOST_BATCH_ID",
-  "jobId": "route",
-  "attemptId": "HOST_ATTEMPT_ID",
-  "packetDigest": "HOST_64_CHARACTER_SHA256",
-  "generation": 2,
-  "resultRevision": 1,
-  "prompt": "Reconsider the claim using the already-selected source; identify the missing condition."
+    "operation": "follow_up",
+    "requestId": "route-correction-1",
+    "batchId": "HOST_BATCH_ID",
+    "jobId": "route",
+    "attemptId": "HOST_ATTEMPT_ID",
+    "packetDigest": "HOST_64_CHARACTER_SHA256",
+    "generation": 2,
+    "resultRevision": 1,
+    "prompt": "Reconsider the claim using the already-selected source; identify the missing condition."
 }
 ```
 
@@ -123,16 +136,16 @@ disposed result cannot receive a follow-up.
 
 ```json
 {
-  "operation": "resolve",
-  "requestId": "route-assessment-1",
-  "batchId": "HOST_BATCH_ID",
-  "jobId": "route",
-  "attemptId": "HOST_ATTEMPT_ID",
-  "packetDigest": "HOST_64_CHARACTER_SHA256",
-  "generation": 2,
-  "resultRevision": 1,
-  "decision": "needs_check",
-  "findings": []
+    "operation": "resolve",
+    "requestId": "route-assessment-1",
+    "batchId": "HOST_BATCH_ID",
+    "jobId": "route",
+    "attemptId": "HOST_ATTEMPT_ID",
+    "packetDigest": "HOST_64_CHARACTER_SHA256",
+    "generation": 2,
+    "resultRevision": 1,
+    "decision": "needs_check",
+    "findings": []
 }
 ```
 
@@ -161,10 +174,15 @@ revokes tool access and requests provider abort; a request keeps its global slot
 the provider settles. Old payloads are discarded. Terminal receipt delivery does not
 imply that network activity has already ended.
 
-The controller survives launcher runtime replacement. Human off/on, task changes,
+The same in-memory controller survives `/reload` and session switches within the Pi
+process. Its ceilings are two active requests, four batches and 48 model invocations
+per process. Human off/on, task changes,
 branch navigation, model selection, guard changes and reloads revoke old generations;
 they do not create a new resource allowance. Normal parent turns do not revoke a job.
-There is no retry on process restart and no durable worker queue.
+The canonical working root remains fixed for that process. Restart Pi to change the
+root or load a new delegation runtime version. There is no retry on process restart
+and no durable worker queue. These limits do not bound midstream output or allocation;
+an oversized complete response is rejected only after it has been returned.
 
 The enforced [resource envelope and limitations](README.md#enforced-resource-envelope)
 define `experimental-calls-time-v1`. Unsupported hard billing, raw transport, provider

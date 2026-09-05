@@ -2089,6 +2089,22 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         }
 
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
+        for (const file of [
+            "index.ts",
+            "native.mjs",
+            "extension.mjs",
+            "core.mjs",
+            "protocol.mjs",
+            "provider.mjs",
+            "snapshot.mjs",
+            "worker.mjs",
+        ]) {
+            assert.ok(
+                fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
+                `Missing installed delegation source: ${file}`,
+            );
+        }
+
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
@@ -2272,6 +2288,23 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "challenge.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "smoke.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")), false);
+        for (const file of [
+            "index.ts",
+            "native.mjs",
+            "extension.mjs",
+            "core.mjs",
+            "protocol.mjs",
+            "provider.mjs",
+            "snapshot.mjs",
+            "worker.mjs",
+        ]) {
+            assert.equal(
+                fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
+                false,
+                `Delegation source survived uninstall: ${file}`,
+            );
+        }
+
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);

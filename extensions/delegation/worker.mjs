@@ -152,7 +152,7 @@ export async function runWorker({
         } catch (error) {
             abort();
             // Revocation does not free a slot while the provider still owns a request or stream.
-            // A non-cooperative adapter may keep this await pending until the launcher exits.
+            // A non-cooperative adapter may keep this await pending until Pi exits.
             try {
                 const settled = await stream.result();
                 onUsage(settled?.usage);

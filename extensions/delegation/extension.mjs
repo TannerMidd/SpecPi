@@ -70,10 +70,17 @@ export const DELEGATE_SCHEMA = {
     ],
 };
 
-/** Not auto-discovered by ordinary Pi: the SDK launcher supplies the private closure capability. */
-export function createDelegationExtension(getHost, { root = process.cwd(), controllerOptions = {} } = {}) {
+/** The native entry supplies a public model-registry capability for the active context. */
+export function createDelegationExtension(
+    getHost,
+    { root = process.cwd(), controllerOptions = {}, prepareContext = () => {} } = {},
+) {
     let currentPi;
     let currentContext;
+    let toolsReady = false;
+    let bindingEpoch = 0;
+    let detach = () => {};
+
     const getGuard = () => {
         let replies = 0;
         let mode;
@@ -94,6 +101,7 @@ export function createDelegationExtension(getHost, { root = process.cwd(), contr
         getGuard,
         onChange() {
             const state = controller.status();
+            syncActiveTool(state.enabled);
             currentContext?.ui?.setStatus?.(
                 "specpi-delegation",
                 state.enabled
@@ -103,12 +111,44 @@ export function createDelegationExtension(getHost, { root = process.cwd(), contr
         },
     });
 
+    function syncActiveTool(enabled) {
+        if (
+            !toolsReady ||
+            typeof currentPi?.getActiveTools !== "function" ||
+            typeof currentPi?.setActiveTools !== "function"
+        ) {
+            return;
+        }
+
+        const active = currentPi.getActiveTools();
+        if (active.includes("delegate") !== enabled) {
+            currentPi.setActiveTools(enabled ? [...active, "delegate"] : active.filter((name) => name !== "delegate"));
+        }
+    }
+
     const factory = (pi) => {
+        detach();
+        bindingEpoch += 1;
+        const issuedEpoch = bindingEpoch;
+        const isBound = () => issuedEpoch === bindingEpoch;
+        toolsReady = false;
+        prepareContext(undefined, true);
         controller.invalidate("runtime factory rebound");
         currentPi = pi;
+        currentContext = undefined;
         const subscriptions = [];
+        detach = () => {
+            for (const off of subscriptions.splice(0)) {
+                off();
+            }
+        };
+
         const subscribe = (name, handler) => {
-            const off = pi.events.on(name, handler);
+            const off = pi.events.on(name, (value) => {
+                if (isBound()) {
+                    handler(value);
+                }
+            });
             if (typeof off === "function") {
                 subscriptions.push(off);
             }
@@ -148,23 +188,37 @@ export function createDelegationExtension(getHost, { root = process.cwd(), contr
             "model_select",
             "thinking_level_select",
         ]) {
-            pi.on(event, () => controller.invalidate(event));
+            pi.on(event, () => {
+                if (isBound()) {
+                    controller.invalidate(event);
+                }
+            });
         }
 
         pi.on("session_start", (_event, ctx) => {
+            if (!isBound()) {
+                return;
+            }
+
             currentContext = ctx;
+            prepareContext(ctx, true);
+            toolsReady = true;
             controller.invalidate("session started or resources reloaded");
         });
         pi.on("session_shutdown", () => {
-            controller.invalidate("session shutdown");
-            for (const off of subscriptions) {
-                off();
+            if (!isBound()) {
+                return;
             }
 
+            controller.invalidate("session shutdown");
+            prepareContext(undefined, true);
+            detach();
             currentContext = undefined;
+            toolsReady = false;
+            bindingEpoch += 1;
         });
         pi.on("before_agent_start", () => {
-            if (controller.status().enabled) {
+            if (isBound() && controller.status().enabled) {
                 return {
                     message: {
                         customType: "specpi-delegation-policy",
@@ -182,6 +236,12 @@ export function createDelegationExtension(getHost, { root = process.cwd(), contr
                     .filter((value) => value.startsWith(prefix.trim()))
                     .map((value) => ({ value, label: value })),
             handler: async (args, ctx) => {
+                if (!isBound()) {
+                    ctx.ui.notify("Delegation was reloaded; use the current command.", "error");
+
+                    return;
+                }
+
                 currentContext = ctx;
                 const [action = "status", id, extra] = args.trim().split(/\s+/u).filter(Boolean);
                 try {
@@ -194,9 +254,11 @@ export function createDelegationExtension(getHost, { root = process.cwd(), contr
                             throw new Error("Delegation activation requires a human interactive command");
                         }
 
+                        prepareContext(ctx);
                         const state = controller.enable();
+                        syncActiveTool(true);
                         ctx.ui.notify(
-                            `Delegation enabled: experimental calls/time policy, exact parent model ${state.model.provider}/${state.model.id}, at most 2 read-only workers, 4 batches and 48 model calls for this launcher. Jobs expire after 120 seconds. Selected text is sent to the configured provider. Configurable retries are disabled; hidden transport retries and provider buffering are not hard-bounded. Cost is unavailable. /delegate off revokes workers; unsettled requests keep their slots.`,
+                            `Delegation enabled: experimental calls/time policy, exact parent model ${state.model.provider}/${state.model.id}, at most 2 read-only workers, 4 batches and 48 registry calls per Pi process. Jobs expire after 120 seconds. Pi owns authentication and provider configuration. Child calls use provider defaults, without parent context, header, payload or response hooks, thinking settings, transport policy or session settings. Selected text is sent to the configured provider. Responses are checked after completion; provider buffering, hidden retries and billing are not hard-bounded. /delegate off revokes workers; unsettled requests keep their slots across reloads.`,
                             "info",
                         );
                     } else if (action === "off") {
@@ -229,8 +291,13 @@ export function createDelegationExtension(getHost, { root = process.cwd(), contr
                 "Bounded read-only workers, only after human /delegate on. Same parent model. Four profiles: tool-free review/consult; investigate/research read selected immutable repository text (no live web). run requires explicit requirements, non-goals, reason and source filenames. Return immediately and continue useful parent work; collect returns structured advisory results with receipts. Resolve each finding after checking evidence. One changed-input follow-up retains budgets and deadline. Cancellation revokes tools but may leave provider settlement pending. Never a source of write permission or verified completion.",
             parameters: DELEGATE_SCHEMA,
             execute: async (_id, input, signal, _update, ctx) => {
-                currentContext = ctx;
                 try {
+                    if (!isBound()) {
+                        throw new Error("Delegation was reloaded; use the current tool");
+                    }
+
+                    currentContext = ctx;
+                    prepareContext(ctx);
                     const output = await controller.execute(input, signal);
 
                     return { content: [{ type: "text", text: JSON.stringify(output) }], details: output };

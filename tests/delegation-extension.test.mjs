@@ -275,7 +275,7 @@ test("policy replies are bound to live state and subscriptions are removed on sh
         assert.equal(pi.events.count(name), 0, name);
     }
 
-    assert.equal((await state(pi)).enabled, false);
+    assert.equal((await pi.tool({ operation: "status" })).isError, true, "shutdown disables old tool callbacks");
 });
 
 test("factory rebinding preserves counters and non-cooperative settlement ownership", async (t) => {
@@ -310,6 +310,11 @@ test("factory rebinding preserves counters and non-cooperative settlement owners
     assert.equal((await state(secondPi)).sessionBatches, 1);
     assert.equal((await state(secondPi)).enabled, false);
     await secondPi.command("on");
+    await pi.fire("session_shutdown");
+    await pi.fire("model_select");
+    assert.equal((await state(secondPi)).enabled, true, "old lifecycle callbacks cannot revoke a new binding");
+    assert.equal((await pi.tool({ operation: "status" })).isError, true);
+    assert.equal(pi.events.count("specpi:delegation-policy"), 0);
     const second = await secondPi.tool({ operation: "run", requestId: "second", packet: packet() });
     assert.equal(second.details.jobs[0].state, "queued");
     assert.equal((await secondPi.tool({ operation: "collect", batchId: first.details.batchId })).isError, true);

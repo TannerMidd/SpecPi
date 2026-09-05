@@ -63,6 +63,8 @@ const requiredFiles = [
     "extensions/files/core.mjs",
     "extensions/delegation/core.mjs",
     "extensions/delegation/extension.mjs",
+    "extensions/delegation/index.ts",
+    "extensions/delegation/native.mjs",
     "extensions/delegation/protocol.mjs",
     "extensions/delegation/provider.mjs",
     "extensions/delegation/snapshot.mjs",
@@ -85,7 +87,6 @@ const requiredFiles = [
     "extensions/workflow-controls/task-contract.mjs",
     "package.json",
     "scripts/check-package.mjs",
-    "scripts/agent.mjs",
     "scripts/check-pi-package.mjs",
     "scripts/check-release-order.mjs",
     "scripts/lib.mjs",
@@ -342,9 +343,10 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     const help = runCli(["help"]);
     const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"));
     assert.match(help.stdout, new RegExp(`SpecPi ${packageJson.version.replaceAll(".", "\\.")}`));
-    const agentHelp = runCli(["agent", "--help"]);
-    assert.match(agentHelp.stdout, /Usage: specpi agent/u);
-    assert.equal(fs.existsSync(agentDir), false, "agent help mutated the isolated Pi directory");
+    assert.doesNotMatch(help.stdout, /specpi agent/u);
+    const retiredLauncher = runCli(["agent"], { expectFailure: true });
+    assert.match(`${retiredLauncher.stdout}\n${retiredLauncher.stderr}`, /Unknown command: agent/u);
+    assert.equal(fs.existsSync(agentDir), false, "unsupported launcher mutated the isolated Pi directory");
 
     runCli(["plan", "--skip-package-install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"]);
     assert.equal(fs.existsSync(agentDir), false, "plan mutated the isolated agent directory");
@@ -403,6 +405,11 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")),
         false,
         "uninstall left a managed extension behind",
+    );
+    assert.equal(
+        fs.existsSync(path.join(agentDir, "extensions", "delegation", "index.ts")),
+        false,
+        "uninstall left native delegation installed",
     );
     for (const [file, expected] of privateEvidence) {
         assert.equal(fs.existsSync(file), true, `uninstall removed private SpecPi evidence: ${file}`);

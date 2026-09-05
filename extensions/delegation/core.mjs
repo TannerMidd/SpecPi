@@ -6,7 +6,7 @@ import { runWorker } from "./worker.mjs";
 const terminal = new Set(["complete", "partial", "needs_context", "failed", "cancelled", "expired", "stale"]);
 const quiet = new Set(["cancelled", "expired", "stale"]);
 
-/** One controller lives for the launcher lifetime, including UI session replacement. */
+/** One controller lives for the Pi process, including native extension reloads. */
 export function createDelegationController({
     getHost,
     root,
@@ -575,7 +575,9 @@ export function createDelegationController({
             const host = getHost();
             const guard = getGuard();
             if (!host?.isCurrent() || !["guard", "strict"].includes(guard)) {
-                throw new Error("A supported SpecPi host and active Command Guard are required");
+                throw new Error(
+                    "Pi's public model registry, a selected model, the original working directory and active Command Guard are required",
+                );
             }
 
             if (enabled) {
@@ -595,8 +597,15 @@ export function createDelegationController({
             const input = validateOperation(raw);
 
             return {
-                fingerprint: digest({ input, generation, enabled, model: enabledHost?.model ?? null, policy }),
-                summary: `Delegation ${input.operation}; experimental calls/time policy; enabled=${enabled}; generation=${generation}; exact parent model ${enabledHost?.model?.provider ?? "unavailable"}/${enabledHost?.model?.id ?? "unavailable"}; up to ${policy.concurrency} read-only workers, ${policy.sessionCalls} model calls per launcher, ${policy.jobMs / 1000}s per job. Selected snapshot text or supplied inline context may be sent to the configured provider. No shell, writes, recursive delegation, live web, or invoice/transport-memory cap. Configurable retries disabled; hidden transport attempts may occur.`,
+                fingerprint: digest({
+                    input,
+                    generation,
+                    enabled,
+                    model: enabledHost?.model ?? null,
+                    policy,
+                    inference: "native-registry-v1",
+                }),
+                summary: `Delegation ${input.operation}; experimental calls/time policy; enabled=${enabled}; generation=${generation}; exact parent model ${enabledHost?.model?.provider ?? "unavailable"}/${enabledHost?.model?.id ?? "unavailable"}; up to ${policy.concurrency} read-only workers, ${policy.sessionCalls} registry invocations per Pi process, ${policy.jobMs / 1000}s per job. Pi owns authentication and provider configuration. Child calls use provider defaults without parent context/header/payload/response hooks, thinking settings, transport policy or session settings. Selected text may be sent to the configured provider. No shell, writes, recursive delegation, live web or invoice/transport-memory cap. Output is checked after completion; hidden provider attempts may occur.`,
             };
         },
     };

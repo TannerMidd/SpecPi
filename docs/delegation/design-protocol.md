@@ -8,6 +8,11 @@ per-provider-attempt or monetary admission guarantees, live web adapter, or alte
 model routes. The schemas and command examples below must not be submitted as if they
 were the implemented protocol.
 
+The current native completion bridge also does not meet the target's full-parent
+pipeline or streaming requirements. It uses Pi's public model registry, provider-default
+reasoning and post-completion output checks. Its process-wide controller survives
+reloads; the implemented guide specifies the restart and fixed-root boundaries.
+
 See the [archived architecture](design.md) for target policy and
 [evaluation](evaluation.md) for the distinction between current fixtures and unmet
 proof obligations.
