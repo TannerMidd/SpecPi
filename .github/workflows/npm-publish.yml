@@ -186,7 +186,7 @@ jobs:
               shell: bash
               run: |
                   set -euo pipefail
-                  TARBALL="dist/specpi-${VERSION}.tgz"
+                  TARBALL="${GITHUB_WORKSPACE}/dist/specpi-${VERSION}.tgz"
                   npm publish --ignore-scripts --access public --provenance --tag "${DIST_TAG}" "${TARBALL}"
 
             - name: Verify registry publication
