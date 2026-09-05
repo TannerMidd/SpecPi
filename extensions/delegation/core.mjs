@@ -14,7 +14,7 @@ export function createDelegationController({
     limits = LIMITS,
     snapshotFactory = createSnapshot,
     worker = runWorker,
-    getGuard = () => "guard",
+    getGuard = () => "absent",
 }) {
     const policy = Object.freeze(
         Object.fromEntries(
@@ -73,6 +73,7 @@ export function createDelegationController({
         limits: policy,
         sessionCalls: totalCalls,
         sessionBatches: batches.size,
+        guard: getGuard() ?? "unavailable",
         model: enabledHost?.model ?? null,
         cost: "unavailable; no invoice cap",
         batches: [...batches.values()].map(summary),
@@ -588,9 +589,27 @@ export function createDelegationController({
         enable() {
             const host = getHost();
             const guard = getGuard();
-            if (!host?.isCurrent() || !["guard", "strict"].includes(guard)) {
+            if (!host) {
+                throw new Error("Delegation has no Pi child-session host. Select a model before enabling delegation.");
+            }
+
+            if (!host.isCurrent()) {
                 throw new Error(
-                    "A supported Pi child-session provider, a selected model, the original working directory and active Command Guard are required",
+                    "The Pi model or working directory changed during delegation setup. Restart Pi in the intended working directory.",
+                );
+            }
+
+            if (guard === "locked") {
+                throw new Error("Command Guard is locked. Review /guard status and unlock it before delegating.");
+            }
+
+            if (guard === "ambiguous") {
+                throw new Error("Multiple Command Guard instances replied. Load only one instance and restart Pi.");
+            }
+
+            if (!["absent", "off", "guard", "strict"].includes(guard)) {
+                throw new Error(
+                    "Command Guard has not reported a ready policy. Check /guard status and its startup errors.",
                 );
             }
 

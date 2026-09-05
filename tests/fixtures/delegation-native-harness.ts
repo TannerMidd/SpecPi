@@ -224,9 +224,11 @@ async function configuredServer() {
         if (!state.closed) {
             state.closed = true;
             state.release();
+            state.closing = new Promise<void>((resolve) => server.close(() => resolve()));
             server.closeAllConnections();
-            server.close();
         }
+
+        return state.closing;
     };
 
     (globalThis as any)[key] = state;
@@ -426,12 +428,15 @@ export default async function nativeEntryFixture(pi: any) {
         parentHooks += 1;
     });
     const guard = captureApi(pi);
-    registerCommandGuard(guard.api, { approvalTimeoutMs: 1000, startupTimeoutMs: 1000 });
+    if (process.env.SPECPI_NATIVE_FIXTURE_MODE !== "guard-absent") {
+        registerCommandGuard(guard.api, { approvalTimeoutMs: 1000, startupTimeoutMs: 1000 });
+    }
+
     const first = captureApi(pi);
     await registerDelegation(first.api);
-    pi.on("session_shutdown", (event: any) => {
+    pi.on("session_shutdown", async (event: any) => {
         if (!["reload", "new"].includes(event.reason)) {
-            server.close();
+            await server.close();
         }
     });
     if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "reload") {
@@ -441,7 +446,7 @@ export default async function nativeEntryFixture(pi: any) {
     }
 
     let started = false;
-    pi.on("session_start", async (_event: any, actual: any) => {
+    const executeFixture = async (_event: any, actual: any) => {
         if (started) {
             return;
         }
@@ -464,6 +469,50 @@ export default async function nativeEntryFixture(pi: any) {
             console.log(
                 `NATIVE_RUNTIME_AUTH_FIXTURE=${JSON.stringify({ runtimeAuthRejected: true, enabled: false, requests: 0 })}`,
             );
+
+            return;
+        }
+
+        if (["guard-absent", "guard-off"].includes(process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "")) {
+            const mode = process.env.SPECPI_NATIVE_FIXTURE_MODE === "guard-off" ? "off" : "absent";
+            try {
+                if (mode === "off") {
+                    await guard.commands.get("guard").handler("off", ctx);
+                }
+
+                await tools.command("on");
+                assert.equal((await tools.status()).enabled, true, JSON.stringify(notices));
+                assert.equal((await tools.status()).guard, mode);
+                const batch = await tools.execute({
+                    operation: "run",
+                    requestId: "optional-guard",
+                    packet: packet([job("j1", "Assess the source", "scout", ["fixture.md"])]),
+                });
+                const collected = await finishBatch(tools, batch);
+                assert.equal(collected.results[0].receipt.calls, 2);
+                assert.equal(server.requests.length, 2);
+                for (const request of server.requests) {
+                    assert.deepEqual(request.body.tools.map((tool: any) => tool.function.name).sort(), [
+                        "list_sources",
+                        "read_source",
+                        "search_sources",
+                    ]);
+                    assert.equal(request.body.max_tokens ?? request.body.max_completion_tokens, 8192);
+                    assert.equal(JSON.stringify(request.body).includes("NATIVE_AMBIENT"), false);
+                }
+
+                await tools.command("off");
+                await tools.command("on");
+                assert.equal((await tools.status()).sessionCalls, 2);
+                assert.equal((await tools.status()).sessionBatches, 1);
+                assert.equal(approvals.length, 0);
+                assert.deepEqual(server.errors, []);
+                console.log(
+                    `NATIVE_OPTIONAL_GUARD_FIXTURE=${JSON.stringify({ mode, completed: true, calls: 2, snapshotToolsOnly: true, countersPreserved: true })}`,
+                );
+            } finally {
+                await active.emit("session_shutdown", { reason: "fixture cleanup" }, ctx);
+            }
 
             return;
         }
@@ -493,6 +542,21 @@ export default async function nativeEntryFixture(pi: any) {
             await tools.command("on", headless);
             assert.equal((await tools.status()).enabled, false);
             assert.match(notices.at(-1).message, /human interactive command/);
+            for (const [key, value, error] of [
+                ["model", undefined, /Select a Pi model/],
+                ["cwd", path.dirname(ctx.cwd), /working directory differs/],
+            ] as const) {
+                const unavailable = new Proxy(ctx, {
+                    get(target, property) {
+                        return property === key ? value : Reflect.get(target, property);
+                    },
+                });
+                await tools.command("on", unavailable);
+                assert.equal((await tools.status()).enabled, false);
+                assert.match(notices.at(-1).message, error);
+                assert.equal(server.requests.length, 0);
+            }
+
             await guard.commands.get("guard").handler("strict", ctx);
             await tools.command("on");
             assert.equal((await tools.status()).enabled, true, JSON.stringify(notices));
@@ -618,5 +682,15 @@ export default async function nativeEntryFixture(pi: any) {
             server.release();
             await active.emit("session_shutdown", { reason: "fixture cleanup" }, ctx);
         }
-    });
+    };
+
+    if (["guard-absent", "guard-off"].includes(process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "")) {
+        // Exercise activation after startup through the public command lifecycle.
+        pi.registerCommand("native-fixture-optional-guard", {
+            description: "Exercise native delegation with an optional Command Guard",
+            handler: (args: string, ctx: any) => executeFixture({}, ctx),
+        });
+    } else {
+        pi.on("session_start", executeFixture);
+    }
 }

@@ -18,6 +18,12 @@ overrides, model-specific headers, startup proxy configuration and safe model-de
 mismatches fail preflight. Parent request hooks,
 ephemeral runtime settings, session affinity and ambient resources are not inherited.
 
+Command Guard is optional. Absent and Off states permit human activation; an installed
+Guard's Strict approvals and explicit locks remain enforced. Unready or duplicate
+Guard responders prevent activation with a specific error. Guard state changes revoke
+the current delegation generation. Snapshot tools and resource limits are enforced
+by delegation itself in every mode. Status includes the observed `guard` state.
+
 The SDK runs the conversation and selected-source tool loop. SpecPi admits each SDK
 invocation before dispatch and observes the SDK stream; provider/session retries and
 automatic compaction are disabled. This does not establish hard raw-transport,

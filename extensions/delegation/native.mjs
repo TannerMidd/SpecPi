@@ -5,7 +5,7 @@ import { createDelegationExtension } from "./extension.mjs";
 import { createNativePiHost, getPiSessionCompatibilityError } from "./provider.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 2;
+const revision = 3;
 
 function canonical(directory) {
     return fs.realpathSync.native(path.resolve(directory));
@@ -36,11 +36,7 @@ function createState(root, sdk) {
             host = undefined;
         }
 
-        if (
-            !matchesRoot(context) ||
-            !context?.model ||
-            typeof context?.modelRegistry?.getProviderAuthStatus !== "function"
-        ) {
+        if (!context) {
             epoch += 1;
             host = undefined;
 
@@ -48,7 +44,24 @@ function createState(root, sdk) {
         }
 
         const thinkingLevel = getThinkingLevel();
+        let compatibilityError;
+        if (!matchesRoot(context)) {
+            compatibilityError =
+                "Pi's working directory differs from delegation's startup directory. Restart Pi in the intended working directory.";
+        } else if (!context.model) {
+            compatibilityError = "Select a Pi model before enabling delegation.";
+        } else if (
+            typeof context.modelRegistry?.getProviderAuthStatus !== "function" ||
+            typeof context.modelRegistry?.getRegisteredProviderIds !== "function"
+        ) {
+            compatibilityError =
+                "Pi's model registry is missing the provider metadata APIs required for delegation. Update Pi or SpecPi and restart Pi.";
+        } else {
+            compatibilityError = getPiSessionCompatibilityError(sdk);
+        }
+
         if (
+            !compatibilityError &&
             host?.isCurrent() &&
             boundRegistry === context.modelRegistry &&
             boundModel === context.model &&
@@ -64,7 +77,6 @@ function createState(root, sdk) {
         boundThinking = thinkingLevel;
         const id = randomUUID();
         const isCurrent = () => epoch === issuedEpoch && matchesRoot(context) && getThinkingLevel() === thinkingLevel;
-        const compatibilityError = getPiSessionCompatibilityError(sdk);
         if (compatibilityError) {
             const unavailable = async () => {
                 throw new Error(compatibilityError);
@@ -73,7 +85,7 @@ function createState(root, sdk) {
             host = Object.freeze({
                 id,
                 isCurrent,
-                model: Object.freeze({ id: context.model.id, provider: context.model.provider, thinkingLevel }),
+                model: Object.freeze({ id: context.model?.id, provider: context.model?.provider, thinkingLevel }),
                 ready: unavailable,
                 openSession: unavailable,
             });

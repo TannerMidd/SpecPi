@@ -72,6 +72,8 @@ function runNativeFixture(context, mode = "main") {
     ];
     if (mode === "reload") {
         args.push("--print", "/native-fixture-reload", "/native-fixture-replace");
+    } else if (mode.startsWith("guard-")) {
+        args.push("--print", "/native-fixture-optional-guard");
     } else {
         args.push("--mode", "rpc");
     }
@@ -85,7 +87,7 @@ function runNativeFixture(context, mode = "main") {
             cwd,
             agentDir,
             args,
-            input: mode === "reload" ? "" : undefined,
+            input: mode === "reload" || mode.startsWith("guard-") ? "" : undefined,
             env: {
                 SPECPI_NATIVE_FIXTURE_MODE: mode,
                 HTTP_PROXY: "",
@@ -201,3 +203,20 @@ test("native child-session activation rejects a parent CLI runtime credential ov
         requests: 0,
     });
 });
+
+for (const mode of ["absent", "off"]) {
+    test(`native Pi child sessions run with Command Guard ${mode}`, (context) => {
+        const result = runNativeFixture(context, `guard-${mode}`);
+        if (!result) {
+            return;
+        }
+
+        assert.deepEqual(report(result, "NATIVE_OPTIONAL_GUARD_FIXTURE"), {
+            mode,
+            completed: true,
+            calls: 2,
+            snapshotToolsOnly: true,
+            countersPreserved: true,
+        });
+    });
+}

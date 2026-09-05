@@ -44,7 +44,7 @@ function mockPi() {
         ui: { notify: (text, kind) => notices.push({ text, kind }), setStatus: (key, text) => statuses.set(key, text) },
     };
     let guard = "guard";
-    events.on("specpi:guard-state", (request) => request.reply({ mode: guard }));
+    const removeGuard = events.on("specpi:guard-state", (request) => request.reply({ mode: guard }));
 
     return {
         events,
@@ -53,6 +53,7 @@ function mockPi() {
         notices,
         statuses,
         context,
+        removeGuard,
         registerCommand: (name, definition) => commands.set(name, definition),
         registerTool: (definition) => tools.set(definition.name, definition),
         on(name, handler) {
@@ -206,6 +207,65 @@ test("activation cannot outlive the extension binding that started provider pref
     assert.match(oldPi.notices.at(-1).text, /changed during delegation setup/);
     await currentPi.command("on");
     assert.equal((await state(currentPi)).enabled, true);
+});
+
+test("delegation runs with Command Guard absent or off and retains its own ceilings", async (t) => {
+    for (const mode of ["absent", "off"]) {
+        const { pi, bridge } = await fixture(t, { limits: { sessionCalls: 1 } });
+        if (mode === "absent") {
+            pi.removeGuard();
+        } else {
+            pi.setGuard(mode);
+        }
+
+        await pi.command("on");
+        assert.equal((await state(pi)).enabled, true, mode);
+        assert.equal((await state(pi)).guard, mode);
+        const batch = await pi.tool({ operation: "run", requestId: "first", packet: packet() });
+        await waitFor(async () => (await state(pi)).active === 0);
+        const collected = await pi.tool({ operation: "collect", batchId: batch.details.batchId });
+        assert.equal(collected.details.results[0].receipt.state, "complete");
+        await pi.command("off");
+        await pi.command("on");
+        assert.equal((await state(pi)).sessionCalls, 1);
+        await pi.tool({ operation: "run", requestId: "second", packet: packet() });
+        await waitFor(async () => (await state(pi)).active === 0);
+        assert.equal(bridge.calls(), 1, "optional Guard must not remove delegation's call ceiling");
+    }
+});
+
+test("activation identifies a locked, unready or ambiguous installed Command Guard", async (t) => {
+    const { pi, bridge } = await fixture(t);
+    for (const [mode, error] of [
+        ["locked", /Guard is locked/],
+        [undefined, /not reported a ready policy/],
+    ]) {
+        pi.setGuard(mode);
+        await pi.command("on");
+        assert.equal((await state(pi)).enabled, false);
+        assert.match(pi.notices.at(-1).text, error);
+    }
+
+    pi.setGuard("off");
+    const detach = pi.events.on("specpi:guard-state", (request) => request.reply({ mode: "off" }));
+    await pi.command("on");
+    assert.equal((await state(pi)).enabled, false);
+    assert.match(pi.notices.at(-1).text, /Multiple Command Guard instances/);
+    detach();
+    assert.equal(bridge.calls(), 0);
+});
+
+test("installing or removing Guard revokes delegation before another worker call", async (t) => {
+    const { pi, bridge } = await fixture(t);
+    await pi.command("on");
+    pi.removeGuard();
+    assert.equal((await pi.tool({ operation: "run", requestId: "removed", packet: packet() })).isError, true);
+    assert.equal((await state(pi)).enabled, false);
+    await pi.command("on");
+    pi.events.on("specpi:guard-state", (request) => request.reply({ mode: "strict" }));
+    assert.equal((await pi.tool({ operation: "run", requestId: "installed", packet: packet() })).isError, true);
+    assert.equal((await state(pi)).enabled, false);
+    assert.equal(bridge.calls(), 0);
 });
 
 test("ordinary leaf and turn advances preserve a collected result generation", async (t) => {

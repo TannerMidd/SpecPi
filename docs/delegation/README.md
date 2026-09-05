@@ -87,9 +87,12 @@ While delegation is off, its tool is removed from the parent's active tool list.
 The command remains available, but the delegation tool schema is included in model
 requests only after activation. Other active tools are preserved.
 
-Command Guard continues to intercept the parent `delegate` tool. Strict mode presents
+Command Guard is optional: delegation can run when Guard is absent or Off. When
+active, Command Guard continues to intercept the parent `delegate` tool. Strict mode presents
 the effective capability envelope and binds approval to its policy fingerprint and
-the exact call. Guard Off and Locked modes cannot activate delegation. A worker result
+the exact call. A locked, unready or ambiguous installed Guard still blocks activation;
+the error identifies that state. `/delegate status` reports the observed Guard state.
+Worker tool restrictions and resource limits are enforced independently of Guard. A worker result
 cannot authorize a write, a commit, a deployment, or an improvement.
 
 ## Admit a specific purpose

@@ -108,7 +108,11 @@ export function createDelegationExtension(
             },
         });
 
-        return replies === 1 ? mode : undefined;
+        if (replies === 0) {
+            return "absent";
+        }
+
+        return replies === 1 ? mode : "ambiguous";
     };
 
     const controller = createDelegationController({

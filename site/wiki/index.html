@@ -537,7 +537,9 @@ npm run check</code></pre>
                         ceilings. Cancelled workers retain slots through SDK-visible stream/result and prompt
                         settlement. Reloads, session switches and off/on preserve the controller and counters. Task,
                         scope, model, session, reload or guard changes revoke the current generation; ordinary parent
-                        turns do not. Guard Off and Locked modes cannot activate delegation.
+                        turns do not. Command Guard is optional: delegation works with Guard absent or Off. Active
+                        Strict approvals and explicit locks still apply. Delegation enforces its own read-only tools
+                        and resource limits.
                     </p>
                     <p class="doc-boundary">
                         <strong>SDK boundary.</strong> Pi runs the model/tool loop; SpecPi admits every SDK invocation
