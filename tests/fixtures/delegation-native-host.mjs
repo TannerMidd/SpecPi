@@ -86,7 +86,7 @@ const sdkDirectory = process.env.SPECPI_FIXTURE_SDK_ABSOLUTE;
 assert.ok(sdkDirectory && path.isAbsolute(sdkDirectory), "The native fixture requires an explicit SDK directory");
 const sdk = await loadPiSdk({ sdkDirectory });
 assert.equal(sdk.VERSION, "0.84.4");
-const root = await fs.mkdtemp(path.join(os.tmpdir(), "specpi-native-host-"));
+const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "specpi-native-host-")));
 const cwd = path.join(root, "project");
 const agentDir = path.join(root, "agent");
 await fs.mkdir(cwd);

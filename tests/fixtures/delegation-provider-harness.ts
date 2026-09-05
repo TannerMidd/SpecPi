@@ -693,7 +693,7 @@ async function delegationProof(root: string) {
 
 export default async function () {
     assert.equal(sdk.VERSION, "0.84.4", "Run this fixture against the pinned isolated SDK");
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-fixture-"));
+    const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-fixture-")));
     try {
         const mode = process.env.SPECPI_DELEGATION_FIXTURE_MODE;
         if (mode === "launcher") {
