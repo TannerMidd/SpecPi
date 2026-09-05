@@ -81,12 +81,37 @@ export function createDelegationController({
         cost: "unavailable; no invoice cap",
         batches: [...[...history.values()].map((item) => structuredClone(item)), ...[...batches.values()].map(summary)],
     });
+    // Presentation reads counters only: no source checks, provider queries or retained worker text.
+    const presentation = () => ({
+        enabled,
+        active,
+        concurrency: policy.concurrency,
+        calls: totalCalls,
+        callLimit: policy.sessionCalls,
+        jobs: [...batches.values()].flatMap((batch) =>
+            [...batch.jobs.values()]
+                .filter((job) => job.settling || (!batch.retired && !quiet.has(job.state) && !job.disposition))
+                .map((job) => ({
+                    id: job.spec.id,
+                    mode: job.mode,
+                    state: job.state,
+                    settling: job.settling,
+                    calls: job.calls,
+                    tools: job.toolCalls,
+                    elapsedMs: Math.max(
+                        0,
+                        (job.settling ? Date.now() : (job.finishedAt ?? Date.now())) - job.startedAt,
+                    ),
+                })),
+        ),
+    });
     const finish = (batch, job, state, result, error) => {
         if (terminal.has(job.state)) {
             return;
         }
 
         job.state = state;
+        job.finishedAt = Date.now();
         job.result = result;
         job.error = error;
         job.revision += 1;
@@ -437,6 +462,9 @@ export function createDelegationController({
         for (const spec of packet.jobs) {
             const job = {
                 spec,
+                mode: spec.mode,
+                startedAt: now,
+                finishedAt: undefined,
                 state: "queued",
                 settling: false,
                 calls: 0,
@@ -505,6 +533,7 @@ export function createDelegationController({
             job.followUpPrompt = input.prompt;
             job.attemptId = randomUUID();
             job.state = "queued";
+            job.finishedAt = undefined;
             job.result = undefined;
             job.error = undefined;
             armDeadline(batch, job);
@@ -674,6 +703,7 @@ export function createDelegationController({
     return {
         execute,
         status,
+        presentation,
         invalidate,
         enable() {
             const host = getHost();

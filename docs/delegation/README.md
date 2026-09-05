@@ -74,6 +74,25 @@ In the interactive session:
 /delegate off
 ```
 
+In Pi's terminal UI, a small panel above the editor shows each worker's ID, role,
+state, elapsed time, model calls and source-tool calls. `1/2 workers` means one of
+two slots is occupied; it is not a completion percentage. Model calls are SDK
+invocations, not tokens. Completed jobs remain visible as **ready for review** until
+the parent resolves them. A cancelled worker shows **stopping** while its SDK request
+still occupies a slot. The panel disappears when no work needs attention.
+
+Tool output uses compact summaries. Expand it with Pi's normal tool-output shortcut
+to read answers, findings, evidence references and missing context. These remain
+advisory worker reports. `/delegate status` shows the selected model, process budgets
+and batch IDs; use an ID with `/delegate cancel <batchId>` to cancel that batch.
+
+The panel follows Pi's theme and adapts to terminal width. It refreshes at most once
+per second between lifecycle changes, stops its timer when workers settle and is
+removed on shutdown or reload. It reads counters without checking files or providers;
+it does not retain or display live child reasoning. RPC and print mode keep the same
+structured tool responses and do not mount terminal widgets. The UI uses Pi's public
+[widget and tool-rendering APIs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md).
+
 `on` grants the displayed experimental calls/time envelope. There is no model-call
 permission toggle in the model-facing tool. `limits` is read-only; the shipped ceilings
 cannot be raised by prompts. Turning delegation off, changing guard policy, switching

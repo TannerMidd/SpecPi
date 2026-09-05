@@ -1,6 +1,7 @@
 import { DelegationError, publicErrorMessage } from "./errors.mjs";
 import { randomUUID } from "node:crypto";
 import { createDelegationController } from "./core.mjs";
+import { createLivePanel, createToolRenderers, readableLimits, readableStatus } from "./presentation.mjs";
 
 const integer = { type: "integer", minimum: 0 };
 const string = { type: "string" };
@@ -91,7 +92,7 @@ export const DELEGATE_SCHEMA = {
 /** The native entry supplies a preflighted Pi child-session host for the active context. */
 export function createDelegationExtension(
     getHost,
-    { root = process.cwd(), controllerOptions = {}, prepareContext = () => {} } = {},
+    { root = process.cwd(), controllerOptions = {}, prepareContext = () => {}, presentation } = {},
 ) {
     let currentPi;
     let currentContext;
@@ -129,6 +130,7 @@ export function createDelegationExtension(
         getGuard,
         onChange: updatePresentation,
     });
+    const panel = presentation ? createLivePanel(() => controller.presentation(), presentation) : undefined;
 
     const status = () => ({
         ...controller.status(),
@@ -143,13 +145,14 @@ export function createDelegationExtension(
         currentContext?.ui?.setStatus?.(
             "specpi-delegation",
             state.enabled
-                ? `Delegate ${state.active}/${state.limits.concurrency} · ${state.sessionCalls}/${state.limits.sessionCalls} calls`
+                ? `Delegate ${state.active}/${state.limits.concurrency} workers · ${state.sessionCalls}/${state.limits.sessionCalls} calls`
                 : requested
                   ? pending
                       ? "Delegate updating model"
                       : "Delegate paused"
                   : undefined,
         );
+        panel?.update();
     }
 
     function invalidate(reason) {
@@ -176,6 +179,7 @@ export function createDelegationExtension(
     }
 
     const factory = (pi) => {
+        panel?.dispose();
         detach();
         bindingEpoch += 1;
         const issuedEpoch = bindingEpoch;
@@ -328,6 +332,7 @@ export function createDelegationExtension(
 
             currentContext = ctx;
             toolsReady = true;
+            panel?.bind(ctx);
             invalidate("session started or resources reloaded");
             try {
                 prepareContext(ctx, true);
@@ -342,6 +347,7 @@ export function createDelegationExtension(
             }
 
             invalidate("session shutdown");
+            panel?.dispose();
             prepareContext(undefined, true);
             detach();
             currentContext = undefined;
@@ -419,7 +425,8 @@ export function createDelegationExtension(
                         });
                         ctx.ui.notify("Batch cancelled. Provider settlement may still be pending.", "info");
                     } else if (["status", "limits"].includes(action)) {
-                        ctx.ui.notify(JSON.stringify(status(), null, 2), "info");
+                        const state = status();
+                        ctx.ui.notify(action === "limits" ? readableLimits(state) : readableStatus(state), "info");
                     } else {
                         throw new DelegationError("Usage: /delegate [on|off|status|limits|cancel <batchId>]");
                     }
@@ -434,6 +441,7 @@ export function createDelegationExtension(
             description:
                 "Delegate an independent frozen review or substantial selected-source analysis to a real Pi child session. Only after human /delegate on. review: check artifacts against assigned requirements in fresh context; scout: answer a distinct evidence question over selected sources. Prefer one worker and parent-only execution for small, sequential or routine work. No shell, edits or live web. run returns immediately; collect waits for advisory evidence, then resolve findings after verification. One changed-input follow_up shares the original budget/deadline. Never grants permission or proves task completion.",
             parameters: DELEGATE_SCHEMA,
+            ...(presentation ? createToolRenderers(presentation) : {}),
             execute: async (_id, input, signal, _update, ctx) => {
                 try {
                     if (!isBound()) {
@@ -452,6 +460,12 @@ export function createDelegationExtension(
                         details: { error: true },
                         isError: true,
                     };
+                } finally {
+                    try {
+                        updatePresentation();
+                    } catch {
+                        // Optional terminal rendering cannot change a tool's outcome.
+                    }
                 }
             },
         });

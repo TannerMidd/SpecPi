@@ -6,7 +6,7 @@ import { createNativePiHost, getPiSessionCompatibilityError } from "./provider.m
 import { DelegationError } from "./errors.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 5;
+const revision = 6;
 
 function canonical(directory) {
     return fs.realpathSync.native(path.resolve(directory));
@@ -16,7 +16,7 @@ function sameRoot(left, right) {
     return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
-function createState(root, sdk) {
+function createState(root, sdk, presentation) {
     let getThinkingLevel = () => undefined;
     let host;
     let epoch = 0;
@@ -105,7 +105,7 @@ function createState(root, sdk) {
         }
     };
 
-    const extensionFactory = createDelegationExtension(() => host, { root, prepareContext });
+    const extensionFactory = createDelegationExtension(() => host, { root, prepareContext, presentation });
     const factory = (pi) => {
         getThinkingLevel = () => pi.getThinkingLevel();
         extensionFactory(pi);
@@ -120,11 +120,11 @@ function createState(root, sdk) {
  * Restart Pi to load a different runtime revision or change the working root.
  * Trusted extensions share this process; this is not a security boundary against them.
  */
-export function registerNativeDelegation(pi, sdk) {
+export function registerNativeDelegation(pi, sdk, presentation) {
     const root = canonical(process.cwd());
     let state = globalThis[stateKey];
     if (state === undefined) {
-        state = createState(root, sdk);
+        state = createState(root, sdk, presentation);
         Object.defineProperty(globalThis, stateKey, { value: state });
     } else if (
         state.revision !== revision ||

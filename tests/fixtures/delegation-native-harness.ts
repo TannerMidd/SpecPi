@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { panelLines } from "../../extensions/delegation/presentation.mjs";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -710,6 +712,58 @@ export default async function nativeEntryFixture(pi: any) {
             assert.equal(server.requests.length, 0);
             answer = "Allow once";
             const firstResult = await finishBatch(tools, await checked(input));
+            const definition = first.tools.get("delegate");
+            const uiPreview: any[] = [];
+            const view = {
+                active: 1,
+                concurrency: 2,
+                calls: 3,
+                callLimit: 32,
+                jobs: [
+                    {
+                        id: "review-api",
+                        mode: "review",
+                        state: "running",
+                        settling: true,
+                        elapsedMs: 24000,
+                        calls: 2,
+                        tools: 0,
+                    },
+                    {
+                        id: "trace-config",
+                        mode: "scout",
+                        state: "complete",
+                        settling: false,
+                        elapsedMs: 17000,
+                        calls: 1,
+                        tools: 3,
+                    },
+                ],
+            };
+            for (const width of [24, 40, 60, 80, 120]) {
+                const panels = panelLines(view, width, ctx.ui.theme, truncateToWidth);
+                const call = definition.renderCall(input, ctx.ui.theme, {}).render(width);
+                const compact = definition
+                    .renderResult({ details: firstResult }, { expanded: false }, ctx.ui.theme, {})
+                    .render(width);
+                const expanded = definition
+                    .renderResult({ details: firstResult }, { expanded: true }, ctx.ui.theme, {})
+                    .render(width);
+                const unicode = definition
+                    .renderCall(
+                        { operation: "run", packet: { jobs: [{ id: "审查-👩‍💻-é".repeat(8), mode: "review" }] } },
+                        ctx.ui.theme,
+                        {},
+                    )
+                    .render(width);
+                for (const line of [...panels, ...call, ...compact, ...expanded, ...unicode]) {
+                    assert.ok(visibleWidth(line) <= width, `UI overflow at ${width}: ${line}`);
+                }
+
+                uiPreview.push({ width, panels, call, compact, expanded });
+            }
+
+            console.log(`NATIVE_UI_FIXTURE=${JSON.stringify(uiPreview)}`);
             assert.equal(firstResult.results[0].receipt.calls, 2);
             assert.equal(firstResult.results[0].receipt.usageComplete, true);
             assert.equal(server.requests.length, 2);

@@ -66,6 +66,7 @@ const requiredFiles = [
     "extensions/delegation/extension.mjs",
     "extensions/delegation/index.ts",
     "extensions/delegation/native.mjs",
+    "extensions/delegation/presentation.mjs",
     "extensions/delegation/protocol.mjs",
     "extensions/delegation/provider.mjs",
     "extensions/delegation/snapshot.mjs",

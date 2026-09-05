@@ -4,6 +4,260 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDelegationExtension, DELEGATE_SCHEMA } from "../extensions/delegation/extension.mjs";
+import { createToolRenderers, panelLines } from "../extensions/delegation/presentation.mjs";
+
+const presentation = {
+    truncateToWidth: (text, width) => [...text].slice(0, width).join(""),
+    wrapTextWithAnsi: (text) => [text],
+};
+const plainTheme = { fg: (_color, text) => text };
+
+test("unchanged tool cards reuse wrapped lines until a resize or theme invalidation", () => {
+    let wraps = 0;
+    const renderers = createToolRenderers({
+        ...presentation,
+        wrapTextWithAnsi(text) {
+            wraps += 1;
+
+            return [text];
+        },
+    });
+    const card = renderers.renderCall({ operation: "status" }, plainTheme);
+    const initial = card.render(80);
+    for (let index = 0; index < 1000; index += 1) {
+        assert.equal(card.render(80), initial);
+    }
+
+    assert.equal(wraps, 1);
+    card.render(40);
+    assert.equal(wraps, 2);
+    card.invalidate();
+    card.render(40);
+    assert.equal(wraps, 3);
+});
+
+test("human status is readable and limits retains every fixed ceiling", async (t) => {
+    const { pi } = await fixture(t);
+    await pi.command("on");
+    await pi.command("status");
+    assert.match(pi.notices.at(-1).text, /0\/2 workers active/);
+    assert.match(pi.notices.at(-1).text, /fixture\/fixture-parent/);
+    assert.match(pi.notices.at(-1).text, /Command Guard: guard/);
+    assert.doesNotMatch(pi.notices.at(-1).text, /\{"/);
+    await pi.command("limits");
+    const state = (await pi.tool({ operation: "status" })).details;
+    for (const value of Object.values(state.limits)) {
+        assert.ok(pi.notices.at(-1).text.includes(String(value)));
+    }
+});
+
+test("live panel samples counters, keeps cancelled slots visible and stops refreshing after settlement", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 10000 });
+    let settle;
+    const held = new Promise((resolve) => {
+        settle = resolve;
+    });
+    const bridge = publicHostBridge();
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        presentation,
+        controllerOptions: {
+            async worker({ job, admitCall }) {
+                admitCall();
+                job.toolCalls = 2;
+                await held;
+
+                return result();
+            },
+        },
+    });
+    const pi = mockPi();
+    pi.context.mode = "tui";
+    factory(pi);
+    await pi.fire("session_start");
+    t.after(() => pi.fire("session_shutdown"));
+    await pi.command("on");
+    assert.equal(pi.widgets.size, 0);
+    await pi.tool({ operation: "run", requestId: "panel-run", packet: packet() });
+    const widget = pi.widgets.get("specpi-delegation-workers");
+    assert.ok(widget);
+    assert.match(widget.render(100).join("\n"), /j1 · review · running · 0s · 1 model · 2 tools/);
+    const before = pi.renders();
+    t.mock.timers.tick(1000);
+    assert.equal(pi.renders(), before + 1);
+    assert.match(widget.render(60).join("\n"), /1s · 1 model · 2 tools/);
+    await pi.command("off");
+    assert.match(widget.render(100).join("\n"), /stopping/);
+    assert.equal((await pi.tool({ operation: "status" })).details.active, 1);
+    settle();
+    await new Promise(setImmediate);
+    assert.equal(pi.widgets.size, 0);
+    const done = pi.renders();
+    t.mock.timers.tick(5000);
+    assert.equal(pi.renders(), done);
+});
+
+test("completed results stay visible without a timer until parent resolution", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const bridge = publicHostBridge();
+    const factory = createDelegationExtension(() => bridge.host, { root: project(t), presentation });
+    const pi = mockPi();
+    pi.context.mode = "tui";
+    factory(pi);
+    await pi.fire("session_start");
+    t.after(() => pi.fire("session_shutdown"));
+    await pi.command("on");
+    const started = await pi.tool({ operation: "run", requestId: "ready-run", packet: packet() });
+    await new Promise(setImmediate);
+    assert.match(pi.widgets.get("specpi-delegation-workers").render(100).join("\n"), /ready for review/);
+    const before = pi.renders();
+    t.mock.timers.tick(1000);
+    assert.equal(pi.renders(), before);
+    const collected = await pi.tool({ operation: "collect", batchId: started.details.batchId });
+    const receipt = collected.details.results[0].receipt;
+    await pi.tool({
+        operation: "resolve",
+        requestId: "ready-resolve",
+        decision: "accept",
+        findings: [],
+        ...Object.fromEntries(
+            ["batchId", "jobId", "attemptId", "packetDigest", "generation", "resultRevision"].map((key) => [
+                key,
+                receipt[key],
+            ]),
+        ),
+    });
+    assert.equal(pi.widgets.size, 0);
+});
+
+test("panel shutdown detaches its timer and a reload cannot render into the old session", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let settle;
+    const held = new Promise((resolve) => {
+        settle = resolve;
+    });
+    const bridge = publicHostBridge();
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        presentation,
+        controllerOptions: {
+            worker: async () => {
+                await held;
+
+                return result();
+            },
+        },
+    });
+    const first = mockPi();
+    first.context.mode = "tui";
+    factory(first);
+    await first.fire("session_start");
+    await first.command("on");
+    await first.tool({ operation: "run", requestId: "reload-panel", packet: packet() });
+    const second = mockPi();
+    second.context.mode = "tui";
+    factory(second);
+    await second.fire("session_start");
+    assert.equal(first.widgets.size, 0);
+    assert.match(second.widgets.get("specpi-delegation-workers").render(100).join("\n"), /stopping/);
+    await first.fire("session_shutdown");
+    t.mock.timers.tick(1000);
+    assert.equal(first.widgets.size, 0);
+    assert.equal(second.widgets.size, 1);
+    await second.fire("session_shutdown");
+    const before = second.renders();
+    t.mock.timers.tick(1000);
+    assert.equal(second.widgets.size, 0);
+    assert.equal(second.renders(), before);
+    settle();
+    await new Promise(setImmediate);
+});
+
+test("RPC and print sessions never mount terminal widgets", async (t) => {
+    const bridge = publicHostBridge();
+    for (const mode of ["rpc", "print"]) {
+        const factory = createDelegationExtension(() => bridge.host, { root: project(t), presentation });
+        const pi = mockPi();
+        pi.context.mode = mode;
+        factory(pi);
+        await pi.fire("session_start");
+        await pi.command("on");
+        await pi.tool({ operation: "run", requestId: `headless-${mode}`, packet: packet() });
+        await new Promise(setImmediate);
+        assert.equal(pi.widgets.size, 0);
+        await pi.fire("session_shutdown");
+    }
+});
+
+test("tool cards keep structured results intact and strip terminal controls from expanded evidence", () => {
+    const renderers = createToolRenderers(presentation);
+    const output = {
+        content: [{ type: "text", text: "unchanged structured JSON" }],
+        details: {
+            jobs: [{ jobId: "j1", state: "complete", calls: 2 }],
+            results: [
+                {
+                    receipt: { jobId: "j1" },
+                    result: {
+                        ...result(),
+                        answer: "\u001b[2JVisible\u202e text",
+                        findings: [
+                            {
+                                id: "f1",
+                                confidence: "observed",
+                                claim: "A claim",
+                                evidence: [{ sourceId: "s1", lineStart: 3, lineEnd: 5 }],
+                                contraryEvidence: [],
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    };
+    const before = JSON.stringify(output);
+    const compact = renderers.renderResult(output, { expanded: false }, plainTheme).render(200).join("\n");
+    assert.match(compact, /1 findings · advisory/);
+    assert.doesNotMatch(compact, /A claim|Visible/);
+    const expanded = renderers.renderResult(output, { expanded: true }, plainTheme).render(200).join("\n");
+    assert.match(expanded, /Visible text/);
+    assert.match(expanded, /f1 \[observed\] A claim/);
+    assert.match(expanded, /s1:3–5/);
+    assert.equal(expanded.includes("\u001b"), false);
+    assert.equal(expanded.includes("\u202e"), false);
+    assert.equal(JSON.stringify(output), before);
+    assert.match(
+        renderers.renderCall({ operation: "run", packet: packet() }, plainTheme).render(100).join("\n"),
+        /Delegate · run · j1 \(review\)/,
+    );
+    assert.match(renderers.renderResult({}, { isPartial: true }, plainTheme).render(100).join("\n"), /Waiting/);
+});
+
+test("narrow worker rows retain separate metrics and status explains occupied slots", () => {
+    const view = {
+        active: 1,
+        concurrency: 2,
+        calls: 3,
+        callLimit: 32,
+        jobs: [
+            {
+                id: "review-api",
+                mode: "review",
+                state: "running",
+                settling: true,
+                elapsedMs: 65000,
+                calls: 2,
+                tools: 4,
+            },
+        ],
+    };
+    assert.equal(panelLines(view, 60, plainTheme, presentation.truncateToWidth).length, 3);
+    assert.match(
+        panelLines(view, 60, plainTheme, presentation.truncateToWidth).join("\n"),
+        /1m 5s · 2 model · 4 tools/,
+    );
+    assert.match(panelLines(view, 100, plainTheme, presentation.truncateToWidth).join("\n"), /1\/2 workers/);
+});
 
 function project(t) {
     const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-ui-")));
@@ -39,9 +293,31 @@ function mockPi() {
     const events = bus();
     const notices = [];
     const statuses = new Map();
+    const widgets = new Map();
+    let renders = 0;
     const context = {
         hasUI: true,
-        ui: { notify: (text, kind) => notices.push({ text, kind }), setStatus: (key, text) => statuses.set(key, text) },
+        ui: {
+            notify: (text, kind) => notices.push({ text, kind }),
+            setStatus: (key, text) => statuses.set(key, text),
+            setWidget(key, value) {
+                if (value) {
+                    widgets.set(
+                        key,
+                        value(
+                            {
+                                requestRender: () => {
+                                    renders += 1;
+                                },
+                            },
+                            { fg: (_color, text) => text },
+                        ),
+                    );
+                } else {
+                    widgets.delete(key);
+                }
+            },
+        },
     };
     let guard = "guard";
     const removeGuard = events.on("specpi:guard-state", (request) => request.reply({ mode: guard }));
@@ -52,6 +328,8 @@ function mockPi() {
         tools,
         notices,
         statuses,
+        widgets,
+        renders: () => renders,
         context,
         removeGuard,
         registerCommand: (name, definition) => commands.set(name, definition),

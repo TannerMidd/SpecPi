@@ -140,6 +140,17 @@ test("ordinary native Pi delegation runs real child sessions through configured 
     }
 
     const observed = report(result, "NATIVE_ENTRY_FIXTURE");
+    const uiPreview = report(result, "NATIVE_UI_FIXTURE");
+    assert.deepEqual(
+        uiPreview.map((item) => item.width),
+        [24, 40, 60, 80, 120],
+    );
+    assert.match(uiPreview.at(-1).panels.join("\n"), /ready for review/);
+    assert.match(uiPreview.at(-1).expanded.join("\n"), /Native SDK child-session assessment complete/);
+    if (process.env.SPECPI_UI_CAPTURE) {
+        fs.writeFileSync(process.env.SPECPI_UI_CAPTURE, `${JSON.stringify(uiPreview, null, 2)}\n`);
+    }
+
     for (const name of [
         "ordinaryEntryRegistered",
         "defaultOff",

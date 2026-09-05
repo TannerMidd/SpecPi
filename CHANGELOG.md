@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show active delegation workers above the Pi editor with state, elapsed time and call counts. Render compact tool results with expandable findings and evidence, and make `/delegate status` and `limits` readable without JSON.
+
 - Repair delegation review findings: restore Guard-state responders across reused sessions, keep invalid/declined Guard commands inert, reject stale confirmations, redact SDK setup errors, and contain teardown failures. Release expired/resolved snapshot inputs and retire old batches without resetting quotas; preserve independently reported token fields. Recover transient host setup failures, remove repeated per-delta filesystem/model serialization and per-tool source rehashing, and use linear snapshot response accounting with explicit protected-boundary checks. Discover and syntax-check all installable JavaScript/TypeScript source files.
 - Follow parent provider/model and thinking changes after one `/delegate on`, with automatic host preflight and no repeated toggle. Pause on unsupported selections and resume on a compatible choice; retain quotas, unsettled slots and stale-result rejection. Preserve explicit Off, reject stale Strict approvals, coalesce duplicate setup and prevent late setup from undoing newer selections or revocations.
 - Remove Command Guard as a delegation prerequisite: `/delegate on` works with Guard absent or Off while delegation enforces its own snapshot tools and limits. Preserve active Strict approvals, explicit locks and revocation on Guard changes. Report specific model, directory and Guard activation failures, expose observed Guard state in status, and test real Pi worker runs without an active Guard.
