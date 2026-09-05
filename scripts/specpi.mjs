@@ -26,6 +26,7 @@ import { validateCapabilityRegistry, isValidValidatorName } from "../extensions/
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
+import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -846,16 +847,7 @@ function managedFiles(includeShell) {
             path.join(agentDir, "extensions", "command-guard", name),
             0o644,
         ]),
-        ...[
-            "index.ts",
-            "native.mjs",
-            "extension.mjs",
-            "core.mjs",
-            "protocol.mjs",
-            "provider.mjs",
-            "snapshot.mjs",
-            "worker.mjs",
-        ].map((name) => [
+        ...DELEGATION_MANAGED_FILES.map((name) => [
             path.join(repoRoot, "extensions", "delegation", name),
             path.join(agentDir, "extensions", "delegation", name),
             0o644,

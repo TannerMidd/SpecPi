@@ -8,6 +8,7 @@ for (const [proof, description] of [
     ["lifecycle", "reused Guard sessions restore one responder and preserve optional-Guard admission semantics"],
     ["mutations", "only accepted Guard policy mutations revoke delegation"],
     ["dialogs", "stale Guard startup and mode confirmations cannot downgrade a later lock or session"],
+    ["lock-order", "all human lock paths publish fully updated policy to synchronous listeners"],
 ]) {
     test(description, () => {
         const result = spawnSync(

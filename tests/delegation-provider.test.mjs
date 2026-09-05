@@ -5,6 +5,40 @@ import { runPiFixture } from "../scripts/pi-test-harness.mjs";
 import { createNativePiHost, getPiSessionCompatibilityError } from "../extensions/delegation/provider.mjs";
 import { LIMITS } from "../extensions/delegation/protocol.mjs";
 import { runWorker } from "../extensions/delegation/worker.mjs";
+import { withPiCompatibility } from "../extensions/delegation/native.mjs";
+
+test("missing compatibility subpath or export reaches the normal capability diagnostic", async () => {
+    for (const load of [
+        async () => {
+            throw new Error("private loader details");
+        },
+        async () => ({}),
+    ]) {
+        const state = fixture();
+        delete state.sdk.clampThinkingLevel;
+        const sdk = await withPiCompatibility(state.sdk, load);
+        assert.match(getPiSessionCompatibilityError(sdk), /clampThinkingLevel/);
+        assert.doesNotMatch(getPiSessionCompatibilityError(sdk), /private loader/);
+        assert.throws(
+            () => createNativePiHost(state.ctx, { ...state.options, sdk }),
+            /missing delegation capabilities/,
+        );
+    }
+
+    const state = fixture();
+    assert.equal(
+        await withPiCompatibility(state.sdk, () => {
+            throw new Error("must not load");
+        }),
+        state.sdk,
+    );
+    const expected = state.sdk.clampThinkingLevel;
+    delete state.sdk.clampThinkingLevel;
+    assert.equal(
+        (await withPiCompatibility(state.sdk, async () => ({ clampThinkingLevel: expected }))).clampThinkingLevel,
+        expected,
+    );
+});
 
 function fixture() {
     const model = {

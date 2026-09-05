@@ -8,7 +8,12 @@ const object = (properties, required = Object.keys(properties)) => ({
     required,
 });
 const toolDefinitions = [
-    { name: "list_sources", description: "List the immutable sources selected for this job.", parameters: object({}) },
+    {
+        name: "list_sources",
+        description:
+            "List selected sources in pages of at most 16 KiB. Omit offset for the first page; use nextOffset for the next page, or stop when null.",
+        parameters: object({ offset: { type: "integer", minimum: 0 } }, []),
+    },
     {
         name: "read_source",
         description: "Read numbered lines from a selected source, at most 200 lines and 16 KiB.",
@@ -84,8 +89,32 @@ export async function runWorker({
 
                 let output;
                 if (name === "list_sources") {
-                    record(args, []);
-                    output = sources;
+                    record(args, ["offset"], []);
+                    const offset = args.offset === undefined ? 0 : args.offset;
+                    integer(offset, 0, sources.length);
+                    const page = [];
+                    const maximum = Math.min(16 * 1024, limits.toolBytes - job.toolBytes);
+                    let size = Math.max(
+                        bytes({ sources: [], nextOffset: null }),
+                        bytes({ sources: [], nextOffset: sources.length }),
+                    );
+                    let next = offset;
+                    while (next < sources.length) {
+                        const entryBytes = bytes(sources[next]) + (page.length ? 1 : 0);
+                        if (size + entryBytes > maximum) {
+                            break;
+                        }
+
+                        page.push(sources[next]);
+                        size += entryBytes;
+                        next += 1;
+                    }
+
+                    if (next === offset && next < sources.length) {
+                        throw new DelegationError("Worker tool output allowance exhausted");
+                    }
+
+                    output = { sources: page, nextOffset: next < sources.length ? next : null };
                 } else if (name === "read_source") {
                     record(args, ["sourceId", "startLine", "maxLines"]);
                     if (!allowed.has(args.sourceId)) {

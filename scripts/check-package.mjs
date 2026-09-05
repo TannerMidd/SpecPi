@@ -7,6 +7,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -61,16 +62,7 @@ const requiredFiles = [
     "extensions/command-guard/rules.mjs",
     "extensions/command-guard/smoke.mjs",
     "extensions/files/core.mjs",
-    "extensions/delegation/core.mjs",
-    "extensions/delegation/errors.mjs",
-    "extensions/delegation/extension.mjs",
-    "extensions/delegation/index.ts",
-    "extensions/delegation/native.mjs",
-    "extensions/delegation/presentation.mjs",
-    "extensions/delegation/protocol.mjs",
-    "extensions/delegation/provider.mjs",
-    "extensions/delegation/snapshot.mjs",
-    "extensions/delegation/worker.mjs",
+    ...DELEGATION_MANAGED_FILES.map((name) => `extensions/delegation/${name}`),
     "extensions/files/index.ts",
     "extensions/spec.ts",
     "extensions/spec/core.mjs",

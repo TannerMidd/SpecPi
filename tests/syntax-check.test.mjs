@@ -28,6 +28,12 @@ test("nested new modules are checked without a hand-maintained manifest", (t) =>
     fs.mkdirSync(nested);
     fs.writeFileSync(path.join(nested, "index.ts"), "class Valid { constructor(public value: number) {} }\n");
     fs.writeFileSync(path.join(nested, "core.mjs"), "export const valid = true;\n");
+    for (const directory of ["browser-runtime/node_modules", "extensions/new-extension/node_modules"]) {
+        const dependency = path.join(root, directory, "broken-package", "nested");
+        fs.mkdirSync(dependency, { recursive: true });
+        fs.writeFileSync(path.join(dependency, "index.mjs"), "Not valid JavaScript!\n");
+    }
+
     assert.deepEqual(checkSyntax(root), { files: 2, passed: true });
     const errors = [];
     t.mock.method(process.stderr, "write", (message) => {

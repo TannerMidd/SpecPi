@@ -1,5 +1,11 @@
 # Third-party components
 
+Delegation loads `clampThinkingLevel` from the Pi SDK when exported there, otherwise
+from the public `@earendil-works/pi-ai/compat` subpath declared in Pi's
+[package exports](https://github.com/earendil-works/pi/blob/main/packages/ai/package.json).
+That fallback is guarded: a missing module or function leaves `/delegate` registered
+and produces a capability error on activation, rather than an extension-load failure.
+
 When Pi is absent, SpecPi can install the reviewed `@earendil-works/pi-coding-agent@0.84.4` npm package globally after confirmation. The package provides the `pi` executable, is installed with lifecycle scripts disabled, retains its upstream license, and remains external system state after SpecPi uninstall.
 
 The experimental delegation extension uses native discovery and public Pi SDK `createAgentSession`, in-memory sessions and a fresh `ModelRuntime`, with **public SDK capability checks instead of an exact-version allowlist**. Compatible Pi updates can activate without a SpecPi release. Missing APIs are named in the activation error; actual SDK/provider behavior remains subject to runtime checks and regression testing. The installer floor and pinned 0.84.4 bootstrap package are unchanged. Pi supplies the conversation/tool loop, standard configuration, authentication and OAuth. The child receives the parent model and thinking level with Pi clamping; unsupported runtime-only authentication, selected extension-provider overrides and safe descriptor mismatches fail preflight. Children load no ambient extensions, skills, AGENTS files or parent history. Parent hooks, ephemeral settings and session affinity are not inherited. Each SDK invocation is admitted before dispatch, retries and compaction are disabled, and SDK-visible streams are checked without claiming hard raw-transport, hidden-attempt, memory or invoice bounds. SpecPi does not install or vendor another runtime, add a launcher/service, or introduce a direct `pi-agent-core` dependency or additional runtime library. Parent Pi startup, resources and trust remain unchanged.

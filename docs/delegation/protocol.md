@@ -96,6 +96,12 @@ explicit packet fields, even when an allowed array or string is empty.
 
 ## Inspect and collect
 
+Worker `list_sources` accepts an optional zero-based `offset` and returns
+`{ "sources": [...], "nextOffset": number | null }`. Each page is at most 16 KiB,
+including JSON metadata, and fits the remaining tool-byte allowance. A non-null
+`nextOffset` identifies the next page; null marks the end. Pages consume the same
+per-job tool-call and byte budgets as reads and searches.
+
 ```json
 { "operation": "status" }
 ```
@@ -198,10 +204,15 @@ Accept/discard finalize the parent disposition; needs_check leaves it open for a
 assessment or allowed follow-up. These are parent assertions, never human permission,
 automatic tool execution, verified completion, or wishlist authorization.
 
-All mutations require `requestId`. Replaying the identical request returns its stored
-response without another request or transition. Reusing an ID with a different payload
-fails. The bounded journal retains failures too. Generation and source checks still
-apply when replaying successful operations. No idempotency record resets accounting.
+All mutations require `requestId`. Successful runs, follow-ups and final dispositions
+retain their replay receipts for the process lifetime; the fixed batch/job ceilings
+bound these to at most 20 entries. Replaying a retained request returns its stored
+response without another request or transition. Reusing a retained ID with a different
+payload fails. Failed requests do not reserve IDs and may be corrected or retried.
+Successful cancellation and `needs_check` responses use a separate 128-entry oldest-first
+cache. After eviction, those operations are revalidated against current state; they
+cannot start inference or restore cancelled jobs. Generation and source checks still
+apply. Neither cache eviction nor failed attempts reset quotas or block cancellation.
 
 ## Cancellation and lifecycle
 

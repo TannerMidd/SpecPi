@@ -353,6 +353,34 @@ const proofs: Record<string, () => Promise<void>> = {
     dialogs: dialogProof,
 };
 const selected = process.argv[2] ?? "policy";
+proofs["lock-order"] = async () => {
+    for (const [name, input] of [
+        ["bash", { command: "git reset --hard" }],
+        ["write", { path: "guard-order-fixture.md", content: "fixture" }],
+        ["unknown_fixture_tool", {}],
+    ] as const) {
+        const h = harness();
+        await h.start();
+        await h.call("remember_fixture_tool", {});
+        await h.command("status");
+        assert.match(h.notices.at(-1)!, /session approvals: 1;/);
+        const observed: string[] = [];
+        const off = h.pi.events.on("specpi:guard-policy-changed", () => {
+            // Event dispatch is synchronous: inspect the policy inside the notification.
+            void h.command("status");
+            observed.push(h.notices.at(-1)!);
+        });
+        h.decisions.answer = "Lock session";
+        const denied = await h.call(name, input);
+        assert.equal(denied?.block, true);
+        assert.equal(observed.length, 1, name);
+        assert.match(observed[0], /Mode: locked;/);
+        assert.match(observed[0], /session approvals: 0;/);
+        off();
+        await h.shutdown();
+    }
+};
+
 assert.ok(proofs[selected], "Unknown delegation Guard proof");
 await proofs[selected]();
 console.log(`DELEGATION_GUARD_HARNESS=${selected}:passed`);

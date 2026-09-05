@@ -9,6 +9,117 @@ import { LIMITS, validatePacket } from "../extensions/delegation/protocol.mjs";
 
 const usage = { input: 3, output: 5, cacheRead: 0, cacheWrite: 0 };
 
+test("failed requests and repeated cancellation cannot exhaust admission or evict spending receipts", async (t) => {
+    const value = controller(t, project(t));
+    const input = { operation: "run", requestId: "retry-after-enable", packet: packet() };
+    for (let index = 0; index < 300; index += 1) {
+        await assert.rejects(value.execute({ ...input, requestId: `failed-${index}` }), /disabled/);
+    }
+
+    await assert.rejects(value.execute(input), /disabled/);
+    value.enable();
+    const first = await value.execute(input);
+    await waitFor(() => value.status().active === 0);
+    for (let index = 0; index < 300; index += 1) {
+        await value.execute({ operation: "cancel", requestId: `cancel-${index}`, batchId: first.batchId });
+    }
+
+    assert.deepEqual(await value.execute(input), first, "admitted run receipt survives cancellation churn");
+    await assert.rejects(
+        value.execute({ ...input, packet: { ...packet(), objective: "changed" } }),
+        /different payload/,
+    );
+    const second = await complete(value, packet(), "second-run");
+    assert.equal(second.results[0].receipt.state, "complete");
+    assert.equal(value.status().sessionCalls, 2);
+    assert.equal(value.status().sessionBatches, 2);
+    await assert.rejects(value.execute(input), /retired/);
+});
+
+test("nonfinal assessment churn preserves follow-up and final-disposition receipts", async (t) => {
+    const value = controller(t, project(t));
+    value.enable();
+    const first = await complete(value);
+    const receipt = binding(first.results[0].receipt);
+    for (let index = 0; index < 300; index += 1) {
+        await value.execute({
+            operation: "resolve",
+            requestId: `check-${index}`,
+            ...receipt,
+            decision: "needs_check",
+            findings: [],
+        });
+    }
+
+    const follow = {
+        operation: "follow_up",
+        requestId: "follow",
+        ...receipt,
+        prompt: "Check the fixture against the additional requirement: confirm the answer is supported.",
+    };
+    const accepted = await value.execute(follow);
+    await waitFor(() => value.status().active === 0);
+    assert.deepEqual(await value.execute(follow), accepted);
+    const collected = await value.execute({ operation: "collect", batchId: first.batchId });
+    const resolve = {
+        operation: "resolve",
+        requestId: "final",
+        ...binding(collected.results[0].receipt),
+        decision: "accept",
+        findings: [],
+    };
+    const finalized = await value.execute(resolve);
+    assert.deepEqual(await value.execute(resolve), finalized);
+    assert.equal(value.status().sessionCalls, 2);
+});
+
+test("source listing paginates long Unicode metadata without consuming the tool allowance in one call", async (t) => {
+    const sources = Array.from({ length: 100 }, (_, index) => ({
+        id: `s${index + 1}`,
+        path: `${"界".repeat(170)}-${index}.md`,
+        digest: "a".repeat(64),
+        bytes: 1,
+        lineCount: 1,
+    }));
+    let observed = [];
+    const bridge = hostBridge((context) => {
+        const outputs = context.messages.filter((item) => item.role === "toolResult");
+        if (!outputs.length) {
+            return message([{ type: "toolCall", id: "page-1", name: "list_sources", arguments: {} }], {
+                stopReason: "toolUse",
+            });
+        }
+
+        const page = JSON.parse(outputs.at(-1).content[0].text);
+        assert.ok(Buffer.byteLength(outputs.at(-1).content[0].text) <= 16 * 1024);
+        assert.ok(page.sources.length > 0 && page.sources.length < sources.length);
+        if (outputs.length === 1) {
+            observed = page.sources.map((source) => source.id);
+
+            return message(
+                [{ type: "toolCall", id: "page-2", name: "list_sources", arguments: { offset: page.nextOffset } }],
+                { stopReason: "toolUse" },
+            );
+        }
+
+        assert.equal(page.sources[0].id, sources[observed.length].id);
+        assert.ok(page.sources.every((source) => !observed.includes(source.id)));
+
+        return message(JSON.stringify(result()));
+    });
+    const value = controller(t, project(t), bridge, {
+        snapshotFactory: () => ({ sources, assertFresh() {}, assertBindings() {}, destroy() {} }),
+    });
+    value.enable();
+    const output = await complete(
+        value,
+        packet([{ ...packet().jobs[0], mode: "scout", sources: sources.map((source) => source.path) }]),
+    );
+    assert.equal(output.results[0].receipt.state, "complete");
+    assert.equal(output.results[0].receipt.toolCalls, 2);
+    assert.ok(output.results[0].receipt.toolBytes <= 32 * 1024);
+});
+
 function deferred() {
     let resolve;
     const promise = new Promise((done) => {
@@ -1098,8 +1209,9 @@ test("actual workers normalize selected paths and use only their selected litera
         const outputs = context.messages
             .filter((item) => item.role === "toolResult")
             .map((item) => JSON.parse(item.content[0].text));
-        assert.equal(outputs[0].length, 1);
-        assert.equal(outputs[0][0].id, selectedId);
+        assert.equal(outputs[0].sources.length, 1);
+        assert.equal(outputs[0].sources[0].id, selectedId);
+        assert.equal(outputs[0].nextOffset, null);
         assert.equal(outputs[1].sourceId, selectedId);
         assert.deepEqual(
             outputs[2].map((item) => item.sourceId),

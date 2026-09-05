@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Share delegation's managed-file inventory across installation and package checks; import the installed module tree in the lifecycle regression. Keep failed requests and repeated cancellations from exhausting the replay journal, paginate source listings, exclude nested dependencies from syntax checks, publish complete Guard lock state before notifications, and handle a missing Pi compatibility export without losing the extension.
+
 - Show active delegation workers above the Pi editor with state, elapsed time and call counts. Render compact tool results with expandable findings and evidence, and make `/delegate status` and `limits` readable without JSON.
 
 - Repair delegation review findings: restore Guard-state responders across reused sessions, keep invalid/declined Guard commands inert, reject stale confirmations, redact SDK setup errors, and contain teardown failures. Release expired/resolved snapshot inputs and retire old batches without resetting quotas; preserve independently reported token fields. Recover transient host setup failures, remove repeated per-delta filesystem/model serialization and per-tool source rehashing, and use linear snapshot response accounting with explicit protected-boundary checks. Discover and syntax-check all installable JavaScript/TypeScript source files.

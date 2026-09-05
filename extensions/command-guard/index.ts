@@ -139,13 +139,17 @@ function decisionPrompt(decision: any, cwd: string, affected: string): string {
     return boundedReason(fields, 1200);
 }
 
+function lockSession(state: State): void {
+    state.mode = "locked";
+    state.generation += 1;
+    state.sessionApprovals.clear();
+    state.onModeChanged?.();
+}
+
 function deny(state: State, reason: string, critical = false): { block: true; reason: string } {
     state.blocks += 1;
     if (critical) {
-        state.mode = "locked";
-        state.generation += 1;
-        state.sessionApprovals.clear();
-        state.onModeChanged?.();
+        lockSession(state);
     }
 
     return { block: true, reason: boundedReason(reason) };
@@ -534,10 +538,7 @@ export default function registerCommandGuard(
                     }
 
                     if (answer === "Lock session") {
-                        state.mode = "locked";
-                        state.onModeChanged?.();
-                        state.generation += 1;
-                        state.sessionApprovals.clear();
+                        lockSession(state);
                         updateStatus(ctx, state);
 
                         return deny(state, "The session was locked by command-guard approval.");
@@ -630,10 +631,7 @@ export default function registerCommandGuard(
                     }
 
                     if (answer === "Lock session") {
-                        state.mode = "locked";
-                        state.onModeChanged?.();
-                        state.generation += 1;
-                        state.sessionApprovals.clear();
+                        lockSession(state);
                         updateStatus(ctx, state);
 
                         return deny(state, "The session was locked by command-guard approval.");
@@ -708,10 +706,7 @@ export default function registerCommandGuard(
                 }
 
                 if (answer === "Lock session") {
-                    state.mode = "locked";
-                    state.onModeChanged?.();
-                    state.generation += 1;
-                    state.sessionApprovals.clear();
+                    lockSession(state);
                     updateStatus(ctx, state);
                 }
 

@@ -40,6 +40,7 @@ export function createDelegationController({
     const batches = new Map();
     const history = new Map();
     const requests = new Map();
+    const recentRequests = new Map();
     const listeners = new Set();
     const changed = () => {
         for (const notify of listeners) {
@@ -659,7 +660,7 @@ export function createDelegationController({
         }
 
         const fingerprint = digest(input);
-        const previous = requests.get(input.requestId);
+        const previous = requests.get(input.requestId) ?? recentRequests.get(input.requestId);
         if (previous) {
             if (previous.fingerprint !== fingerprint) {
                 throw new DelegationError("A request identifier cannot be reused with a different payload");
@@ -677,26 +678,27 @@ export function createDelegationController({
                 }
             }
 
-            if (previous.error) {
-                throw new DelegationError(previous.error);
-            }
-
             return structuredClone(previous.value);
         }
 
-        if (requests.size >= 128) {
-            throw new DelegationError("Session idempotency journal is full");
-        }
-
         const entry = { fingerprint, generation };
-        requests.set(input.requestId, entry);
         try {
             entry.value = mutate(input);
+            // Spending and final-disposition receipts fit the fixed batch/job ceilings
+            // (at most 4 runs + 8 follow-ups + 8 final dispositions). Never evict them.
+            if (input.operation === "cancel" || (input.operation === "resolve" && input.decision === "needs_check")) {
+                recentRequests.set(input.requestId, entry);
+                if (recentRequests.size > 128) {
+                    recentRequests.delete(recentRequests.keys().next().value);
+                }
+            } else {
+                requests.set(input.requestId, entry);
+            }
 
             return structuredClone(entry.value);
         } catch (error) {
-            entry.error = publicErrorMessage(error);
-            throw new DelegationError(entry.error);
+            // Failed requests reserve neither a key nor journal capacity.
+            throw new DelegationError(publicErrorMessage(error));
         }
     };
 

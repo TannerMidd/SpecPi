@@ -13,7 +13,9 @@ export function syntaxFiles(root) {
         for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
             const filename = path.join(directory, entry.name);
             if (entry.isDirectory()) {
-                visit(filename);
+                if (entry.name.toLowerCase() !== "node_modules") {
+                    visit(filename);
+                }
             } else if (entry.isFile() && sourceExtensions.has(path.extname(entry.name))) {
                 files.push(filename);
             }

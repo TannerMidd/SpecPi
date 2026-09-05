@@ -20,6 +20,7 @@ import {
 } from "../extensions/tool-wishlist/core.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
+import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
 import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
 import { acquireSpecPiLock } from "../scripts/lock.mjs";
 import { describeSpecPhase, transformSpecMarkdown } from "../extensions/spec/core.mjs";
@@ -2089,16 +2090,12 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         }
 
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
-        for (const file of [
-            "index.ts",
-            "native.mjs",
-            "extension.mjs",
-            "core.mjs",
-            "protocol.mjs",
-            "provider.mjs",
-            "snapshot.mjs",
-            "worker.mjs",
-        ]) {
+        assert.deepEqual(
+            fs.readdirSync(path.resolve("extensions/delegation")).sort(),
+            [...DELEGATION_MANAGED_FILES].sort(),
+            "Every delegation source must be in the managed inventory",
+        );
+        for (const file of DELEGATION_MANAGED_FILES) {
             assert.ok(
                 fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
                 `Missing installed delegation source: ${file}`,
@@ -2137,6 +2134,23 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             .map((target) => path.basename(target))
             .sort();
         assert.deepEqual(manifestGuardFiles, [...COMMAND_GUARD_MANAGED_FILES].sort());
+        const installedDelegationDirectory = path.join(agentDir, "extensions", "delegation");
+        const manifestDelegationFiles = Object.keys(installedManifest.files || {})
+            .filter((target) => path.dirname(target) === installedDelegationDirectory)
+            .map((target) => path.basename(target))
+            .sort();
+        assert.deepEqual(manifestDelegationFiles, [...DELEGATION_MANAGED_FILES].sort());
+        const installedDelegationImport = spawnSync(
+            process.execPath,
+            [
+                "--input-type=module",
+                "-e",
+                "import(process.argv[1])",
+                pathToFileURL(path.join(installedDelegationDirectory, "native.mjs")).href,
+            ],
+            { cwd: root, encoding: "utf8" },
+        );
+        assert.equal(installedDelegationImport.status, 0, installedDelegationImport.stderr);
 
         assert.ok(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")));
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));

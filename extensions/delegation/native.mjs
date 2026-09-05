@@ -6,7 +6,23 @@ import { createNativePiHost, getPiSessionCompatibilityError } from "./provider.m
 import { DelegationError } from "./errors.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 6;
+const revision = 7;
+
+export async function withPiCompatibility(sdk, loadCompatibility) {
+    if (typeof sdk.clampThinkingLevel === "function") {
+        return sdk;
+    }
+
+    let clampThinkingLevel;
+    try {
+        ({ clampThinkingLevel } = await loadCompatibility());
+    } catch {
+        // Register the command even if this optional public subpath was removed.
+        // The capability check supplies a controlled diagnostic on activation.
+    }
+
+    return { ...sdk, clampThinkingLevel };
+}
 
 function canonical(directory) {
     return fs.realpathSync.native(path.resolve(directory));
