@@ -252,6 +252,48 @@ function streamingFixture(eventScript, overrides = {}) {
     return { state, host, counts, controls, session: () => session };
 }
 
+test("provider timeout and abort timer use the remaining configured job deadline, not two minutes", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 10_000 });
+    for (const minutes of [1, 10, 15, 60]) {
+        let release;
+        let requestOptions;
+        const held = new Promise((resolve) => {
+            release = resolve;
+        });
+        const state = streamingFixture(
+            async function* (terminal) {
+                await held;
+                yield { type: "done", message: terminal };
+            },
+            {
+                configure(session) {
+                    const original = session.agent.streamFunction;
+                    session.agent.streamFunction = (...args) => {
+                        requestOptions = args[2];
+
+                        return original(...args);
+                    };
+                },
+            },
+        );
+        const child = await state.host.openSession({ systemPrompt: "fixture", tools: [] });
+        const remaining = minutes * 60_000 - 5000;
+        state.controls.deadline = Date.now() + remaining;
+        const run = child.run("fixture", state.controls);
+        const rejected = assert.rejects(run, /cancelled or expired|lease/);
+        await new Promise(setImmediate);
+        assert.equal(requestOptions.timeoutMs, remaining);
+        assert.equal(requestOptions.maxRetries, 0);
+        t.mock.timers.tick(remaining - 1);
+        assert.equal(state.controls.signal.aborted, false);
+        t.mock.timers.tick(1);
+        assert.equal(state.controls.signal.aborted, true);
+        release();
+        await rejected;
+        child.release();
+    }
+});
+
 test("stream deltas do not reserialize model descriptors or full growing partials", async (t) => {
     const state = streamingFixture(async function* (terminal) {
         yield { type: "start", partial: { ...terminal, content: [] } };

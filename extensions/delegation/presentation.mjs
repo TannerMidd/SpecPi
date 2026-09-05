@@ -145,6 +145,7 @@ export function readableStatus(state) {
         `Delegation ${mode} · ${state.active}/${state.limits.concurrency} workers active`,
         `Process budget: ${state.sessionCalls}/${state.limits.sessionCalls} model calls · ${state.sessionBatches}/${state.limits.sessionBatches} batches used`,
         `Command Guard: ${plain(state.guard)}`,
+        `Timeout: ${state.limits.jobMs / 60_000} minutes per job · ${state.limits.batchMs / 60_000} minutes per batch (/delegate timeout)`,
     ];
     if (state.model) {
         lines.push(
@@ -176,7 +177,7 @@ export function readableLimits(state) {
         return `  ${label}: ${value}${unit}`;
     });
 
-    return `${readableStatus(state)}\nFixed limits:\n${limits.join("\n")}\nBudgets do not reset on off/on or reload. Cancellation is best effort; no billing cap.`;
+    return `${readableStatus(state)}\nEffective limits:\n${limits.join("\n")}\nBudgets do not reset on off/on or reload. Cancellation is best effort; no billing cap.`;
 }
 
 export function createToolRenderers({ truncateToWidth, wrapTextWithAnsi }) {

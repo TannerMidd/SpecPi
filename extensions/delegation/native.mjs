@@ -4,9 +4,10 @@ import { randomUUID } from "node:crypto";
 import { createDelegationExtension } from "./extension.mjs";
 import { createNativePiHost, getPiSessionCompatibilityError } from "./provider.mjs";
 import { DelegationError } from "./errors.mjs";
+import { createTimeoutStore } from "./settings.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 7;
+const revision = 8;
 
 export async function withPiCompatibility(sdk, loadCompatibility) {
     if (typeof sdk.clampThinkingLevel === "function") {
@@ -121,7 +122,12 @@ function createState(root, sdk, presentation) {
         }
     };
 
-    const extensionFactory = createDelegationExtension(() => host, { root, prepareContext, presentation });
+    const extensionFactory = createDelegationExtension(() => host, {
+        root,
+        prepareContext,
+        presentation,
+        timeoutStore: createTimeoutStore(),
+    });
     const factory = (pi) => {
         getThinkingLevel = () => pi.getThinkingLevel();
         extensionFactory(pi);

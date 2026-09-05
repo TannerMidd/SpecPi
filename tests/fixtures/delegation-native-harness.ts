@@ -670,6 +670,14 @@ export default async function nativeEntryFixture(pi: any) {
         try {
             assert.ok(pi.getAllTools().some((tool: any) => tool.name === "delegate"));
             assert.deepEqual([...first.commands.keys()], ["delegate"]);
+            assert.equal((await tools.status()).limits.jobMs, 900_000);
+            await tools.command("timeout 30");
+            assert.equal((await tools.status()).limits.jobMs, 1_800_000);
+            assert.equal((await tools.status()).limits.batchMs, 3_600_000);
+            const preferenceFile = path.join(process.env.PI_CODING_AGENT_DIR!, "specpi", "delegation", "settings.json");
+            assert.deepEqual(JSON.parse(fs.readFileSync(preferenceFile, "utf8")), { schema: 1, timeoutMinutes: 30 });
+            await tools.command("timeout reset");
+            assert.equal((await tools.status()).limits.jobMs, 600_000);
             const headless = new Proxy(ctx, {
                 get(target, key) {
                     return key === "hasUI" ? false : Reflect.get(target, key);

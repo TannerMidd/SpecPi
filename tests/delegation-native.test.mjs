@@ -15,6 +15,14 @@ function runNativeFixture(context, mode = "main") {
     const provider = "specpi-native-entry-fixture";
     fs.mkdirSync(cwd);
     fs.mkdirSync(agentDir);
+    if (mode === "main") {
+        fs.mkdirSync(path.join(agentDir, "specpi", "delegation"), { recursive: true });
+        fs.writeFileSync(
+            path.join(agentDir, "specpi", "delegation", "settings.json"),
+            JSON.stringify({ schema: 1, timeoutMinutes: 15 }),
+        );
+    }
+
     fs.writeFileSync(path.join(cwd, "fixture.md"), "Public native fixture evidence.\n");
     fs.writeFileSync(path.join(cwd, "AGENTS.md"), "NATIVE_AMBIENT_CONTEXT_CANARY\n");
     fs.mkdirSync(path.join(cwd, ".pi", "extensions"), { recursive: true });

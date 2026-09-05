@@ -420,7 +420,7 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
-    assert.equal(manifest.version, "0.13.0");
+    assert.equal(manifest.version, "0.14.0");
     assert.equal(manifest.publishConfig.access, "public");
     assert.equal(manifest.publishConfig.provenance, true);
     assert.equal(manifest.scripts.preinstall, undefined);
@@ -466,6 +466,13 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(ci, /os: \[windows-latest, macos-latest\]/);
     assert.equal(ci.match(/npm run check:package/g)?.length, 1);
     assert.equal(ci.match(/npm run check:pi-package/g)?.length, 2);
+    for (const workflow of [publish, ci]) {
+        assert.ok(
+            workflow.includes(
+                "node --test tests/delegation-settings.test.mjs tests/delegation-settings-review.test.mjs",
+            ),
+        );
+    }
 });
 
 test("showcase site is self-contained and Pages-ready", () => {
@@ -602,7 +609,10 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(workflow, /actions\/configure-pages@v5/);
     assert.match(workflow, /actions\/upload-pages-artifact@v4/);
     assert.match(workflow, /actions\/deploy-pages@v4/);
-    assert.match(workflow, /permissions:\n\s+contents: read\n\s+pages: write\n\s+id-token: write/);
+    for (const content of [workflow.replaceAll("\r\n", "\n"), workflow.replace(/\r?\n/gu, "\r\n")]) {
+        assert.match(content, /permissions:\r?\n\s+contents: read\r?\n\s+pages: write\r?\n\s+id-token: write/);
+    }
+
     assert.match(workflow, /path: site/);
 });
 

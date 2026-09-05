@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createSnapshot } from "./snapshot.mjs";
-import { LIMITS, digest, validateOperation } from "./protocol.mjs";
+import { LIMITS, digest, timeoutLimits, validateOperation } from "./protocol.mjs";
 import { runWorker } from "./worker.mjs";
 import { DelegationError, publicErrorMessage } from "./errors.mjs";
 
@@ -17,7 +17,7 @@ export function createDelegationController({
     worker = runWorker,
     getGuard = () => "absent",
 }) {
-    const policy = Object.freeze(
+    let policy = Object.freeze(
         Object.fromEntries(
             Object.entries(LIMITS).map(([key, maximum]) => {
                 const value = limits[key] ?? maximum;
@@ -707,6 +707,17 @@ export function createDelegationController({
         status,
         presentation,
         invalidate,
+        // Human command only; never exposed through execute() or the model schema.
+        setTimeoutMinutes(minutes) {
+            const times = timeoutLimits(minutes);
+            if (enabled) {
+                throw new DelegationError("Turn delegation off before changing its timeout: /delegate off");
+            }
+
+            invalidate("timeout policy changed");
+            policy = Object.freeze({ ...policy, ...times });
+            changed();
+        },
         enable() {
             const host = getHost();
             const guard = getGuard();
