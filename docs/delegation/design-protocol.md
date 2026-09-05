@@ -8,7 +8,7 @@ per-provider-attempt or monetary admission guarantees, live web adapter, or alte
 model routes. The schemas and command examples below must not be submitted as if they
 were the implemented protocol.
 
-The current `bounded-pi-sessions-v1` implementation allows Pi 0.84.4 and 0.85.0 and uses actual Pi AgentSession workers,
+The current `bounded-pi-sessions-v1` implementation checks public SDK capabilities and uses actual Pi AgentSession workers,
 fresh standard ModelRuntime configuration, explicit parent model/thinking and SDK-visible
 streaming. It does not claim full parent-hook/ephemeral-setting inheritance or hard
 raw-transport, hidden-attempt or invoice limits. It admits only `review` and `scout`,

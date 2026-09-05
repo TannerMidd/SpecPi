@@ -19,12 +19,14 @@ install/update lifecycle. Existing Pi startup, UI, resources, trust decisions an
 proxy configuration remain Pi-owned. Delegation needs no alternate launcher, extra
 SDK host, separate runtime process or new setup path.
 
-This experimental SDK integration explicitly supports **Pi 0.84.4 and 0.85.0**.
-Other Pi versions cannot activate delegation; adding support requires fresh compatibility
-review. The [compatibility record](research.md#pi-compatibility-evidence) distinguishes
-the allowed versions from completed SDK/native validation. Normal SpecPi installation
+Delegation checks **SDK capabilities, not an exact Pi version list**. New Pi versions
+can activate when the required public session, runtime, settings and thinking APIs are
+available. Missing APIs produce an error naming the unavailable capability; session
+construction and each request still enforce the tool, model and resource policy.
+The [compatibility record](research.md#pi-compatibility-evidence) records tested versions
+separately; API presence does not prove every future SDK behavior. Normal SpecPi installation
 keeps its separately documented host floor and 0.84.4 bootstrap pin.
-Restart Pi to load a changed delegation
+Restart Pi after updating SpecPi to load a changed delegation
 runtime version or change its working root. The broker uses the canonical working
 directory captured for this Pi process.
 

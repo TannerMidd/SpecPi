@@ -331,9 +331,9 @@ spend counter must not be presented as the total task budget.
 The following records the original compatibility analysis and its stronger target.
 The current native experiment instead uses public SDK `createAgentSession` with a fresh
 standard Pi `ModelRuntime`, explicit parent model/thinking, in-memory sessions and
-admission before each SDK invocation. Delegation currently allows the reviewed
-Pi 0.84.4 and 0.85.0 SDK versions; the normal installer floor and bootstrap pin are
-separate contracts. See the compatibility record for completed validation.
+admission before each SDK invocation. Delegation checks required public SDK capabilities
+instead of gating exact Pi versions; the normal installer floor and bootstrap pin are
+separate contracts. See the compatibility record for tested versions and completed validation.
 SDK-visible streams are checked, but full parent-hook/ephemeral-setting parity and
 hard raw-transport, hidden-attempt and monetary bounds remain unclaimed.
 See the [implemented guide](README.md). The target `InferencePort` below is not an

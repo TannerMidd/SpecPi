@@ -5,9 +5,10 @@ or child session store. The broader [target protocol](design-protocol.md) remain
 proposal; its stronger transport/attempt/cost gates are not supplied by this version.
 
 The extension loads through normal `pi` package discovery and remains disabled until
-the human runs `/delegate on`. The SDK version allowlist is **Pi 0.84.4 and 0.85.0**;
-other versions fail the delegation support gate pending compatibility review. Allowlist
-membership does not itself establish a passing provider or native integration suite.
+the human runs `/delegate on`. Compatibility is checked through required public SDK
+capabilities; there is no exact-version allowlist. Missing APIs prevent activation and
+are named in the error. The runtime also verifies the created session's thinking,
+tools and streaming interface. Tested versions are evidence, not an activation gate.
 Workers are SDK `createAgentSession` instances using in-memory session storage and a
 fresh Pi `ModelRuntime`. The parent model and thinking level are passed explicitly,
 subject to Pi's clamping. Standard Pi authentication, environment and `models.json`

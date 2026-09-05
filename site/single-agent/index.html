@@ -1019,9 +1019,9 @@
                             The unreleased source creates actual Pi <code>AgentSession</code> subagents through the
                             native extension. Use normal <code>pi</code> startup and the existing SpecPi install/update
                             lifecycle. Human <code>/delegate on</code> enables the fixed envelope; its tool schema is
-                            absent from model requests while off. This experimental SDK integration supports
-                            <strong>Pi 0.84.4 and 0.85.0</strong>; other versions require compatibility review. The
-                            parent remains the sole writer and owns acceptance.
+                            absent from model requests while off. <strong>SDK capability checks</strong> allow
+                            compatible Pi updates without an exact-version gate. Missing APIs prevent activation
+                            and are named in the error. The parent remains the sole writer and owns acceptance.
                         </p>
                         <p>
                             Two purposes are supported: <code>review</code> of a frozen artifact and

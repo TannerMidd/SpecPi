@@ -1,6 +1,5 @@
 const MAX_CONTEXT_BYTES = 256 * 1024;
 const MAX_OUTPUT_TOKENS = 8192;
-export const SUPPORTED_PI_VERSIONS = Object.freeze(["0.84.4", "0.85.0"]);
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const MODEL_FIELDS = [
     "id",
@@ -15,6 +14,23 @@ const MODEL_FIELDS = [
     "compat",
     "samplingParams",
 ];
+
+export function getPiSessionCompatibilityError(sdk) {
+    const required = [
+        ["createAgentSession", sdk?.createAgentSession],
+        ["ModelRuntime.create", sdk?.ModelRuntime?.create],
+        ["SessionManager.inMemory", sdk?.SessionManager?.inMemory],
+        ["SettingsManager.create", sdk?.SettingsManager?.create],
+        ["SettingsManager.inMemory", sdk?.SettingsManager?.inMemory],
+        ["createExtensionRuntime", sdk?.createExtensionRuntime],
+        ["clampThinkingLevel", sdk?.clampThinkingLevel],
+    ];
+    const missing = required.filter(([, value]) => typeof value !== "function").map(([name]) => name);
+
+    return missing.length
+        ? `Pi SDK is missing delegation capabilities: ${missing.join(", ")}. Update Pi or SpecPi and restart Pi.`
+        : undefined;
+}
 
 function bounded(value, maximum = MAX_CONTEXT_BYTES) {
     let serialized;
@@ -106,14 +122,14 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
         model.maxTokens < 1 ||
         !THINKING_LEVELS.includes(thinkingLevel) ||
         typeof registry?.getProviderAuthStatus !== "function" ||
-        typeof registry?.getRegisteredProviderIds !== "function" ||
-        !SUPPORTED_PI_VERSIONS.includes(sdk?.VERSION) ||
-        typeof sdk.createAgentSession !== "function" ||
-        typeof sdk.ModelRuntime?.create !== "function" ||
-        typeof sdk.createExtensionRuntime !== "function" ||
-        typeof sdk.clampThinkingLevel !== "function"
+        typeof registry?.getRegisteredProviderIds !== "function"
     ) {
         throw new Error("Delegation requires the supported Pi SDK and an explicit thinking level");
+    }
+
+    const compatibilityError = getPiSessionCompatibilityError(sdk);
+    if (compatibilityError) {
+        throw new Error(compatibilityError);
     }
 
     thinkingLevel = sdk.clampThinkingLevel(model, thinkingLevel);

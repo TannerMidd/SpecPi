@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createDelegationExtension } from "./extension.mjs";
-import { createNativePiHost, SUPPORTED_PI_VERSIONS } from "./provider.mjs";
+import { createNativePiHost, getPiSessionCompatibilityError } from "./provider.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
 const revision = 2;
@@ -64,11 +64,10 @@ function createState(root, sdk) {
         boundThinking = thinkingLevel;
         const id = randomUUID();
         const isCurrent = () => epoch === issuedEpoch && matchesRoot(context) && getThinkingLevel() === thinkingLevel;
-        if (!SUPPORTED_PI_VERSIONS.includes(sdk?.VERSION)) {
+        const compatibilityError = getPiSessionCompatibilityError(sdk);
+        if (compatibilityError) {
             const unavailable = async () => {
-                throw new Error(
-                    `Delegation SDK sessions require a reviewed Pi version: ${SUPPORTED_PI_VERSIONS.join(" or ")}`,
-                );
+                throw new Error(compatibilityError);
             };
 
             host = Object.freeze({

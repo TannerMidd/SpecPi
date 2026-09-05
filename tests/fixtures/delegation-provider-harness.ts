@@ -10,7 +10,7 @@ import {
     InMemoryCredentialStore,
     InMemoryModelsStore,
 } from "@earendil-works/pi-ai";
-import { createNativePiHost, SUPPORTED_PI_VERSIONS } from "../../extensions/delegation/provider.mjs";
+import { createNativePiHost } from "../../extensions/delegation/provider.mjs";
 import { runWorker } from "../../extensions/delegation/worker.mjs";
 import { LIMITS } from "../../extensions/delegation/protocol.mjs";
 
@@ -651,7 +651,7 @@ async function workerProof(root: string) {
 }
 
 export default async function () {
-    assert.ok(SUPPORTED_PI_VERSIONS.includes(sdk.VERSION));
+    assert.match(sdk.VERSION, /^\d+\.\d+\.\d+/u);
     const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-fixture-")));
     try {
         await pipelineProof(root);

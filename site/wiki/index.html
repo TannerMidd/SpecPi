@@ -507,8 +507,9 @@ npm run check</code></pre>
                         normal Pi package discovery and the existing SpecPi install/update lifecycle. Start
                         <code>pi</code> normally, then use <code>/delegate on</code> to enable the fixed calls/time
                         envelope. The parent remains the sole writer.
-                        <strong>This SDK integration supports Pi 0.84.4 and 0.85.0</strong>; other versions require
-                        compatibility review. The delegation schema is absent from model requests while off.
+                        <strong>Compatibility uses SDK capability checks</strong>, so compatible Pi updates can run
+                        without a SpecPi release. Missing APIs are named in the activation error. The delegation
+                        schema is absent from model requests while off.
                     </p>
                     <div class="terminal doc-terminal">
                         <pre><code>pi

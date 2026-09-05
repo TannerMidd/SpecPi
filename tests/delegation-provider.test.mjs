@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
 import { runPiFixture } from "../scripts/pi-test-harness.mjs";
-import { createNativePiHost } from "../extensions/delegation/provider.mjs";
+import { createNativePiHost, getPiSessionCompatibilityError } from "../extensions/delegation/provider.mjs";
 
 function fixture() {
     const model = {
@@ -70,13 +70,9 @@ function fixture() {
     };
 }
 
-test("native session host requires pinned public SDK contracts and explicit thinking", () => {
+test("native session host requires public context contracts and explicit thinking", () => {
     const state = fixture();
-    for (const options of [
-        {},
-        { ...state.options, thinkingLevel: undefined },
-        { ...state.options, sdk: { ...state.sdk, VERSION: "0.86.0" } },
-    ]) {
+    for (const options of [{}, { ...state.options, thinkingLevel: undefined }]) {
         assert.throws(() => createNativePiHost(state.ctx, options), /supported Pi SDK/u);
     }
 
@@ -114,6 +110,44 @@ test("readiness uses only public non-credential metadata and initializes once", 
     state.revoke();
     assert.equal(host.isCurrent(), false);
     await assert.rejects(async () => host.ready(), /lease/u);
+});
+
+test("SDK capabilities permit new versions without weakening provider restrictions", async () => {
+    for (const version of ["0.85.1", "0.86.0", "1.0.0", undefined]) {
+        const state = fixture();
+        state.sdk.VERSION = version;
+        const host = state.create();
+        await host.ready();
+        assert.equal(state.initialized(), 1);
+        state.ctx.modelRegistry.getProviderAuthStatus = () => ({ source: "runtime" });
+        await assert.rejects(async () => host.ready(), /runtime provider override/u);
+        assert.equal(state.opened(), 0);
+    }
+});
+
+test("missing SDK capabilities fail preflight and identify the unavailable API", () => {
+    for (const name of [
+        "createAgentSession",
+        "ModelRuntime.create",
+        "SessionManager.inMemory",
+        "SettingsManager.create",
+        "SettingsManager.inMemory",
+        "createExtensionRuntime",
+        "clampThinkingLevel",
+    ]) {
+        const state = fixture();
+        const [owner, property] = name.split(".");
+        if (property) {
+            state.sdk[owner][property] = undefined;
+        } else {
+            state.sdk[owner] = undefined;
+        }
+
+        const error = getPiSessionCompatibilityError(state.sdk);
+        assert.ok(error.includes(name));
+        assert.throws(state.create, (caught) => caught.message === error);
+        assert.equal(state.initialized(), 0);
+    }
 });
 
 test("unsupported runtime auth, extension providers, and direct model headers fail before initialization", async () => {
@@ -200,7 +234,7 @@ test("real Pi SDK sessions stream, replay tools, apply thinking and auth, and re
         .find((line) => line.startsWith("DELEGATION_FIXTURE="));
     assert.ok(marker, `${result.stderr}\n${result.stdout}`);
     const proof = JSON.parse(marker.slice("DELEGATION_FIXTURE=".length));
-    assert.ok(["0.84.4", "0.85.0"].includes(proof.sdkVersion));
+    assert.match(proof.sdkVersion, /^\d+\.\d+\.\d+/u);
     assert.deepEqual(proof, {
         sdkVersion: proof.sdkVersion,
         realSessions: true,

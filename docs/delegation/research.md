@@ -156,9 +156,10 @@ evaluation, not empirical optima extracted from the papers.
 
 ## Pi compatibility evidence
 
-The experimental SDK integration explicitly allows Pi 0.84.4 and 0.85.0. Other versions
-require fresh review before this route is enabled. The installer still bootstraps
-0.84.4; runtime compatibility review does not authorize a package-pin upgrade. The investigation used
+The experimental SDK integration checks required public capabilities rather than an
+exact version list. Compatible Pi updates can activate without a SpecPi patch. Missing
+APIs and incompatible session/provider behavior detected by the runtime checks fail closed.
+The installer still bootstraps 0.84.4; its minimum-version contract is separate. The investigation used
 public tagged source and official documentation without live provider calls or private
 Pi state inspection. The current implementation uses public SDK `createAgentSession`,
 in-memory sessions and a fresh Pi `ModelRuntime` with standard authentication,
@@ -194,7 +195,16 @@ confirm its 4 September 2026 release. An isolated installation also reported CLI
 0.85.0, prompting review of that released SDK alongside the tagged 0.84.4 baseline cited
 above. Isolated native and provider integration checks have passed on 0.85.0. These
 prove the exercised fixtures, not every provider/setup or comparative task benefit.
-Full repository and package validation remain separate release checks; the allowlist
+The local activation failure on Pi 0.85.1 exposed the fragility of exact-version gating.
+The [0.85.1 tag](https://github.com/earendil-works/pi/releases/tag/v0.85.1) and an isolated
+installation were checked; its SDK session, agent-session and model-runtime modules
+match 0.85.0. The provider and ordinary-startup integration suites also pass on 0.85.1,
+including actual SDK tool replay, cancellation settlement, resource isolation and
+reload behavior. Unit fixtures accept newer and absent version identifiers while
+rejecting missing required APIs and unsupported provider routes. These synthetic
+identifiers do not claim that future SDK releases have been tested. Version labels
+now record test coverage rather than grant permission.
+Full repository and package validation remain separate release checks; API presence
 and a successful CLI version check cannot replace them.
 
 ## What remains unproven

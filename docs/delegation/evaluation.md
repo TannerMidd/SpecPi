@@ -166,9 +166,10 @@ The implementation includes deterministic fake-provider and broker fixtures. Run
 relevant suites and record their actual results before live inference; this checklist
 is not itself a passing receipt. The supported calls/time contract requires coverage for:
 
-- Native Pi package discovery and actual SDK AgentSession creation on each allowed
-  version, Pi 0.84.4 and 0.85.0, with in-memory sessions and rejection of other versions
-  and unsupported routes. An allowlist entry or CLI version check is not suite completion.
+- Native Pi package discovery and actual SDK AgentSession creation on recorded test
+  versions, including current Pi releases, with in-memory sessions and rejection of
+  missing capabilities and unsupported routes. New version identifiers alone must not
+  block activation. API presence or a CLI version check is not suite completion.
 - Explicit parent model/thinking with Pi clamping; fresh standard ModelRuntime
   configuration; configured global transport/thinking budgets without project settings;
   rejection of runtime-only authentication, selected extension-provider overrides,
