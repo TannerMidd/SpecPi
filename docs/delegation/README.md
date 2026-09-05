@@ -1,6 +1,6 @@
 # Bounded delegation
 
-Status: experimental implementation in the unreleased source. Disabled by default.
+Status: experimental in SpecPi 0.12.0. Disabled by default.
 The package remains `specpi`; no separate npm package or background service is required.
 
 SpecPi keeps one agent responsible for changes and acceptance. This extension adds

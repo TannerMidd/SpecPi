@@ -24,11 +24,11 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-The released baseline is `0.11.2`, including task cards, verification receipts, and human outcome assessments. This checkout also contains the unreleased experimental native delegation extension described below. See the [release notes](CHANGELOG.md) for the change list.
+Version `0.12.0` adds experimental native delegation and a new technical site. Task cards, verification receipts and human outcome assessments remain part of the single-agent workflow. See the [release notes](CHANGELOG.md) for the change list.
 
 ## Optional delegation
 
-The unreleased native extension creates actual Pi `AgentSession` subagents while the parent remains the sole writer. Use normal `pi` startup and the existing SpecPi install/update lifecycle. Delegation starts disabled, with its tool schema absent from model requests; human `/delegate on` enables the displayed envelope and `/delegate off` revokes outstanding work. Delegation checks required public SDK capabilities rather than an exact Pi version list, so compatible Pi updates do not require a SpecPi release. The installer bootstrap remains pinned to 0.84.4, and runtime validation is recorded separately.
+The native extension creates actual Pi `AgentSession` subagents while the parent remains the sole writer. Use normal `pi` startup and the existing SpecPi install/update lifecycle. Delegation starts disabled, with its tool schema absent from model requests; human `/delegate on` enables the displayed envelope and `/delegate off` revokes outstanding work. Delegation checks required public SDK capabilities rather than an exact Pi version list, so compatible Pi updates do not require a SpecPi release. The installer bootstrap remains pinned to 0.84.4, and runtime validation is recorded separately.
 
 Only `review` of a frozen artifact and `scout` analysis of a bounded evidence question are supported. Both can list, read and search exact selected text snapshots. Children have in-memory sessions and no ambient extensions, skills, AGENTS files, parent history, shell, writes, recursive delegation or live web access. Each receives assigned requirements and fixed constraints. There are at most two active workers, two jobs per batch, four batches and 32 SDK model invocations per Pi process. Reloads, session switches and off/on preserve counters; cancellation holds slots through SDK-visible stream/result and prompt settlement. Restart Pi to change the fixed working root or load a changed delegation runtime.
 
@@ -49,7 +49,7 @@ specpi install
 specpi doctor
 ```
 
-`plan` does not mutate the system. Install, update, and uninstall require confirmation unless `--yes` is supplied. After installation, run `/reload` in Pi.
+`plan` does not mutate the system. Install, update, and uninstall require confirmation unless `--yes` is supplied. Restart Pi after installation or updating SpecPi to load the delegation runtime.
 
 <details>
 <summary><strong>Pin a release or install from audited source</strong></summary>
@@ -57,14 +57,14 @@ specpi doctor
 Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
 
 ```bash
-npm install --global specpi@0.11.2
-npx --package specpi@0.11.2 specpi plan
+npm install --global specpi@0.12.0
+npx --package specpi@0.12.0 specpi plan
 ```
 
 For a source-audited installation, clone the exact release:
 
 ```bash
-git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
+git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -169,7 +169,7 @@ Use `/task clear` before recording an unrelated task. Within a session, repeated
 
 Use `/experiment start` when an independent review or trial justifies a separate worktree. Open the reported path in another Pi session. SpecPi does not launch an agent, copy dirty base changes, commit, merge, or touch remotes.
 
-SpecPi keeps one writer per working directory. Its unreleased delegation experiment adds bounded read-only Pi sessions, not writing teams. A parent determines what context a child receives and verifies what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
+SpecPi keeps one writer per working directory. Its experimental delegation adds bounded read-only Pi sessions. A parent determines what context a child receives and verifies what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
 
 ## Improvement loop
 

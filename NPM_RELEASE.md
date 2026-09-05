@@ -21,7 +21,7 @@ Verify the registry bytes and metadata immediately, then configure trusted publi
 ## Prepare a release
 
 1. Select a version that has never appeared on npm. npm versions are immutable.
-2. Update `package.json`, `CHANGELOG.md`, `README.md`, `site/index.html`, and `site/wiki/index.html` to the same version.
+2. Update `package.json`, `CHANGELOG.md`, `README.md`, `site/index.html`, `site/wiki/index.html`, `site/single-agent/index.html`, and the delegation guide to the same version. Keep historical changelog entries intact and remove stale unreleased-status wording.
 3. For a stable release, add a dated changelog heading. Use a prerelease version when the package should not receive the `latest` dist-tag.
 4. Install the pinned development tools without lifecycle scripts or peers:
 
@@ -91,6 +91,8 @@ npm install --global specpi@latest
 specpi update
 specpi doctor
 ```
+
+Restart Pi after updating managed resources so it loads the new delegation runtime.
 
 Remove managed resources before removing the CLI:
 

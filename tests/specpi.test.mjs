@@ -414,11 +414,13 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const changelog = fs.readFileSync(path.join(repoRoot, "CHANGELOG.md"), "utf8");
     const site = fs.readFileSync(path.join(repoRoot, "site", "index.html"), "utf8");
     const wiki = fs.readFileSync(path.join(repoRoot, "site", "wiki", "index.html"), "utf8");
+    const architecture = fs.readFileSync(path.join(repoRoot, "site", "single-agent", "index.html"), "utf8");
+    const delegationGuide = fs.readFileSync(path.join(repoRoot, "docs", "delegation", "README.md"), "utf8");
     const publish = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "npm-publish.yml"), "utf8");
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
-    assert.equal(manifest.version, "0.11.2");
+    assert.equal(manifest.version, "0.12.0");
     assert.equal(manifest.publishConfig.access, "public");
     assert.equal(manifest.publishConfig.provenance, true);
     assert.equal(manifest.scripts.preinstall, undefined);
@@ -432,6 +434,12 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(site, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(wiki, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(wiki, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(architecture, new RegExp(`SpecPi v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.ok(delegationGuide.includes(`experimental in SpecPi ${manifest.version}`));
+    for (const documentation of [readme, site, wiki, architecture, delegationGuide]) {
+        assert.doesNotMatch(documentation, /unreleased/i);
+    }
+
     assert.match(publish, /release:\s*\n\s*types: \[published\]/);
     assert.match(publish, /environment: npm/);
     assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);
@@ -568,7 +576,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiHtml, /pi install npm:specpi/);
     assert.match(wikiHtml, /\.\/specpi doctor/);
     assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
-    assert.equal(wikiHtml.match(/git clone --branch v0\.11\.2/g)?.length, 2);
+    const releaseVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
+    assert.equal(wikiHtml.split(`git clone --branch v${releaseVersion}`).length - 1, 2);
     assert.match(wikiHtml, /npm run check/);
     assert.match(wikiHtml, /fresh isolated Chromium context/);
     assert.match(wikiCss, /\.definition-list/);

@@ -48,22 +48,22 @@
                     <a href="#development"><span>11</span>Development</a>
                     <a href="#delegation"><span>12</span>Experimental delegation</a>
                 </nav>
-                <div class="index-meta"><span>Reference · v0.11.2</span></div>
+                <div class="index-meta"><span>Reference · v0.12.0</span></div>
             </aside>
 
             <main id="main" class="wiki-content">
                 <header class="wiki-intro" id="overview">
-                    <p class="eyebrow">Documentation / v0.11.2</p>
+                    <p class="eyebrow">Documentation / v0.12.0</p>
                     <h1>Technical reference</h1>
                     <p class="wiki-summary">
                         Install with a plan. Keep one agent focused. Verify the work, then improve the harness from
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.11.2.
+                        Release reference · v0.12.0.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
-                        <a href="#delegation">delegation experiment</a> describes unreleased source behavior.
+                        <a href="#delegation">delegation experiment</a> is optional and disabled by default.
                     </p>
                 </header>
 
@@ -78,17 +78,17 @@
                         that package installed.
                     </p>
                     <div class="terminal doc-terminal">
-                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.11.2</span></div>
+                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.12.0</span></div>
                         <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
                         <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-                        <pre><code>npm install --global specpi@0.11.2</code></pre>
+                        <pre><code>npm install --global specpi@0.12.0</code></pre>
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Linux, macOS, Git Bash</span>
                         </div>
-                        <pre><code>git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -96,7 +96,7 @@ cd SpecPi
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Windows PowerShell / cmd</span>
                         </div>
-                        <pre><code>git clone --branch v0.11.2 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.12.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
@@ -153,7 +153,7 @@ specpi doctor</code></pre>
                         <li>
                             <span>1</span>
                             <p>
-                                <strong>Reload Pi.</strong> Run <code>/reload</code> so Pi loads SpecPi's extensions,
+                                <strong>Restart Pi.</strong> Restart so Pi loads SpecPi's extensions,
                                 skills, theme, and managed settings.
                             </p>
                         </li>
@@ -274,7 +274,7 @@ specpi doctor</code></pre>
                         <h2 id="task-records-title">Tasks and evidence</h2>
                     </header>
                     <p class="doc-boundary release-boundary">
-                        <strong>New in v0.11.2.</strong> Optional task cards, verification receipts, and human outcome
+                        Optional task cards, verification receipts, and human outcome
                         feedback make the boundaries and evidence of a change easier to review.
                     </p>
                     <p>
@@ -421,7 +421,7 @@ specpi doctor</code></pre>
                             ><span>Inspect or change session command protection.</span>
                         </div>
                         <div>
-                            <code>/reload</code><span>Reload Pi after installation or startup-loaded changes.</span>
+                            <code>/reload</code><span>Reload ordinary resources. Restart Pi after updating SpecPi's delegation runtime.</span>
                         </div>
                         <div>
                             <code>/delegate [on|off|status|limits|cancel]</code
@@ -503,7 +503,7 @@ npm run check</code></pre>
                         <h2 id="delegation-title">Experimental delegation</h2>
                     </header>
                     <p>
-                        Implemented in unreleased source and disabled by default. The native extension loads through
+                        Available in v0.12.0 and disabled by default. The native extension loads through
                         normal Pi package discovery and the existing SpecPi install/update lifecycle. Start
                         <code>pi</code> normally, then use <code>/delegate on</code> to enable the fixed calls/time
                         envelope. The parent remains the sole writer.
@@ -589,7 +589,7 @@ npm run check</code></pre>
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.11.2</p>
+            <p>Pi harness / v0.12.0</p>
             <nav aria-label="Footer navigation">
                 <a href="../single-agent/">Architecture</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
