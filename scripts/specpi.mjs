@@ -729,18 +729,7 @@ function validManagedModelScope(value) {
 }
 
 function desiredSettingsOperations() {
-    return [
-        {
-            path: ["theme"],
-            value: "specpi-spec",
-            userTunable: true,
-            validate: (value) =>
-                typeof value === "string" &&
-                value.trim().length > 0 &&
-                value.length <= 128 &&
-                !/[\u0000-\u001f\u007f]/u.test(value),
-        },
-    ];
+    return [{ path: ["theme"], value: "specpi-spec" }];
 }
 
 function managedFiles(includeShell) {
@@ -764,11 +753,6 @@ function managedFiles(includeShell) {
         [
             path.join(repoRoot, "extensions", "workflow-controls", "scope.mjs"),
             path.join(agentDir, "extensions", "workflow-controls", "scope.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "workflow-controls", "task-contract.mjs"),
-            path.join(agentDir, "extensions", "workflow-controls", "task-contract.mjs"),
             0o644,
         ],
         [
@@ -819,11 +803,6 @@ function managedFiles(includeShell) {
         [
             path.join(repoRoot, "extensions", "tool-wishlist", "core.mjs"),
             path.join(agentDir, "extensions", "tool-wishlist", "core.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "tool-wishlist", "verification.mjs"),
-            path.join(agentDir, "extensions", "tool-wishlist", "verification.mjs"),
             0o644,
         ],
         [
@@ -1112,7 +1091,6 @@ function assertSources() {
         "extensions/ui-refresh/index.ts",
         "extensions/workflow-controls/index.ts",
         "extensions/workflow-controls/scope.mjs",
-        "extensions/workflow-controls/task-contract.mjs",
         "extensions/workflow-controls/experiments.mjs",
         "extensions/workflow-controls/challenge.mjs",
         "extensions/workflow-controls/smoke.mjs",
@@ -1125,7 +1103,6 @@ function assertSources() {
         "browser-runtime/package-lock.json",
         "extensions/tool-wishlist/index.ts",
         "extensions/tool-wishlist/core.mjs",
-        "extensions/tool-wishlist/verification.mjs",
         "extensions/tool-wishlist/registry.mjs",
         "extensions/tool-wishlist/validators.mjs",
         "extensions/tool-wishlist/capabilities.json",
@@ -1174,7 +1151,7 @@ Managed files:`);
     console.log(`  ${manifestPath}`);
 
     console.log("\nSettings ownership:");
-    console.log("  theme defaults to specpi-spec; existing valid user choices are preserved");
+    console.log("  theme = specpi-spec");
     console.log("  pinned package entries (merged by npm package identity)");
     console.log("  command-guard mode and approvals are session-only and no raw commands are persisted");
     console.log("  scope and completion state stays in the active Pi session branch without raw tool content");
@@ -1184,12 +1161,6 @@ Managed files:`);
     console.log("  collection requires one explicit local on/off decision and never uploads data");
     console.log("  wishlist lifecycle decisions are explicit, append-only, and reversible");
     console.log("  isolated browser contexts never reuse the user's Chrome profile or cookies");
-    console.log("\nPrivacy boundaries:");
-    console.log("  SpecPi keeps its wishlist and improvement evidence local; this does not make Pi offline");
-    console.log(
-        "  model requests go to the selected provider; browser pages and installed packages may use the network",
-    );
-    console.log("  Pi controls its own telemetry and update checks; review Pi settings separately");
 
     console.log("\nManaged browser runtime:");
     if (options.skipBrowserInstall) {

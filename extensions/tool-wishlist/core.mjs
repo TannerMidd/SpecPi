@@ -3,8 +3,6 @@ import path from "node:path";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { normalizeCapability, validateCapabilityRegistry } from "./registry.mjs";
-import { saltedSourceRootIdentity, validateVerificationReceipt } from "./verification.mjs";
-import { markdownPathLabel } from "../workflow-controls/task-contract.mjs";
 
 export { normalizeCapability } from "./registry.mjs";
 
@@ -20,10 +18,7 @@ const GATE_PATTERN = /^(?=.*[A-Za-z0-9])[A-Za-z0-9 ._-]{1,60}$/;
 const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,39}$/;
 const COLLECTION_MODES = new Set(["on", "off"]);
 const STATE_ACTIONS = new Set(["select", "decline", "retire", "reopen"]);
-const OUTCOME_VALUES = new Set(["helped", "failed", "not-exercised", "reverted"]);
-const DECISION_ACTIONS = new Set([...STATE_ACTIONS, "merge", "unmerge", "outcome"]);
-const MAX_OUTCOME_NOTE_LENGTH = 240;
-const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/u;
+const DECISION_ACTIONS = new Set([...STATE_ACTIONS, "merge", "unmerge"]);
 export const WISHLIST_FILENAMES = {
     events: "tool-wishlist-events.jsonl",
     decisions: "tool-wishlist-decisions.jsonl",
@@ -63,16 +58,6 @@ function readCapabilityRegistry() {
 }
 
 export const CAPABILITY_REGISTRY = readCapabilityRegistry();
-
-export function wishlistSourceRootIdentity(stateDir, root) {
-    const salt = getSalt(pathsFor(stateDir).salt);
-
-    return saltedSourceRootIdentity(root, salt);
-}
-
-export function wishlistSourceRootSalt(stateDir) {
-    return getSalt(pathsFor(stateDir).salt);
-}
 
 function registryAliasMap() {
     const aliases = new Map();
@@ -137,7 +122,7 @@ function recoverArchiveTransaction(stateDir) {
 function assertNotSymlink(file) {
     try {
         if (fs.lstatSync(file).isSymbolicLink()) {
-            throw new Error(`Refusing to use symlinked wishlist state: ${markdownPathLabel(file)}`);
+            throw new Error(`Refusing to use symlinked wishlist state: ${file}`);
         }
     } catch (error) {
         if (error.code !== "ENOENT") {
@@ -238,7 +223,7 @@ async function withStateLock(stateDir, signal, operation) {
     }
 
     throw new Error(
-        `Timed out waiting for ${markdownPathLabel(lock)}. Remove it only after confirming no Pi session is updating the wishlist.`,
+        `Timed out waiting for ${lock}. Remove it only after confirming no Pi session is updating the wishlist.`,
     );
 }
 
@@ -318,19 +303,8 @@ function isValidJournal(journal) {
                 journal.changedFiles.every(isValidChangedFilePath))) &&
         (journal.changedFilesTruncated === undefined || typeof journal.changedFilesTruncated === "boolean") &&
         typeof journal.version === "string" &&
-        VERSION_PATTERN.test(journal.version) &&
-        (journal.receipt === undefined || isValidVerificationReceipt(journal.receipt))
+        VERSION_PATTERN.test(journal.version)
     );
-}
-
-function isValidVerificationReceipt(receipt) {
-    try {
-        validateVerificationReceipt(receipt);
-
-        return true;
-    } catch {
-        return false;
-    }
 }
 
 function isStoredDecision(event) {
@@ -346,17 +320,7 @@ function isStoredDecision(event) {
         typeof event.note === "string" &&
         (!Object.hasOwn(event, "evidence") ||
             (event.action === "reopen" && isValidEvidenceList(event.evidence, REOPEN_EVIDENCE_LIMIT))) &&
-        (!Object.hasOwn(event, "journal") || (event.action === "retire" && isValidJournal(event.journal))) &&
-        (event.action === "outcome"
-            ? OUTCOME_VALUES.has(event.outcome) &&
-              typeof event.requestId === "string" &&
-              REQUEST_ID_PATTERN.test(event.requestId) &&
-              typeof event.previousOutcomeId === "string" &&
-              (event.previousOutcomeId === "" || REQUEST_ID_PATTERN.test(event.previousOutcomeId)) &&
-              event.targetKey.length > 0
-            : !Object.hasOwn(event, "outcome") &&
-              !Object.hasOwn(event, "requestId") &&
-              !Object.hasOwn(event, "previousOutcomeId"))
+        (!Object.hasOwn(event, "journal") || (event.action === "retire" && isValidJournal(event.journal)))
     );
 }
 
@@ -502,7 +466,6 @@ function sanitizeJournal(journal) {
         ...(journal.changedFiles === undefined ? {} : { changedFiles: [...journal.changedFiles] }),
         changedFilesTruncated: journal.changedFilesTruncated === true,
         version: sanitizeReportText(journal.version, 40),
-        ...(journal.receipt === undefined ? {} : { receipt: validateVerificationReceipt(journal.receipt) }),
     };
     // Redaction can empty a value; the sanitized journal must survive its own
     // reader validation or the whole decision would silently turn invalid.
@@ -681,67 +644,6 @@ export function latestRetirementDecision(decisions, canonicalKey, aliases = buil
     return latest;
 }
 
-export function latestLocalRetirementDecision(decisions, canonicalKey, aliases = buildAliasMap(decisions)) {
-    let latest;
-    for (const decision of decisions) {
-        if (decision.action !== "retire" || resolveAlias(decision.canonicalKey, aliases) !== canonicalKey) {
-            continue;
-        }
-
-        if (latest === undefined || timestampMs(decision.timestamp) >= timestampMs(latest.timestamp)) {
-            latest = decision;
-        }
-    }
-
-    return latest;
-}
-
-export function latestOutcomeDecision(decisions, canonicalKey, retirementId, aliases = buildAliasMap(decisions)) {
-    let latest;
-    for (const decision of decisions) {
-        if (
-            decision.action !== "outcome" ||
-            resolveAlias(decision.canonicalKey, aliases) !== canonicalKey ||
-            decision.targetKey !== retirementId
-        ) {
-            continue;
-        }
-
-        if (latest === undefined || timestampMs(decision.timestamp) >= timestampMs(latest.timestamp)) {
-            latest = decision;
-        }
-    }
-
-    return latest;
-}
-
-export function outcomeSummary(canonicalKey, decisions, aliases = buildAliasMap(decisions)) {
-    const counts = {
-        helped: 0,
-        failed: 0,
-        "not-exercised": 0,
-        reverted: 0,
-        unassessed: 0,
-    };
-    const retirements = decisions
-        .filter(
-            (decision) => decision.action === "retire" && resolveAlias(decision.canonicalKey, aliases) === canonicalKey,
-        )
-        .sort((left, right) => timestampMs(left.timestamp) - timestampMs(right.timestamp));
-    const latest = [];
-    for (const retirement of retirements) {
-        const outcome = latestOutcomeDecision(decisions, canonicalKey, retirement.id, aliases);
-        if (!outcome) {
-            counts.unassessed += 1;
-        } else {
-            counts[outcome.outcome] += 1;
-            latest.push(outcome);
-        }
-    }
-
-    return { ...counts, latest };
-}
-
 export function linkReopenToRetirement(decisions, reopenDecision) {
     if (reopenDecision?.action !== "reopen") {
         return undefined;
@@ -808,28 +710,14 @@ function groupsWithState(events, decisions) {
         const signals = reviewSignals(group.canonicalKey, events, decisions, state).sort(
             (a, b) => timestampMs(a.timestamp) - timestampMs(b.timestamp),
         );
-        const outcomes = outcomeSummary(group.canonicalKey, decisions);
-        const latestRetirement = latestLocalRetirementDecision(decisions, group.canonicalKey);
-        const latestOutcome = latestRetirement
-            ? latestOutcomeDecision(decisions, group.canonicalKey, latestRetirement.id)
-            : undefined;
-        const negativeOutcome =
-            state === "retired" && latestOutcome && ["failed", "reverted"].includes(latestOutcome.outcome);
-        const reviewSignalCount = signals.length + (negativeOutcome ? 1 : 0);
-        const reviewTimestamps = [
-            ...signals.map((item) => item.timestamp),
-            ...(negativeOutcome ? [latestOutcome.timestamp] : []),
-        ].sort((left, right) => timestampMs(left) - timestampMs(right));
 
         return {
             ...group,
             state,
-            outcomes,
-            latestOutcome,
-            reviewNeeded: reviewSignalCount > 0,
-            reviewSignalCount,
-            reviewFirstSeen: reviewTimestamps[0],
-            reviewLastSeen: reviewTimestamps.at(-1),
+            reviewNeeded: signals.length > 0,
+            reviewSignalCount: signals.length,
+            reviewFirstSeen: signals[0]?.timestamp,
+            reviewLastSeen: signals.at(-1)?.timestamp,
         };
     });
 }
@@ -878,7 +766,6 @@ function renderGroup(lines, group) {
         `- Suggested fix: ${group.suggestedFix}`,
         `- First seen: ${day(group.firstSeen)}`,
         `- Last seen: ${day(group.lastSeen)}`,
-        `- Outcomes: helped ${group.outcomes.helped} | failed ${group.outcomes.failed} | not-exercised ${group.outcomes["not-exercised"]} | reverted ${group.outcomes.reverted} | unassessed ${group.outcomes.unassessed}`,
     );
     if (group.reviewNeeded) {
         lines.push(`- Review needed: yes`, `- Unresolved post-retirement signals: ${group.reviewSignalCount}`);
@@ -988,8 +875,7 @@ export function renderWishlist(events, options = {}) {
         "",
         "# Loop health",
         "",
-        `- Retirements: ${metrics.retirements} | Reopen rate: ${metrics.reopenRateKnown ? `${metrics.reopenRate}%` : "unknown"} | Open reviews: ${metrics.openReviews} | Local cohort rate: ${metrics.reopenRateKnown ? `${metrics.reopenRate}%` : "unknown"} | Baseline reviews: ${metrics.baselineReviews}`,
-        `- Outcomes: helped ${metrics.outcomes.helped} | failed ${metrics.outcomes.failed} | not-exercised ${metrics.outcomes["not-exercised"]} | reverted ${metrics.outcomes.reverted} | unassessed ${metrics.outcomes.unassessed}`,
+        `- Retirements: ${metrics.retirements} | Reopen rate: ${metrics.reopenRate}% | Open reviews: ${metrics.openReviews}`,
         metrics.medianDaysToRetire === undefined
             ? `- Qualification rate: ${metrics.qualificationRate}% of ${metrics.observedGroups} observed gap(s)`
             : `- Median time to retire: ${metrics.medianDaysToRetire} day(s) | Qualification rate: ${metrics.qualificationRate}% of ${metrics.observedGroups} observed gap(s)`,
@@ -1007,9 +893,7 @@ export function loopMetrics(events, decisions = []) {
     // Replays the lifecycle to count only reopens that left the retired state,
     // so reopen-from-declined does not inflate the rate.
     const states = new Map();
-    let localReopens = 0;
-    let baselineReviews = 0;
-    const localRetirementIds = new Map();
+    let reopens = 0;
     for (const decision of decisions) {
         if (!STATE_ACTIONS.has(decision.action)) {
             continue;
@@ -1018,18 +902,7 @@ export function loopMetrics(events, decisions = []) {
         const key = resolveAlias(decision.canonicalKey, aliases);
         const current = states.get(key) ?? (registryCapability(key) ? "retired" : "open");
         if (decision.action === "reopen" && current === "retired") {
-            const linked = decision.targetKey
-                ? decisions.find((item) => item.action === "retire" && item.id === decision.targetKey)
-                : undefined;
-            if (linked && localRetirementIds.get(key) === linked.id) {
-                localReopens += 1;
-            } else {
-                baselineReviews += 1;
-            }
-
-            localRetirementIds.delete(key);
-        } else if (decision.action === "retire") {
-            localRetirementIds.set(key, decision.id);
+            reopens += 1;
         }
 
         states.set(
@@ -1065,28 +938,12 @@ export function loopMetrics(events, decisions = []) {
     const qualified = groups.filter(
         (group) => group.qualified || group.state === "selected" || group.state === "retired",
     ).length;
-    const outcomes = {
-        helped: 0,
-        failed: 0,
-        "not-exercised": 0,
-        reverted: 0,
-        unassessed: 0,
-    };
-    for (const group of groups) {
-        for (const key of Object.keys(outcomes)) {
-            outcomes[key] += group.outcomes[key];
-        }
-    }
 
     return {
         observedGroups: groups.length,
         retirements: retirements.length,
-        reopens: localReopens,
-        localReopens,
-        baselineReviews,
-        reopenRate: retirements.length === 0 ? 0 : Math.min(100, Math.round((100 * localReopens) / retirements.length)),
-        reopenRateKnown: retirements.length > 0,
-        outcomes,
+        reopens,
+        reopenRate: retirements.length === 0 ? 0 : Math.round((100 * reopens) / retirements.length),
         openReviews: retiredGroups.filter((group) => group.reviewNeeded).length,
         medianDaysToRetire: median === undefined ? undefined : Math.round(median * 10) / 10,
         qualificationRate: groups.length === 0 ? 0 : Math.round((100 * qualified) / groups.length),
@@ -1097,11 +954,7 @@ function renderJournalDecision(lines, decisions, decision, options = {}) {
     const stamp = day(decision.timestamp);
     if (options.compact) {
         const journal = decision.journal;
-        const proof = journal
-            ? ` · gates: ${journal.gates.join(", ")} · v${journal.version}`
-            : decision.action === "outcome"
-              ? ` · outcome: ${decision.outcome}`
-              : "";
+        const proof = journal ? ` · gates: ${journal.gates.join(", ")} · v${journal.version}` : "";
         lines.push(
             `- ${stamp} ${decision.action} \`${decision.canonicalKey}\` — ${markdownText(decision.note)}${proof}`,
         );
@@ -1109,8 +962,10 @@ function renderJournalDecision(lines, decisions, decision, options = {}) {
         return;
     }
 
-    const title = decision.action === "retire" ? "Retired" : decision.action === "reopen" ? "Reopened" : "Outcome";
-    lines.push(`### ${title} ${stamp}`, `- Decision: \`${decision.id.slice(0, 8)}\``);
+    lines.push(
+        `### ${decision.action === "retire" ? "Retired" : "Reopened"} ${stamp}`,
+        `- Decision: \`${decision.id.slice(0, 8)}\``,
+    );
     if (decision.action === "retire") {
         const journal = decision.journal;
         if (journal) {
@@ -1127,7 +982,7 @@ function renderJournalDecision(lines, decisions, decision, options = {}) {
         } else {
             lines.push(`- Note: ${markdownText(decision.note)}`);
         }
-    } else if (decision.action === "reopen") {
+    } else {
         const linked = linkReopenToRetirement(decisions, decision);
         if (linked) {
             lines.push(`- Linked retirement: \`${linked.id.slice(0, 8)}\` (${day(linked.timestamp)})`);
@@ -1138,15 +993,6 @@ function renderJournalDecision(lines, decisions, decision, options = {}) {
         }
 
         lines.push(`- Note: ${markdownText(decision.note)}`);
-    } else {
-        lines.push(`- Retirement: \`${decision.targetKey.slice(0, 8)}\``, `- Result: **${decision.outcome}**`);
-        if (decision.previousOutcomeId) {
-            lines.push(`- Corrects outcome: \`${decision.previousOutcomeId.slice(0, 8)}\``);
-        }
-
-        if (decision.note) {
-            lines.push(`- Note: ${markdownText(decision.note)}`);
-        }
     }
 
     lines.push("");
@@ -1154,9 +1000,7 @@ function renderJournalDecision(lines, decisions, decision, options = {}) {
 
 export function renderWishlistHistory(events, decisions = [], requestedKey) {
     const aliases = buildAliasMap(decisions);
-    const timeline = decisions.filter(
-        (decision) => decision.action === "retire" || decision.action === "reopen" || decision.action === "outcome",
-    );
+    const timeline = decisions.filter((decision) => decision.action === "retire" || decision.action === "reopen");
     const lines = [
         "# Improvement journal",
         "",
@@ -1164,7 +1008,7 @@ export function renderWishlistHistory(events, decisions = [], requestedKey) {
         "",
     ];
     if (timeline.length === 0) {
-        lines.push("No retirements or reopens recorded yet; no outcomes have been assessed.", "");
+        lines.push("No retirements or reopens recorded yet.", "");
 
         return lines.join("\n");
     }
@@ -1181,7 +1025,7 @@ export function renderWishlistHistory(events, decisions = [], requestedKey) {
         lines.push(
             `## ${markdownText(title)}`,
             "",
-            `\`${key}\` — ${scoped.length} lifecycle and outcome decision(s), oldest first.`,
+            `\`${key}\` — ${scoped.length} lifecycle decision(s), oldest first.`,
             "",
         );
         for (const decision of scoped) {
@@ -1455,10 +1299,6 @@ export async function appendWishlistDecision(options) {
         evidence,
         journal,
         linkedRetirementId,
-        outcome,
-        requestId,
-        previousOutcomeId,
-        precondition,
         signal,
         now = new Date().toISOString(),
         maxDecisionFileBytes = MAX_DECISION_FILE_BYTES,
@@ -1466,8 +1306,6 @@ export async function appendWishlistDecision(options) {
     if (!DECISION_ACTIONS.has(action)) {
         throw new Error(`Unknown wishlist action: ${action}`);
     }
-
-    const normalizedPreviousOutcomeId = previousOutcomeId ?? "";
 
     if (journal !== undefined && action !== "retire") {
         throw new Error("A retirement journal is only valid on retire decisions");
@@ -1479,38 +1317,11 @@ export async function appendWishlistDecision(options) {
         );
     }
 
-    if (action === "outcome") {
-        if (!OUTCOME_VALUES.has(outcome)) {
-            throw new Error("Outcome must be helped, failed, not-exercised, or reverted");
-        }
-
-        if (typeof requestId !== "string" || !REQUEST_ID_PATTERN.test(requestId)) {
-            throw new Error("Outcome request ID is invalid");
-        }
-
-        if (
-            typeof normalizedPreviousOutcomeId !== "string" ||
-            (normalizedPreviousOutcomeId && !REQUEST_ID_PATTERN.test(normalizedPreviousOutcomeId))
-        ) {
-            throw new Error("Previous outcome ID is invalid");
-        }
-
-        if (!targetKey || typeof targetKey !== "string") {
-            throw new Error("Outcome must link to an exact local retirement decision");
-        }
-    } else if (outcome !== undefined || requestId !== undefined || previousOutcomeId !== undefined) {
-        throw new Error("Outcome fields are only valid on outcome decisions");
-    }
-
     const journalValue = journal !== undefined ? sanitizeJournal(journal) : undefined;
     const evidenceValue =
         evidence !== undefined ? sanitizeEvidenceList(evidence, REOPEN_EVIDENCE_LIMIT, "Reopen evidence") : undefined;
 
     return withStateLock(stateDir, signal, async () => {
-        if (action === "outcome" && readCollectionMode(stateDir) !== "on") {
-            throw new Error("Local wishlist collection must be on before recording an outcome");
-        }
-
         if (!Number.isFinite(timestampMs(now))) {
             throw new Error("Decision timestamp is invalid");
         }
@@ -1529,72 +1340,7 @@ export async function appendWishlistDecision(options) {
             throw new Error(`Unknown wishlist gap: ${key}`);
         }
 
-        if (typeof precondition === "function") {
-            await precondition({
-                files,
-                events: parsed.events,
-                decisions: decisionData.decisions,
-                canonicalKey: key,
-            });
-        }
-
-        if (action === "outcome") {
-            const existing = decisionData.decisions.find(
-                (decision) => decision.action === "outcome" && decision.requestId === requestId,
-            );
-            if (existing) {
-                if (
-                    resolveAlias(existing.canonicalKey, aliases) !== key ||
-                    existing.targetKey !== targetKey ||
-                    existing.outcome !== outcome ||
-                    existing.previousOutcomeId !== normalizedPreviousOutcomeId ||
-                    existing.note !== sanitizeReportText(note, MAX_OUTCOME_NOTE_LENGTH)
-                ) {
-                    throw new Error("Outcome request ID was already used for a different decision");
-                }
-
-                return {
-                    action,
-                    decisionId: existing.id,
-                    canonicalKey: existing.canonicalKey,
-                    targetKey: existing.targetKey,
-                    reportPath: files.report,
-                    report: writeReport(
-                        files.report,
-                        parsed.events,
-                        decisionData.decisions,
-                        parsed.invalidLines,
-                        decisionData.invalidLines,
-                        now,
-                    ),
-                    idempotent: true,
-                };
-            }
-
-            const current = currentStateFor(key, decisionData.decisions);
-            if (current !== "retired") {
-                throw new Error(`Outcome can only be recorded for a retired wishlist gap; ${key} is ${current}`);
-            }
-
-            const retirement = decisionData.decisions.find(
-                (decision) => decision.action === "retire" && decision.id === targetKey,
-            );
-            const latestRetirement = latestLocalRetirementDecision(decisionData.decisions, key, aliases);
-            if (!retirement || retirement !== latestRetirement || !retirement.journal?.receipt) {
-                throw new Error("Outcome must link to the exact latest local retirement receipt");
-            }
-
-            if (retirement.journal.receipt.gapId !== key) {
-                throw new Error("Outcome retirement receipt is bound to a different wishlist gap");
-            }
-
-            const previous = latestOutcomeDecision(decisionData.decisions, key, retirement.id, aliases);
-            if ((previous?.id ?? "") !== previousOutcomeId) {
-                throw new Error("Outcome is stale; refresh the latest retirement outcome before retrying");
-            }
-
-            target = targetKey;
-        } else if (STATE_ACTIONS.has(action)) {
+        if (STATE_ACTIONS.has(action)) {
             const current = currentStateFor(key, decisionData.decisions);
             if (!validateStateTransition(action, current)) {
                 throw new Error(`Cannot ${action} ${key} while its state is ${current}`);
@@ -1654,13 +1400,6 @@ export async function appendWishlistDecision(options) {
             note: sanitizeReportText(note, 240),
             ...(evidenceValue ? { evidence: evidenceValue } : {}),
             ...(journalValue ? { journal: journalValue } : {}),
-            ...(action === "outcome"
-                ? {
-                      outcome,
-                      requestId,
-                      previousOutcomeId: normalizedPreviousOutcomeId,
-                  }
-                : {}),
         };
         appendBounded(
             files.decisions,

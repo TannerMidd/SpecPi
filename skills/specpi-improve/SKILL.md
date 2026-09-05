@@ -28,10 +28,6 @@ Before editing, present one compact card:
 
 The `/harness-improvement` selection authorizes this exact smallest-sufficient card. Do not add another approval step unless the proposed work exceeds it.
 
-Record the card with `record_harness_contract` before editing. Include stable requirement IDs and direct acceptance checks, and declare the expected source paths. The tool binds the card to the selected gap, selection generation, session, and source checkout. An identical retry is allowed; a changed card requires the human to revise it with `/task set` or select the improvement again. Never use a new card to manufacture authorization for another gap. `/scope task` is the human command for importing its paths into scope monitoring.
-
-The selection preserves verification policy, including task/scope and wishlist lifecycle rules, the package check, and formatter configuration. If the work changes those rules, obtain human review of that concrete policy change and a fresh `/harness-improvement` selection before using it to retire the item. Do not weaken or bypass preserved gates to make a change pass.
-
 ## Implementation
 
 1. Preserve a single writer for the active worktree.
@@ -48,7 +44,7 @@ The selection preserves verification policy, including task/scope and wishlist l
 1. Run the narrowest focused checks, then `npm run check`.
 2. For installer changes, exercise plan/install/doctor/update/uninstall with a temporary `PI_CODING_AGENT_DIR`; never use the live Pi directory.
 3. Inspect the final diff and obtain fresh read-only review when risk warrants it.
-4. At the end, call `finish_harness_improvement` with the exact gap ID, concise direct acceptance evidence, and a sanitized validation note. The tool requires the matching task contract, checks newly changed source paths against it, requires source-registry integration, runs `npm run check`, and executes every linked closed validator. It rejects stale selection or changed source and journals the resulting verification receipt separately from model-reported evidence. Retirement occurs only when every gate passes.
+4. At the end, call `finish_harness_improvement` with the exact gap ID, concise direct acceptance evidence, and a sanitized validation note. The tool independently requires source-registry integration, runs `npm run check`, executes every capability validator through the closed validators catalog, persists that proof into the local improvement journal, and retires only if every gate passes.
 5. If validation fails, fix or revert. Do not retire on plausibility; leave the item selected and report the blocker.
 6. A later regression returns the retired item to the `/harness-improvement` menu. Choosing it there explicitly reopens and selects it for review.
 7. When a retired item reopens, start from `/wishlist history <gap-id>`: the journal supplies the original proof and the changed-file set of the original change. Propose an explicit revert plan for human approval; never revert autonomously.
@@ -56,5 +52,3 @@ The selection preserves verification policy, including task/scope and wishlist l
 ## Handoff
 
 Report the gap ID, changed files, acceptance evidence, commands and exit codes, lifecycle action, rollback path, and residual risks. Never claim that silence or the absence of later reports proves success.
-
-When a separate human-directed review is useful, `/task handoff` assembles a bounded review packet in the current conversation. The human can later use `/wishlist outcome <gap-id>` to assess the latest local retirement. Do not submit outcome feedback on the human's behalf or treat a negative assessment as permission to start work.

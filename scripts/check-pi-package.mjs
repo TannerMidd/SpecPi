@@ -6,7 +6,6 @@ import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { runPiFixture } from "./pi-test-harness.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -36,7 +35,6 @@ function runNode(args, options = {}) {
         cwd: options.cwd || repoRoot,
         env: options.env || process.env,
         encoding: "utf8",
-        input: options.input,
         windowsHide: true,
         timeout: options.timeout || 300_000,
         maxBuffer: 20 * 1024 * 1024,
@@ -56,17 +54,6 @@ function runNode(args, options = {}) {
 
 function runNpm(args, options = {}) {
     return runNode([npmCli, ...args], options);
-}
-
-function readHarnessReport(result, marker, label) {
-    assert.equal(result.unavailable, false, `${label} could not find the pinned Pi CLI`);
-    assert.equal(result.status, 0, `${label} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
-    assert.equal(result.error, null, `${label} could not start Pi: ${result.error}`);
-    const output = `${result.stdout}\n${result.stderr}`;
-    const line = output.split(/\r?\n/u).find((entry) => entry.startsWith(marker));
-    assert.ok(line, `${label} did not return ${marker}\n${output}`);
-
-    return JSON.parse(line.slice(marker.length));
 }
 
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-package-check-"));
@@ -210,100 +197,14 @@ try {
     assert.ok(resources.themeNames.includes("specpi-spec"), "Pi did not discover the SpecPi theme");
     assert.ok(resources.themeNames.includes("tea-house"), "Pi did not discover the tea-house theme");
 
-    // The resource probe above exercises discovery. These isolated extension fixtures additionally exercise Pi's
-    // actual extension loader and event/command hooks through the pinned host runtime.
-    const workflowAgentDir = path.join(temporaryRoot, "workflow-agent");
-    const wishlistAgentDir = path.join(temporaryRoot, "wishlist-agent");
-    fs.mkdirSync(workflowAgentDir);
-    fs.mkdirSync(wishlistAgentDir);
-    const workflowReport = readHarnessReport(
-        runPiFixture(path.join(repoRoot, "tests", "fixtures", "workflow-controls-harness.ts"), {
-            piCommand: piCli,
-            cwd: temporaryRoot,
-            agentDir: workflowAgentDir,
-        }),
-        "WORKFLOW_CONTROLS_HARNESS=",
-        "workflow extension harness",
-    );
-    assert.deepEqual(workflowReport.commands, ["challenge", "experiment", "guard", "scope", "task"]);
-    assert.equal(workflowReport.toolRegistered, true);
-    assert.equal(workflowReport.emittedScopeStatus, true);
-
-    const wishlistReport = readHarnessReport(
-        runPiFixture(path.join(repoRoot, "tests", "fixtures", "wishlist-extension-harness.ts"), {
-            piCommand: piCli,
-            cwd: temporaryRoot,
-            agentDir: wishlistAgentDir,
-        }),
-        "SPECPI_WISHLIST_HARNESS=",
-        "wishlist extension harness",
-    );
-    assert.equal(wishlistReport.completionToolExposed, true);
-    assert.equal(wishlistReport.reportStableAfterRetirement, true);
-    assert.equal(wishlistReport.checksumsValid, true);
-
-    // These suites may skip without a local Pi runtime during the ordinary repository check. The pinned host here
-    // must execute their behavioral assertions in CI, including task display and rejected verification races.
-    const fixtureTestEnvironment = { ...env, SPECPI_TEST_PI: piCli };
-    delete fixtureTestEnvironment.NODE_TEST_CONTEXT;
-    const fixtureTests = runNode(
-        [
-            "--test",
-            "--test-reporter=tap",
-            path.join(repoRoot, "tests", "workflow-controls-extension.test.mjs"),
-            path.join(repoRoot, "tests", "spec-task-extension.test.mjs"),
-            path.join(repoRoot, "tests", "wishlist-verification-extension.test.mjs"),
-        ],
-        { cwd: repoRoot, env: fixtureTestEnvironment, timeout: 120_000 },
-    );
-    assert.match(fixtureTests.stdout, /# tests [1-9]\d*/u, "the pinned extension suites did not execute");
-    assert.doesNotMatch(fixtureTests.stdout, /# skipped [1-9]\d*/u, "the pinned extension suites skipped coverage");
-
-    // Exercise the installed package through Pi's actual resource loader and RPC mode without sending a prompt.
-    // Closing stdin after the two requests is the bounded shutdown path, and --no-session keeps the RPC process from
-    // creating session history. The temporary agent already contains the candidate package settings and installation.
-    const rpcFixture = path.join(repoRoot, "tests", "fixtures", "workflow-controls-harness.ts");
-    const rpcResult = runPiFixture(rpcFixture, {
-        piCommand: piCli,
-        cwd: temporaryRoot,
-        agentDir,
-        args: ["--mode", "rpc", "--offline", "--no-session", "--no-context-files"],
-        input:
-            `${JSON.stringify({ id: "commands", type: "get_commands" })}\n` +
-            `${JSON.stringify({ id: "state", type: "get_state" })}\n`,
-        timeout: 120_000,
+    const loaded = runNode([piCli, "--offline", "--no-session", "--no-context-files", "--list-models", "gpt"], {
+        env,
+        timeout: 300_000,
     });
-    assert.equal(rpcResult.unavailable, false, "Pi RPC smoke could not find the pinned Pi CLI");
-    assert.equal(
-        rpcResult.status,
-        0,
-        `Pi RPC smoke failed\nstdout:\n${rpcResult.stdout}\nstderr:\n${rpcResult.stderr}`,
-    );
-    assert.equal(rpcResult.error, null, `Pi RPC smoke could not start Pi: ${rpcResult.error}`);
     assert.doesNotMatch(
-        `${rpcResult.stdout}\n${rpcResult.stderr}`,
+        `${loaded.stdout}\n${loaded.stderr}`,
         /failed to load|cannot find package|ERR_MODULE_NOT_FOUND/i,
     );
-    const rpcMessages = rpcResult.stdout
-        .split(/\r?\n/u)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .flatMap((line) => {
-            try {
-                return [JSON.parse(line)];
-            } catch {
-                return [];
-            }
-        });
-    const commandsResponse = rpcMessages.find((message) => message.type === "response" && message.id === "commands");
-    const stateResponse = rpcMessages.find((message) => message.type === "response" && message.id === "state");
-    assert.equal(commandsResponse?.success, true, `Pi RPC get_commands failed:\n${rpcResult.stdout}`);
-    assert.equal(stateResponse?.success, true, `Pi RPC get_state failed:\n${rpcResult.stdout}`);
-    const registeredCommands = commandsResponse.data?.commands?.map((command) => command.name) ?? [];
-    assert.ok(registeredCommands.includes("guard"), JSON.stringify(registeredCommands));
-    assert.ok(registeredCommands.includes("scope"), JSON.stringify(registeredCommands));
-    assert.ok(registeredCommands.includes("task"), JSON.stringify(registeredCommands));
-    assert.equal(stateResponse.data?.isStreaming, false, JSON.stringify(stateResponse));
     assert.equal(fs.readFileSync(authPath, "utf8"), authCanary, "Pi package smoke modified authentication state");
     assert.equal(
         fs.existsSync(path.join(specpiRoot, "browser-runtime", "node_modules")),

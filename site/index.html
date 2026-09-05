@@ -17,19 +17,19 @@
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="cycle.js"></script>
 </head>
-<body class="home-page">
+<body>
   <a class="skip-link" href="#overview">Skip to content</a>
 
   <header class="site-header">
     <a class="brand" href="#overview" aria-label="SpecPi home">
-      <img class="brand-logo" src="logo.svg" width="28" height="28" alt="">
+      <span class="brand-mark" aria-hidden="true">π</span>
       <strong>SpecPi</strong>
       <span class="brand-separator">/</span>
-      <span>v0.11.1</span>
+      <span>v0.10.0</span>
     </a>
     <nav class="header-nav" aria-label="Primary navigation">
       <a class="active" href="#overview" aria-current="page">Overview</a>
-      <a href="wiki/">Documentation</a>
+      <a href="wiki/">Wiki</a>
       <a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
@@ -47,54 +47,36 @@
       </nav>
       <div class="index-meta">
         <span>MIT · Node 22.19+</span>
-        <span>Pi 0.84.4+ · local evidence</span>
+        <span>Pi 0.84.4+ · no telemetry</span>
       </div>
     </aside>
 
     <main id="main" class="content">
       <section class="hero" id="overview" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span>Human-directed improvement for Pi</p>
-          <h1 id="hero-title">Better tools.<br><span>On your terms.</span></h1>
-          <p class="hero-summary">Turn recurring friction into small, verified improvements. SpecPi adds local evidence, explicit choices, and clear boundaries to the Pi coding agent.</p>
-          <div class="hero-actions">
-            <a class="button primary" href="#install">Install SpecPi <span aria-hidden="true">↓</span></a>
-            <a class="button" href="#loop">Explore the loop <span aria-hidden="true">↓</span></a>
-          </div>
-          <p class="hero-boundary">Collection is disabled by default.<br>Every improvement starts with your choice.</p>
+        <p class="eyebrow">Self-improving harness for the Pi coding agent</p>
+        <h1 id="hero-title">Let friction teach<br>the system.</h1>
+        <p class="hero-summary">SpecPi records capability gaps, measures recurrence across tasks and projects, and presents one bounded improvement for approval.</p>
+        <p class="hero-boundary">Collection is disabled by default. Reports stay local. Improvements require explicit approval.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#install">Install SpecPi</a>
+          <a class="button" href="#session">View one session</a>
         </div>
-
-        <figure class="architecture" aria-labelledby="architecture-title">
-          <figcaption><span id="architecture-title">SpecPi &amp; Pi</span><span>01 / Architecture</span></figcaption>
-          <div class="human-node"><span class="node-symbol" aria-hidden="true">◇</span><strong>You</strong><span>Goals · scope · decisions</span></div>
-          <div class="diagram-connector" aria-hidden="true"><span>↓</span></div>
-          <div class="pi-frame">
-            <div class="runtime-heading"><strong>Pi</strong><span>The agent runtime</span></div>
-            <div class="runtime-parts"><span>Agent loop</span><span>Tools</span><span>Sessions</span></div>
-            <div class="extension-seam"><span aria-hidden="true">↕</span> Extension hooks</div>
-            <div class="specpi-layer">
-              <div><strong>SpecPi</strong><span>Your local harness</span></div>
-              <p>Working agreement · workflow controls<br>Evidence · review · improvement</p>
-            </div>
-          </div>
-          <p class="architecture-note">Pi connects to your chosen model provider.<br>SpecPi keeps its improvement records local.</p>
-        </figure>
       </section>
 
       <dl class="facts" aria-label="SpecPi operating constraints">
-        <div><dt>01 / Evidence</dt><dd>Observed friction</dd></div>
-        <div><dt>02 / Privacy</dt><dd>Local improvement records</dd></div>
-        <div><dt>03 / Authority</dt><dd>One explicit choice</dd></div>
-        <div><dt>04 / Changes</dt><dd>Bounded &amp; reversible</dd></div>
+        <div><dt>Collection</dt><dd>off until enabled</dd></div>
+        <div><dt>Storage</dt><dd>local only</dd></div>
+        <div><dt>Authority</dt><dd>one human choice</dd></div>
+        <div><dt>Install</dt><dd>backed up, reversible</dd></div>
       </dl>
 
       <section class="content-section" id="loop" aria-labelledby="loop-title">
         <header class="section-heading">
           <span>01</span>
-          <h2 id="loop-title">Small changes. A complete loop.</h2>
+          <h2 id="loop-title">The loop</h2>
           <small>Seven stages · two gates</small>
         </header>
-        <p class="section-summary">Notice a gap. Establish a pattern. Choose one improvement. Each step leaves something you can inspect, and the work pauses at two explicit gates.</p>
+        <p class="section-summary">A capability gap becomes implementation work only after it recurs and a person selects it. The loop pauses for human authorization and for automated verification.</p>
 
         <div class="loop-table" role="table" aria-label="Improvement loop stages">
           <div class="table-head" role="row"><span role="columnheader">#</span><span role="columnheader">Stage</span><span role="columnheader">Action</span><span role="columnheader">Authority</span></div>
@@ -112,29 +94,33 @@
       <section class="content-section" id="session" aria-labelledby="session-title">
         <header class="section-heading">
           <span>02</span>
-          <h2 id="session-title">Follow one change, end to end.</h2>
-          <small>Illustrative session</small>
+          <h2 id="session-title">One session</h2>
+          <small>Local transcript</small>
         </header>
-        <p class="section-summary">A qualified gap becomes a bounded task, then a checked change. The local journal keeps the evidence and rollback context available for review.</p>
+        <p class="section-summary">This example moves one qualified gap through selection, validation, and retirement. All state remains on the local machine.</p>
 
-        <div class="session-layout">
         <div class="terminal">
-          <div class="terminal-bar"><span><i class="terminal-indicator" aria-hidden="true"></i>Pi session</span><span>Example · not live data</span></div>
+          <div class="terminal-bar"><span>Pi session</span><span>local only</span></div>
           <pre><code><span class="accent">›</span> /wishlist status
 
   collection   <span class="pass">on</span> · local only · never uploaded
-  queue        1 qualified
+  queue        6 open · 2 qualified · 1 review-needed
+  retired      14 · reopen rate 7% · median 2 sessions
 
 <span class="accent">›</span> /harness-improvement
 
   qualified
    1  local-browser-automation      8 tasks · 3 projects
+   2  structured-diff-review        5 tasks · 2 projects
+  review-needed
+   3  scope-drift-detection         reopened after v0.8.1
 
   select one to authorize › <span class="bright">1</span>
 
   authorized   local-browser-automation
   skill        specpi-improve
   scope        extensions/browser/**, capability registry
+  this choice covers no other work
 
   npm run check ........................ <span class="pass">pass</span>
   validator: browser-capability ........ <span class="pass">pass</span>
@@ -142,13 +128,6 @@
 
   <span class="pass">retired</span>  local-browser-automation
   journal  evidence · gates · 4 files · v0.8.4</code></pre>
-        </div>
-        <div class="session-notes">
-          <p class="eyebrow">Three things stay visible</p>
-          <div><span>01</span><h3>The reason</h3><p>Recurring evidence explains why a capability is in the review menu.</p></div>
-          <div><span>02</span><h3>The boundary</h3><p>Your exact selection authorizes one improvement and its expected scope.</p></div>
-          <div><span>03</span><h3>The checks</h3><p>Repository checks and capability validators must pass before retirement.</p></div>
-        </div>
         </div>
         <div class="command-cards">
           <div><code>/wishlist status</code><p>Queue size, retirements, reopen rate, and time to retire.</p></div>
@@ -160,10 +139,10 @@
       <section class="content-section" id="guard" aria-labelledby="guard-title">
         <header class="section-heading">
           <span>03</span>
-          <h2 id="guard-title">Control at the point of execution.</h2>
+          <h2 id="guard-title">Command guard</h2>
           <small>Compare modes</small>
         </header>
-        <p class="section-summary">Command guard analyzes supported model-initiated tool calls before execution. Explore the modes to see where a call runs, asks for a decision, or stops.</p>
+        <p class="section-summary">Supported model-initiated tool calls are analyzed before execution. Confirmed host-wide destructive commands are denied. Calls that require a decision ask first.</p>
 
         <div class="guard-controls" role="tablist" aria-label="Command guard modes">
           <button id="guard-mode-guard" type="button" role="tab" aria-selected="true" aria-controls="guard-comparison" data-guard-mode="guard">guard</button>
@@ -194,10 +173,10 @@
         </header>
         <div class="writer-layout">
           <div>
-            <p>Good review starts with clear ownership. Keep one writer in each working directory, declare expected paths, and make unresolved evidence visible.</p>
-            <p>For an independent review or trial, <code>/experiment start</code> creates a detached worktree that you open in a separate Pi session.</p>
-            <p class="muted">SpecPi does not install subagent orchestration. A parent can omit context in either direction, and parallel writers can introduce conflicting assumptions. Independent work benefits from explicit boundaries.</p>
-            <a class="inline-link" href="wiki/#work-ownership">Read the workflow reference <span aria-hidden="true">↗</span></a>
+            <p>SpecPi does not install a subagent orchestration layer. A parent agent decides what context a child receives and summarizes the result. Either handoff can omit a material constraint.</p>
+            <p>Parallel writers also create conflicting assumptions and increase review work.</p>
+            <p>Keep one writer in each working directory. For an independent review or trial, <code>/experiment start</code> creates a detached worktree that you open in a separate Pi session.</p>
+            <p class="muted">Independent agents can still be useful. SpecPi keeps their context, ownership, and output explicit.</p>
           </div>
           <div class="ownership-cards">
             <p>Workflow controls</p>
@@ -211,26 +190,25 @@
       <section class="content-section" id="install" aria-labelledby="install-title">
         <header class="section-heading">
           <span>05</span>
-          <h2 id="install-title">Start with a plan.</h2>
+          <h2 id="install-title">Install</h2>
           <small>Node 22.19+ · npm · Git</small>
         </header>
         <p class="section-summary">Run the non-mutating plan first. Confirm the install after reviewing the printed changes, then run the doctor check. If Pi 0.84.4+ is missing, the confirmed install adds the reviewed pinned package.</p>
 
         <div class="terminal install-terminal">
-          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.11.1</span></div>
+          <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.10.0</span></div>
           <pre><code>npm install --global specpi@latest
 specpi plan      <span class="comment"># preview changes</span>
 specpi install   <span class="comment"># confirm before mutation</span>
 specpi doctor    <span class="comment"># verify managed state and validators</span></code></pre>
           <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-          <pre><code>npm install --global specpi@0.11.1</code></pre>
+          <pre><code>npm install --global specpi@0.10.0</code></pre>
           <div class="terminal-bar secondary"><span>Update · two explicit steps</span></div>
           <pre><code>npm install --global specpi@latest
 specpi update
 specpi doctor</code></pre>
         </div>
         <p class="section-note">After installation, run <code>/reload</code> in Pi. SpecPi backs up managed files before mutation and supports uninstall.</p>
-        <p class="section-note">Pi still sends model requests to your chosen provider. Local improvement records do not make the whole agent offline. <a class="inline-link" href="wiki/#security">Read the security boundaries <span aria-hidden="true">↗</span></a></p>
       </section>
 
       <footer>

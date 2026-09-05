@@ -63,7 +63,7 @@ When appropriate, SpecPi publishes security information through [GitHub Security
 - Run Pi and SpecPi with the least operating-system privilege practical. Use a container or VM for hostile repositories, code, or web content.
 - Protect Pi configuration and credentials with operating-system permissions. SpecPi is not a credential or process sandbox.
 - Use dedicated test accounts rather than personal authenticated browser sessions.
-- Inspect task cards, review packets, wishlist reports, issue drafts, screenshots, page text, downloads, console output, and visual baselines before sharing them.
+- Inspect wishlist reports, issue drafts, screenshots, page text, downloads, console output, and visual baselines before sharing them.
 - Review optional and global package installations. Some external state and package caches survive rollback or uninstall.
 
 ## Security boundaries at a glance
@@ -74,7 +74,6 @@ When appropriate, SpecPi publishes security information through [GitHub Security
 | Installer | Explicit plans and confirmation, bounded managed changes, backups, checksums, atomic promotion, and rollback | Rollback of every external package-manager side effect or cache |
 | Command Guard | Pre-execution defense in depth for documented model-tool seams | A general sandbox for direct user commands, arbitrary tools, scripts, extensions, or running processes |
 | Local improvement state | Explicit collection choice, bounded local records, sanitization, and no SpecPi upload | Guaranteed removal of every plain-language identity or automatic deletion on uninstall |
-| Task and verification records | Fixed task requirements, source-bound gate observations, and explicit human outcome feedback | Independent model judgment, cryptographic attestation, or automatic authority to expand a task |
 | Browser | A fresh Chromium context without the personal browser profile | Operating-system or network isolation from hostile web content |
 
 The authoritative assumptions, enforcement seams, residual risks, and component details are in [SECURITY_MODEL.md](SECURITY_MODEL.md).

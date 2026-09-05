@@ -3,10 +3,6 @@ node_modules/
 .pi/npm/
 .pi/git/
 
-# Generated desktop builds
-/desktop/out/
-/desktop/dist/
-
 # Credentials, personal provider configuration, and state
 auth.json
 models.json

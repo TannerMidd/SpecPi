@@ -258,51 +258,15 @@ export function relativeMutationPath(root, input, options = {}) {
     const requested = relative ? input.trim() : input;
     const resolvedRoot = canonicalRoot(root);
     const cwd = typeof options.cwd === "string" && options.cwd ? options.cwd : resolvedRoot;
-    // Pi resolves relative paths lexically before the filesystem follows symlinks. Canonicalizing cwd first would
-    // change the target of ../ beneath an aliased directory.
     const candidate = relative ? path.resolve(cwd, requested) : path.resolve(requested);
-    const existing = nearestExistingParent(candidate);
-    if (!existing) {
-        throw new Error("Mutation path has no verifiable parent");
-    }
-
-    const canonicalParent = fs.realpathSync.native(existing);
-    if (!isInside(resolvedRoot, canonicalParent, options.platform)) {
-        throw new Error("Mutation path escapes the project root through a symlink");
-    }
-
-    // Rebase only an aliased project-root prefix, preserving internal symlink labels and nonexistent descendants.
-    // The outermost matching ancestor keeps an internal link back to the root from erasing its own scope label.
-    let scopedCandidate = candidate;
     if (!isInside(resolvedRoot, candidate, options.platform)) {
-        let lexicalRoot;
-        let ancestor = existing;
-        while (true) {
-            if (
-                comparable(fs.realpathSync.native(ancestor), options.platform) ===
-                comparable(resolvedRoot, options.platform)
-            ) {
-                lexicalRoot = ancestor;
-            }
-
-            const parent = path.dirname(ancestor);
-            if (parent === ancestor) {
-                break;
-            }
-
-            ancestor = parent;
-        }
-
-        if (!lexicalRoot) {
-            throw new Error("Mutation path escapes the project root");
-        }
-
-        scopedCandidate = path.resolve(resolvedRoot, path.relative(lexicalRoot, candidate));
-    }
-
-    if (!isInside(resolvedRoot, scopedCandidate, options.platform)) {
         throw new Error("Mutation path escapes the project root");
     }
 
-    return portableRelative(path.relative(resolvedRoot, scopedCandidate)) || ".";
+    const existing = nearestExistingParent(candidate);
+    if (!existing || !isInside(resolvedRoot, fs.realpathSync.native(existing), options.platform)) {
+        throw new Error("Mutation path escapes the project root through a symlink");
+    }
+
+    return portableRelative(path.relative(resolvedRoot, candidate)) || ".";
 }

@@ -33,21 +33,11 @@ import {
     renderChallengeMarkdown,
     validateChallengeSubmission,
 } from "./challenge.mjs";
-import {
-    TASK_CONTRACT_ENTRY,
-    createTaskContract,
-    markdownPathLabel,
-    readTaskContract,
-    renderTaskContract,
-    taskContractScopeViolations,
-    validateTaskContract,
-} from "./task-contract.mjs";
 
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
 const stateDir = path.join(agentDir, "specpi");
 const SCOPE_ENTRY = "specpi-scope-state";
 const CHALLENGE_ENTRY = "specpi-completion-challenge";
-const TASK_HANDOFF_ENTRY = "specpi-task-handoff";
 const SCOPE_STATUS = "specpi-scope";
 const MAX_PENDING_SCOPE = 40;
 // `read` is the one documented Pi seam that cannot mutate the worktree. Every other tool, including extension-provided
@@ -67,14 +57,11 @@ interface ScopeState {
     observed: string[];
     indeterminate: boolean;
     generation: number;
-    taskDigest?: string;
 }
 
 interface ActiveChallenge {
     generation: string;
     sessionId: string;
-    root: string;
-    taskContractDigest?: string;
     facts: any;
     prompt: string;
     delivered: boolean;
@@ -87,21 +74,6 @@ interface ChallengeEntryData {
     result?: any;
     markdown?: string;
     createdAt?: string;
-}
-
-interface TaskContractEntryData {
-    kind: "set" | "cleared";
-    contract?: any;
-    createdAt?: string;
-    reason?: string;
-}
-
-interface TaskHandoffEntryData {
-    markdown: string;
-    contractId: string;
-    contractDigest: string;
-    indeterminate: boolean;
-    createdAt: string;
 }
 
 function validScopeEntry(value: any): value is ScopeItem {
@@ -124,7 +96,6 @@ function emptyScope(root: string): ScopeState {
         observed: [],
         indeterminate: false,
         generation: 0,
-        taskDigest: undefined,
     };
 }
 
@@ -143,128 +114,6 @@ function parseExperimentCard(source: string, fallbackName: string) {
     };
 }
 
-function taskContractEditorText(contract: any = {}) {
-    const requirements = Array.isArray(contract.requirements) ? contract.requirements : [];
-    const paths = Array.isArray(contract.paths) ? contract.paths : [];
-    const nonGoals = Array.isArray(contract.nonGoals) ? contract.nonGoals : [];
-    const requirementLines =
-        requirements.length > 0
-            ? requirements.flatMap((item: any, index: number) => [
-                  `- ${item.id ?? `R${index + 1}`}: ${item.description ?? ""}`,
-                  `  Acceptance: ${item.acceptance ?? ""}`,
-              ])
-            : ["- R1: ", "  Acceptance: "];
-
-    return [
-        `Objective: ${contract.objective ?? ""}`,
-        `Hypothesis: ${contract.hypothesis ?? ""}`,
-        "Requirements:",
-        ...requirementLines,
-        "Paths:",
-        ...(paths.length > 0 ? paths.map((item: string) => `- ${markdownPathLabel(item)}`) : ["- "]),
-        `Rollback: ${contract.rollback ?? ""}`,
-        "Non-goals:",
-        ...(nonGoals.length > 0 ? nonGoals.map((item: string) => `- ${item}`) : ["- "]),
-    ].join("\n");
-}
-
-function parseTaskContractCard(source: string) {
-    const fields: Record<string, string> = {};
-    const requirements: any[] = [];
-    const paths: string[] = [];
-    const nonGoals: string[] = [];
-    let section = "";
-    let currentRequirement: any;
-
-    for (const rawLine of String(source).split(/\r?\n/u)) {
-        const line = rawLine.trimEnd();
-        const field = line.match(/^\s*(Objective|Hypothesis|Rollback|Requirements|Paths|Non-goals):\s*(.*)$/iu);
-        if (field) {
-            const name = field[1].toLowerCase();
-            const value = field[2].trim();
-            if (["objective", "hypothesis", "rollback"].includes(name)) {
-                fields[name] = value;
-                section = "";
-            } else {
-                section = name;
-                if (value) {
-                    if (name === "paths") {
-                        paths.push(decodeDisplayedPath(value.replace(/^[-*]\s*/u, "").trim()));
-                    } else if (name === "non-goals") {
-                        nonGoals.push(value.replace(/^[-*]\s*/u, "").trim());
-                    }
-                }
-            }
-
-            continue;
-        }
-
-        if (!line.trim()) {
-            continue;
-        }
-
-        if (section === "requirements") {
-            const requirement = line.match(/^\s*[-*]\s*(?:\[?([A-Za-z][A-Za-z0-9_-]*)\]?\s*(?::|[-–—])\s*)?(.+?)\s*$/u);
-            const acceptance = line.match(/^\s*(?:Acceptance|Accept):\s*(.*)$/iu);
-            if (requirement) {
-                currentRequirement = {
-                    ...(requirement[1] ? { id: requirement[1] } : {}),
-                    description: requirement[2].trim(),
-                    acceptance: "",
-                };
-                requirements.push(currentRequirement);
-            } else if (acceptance && currentRequirement) {
-                currentRequirement.acceptance = acceptance[1].trim();
-            }
-        } else if (section === "paths") {
-            const value = line.replace(/^\s*[-*]\s*/u, "").trim();
-            if (value) {
-                paths.push(decodeDisplayedPath(value));
-            }
-        } else if (section === "non-goals") {
-            const value = line.replace(/^\s*[-*]\s*/u, "").trim();
-            if (value) {
-                nonGoals.push(value);
-            }
-        }
-    }
-
-    return {
-        objective: fields.objective ?? "",
-        hypothesis: fields.hypothesis ?? "",
-        requirements,
-        paths,
-        rollback: fields.rollback ?? "",
-        nonGoals,
-    };
-}
-
-function decodeDisplayedPath(value: string) {
-    try {
-        return decodeURIComponent(value);
-    } catch {
-        return value;
-    }
-}
-
-function experimentCardEditorText(contract: any, fallbackName: string) {
-    if (!contract) {
-        return `Name: ${fallbackName}\nHypothesis: \nAcceptance: \nNon-goals:\n- `;
-    }
-
-    const acceptance = contract.requirements.map((item: any) => `${item.id}: ${item.acceptance}`).join("; ");
-    const nonGoals =
-        contract.nonGoals.length > 0 ? contract.nonGoals.map((item: string) => `- ${item}`).join("\n") : "- ";
-
-    return [
-        `Name: ${contract.objective}`,
-        `Hypothesis: ${contract.hypothesis}`,
-        `Acceptance: ${acceptance}`,
-        "Non-goals:",
-        nonGoals,
-    ].join("\n");
-}
-
 function safeMessage(error: unknown) {
     return (error instanceof Error ? error.message : String(error))
         .replace(/[\u0000-\u001f\u007f]+/gu, " ")
@@ -273,14 +122,11 @@ function safeMessage(error: unknown) {
 
 export default function workflowControls(pi: ExtensionAPI) {
     let scope = emptyScope(canonicalRoot(process.cwd()));
-    let latestTaskContract: any | undefined;
     let activeChallenge: ActiveChallenge | undefined;
     let latestChallenge: ChallengeEntryData | undefined;
-    let taskContractError: string | undefined;
     let observedToolFailures = 0;
     let experimentBusy = false;
     let latestSnapshot: any;
-    let sessionGeneration = 0;
     const snapshots = new Map<string, any>();
     const supportsEntryRenderer = typeof pi.registerEntryRenderer === "function";
 
@@ -299,125 +145,16 @@ export default function workflowControls(pi: ExtensionAPI) {
         return canonicalRoot(cwd);
     };
 
-    const branchEntries = (ctx: ExtensionContext) => ctx.sessionManager.getBranch?.() ?? [];
-
-    // Pi contexts expose the live session through getters. Retaining `ctx` across an await does not retain its
-    // original branch, and /tree can change that branch without reloading this extension or changing its session ID.
-    const captureSession = (ctx: ExtensionContext) => ({
-        generation: sessionGeneration,
-        cwd: ctx.cwd,
-        sessionId: ctx.sessionManager.getSessionId(),
-    });
-    const sessionIsCurrent = (origin: ReturnType<typeof captureSession>, ctx: ExtensionContext) =>
-        origin.generation === sessionGeneration &&
-        origin.cwd === ctx.cwd &&
-        origin.sessionId === ctx.sessionManager.getSessionId();
-
-    const emitTaskContractChanged = (contract: any | undefined, previousDigest?: string) => {
-        pi.events.emit("specpi:task-contract-changed", {
-            active: Boolean(contract),
-            previousDigest,
-            digest: contract?.digest,
-            id: contract?.id,
-            objective: contract?.objective,
-            requirements: contract?.requirements?.length ?? 0,
-        });
-    };
-
-    const invalidateChallenge = (ctx: ExtensionContext, reason = "task contract changed") => {
-        const hadEvidence = Boolean(activeChallenge || latestChallenge);
-        activeChallenge = undefined;
-        latestChallenge = undefined;
-        if (hadEvidence) {
-            pi.appendEntry<ChallengeEntryData>(CHALLENGE_ENTRY, {
-                kind: "cleared",
-                generation: randomUUID(),
-                createdAt: new Date().toISOString(),
-                reason,
-            });
-        }
-
-        return hadEvidence;
-    };
-
-    const readCurrentTaskContract = (ctx: ExtensionContext, root: string) => {
-        const current = readTaskContract(branchEntries(ctx), root);
-        taskContractError = undefined;
-
-        return current;
-    };
-
-    const refreshTaskContract = (ctx: ExtensionContext, root: string, { invalidate = true } = {}) => {
-        let current;
-        try {
-            current = readCurrentTaskContract(ctx, root);
-        } catch (error) {
-            taskContractError = safeMessage(error);
-            throw error;
-        }
-
-        const previousDigest = latestTaskContract?.digest;
-        const changed = previousDigest !== current?.digest;
-        latestTaskContract = current;
-        if (changed) {
-            if (
-                invalidate &&
-                previousDigest !== current?.digest &&
-                (previousDigest !== undefined || activeChallenge || latestChallenge)
-            ) {
-                invalidateChallenge(ctx);
-            }
-
-            emitTaskContractChanged(current, previousDigest);
-            emitScopeStatus(ctx);
-        }
-
-        return current;
-    };
-
-    const persistTaskContract = (contract: any | undefined, ctx: ExtensionContext, reason?: string) => {
-        const previousDigest = latestTaskContract?.digest;
-        if (contract) {
-            const validated = validateTaskContract(contract);
-            pi.appendEntry<TaskContractEntryData>(TASK_CONTRACT_ENTRY, {
-                kind: "set",
-                contract: validated,
-                createdAt: new Date().toISOString(),
-            });
-            latestTaskContract = validated;
-        } else {
-            pi.appendEntry<TaskContractEntryData>(TASK_CONTRACT_ENTRY, {
-                kind: "cleared",
-                createdAt: new Date().toISOString(),
-                reason,
-            });
-            latestTaskContract = undefined;
-        }
-
-        const changed = previousDigest !== latestTaskContract?.digest;
-        if (changed) {
-            invalidateChallenge(ctx, reason ?? "task contract changed");
-        }
-
-        emitTaskContractChanged(latestTaskContract, previousDigest);
-        if (changed || !contract) {
-            emitScopeStatus(ctx);
-        }
-    };
-
-    const emitScopeStatus = (ctx: ExtensionContext, { taskReviewChanged = false } = {}) => {
-        const taskStale = scope.taskDigest !== undefined && latestTaskContract?.digest !== scope.taskDigest;
+    const emitScopeStatus = (ctx: ExtensionContext) => {
         const summary = scope.active
             ? {
                   active: true,
                   pending: scope.pending.length,
                   entries: scope.entries.length,
                   indeterminate: scope.indeterminate,
-                  taskBound: scope.taskDigest !== undefined,
-                  taskStale,
               }
-            : { active: false, pending: 0, entries: 0, indeterminate: false, taskBound: false, taskStale: false };
-        pi.events.emit("specpi:workflow-status", taskReviewChanged ? { ...summary, taskReviewChanged: true } : summary);
+            : { active: false, pending: 0, entries: 0, indeterminate: false };
+        pi.events.emit("specpi:workflow-status", summary);
         if (!scope.active) {
             ctx.ui.setStatus(SCOPE_STATUS, undefined);
             ctx.ui.setWidget(SCOPE_STATUS, undefined);
@@ -425,20 +162,19 @@ export default function workflowControls(pi: ExtensionAPI) {
             return;
         }
 
-        const label = scope.pending.length > 0 || scope.indeterminate || taskStale ? "scope: review" : "scope: clean";
+        const label = scope.pending.length > 0 || scope.indeterminate ? "scope: review" : "scope: clean";
         ctx.ui.setStatus(SCOPE_STATUS, label);
         ctx.ui.setWidget(SCOPE_STATUS, (_tui, theme) => ({
             invalidate() {},
             render(width: number): string[] {
                 const pending = scope.pending.length > 0 ? ` · ${scope.pending.length} pending` : "";
                 const uncertain = scope.indeterminate ? " · snapshot uncertain" : "";
-                const stale = taskStale ? " · task stale" : "";
 
                 return [
                     truncateToWidth(
                         theme.fg(
                             scope.pending.length > 0 || scope.indeterminate ? "warning" : "dim",
-                            `scope · ${scope.entries.length} paths · ${scope.observed.length} changed${pending}${uncertain}${stale}`,
+                            `scope · ${scope.entries.length} paths · ${scope.observed.length} changed${pending}${uncertain}`,
                         ),
                         width,
                         "",
@@ -459,7 +195,6 @@ export default function workflowControls(pi: ExtensionAPI) {
             observed: [...scope.observed],
             indeterminate: scope.indeterminate,
             generation: scope.generation,
-            taskDigest: scope.taskDigest,
         });
         emitScopeStatus(ctx);
     };
@@ -498,37 +233,27 @@ export default function workflowControls(pi: ExtensionAPI) {
             return undefined;
         }
 
-        const generation = sessionGeneration;
-        const root = scope.root;
         try {
             const result = await pi.exec("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
-                cwd: root,
+                cwd: scope.root,
                 timeout: 30_000,
             });
-            if (generation !== sessionGeneration) {
-                return undefined;
-            }
-
             if (result.code !== 0 || typeof result.stdout !== "string") {
                 // A failed status leaves no trustworthy baseline, so the next tool must observe the worktree afresh
                 // rather than diffing against a snapshot taken before the gap.
                 latestSnapshot = undefined;
 
-                return { root, paths: [], fingerprints: {}, indeterminate: true };
+                return { root: scope.root, paths: [], fingerprints: {}, indeterminate: true };
             }
 
-            const snapshot = createWorktreeSnapshot(root, result.stdout);
+            const snapshot = createWorktreeSnapshot(scope.root, result.stdout);
             latestSnapshot = snapshot;
 
             return snapshot;
         } catch {
-            if (generation !== sessionGeneration) {
-                return undefined;
-            }
-
             latestSnapshot = undefined;
 
-            return { root, paths: [], fingerprints: {}, indeterminate: true };
+            return { root: scope.root, paths: [], fingerprints: {}, indeterminate: true };
         }
     };
 
@@ -543,45 +268,27 @@ export default function workflowControls(pi: ExtensionAPI) {
         return takeSnapshot();
     };
 
-    const setScopeEntries = (entries: ScopeItem[], ctx: ExtensionContext, options: { taskDigest?: string } = {}) => {
+    const setScopeEntries = (entries: ScopeItem[], ctx: ExtensionContext) => {
         if (entries.length === 0 || entries.length > 40) {
             throw new Error("Scope must contain between 1 and 40 paths");
         }
 
         scope.active = true;
         scope.entries = entries;
-        if (options.taskDigest !== undefined) {
-            scope.taskDigest = options.taskDigest;
-        } else {
-            scope.taskDigest = undefined;
-            scope.pending = scope.pending.filter((item) => !scopeMatches(entries, item));
-        }
-
+        scope.pending = scope.pending.filter((item) => !scopeMatches(entries, item));
         scope.generation += 1;
         latestSnapshot = undefined;
         persistScope(ctx);
     };
 
-    const restoreSession = async (ctx: ExtensionContext) => {
-        sessionGeneration += 1;
-        const origin = captureSession(ctx);
-        // Retire armed prompts synchronously, before root lookup can yield to a tool call or another branch change.
-        scope = emptyScope(path.resolve(origin.cwd));
-        latestTaskContract = undefined;
+    pi.on("session_start", async (_event, ctx) => {
+        const root = await resolveRoot(ctx.cwd);
+        scope = emptyScope(root);
         activeChallenge = undefined;
         latestChallenge = undefined;
-        taskContractError = undefined;
         observedToolFailures = 0;
         latestSnapshot = undefined;
         snapshots.clear();
-        emitScopeStatus(ctx);
-
-        const root = await resolveRoot(origin.cwd);
-        if (!sessionIsCurrent(origin, ctx)) {
-            return;
-        }
-
-        scope = emptyScope(root);
 
         for (const entry of ctx.sessionManager.getBranch?.() ?? []) {
             if (entry.type !== "custom") {
@@ -612,7 +319,6 @@ export default function workflowControls(pi: ExtensionAPI) {
                             : [],
                         indeterminate: Boolean(data.indeterminate),
                         generation: Number.isInteger(data.generation) ? data.generation : 0,
-                        taskDigest: typeof data.taskDigest === "string" ? data.taskDigest : undefined,
                     };
                 } else if (data?.active === false) {
                     scope = emptyScope(root);
@@ -627,36 +333,14 @@ export default function workflowControls(pi: ExtensionAPI) {
             }
         }
 
-        try {
-            latestTaskContract = readCurrentTaskContract(ctx, root);
-        } catch (error) {
-            taskContractError = safeMessage(error);
-            ctx.ui.notify(`Task contract unavailable: ${taskContractError}`, "error");
-        }
-
-        if (
-            latestChallenge &&
-            latestChallenge.facts?.taskContractDigest !== latestTaskContract?.digest &&
-            (latestTaskContract || latestChallenge.facts?.taskContractDigest !== undefined)
-        ) {
-            latestChallenge = undefined;
-        }
-
         emitScopeStatus(ctx);
-    };
-
-    pi.on("session_start", (_event, ctx) => restoreSession(ctx));
-    pi.on("session_tree", (_event, ctx) => restoreSession(ctx));
+    });
 
     pi.on("session_shutdown", (_event, ctx) => {
-        sessionGeneration += 1;
         snapshots.clear();
         latestSnapshot = undefined;
-        latestTaskContract = undefined;
         activeChallenge = undefined;
-        latestChallenge = undefined;
         experimentBusy = false;
-        taskContractError = undefined;
         ctx.ui.setStatus(SCOPE_STATUS, undefined);
         ctx.ui.setWidget(SCOPE_STATUS, undefined);
     });
@@ -690,11 +374,7 @@ export default function workflowControls(pi: ExtensionAPI) {
             return;
         }
 
-        const generation = sessionGeneration;
-        const snapshot = await baselineSnapshot();
-        if (generation === sessionGeneration) {
-            snapshots.set(event.toolCallId, snapshot);
-        }
+        snapshots.set(event.toolCallId, await baselineSnapshot());
     });
 
     pi.on("tool_call", async (event: any, ctx) => {
@@ -719,7 +399,6 @@ export default function workflowControls(pi: ExtensionAPI) {
 
         const originalPath = event.input.path;
         const generation = scope.generation;
-        const origin = captureSession(ctx);
         if (!ctx.hasUI) {
             addPending([relativePath], ctx);
 
@@ -731,7 +410,7 @@ export default function workflowControls(pi: ExtensionAPI) {
             "Allow once without expanding scope",
             "Add this path to scope and allow",
         ]);
-        if (!sessionIsCurrent(origin, ctx) || generation !== scope.generation || event.input.path !== originalPath) {
+        if (generation !== scope.generation || event.input.path !== originalPath) {
             return { block: true, reason: "Scope state or tool input changed during acknowledgement" };
         }
 
@@ -777,12 +456,7 @@ export default function workflowControls(pi: ExtensionAPI) {
             return;
         }
 
-        const origin = captureSession(ctx);
         const after = await takeSnapshot();
-        if (!sessionIsCurrent(origin, ctx)) {
-            return;
-        }
-
         const comparison = compareWorktreeSnapshots(before, after, scope.entries);
         if (comparison.indeterminate) {
             scope.indeterminate = true;
@@ -810,35 +484,11 @@ export default function workflowControls(pi: ExtensionAPI) {
         return { content: [...event.content, { type: "text", text: warning }] };
     });
 
-    pi.on("before_agent_start", async (event, ctx) => {
-        const origin = captureSession(ctx);
+    pi.on("before_agent_start", async (event) => {
         const guidance = [];
-        let currentTask;
-        try {
-            const root = await resolveRoot(origin.cwd);
-            if (!sessionIsCurrent(origin, ctx)) {
-                return;
-            }
-
-            currentTask = refreshTaskContract(ctx, root);
-        } catch (error) {
-            if (!sessionIsCurrent(origin, ctx)) {
-                return;
-            }
-
-            taskContractError = safeMessage(error);
-        }
-
-        if (currentTask) {
-            guidance.push(`[SPECPI TASK CONTRACT]\n${renderTaskContract(currentTask)}`);
-        } else if (taskContractError) {
-            guidance.push(`[SPECPI TASK CONTRACT]\nUnavailable: ${taskContractError}`);
-        }
-
         if (scope.active) {
-            const taskStale = scope.taskDigest !== undefined && currentTask?.digest !== scope.taskDigest;
             guidance.push(
-                `[SPECPI SCOPE]\nDeclared paths: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}\nPending outside-scope paths: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}. Do not describe pending paths as accepted scope.${taskStale ? "\nTask-bound scope is stale; do not widen it automatically." : ""}`,
+                `[SPECPI SCOPE]\nDeclared paths: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}\nPending outside-scope paths: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}. Do not describe pending paths as accepted scope.`,
             );
         }
 
@@ -854,348 +504,30 @@ export default function workflowControls(pi: ExtensionAPI) {
         return { systemPrompt: `${event.systemPrompt}\n\n${guidance.join("\n\n")}` };
     });
 
-    const currentSnapshot = async (root: string) => {
-        try {
-            const status = await pi.exec("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
-                cwd: root,
-                timeout: 30_000,
-            });
-            if (status.code !== 0 || typeof status.stdout !== "string") {
-                return { root, paths: [], fingerprints: {}, indeterminate: true, reason: "Git status failed" };
-            }
-
-            const snapshot = createWorktreeSnapshot(root, status.stdout);
-            const fingerprints: Record<string, string> = {};
-            for (const relativePath of snapshot.paths) {
-                const fingerprint = handoffFingerprint(snapshot.fingerprints[relativePath]);
-                const candidate = path.resolve(root, relativePath);
-                const candidateRelative = path.relative(root, candidate);
-                if (
-                    candidateRelative === ".." ||
-                    candidateRelative.startsWith(`..${path.sep}`) ||
-                    path.isAbsolute(candidateRelative)
-                ) {
-                    fingerprints[relativePath] = `type:unknown;mode:unknown;${fingerprint}`;
-
-                    continue;
-                }
-
-                try {
-                    const stat = fs.lstatSync(candidate);
-                    const type = stat.isSymbolicLink()
-                        ? "symlink"
-                        : stat.isFile()
-                          ? "file"
-                          : stat.isDirectory()
-                            ? "directory"
-                            : "other";
-                    fingerprints[relativePath] = `type:${type};mode:${(stat.mode & 0o7777).toString(8)};${fingerprint}`;
-                } catch {
-                    fingerprints[relativePath] = `type:missing;mode:unknown;${fingerprint}`;
-                }
-            }
-
-            return { ...snapshot, fingerprints };
-        } catch {
-            return { root, paths: [], fingerprints: {}, indeterminate: true, reason: "Git status was unavailable" };
-        }
-    };
-
-    const handoffFingerprint = (value: unknown) => {
-        if (typeof value !== "string") {
-            return "unavailable";
-        }
-
-        if (/^[a-f0-9]{64}$/u.test(value)) {
-            return `sha256:${value}`;
-        }
-
-        if (value === "missing") {
-            return "missing";
-        }
-
-        if (value.startsWith("symlink:")) {
-            return "symlink";
-        }
-
-        if (/^[0-9]+:[0-9]+:/u.test(value)) {
-            return `metadata:${value}`;
-        }
-
-        return safeMessage(value);
-    };
-
-    const renderTaskHandoff = (contract: any, snapshot: any, root: string) => {
-        const indeterminate = Boolean(scope.indeterminate || snapshot?.indeterminate);
-        const lines = [
-            "## Task Handoff",
-            "",
-            `Generated for task \`${contract.id}\` at root \`${markdownPathLabel(root)}\`.`,
-            "",
-            renderTaskContract(contract),
-            "",
-            "### Current changes",
-        ];
-        if (indeterminate) {
-            lines.push(
-                `- Snapshot indeterminate: ${safeMessage(snapshot?.reason ?? "some changes may be unobserved")}.`,
-                "- Change paths and fingerprints below are incomplete.",
-            );
-        } else if (snapshot?.paths.length === 0) {
-            lines.push("- No changed paths observed.");
-        } else {
-            for (const relativePath of snapshot.paths.slice(0, 256)) {
-                lines.push(
-                    `- \`${markdownPathLabel(relativePath)}\` — ${handoffFingerprint(snapshot.fingerprints[relativePath])}`,
-                );
-            }
-        }
-
-        const violations = indeterminate ? [] : taskContractScopeViolations(contract, snapshot.paths);
-        lines.push("", "### Latest review");
-        if (!latestChallenge?.result) {
-            lines.push("- No completion challenge review is recorded for this task contract.");
-        } else {
-            lines.push(`- Verdict: **${latestChallenge.result.verdict}**.`);
-            for (const item of latestChallenge.result.requirements ?? []) {
-                const id = item.id ? `${item.id}: ` : "";
-                lines.push(`- ${id}${item.status}: ${safeMessage(item.evidence || "No evidence recorded")}`);
-            }
-
-            if (latestChallenge.result.validationGaps?.length) {
-                lines.push(`- Validation gaps: ${latestChallenge.result.validationGaps.map(safeMessage).join("; ")}`);
-            }
-        }
-
-        lines.push("", "### Unresolved facts");
-        const unresolved = [];
-        if (scope.pending.length > 0) {
-            unresolved.push(`Pending scope findings: ${scope.pending.map(markdownPathLabel).join(", ")}`);
-        }
-
-        if (violations.length > 0) {
-            unresolved.push(`Task paths outside declared paths: ${violations.map(markdownPathLabel).join(", ")}`);
-        }
-
-        if (scope.taskDigest !== undefined && scope.taskDigest !== contract.digest) {
-            unresolved.push(
-                "The imported scope is bound to an older task contract digest; it was not widened automatically.",
-            );
-        }
-
-        if (indeterminate) {
-            unresolved.push("The current worktree snapshot may omit changed paths or fingerprints.");
-        }
-
-        if (latestChallenge?.result) {
-            for (const item of latestChallenge.result.requirements ?? []) {
-                if (item.status !== "proven") {
-                    unresolved.push(`${item.id ? `${item.id} ` : ""}requirement remains ${item.status}.`);
-                }
-            }
-
-            unresolved.push(
-                ...(latestChallenge.result.contradictions ?? []).map((item: string) => `Contradiction: ${item}`),
-            );
-            unresolved.push(
-                ...(latestChallenge.result.residualRisks ?? []).map((item: string) => `Residual risk: ${item}`),
-            );
-        }
-
-        lines.push(
-            ...(unresolved.length > 0
-                ? unresolved.map((item) => `- ${safeMessage(item)}`)
-                : ["- No unresolved facts recorded."]),
-        );
-        lines.push(
-            "",
-            "> This handoff is a bounded view of the current conversation state. It does not launch, export, or commit work.",
-        );
-
-        return lines.join("\n");
-    };
-
-    pi.registerCommand("task", {
-        description: "Set, inspect, or hand off the current task contract",
-        getArgumentCompletions: (prefix: string) =>
-            ["set", "clear", "status", "handoff"]
-                .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
-                .map((value) => ({ value, label: value })),
-        handler: async (args, ctx) => {
-            const origin = captureSession(ctx);
-            const action = args.trim().toLowerCase() || "status";
-            try {
-                const root = await resolveRoot(origin.cwd);
-                if (!sessionIsCurrent(origin, ctx)) {
-                    return;
-                }
-
-                const current = refreshTaskContract(ctx, root);
-                if (action === "status") {
-                    if (!current) {
-                        ctx.ui.notify("No task contract is active for this project.", "info");
-
-                        return;
-                    }
-
-                    ctx.ui.notify(
-                        `Task ${current.id.slice(0, 8)}: ${current.objective}; ${current.requirements.length} fixed requirement(s); digest ${current.digest.slice(0, 12)}.`,
-                        "info",
-                    );
-
-                    return;
-                }
-
-                if (action === "clear") {
-                    persistTaskContract(undefined, ctx, "task contract cleared by human");
-                    ctx.ui.notify(
-                        "Task contract cleared. Existing scope remains unchanged and is reported as stale if it was task-bound.",
-                        "warning",
-                    );
-
-                    return;
-                }
-
-                if (action === "set") {
-                    if (!ctx.hasUI || typeof ctx.ui.editor !== "function") {
-                        ctx.ui.notify("/task set requires interactive editor support.", "error");
-
-                        return;
-                    }
-
-                    const edited = await ctx.ui.editor("Task contract", taskContractEditorText(current));
-                    if (!sessionIsCurrent(origin, ctx) || edited === undefined) {
-                        return;
-                    }
-
-                    const card = parseTaskContractCard(edited);
-                    const contractOrigin = current?.origin === "improvement" ? "improvement" : "human";
-                    const contract = createTaskContract(card, {
-                        root,
-                        origin: contractOrigin,
-                        ...(contractOrigin === "improvement"
-                            ? { gapId: current.gapId, selectionId: current.selectionId, id: current.id }
-                            : current
-                              ? { id: current.id }
-                              : {}),
-                    });
-                    persistTaskContract(contract, ctx, "task contract revised by human");
-                    ctx.ui.notify(
-                        `Task contract set: ${contract.objective} (${contract.requirements.length} requirement(s)).`,
-                        "info",
-                    );
-
-                    return;
-                }
-
-                if (action === "handoff") {
-                    if (!current) {
-                        ctx.ui.notify("No task contract is active for this project.", "error");
-
-                        return;
-                    }
-
-                    const snapshot = await currentSnapshot(root);
-                    if (!sessionIsCurrent(origin, ctx)) {
-                        return;
-                    }
-
-                    const markdown = renderTaskHandoff(current, snapshot, root);
-                    const data: TaskHandoffEntryData = {
-                        markdown,
-                        contractId: current.id,
-                        contractDigest: current.digest,
-                        indeterminate: Boolean(scope.indeterminate || snapshot.indeterminate),
-                        createdAt: new Date().toISOString(),
-                    };
-                    pi.appendEntry(TASK_HANDOFF_ENTRY, data);
-                    if (!supportsEntryRenderer && typeof ctx.ui.editor === "function") {
-                        await ctx.ui.editor("Task handoff (view only)", markdown);
-                    }
-
-                    ctx.ui.notify("Task handoff rendered in the current conversation.", "info");
-
-                    return;
-                }
-
-                ctx.ui.notify("Usage: /task [set|clear|status|handoff]", "error");
-            } catch (error) {
-                if (!sessionIsCurrent(origin, ctx)) {
-                    return;
-                }
-
-                taskContractError = safeMessage(error);
-                ctx.ui.notify(taskContractError, "error");
-            }
-        },
-    });
-
     pi.registerCommand("scope", {
         description: "Declare expected project paths and review scope drift",
         getArgumentCompletions: (prefix: string) =>
-            ["set", "task", "add", "remove", "accept", "recheck", "status", "clear"]
+            ["set", "add", "remove", "accept", "recheck", "status", "clear"]
                 .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
                 .map((value) => ({ value, label: value })),
         handler: async (args, ctx) => {
-            const origin = captureSession(ctx);
             const [actionRaw, ...rest] = args.trim().split(/\s+/u).filter(Boolean);
             const action = actionRaw?.toLowerCase() || (scope.active ? "status" : "set");
             const requestedPath = rest.join(" ");
             try {
-                if (action === "task") {
-                    const root = await resolveRoot(origin.cwd);
-                    if (!sessionIsCurrent(origin, ctx)) {
-                        return;
-                    }
-
-                    const contract = refreshTaskContract(ctx, root);
-                    if (!contract) {
-                        ctx.ui.notify("No task contract is active for this project.", "error");
-
-                        return;
-                    }
-
-                    if (contract.paths.length === 0) {
-                        ctx.ui.notify("The active task contract declares no importable paths.", "error");
-
-                        return;
-                    }
-
-                    const entries = normalizeScopeEntries(root, contract.paths);
-                    setScopeEntries(entries, ctx, { taskDigest: contract.digest });
-                    ctx.ui.notify(
-                        `Scope imported from task ${contract.id.slice(0, 8)}. Existing pending findings were preserved; run /scope status to review them.`,
-                        scope.pending.length > 0 ? "warning" : "info",
-                    );
-
-                    return;
-                }
-
                 if (action === "status") {
-                    const root = await resolveRoot(origin.cwd);
-                    if (!sessionIsCurrent(origin, ctx)) {
-                        return;
-                    }
-
-                    refreshTaskContract(ctx, root);
-                    const taskStale = scope.taskDigest !== undefined && latestTaskContract?.digest !== scope.taskDigest;
                     ctx.ui.notify(
                         scope.active
-                            ? `Scope: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}; pending: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}; snapshot: ${scope.indeterminate ? "indeterminate" : "observed"}; task binding: ${scope.taskDigest ? (taskStale ? "stale" : "current") : "manual"}.`
+                            ? `Scope: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}; pending: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}; snapshot: ${scope.indeterminate ? "indeterminate" : "observed"}.`
                             : "Scope monitoring is inactive.",
-                        scope.pending.length > 0 || scope.indeterminate || taskStale ? "warning" : "info",
+                        scope.pending.length > 0 || scope.indeterminate ? "warning" : "info",
                     );
 
                     return;
                 }
 
                 if (action === "clear") {
-                    const root = await resolveRoot(origin.cwd);
-                    if (!sessionIsCurrent(origin, ctx)) {
-                        return;
-                    }
-
-                    scope = emptyScope(root);
+                    scope = emptyScope(await resolveRoot(ctx.cwd));
                     scope.generation += 1;
                     // Nothing is observed while scope is off, so the cached baseline is stale the moment it is cleared;
                     // reactivating later must start from a fresh snapshot rather than blame the unmonitored gap on the
@@ -1218,7 +550,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                         .map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`)
                         .join("\n");
                     const edited = await ctx.ui.editor("Scope paths — one project-relative path per line", initial);
-                    if (!sessionIsCurrent(origin, ctx) || edited === undefined) {
+                    if (edited === undefined) {
                         return;
                     }
 
@@ -1250,10 +582,6 @@ export default function workflowControls(pi: ExtensionAPI) {
                     // side effect of the next successful comparison. Re-baselining here is that act.
                     latestSnapshot = undefined;
                     const rebaselined = await takeSnapshot();
-                    if (!sessionIsCurrent(origin, ctx)) {
-                        return;
-                    }
-
                     scope.indeterminate = Boolean(rebaselined?.indeterminate);
                     scope.generation += 1;
                     persistScope(ctx);
@@ -1302,8 +630,6 @@ export default function workflowControls(pi: ExtensionAPI) {
                     const deactivated = scope.entries.length === 0;
                     if (deactivated) {
                         scope = emptyScope(scope.root);
-                    } else {
-                        scope.taskDigest = undefined;
                     }
 
                     scope.generation += 1;
@@ -1359,7 +685,6 @@ export default function workflowControls(pi: ExtensionAPI) {
                 }
 
                 scope.active = true;
-                scope.taskDigest = undefined;
                 scope.pending = scope.pending.filter((item) => !scopeMatches([normalized], item));
                 scope.generation += 1;
                 persistScope(ctx);
@@ -1414,8 +739,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                         }
                     }
 
-                    const currentTask = refreshTaskContract(ctx, repository.repoRoot);
-                    const template = experimentCardEditorText(currentTask, query);
+                    const template = `Name: ${query}\nHypothesis: \nAcceptance: \nNon-goals:\n- `;
                     const edited = await ctx.ui.editor("Experiment card", template);
                     if (edited === undefined) {
                         return;
@@ -1627,8 +951,7 @@ export default function workflowControls(pi: ExtensionAPI) {
             requirements: Type.Array(
                 Type.Object(
                     {
-                        id: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
-                        requirement: Type.Optional(Type.String({ minLength: 1, maxLength: 360 })),
+                        requirement: Type.String({ minLength: 1, maxLength: 360 }),
                         status: StringEnum(["proven", "partial", "unproven"] as const),
                         evidence: Type.String({ maxLength: 600 }),
                     },
@@ -1642,7 +965,6 @@ export default function workflowControls(pi: ExtensionAPI) {
             validationGaps: Type.Array(Type.String({ minLength: 1, maxLength: 360 }), { maxItems: 12 }),
             residualRisks: Type.Array(Type.String({ minLength: 1, maxLength: 360 }), { maxItems: 12 }),
             nextAction: Type.String({ maxLength: 500 }),
-            taskContractDigest: Type.Optional(Type.String({ minLength: 64, maxLength: 64 })),
         },
         { additionalProperties: false },
     );
@@ -1664,26 +986,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                 throw new Error("No matching completion challenge is active in this session");
             }
 
-            let currentTask;
-            try {
-                currentTask = readCurrentTaskContract(ctx, activeChallenge.root);
-            } catch {
-                invalidateChallenge(ctx, "task contract could not be revalidated");
-
-                throw new Error("Task contract could not be revalidated for this challenge");
-            }
-
-            if (currentTask?.digest !== activeChallenge.taskContractDigest) {
-                invalidateChallenge(ctx, "task contract changed during challenge");
-
-                throw new Error("No matching completion challenge is active for the current task contract");
-            }
-
-            const result = validateChallengeSubmission(params, {
-                ...activeChallenge.facts,
-                challengeGeneration: activeChallenge.generation,
-                taskContractDigest: activeChallenge.taskContractDigest,
-            });
+            const result = validateChallengeSubmission(params, activeChallenge.facts);
             const data: ChallengeEntryData = {
                 kind: "result",
                 generation: activeChallenge.generation,
@@ -1695,7 +998,6 @@ export default function workflowControls(pi: ExtensionAPI) {
             pi.appendEntry(CHALLENGE_ENTRY, data);
             latestChallenge = data;
             activeChallenge = undefined;
-            emitScopeStatus(ctx, { taskReviewChanged: true });
 
             return {
                 content: [{ type: "text", text: data.markdown }],
@@ -1712,26 +1014,8 @@ export default function workflowControls(pi: ExtensionAPI) {
                 .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
                 .map((value) => ({ value, label: value })),
         handler: async (args, ctx) => {
-            const origin = captureSession(ctx);
             const action = args.trim().toLowerCase();
             if (action === "status") {
-                try {
-                    const root = await resolveRoot(origin.cwd);
-                    if (!sessionIsCurrent(origin, ctx)) {
-                        return;
-                    }
-
-                    refreshTaskContract(ctx, root);
-                } catch (error) {
-                    if (!sessionIsCurrent(origin, ctx)) {
-                        return;
-                    }
-
-                    ctx.ui.notify(`Task contract unavailable: ${safeMessage(error)}`, "error");
-
-                    return;
-                }
-
                 if (!latestChallenge) {
                     ctx.ui.notify("No completed challenge exists on this session branch.", "info");
                 } else if (supportsEntryRenderer) {
@@ -1777,49 +1061,20 @@ export default function workflowControls(pi: ExtensionAPI) {
             }
 
             let snapshot;
-            let challengeRoot: string | undefined;
-            let challengeTask;
-            let challengeTaskScopeStale = scope.taskDigest !== undefined;
             try {
-                const root = await resolveRoot(origin.cwd);
-                if (!sessionIsCurrent(origin, ctx)) {
-                    return;
-                }
-
-                challengeRoot = root;
-                challengeTask = refreshTaskContract(ctx, root);
-                challengeTaskScopeStale = scope.taskDigest !== undefined && challengeTask?.digest !== scope.taskDigest;
-            } catch (error) {
-                if (!sessionIsCurrent(origin, ctx)) {
-                    return;
-                }
-
-                ctx.ui.notify(`Task contract unavailable: ${safeMessage(error)}. Challenge was not started.`, "error");
-
-                return;
-            }
-
-            try {
+                const root = await resolveRoot(ctx.cwd);
                 const status = await pi.exec("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
-                    cwd: challengeRoot,
+                    cwd: root,
                     timeout: 30_000,
                 });
-                if (!sessionIsCurrent(origin, ctx)) {
-                    return;
-                }
-
-                snapshot = status.code === 0 ? createWorktreeSnapshot(challengeRoot, status.stdout) : undefined;
+                snapshot = status.code === 0 ? createWorktreeSnapshot(root, status.stdout) : undefined;
             } catch {
                 snapshot = undefined;
             }
 
-            if (!sessionIsCurrent(origin, ctx)) {
-                return;
-            }
-
             let experiment;
             try {
-                experiment = findExperiment(stateDir, "", origin.cwd);
+                experiment = findExperiment(stateDir, "", ctx.cwd);
             } catch {
                 experiment = undefined;
             }
@@ -1827,23 +1082,18 @@ export default function workflowControls(pi: ExtensionAPI) {
             const facts = boundedChallengeFacts({
                 changedPaths: snapshot?.paths ?? [],
                 scopeEntries: scope.active
-                    ? scope.entries.map((item) => `${item.path}${item.directory ? "/" : ""}`)
+                    ? scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`)
                     : [],
-                pendingScope: scope.active ? scope.pending : [],
+                pendingScope: scope.active ? scope.pending.map(sanitizePathLabel) : [],
                 experiment,
                 observedToolFailures,
-                snapshotIndeterminate: scope.indeterminate || !snapshot || snapshot.indeterminate,
-                taskContract: challengeTask,
-                taskContractDigest: challengeTask?.digest,
-                scopeTaskStale: challengeTaskScopeStale,
+                snapshotIndeterminate: !snapshot || snapshot.indeterminate,
             });
             const generation = randomUUID();
             const prompt = challengePrompt(generation, facts);
             activeChallenge = {
                 generation,
-                sessionId: origin.sessionId,
-                root: challengeRoot ?? scope.root,
-                taskContractDigest: facts.taskContractDigest,
+                sessionId: ctx.sessionManager.getSessionId(),
                 facts,
                 prompt,
                 delivered: false,
@@ -1867,32 +1117,6 @@ export default function workflowControls(pi: ExtensionAPI) {
     });
 
     if (supportsEntryRenderer) {
-        pi.registerEntryRenderer<TaskContractEntryData>(TASK_CONTRACT_ENTRY, (entry, _options, theme) => {
-            const data = entry.data;
-            const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
-            if (data?.kind === "set" && data.contract) {
-                try {
-                    box.addChild(new Markdown(renderTaskContract(data.contract), 0, 0, getMarkdownTheme()));
-                } catch (error) {
-                    box.addChild(
-                        new Text(theme.fg("warning", `Task contract unavailable: ${safeMessage(error)}`), 0, 0),
-                    );
-                }
-            } else {
-                box.addChild(new Text(theme.fg("dim", "Task contract cleared"), 0, 0));
-            }
-
-            return box;
-        });
-
-        pi.registerEntryRenderer<TaskHandoffEntryData>(TASK_HANDOFF_ENTRY, (entry, _options, theme) => {
-            const data = entry.data;
-            const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
-            box.addChild(new Markdown(data?.markdown ?? "Task handoff unavailable.", 0, 0, getMarkdownTheme()));
-
-            return box;
-        });
-
         pi.registerEntryRenderer<ChallengeEntryData>(CHALLENGE_ENTRY, (entry, _options, theme) => {
             const data = entry.data;
             const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));

@@ -6,8 +6,6 @@
 - Use project-native commands and dependencies. Do not introduce global tooling when a local script or dependency already exists.
 - Treat plans and model output as context rather than proof. Files, diffs, command output, tests, and runtime behavior are authoritative.
 - Use visible `PLAN.md`, `TODO.md`, `DECISIONS.md`, or `HANDOFF.md` artifacts only when they improve continuity.
-- For material work, an optional `/task` card keeps the original requirement IDs, acceptance checks, expected paths, rollback, and non-goals together. Use it as the shared reference for `/spec`, `/challenge`, and experiments; only the human's `/scope task` command imports its paths into scope monitoring.
-- Preserve the original task requirements in reviews. A changed card invalidates earlier completion evidence; a handoff packet is review context, not permission to implement or launch another agent.
 - Delegate only when fresh context, parallel independent investigation, specialist judgment, or review justifies the overhead.
 - Keep one writer per shared working directory. Use `/experiment` or another isolated worktree for intentional parallel writers, and open the separate session yourself.
 - When `/scope` is active, treat outside-scope findings as pending until the human allows once, acknowledges them with `/scope accept`, expands the declared scope with `/scope add`, or clears it; never describe observed drift as accepted scope, and never assume an acknowledged path was added to the contract.
