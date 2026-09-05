@@ -279,23 +279,23 @@
                     </div>
                     <div class="article-feature-copy">
                         <p class="eyebrow">Architecture decision</p>
-                        <h2 id="reason-title">Single-agent architecture</h2>
+                        <h2 id="reason-title">One writer. Focused delegation.</h2>
                         <p>
-                            An analysis of coordination overhead, context loss, and cost per accepted outcome. Includes
-                            current research, the experimental bounded delegation protocol, and criteria for measuring
-                            its effect on accepted outcomes.
+                            How research shaped the current system: one owner for edits, optional read-only workers, and
+                            evidence the parent must check.
                         </p>
-                        <span class="text-link">Research and evaluation criteria <span aria-hidden="true">↗</span></span
-                        ><span class="article-date">Evidence reviewed 04 Sep 2026 · 10 min read</span>
+                        <span class="text-link"
+                            >Research → decisions → implementation <span aria-hidden="true">↗</span></span
+                        ><span class="article-date">SpecPi v0.12.0 · Architecture decisions</span>
                     </div>
                 </a>
                 <div class="writer-note">
                     <strong>One writer per working directory.</strong>
                     <p>
-                        The default is one agent. Explicitly enabled Pi subagent sessions can review frozen changes or
-                        analyze selected sources. This remains an experiment; the parent owns changes and acceptance.
+                        Use <code>/delegate on</code> for independent review or analysis of selected sources. Workers report
+                        findings; the parent verifies them and makes changes.
                     </p>
-                    <a href="wiki/#delegation">Delegation boundaries <span aria-hidden="true">↗</span></a>
+                    <a href="wiki/#delegation">Use delegation <span aria-hidden="true">↗</span></a>
                 </div>
             </section>
 

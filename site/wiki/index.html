@@ -503,84 +503,44 @@ npm run check</code></pre>
                         <h2 id="delegation-title">Experimental delegation</h2>
                     </header>
                     <p>
-                        Available in v0.12.0 and disabled by default. The native extension loads through
-                        normal Pi package discovery and the existing SpecPi install/update lifecycle. Start
-                        <code>pi</code> normally, then use <code>/delegate on</code> to enable the fixed calls/time
-                        envelope. The parent remains the sole writer.
-                        <strong>Compatibility uses SDK capability checks</strong>, so compatible Pi updates can run
-                        without a SpecPi release. Missing APIs are named in the activation error. The delegation
-                        schema is absent from model requests while off.
+                        Off by default. Enable up to two read-only Pi workers while the parent owns edits and checks
+                        their findings.
                     </p>
+                    <div class="definition-list">
+                        <div><code>review</code><span>Check a frozen artifact against its requirements.</span></div>
+                        <div><code>scout</code><span>Answer a focused question from selected source files.</span></div>
+                    </div>
+                    <p>Start Pi normally after installing SpecPi. Then use:</p>
                     <div class="terminal doc-terminal">
-                        <pre><code>pi
-# Then, in the interactive session:
-/delegate on
+                        <pre><code>/delegate on
 /delegate status
 /delegate limits
 /delegate cancel &lt;batchId&gt;
 /delegate off</code></pre>
                     </div>
                     <p>
-                        Workers are actual SDK <code>AgentSession</code> instances with in-memory storage.
-                        <code>review</code> examines a frozen artifact; <code>scout</code> answers a bounded evidence
-                        question. Both can list, read and search exact selected text files; a review may instead use
-                        nonempty inline context without tools. Scouts require selected files. Children load no ambient
-                        extensions, skills, AGENTS files or parent history, and have no shell, writes, live web or
-                        nested delegation.
+                        The worker panel shows progress; expand tool results to read findings and evidence. Workers
+                        receive only assigned context and can read selected snapshots. They have no shell, writes, live
+                        web access, or nested delegation.
                     </p>
                     <p>
-                        The packet assigns requirements to each job and declares independent review, parallel analysis
-                        or context isolation. Explain the benefit; concurrent parent work is required only for parallel
-                        analysis. These checks constrain structure, not prove useful independence. Each batch has at
-                        most two jobs. The Pi process permits two active workers, four batches and 32 SDK invocations;
-                        each job gets four invocations and 120 seconds including one follow-up. These are experimental
-                        ceilings. Cancelled workers retain slots through SDK-visible stream/result and prompt
-                        settlement. Reloads, session switches and off/on preserve the controller and counters. Task,
-                        scope, model, session, reload or guard changes revoke the current generation; ordinary parent
-                        turns do not. Command Guard is optional: delegation works with Guard absent or Off. Active
-                        Strict approvals and explicit locks still apply. Delegation enforces its own read-only tools
-                        and resource limits.
-                    </p>
-                    <p>
-                        Once enabled, delegation follows the parent's provider, model and thinking level without
-                        another toggle. A change revokes old results and checks the new host before dispatch resumes.
-                        Unsupported selections pause with a reason; a compatible selection resumes automatically.
-                        Quotas and settling slots remain consumed. Explicit <code>/delegate off</code> stays off.
+                        Each job allows four SDK model calls and 120 seconds. The Pi process allows four batches and 32
+                        calls; toggling or reloading does not reset those counters. These limits do not cap provider
+                        charges. Restart Pi after updating SpecPi.
                     </p>
                     <p class="doc-boundary">
-                        <strong>SDK boundary.</strong> Pi runs the model/tool loop; SpecPi admits every SDK invocation
-                        before dispatch and checks SDK-visible streaming. Provider/session retries and compaction are
-                        disabled. SDK events do not establish hard raw-transport, hidden-provider-attempt, invoice or
-                        memory caps, or prove remote execution has ended. Cost is unavailable; missing usage is
-                        explicit. The parent must verify findings. Receipts and parent acceptance do not grant human
-                        authority or prove task completion.
-                    </p>
-                    <p>
-                        A fresh child Pi ModelRuntime uses standard authentication, environment and model definitions.
-                        Transport/thinking budgets use configured global settings without project settings. Parent
-                        model/thinking are explicit with Pi clamping. Runtime-only authentication, selected
-                        extension-provider overrides, model headers, startup proxy configuration and safe descriptor
-                        mismatches fail preflight. Parent hooks, ephemeral settings and session affinity are not
-                        inherited; keep delegation disabled when those controls are required. Parent Pi resources and
-                        trust remain unchanged. Selected context reaches the configured provider, and normal parent tool
-                        results may persist in Pi's session. Snapshot access is a trusted-local-filesystem boundary, not
-                        an OS sandbox. Its canonical working root is fixed for the Pi process; restart Pi to change it
-                        or load a new delegation runtime version.
-                    </p>
-                    <p>
-                        Read the
+                        <strong>Before enabling:</strong> selected context goes to the configured provider. Workers do
+                        not inherit every parent hook or provider setting; unsupported configurations can block
+                        activation. Review the
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
-                            >implementation guide</a
-                        >,
-                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/protocol.md"
-                            >implemented protocol</a
-                        >, and
-                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/research.md"
-                            >research ledger</a
-                        >. Runtime fixtures do not establish quality, cost or speed gains; those require the separate
-                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/evaluation.md"
-                            >outcome evaluation</a
+                            >compatibility and privacy boundaries</a
                         >.
+                    </p>
+                    <p>
+                        See <a href="../single-agent/">why we chose this design</a> and the
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/protocol.md"
+                            >tool protocol</a
+                        >. Quality, speed, and cost gains remain unmeasured.
                     </p>
                 </section>
             </main>

@@ -28,13 +28,11 @@ Version `0.12.0` adds experimental native delegation and a new technical site. T
 
 ## Optional delegation
 
-The native extension creates actual Pi `AgentSession` subagents while the parent remains the sole writer. Use normal `pi` startup and the existing SpecPi install/update lifecycle. Delegation starts disabled, with its tool schema absent from model requests; human `/delegate on` enables the displayed envelope and `/delegate off` revokes outstanding work. Delegation checks required public SDK capabilities rather than an exact Pi version list, so compatible Pi updates do not require a SpecPi release. The installer bootstrap remains pinned to 0.84.4, and runtime validation is recorded separately.
+One agent owns edits and verifies results. Experimental delegation adds up to two read-only Pi workers: `review` checks a frozen artifact; `scout` answers a focused question using selected sources. Workers cannot write, run shell commands, browse the web, or delegate further.
 
-Only `review` of a frozen artifact and `scout` analysis of a bounded evidence question are supported. Both can list, read and search exact selected text snapshots. Children have in-memory sessions and no ambient extensions, skills, AGENTS files, parent history, shell, writes, recursive delegation or live web access. Each receives assigned requirements and fixed constraints. There are at most two active workers, two jobs per batch, four batches and 32 SDK model invocations per Pi process. Reloads, session switches and off/on preserve counters; cancellation holds slots through SDK-visible stream/result and prompt settlement. Restart Pi to change the fixed working root or load a changed delegation runtime.
+Delegation is **off by default**. In Pi, use `/delegate on` to enable it, `/delegate status` to inspect work, and `/delegate off` to revoke it. Research informed the design; SpecPi quality, speed, and cost gains remain unmeasured.
 
-Pi owns the agent loop, authentication and OAuth. A fresh child `ModelRuntime` uses standard environment and `models.json` resolution; child transport/thinking budgets come from configured global settings, without project settings. Parent model/thinking are explicit with Pi clamping. Runtime-only authentication, selected extension-provider overrides, model-specific headers, startup proxy configuration and safe descriptor mismatches fail preflight without changing parent setup. Parent hooks, ephemeral settings and session affinity are not inherited. Each SDK invocation is admitted before dispatch; retries and compaction are disabled. SDK-visible streaming checks do not establish raw-transport, hidden-provider-attempt, invoice or memory caps, or prove remote execution has ended. Cost is unavailable. Research supports testing these purposes; no measured SpecPi quality, cost or speed advantage is claimed.
-
-See the [delegation guide](docs/delegation/README.md), [tool protocol](docs/delegation/protocol.md), [research](docs/delegation/research.md), and [evaluation plan](docs/delegation/evaluation.md) for setup, examples, boundaries and evidence.
+See [setup and limits](docs/delegation/README.md) or [how the research shaped the architecture](https://tannermidd.github.io/SpecPi/single-agent/).
 
 ## Install
 

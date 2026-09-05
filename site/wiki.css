@@ -281,6 +281,151 @@
     background: var(--surface-raised);
     font-size: 0.95rem;
 }
+.architecture-page .article-heading {
+    padding-bottom: 2rem;
+}
+.architecture-page .article-body {
+    max-width: none;
+    font-size: 1rem;
+    line-height: 1.7;
+    padding-bottom: 3rem;
+}
+.architecture-page .article-body h2 {
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+}
+.architecture-page .article-body section > p {
+    max-width: 52rem;
+}
+.decision-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    text-align: left;
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+}
+.decision-table caption {
+    text-align: left;
+    font: 0.75rem/1.6 var(--mono);
+    color: var(--muted);
+    padding-bottom: 0.75rem;
+}
+.decision-table th,
+.decision-table td {
+    vertical-align: top;
+    border-block: 1px solid var(--line);
+    padding: 1.25rem;
+    font-weight: 400;
+}
+.decision-table thead {
+    background: var(--surface-raised);
+    font: 0.75rem/1.6 var(--mono);
+}
+.decision-table th:first-child {
+    width: 34%;
+}
+.decision-table th:nth-child(2) {
+    width: 28%;
+}
+.decision-table tbody th a {
+    font-weight: 600;
+}
+.decision-table tbody p {
+    margin: 0.5rem 0 0;
+}
+.delegation-flow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--line);
+    background: var(--surface-raised);
+}
+.article-body .delegation-flow li {
+    margin: 0;
+    padding: 1.25rem;
+}
+.delegation-flow li + li {
+    border-left: 1px solid var(--line);
+}
+.delegation-flow span,
+.delegation-flow strong {
+    display: block;
+}
+.delegation-flow span {
+    font: 0.75rem/1.6 var(--mono);
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+}
+.delegation-flow p {
+    font-size: 0.9rem;
+    margin-bottom: 0;
+}
+.research-appendix {
+    border-block: 1px solid var(--line);
+    margin: 0 0 2rem;
+    padding: 1.25rem 0;
+}
+.research-appendix > summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+.research-appendix > summary span {
+    font: 0.75rem/1.6 var(--mono);
+    color: var(--muted);
+    margin-left: 1rem;
+}
+@media (max-width: 700px) {
+    .decision-table caption {
+        display: block;
+    }
+    .decision-table,
+    .decision-table tbody,
+    .decision-table tr,
+    .decision-table th,
+    .decision-table td {
+        display: block;
+        width: auto;
+    }
+    .decision-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+    .decision-table tr {
+        border-top: 1px solid var(--line);
+        padding: 1rem 0;
+    }
+    .decision-table tbody th:first-child,
+    .decision-table td {
+        width: auto;
+        border: 0;
+        padding: 0.5rem 0;
+    }
+    .decision-table td::before {
+        display: block;
+        font: 0.7rem/1.6 var(--mono);
+        color: var(--muted);
+        margin-bottom: 0.4rem;
+    }
+    .decision-table td:nth-child(2)::before {
+        content: "Our decision";
+    }
+    .decision-table td:nth-child(3)::before {
+        content: "In the current system";
+    }
+    .delegation-flow {
+        grid-template-columns: 1fr;
+    }
+    .delegation-flow li + li {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+    }
+}
 .cost-model {
     margin: 2rem 0;
     padding: 1.5rem 2rem;
