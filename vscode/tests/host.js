@@ -114,6 +114,15 @@ async function run() {
         );
         checks.push("streaming, tool activity, and owned-session retention");
 
+        const previousClient = controller.client;
+        const previousSessionId = controller.activeSessionId;
+        await vscode.commands.executeCommand("specpi.chat.restart");
+        assert.equal(controller.state.status, "ready", controller.state.error);
+        assert.notEqual(controller.client, previousClient);
+        assert.equal(controller.activeSessionId, previousSessionId);
+        assert.ok(controller.state.messages.some((message) => message.text.includes("Fixture response complete")));
+        checks.push("Restart Pi command reconnects and resumes the selected conversation");
+
         const imageFile = vscode.Uri.joinPath(workspace, "fixture image.png");
         fs.writeFileSync(imageFile.fsPath, Buffer.from(PNG_DATA, "base64"));
         await controller.attachImage(imageFile);

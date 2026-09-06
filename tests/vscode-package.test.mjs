@@ -104,10 +104,20 @@ test("SpecPi Chat manifest provides a trusted native sidebar and application-onl
         "settings",
         "connect",
         "disconnect",
+        "restart",
         "chooseWorkspace",
     ]) {
         assert.ok(commands.includes(`specpi.chat.${command}`));
     }
+
+    assert.ok(
+        manifest.contributes.menus["view/title"].some(
+            (item) =>
+                item.command === "specpi.chat.restart" &&
+                item.when === "view == specpi.chat" &&
+                item.group.startsWith("navigation@"),
+        ),
+    );
 });
 
 test("Chat release docs and Pages install examples name the actual VSIX and CI checks its rendering", () => {

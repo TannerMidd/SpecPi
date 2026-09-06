@@ -2,7 +2,7 @@
     "name": "specpi-chat",
     "displayName": "SpecPi Chat",
     "description": "A native VS Code chat sidebar for your local Pi agent and SpecPi harness.",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "publisher": "tannermidd",
     "private": true,
     "preview": true,
@@ -153,6 +153,12 @@
                 "icon": "$(plug)"
             },
             {
+                "command": "specpi.chat.restart",
+                "title": "Restart Pi",
+                "category": "SpecPi",
+                "icon": "$(refresh)"
+            },
+            {
                 "command": "specpi.chat.disconnect",
                 "title": "Disconnect Pi",
                 "category": "SpecPi",
@@ -204,9 +210,14 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "specpi.chat.settings",
+                    "command": "specpi.chat.restart",
                     "when": "view == specpi.chat",
                     "group": "navigation@3"
+                },
+                {
+                    "command": "specpi.chat.settings",
+                    "when": "view == specpi.chat",
+                    "group": "navigation@4"
                 }
             ]
         },

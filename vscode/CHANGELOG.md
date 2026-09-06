@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.3.5
+
+- Add Restart Pi to the Chat title bar and Command Palette to reconnect the selected conversation and reload its Pi extensions while other chats keep running.
+
 ## 0.3.4
 
 - Include the SpecPi logo as a 256×256 PNG and declare it in the extension and VSIX manifests so Marketplace and VS Code display the logo.

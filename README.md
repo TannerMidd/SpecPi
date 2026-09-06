@@ -62,6 +62,8 @@ Chat beside your code, attach files, and switch conversations.
 
 In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
 
+Chat 0.3.5 adds **Restart Pi** in the Chat title bar and Command Palette to reconnect the selected conversation and reload its Pi extensions. Other conversations keep running.
+
 ## Go further
 
 [Commands](https://tannermidd.github.io/SpecPi/wiki/#reference) · [Chat help](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) · [Development](https://tannermidd.github.io/SpecPi/wiki/#development) · [Security](SECURITY_MODEL.md) · [Release notes](CHANGELOG.md)

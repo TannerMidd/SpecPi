@@ -654,6 +654,10 @@ class ConversationCoordinator {
         return this.active.disconnect();
     }
 
+    restart() {
+        return this.active.restart();
+    }
+
     stop() {
         return this.active.stop();
     }
