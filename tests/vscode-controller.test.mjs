@@ -901,6 +901,62 @@ test("stop remains responsive while a prompt is waiting for extension input", as
     assert.equal(controller.client, client);
 });
 
+test("usage plugin status updates remain per-connection, clear on disconnect, and ignore obsolete clients", async (t) => {
+    const { controller, client } = await connected(t);
+    const requestCount = client.requests.length;
+    const update = (key, text) =>
+        client.emit("event", { type: "extension_ui_request", method: "setStatus", statusKey: key, statusText: text });
+    update("aa-codex-usage", "\u001b[36mcodex\u001b[0m ▀▀▀▄▄ 4d");
+    update("provider-usage", "claude 25% 5h 40% 7d");
+    assert.match(controller.state.runtimeStatus["aa-codex-usage"], /codex/u);
+    assert.equal(controller.state.runtimeStatus["provider-usage"], "claude 25% 5h 40% 7d");
+    update("provider-usage", undefined);
+    assert.equal(Object.hasOwn(controller.state.runtimeStatus, "provider-usage"), false);
+    assert.equal(client.requests.length, requestCount, "Status display must not query providers or issue RPC commands");
+    await controller.disconnect();
+    assert.deepEqual(controller.state.runtimeStatus, {});
+    update("provider-usage", "obsolete report");
+    assert.deepEqual(controller.state.runtimeStatus, {});
+    await controller.connect();
+    assert.deepEqual(controller.state.runtimeStatus, {});
+    update("aa-codex-usage", "obsolete report after reconnect");
+    assert.deepEqual(controller.state.runtimeStatus, {});
+    controller.client.emit("event", {
+        type: "extension_ui_request",
+        method: "setStatus",
+        statusKey: "provider-usage",
+        statusText: "checking",
+    });
+    assert.equal(controller.state.runtimeStatus["provider-usage"], "checking");
+    controller.client.emit("exit", 1);
+    assert.deepEqual(controller.state.runtimeStatus, {});
+});
+
+test("usage plugins retain two bounded slots when generic runtime status is full", async (t) => {
+    const { controller, client } = await connected(t);
+    const update = (key, value) =>
+        client.emit("event", { type: "extension_ui_request", method: "setStatus", statusKey: key, statusText: value });
+    for (let index = 0; index < 40; index += 1) {
+        update(`generic-${index}`, "Generic status");
+    }
+
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 24);
+    update("aa-codex-usage", "codex 75%");
+    update("provider-usage", "claude 25% 5h");
+    assert.equal(controller.state.runtimeStatus["aa-codex-usage"], "codex 75%");
+    assert.equal(controller.state.runtimeStatus["provider-usage"], "claude 25% 5h");
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 26);
+    update("generic-overflow", "Not admitted");
+    update("provider-usage", "checking");
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 26);
+    assert.equal(controller.state.runtimeStatus["provider-usage"], "checking");
+    update("aa-codex-usage", undefined);
+    update("provider-usage", undefined);
+    update("generic-overflow", "Still not admitted");
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 24);
+    assert.equal(Object.hasOwn(controller.state.runtimeStatus, "generic-overflow"), false);
+});
+
 test("malformed runtime status and widget payloads cannot break event handling or expose nested data", async (t) => {
     const { controller, client, posted } = await connected(t);
     const secret = "SYNTHETIC-NESTED-STATUS-DATA";

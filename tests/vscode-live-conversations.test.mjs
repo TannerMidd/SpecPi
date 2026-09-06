@@ -270,6 +270,42 @@ test("history and new chat do not launch Pi; switching preserves live runtime, a
     assert.equal(nativeDialogs.length, 0);
 });
 
+test("live usage reports stay with their conversation across switching and selected-only disconnect", async (t) => {
+    const { coordinator } = fixture(t);
+    await coordinator.connect();
+    const first = coordinator.active;
+    const firstId = coordinator.activeId;
+    first.client.emit("event", {
+        type: "extension_ui_request",
+        method: "setStatus",
+        statusKey: "aa-codex-usage",
+        statusText: "codex 75%",
+    });
+    await coordinator.newChat();
+    await coordinator.connect();
+    const second = coordinator.active;
+    const secondId = coordinator.activeId;
+    second.client.emit("event", {
+        type: "extension_ui_request",
+        method: "setStatus",
+        statusKey: "provider-usage",
+        statusText: "claude 25% 5h",
+    });
+    first.client.emit("event", {
+        type: "extension_ui_request",
+        method: "setStatus",
+        statusKey: "aa-codex-usage",
+        statusText: "codex 70%",
+    });
+    assert.deepEqual(coordinator.state.runtimeStatus, { "provider-usage": "claude 25% 5h" });
+    await coordinator.selectConversation(firstId);
+    assert.deepEqual(coordinator.state.runtimeStatus, { "aa-codex-usage": "codex 70%" });
+    await coordinator.disconnect();
+    assert.deepEqual(coordinator.state.runtimeStatus, {});
+    await coordinator.selectConversation(secondId);
+    assert.deepEqual(coordinator.state.runtimeStatus, { "provider-usage": "claude 25% 5h" });
+});
+
 test("drafts, selection, send mode and delayed failures belong to their original conversation", async (t) => {
     const pending = deferred();
     const { coordinator, posted } = fixture(t, {

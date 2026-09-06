@@ -21,6 +21,8 @@
 #token-status[role="button"] { cursor: pointer; border-radius: 3px; }
 #token-status[aria-disabled="true"] { cursor: default; }
 #token-status[role="button"]:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+.extras-menu-item, .extras-search-input, .extras-search-count, .extras-mention-option,
+.extras-mention-notice, .extras-recovered-title, .extras-recovered-label { font-size: var(--chat-small-font-size); }
 @media (max-width: 340px) {
     .topbar .brand-chat { display: none; }
 }

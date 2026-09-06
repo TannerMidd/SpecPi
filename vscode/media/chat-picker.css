@@ -52,6 +52,11 @@
 .history-more { width: 100%; margin: 5px 0; }
 .history-footer { display: flex; flex: 0 0 auto; justify-content: space-between; gap: 7px; padding: 9px 5px 0; color: var(--muted); font-size: 9px; }
 .history-keyboard-hint { white-space: nowrap; }
+.history-heading, .history-search, .history-title, .history-rename-input,
+.history-empty-title { font-size: var(--chat-font-size); }
+.history-tab, .history-group, .history-row-detail, .history-time, .history-save-button,
+.history-text-button, .history-feedback, .history-empty-detail, .history-footer { font-size: var(--chat-small-font-size); }
+.history-title, .history-row-detail { line-height: 1.5; }
 @media (max-width: 330px) {
     .history-panel { right: 7px; width: calc(100vw - 14px); padding: 8px; }
     .history-keyboard-hint { display: none; }

@@ -18,6 +18,7 @@ const PREFIX = "specpi.chat";
 const MAX_INPUT = 64 * 1024;
 const DIALOG_METHODS = new Set(["select", "confirm", "input", "editor"]);
 const ACTIVE_STATUSES = new Set(["busy", "retrying", "compacting"]);
+const USAGE_STATUS_KEYS = new Set(["aa-codex-usage", "provider-usage"]);
 
 class ChatController {
     constructor(context, options = {}) {
@@ -243,6 +244,7 @@ class ChatController {
         const cwd = this.requireWorkspace();
         resetRunState(this.state);
         this.state.status = "connecting";
+        this.state.runtimeStatus = {};
         this.state.error = undefined;
         this.state.connectionMessage = "Starting Pi and loading its extensions. This can take up to 90 seconds.";
         this.publish();
@@ -342,6 +344,7 @@ class ChatController {
                     this.cancelDialogs();
                     resetRunState(this.state);
                     this.state.status = "error";
+                    this.state.runtimeStatus = {};
                     this.state.error =
                         "Pi stopped. Reconnect to resume this chat. Check Pi and provider setup in a terminal if this repeats.";
                     this.publish();
@@ -541,6 +544,7 @@ class ChatController {
         this.imageQueue.clear();
         resetRunState(this.state);
         this.state.status = "disconnected";
+        this.state.runtimeStatus = {};
         this.state.connectionMessage = undefined;
         this.state.queueCount = 0;
         this.publish();
@@ -1319,7 +1323,12 @@ class ChatController {
         } else if (request.method === "setStatus" || request.method === "setWidget") {
             this.state.runtimeStatus = this.state.runtimeStatus || {};
             const key = String(request.statusKey || request.widgetKey || "Pi").slice(0, 80);
-            if (Object.keys(this.state.runtimeStatus).length < 24 || Object.hasOwn(this.state.runtimeStatus, key)) {
+            // Reserve the two known usage keys so generic widgets cannot crowd
+            // them out. The total remains bounded to 24 generic + 2 usage keys.
+            const genericCount = Object.keys(this.state.runtimeStatus).filter(
+                (name) => !USAGE_STATUS_KEYS.has(name),
+            ).length;
+            if (USAGE_STATUS_KEYS.has(key) || genericCount < 24 || Object.hasOwn(this.state.runtimeStatus, key)) {
                 const value =
                     typeof request.statusText === "string"
                         ? request.statusText

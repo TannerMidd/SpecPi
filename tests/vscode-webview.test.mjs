@@ -7,7 +7,14 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const { getWebviewHtml } = require("../vscode/src/webview.js");
-const { safeHref, imageSource, parseMarkdown, inlineTokens } = require("../vscode/media/chat.js");
+const {
+    safeHref,
+    imageSource,
+    parseMarkdown,
+    inlineTokens,
+    runtimeText,
+    providerUsageEntries,
+} = require("../vscode/media/chat.js");
 
 const webviewOptions = {
     cspSource: "https://specpi-test.vscode-cdn.net",
@@ -32,6 +39,36 @@ function decodeAttribute(value) {
         .replaceAll("&gt;", ">")
         .replaceAll("&amp;", "&");
 }
+
+test("provider usage projects only known plugin status strings without inventing quota semantics", () => {
+    const status = {
+        "aa-codex-usage": "\u001b[36mcodex\u001b[0m ▀▀▀▄▄▄▄ 4d",
+        "provider-usage": "claude 25% 5h · 40% 7d (3m old)",
+        "some-other-plugin": "must stay in generic runtime status",
+    };
+    const entries = providerUsageEntries(status);
+    assert.deepEqual(
+        entries.map(({ source, text }) => [source, text]),
+        [
+            ["@llblab/pi-codex-usage", "codex ▀▀▀▄▄▄▄ 4d"],
+            ["@sreetej510/pi-usage", status["provider-usage"]],
+        ],
+    );
+    for (const value of [undefined, null, {}, false, 12, "", "\u001b[0m", { token: "SYNTHETIC-PRIVATE" }]) {
+        assert.deepEqual(providerUsageEntries({ "provider-usage": value }), []);
+    }
+
+    assert.deepEqual(providerUsageEntries(Object.create(status)), []);
+    assert.equal(
+        providerUsageEntries({ "provider-usage": "usage rate-limited (3m)" })[0].text,
+        "usage rate-limited (3m)",
+    );
+    assert.equal(providerUsageEntries({ "provider-usage": "checking" })[0].text, "checking");
+    assert.equal(providerUsageEntries({ "aa-codex-usage": "codex n/a" })[0].text, "codex n/a");
+    assert.equal(runtimeText("x".repeat(5000)).length, 4000);
+    assert.equal(runtimeText("\u001b]8;;https://example.invalid/\u0007text\u001b]8;;\u0007\u202e\u0000"), "text");
+    assert.equal(runtimeText("\u009b31mred\u009b0m\nnext"), "red\nnext");
+});
 
 test("chat webview denies content by default and authorizes only its nonce-bearing local scripts", () => {
     const html = getWebviewHtml(webviewOptions);

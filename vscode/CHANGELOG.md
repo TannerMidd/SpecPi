@@ -2,6 +2,8 @@
 
 ## 0.3.1
 
+- Increase chat/composer text to a 14px minimum, limits/code to 13px, and secondary labels to 12px. Respect larger host font sizes and let footer controls wrap rather than overlap in narrow sidebars.
+- Add a compact, expandable provider Limits row for installed Codex Usage and pi-usage plugins (including Anthropic). Preserve plugin-reported semantics, strip terminal controls, isolate live conversation updates, and clear obsolete connection reports without adding provider queries or packages.
 - Expand thinking blocks by default while preserving manual collapse/expand choices during streaming; tool blocks remain collapsed by default.
 - Fix `/model` selection while retaining the composer send lock and rejecting overlapping prompts or stale picker results.
 - Allow read-only usage details during active responses, retries, compaction, and queued sends, without querying a connection before readiness.

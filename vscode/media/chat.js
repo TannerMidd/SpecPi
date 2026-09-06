@@ -349,8 +349,45 @@
         return blocks;
     }
 
+    // Pi emits plugin-formatted text, not normalized quota data. Keep sources
+    // separate: Codex's remaining-budget bar and pi-usage's used percentages
+    // are not interchangeable. See the compatibility versions in THIRD_PARTY.md.
+    const USAGE_PLUGINS = [
+        { key: "aa-codex-usage", label: "Codex", source: "@llblab/pi-codex-usage" },
+        { key: "provider-usage", label: "Provider usage", source: "@sreetej510/pi-usage" },
+    ];
+
+    function runtimeText(value) {
+        if (typeof value !== "string") {
+            return "";
+        }
+
+        return value
+            .slice(0, 4000)
+            .replace(/(?:\u001b\]|\u009d)[^\u0007\u001b\u009c]*(?:\u0007|\u001b\\|\u009c|$)/gu, "")
+            .replace(/(?:\u001b\[|\u009b)[0-?]*[ -/]*[@-~]/gu, "")
+            .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, "")
+            .trim();
+    }
+
+    function providerUsageEntries(status) {
+        return USAGE_PLUGINS.flatMap((plugin) => {
+            const text = status && Object.hasOwn(status, plugin.key) ? runtimeText(status[plugin.key]) : "";
+
+            return text ? [{ ...plugin, text }] : [];
+        });
+    }
+
     if (typeof module !== "undefined" && module.exports) {
-        module.exports = { safeHref, isCodeReference, parseMarkdown, inlineTokens, imageSource };
+        module.exports = {
+            safeHref,
+            isCodeReference,
+            parseMarkdown,
+            inlineTokens,
+            imageSource,
+            runtimeText,
+            providerUsageEntries,
+        };
     }
 
     if (typeof window === "undefined" || typeof document === "undefined" || typeof acquireVsCodeApi !== "function") {
@@ -1351,17 +1388,38 @@
     }
 
     function renderRuntimeStatus() {
-        const entries = Object.entries(state.runtimeStatus || {}).filter(([, value]) => typeof value === "string");
-        const signature = JSON.stringify(entries);
+        const connected = ["connecting", "ready", "busy", "retrying", "compacting"].includes(state.status);
+        const usage = connected ? providerUsageEntries(state.runtimeStatus) : [];
+        const entries = Object.entries(state.runtimeStatus || {}).filter(
+            ([key, value]) => typeof value === "string" && !USAGE_PLUGINS.some((plugin) => plugin.key === key),
+        );
+        const signature = JSON.stringify([entries, usage]);
         if (signature === runtimeSignature) {
             return;
         }
 
         runtimeSignature = signature;
+        const usageDetails = byId("provider-usage");
+        usageDetails.hidden = !usage.length;
+        if (!usage.length) {
+            usageDetails.open = false;
+        }
+
+        const summary = byId("provider-usage-summary");
+        const values = byId("provider-usage-values");
+        summary.replaceChildren();
+        values.replaceChildren();
+        for (const entry of usage) {
+            const value = element("span", "provider-usage-value", entry.text);
+            value.title = `${entry.source}: ${entry.text}`;
+            summary.append(value);
+            values.append(element("dt", "", `${entry.label} · ${entry.source}`), element("dd", "", entry.text));
+        }
+
         const container = byId("runtime-values");
         container.replaceChildren();
         for (const [key, value] of entries) {
-            const plainValue = value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+            const plainValue = runtimeText(value);
             container.append(element("dt", "", key), element("dd", "", plainValue));
         }
 

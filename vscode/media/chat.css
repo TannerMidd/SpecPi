@@ -14,12 +14,15 @@
     --input: var(--vscode-input-background, #202329);
     --error: var(--vscode-errorForeground, #f38d90);
     --mono: var(--vscode-editor-font-family, ui-monospace, monospace);
+    --chat-font-size: max(14px, var(--vscode-font-size, 13px));
+    --chat-small-font-size: max(12px, calc(var(--chat-font-size) - 2px));
+    --chat-reading-font-size: max(13px, calc(var(--chat-font-size) - 1px));
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
-body { background: var(--surface); color: var(--text); font: var(--vscode-font-size, 13px)/1.5 var(--vscode-font-family, system-ui, sans-serif); }
+body { background: var(--surface); color: var(--text); font: var(--chat-font-size)/1.5 var(--vscode-font-family, system-ui, sans-serif); }
 button, select, input, textarea { font: inherit; }
 button, select { cursor: pointer; }
 button { color: inherit; }
@@ -188,6 +191,19 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .error-actions { display: flex; gap: 10px; margin-top: 5px; }
 .text-button { padding: 2px 0; font-size: 10px; color: var(--accent); background: transparent; text-align: left; border-radius: 3px; }
 .queue-notice { font-size: 10px; padding: 1px 2px 8px; color: var(--muted); }
+.provider-usage { width: 100%; max-width: 850px; margin: 0 auto 5px; font-size: 10px; color: var(--muted); }
+.provider-usage summary { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 2px; cursor: pointer; border-radius: 3px; list-style: none; }
+.provider-usage summary::-webkit-details-marker { display: none; }
+.provider-usage summary::before { content: "›"; flex: 0 0 auto; font-size: 13px; }
+.provider-usage[open] summary::before { transform: rotate(90deg); }
+.provider-usage-label { flex: 0 0 auto; color: var(--text); }
+#provider-usage-summary { display: flex; flex: 1; min-width: 0; gap: 8px; }
+.provider-usage-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.provider-usage-details { max-height: 170px; overflow: auto; padding: 7px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface-raised); }
+.provider-usage-details dl { margin: 0; }
+.provider-usage-details dt { color: var(--text); overflow-wrap: anywhere; }
+.provider-usage-details dd { margin: 3px 0 9px; font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.provider-usage-details p { margin: 6px 0 0; overflow-wrap: anywhere; }
 .runtime-details { color: var(--muted); font-size: 10px; margin: 0 2px 8px; }
 .runtime-details summary { cursor: pointer; }
 .runtime-details dl { margin: 7px 0 0; padding: 7px 8px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 4px; max-height: 170px; overflow: auto; }
@@ -246,3 +262,26 @@ body.vscode-high-contrast, body.vscode-high-contrast-light { --border: var(--vsc
 body.vscode-high-contrast .icon-button, body.vscode-high-contrast-light .icon-button { border: 1px solid transparent; }
 body.vscode-high-contrast .icon-button:hover, body.vscode-high-contrast-light .icon-button:hover { border-color: var(--focus); }
 body.vscode-high-contrast .message-copy, body.vscode-high-contrast-light .message-copy { opacity: 1; }
+
+/* Shared readable type scale; retain compact spacing rather than shrinking text. */
+.markdown, #composer-input, .welcome-description, .primary-button, .suggestion-title,
+.request-input, .ui-request h2, .image-preview-header h2, .image-drop-target { font-size: var(--chat-font-size); }
+.workspace-bar, .workspace-runtime, .session-bar h1, .connection-pill,
+.connection-progress-heading, .connection-banner p, .eyebrow, .connect-note,
+.suggestion-detail, .message-header, .message-avatar, .message-author, .message-copy,
+.message-notice, .code-header, .code-copy, .markdown table, .reasoning summary,
+.tool-card summary, .tool-state, .tool-section-label, .activity, #activity-elapsed,
+.jump-button, .compact-select, .composer-hint, .stop-button, .session-footer, #token-status,
+.attachment, .attachment-image .attachment-label, .image-unavailable, .attach-menu button,
+.attach-menu p, .image-feedback, .vision-warning, .image-preview-meta, .error-banner p,
+.text-button, .queue-notice, .slash-name, .slash-description, .request-option,
+.request-actions .primary-button { font-size: var(--chat-small-font-size); }
+.provider-usage, .runtime-details, .runtime-details dt, .reasoning-content,
+.code-block pre code, .tool-output, .tool-input, .request-message { font-size: var(--chat-reading-font-size); }
+.markdown h2 { font-size: 19px; }
+.markdown h3 { font-size: 17px; }
+.markdown h4, .markdown h5, .markdown h6 { font-size: 15px; }
+.session-footer { height: auto; min-height: 32px; flex-wrap: wrap; row-gap: 4px; }
+.footer-status { flex-basis: 92px; }
+.stop-button { height: 28px; margin-left: auto; }
+#token-status { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

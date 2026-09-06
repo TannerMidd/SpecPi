@@ -227,6 +227,19 @@ test(
                 false,
             );
             await notification("/guard status", /^Mode: guard;/u);
+            for (const suffix of ["", " clear"]) {
+                const cursor = rpc.events.length;
+                await notification(`/rpc-usage-probe${suffix}`, /^Synthetic provider usage report/u);
+                const statuses = rpc.events.slice(cursor).filter((event) => event.method === "setStatus");
+                assert.deepEqual(
+                    statuses.map((event) => event.statusKey),
+                    ["aa-codex-usage", "provider-usage"],
+                );
+                assert.deepEqual(
+                    statuses.map((event) => event.statusText),
+                    suffix ? [undefined, undefined] : ["\u001b[36mcodex\u001b[0m ▀▀▀▄▄ 4d", "claude 25% 5h 40% 7d"],
+                );
+            }
 
             const { commands } = await rpc.request("get_commands");
             for (const name of [

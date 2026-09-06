@@ -103,6 +103,14 @@ function getWebviewHtml({
             <div class="footer-panels">
             <div id="error-banner" class="error-banner" role="alert" hidden><p id="error-message"></p><div class="error-actions"><button id="error-retry" class="text-button" type="button">Try again</button><button id="error-dismiss" class="text-button" type="button">Dismiss</button></div></div>
             <div id="queue-notice" class="queue-notice" hidden></div>
+            <details id="provider-usage" class="provider-usage" hidden>
+                <summary><span class="provider-usage-label">Limits</span><span id="provider-usage-summary"></span></summary>
+                <div class="provider-usage-details">
+                    <dl id="provider-usage-values"></dl>
+                    <p>Last reported by installed Pi plugins, not conversation tokens or cost. Values may be cached. Bars, percentages, and reset times retain each plugin's meaning; they are not combined.</p>
+                    <p>With pi-usage installed, send <code>/usage</code> for a report or <code>/usage --refresh</code> to request fresh data. Authentication and refresh scheduling remain in Pi.</p>
+                </div>
+            </details>
             <details id="runtime-details" class="runtime-details" hidden><summary>Runtime status <span id="runtime-count"></span></summary><dl id="runtime-values"></dl></details>
             <section id="ui-request" class="ui-request" aria-labelledby="ui-request-title" hidden></section>
             <div id="image-feedback" class="image-feedback" role="status" hidden><span id="image-feedback-text"></span><button id="image-feedback-dismiss" class="text-button" type="button" aria-label="Dismiss image attachment message">Dismiss</button></div>

@@ -680,18 +680,92 @@ test(
                                         height: footer.getBoundingClientRect().height,
                                         left: cost.left,
                                         right: cost.right,
-                                        modeRight: mode.right,
-                                        stopLeft: stop.left,
+                                        cost: {
+                                            left: cost.left,
+                                            right: cost.right,
+                                            top: cost.top,
+                                            bottom: cost.bottom,
+                                        },
+                                        mode: {
+                                            left: mode.left,
+                                            right: mode.right,
+                                            top: mode.top,
+                                            bottom: mode.bottom,
+                                        },
+                                        stop: {
+                                            left: stop.left,
+                                            right: stop.right,
+                                            top: stop.top,
+                                            bottom: stop.bottom,
+                                        },
                                     };
                                 });
-                                assert.equal(bounds.height, 32);
-                                assert.ok(bounds.left >= bounds.modeRight && bounds.right <= bounds.stopLeft, expected);
+                                assert.ok(bounds.height >= 32 && bounds.height <= 72);
+                                for (const other of [bounds.mode, bounds.stop]) {
+                                    const separate =
+                                        bounds.cost.right <= other.left ||
+                                        bounds.cost.left >= other.right ||
+                                        bounds.cost.bottom <= other.top ||
+                                        bounds.cost.top >= other.bottom;
+                                    assert.ok(separate, `Readable footer controls must not overlap: ${expected}`);
+                                }
                             }
 
                             await setState(page, { status: "busy", cost: 0.01234, messages: sampleMessages() });
                             await page.screenshot({ path: path.join(screenshots, "conversation-cost-280-busy.png") });
                         },
                     );
+                },
+            );
+
+            await t.test(
+                "chat typography stays readable in narrow and wide sidebars and follows larger host fonts",
+                async () => {
+                    for (const width of [280, 390, 768, 1200]) {
+                        await withPage(browser, fixtures, { name: `readable-type-${width}`, width }, async (page) => {
+                            await setState(page, {
+                                messages: sampleMessages(),
+                                runtimeStatus: {
+                                    "aa-codex-usage": "codex ▀▀▀▄▄▄▄▄▄▄ 4d",
+                                    "provider-usage": "claude 25% 5h · 40% 7d",
+                                },
+                            });
+                            await page.locator("#provider-usage summary").click();
+                            const fonts = async () =>
+                                page.evaluate(() => {
+                                    const size = (selector) =>
+                                        parseFloat(getComputedStyle(document.querySelector(selector)).fontSize);
+
+                                    return {
+                                        message: size(".message-assistant .markdown"),
+                                        composer: size("#composer-input"),
+                                        limits: size("#provider-usage-values dd"),
+                                        footer: size("#token-status"),
+                                        code: size(".code-block pre code"),
+                                    };
+                                });
+                            assert.deepEqual(await fonts(), {
+                                message: 14,
+                                composer: 14,
+                                limits: 13,
+                                footer: 12,
+                                code: 13,
+                            });
+                            await assertLayout(page, width);
+                            await page.screenshot({ path: path.join(screenshots, `readable-type-${width}.png`) });
+                            await page.evaluate(() =>
+                                document.documentElement.style.setProperty("--vscode-font-size", "16px"),
+                            );
+                            assert.deepEqual(await fonts(), {
+                                message: 16,
+                                composer: 16,
+                                limits: 15,
+                                footer: 14,
+                                code: 15,
+                            });
+                            await assertLayout(page, width);
+                        });
+                    }
                 },
             );
 
@@ -1707,6 +1781,97 @@ test(
                     await assertLayout(page, 280);
                 });
             });
+
+            await t.test(
+                "provider limits show both installed plugins with accessible details and isolated updates",
+                async () => {
+                    for (const theme of ["dark", "light", "highcontrast"]) {
+                        for (const width of [280, 390, 768, 1200]) {
+                            await withPage(
+                                browser,
+                                fixtures,
+                                { name: `provider-usage-${theme}-${width}`, theme, width },
+                                async (page) => {
+                                    const runtimeStatus = {
+                                        "aa-codex-usage": "\u001b[36mcodex\u001b[0m ▀▀▀▄▄▄▄▄▄▄ 4d",
+                                        "provider-usage": "claude 25% 5h · 40% 7d (3m old)",
+                                        "another-extension": "Other runtime status",
+                                    };
+                                    await setState(page, { runtimeStatus, messages: sampleMessages() });
+                                    const details = page.locator("#provider-usage");
+                                    const summary = details.locator("summary");
+                                    assert.equal(await details.isVisible(), true);
+                                    assert.equal(await page.locator(".provider-usage-value").count(), 2);
+                                    assert.match(await summary.textContent(), /codex.*claude/su);
+                                    assert.doesNotMatch(await summary.textContent(), /\u001b/u);
+                                    assert.equal(await page.locator("#runtime-count").textContent(), "1");
+                                    assert.equal(await page.locator("#provider-usage-values").isVisible(), false);
+                                    const tokens = await page.locator("#token-status").textContent();
+                                    await summary.focus();
+                                    await summary.press("Enter");
+                                    assert.equal(await page.locator("#provider-usage-values").isVisible(), true);
+                                    assert.match(
+                                        await page.locator("#provider-usage-values").textContent(),
+                                        /@llblab\/pi-codex-usage/u,
+                                    );
+                                    assert.match(
+                                        await page.locator("#provider-usage-values").textContent(),
+                                        /@sreetej510\/pi-usage/u,
+                                    );
+                                    runtimeStatus["provider-usage"] = "usage rate-limited (3m)";
+                                    await setState(page, { status: "busy", runtimeStatus, messages: sampleMessages() });
+                                    assert.equal(await details.getAttribute("open"), "");
+                                    assert.equal(
+                                        await summary.evaluate((node) => node === document.activeElement),
+                                        true,
+                                    );
+                                    assert.match(await summary.textContent(), /rate-limited/u);
+                                    assert.equal(await page.locator("#token-status").textContent(), tokens);
+                                    assert.deepEqual(
+                                        await takeMessages(page),
+                                        [],
+                                        "Opening details must not run a command or query a provider",
+                                    );
+                                    await assertLayout(page, width);
+                                    if (theme === "dark") {
+                                        await page.screenshot({
+                                            path: path.join(screenshots, `provider-usage-${width}.png`),
+                                        });
+                                    }
+
+                                    await setState(page, {
+                                        contextToken: "different-chat",
+                                        runtimeStatus: { "provider-usage": "checking" },
+                                    });
+                                    assert.equal(await page.locator(".provider-usage-value").count(), 1);
+                                    assert.doesNotMatch(
+                                        await page.locator("#provider-usage-values").textContent(),
+                                        /4d|rate-limited/u,
+                                    );
+                                    for (const status of ["error", "disconnected"]) {
+                                        await setState(page, { status, runtimeStatus });
+                                        assert.equal(await details.isVisible(), false);
+                                        assert.equal(await page.locator("#provider-usage-values").textContent(), "");
+                                    }
+
+                                    await setState(page, { runtimeStatus: {} });
+                                    assert.equal(await details.isVisible(), false);
+                                    await setState(page, {
+                                        runtimeStatus: {
+                                            "provider-usage":
+                                                '<img src="https://example.invalid/quota" onerror="window.quotaAttack=true">',
+                                        },
+                                    });
+                                    await summary.click();
+                                    assert.equal(await details.locator("img, script, a").count(), 0);
+                                    assert.match(await page.locator("#provider-usage-values").textContent(), /<img/u);
+                                    assert.equal(await page.evaluate(() => window.quotaAttack), undefined);
+                                },
+                            );
+                        }
+                    }
+                },
+            );
 
             await t.test("refreshing status preserves newer drafts without resending an accepted prompt", async () => {
                 await withPage(browser, fixtures, { name: "recovery" }, async (page) => {

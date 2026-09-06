@@ -29,6 +29,15 @@ export default function rpcFixture(pi: ExtensionAPI) {
         });
     });
 
+    pi.registerCommand("rpc-usage-probe", {
+        description: "Exercise installed usage plugin wire contracts without provider queries",
+        handler: async (args, ctx) => {
+            ctx.ui.setStatus("aa-codex-usage", args === "clear" ? undefined : "\u001b[36mcodex\u001b[0m ▀▀▀▄▄ 4d");
+            ctx.ui.setStatus("provider-usage", args === "clear" ? undefined : "claude 25% 5h 40% 7d");
+            ctx.ui.notify("Synthetic provider usage report; no model or provider call", "info");
+        },
+    });
+
     pi.registerCommand("rpc-dialog-probe", {
         description: "Exercise the real RPC dialog transport without model calls",
         handler: async (_args, ctx) => {
