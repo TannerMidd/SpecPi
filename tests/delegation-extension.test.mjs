@@ -296,6 +296,7 @@ function mockPi() {
     const statuses = new Map();
     const widgets = new Map();
     let renders = 0;
+    let activeTools = ["read", "delegate"];
     const context = {
         hasUI: true,
         ui: {
@@ -333,6 +334,10 @@ function mockPi() {
         renders: () => renders,
         context,
         removeGuard,
+        getActiveTools: () => [...activeTools],
+        setActiveTools: (names) => {
+            activeTools = [...names];
+        },
         registerCommand: (name, definition) => commands.set(name, definition),
         registerTool: (definition) => tools.set(definition.name, definition),
         on(name, handler) {
@@ -440,6 +445,7 @@ test("human timeout command saves, reloads, resets and displays the effective po
     assert.match(pi.notices.at(-1).text, /10 minutes per job; 20 minutes per batch/);
     const completions = pi.commands.get("delegate").getArgumentCompletions("timeout ");
     assert.ok(completions.some((item) => item.value === "timeout reset"));
+    await pi.command("off");
     await pi.command("timeout 15");
     assert.match(pi.notices.at(-1).text, /Saved/);
     assert.equal(timeoutStore.load(), 15);
@@ -471,6 +477,7 @@ test("human timeout command saves, reloads, resets and displays the effective po
     assert.equal((await state(reloaded)).limits.jobMs, 3_600_000);
     const restarted = await fixture(t, {}, { timeoutStore: createTimeoutStore(agentDir) });
     assert.equal((await state(restarted.pi)).limits.jobMs, 3_600_000);
+    await restarted.pi.command("off");
     await restarted.pi.command("timeout reset");
     assert.equal(timeoutStore.load(), 10);
     assert.equal((await state(restarted.pi)).limits.jobMs, 600_000);
@@ -479,6 +486,7 @@ test("human timeout command saves, reloads, resets and displays the effective po
 test("invalid, noninteractive, enabled and model-facing timeout changes are rejected", async (t) => {
     const timeoutStore = createTimeoutStore(project(t));
     const { pi } = await fixture(t, {}, { timeoutStore });
+    await pi.command("off");
     for (const args of [
         "timeout 0",
         "timeout -1",
@@ -520,6 +528,10 @@ test("settings failures block activation or preserve the existing policy without
             },
         },
     );
+    assert.equal((await state(pi)).enabled, false);
+    assert.equal((await state(pi)).requested, false);
+    assert.deepEqual(pi.getActiveTools(), ["read"]);
+    assert.deepEqual(await pi.fire("before_agent_start"), [undefined]);
     await pi.command("on");
     assert.equal((await state(pi)).enabled, false);
     await pi.command("timeout 15");
@@ -548,6 +560,7 @@ test("configured deadlines expire at admission time and timeout changes preserve
         },
         { timeoutStore: createTimeoutStore(project(t)) },
     );
+    await pi.command("off");
     await pi.command("timeout 15");
     await pi.command("on");
     await pi.tool({ operation: "run", requestId: "timeout-run", packet: packet() });
@@ -593,6 +606,7 @@ test("SDK setup failures never expose messages, causes or non-Error thrown value
             throw thrown;
         };
 
+        await pi.command("off");
         await pi.command("on");
         const paused = await state(pi);
         assert.equal(paused.enabled, false);
@@ -666,11 +680,18 @@ test("startup setup failures revoke old work, redact SDK errors and allow later 
     assert.equal((await state(pi)).pauseReason, null);
 });
 
-test("extension stays off until a human UI command and exposes closed operations", async (t) => {
+test("extension defaults on without inference and off still requires human reactivation", async (t) => {
     const { pi, bridge } = await fixture(t);
     assert.deepEqual([...pi.commands.keys()], ["delegate"]);
     assert.deepEqual([...pi.tools.keys()], ["delegate"]);
-    assert.equal((await state(pi)).enabled, false);
+    assert.equal((await state(pi)).enabled, true);
+    assert.equal((await state(pi)).requested, true);
+    assert.deepEqual(pi.getActiveTools(), ["read", "delegate"]);
+    assert.equal((await pi.fire("before_agent_start"))[0].message.display, false);
+    assert.equal(bridge.calls(), 0);
+    assert.ok(DELEGATE_SCHEMA.anyOf.every((branch) => !["on", "off"].includes(branch.properties.operation.const)));
+    await pi.command("off");
+    assert.deepEqual(pi.getActiveTools(), ["read"]);
     assert.deepEqual(await pi.fire("before_agent_start"), [undefined]);
     await pi.command("on", { ...pi.context, hasUI: false });
     assert.equal((await state(pi)).enabled, false);
@@ -686,6 +707,155 @@ test("extension stays off until a human UI command and exposes closed operations
     assert.equal(bridge.calls(), 0);
 });
 
+test("startup enables every Pi mode without a command or model invocation", async (t) => {
+    for (const mode of ["tui", "rpc", "print", "json"]) {
+        for (const guard of ["absent", "off", "guard", "strict"]) {
+            const bridge = publicHostBridge();
+            const factory = createDelegationExtension(() => bridge.host, { root: project(t) });
+            const pi = mockPi();
+            pi.context.mode = mode;
+            pi.context.hasUI = ["tui", "rpc"].includes(mode);
+            if (guard === "absent") {
+                pi.removeGuard();
+            } else {
+                pi.setGuard(guard);
+            }
+
+            factory(pi);
+            await pi.fire("session_start");
+            assert.equal((await state(pi)).enabled, true, `${mode}/${guard}`);
+            assert.deepEqual(pi.getActiveTools(), ["read", "delegate"]);
+            assert.equal(bridge.calls(), 0);
+            await pi.fire("session_shutdown");
+        }
+    }
+});
+
+test("unsupported startup host pauses and a compatible selection resumes without on", async (t) => {
+    const bridge = publicHostBridge();
+    const supported = bridge.host;
+    bridge.host = {
+        ...supported,
+        ready: async () => {
+            throw new Error("private-startup-provider-canary");
+        },
+    };
+    const pi = mockPi();
+    createDelegationExtension(() => bridge.host, { root: project(t) })(pi);
+    await pi.fire("session_start");
+    const paused = await state(pi);
+    assert.equal(paused.enabled, false);
+    assert.equal(paused.requested, true);
+    assert.deepEqual(pi.getActiveTools(), ["read"]);
+    assert.doesNotMatch(JSON.stringify({ paused, notices: pi.notices }), /private-startup-provider-canary/);
+    bridge.host = supported;
+    await pi.fire("model_select");
+    assert.equal((await state(pi)).enabled, true);
+    assert.deepEqual(pi.getActiveTools(), ["read", "delegate"]);
+    assert.equal(bridge.calls(), 0);
+    await pi.fire("session_shutdown");
+});
+
+test("startup fails closed for locked, unready and ambiguous Guard policies", async (t) => {
+    for (const guard of ["locked", undefined, "ambiguous"]) {
+        const bridge = publicHostBridge();
+        const pi = mockPi();
+        pi.setGuard(guard);
+        if (guard === "ambiguous") {
+            pi.events.on("specpi:guard-state", (request) => request.reply({ mode: "guard" }));
+        }
+
+        createDelegationExtension(() => bridge.host, { root: project(t) })(pi);
+        await pi.fire("session_start");
+        assert.equal((await state(pi)).enabled, false);
+        assert.deepEqual(pi.getActiveTools(), ["read"]);
+        assert.ok((await state(pi)).pauseReason);
+        assert.equal(bridge.calls(), 0);
+        await pi.fire("session_shutdown");
+    }
+});
+
+test("revocation before or during synchronous startup preparation cancels the default", async (t) => {
+    for (const timing of ["before", "settings", "prepare"]) {
+        for (const change of ["off", "guard", "task", "scope"]) {
+            const bridge = publicHostBridge();
+            const pi = mockPi();
+            let revoked = false;
+            const revoke = () => {
+                if (revoked) {
+                    return;
+                }
+
+                revoked = true;
+                if (change === "off") {
+                    void pi.command("off");
+                } else if (change === "guard") {
+                    pi.events.emit("specpi:guard-policy-changed", {});
+                } else if (change === "task") {
+                    pi.events.emit("specpi:task-contract-changed", { digest: "new", previousDigest: "old" });
+                } else {
+                    pi.events.emit("specpi:workflow-status", { active: "scope", generation: 1 });
+                    pi.events.emit("specpi:workflow-status", { active: "scope", generation: 2 });
+                }
+            };
+
+            createDelegationExtension(() => bridge.host, {
+                root: project(t),
+                timeoutStore: {
+                    load() {
+                        if (timing === "settings") {
+                            revoke();
+                        }
+
+                        return 10;
+                    },
+                },
+                prepareContext(ctx) {
+                    if (ctx && timing === "prepare") {
+                        revoke();
+                    }
+                },
+            })(pi);
+            if (timing === "before") {
+                revoke();
+            }
+
+            await pi.fire("session_start");
+            assert.equal(revoked, true);
+            assert.equal((await state(pi)).requested, false, `${timing}/${change}`);
+            assert.equal((await state(pi)).enabled, false, `${timing}/${change}`);
+            assert.deepEqual(pi.getActiveTools(), ["read"]);
+            assert.deepEqual(await pi.fire("before_agent_start"), [undefined]);
+            assert.equal(bridge.calls(), 0);
+            await pi.command("on");
+            assert.equal((await state(pi)).enabled, true);
+            await pi.fire("session_shutdown");
+        }
+    }
+});
+
+test("off during startup preflight cannot be undone by its late completion", async (t) => {
+    let finish;
+    const bridge = publicHostBridge();
+    bridge.host.ready = () =>
+        new Promise((resolve) => {
+            finish = resolve;
+        });
+    const pi = mockPi();
+    createDelegationExtension(() => bridge.host, { root: project(t) })(pi);
+    const startup = pi.fire("session_start");
+    await pi.command("off");
+    finish();
+    await startup;
+    assert.equal((await state(pi)).enabled, false);
+    assert.equal((await state(pi)).requested, false);
+    await pi.fire("before_agent_start");
+    await pi.fire("session_start", { reason: "reload" });
+    assert.deepEqual(pi.getActiveTools(), ["read"]);
+    assert.equal(bridge.calls(), 0);
+    await pi.fire("session_shutdown");
+});
+
 test("activation cannot outlive the extension binding that started provider preflight", async (t) => {
     let finish;
     const ready = new Promise((resolve) => {
@@ -696,8 +866,7 @@ test("activation cannot outlive the extension binding that started provider pref
     const factory = createDelegationExtension(() => bridge.host, { root: project(t) });
     const oldPi = mockPi();
     factory(oldPi);
-    await oldPi.fire("session_start");
-    const pendingActivation = oldPi.command("on");
+    const pendingActivation = oldPi.fire("session_start");
     const currentPi = mockPi();
     factory(currentPi);
     await currentPi.fire("session_start");
@@ -705,7 +874,7 @@ test("activation cannot outlive the extension binding that started provider pref
     finish();
     await pendingActivation;
     assert.equal((await state(currentPi)).enabled, false);
-    assert.match(oldPi.notices.at(-1).text, /changed during delegation setup/);
+    assert.equal(oldPi.notices.length, 0, "stale startup cannot notify or activate the replacement");
     await currentPi.command("on");
     assert.equal((await state(currentPi)).enabled, true);
 });
@@ -713,6 +882,7 @@ test("activation cannot outlive the extension binding that started provider pref
 test("delegation runs with Command Guard absent or off and retains its own ceilings", async (t) => {
     for (const mode of ["absent", "off"]) {
         const { pi, bridge } = await fixture(t, { limits: { sessionCalls: 1 } });
+        await pi.command("off");
         if (mode === "absent") {
             pi.removeGuard();
         } else {
@@ -737,6 +907,7 @@ test("delegation runs with Command Guard absent or off and retains its own ceili
 
 test("activation identifies a locked, unready or ambiguous installed Command Guard", async (t) => {
     const { pi, bridge } = await fixture(t);
+    await pi.command("off");
     for (const [mode, error] of [
         ["locked", /Guard is locked/],
         [undefined, /not reported a ready policy/],
@@ -977,6 +1148,7 @@ test("task, workflow, and guard state changes revoke policy without ordinary sta
 
 test("policy replies are bound to live state and subscriptions are removed on shutdown", async (t) => {
     const { pi } = await fixture(t);
+    await pi.command("off");
     let before;
     pi.events.emit("specpi:delegation-policy", {
         input: { operation: "status" },

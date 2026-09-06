@@ -161,7 +161,8 @@ test("ordinary native Pi delegation runs real child sessions through configured 
 
     for (const name of [
         "ordinaryEntryRegistered",
-        "defaultOff",
+        "defaultOn",
+        "startupWithoutInference",
         "headlessActivationDenied",
         "sameModelThinking",
         "snapshotRead",
@@ -188,6 +189,21 @@ test("ordinary native Pi delegation runs real child sessions through configured 
         sessionBatches: 4,
         batchJobs: 2,
         outputTokens: 8192,
+    });
+});
+
+test("native startup admits a real child without an on command and off removes the tool", (context) => {
+    const result = runNativeFixture(context, "default-on");
+    if (!result) {
+        return;
+    }
+
+    assert.deepEqual(report(result, "NATIVE_DEFAULT_FIXTURE"), {
+        defaultOn: true,
+        startupRequests: 0,
+        completedWithoutOnCommand: true,
+        calls: 1,
+        offRemovesTool: true,
     });
 });
 

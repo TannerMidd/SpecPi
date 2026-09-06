@@ -4,8 +4,12 @@ This is the implemented in-process API. It has no HTTP listener, daemon, child p
 or child session store. The broader [target protocol](design-protocol.md) remains a
 proposal; its stronger transport/attempt/cost gates are not supplied by this version.
 
-The extension loads through normal `pi` package discovery and remains disabled until
-the human runs `/delegate on`. Compatibility is checked through required public SDK
+The extension loads through normal `pi` package discovery and enables delegation at
+the first session start of each Pi process, including noninteractive modes. Startup
+preflights the host but launches no workers or model inference; Pi-owned authentication
+preparation may occur. `/delegate off` and safety revocations survive reloads and session
+switches; `/delegate on` re-enables it, and restarting Pi reapplies the on default.
+Compatibility is checked through required public SDK
 capabilities; there is no exact-version allowlist. Missing APIs prevent activation and
 are named in the error. The runtime also verifies the created session's thinking,
 tools and streaming interface. Tested versions are evidence, not an activation gate.
@@ -18,7 +22,7 @@ overrides, model-specific headers, startup proxy configuration and safe model-de
 mismatches fail preflight. Parent request hooks,
 ephemeral runtime settings, session affinity and ambient resources are not inherited.
 
-Command Guard is optional. Absent and Off states permit human activation; an installed
+Command Guard is optional. Absent and Off states permit activation; an installed
 Guard's Strict approvals and explicit locks remain enforced. Unready or duplicate
 Guard responders prevent activation with a specific error. Guard state changes revoke
 the current delegation generation. Snapshot tools and resource limits are enforced
@@ -51,7 +55,7 @@ policy rather than assuming the shipped default.
 
 ## Submit a batch
 
-After the human runs `/delegate on`, the parent calls the `delegate` tool:
+When delegation is enabled, the parent calls the `delegate` tool:
 
 ```json
 {
@@ -248,7 +252,7 @@ maximum. These are experiment limits, not research-derived optimal values.
 Human off/on, task changes,
 branch navigation, model selection, guard changes and reloads revoke old generations;
 they do not create a new resource allowance. Normal parent turns do not revoke a job.
-Model and thinking selections retain the human's activation choice. The extension
+Model and thinking selections retain the default or human activation choice. The extension
 preflights the latest selected host and resumes dispatch automatically, without
 replaying old jobs. Unsupported selections pause dispatch and report `pauseReason`;
 a compatible selection resumes it. Status exposes `requested`, `updating` and

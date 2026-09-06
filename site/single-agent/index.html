@@ -38,7 +38,7 @@
         <main id="article" class="wrap">
             <header class="article-heading">
                 <div class="article-meta">
-                    <span>Architecture / SpecPi v0.15.0</span><span>Research reviewed 05 Sep 2026</span>
+                    <span>Architecture / SpecPi v0.16.0</span><span>Research reviewed 05 Sep 2026</span>
                 </div>
                 <h1>One writer. Focused delegation.</h1>
                 <p class="article-deck">
@@ -137,7 +137,7 @@
                                     <p>Extra compute must not be mistaken for a coordination benefit.</p>
                                 </td>
                                 <td>
-                                    Delegation is opt-in, with two worker slots, fixed call limits and human-configurable
+                                    Delegation is on by default at Pi startup, with two worker slots, fixed call limits and human-configurable
                                     timeouts. The evaluation plan compares it with single-agent and serial workflows at matched
                                     resource budgets.
                                 </td>
@@ -167,9 +167,9 @@
                         extensions. Their tools are limited to selected-source list, read, and search.
                     </p>
                     <p id="exceptions">
-                        <a href="../wiki/#delegation">Enable with <code>/delegate on</code></a
-                        >; use <code>/delegate off</code> to revoke work. Each job has four SDK model calls and 120
-                        seconds. The process permits four batches and 32 calls. These are local execution limits, not a
+                        <a href="../wiki/#delegation">Control with <code>/delegate status</code></a
+                        >; use <code>/delegate off</code> to revoke work. Each job has four SDK model calls and 10
+                        minutes by default. The process permits four batches and 32 calls. These are local execution limits, not a
                         provider spending cap. See the
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
                             >runtime and compatibility guide</a
@@ -807,7 +807,7 @@
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.15.0</p>
+            <p>Pi harness / v0.16.0</p>
             <nav aria-label="Footer navigation">
                 <a href="../wiki/">Reference</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a

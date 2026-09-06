@@ -470,12 +470,16 @@ export default async function nativeEntryFixture(pi: any) {
         const approvals: string[] = [];
         let answer = "Allow once";
         const ctx = fixtureContext(actual, notices, approvals, () => answer);
-        await selectModel(pi, ctx);
         let active = first;
         let tools = toolsFor(active, ctx);
-        const ordinaryTools = pi.getActiveTools();
-        assert.equal(ordinaryTools.includes("delegate"), false);
-        assert.equal((await tools.status()).enabled, false);
+        const ordinaryTools = pi.getActiveTools().filter((name: string) => name !== "delegate");
+        const startup = await tools.status();
+        assert.equal(startup.sessionCalls, 0);
+        assert.equal(startup.sessionBatches, 0);
+        assert.equal(server.requests.length, 0, "startup must not run inference");
+        const defaultOn = process.env.SPECPI_NATIVE_FIXTURE_MODE !== "runtime-auth";
+        assert.equal(startup.enabled, defaultOn);
+        assert.equal(pi.getActiveTools().includes("delegate"), defaultOn);
         if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "runtime-auth") {
             await tools.command("on");
             assert.equal((await tools.status()).enabled, false, JSON.stringify(notices));
@@ -486,6 +490,30 @@ export default async function nativeEntryFixture(pi: any) {
 
             return;
         }
+
+        if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "default-on") {
+            try {
+                const batch = await tools.execute({ operation: "run", requestId: "startup-default", packet: packet() });
+                const collected = await finishBatch(tools, batch);
+                await resolveBatch(tools, collected, "startup-default");
+                assert.equal(server.requests.length, 1);
+                assert.equal((await tools.status()).sessionCalls, 1);
+                assert.equal(parentHooks, 0);
+                await tools.command("off");
+                assert.deepEqual(pi.getActiveTools(), ordinaryTools);
+                console.log(
+                    `NATIVE_DEFAULT_FIXTURE=${JSON.stringify({ defaultOn: true, startupRequests: 0, completedWithoutOnCommand: true, calls: 1, offRemovesTool: true })}`,
+                );
+            } finally {
+                await active.emit("session_shutdown", { reason: "fixture cleanup" }, ctx);
+            }
+
+            return;
+        }
+
+        await tools.command("off");
+        assert.deepEqual(pi.getActiveTools(), ordinaryTools);
+        await selectModel(pi, ctx);
 
         if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "stream-performance") {
             const originalRealpath = fs.realpathSync.native;
@@ -872,7 +900,7 @@ export default async function nativeEntryFixture(pi: any) {
             assert.equal((await tools.status()).enabled, false, JSON.stringify(notices));
             assert.equal(server.requests.length, 8);
             console.log(
-                `NATIVE_ENTRY_FIXTURE=${JSON.stringify({ ordinaryEntryRegistered: true, defaultOff: true, headlessActivationDenied: true, sameModelThinking: true, snapshotRead: true, strictGuardIntercepted: true, noAmbientResources: true, parentHooksNotInherited: true, actualSdkToolLoop: true, cancelledResultSuppressed: true, rebindCountersPreserved: true, oldCallbacksInert: true, sourceFreshness: true, batchQuotaPreserved: true, registeredOverrideRejected: true, activeToolGated: true, calls: final.sessionCalls, batches: final.sessionBatches, ceilings: { concurrency: final.limits.concurrency, sessionCalls: final.limits.sessionCalls, sessionBatches: final.limits.sessionBatches, batchJobs: final.limits.batchJobs, outputTokens: final.limits.outputTokens } })}`,
+                `NATIVE_ENTRY_FIXTURE=${JSON.stringify({ ordinaryEntryRegistered: true, defaultOn: true, startupWithoutInference: true, headlessActivationDenied: true, sameModelThinking: true, snapshotRead: true, strictGuardIntercepted: true, noAmbientResources: true, parentHooksNotInherited: true, actualSdkToolLoop: true, cancelledResultSuppressed: true, rebindCountersPreserved: true, oldCallbacksInert: true, sourceFreshness: true, batchQuotaPreserved: true, registeredOverrideRejected: true, activeToolGated: true, calls: final.sessionCalls, batches: final.sessionBatches, ceilings: { concurrency: final.limits.concurrency, sessionCalls: final.limits.sessionCalls, sessionBatches: final.limits.sessionBatches, batchJobs: final.limits.batchJobs, outputTokens: final.limits.outputTokens } })}`,
             );
         } finally {
             server.release();

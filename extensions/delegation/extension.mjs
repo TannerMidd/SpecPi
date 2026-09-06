@@ -104,6 +104,7 @@ export function createDelegationExtension(
     let detach = () => {};
 
     let requested = false;
+    let startupActivation = true;
     let requestedGuard;
     let boundHost;
     let pending;
@@ -166,7 +167,11 @@ export function createDelegationExtension(
         panel?.update();
     }
 
-    function invalidate(reason) {
+    function invalidate(reason, preserveStartupDefault = false) {
+        if (!preserveStartupDefault) {
+            startupActivation = false;
+        }
+
         requested = false;
         pending = undefined;
         boundHost = undefined;
@@ -197,7 +202,7 @@ export function createDelegationExtension(
         const isBound = () => issuedEpoch === bindingEpoch;
         toolsReady = false;
         prepareContext(undefined, true);
-        invalidate("runtime factory rebound");
+        invalidate("runtime factory rebound", true);
         currentPi = pi;
         currentContext = undefined;
         const refreshSelection = async (ctx) => {
@@ -336,7 +341,7 @@ export function createDelegationExtension(
             });
         }
 
-        pi.on("session_start", (_event, ctx) => {
+        pi.on("session_start", async (_event, ctx) => {
             if (!isBound()) {
                 return;
             }
@@ -344,13 +349,27 @@ export function createDelegationExtension(
             currentContext = ctx;
             toolsReady = true;
             panel?.bind(ctx);
-            invalidate("session started or resources reloaded");
+            invalidate("session started or resources reloaded", true);
             try {
                 loadTimeout();
                 prepareContext(ctx, true);
+                // Consume the default only after synchronous preparation, which
+                // may revoke it. Off and safety events cancel it even before startup.
+                const activate = startupActivation;
+                startupActivation = false;
+                if (activate && isBound()) {
+                    requested = true;
+                    requestedGuard = getGuard();
+                    await refreshSelection(ctx);
+                    if (isBound() && requested && pauseReason) {
+                        ctx.ui.notify(`Delegation paused: ${pauseReason}`, "warning");
+                    }
+                }
             } catch (error) {
                 pauseReason = publicErrorMessage(error);
                 ctx.ui.notify(`Delegation unavailable: ${pauseReason}`, "warning");
+            } finally {
+                startupActivation = false;
             }
         });
         pi.on("session_shutdown", () => {
@@ -380,7 +399,8 @@ export function createDelegationExtension(
             }
         });
         pi.registerCommand("delegate", {
-            description: "Enable read-only delegation, inspect limits, or save timeout <minutes> (1–60; reset: 10)",
+            description:
+                "Control read-only delegation (on at Pi startup), inspect limits, or save timeout <minutes> (1–60; reset: 10)",
             getArgumentCompletions: (prefix) =>
                 [
                     "on",
@@ -496,7 +516,7 @@ export function createDelegationExtension(
             name: "delegate",
             label: "Delegate",
             description:
-                "Delegate an independent frozen review or substantial selected-source analysis to a real Pi child session. Only after human /delegate on. review: check artifacts against assigned requirements in fresh context; scout: answer a distinct evidence question over selected sources. Prefer one worker and parent-only execution for small, sequential or routine work. No shell, edits or live web. run returns immediately; collect waits for advisory evidence, then resolve findings after verification. One changed-input follow_up shares the original budget/deadline. Never grants permission or proves task completion.",
+                "Delegate an independent frozen review or substantial selected-source analysis to a real Pi child session. Enabled by default at Pi startup; respect /delegate off and safety revocations. review: check artifacts against assigned requirements in fresh context; scout: answer a distinct evidence question over selected sources. Prefer one worker and parent-only execution for small, sequential or routine work. No shell, edits or live web. run returns immediately; collect waits for advisory evidence, then resolve findings after verification. One changed-input follow_up shares the original budget/deadline. Never grants permission or proves task completion.",
             parameters: DELEGATE_SCHEMA,
             ...(presentation ? createToolRenderers(presentation) : {}),
             execute: async (_id, input, signal, _update, ctx) => {

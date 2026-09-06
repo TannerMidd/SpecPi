@@ -7,7 +7,7 @@ import { DelegationError } from "./errors.mjs";
 import { createTimeoutStore } from "./settings.mjs";
 
 const stateKey = Symbol.for("specpi.delegation.native.v1");
-const revision = 8;
+const revision = 9;
 
 export async function withPiCompatibility(sdk, loadCompatibility) {
     if (typeof sdk.clampThinkingLevel === "function") {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.0 - 2026-09-05
+
+- Enable experimental read-only delegation by default at the first session start of each Pi process, including TUI, RPC, print and JSON modes. Startup preflights the host without launching workers or model inference; selective review/scout admission, Guard checks, source restrictions and resource ceilings remain unchanged.
+- Keep `/delegate off` and safety revocations effective through reloads and session switches. `/delegate on` explicitly re-enables dispatch; restarting Pi reapplies the on default. Invalid settings, unsupported providers and locked, unready or ambiguous Guard policies still block activation.
+- Update delegation guidance and release references, and add startup/default-on regression coverage alongside real-Pi lifecycle checks. Restart Pi after updating SpecPi to load the changed delegation runtime.
+
 ## 0.15.0 - 2026-09-05
 
 - Add **SpecPi Chat 0.3.1**, a separately packaged VS Code sidebar with streamed Pi replies, safe Markdown, expanded thinking and collapsed tool output by default, model/thinking controls, exact approvals, and a compact composer. It reuses the user's Pi configuration without managing credentials or installing the harness.
