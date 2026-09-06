@@ -13,6 +13,7 @@ import {
 import { createNativePiHost } from "../../extensions/delegation/provider.mjs";
 import { runWorker } from "../../extensions/delegation/worker.mjs";
 import { LIMITS } from "../../extensions/delegation/protocol.mjs";
+import { DelegationError, workerFailureMessage } from "../../extensions/delegation/errors.mjs";
 
 const usage = {
     input: 7,
@@ -346,7 +347,7 @@ function controls(overrides: any = {}) {
                 calls += 1;
             },
             onUsage: (value: any) => usages.push(value),
-            limits: { ...LIMITS, outputTokens: 8192 },
+            limits: { ...LIMITS },
             ...overrides,
         },
     };
@@ -403,7 +404,7 @@ async function pipelineProof(root: string) {
             assert.equal(request.options.thinkingBudgets.low, 19);
             assert.equal(request.options.transport, "sse");
             assert.equal(request.options.maxRetries, 0);
-            assert.equal(request.options.maxTokens, 4096);
+            assert.equal(request.options.maxTokens, undefined, "Pi controls response length without a delegation cap");
             assert.equal(request.options.headers["x-fixture-auth"], "synthetic");
             assert.equal(request.options.headers["x-parent-policy"], undefined);
             assert.equal(request.requestModel.baseUrl, "https://configured.invalid/route");
@@ -439,7 +440,11 @@ async function boundsProof(root: string) {
         "provider-error",
     ]) {
         let executions = 0;
-        const state = await fixture(root, kind, () => {
+        const state = await fixture(root, kind, (_request: any, call: number) => {
+            if (["bad-args", "tool-throw"].includes(kind) && call > 1) {
+                return final();
+            }
+
             if (kind === "unknown-tool") {
                 return readCall("bash");
             }
@@ -453,7 +458,10 @@ async function boundsProof(root: string) {
             }
 
             if (kind === "oversize") {
-                return { content: [{ type: "text", text: "x".repeat(256 * 1024) }], stopReason: "stop" };
+                return {
+                    content: [{ type: "text", text: "x".repeat(LIMITS.retainedResponseBytes) }],
+                    stopReason: "stop",
+                };
             }
 
             if (kind === "provider-error") {
@@ -495,7 +503,37 @@ async function boundsProof(root: string) {
             ],
         });
         try {
-            await assert.rejects(handle.run(kind === "context" ? "x".repeat(256 * 1024) : "child", run.value));
+            if (["bad-args", "tool-throw"].includes(kind)) {
+                await handle.run("child", run.value);
+                assert.equal(state.observed.length, 2);
+                assert.ok(
+                    state.observed[1].context.messages.some(
+                        (entry: any) => entry.role === "toolResult" && entry.isError,
+                    ),
+                );
+                assert.equal(executions, kind === "tool-throw" ? 1 : 0);
+                continue;
+            }
+
+            await assert.rejects(
+                handle.run(kind === "context" ? "x".repeat(LIMITS.contextBytes) : "child", run.value),
+                (error: any) => {
+                    const diagnostic = workerFailureMessage(error);
+                    assert.match(
+                        diagnostic,
+                        kind === "context"
+                            ? /context allowance/
+                            : kind === "bad-args" || kind === "tool-throw"
+                              ? /source-tool request failed/
+                              : kind === "provider-error"
+                                ? /no complete assistant response/
+                                : /Worker/,
+                    );
+                    assert.doesNotMatch(diagnostic, /429 overloaded|Denied fixture tool|No calls left/);
+
+                    return true;
+                },
+            );
             assert.equal(state.observed.length, ["admission", "context"].includes(kind) ? 0 : 1, kind);
             assert.equal(executions, kind === "tool-throw" ? 1 : 0, kind);
         } finally {
@@ -657,6 +695,81 @@ async function workerProof(root: string) {
     }
 }
 
+async function workerFailureProof(root: string) {
+    for (const kind of ["tool", "length", "json"]) {
+        const state = await fixture(root, "failure-" + kind, (_request: any, call: number) =>
+            call > 1
+                ? final()
+                : kind === "tool"
+                  ? readCall()
+                  : {
+                        content: [{ type: "text", text: "SENSITIVE_REPORT" }],
+                        stopReason: kind === "length" ? "length" : "stop",
+                    },
+        );
+        const job: any = {
+            spec: {
+                mode: "review",
+                question: "Review",
+                requirements: ["r1"],
+                context: "fixture",
+                sources: ["source.md"],
+            },
+            deadline: Date.now() + 5000,
+            calls: 0,
+            toolCalls: 0,
+            toolBytes: 0,
+        };
+        const snapshot = {
+            sources: [{ id: "s1", path: "source.md", lineCount: 1 }],
+            assertBindings() {},
+            read() {
+                throw new DelegationError("Snapshot source changed.");
+            },
+        };
+        try {
+            const running = runWorker({
+                packet: {
+                    objective: "Review",
+                    requirements: [{ id: "r1", text: "Review" }],
+                    decisions: [],
+                    nonGoals: [],
+                },
+                job,
+                host: state.host,
+                snapshot,
+                ...controls().value,
+            });
+            if (kind !== "tool") {
+                const result = await running;
+                assert.equal(result.status, "complete");
+                assert.equal(state.observed.length, 2);
+                assert.match(state.observed[1].context.messages.at(-1).content[0].text, /Correct your previous report/);
+                continue;
+            }
+
+            await assert.rejects(running, (error: any) => {
+                const diagnostic = workerFailureMessage(error);
+                assert.match(
+                    diagnostic,
+                    kind === "tool"
+                        ? /source-tool request failed.*Snapshot source changed/
+                        : kind === "length"
+                          ? /output-token limit/
+                          : /not valid JSON/,
+                );
+                assert.doesNotMatch(diagnostic, /SENSITIVE_REPORT/);
+
+                return true;
+            });
+            assert.equal(state.observed.length, 1);
+        } finally {
+            job.release?.();
+            state.close();
+        }
+    }
+}
+
 export default async function () {
     assert.match(sdk.VERSION, /^\d+\.\d+\.\d+/u);
     const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-fixture-")));
@@ -666,6 +779,7 @@ export default async function () {
         await settlementProof(root);
         await oauthProof(root);
         await workerProof(root);
+        await workerFailureProof(root);
         console.log(
             `DELEGATION_FIXTURE=${JSON.stringify({ sdkVersion: sdk.VERSION, realSessions: true, streaming: true, toolReplay: true, thinking: true, oauth: true, noAmbientResources: true, parentHooksExcluded: true, settlement: true })}`,
         );

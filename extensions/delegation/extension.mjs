@@ -1,10 +1,11 @@
 import { DelegationError, publicErrorMessage } from "./errors.mjs";
 import { randomUUID } from "node:crypto";
 import { createDelegationController } from "./core.mjs";
-import { DEFAULT_TIMEOUT_MINUTES, timeoutLimits } from "./protocol.mjs";
+import { DEFAULT_TIMEOUT_MINUTES, DEFAULT_BUDGET_MULTIPLIER, timeoutLimits, budgetLimits } from "./protocol.mjs";
 import { createLivePanel, createToolRenderers, readableLimits, readableStatus } from "./presentation.mjs";
 
-const USAGE = "Usage: /delegate [on|off|status|limits|timeout [<minutes>|reset]|cancel <batchId>]";
+const USAGE =
+    "Usage: /delegate [on|off|status|limits|budget [<multiplier>|reset]|timeout [<minutes>|reset]|cancel <batchId>]";
 
 const integer = { type: "integer", minimum: 0 };
 const string = { type: "string" };
@@ -58,7 +59,11 @@ export const DELEGATE_SCHEMA = {
                         mode: { type: "string", enum: ["review", "scout"] },
                         question: string,
                         context: string,
-                        sources: strings,
+                        sources: {
+                            ...strings,
+                            description:
+                                "Exact workspace-relative text filenames. Ordinary auth, credential, session and history source names are allowed. Private runtime storage, credential stores and keys are excluded; no directories, globs or absolute paths.",
+                        },
                         requirements: {
                             type: "array",
                             minItems: 1,
@@ -137,7 +142,13 @@ export function createDelegationExtension(
     let timeoutLoaded = !timeoutStore;
     const loadTimeout = () => {
         if (!timeoutLoaded) {
-            controller.setTimeoutMinutes(timeoutStore.load());
+            const minutes = timeoutStore.load();
+            const multiplier = timeoutStore.loadBudget?.();
+            if (multiplier !== undefined) {
+                controller.setBudgetMultiplier(multiplier);
+            }
+
+            controller.setTimeoutMinutes(minutes);
             timeoutLoaded = true;
         }
     };
@@ -400,13 +411,19 @@ export function createDelegationExtension(
         });
         pi.registerCommand("delegate", {
             description:
-                "Control read-only delegation (on at Pi startup), inspect limits, or save timeout <minutes> (1–60; reset: 10)",
+                "Control delegation, inspect limits, or save budget <multiplier> (1–64; default 8) and timeout <minutes> (1–60; default 10)",
             getArgumentCompletions: (prefix) =>
                 [
                     "on",
                     "off",
                     "status",
                     "limits",
+                    "budget",
+                    "budget 8",
+                    "budget 16",
+                    "budget 32",
+                    "budget 64",
+                    "budget reset",
                     "timeout",
                     "timeout 5",
                     "timeout 10",
@@ -428,7 +445,7 @@ export function createDelegationExtension(
                 currentContext = ctx;
                 const [action = "status", id, extra] = args.trim().split(/\s+/u).filter(Boolean);
                 try {
-                    if (extra || (id && !["cancel", "timeout"].includes(action))) {
+                    if (extra || (id && !["cancel", "timeout", "budget"].includes(action))) {
                         throw new DelegationError(USAGE);
                     }
 
@@ -454,7 +471,36 @@ export function createDelegationExtension(
 
                         syncActiveTool(true);
                         ctx.ui.notify(
-                            `Delegation enabled: Pi child sessions for review and scout, ${state.model.provider}/${state.model.id}, thinking ${state.model.thinkingLevel ?? "Pi configured"}. At most 2 workers, 4 batches and 32 SDK inference calls per Pi process; ${state.limits.jobMs / 60_000} minutes per job, ${state.limits.batchMs / 60_000} minutes per batch. Configure with /delegate timeout <minutes> while off (saved across restarts). Workers see only supplied text and selected snapshots. Pi owns configured authentication; temporary parent provider/auth overrides and parent hooks are not inherited. No shell, edits, recursion, automatic retries or compaction. /delegate off cancels workers; SDK requests still settling retain their slots. These limits do not guarantee remote termination or a billing cap.`,
+                            `Delegation enabled: Pi child sessions for review and scout, ${state.model.provider}/${state.model.id}, thinking ${state.model.thinkingLevel ?? "Pi configured"}. At most ${state.limits.concurrency} workers, ${state.limits.sessionBatches} batches and ${state.limits.sessionCalls} SDK inference calls per Pi process; ${state.limits.jobMs / 60_000} minutes per job, ${state.limits.batchMs / 60_000} minutes per batch. Configure /delegate budget and /delegate timeout while off (saved across restarts). Workers see only supplied text and selected snapshots. Pi owns configured authentication; temporary parent provider/auth overrides and parent hooks are not inherited. No shell, edits, recursion, automatic provider retries or compaction. Workers can correct tool arguments and reports within their existing budgets. /delegate off cancels workers; SDK requests still settling retain their slots. These limits do not guarantee remote termination or a billing cap.`,
+                            "info",
+                        );
+                    } else if (action === "budget") {
+                        if (id) {
+                            if (!ctx.hasUI) {
+                                throw new DelegationError("Budget changes require a human interactive command");
+                            }
+
+                            if (requested || pending || controller.status().enabled) {
+                                throw new DelegationError(
+                                    "Turn delegation off before changing its budget: /delegate off",
+                                );
+                            }
+
+                            const multiplier =
+                                id === "reset" ? DEFAULT_BUDGET_MULTIPLIER : /^\d+$/u.test(id) ? Number(id) : NaN;
+                            budgetLimits(multiplier);
+                            if (!timeoutStore?.saveBudget) {
+                                throw new DelegationError("Persistent delegation settings are unavailable");
+                            }
+
+                            timeoutStore.saveBudget(multiplier);
+                            controller.setBudgetMultiplier(multiplier);
+                        } else {
+                            loadTimeout();
+                        }
+
+                        ctx.ui.notify(
+                            `${readableLimits(status())}\n${id ? "Budget saved. " : ""}Use /delegate budget <multiplier> (1–64; default 8) while off. Counts, source-output bytes and model-context bytes scale together; spent usage and deadlines do not reset.`,
                             "info",
                         );
                     } else if (action === "timeout") {

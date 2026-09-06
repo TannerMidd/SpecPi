@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.0 - 2026-09-06
+
+- Let delegation workers correct ordinary source-tool arguments and malformed/truncated reports in the same child session, preserving previously read passages and spending the original budgets. Keep source changes, revocations, unavailable tools, and exhausted budgets terminal. Remove the delegation-specific 8,192-token cap in favor of Pi's provider/model settings; scale SDK response acceptance with `/delegate budget` (1 MiB by default).
+- Replace generic delegation worker failures with safe diagnostics for source tools, provider requests, stream/context/response limits, output-token truncation, and final JSON/schema/evidence validation. Preserve the original tool failure through SDK cancellation, disclose report constraints in the worker prompt, and cover low-usage failures with controller and native Pi regressions.
+- Raise default delegation budgets to 96 source calls/512 KiB and 32 model turns per job, with 32 batches/256 model turns per Pi process. Add human-only, persisted `/delegate budget <multiplier>` (1–64, default 8), scaling counts and context together while preserving spent usage, deadlines, and concurrency. Keep handoff and response sizes independently bounded.
+- Count only delivered source JSON, report the specific exhausted allowance, and reject spent-budget follow-ups before starting a child. Tell workers their remaining allowance and verify substantial reading plus passage-preserving follow-up with offline regressions.
+- Preserve safe delegation snapshot rejection reasons and identify the selected-source position so failed reviews are diagnosable in SpecPi Chat and terminal Pi. Redact raw filesystem errors and verify that rejected snapshots start no worker or inference.
+- Replace delegation's private-topic keyword filter with known private namespaces and credential-store formats. Allow ordinary authentication, credential, session, and history source files/directories in all supported text formats, including `src/lib/security/credential-url.ts` and `credentials.ts`. Protect configured Pi storage and its canonical aliases; retain selected-file scope, containment, link, text, size, and freshness checks.
+
 ## 0.16.0 - 2026-09-05
 
 - Enable experimental read-only delegation by default at the first session start of each Pi process, including TUI, RPC, print and JSON modes. Startup preflights the host without launching workers or model inference; selective review/scout admission, Guard checks, source restrictions and resource ceilings remain unchanged.

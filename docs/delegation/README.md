@@ -1,6 +1,6 @@
 # Bounded delegation
 
-Status: experimental in SpecPi 0.16.0. Enabled by default at Pi startup.
+Status: experimental in SpecPi 0.17.0. Enabled by default at Pi startup.
 The package remains `specpi`; no separate npm package or background service is required.
 
 SpecPi keeps one agent responsible for changes and acceptance. This extension adds
@@ -188,7 +188,7 @@ edits, coupled mutable work, generic second opinions or repeated role-based answ
 Use parallel parent tool calls when retrieval alone answers the question.
 
 Workers have no shell, writes, arbitrary plugin tools or recursive delegation.
-The parent obtains and selects source material. Model routing, automatic retries,
+The parent obtains and selects source material. Model routing, automatic provider retries,
 live-web access, monetary admission and automatic policy tuning remain unimplemented.
 
 `/task` remains optional. Changes to an active task contract invalidate delegation,
@@ -205,21 +205,42 @@ and counters. [Protocol and executable examples](protocol.md) define the exact f
 | Resource                  | Ceiling                                                                      |
 | ------------------------- | ---------------------------------------------------------------------------- |
 | Active worker requests    | 2 per Pi process, including cancelled requests still settling                |
-| Batches / jobs            | 4 batches per Pi process; one unresolved batch; 2 jobs per batch             |
-| SDK model invocations     | 32 per Pi process, 8 per batch; 4 per logical job including follow-up        |
+| Batches / jobs            | 32 batches per Pi process; one unresolved batch; 2 jobs per batch            |
+| SDK model invocations     | 256 per Pi process, 64 per batch; 32 per logical job including follow-up      |
 | Follow-ups / retries      | 1 changed-input follow-up per job; provider and session retries disabled     |
 | Time                      | 10 minutes per job by default (human configurable 1–60); batch twice that; queue/follow-up included |
-| Packet / child context    | 256 KiB, checked before dispatch                                             |
+| Packet / child context    | 256 KiB handoff; 2 MiB serialized child context, checked before dispatch      |
 | Selected sources          | 200 files and 8 MiB per batch                                                |
-| Tools                     | 12 calls and 64 KiB total returned JSON per logical job                      |
+| Tools                     | 96 calls and 512 KiB total returned JSON per logical job                     |
 | Tool response             | Bounded reads/search; 16 KiB per snapshot read/search response               |
 | Final report              | 16 KiB; 8 findings; coverage for each assigned requirement                   |
-| Requested provider output | 8,192 tokens, clamped to the model maximum                                   |
-| SDK-visible response      | 256 KiB acceptance limit on observed response content                        |
+| Requested provider output | Pi's normal provider/model output and thinking settings                     |
+| SDK-visible response      | 1 MiB acceptance limit on observed response content; scales with budget       |
 
-These are conservative experiment limits, not empirically optimal values. Each SDK
+These use the default budget multiplier of 8, not empirically optimal values. Each SDK
 invocation is admitted before dispatch. Automatic provider/session retries and
 compaction are disabled, so they cannot silently create another SDK request.
+Ordinary source-argument mistakes return corrective feedback. Invalid or truncated
+reports trigger a correction in the same child session with its passages preserved.
+These corrections consume the existing model-call, context and deadline budgets;
+they do not create a fresh job or reset usage. Only a validated report can complete.
+
+Use `/delegate off`, `/delegate budget 16`, then `/delegate on` for a larger review:
+192 source tool calls, 1 MiB source output, and 64 model turns per job. The human-only
+budget command saves a multiplier from 1 to 64; `budget reset` restores 8. It scales
+tool calls/output, model turns per job/batch/process, process batches, and serialized
+child context and SDK response bytes together. It leaves concurrency, tool-response/packet/result limits,
+and timeouts unchanged. Existing settings files use 8 when no budget is saved.
+Budget changes invalidate old jobs and preserve spent process counters. Use a fresh
+batch afterward. Increasing budgets can increase model usage, cost, and retained
+context; provider context-window limits still apply.
+
+Tool-byte receipts count only delivered JSON; a rejected response cannot inflate the
+total beyond the allowance. Budget exhaustion reports the specific allowance and
+blocks a follow-up before launching a child. Successful follow-ups retain their
+existing passages and share the original budget/deadline. A failed child is released;
+when another attempt is eligible it starts with the original handoff, not the failed
+child's transcript.
 Pi authentication preflight occurs before the model-invocation counter; these quotas
 do not count or bound Pi's authentication/OAuth preparation.
 
@@ -257,6 +278,27 @@ all selected bytes. Publication, collection, follow-up and disposition also rech
 content digests. Changed source bindings require a fresh batch. A content change that
 evades filesystem metadata is detected at the next digest check, not by each tool call.
 
+Snapshot creation failures report a safe reason and, when applicable, the one-based
+position in the batch's selected-source list (job order, with repeated paths removed).
+Paths must be exact repository-relative filenames. A relative path can still be
+rejected for known private storage or credential-store filenames,
+unsupported file types, missing or inaccessible files, links, quotas, or changed or
+non-text content. The diagnostic never includes raw filesystem errors or file contents.
+Rejection starts no worker and consumes no batch or inference allowance. It provides
+no independent review. Check the reported cause before submitting corrected inputs;
+do not rename or copy restricted files to bypass the source policy.
+
+Ordinary application names such as `auth.ts`, `credentials.ts`, `secrets.py`,
+`credential-url.json`, and `sessions/` are allowed across supported text formats.
+The parent chooses the review material. Private namespaces such as `.pi`, `.ssh`,
+and SpecPi Chat storage, the configured Pi agent directory (including its canonical
+alias target), `.env` files, credential stores such as `auth.json` and
+`credentials.json`, and private keys remain blocked. An inaccessible configured
+Pi storage boundary must be repaired before capture. All selected-file scope,
+containment, link, text, size, and freshness checks still apply. Source naming is
+not proof that a file contains no secrets. Workers have no ambient source access;
+using the parent's provider does not grant them the parent's tools or transcript.
+
 This is a trusted-local-filesystem contract, not an operating-system sandbox or an
 atomic filesystem snapshot. Filename restrictions cannot detect secrets embedded in
 an ordinary source file. The parent must select appropriate material for the configured
@@ -282,6 +324,17 @@ Only bounded state summaries, quota counters and the idempotency journal remain 
 the Pi process lifetime, including `/reload` and session switches. They cannot recreate
 retired work. SDK setup errors are replaced with generic diagnostics before reaching
 status, command notices or model-facing errors; code-owned policy errors stay specific.
+Worker failures identify the failing stage: source tools, provider requests, stream or
+context/response limits, missing/truncated output, or final JSON/schema/evidence validation.
+Known source and report-validation reasons are included; raw provider errors, rejected
+report text, and filesystem paths are not. A tool failure keeps its original diagnostic
+even when Pi aborts the session. A low tool-call count therefore does not imply a reading
+budget failure. Delegation does not impose its own output-token cap. Ordinary argument
+errors and invalid reports can be corrected within the same session; source changes,
+revocation, unavailable tools and exhausted allowances still terminate it. No failure
+is a completed review or independent sign-off. Provider failures do not trigger automatic
+retries; a changed-input follow-up still shares the original job allowances
+and deadline, and a released failed child starts from its original handoff.
 There is no child session database, raw metrics log,
 credential copy, automatic resume, or secure memory-erasure claim. Normal Pi parent
 tool results may be retained in its ordinary session. Turning delegation off does not

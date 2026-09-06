@@ -188,7 +188,7 @@ test("ordinary native Pi delegation runs real child sessions through configured 
         sessionCalls: 32,
         sessionBatches: 4,
         batchJobs: 2,
-        outputTokens: 8192,
+        outputTokens: null,
     });
 });
 

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createSnapshot } from "../extensions/delegation/snapshot.mjs";
+import { DelegationError } from "../extensions/delegation/errors.mjs";
 
 function project(t, files = {}) {
     const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-snapshot-")));
@@ -151,14 +152,7 @@ test("all paths are screened before filesystem reads and cannot escape the root"
         ".codex/config.toml",
         ".ssh/config.json",
         "src/auth.json",
-        "src/provider-auth.ts",
-        "secrets/config.json",
         "credentials.json",
-        "session/data.json",
-        "sessions/data.json",
-        "history/log.md",
-        "missions/plan.md",
-        "trust.json",
         ".env",
         ".env.local",
         "nested/.env.json",
@@ -167,7 +161,10 @@ test("all paths are screened before filesystem reads and cannot escape the root"
         "program.exe",
     ];
     for (const relative of rejected) {
-        assert.throws(() => createSnapshot(root, ["normal.md", relative]), /^Error: Snapshot creation rejected\.$/);
+        assert.throws(
+            () => createSnapshot(root, ["normal.md", relative]),
+            /^Error: Snapshot creation rejected \(selected source 2\): Snapshot /,
+        );
     }
 
     assert.throws(() => createSnapshot(root, ["normal.md", "normal.md"]), /Snapshot/);
@@ -176,6 +173,221 @@ test("all paths are screened before filesystem reads and cannot escape the root"
     assert.throws(() => createSnapshot(path.join(root, ".pi"), []), /Snapshot/);
     assert.equal(open.mock.callCount(), 0);
     open.mock.restore();
+});
+
+test("ordinary source names and directories may discuss credentials and private state in any supported language", (t) => {
+    const files = Object.fromEntries(
+        [
+            "src/lib/security/credential-url.ts",
+            "src/provider-auth.js",
+            "src/session-catalog.mjs",
+            "src/history-view.tsx",
+            "src/trust-check.jsx",
+            "src/secret-parser.cjs",
+            "src/mission-state.mts",
+            "src/auth-helper.cts",
+            "src/CREDENTIAL-URL.TS",
+            "src/auth.ts",
+            "src/credentials.ts",
+            "src/secrets.py",
+            "src/session.rs",
+            "src/trust.go",
+            "src/auth/login.ts",
+            "src/credentials/provider.ts",
+            "src/session-store/history.json",
+            "src/secret/parser.py",
+            "src/.credential-url.ts",
+            "src/credential-url.json",
+            "src/provider-auth.json",
+            "secrets/config.json",
+            "session/data.json",
+            "sessions/data.json",
+            "history/log.md",
+            "missions/plan.md",
+            "trust.json",
+        ].map((relative) => [relative, "export const fixture = true;\n"]),
+    );
+    const root = project(t, files);
+    const value = snapshot(t, root, Object.keys(files));
+    assert.deepEqual(
+        value.sources.map((source) => source.path),
+        Object.keys(files),
+    );
+    for (const source of value.sources) {
+        assert.equal(value.read(source.id).text, "export const fixture = true;");
+    }
+
+    value.assertFresh();
+});
+
+test("actual private namespaces and credential-store formats are screened before filesystem access", (t) => {
+    const root = project(t);
+    const stat = t.mock.method(fs, "lstatSync", () => {
+        throw new Error("Private paths must be rejected before filesystem access.");
+    });
+    for (const relative of [
+        ".pi/credential-url.ts",
+        ".codex/credential-url.ts",
+        ".ssh/credential-url.ts",
+        ".aws/credential-url.ts",
+        ".azure/credential-url.ts",
+        ".gnupg/credential-url.ts",
+        ".kube/config.json",
+        ".docker/config.json",
+        ".config/gcloud/application_default_credentials.json",
+        "tannermidd.specpi-chat/sessions/log.md",
+        "src/.env.local.ts",
+        "src/.env-example.ts",
+        ".npmrc",
+        ".netrc",
+        ".pypirc",
+        ".git-credentials",
+        "src/.credentials.json",
+        "src/credentials.json",
+        "src/credentials.json.bak",
+        "src/credentials.yaml",
+        "src/secrets.toml",
+        "src/token.txt",
+        "src/auth.json",
+        "src/auth.json.backup",
+        "src/id_ed25519",
+        "src/id_rsa.txt",
+        "src/signing.pem",
+        "src/signing.key.json",
+        "src/store.keystore",
+    ]) {
+        assert.throws(() => createSnapshot(root, [relative]), {
+            message: "Snapshot creation rejected (selected source 1): Snapshot private path rejected.",
+        });
+    }
+
+    assert.throws(() => createSnapshot(path.join(root, ".aws"), []), /Snapshot root rejected/);
+    assert.equal(stat.mock.callCount(), 0);
+    stat.mock.restore();
+});
+
+test("ordinary workspace root names do not make source private", (t) => {
+    const root = project(t, { "auth-session-project/credentials.ts": "export const fixture = true;" });
+    const value = snapshot(t, path.join(root, "auth-session-project"), ["credentials.ts"]);
+    assert.equal(value.read("s1").text, "export const fixture = true;");
+});
+
+function configuredAgentDirectory(t, value) {
+    const previous = process.env.PI_CODING_AGENT_DIR;
+    process.env.PI_CODING_AGENT_DIR = value;
+    t.after(() => {
+        if (previous === undefined) {
+            delete process.env.PI_CODING_AGENT_DIR;
+        } else {
+            process.env.PI_CODING_AGENT_DIR = previous;
+        }
+    });
+}
+
+test("custom Pi storage is denied as a selected path or working root before content reads", (t) => {
+    const root = project(t, { "runtime-store/history/log.md": "synthetic private state", "src/session.ts": "source" });
+    configuredAgentDirectory(t, path.join(root, "runtime-store"));
+    const open = t.mock.method(fs, "openSync", () => {
+        throw new Error("Private contents must not be opened.");
+    });
+    assert.throws(() => createSnapshot(root, ["src/session.ts", "runtime-store/history/log.md"]), {
+        message: "Snapshot creation rejected (selected source 2): Snapshot private path rejected.",
+    });
+    assert.throws(() => createSnapshot(path.join(root, "runtime-store", "history"), ["log.md"]), {
+        message: "Snapshot creation rejected: Snapshot private working root rejected.",
+    });
+    assert.equal(open.mock.callCount(), 0);
+    open.mock.restore();
+    assert.equal(snapshot(t, root, ["src/session.ts"]).read("s1").text, "source");
+});
+
+test("custom Pi storage aliases protect their canonical target too", (t) => {
+    const root = project(t, { "runtime-store/history/log.md": "synthetic private state" });
+    const alias = path.join(root, "runtime-alias");
+    try {
+        fs.symlinkSync(path.join(root, "runtime-store"), alias, process.platform === "win32" ? "junction" : "dir");
+    } catch (error) {
+        if (["EPERM", "EACCES", "ENOTSUP"].includes(error.code)) {
+            t.skip("Platform does not permit symlink/junction creation.");
+
+            return;
+        }
+
+        throw error;
+    }
+
+    configuredAgentDirectory(t, alias);
+    const open = t.mock.method(fs, "openSync", () => {
+        throw new Error("Private contents must not be opened.");
+    });
+    assert.throws(() => createSnapshot(root, ["runtime-store/history/log.md"]), /Snapshot private path rejected/);
+    assert.equal(open.mock.callCount(), 0);
+    open.mock.restore();
+});
+
+test("creation reports safe reasons and one-based selection positions without paths or contents", (t) => {
+    const root = project(t, {
+        "normal.md": "fixture",
+        "binary.txt": Buffer.from([65, 0, 66]),
+        "invalid.txt": Buffer.from([0xc3, 0x28]),
+    });
+    const cases = [
+        [path.join(root, "normal.md"), "Snapshot path must be repository-relative."],
+        ["../outside.md", "Snapshot path rejected."],
+        ["src/auth.json", "Snapshot private path rejected."],
+        ["evidence.diff", "Snapshot file type rejected."],
+        ["binary.txt", "Snapshot non-text source rejected."],
+        ["invalid.txt", "Snapshot non-text source rejected."],
+        ["missing.md", "Selected file or working root does not exist."],
+    ];
+    for (const [relative, reason] of cases) {
+        assert.throws(() => createSnapshot(root, ["normal.md", relative]), {
+            message: `Snapshot creation rejected (selected source 2): ${reason}`,
+        });
+    }
+
+    assert.throws(() => createSnapshot(path.join(root, "missing"), ["normal.md"]), {
+        message: "Snapshot creation rejected: Selected file or working root does not exist.",
+    });
+    assert.throws(() => createSnapshot(root, ["normal.md", "normal.md"]), {
+        message: "Snapshot creation rejected: Snapshot duplicate source rejected.",
+    });
+    assert.throws(() => createSnapshot(root, ["normal.md"], { maxBytes: 1 }), {
+        message: "Snapshot creation rejected (selected source 1): Snapshot byte quota exceeded.",
+    });
+});
+
+test("creation redacts filesystem and unexpected errors, including foreign policy errors", (t) => {
+    const root = project(t, { "normal.md": "fixture" });
+    const originalStat = fs.lstatSync;
+    const canary = "PRIVATE-CANARY /private/credential.txt https://example.test/?token=hidden";
+    for (const [code, reason] of [
+        ["ENOENT", "Selected file or working root does not exist."],
+        ["ENOTDIR", "Selected file or working root does not exist."],
+        ["EACCES", "Selected file or working root is not accessible."],
+        ["EPERM", "Selected file or working root is not accessible."],
+        ["EIO", "Source unavailable or changed; check the selection and working root."],
+        [undefined, "Source unavailable or changed; check the selection and working root."],
+    ]) {
+        const stat = t.mock.method(fs, "lstatSync", (filename, ...args) => {
+            if (filename === path.join(root, "normal.md")) {
+                throw Object.assign(new DelegationError(canary), { code, path: canary });
+            }
+
+            return originalStat(filename, ...args);
+        });
+        assert.throws(
+            () => createSnapshot(root, ["normal.md"]),
+            (error) => {
+                assert.equal(error.message, `Snapshot creation rejected (selected source 1): ${reason}`);
+                assert.equal(error.cause, undefined);
+                assert.doesNotMatch(error.stack, /PRIVATE-CANARY/);
+
+                return true;
+            },
+        );
+        stat.mock.restore();
+    }
 });
 
 test("search scopes cannot reveal sibling files or spend the caller's result quota", (t) => {
@@ -201,9 +413,11 @@ test("snapshot rejects directories, hard links, binary content, and invalid UTF-
         "binary.txt": Buffer.from([65, 0, 66]),
         "invalid.txt": Buffer.from([0xc3, 0x28]),
         "control.txt": Buffer.from([65, 27, 66]),
+        "src/credential-url.ts": Buffer.from([65, 0, 66]),
     });
     fs.mkdirSync(path.join(root, "folder.md"));
     fs.linkSync(path.join(root, "normal.md"), path.join(root, "linked.md"));
+    fs.linkSync(path.join(root, "normal.md"), path.join(root, "provider-auth.ts"));
     for (const relative of [
         "normal.md",
         "linked.md",
@@ -211,6 +425,8 @@ test("snapshot rejects directories, hard links, binary content, and invalid UTF-
         "binary.txt",
         "invalid.txt",
         "control.txt",
+        "src/credential-url.ts",
+        "provider-auth.ts",
         "missing.md",
     ]) {
         assert.throws(() => createSnapshot(root, [relative]), /Snapshot creation rejected/);
@@ -242,7 +458,7 @@ test("snapshot rejects selected directory junction redirects", (t) => {
 test("snapshot rejects selected file symlinks", (t) => {
     const root = project(t, { "normal.md": "fixture" });
     try {
-        fs.symlinkSync(path.join(root, "normal.md"), path.join(root, "link.md"), "file");
+        fs.symlinkSync(path.join(root, "normal.md"), path.join(root, "credential-url.ts"), "file");
     } catch (error) {
         if (error.code === "EPERM" || error.code === "EACCES" || error.code === "ENOTSUP") {
             t.skip("Platform does not permit file symlink creation.");
@@ -253,7 +469,7 @@ test("snapshot rejects selected file symlinks", (t) => {
         throw error;
     }
 
-    assert.throws(() => createSnapshot(root, ["link.md"]), /Snapshot/);
+    assert.throws(() => createSnapshot(root, ["credential-url.ts"]), /Snapshot/);
 });
 
 test("aggregate file and byte quotas apply before capture and may only be lowered", (t) => {

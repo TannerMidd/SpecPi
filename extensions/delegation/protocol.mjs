@@ -4,6 +4,25 @@ import { createHash } from "node:crypto";
 export const DEFAULT_TIMEOUT_MINUTES = 10;
 export const MAX_TIMEOUT_MINUTES = 60;
 export const MAX_JOB_MS = MAX_TIMEOUT_MINUTES * 60_000;
+export const DEFAULT_BUDGET_MULTIPLIER = 8;
+export const MAX_BUDGET_MULTIPLIER = 64;
+
+export function budgetLimits(multiplier) {
+    if (!Number.isSafeInteger(multiplier) || multiplier < 1 || multiplier > MAX_BUDGET_MULTIPLIER) {
+        throw new DelegationError(`Delegation budget must be a whole multiplier from 1 to ${MAX_BUDGET_MULTIPLIER}`);
+    }
+
+    return {
+        sessionBatches: 4 * multiplier,
+        sessionCalls: 32 * multiplier,
+        batchCalls: 8 * multiplier,
+        jobCalls: 4 * multiplier,
+        toolBytes: 64 * 1024 * multiplier,
+        toolCalls: 12 * multiplier,
+        contextBytes: 256 * 1024 * multiplier,
+        retainedResponseBytes: 128 * 1024 * multiplier,
+    };
+}
 
 export function timeoutLimits(minutes) {
     if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES) {
@@ -15,18 +34,12 @@ export function timeoutLimits(minutes) {
 
 export const LIMITS = Object.freeze({
     concurrency: 2,
-    sessionBatches: 4,
-    sessionCalls: 32,
     batchJobs: 2,
-    batchCalls: 8,
-    jobCalls: 4,
+    ...budgetLimits(DEFAULT_BUDGET_MULTIPLIER),
     ...timeoutLimits(DEFAULT_TIMEOUT_MINUTES),
-    contextBytes: 256 * 1024,
-    retainedResponseBytes: 256 * 1024,
-    toolBytes: 64 * 1024,
-    toolCalls: 12,
+    packetBytes: 256 * 1024,
     resultBytes: 16 * 1024,
-    outputTokens: 8192,
+    outputTokens: null,
 });
 
 export function bytes(value) {
@@ -162,7 +175,7 @@ function validatePacketShape(packet) {
     if (
         !packet.jobs.length ||
         new Set(packet.jobs.map((job) => job.id)).size !== packet.jobs.length ||
-        bytes(packet) > LIMITS.contextBytes
+        bytes(packet) > LIMITS.packetBytes
     ) {
         throw new DelegationError("Delegation packet exceeds its bound or repeats job identifiers");
     }
@@ -200,7 +213,7 @@ export function validateOperation(input) {
         operations[input.operation],
         operations[input.operation].filter((key) => !optional.includes(key)),
     );
-    if (bytes(input) > LIMITS.contextBytes + 4096) {
+    if (bytes(input) > LIMITS.packetBytes + 4096) {
         throw new DelegationError("Delegation operation exceeds its bound");
     }
 

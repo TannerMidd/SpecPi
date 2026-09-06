@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { DelegationError } from "./errors.mjs";
@@ -77,17 +78,69 @@ const TEXT_NAMES = new Set([
     ".prettierrc",
     ".eslintrc",
 ]);
-const PRIVATE_SEGMENT =
-    /(?:^|[._-])(?:auth|authentication|secret|secrets|credential|credentials|session|sessions|history|mission|missions|trust)(?:$|[._-])/i;
-const PRIVATE_DIRECTORY = /^(?:\.git|\.pi|\.codex|\.ssh|\.aws|\.azure|\.gnupg)$/i;
+const PRIVATE_DIRECTORY =
+    /^(?:\.git|\.pi|\.codex|\.ssh|\.aws|\.azure|\.gnupg|\.kube|\.docker|tannermidd\.specpi-chat)$/i;
+// Reserve credential-store names and formats, never topic words in source paths.
+const CREDENTIAL_FILE =
+    /^(?:\.env(?:[._-].*)?|\.(?:npmrc|netrc|pypirc|git-credentials|credentials|token|secrets?)(?:[._-].*)?|auth\.json(?:[._-].*)?|(?:credentials?|token|secrets?)\.(?:json|ya?ml|toml|ini|txt|env|enc)(?:[._-].*)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:[._-].*)?|private\.key(?:[._-].*)?)$/i;
+const PRIVATE_KEY_FILE = /\.(?:pem|key|p12|pfx|keystore)(?:[._-].*)?$/i;
 const DEVICE_NAME = /^(?:con|prn|aux|nul|clock\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i;
 
+class SnapshotError extends DelegationError {}
+
 function fail(label) {
-    throw new DelegationError(`Snapshot ${label}.`);
+    throw new SnapshotError(`Snapshot ${label}.`);
 }
 
-function isPrivate(segment) {
-    return PRIVATE_DIRECTORY.test(segment) || PRIVATE_SEGMENT.test(segment) || /^\.env(?:\.|$)/i.test(segment);
+function creationReason(error) {
+    if (error instanceof SnapshotError) {
+        return error.message;
+    }
+
+    // Never expose filesystem messages, paths, stacks, or arbitrary error text.
+    switch (error?.code) {
+        case "ENOENT":
+        case "ENOTDIR":
+            return "Selected file or working root does not exist.";
+        case "EACCES":
+        case "EPERM":
+            return "Selected file or working root is not accessible.";
+        default:
+            return "Source unavailable or changed; check the selection and working root.";
+    }
+}
+
+function isPrivatePath(value) {
+    const normalized = value.replaceAll("\\", "/");
+
+    return (
+        normalized
+            .split("/")
+            .some(
+                (part) => PRIVATE_DIRECTORY.test(part) || CREDENTIAL_FILE.test(part) || PRIVATE_KEY_FILE.test(part),
+            ) || /(?:^|\/)\.config\/gcloud(?:\/|$)/i.test(normalized)
+    );
+}
+
+function agentRoots() {
+    const requested = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
+    const roots = [requested];
+    try {
+        // Directory metadata only: never enumerate or read any private state.
+        roots.push(fs.realpathSync.native(requested));
+    } catch (error) {
+        if (error.code !== "ENOENT" && error.code !== "ENOTDIR") {
+            fail("private state boundary unavailable");
+        }
+    }
+
+    return roots;
+}
+
+function within(root, candidate) {
+    const relative = path.relative(root, candidate);
+
+    return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
 function samePath(left, right) {
@@ -103,24 +156,24 @@ function validateRelative(value) {
         fail("path rejected");
     }
 
-    if (path.posix.isAbsolute(value) || path.win32.isAbsolute(value) || /[\x00-\x1f\x7f:*?]/.test(value)) {
+    if (path.posix.isAbsolute(value) || path.win32.isAbsolute(value)) {
+        fail("path must be repository-relative");
+    }
+
+    if (/[\x00-\x1f\x7f:*?]/.test(value)) {
         fail("path rejected");
     }
 
     const parts = value.replaceAll("\\", "/").split("/");
     if (
         parts.length > 128 ||
-        parts.some(
-            (part) =>
-                !part ||
-                part === "." ||
-                part === ".." ||
-                /[. ]$/.test(part) ||
-                isPrivate(part) ||
-                DEVICE_NAME.test(part),
-        )
+        parts.some((part) => !part || part === "." || part === ".." || /[. ]$/.test(part) || DEVICE_NAME.test(part))
     ) {
         fail("path rejected");
+    }
+
+    if (isPrivatePath(parts.join("/"))) {
+        fail("private path rejected");
     }
 
     const name = parts.at(-1).toLowerCase();
@@ -275,6 +328,7 @@ export function createSnapshot(root, paths, options = {}) {
     const records = [];
     let closed = false;
     let canonicalRoot;
+    let sourceIndex;
     try {
         if (
             !options ||
@@ -292,7 +346,12 @@ export function createSnapshot(root, paths, options = {}) {
         }
 
         // Validate the entire selection before inspecting any selected file.
-        const selected = paths.map(validateRelative);
+        const selected = paths.map((value, index) => {
+            sourceIndex = index;
+
+            return validateRelative(value);
+        });
+        sourceIndex = undefined;
         const keys = selected.map((value) => (process.platform === "win32" ? value.toLowerCase() : value));
         if (new Set(keys).size !== selected.length) {
             fail("duplicate source rejected");
@@ -303,19 +362,34 @@ export function createSnapshot(root, paths, options = {}) {
             root.length === 0 ||
             root.length > 4096 ||
             /[\x00-\x1f\x7f]/.test(root) ||
-            root.replaceAll("\\", "/").split("/").some(isPrivate)
+            isPrivatePath(root)
         ) {
             fail("root rejected");
         }
 
         canonicalRoot = path.resolve(root);
-        if (canonicalRoot.replaceAll("\\", "/").split("/").some(isPrivate)) {
+        if (isPrivatePath(canonicalRoot)) {
             fail("root rejected");
         }
 
+        const privateRoots = agentRoots();
+        if (privateRoots.some((privateRoot) => within(privateRoot, canonicalRoot))) {
+            fail("private working root rejected");
+        }
+
+        // Screen the complete selection against custom Pi storage before reads.
+        for (const [index, relative] of selected.entries()) {
+            sourceIndex = index;
+            if (privateRoots.some((privateRoot) => within(privateRoot, path.join(canonicalRoot, relative)))) {
+                fail("private path rejected");
+            }
+        }
+
+        sourceIndex = undefined;
         checkedStat(canonicalRoot, true);
         let totalBytes = 0;
-        for (const relative of selected) {
+        for (const [index, relative] of selected.entries()) {
+            sourceIndex = index;
             const original = binding(canonicalRoot, relative);
             if (original.stat.size > BigInt(maxBytes - totalBytes)) {
                 fail("byte quota exceeded");
@@ -325,7 +399,8 @@ export function createSnapshot(root, paths, options = {}) {
             records.push({ relative, original, digest: undefined, lines: undefined });
         }
 
-        for (const record of records) {
+        for (const [index, record] of records.entries()) {
+            sourceIndex = index;
             const bytes = readBoundFile(canonicalRoot, record.relative, record.original, maxBytes);
             try {
                 record.digest = hash(bytes);
@@ -337,7 +412,8 @@ export function createSnapshot(root, paths, options = {}) {
 
         // Recheck every digest after all captures, then all path/stat bindings.
         // This detects observed drift, without claiming an atomic OS snapshot.
-        for (const record of records) {
+        for (const [index, record] of records.entries()) {
+            sourceIndex = index;
             const bytes = readBoundFile(canonicalRoot, record.relative, record.original, maxBytes);
             try {
                 if (hash(bytes) !== record.digest) {
@@ -348,14 +424,16 @@ export function createSnapshot(root, paths, options = {}) {
             }
         }
 
-        for (const record of records) {
+        for (const [index, record] of records.entries()) {
+            sourceIndex = index;
             if (!bindingEqual(record.original, binding(canonicalRoot, record.relative))) {
                 fail("source changed");
             }
         }
-    } catch {
+    } catch (error) {
         records.length = 0;
-        fail("creation rejected");
+        const location = sourceIndex === undefined ? "" : ` (selected source ${sourceIndex + 1})`;
+        throw new DelegationError(`Snapshot creation rejected${location}: ${creationReason(error)}`);
     }
 
     const sources = Object.freeze(

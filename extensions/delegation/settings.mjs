@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { DEFAULT_TIMEOUT_MINUTES, timeoutLimits } from "./protocol.mjs";
+import { DEFAULT_TIMEOUT_MINUTES, DEFAULT_BUDGET_MULTIPLIER, timeoutLimits, budgetLimits } from "./protocol.mjs";
 import { DelegationError } from "./errors.mjs";
 
 const MAX_SETTINGS_BYTES = 4096;
@@ -94,18 +94,59 @@ export function createTimeoutStore(
         if (
             !settings ||
             settings.schema !== 1 ||
-            Object.keys(settings).length !== 2 ||
+            Object.keys(settings).some((key) => !["schema", "timeoutMinutes", "budgetMultiplier"].includes(key)) ||
             !Object.hasOwn(settings, "timeoutMinutes")
         ) {
             throw new Error("Invalid settings schema");
         }
 
         timeoutLimits(settings.timeoutMinutes);
+        if (Object.hasOwn(settings, "budgetMultiplier")) {
+            budgetLimits(settings.budgetMultiplier);
+        }
 
-        return { content, minutes: settings.timeoutMinutes };
+        return { content, minutes: settings.timeoutMinutes, budgetMultiplier: settings.budgetMultiplier };
+    };
+
+    const save = (patch) => {
+        const previous = read();
+        const { dir, file } = location();
+        directory(dir, true);
+        if (previous) {
+            atomicWrite(
+                `${file}.bak`,
+                `${JSON.stringify({ sha256: createHash("sha256").update(previous.content).digest("hex"), content: previous.content })}\n`,
+                MAX_BACKUP_BYTES,
+            );
+        }
+
+        const settings = {
+            schema: 1,
+            timeoutMinutes: previous?.minutes ?? DEFAULT_TIMEOUT_MINUTES,
+            ...(previous?.budgetMultiplier === undefined ? {} : { budgetMultiplier: previous.budgetMultiplier }),
+            ...patch,
+        };
+        atomicWrite(file, `${JSON.stringify(settings)}\n`);
     };
 
     return {
+        loadBudget() {
+            try {
+                return read()?.budgetMultiplier ?? DEFAULT_BUDGET_MULTIPLIER;
+            } catch {
+                throw new DelegationError(
+                    "Cannot read delegation budget settings; check the owned settings file and restart Pi.",
+                );
+            }
+        },
+        saveBudget(multiplier) {
+            budgetLimits(multiplier);
+            try {
+                save({ budgetMultiplier: multiplier });
+            } catch {
+                throw new DelegationError("Cannot save delegation budget settings; the active budget is unchanged.");
+            }
+        },
         load() {
             try {
                 return read()?.minutes ?? DEFAULT_TIMEOUT_MINUTES;
@@ -118,18 +159,7 @@ export function createTimeoutStore(
         save(minutes) {
             timeoutLimits(minutes);
             try {
-                const previous = read();
-                const { dir, file } = location();
-                directory(dir, true);
-                if (previous) {
-                    atomicWrite(
-                        `${file}.bak`,
-                        `${JSON.stringify({ sha256: createHash("sha256").update(previous.content).digest("hex"), content: previous.content })}\n`,
-                        MAX_BACKUP_BYTES,
-                    );
-                }
-
-                atomicWrite(file, `${JSON.stringify({ schema: 1, timeoutMinutes: minutes })}\n`);
+                save({ timeoutMinutes: minutes });
             } catch {
                 throw new DelegationError(
                     "Cannot save delegation settings. Check <agent-dir>/specpi/delegation/settings.json and its permissions; the active timeout is unchanged.",

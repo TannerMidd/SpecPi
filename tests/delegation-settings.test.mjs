@@ -5,7 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import { createTimeoutStore } from "../extensions/delegation/settings.mjs";
-import { LIMITS, timeoutLimits } from "../extensions/delegation/protocol.mjs";
+import { LIMITS, timeoutLimits, budgetLimits } from "../extensions/delegation/protocol.mjs";
 
 function fixture(t) {
     // Match the store's spelling, including Windows short/long TEMP path aliases.
@@ -23,6 +23,31 @@ test("timeout defaults and numeric bounds are explicit and finite", () => {
     for (const value of [0, -1, 61, 1.5, NaN, Infinity, "10", undefined, null]) {
         assert.throws(() => timeoutLimits(value), /whole number/);
     }
+});
+
+test("budget defaults support substantial reviews and validated overrides persist with timeout settings", (t) => {
+    const { dir, file, store } = fixture(t);
+    assert.equal(store.loadBudget(), 8);
+    assert.equal(LIMITS.toolCalls, 96);
+    assert.equal(LIMITS.toolBytes, 512 * 1024);
+    assert.equal(LIMITS.jobCalls, 32);
+    assert.equal(budgetLimits(64).toolCalls, 768);
+    assert.deepEqual(fs.readdirSync(dir), []);
+    store.save(30);
+    store.saveBudget(16);
+    assert.equal(createTimeoutStore(dir).loadBudget(), 16);
+    assert.equal(store.load(), 30);
+    store.save(15);
+    assert.equal(store.loadBudget(), 16);
+    const previous = fs.readFileSync(file, "utf8");
+    for (const value of [0, 65, -1, 1.5, Infinity, NaN, "16", null]) {
+        assert.throws(() => store.saveBudget(value), /whole multiplier/);
+        assert.equal(fs.readFileSync(file, "utf8"), previous);
+    }
+
+    fs.writeFileSync(file, JSON.stringify({ schema: 1, timeoutMinutes: 15, budgetMultiplier: 65 }));
+    assert.throws(() => store.loadBudget(), /Cannot read delegation budget/);
+    assert.throws(() => store.saveBudget(8), /Cannot save delegation budget/);
 });
 
 test("preference reads are non-mutating; saves survive a new store and back up only own settings", (t) => {
