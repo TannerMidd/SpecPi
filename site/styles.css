@@ -1006,15 +1006,12 @@ pre {
 }
 .improvement-diagram picture {
     display: block;
-    aspect-ratio: 3 / 1;
-    overflow: hidden;
 }
 .improvement-diagram img {
     display: block;
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    mix-blend-mode: multiply;
+    height: auto;
+    object-fit: contain;
 }
 .improvement-diagram figcaption {
     display: flex;
@@ -1027,9 +1024,14 @@ pre {
 .improvement-diagram figcaption a {
     color: var(--accent);
 }
-[data-theme="dark"] .improvement-diagram img {
-    filter: invert(1) hue-rotate(180deg) brightness(1.4);
-    mix-blend-mode: screen;
+.improvement-diagram [data-diagram-theme="dark"] {
+    display: none;
+}
+[data-theme="dark"] .improvement-diagram [data-diagram-theme="light"] {
+    display: none;
+}
+[data-theme="dark"] .improvement-diagram [data-diagram-theme="dark"] {
+    display: block;
 }
 @media (max-width: 800px) {
     .improvement-intro {
@@ -1037,10 +1039,13 @@ pre {
         gap: 1rem;
     }
 }
-@media (max-width: 600px) {
+@media (max-width: 900px) {
     .improvement-diagram picture {
-        aspect-ratio: 3 / 4;
+        max-width: 440px;
+        margin-inline: auto;
     }
+}
+@media (max-width: 600px) {
     .improvement-diagram figcaption {
         flex-direction: column;
         gap: 0.5rem;

@@ -26,7 +26,10 @@ test(
     { skip: !enabled, timeout: 180000 },
     async (t) => {
         await withBrowser(async (browser, origin) => {
-            for (const [name, viewport] of Object.entries(VIEWPORT_PRESETS)) {
+            for (const [name, viewport] of Object.entries({
+                ...VIEWPORT_PRESETS,
+                fullDesktop: { width: 1920, height: 1080 },
+            })) {
                 for (const { route, theme } of ["", "wiki/", "single-agent/"].flatMap((route) =>
                     ["light", "dark"].map((theme) => ({ route, theme })),
                 )) {
@@ -206,7 +209,7 @@ test(
                 assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
                 await assertPreview("light");
                 await page.goto(`${origin}/SpecPi/#loop`);
-                assert.equal(await page.locator("#loop img").isVisible(), true);
+                assert.equal(await page.locator("#loop img:visible").isVisible(), true);
                 assert.equal(await page.locator("#loop summary, #loop button").count(), 0);
                 await page.goto(`${origin}/SpecPi/#guard`);
                 assert.equal(await page.locator("#guard").evaluate((element) => element.open), true);

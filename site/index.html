@@ -252,17 +252,33 @@ specpi doctor</code></pre>
                         </p>
                     </div>
                     <figure class="improvement-diagram">
-                        <picture>
+                        <picture data-diagram-theme="light">
                             <source
-                                media="(max-width: 600px)"
-                                srcset="media/improvement-workflow-mobile.png"
-                                width="1086"
-                                height="1448"
+                                media="(max-width: 900px)"
+                                srcset="media/improvement-workflow-mobile.svg"
+                                width="360"
+                                height="540"
                             />
                             <img
-                                src="media/improvement-workflow.png"
-                                width="1774"
-                                height="887"
+                                src="media/improvement-workflow.svg"
+                                width="1200"
+                                height="280"
+                                loading="lazy"
+                                decoding="async"
+                                alt="Pi harness improvement: observe and qualify a recurring gap; select one change with human authorization; modify the Pi harness; run checks and validation; retire only with evidence; review later outcomes. Failed checks return to Modify. New work requires a new human selection."
+                            />
+                        </picture>
+                        <picture data-diagram-theme="dark">
+                            <source
+                                media="(max-width: 900px)"
+                                srcset="media/improvement-workflow-mobile-dark.svg"
+                                width="360"
+                                height="540"
+                            />
+                            <img
+                                src="media/improvement-workflow-dark.svg"
+                                width="1200"
+                                height="280"
                                 loading="lazy"
                                 decoding="async"
                                 alt="Pi harness improvement: observe and qualify a recurring gap; select one change with human authorization; modify the Pi harness; run checks and validation; retire only with evidence; review later outcomes. Failed checks return to Modify. New work requires a new human selection."

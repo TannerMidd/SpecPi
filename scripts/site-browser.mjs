@@ -174,11 +174,29 @@ export async function checkRenderedPage(page, { origin, route, viewport, fault }
             await page.keyboard.press("ArrowRight");
             await selectedTab(page, '[data-guard-mode="strict"]', "#guard-comparison");
             assert.equal(await page.locator("#loop button, #loop summary, #loop [role=tab]").count(), 0);
-            assert.equal(await page.locator("#loop img").isVisible(), true);
+            assert.equal(await page.locator("#loop img:visible").isVisible(), true);
             assert.equal(
-                await page.locator("#loop img").evaluate((image) => image.complete && image.naturalWidth > 0),
+                await page.locator("#loop img:visible").evaluate((image) => image.complete && image.naturalWidth > 0),
                 true,
             );
+            const diagram = await page.locator("#loop img:visible").evaluate((image) => {
+                const bounds = image.getBoundingClientRect();
+
+                return {
+                    width: bounds.width,
+                    height: bounds.height,
+                    naturalWidth: image.naturalWidth,
+                    naturalHeight: image.naturalHeight,
+                    fit: getComputedStyle(image).objectFit,
+                    source: image.currentSrc,
+                };
+            });
+            assert.equal(diagram.fit, "contain");
+            assert.ok(
+                Math.abs(diagram.width / diagram.height - diagram.naturalWidth / diagram.naturalHeight) < 0.01,
+                "Workflow image must retain its native proportions",
+            );
+            assert.ok(diagram.source.endsWith(".svg"));
             await page.locator("[data-copy-target]").click();
             await expectText(page, "[data-copy-status]", "Commands copied.");
             assert.equal(

@@ -594,8 +594,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(cycle, /ArrowRight|ArrowDown/);
     assert.doesNotMatch(cycle, /CYCLE_STAGES|cycleControls/);
     assert.doesNotMatch(html, /data-cycle-step|cycle-panel/);
-    assert.match(html, /media\/improvement-workflow\.png/);
-    assert.ok(fs.statSync(path.join(siteDir, "media", "improvement-workflow.png")).size > 0);
+    assert.match(html, /media\/improvement-workflow\.svg/);
+    assert.ok(fs.statSync(path.join(siteDir, "media", "improvement-workflow.svg")).size > 0);
     assert.match(workflow, /actions\/configure-pages@v5/);
     assert.match(workflow, /actions\/upload-pages-artifact@v4/);
     assert.match(workflow, /actions\/deploy-pages@v4/);
