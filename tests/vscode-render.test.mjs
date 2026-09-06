@@ -1708,7 +1708,7 @@ test(
                             },
                         ];
                         await setState(page, { status: "busy", messages });
-                        assert.equal(await page.locator(".tool-input").isVisible(), false);
+                        assert.equal(await page.locator(".tool-input").isVisible(), true);
                         assert.equal(
                             await page
                                 .locator(
@@ -1740,7 +1740,6 @@ test(
                         assert.equal(await copy.textContent(), "Copied");
                         assert.equal(await page.locator("#announcer").textContent(), "Copied to clipboard");
                         assert.equal(await page.locator(".reasoning-content").isVisible(), true);
-                        await page.locator(".tool-card summary").click();
                         assert.equal(
                             await page.locator(".tool-input").textContent(),
                             "<img onerror=alert(1)> literal tool input",
@@ -1757,6 +1756,64 @@ test(
                         assert.equal(await page.locator(".tool-state").textContent(), "Completed");
                         assert.equal(await page.locator(".tool-output").textContent(), "first output\nsecond output");
                     });
+                },
+            );
+
+            await t.test(
+                "tools open by default and preserve manual toggles through streaming and completion",
+                async () => {
+                    for (const width of [280, 390, 768, 1200]) {
+                        await withPage(browser, fixtures, { name: `tool-default-${width}`, width }, async (page) => {
+                            const message = {
+                                id: "tool-stream",
+                                role: "tool",
+                                toolName: "browser_screenshot",
+                                input: '{ "fullPage": false }',
+                                text: "",
+                                isRunning: true,
+                            };
+                            const tool = page.locator('[data-message-id="tool-stream"] .tool-card');
+                            await setState(page, { status: "busy", messages: [message] });
+                            assert.equal(await tool.getAttribute("open"), "");
+                            assert.equal(await tool.locator(".tool-input").isVisible(), true);
+                            assert.equal(await tool.locator(".tool-output").textContent(), "Waiting for output…");
+                            message.text = "Capturing screenshot.";
+                            await setState(page, { status: "busy", messages: [message] });
+                            assert.equal(await tool.getAttribute("open"), "");
+                            await tool.locator("summary").focus();
+                            await page.keyboard.press("Enter");
+                            message.text += " Capture in progress.";
+                            await setState(page, { status: "busy", messages: [message] });
+                            assert.equal(await tool.getAttribute("open"), null);
+                            assert.equal(await tool.locator(".tool-output").isVisible(), false);
+                            message.isRunning = false;
+                            message.text = "Screenshot captured.";
+                            message.images = [{ type: "image", ...imageFixture() }];
+                            await setState(page, { messages: [message] });
+                            assert.equal(await tool.getAttribute("open"), null);
+                            assert.equal(await tool.locator("img").isVisible(), false);
+                            await tool.locator("summary").focus();
+                            await page.keyboard.press("Enter");
+                            await assertImageLoaded(tool.locator("img"));
+                            assert.equal(await tool.locator(".tool-state").textContent(), "Completed");
+                            await setState(page, {
+                                messages: [
+                                    message,
+                                    { id: "failed-tool", role: "tool", text: "Synthetic failure", isError: true },
+                                ],
+                            });
+                            assert.equal(await tool.getAttribute("open"), "");
+                            assert.equal(await page.locator(".tool-card.is-error").getAttribute("open"), "");
+                            assert.equal(await page.locator(".tool-card.is-error .tool-output").isVisible(), true);
+                            await setState(page, { messages: [] });
+                            await setState(page, { messages: [{ ...message, text: "" }] });
+                            assert.equal(await tool.getAttribute("open"), "", "Restored tools start expanded");
+                            await assertImageLoaded(tool.locator("img"));
+                            assert.equal(await tool.locator(".tool-output").isVisible(), false);
+                            await assertLayout(page, width);
+                            await page.screenshot({ path: path.join(screenshots, `tool-default-${width}.png`) });
+                        });
+                    }
                 },
             );
 
@@ -2146,7 +2203,7 @@ test(
                                     await assertImageLoaded(page.locator("#attachments .attachment-image img"));
                                     await assertImageLoaded(page.locator(".message-user .message-images img"));
                                     await assertImageLoaded(page.locator(".message-assistant .message-images img"));
-                                    assert.equal(await page.locator(".message-tool .message-images img").count(), 1);
+                                    await assertImageLoaded(page.locator(".message-tool .message-images img"));
                                     assert.equal(await page.locator("#send-button").isEnabled(), true);
                                     await assertLayout(page, width);
                                     await page.screenshot({
@@ -2367,7 +2424,6 @@ test(
                             ".message-tool .image-thumbnail",
                         ]) {
                             if (selector.startsWith(".message-tool")) {
-                                await page.locator(".message-tool summary").click();
                                 await assertImageLoaded(page.locator(".message-tool .message-images img"));
                             }
 
@@ -2795,6 +2851,8 @@ test(
                             { id: "extra-assistant", role: "assistant", text: "I found the needle." },
                         ];
                         await setState(page, { messages });
+                        assert.equal(await page.locator(".tool-card").getAttribute("open"), "");
+                        await page.locator(".tool-card summary").click();
                         assert.equal(await page.locator(".tool-card").getAttribute("open"), null);
                         await page.locator("#composer-input").focus();
                         await page.keyboard.press("Control+f");

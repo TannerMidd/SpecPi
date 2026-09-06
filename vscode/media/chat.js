@@ -1148,15 +1148,13 @@
         const article = existing || element("article");
         const gallery = imageGallery(message.images, article.querySelector(".message-images"));
         const thinkingOpen = article.querySelector('details[data-section="thinking"]')?.open ?? true;
-        const expanded = new Set(
-            Array.from(article.querySelectorAll("details[open]")).map((detail) => detail.dataset.section),
-        );
+        const toolOpen = article.querySelector('details[data-section="tool"]')?.open ?? true;
         article.className = `message message-${role}${message.isError ? " message-is-error" : ""}`;
         article.replaceChildren();
         if (role === "tool") {
             const details = element("details", `tool-card${message.isError ? " is-error" : ""}`);
             details.dataset.section = "tool";
-            details.open = expanded.has("tool");
+            details.open = toolOpen;
             const summary = element("summary");
             summary.append(element("span", "tool-name", message.toolName || "Tool"));
             summary.append(

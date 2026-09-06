@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.3.2
+
+- Expand tool calls by default so progress, results, and images are visible without an extra click. Preserve manual collapse/expand choices during streaming and completion.
+
 ## 0.3.1
 
 - Increase chat/composer text to a 14px minimum, limits/code to 13px, and secondary labels to 12px. Respect larger host font sizes and let footer controls wrap rather than overlap in narrow sidebars.
