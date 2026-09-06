@@ -2,9 +2,11 @@
 
 ## 0.3.1
 
+- Expand thinking blocks by default while preserving manual collapse/expand choices during streaming; tool blocks remain collapsed by default.
 - Fix `/model` selection while retaining the composer send lock and rejecting overlapping prompts or stale picker results.
 - Allow read-only usage details during active responses, retries, compaction, and queued sends, without querying a connection before readiness.
 - Prevent failed Stop cleanup from reporting an obsolete error into a reconnected conversation.
+- Allow ordinary source names such as `auth.ts`, `history.js`, and `sessions.py` in attachments, editor selections, code links, and file suggestions. Scope Pi-state names to Pi/Chat storage while retaining global credential/key filtering and canonical-path checks.
 - Align the README, Pages guide, and VSIX installation examples with the release package; run the rendered Chat suite in CI.
 
 ## 0.3.0

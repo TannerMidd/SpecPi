@@ -242,8 +242,9 @@ test("code references reject sensitive paths before checking existence and reche
         ".pi/agent/sessions/one.jsonl",
         ".pi/agent/missions/one.json",
         ".pi/agent/history.jsonl",
-        "sessions/one.jsonl",
-        "history.jsonl",
+        ".pi/sessions/one.jsonl",
+        ".pi/history.jsonl",
+        "tannermidd.specpi-chat/workspaces/example/sessions/one.jsonl",
         `${pathToFileURL(workspace).href}/%2eenv#L2`,
     ]) {
         await assert.rejects(
@@ -269,6 +270,11 @@ test("code references reject sensitive paths before checking existence and reche
 test("code references allow ordinary source filenames resembling sensitive words", async (t) => {
     const { workspace } = await fixture(t);
     for (const name of [
+        "auth.ts",
+        "history.js",
+        "sessions.py",
+        "trust.go",
+        "mission.rs",
         "author.js",
         "authentication.ts",
         "trustworthiness.md",

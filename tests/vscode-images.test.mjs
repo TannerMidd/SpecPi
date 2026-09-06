@@ -347,10 +347,10 @@ test("image file attachments reject nonfiles, oversized content, sensitive paths
     for (const name of [
         ".env",
         "auth.json",
-        "trust.png",
+        ".pi/agent/trust.png",
         "credentials.png",
-        "history.png",
-        "sessions/screenshot.png",
+        ".pi/agent/history.png",
+        ".pi/agent/sessions/screenshot.png",
         ".ssh/screenshot.png",
     ]) {
         await assert.rejects(collectImageAttachment({ filePath: path.join(directory, name) }), /cannot be attached/u);

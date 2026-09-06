@@ -2,11 +2,12 @@
 
 ## 0.15.0 - 2026-09-05
 
-- Add **SpecPi Chat 0.3.1**, a separately packaged VS Code sidebar with streamed Pi replies, safe Markdown, collapsed tool/reasoning output, model/thinking controls, exact approvals, and a compact composer. It reuses the user's Pi configuration without managing credentials or installing the harness.
+- Add **SpecPi Chat 0.3.1**, a separately packaged VS Code sidebar with streamed Pi replies, safe Markdown, expanded thinking and collapsed tool output by default, model/thinking controls, exact approvals, and a compact composer. It reuses the user's Pi configuration without managing credentials or installing the harness.
 - Add searchable extension-owned history, rename and reversible archive, and independent live conversations. Switching chats or folders preserves background work, approvals, drafts, attachments, usage, and view position. Stop/Disconnect target the selected conversation; parallel chats share workspace files rather than isolated worktrees.
 - Add validated file/image attachment, screenshot paste/drop, bounded inline images, workspace code links and image previews, explicit queued-image recovery, visible transcript search/copy/export, usage/cost reporting, and native Git diff review. Branching and earlier-prompt editing preserve the source conversation and never undo code files or automatically send restored drafts.
 - Start Command Guard in Guard mode in RPC without an unreadable startup selector; retain explicit `/guard` choices after readiness. Route task handoffs, challenge reports, and wishlist reports through RPC-capable dialogs, and disclose terminal-only display controls.
 - Wait for legacy Pi startup fallbacks without approving early dialogs. Reset interrupted-run state on reconnect and never restore accepted prompts after a later refresh failure.
+- Scope Chat's Pi-state filename restrictions to Pi/Chat storage so ordinary authentication, session, and history source files remain usable; retain global credential/key protection and canonical-path checks.
 - Fix composer `/model` selection, read-only usage during active work, and stale Stop cleanup errors after reconnect. Align README and Pages installation examples with the separately versioned Chat artifact.
 - Add dependency-free local VSIX packaging, isolated real-Pi and native VS Code tests, rendered Chat checks in CI, and editor-extension syntax/source-inventory coverage. No npm/Marketplace publication or automatic editor installation is included.
 

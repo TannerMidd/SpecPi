@@ -4,8 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import contextModule from "../vscode/src/context.js";
+import codeReferenceModule from "../vscode/src/code-references.js";
 
-const { collectAttachment, formatPrompt, MAX_ATTACHMENT_BYTES } = contextModule;
+const { collectAttachment, formatPrompt, sensitivePath, MAX_ATTACHMENT_BYTES } = contextModule;
 
 async function fixture(t) {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "specpi-vscode-context-"));
@@ -67,6 +68,8 @@ test("VS Code attachments block private Pi state and credential filenames before
         ".ssh/id_ed25519",
         ".aws/config",
         "credentials.json",
+        "src/auth.json",
+        "src/auth.json.bak",
         "private-key.txt",
         "key.pem",
         ".npmrc",
@@ -75,9 +78,10 @@ test("VS Code attachments block private Pi state and credential filenames before
         ".pi/agent/sessions/one.jsonl",
         ".pi/agent/missions/one.json",
         ".pi/agent/history.jsonl",
-        "sessions/private.jsonl",
-        "config/trust.json",
-        "history.jsonl",
+        ".pi/sessions/private.jsonl",
+        ".pi/trust.json",
+        ".pi/history.jsonl",
+        "tannermidd.specpi-chat/workspaces/example/sessions/one.jsonl",
     ]) {
         await assert.rejects(
             collectAttachment({ workspacePath: workspace, filePath, text: "DO NOT EXPOSE" }),
@@ -89,6 +93,109 @@ test("VS Code attachments block private Pi state and credential filenames before
     await fs.mkdir(path.join(workspace, ".pi"));
     await fs.writeFile(path.join(workspace, ".pi", "settings.json"), "{}");
     assert.equal((await collectAttachment({ workspacePath: workspace, filePath: ".pi/settings.json" })).text, "{}");
+});
+
+test("ordinary auth, trust, history, session, and mission sources support files and editor selections", async (t) => {
+    const { workspace } = await fixture(t);
+    for (const name of [
+        "src/auth.ts",
+        "src/history.js",
+        "lib/sessions.py",
+        "app/trust.go",
+        "src/mission.rs",
+        "sessions/view.ts",
+    ]) {
+        const filePath = path.join(workspace, name);
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        await fs.writeFile(filePath, "ordinary source");
+        assert.equal(sensitivePath(filePath), false, name);
+        assert.equal((await collectAttachment({ workspacePath: workspace, filePath })).text, "ordinary source");
+        assert.equal(
+            (await collectAttachment({ workspacePath: workspace, filePath, text: "unsaved", startLine: 1, endLine: 1 }))
+                .text,
+            "unsaved",
+        );
+    }
+
+    assert.equal(sensitivePath("C:\\repo\\src\\auth.ts"), false);
+    assert.equal(sensitivePath("C:\\repo\\.PI\\AGENT\\HISTORY.jsonl"), true);
+});
+
+test("custom Pi agent roots protect state and canonical aliases without blocking sibling sources", async (t) => {
+    const { workspace } = await fixture(t);
+    const agent = path.join(workspace, "private-agent");
+    const alias = path.join(workspace, "agent-alias");
+    await fs.mkdir(agent);
+    await fs.symlink(agent, alias, process.platform === "win32" ? "junction" : "dir");
+    const previous = process.env.PI_CODING_AGENT_DIR;
+    t.after(() => {
+        if (previous === undefined) {
+            delete process.env.PI_CODING_AGENT_DIR;
+        } else {
+            process.env.PI_CODING_AGENT_DIR = previous;
+        }
+    });
+    process.env.PI_CODING_AGENT_DIR = alias;
+    for (const root of [agent, alias]) {
+        for (const name of ["auth.json", "trust.json", "sessions/one.jsonl", "missions/one.json", "history.jsonl"]) {
+            await assert.rejects(
+                collectAttachment({ workspacePath: workspace, filePath: path.join(root, name), text: "synthetic" }),
+                /cannot be attached/u,
+            );
+        }
+    }
+
+    await assert.rejects(
+        codeReferenceModule.resolveCodeReference({
+            workspacePath: workspace,
+            reference: "private-agent/history.jsonl:42",
+        }),
+        /cannot be opened from chat/u,
+    );
+    assert.equal(sensitivePath(path.join(workspace, "private-agent-other", "history.js")), false);
+    assert.equal(sensitivePath(path.join(workspace, "src", "auth.ts")), false);
+    assert.equal(sensitivePath(path.join(agent, "settings.json")), false);
+
+    // A neutral alias to a state directory must also fail its canonical recheck.
+    await fs.mkdir(path.join(agent, "sessions"));
+    await fs.writeFile(path.join(agent, "sessions", "one.jsonl"), "synthetic");
+    await fs.symlink(
+        path.join(agent, "sessions"),
+        path.join(workspace, "neutral"),
+        process.platform === "win32" ? "junction" : "dir",
+    );
+    await assert.rejects(
+        collectAttachment({ workspacePath: workspace, filePath: "neutral/one.jsonl", text: "synthetic" }),
+        /cannot be attached/u,
+    );
+    await assert.rejects(
+        codeReferenceModule.resolveCodeReference({ workspacePath: workspace, reference: "neutral/one.jsonl:42" }),
+        /cannot be opened from chat/u,
+    );
+
+    t.mock.method(os, "homedir", () => workspace);
+    process.env.PI_CODING_AGENT_DIR = "~/agent-alias";
+    assert.equal(sensitivePath(path.join(agent, "history.jsonl")), true);
+    delete process.env.PI_CODING_AGENT_DIR;
+    await fs.mkdir(path.join(workspace, ".pi"));
+    await fs.symlink(agent, path.join(workspace, ".pi", "agent"), process.platform === "win32" ? "junction" : "dir");
+    assert.equal(sensitivePath(path.join(agent, "history.jsonl")), true);
+    assert.equal(sensitivePath(path.join(workspace, "src", "history.js")), false);
+});
+
+test("relative Pi agent overrides remain fail-closed when the child workspace is unknown", (t) => {
+    const previous = process.env.PI_CODING_AGENT_DIR;
+    t.after(() => {
+        if (previous === undefined) {
+            delete process.env.PI_CODING_AGENT_DIR;
+        } else {
+            process.env.PI_CODING_AGENT_DIR = previous;
+        }
+    });
+    process.env.PI_CODING_AGENT_DIR = "relative-agent";
+    assert.equal(sensitivePath("/repo/relative-agent/history.jsonl"), true);
+    assert.equal(sensitivePath("/repo/src/history.js"), true);
+    assert.equal(sensitivePath("/repo/src/ordinary.js"), false);
 });
 
 test("VS Code attachment checks canonical credential paths for innocuous links", async (t) => {

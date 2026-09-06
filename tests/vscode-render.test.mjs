@@ -1665,7 +1665,7 @@ test(
                         await sendHost(page, { type: "copied", requestId: copyMessage.requestId });
                         assert.equal(await copy.textContent(), "Copied");
                         assert.equal(await page.locator("#announcer").textContent(), "Copied to clipboard");
-                        await page.locator(".reasoning summary").click();
+                        assert.equal(await page.locator(".reasoning-content").isVisible(), true);
                         await page.locator(".tool-card summary").click();
                         assert.equal(
                             await page.locator(".tool-input").textContent(),
@@ -1685,6 +1685,28 @@ test(
                     });
                 },
             );
+
+            await t.test("thinking opens on first arrival and preserves manual toggles during streaming", async () => {
+                await withPage(browser, fixtures, { name: "thinking-default", width: 280 }, async (page) => {
+                    const message = { id: "thinking-stream", role: "assistant", text: "", isRunning: true };
+                    await setState(page, { status: "busy", messages: [message] });
+                    assert.equal(await page.locator(".reasoning").count(), 0);
+                    message.thinking = "Initial thinking.";
+                    await setState(page, { messages: [message] });
+                    assert.equal(await page.locator(".reasoning-content").isVisible(), true);
+                    await page.locator(".reasoning summary").click();
+                    message.thinking += " More thinking.";
+                    await setState(page, { messages: [message] });
+                    assert.equal(await page.locator(".reasoning").getAttribute("open"), null);
+                    assert.equal(await page.locator(".reasoning-content").isVisible(), false);
+                    await page.locator(".reasoning summary").click();
+                    message.text = "Completed response.";
+                    message.isRunning = false;
+                    await setState(page, { status: "ready", messages: [message] });
+                    assert.equal(await page.locator(".reasoning-content").isVisible(), true);
+                    await assertLayout(page, 280);
+                });
+            });
 
             await t.test("refreshing status preserves newer drafts without resending an accepted prompt", async () => {
                 await withPage(browser, fixtures, { name: "recovery" }, async (page) => {

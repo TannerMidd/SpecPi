@@ -1110,6 +1110,7 @@
         const role = ["user", "assistant", "tool", "notice"].includes(message.role) ? message.role : "notice";
         const article = existing || element("article");
         const gallery = imageGallery(message.images, article.querySelector(".message-images"));
+        const thinkingOpen = article.querySelector('details[data-section="thinking"]')?.open ?? true;
         const expanded = new Set(
             Array.from(article.querySelectorAll("details[open]")).map((detail) => detail.dataset.section),
         );
@@ -1172,7 +1173,7 @@
         if (message.thinking) {
             const details = element("details", "reasoning");
             details.dataset.section = "thinking";
-            details.open = expanded.has("thinking");
+            details.open = thinkingOpen;
             details.append(element("summary", "", message.isRunning ? "Thinking…" : "Thinking"));
             const content = element("div", "reasoning-content");
             content.append(renderMarkdown(message.thinking));

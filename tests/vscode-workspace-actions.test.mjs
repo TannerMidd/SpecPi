@@ -179,6 +179,8 @@ test("file suggestions enumerate only selected-workspace metadata and filter pri
     const names = [
         "src/a.js",
         "src/b.js",
+        "src/auth.ts",
+        "sessions/view.ts",
         ".env",
         "auth.json",
         "src/credentials.txt",
@@ -186,7 +188,7 @@ test("file suggestions enumerate only selected-workspace metadata and filter pri
         ".git/config",
         "node_modules/library.js",
         ".aws/config",
-        "sessions/chat.jsonl",
+        ".pi/agent/sessions/chat.jsonl",
         "../outside.js",
         "source:stream",
         "src/not-a-line#L123",
@@ -213,7 +215,9 @@ test("file suggestions enumerate only selected-workspace metadata and filter pri
             type: "fileSuggestions",
             requestId: "query-1",
             files: [
+                { path: "sessions/view.ts", label: "sessions/view.ts" },
                 { path: "src/a.js", label: "src/a.js" },
+                { path: "src/auth.ts", label: "src/auth.ts" },
                 { path: "src/b.js", label: "src/b.js" },
             ],
         },

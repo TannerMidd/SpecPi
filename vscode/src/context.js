@@ -3,7 +3,8 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { constants } = require("node:fs");
+const { constants, realpathSync } = require("node:fs");
+const os = require("node:os");
 
 const MAX_ATTACHMENT_BYTES = 64 * 1024;
 const MAX_ATTACHMENTS = 8;
@@ -20,15 +21,60 @@ function sensitivePath(filePath) {
         return true;
     }
 
-    if (
-        segments.some((segment) => /^(?:auth|trust|sessions?|missions?|history|credentials?)(?:[.-]|$)/u.test(segment))
-    ) {
-        return true;
+    const piState = /^(?:auth|trust|sessions?|missions?|history)(?:[.-]|$)/u;
+    if (segments.some((segment) => piState.test(segment))) {
+        // These names describe ordinary application code too. Only reserve them
+        // inside Pi namespaces, including Chat's extension-owned storage.
+        if (
+            segments.some(
+                (segment, index) =>
+                    [".pi", "tannermidd.specpi-chat"].includes(segment) &&
+                    segments.slice(index + 1).some((entry) => piState.test(entry)),
+            )
+        ) {
+            return true;
+        }
+
+        let agentDirectory = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
+        if (/^~(?:[/\\]|$)/u.test(agentDirectory)) {
+            agentDirectory = path.join(os.homedir(), agentDirectory.slice(1));
+        }
+
+        // Relative overrides resolve in Pi's workspace, not necessarily this
+        // extension host's cwd. Retain the conservative rule in that case.
+        if (!path.isAbsolute(agentDirectory)) {
+            return true;
+        }
+
+        const roots = [path.resolve(agentDirectory)];
+        try {
+            // Resolve directory metadata only, never enumerate/read Pi state.
+            roots.push(realpathSync(agentDirectory));
+        } catch {
+            // Missing/inaccessible roots still receive lexical protection.
+        }
+
+        const candidate = path.resolve(filePath).replaceAll("\\", "/").toLowerCase();
+        if (
+            roots.some((root) => {
+                const prefix = `${root.replaceAll("\\", "/").toLowerCase().replace(/\/$/u, "")}/`;
+
+                return (
+                    candidate.startsWith(prefix) &&
+                    candidate
+                        .slice(prefix.length)
+                        .split("/")
+                        .some((segment) => piState.test(segment))
+                );
+            })
+        ) {
+            return true;
+        }
     }
 
     return segments.some(
         (segment) =>
-            /^(?:\.env(?:[.-].*)?|\.npmrc|\.pypirc|\.netrc|credentials?(?:[.-].*)?|secrets?(?:[.-].*)?|auth\.json|id_(?:rsa|dsa|ecdsa|ed25519)(?:\..*)?|private[-_]?key(?:[.-].*)?)$/u.test(
+            /^(?:\.env(?:[.-].*)?|\.npmrc|\.pypirc|\.netrc|credentials?(?:[.-].*)?|secrets?(?:[.-].*)?|auth\.json(?:[.-].*)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\..*)?|private[-_]?key(?:[.-].*)?)$/u.test(
                 segment,
             ) || /\.(?:pem|key|p12|pfx|keystore)$/u.test(segment),
     );
