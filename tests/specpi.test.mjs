@@ -426,9 +426,9 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.equal(manifest.scripts.preinstall, undefined);
     assert.equal(manifest.scripts.install, undefined);
     assert.equal(manifest.scripts.postinstall, undefined);
-    assert.match(readme, new RegExp(`specpi@${manifest.version.replaceAll(".", "\\.")}`));
-    assert.match(readme, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
-    assert.match(readme, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
+    assert.match(readme, /npm install --global specpi@latest/);
+    assert.match(readme, /wiki\/#getting-started/);
+    assert.match(readme, /\[Release notes\]\(CHANGELOG\.md\)/);
     assert.match(changelog, new RegExp(`^## ${manifest.version.replaceAll(".", "\\.")} - \\d{4}-\\d{2}-\\d{2}$`, "m"));
     assert.match(site, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(site, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
@@ -488,9 +488,8 @@ test("showcase site is self-contained and Pages-ready", () => {
     const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
 
     const svgViewBox = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
-    const readmeImage = readme.match(/src="site\/self-improvement-loop-v2\.svg" width="(\d+)"/);
-    assert.ok(svgViewBox && readmeImage);
-    const renderScale = Number(readmeImage[1]) / Number(svgViewBox[1]);
+    assert.ok(svgViewBox);
+    const renderScale = 760 / Number(svgViewBox[1]);
     assert.ok(Number(svgViewBox[1]) / Number(svgViewBox[2]) >= 2);
     const fontSizes = [...svg.matchAll(/font-size="(\d+)"/g)].map((match) => Number(match[1]));
     assert.ok(fontSizes.length > 0 && Math.min(...fontSizes) * renderScale >= 12);
@@ -502,8 +501,7 @@ test("showcase site is self-contained and Pages-ready", () => {
         svg.replace('xmlns="http://www.w3.org/2000/svg"', ""),
         /<script|<foreignObject|<image|<animate|\bhref=|https?:|data:image|@import|@font-face/i,
     );
-    assert.match(readme, /src="site\/self-improvement-loop-v2\.svg"/);
-    assert.match(readme, /alt="[^"]*failure[^"]*later evidence[^"]*human review/i);
+    assert.match(svg, /<desc[^>]*>[^<]*failure[^<]*later evidence[^<]*human review/i);
     assert.ok(
         JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).files.includes(
             "site/self-improvement-loop-v2.svg",
@@ -550,8 +548,7 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(thirdParty, /SIL Open Font License 1\.1/);
 
     assert.match(readme, /tannermidd\.github\.io\/SpecPi\/wiki\//);
-    assert.match(readme, /\/wishlist history \[gap-id\]/);
-    assert.match(readme, /registry-linked validators/);
+    assert.match(wikiHtml, /registry-linked validators/);
     assert.match(wikiHtml, /<html lang="en">/);
     assert.match(wikiHtml, /name="viewport"/);
     assert.match(wikiHtml, /href="\.\.\/styles\.css"/);

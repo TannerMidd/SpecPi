@@ -5,250 +5,54 @@
 <h1 align="center">SpecPi</h1>
 
 <p align="center">
-  A local, human-directed improvement harness for the
-  <a href="https://pi.dev/">Pi coding agent</a>.
+  A small toolkit for the <a href="https://pi.dev/">Pi coding agent</a>.
 </p>
 
 <p align="center">
-  <a href="#install"><strong>Install</strong></a>
-  · <a href="#included-capabilities">Capabilities</a>
-  · <a href="#improvement-loop">Improvement loop</a>
+  <a href="#install">Install</a>
   · <a href="https://tannermidd.github.io/SpecPi/">Website</a>
-  · <a href="https://tannermidd.github.io/SpecPi/wiki/">Wiki</a>
-  · <a href="SECURITY.md">Security</a>
+  · <a href="https://tannermidd.github.io/SpecPi/wiki/">Documentation</a>
 </p>
-
-## Purpose
-
-SpecPi adds task contracts, workflow controls, and a local improvement loop to Pi. It records recurring capability gaps and presents qualified items for human review. Selecting one exact item with `/harness-improvement` authorizes a bounded change; repository checks and capability-specific validators must pass before it can retire.
-
-Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
-
-Version `0.16.0` enables bounded read-only delegation by default at Pi startup. One agent still owns edits and verification; worker use remains selective. SpecPi Chat, browser checks, and the human-selected improvement workflow remain available. See the [release notes](CHANGELOG.md) for the change list.
 
 <details>
 <summary>Watch the showcase · 51 seconds</summary>
 
 <p>
   <a href="https://tannermidd.github.io/SpecPi/#showcase">
-    <img src="https://tannermidd.github.io/SpecPi/media/showcase-poster.jpg" width="560" alt="Watch the 51-second SpecPi showcase: VS Code Chat, read-only delegation, and harness improvements">
+    <img src="https://tannermidd.github.io/SpecPi/media/showcase-poster.jpg" width="560" alt="Play the SpecPi showcase">
   </a>
 </p>
 
-[Watch on the site](https://tannermidd.github.io/SpecPi/#showcase). Opens a player with controls and a transcript.
-
 </details>
 
-## SpecPi Chat for VS Code
+## What it adds
 
-The `vscode/` source contains **SpecPi Chat 0.3.2**, a separately packaged native sidebar with streamed replies, tool results, file and image attachments, model/thinking controls, Pi approvals, and searchable workspace conversation history. Rename or archive chats, switch between independent live conversations, branch or edit an earlier prompt, search and export visible messages, inspect usage, and review changes through VS Code's native diff tools. Switching chats preserves background work, approvals, drafts, and attachments. Connected conversations share workspace files; use separate worktrees for isolated writers. Opening the sidebar does not start Pi.
+- **Chat beside your code.** A VS Code sidebar with attachments, approvals, and separate conversations. [Extension guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) · Local preview; install from VSIX.
+- **Focused delegation.** One agent makes changes. Up to two read-only subagents help investigate and review. [Research and design](https://tannermidd.github.io/SpecPi/single-agent/)
+- **Review as you work.** Track changed files, inspect diffs, check pages in a browser, and review risky commands.
+- **Improvements you choose.** Record recurring problems, select one with `/harness-improvement`, and test the change before calling it done.
 
-From a repository checkout, build a local VSIX with `npm --prefix vscode run package`, then install `.specpi-test/vscode/specpi-chat-0.3.2.vsix` through **Extensions: Install from VSIX…**. See the [extension guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) for prerequisites, image/provider limits, commands, privacy, and testing. Pi owns provider authentication and tool execution. Stop and Disconnect affect the selected conversation only; branching does not undo code changes. The extension is separate from the SpecPi npm package and has not been published to a marketplace.
-
-## Selective delegation
-
-One agent owns edits and verifies results. Experimental delegation adds up to two read-only Pi workers: `review` checks a frozen artifact; `scout` answers a focused question using selected sources. Workers cannot write, run shell commands, browse the web, or delegate further.
-
-Delegation is **on by default at Pi startup**, subject to compatibility, settings, and Guard checks. Startup does not launch workers or model inference. Use `/delegate status` to inspect work and limits, `/delegate off` to revoke it, and `/delegate on` to re-enable it. Off and safety revocations survive reloads and session switches; restarting Pi reapplies the on default. Research informed the design; SpecPi quality, speed, and cost gains remain unmeasured.
-
-See [setup and limits](docs/delegation/README.md) or [how the research shaped the architecture](https://tannermidd.github.io/SpecPi/single-agent/).
+Problem collection is off by default. Its records stay on your machine. Pi connects to your chosen model provider.
 
 ## Install
 
-Requires **Node.js 22.19+**, **npm**, **Git**, and **Pi 0.84.4+**. If Pi is absent, the confirmed install adds the reviewed pinned package.
+Requires **Node.js 22.19+**, **npm**, and **Git**. SpecPi needs **Pi 0.84.4+**; the installer can add it if missing.
 
-Install the CLI, inspect its non-mutating plan, and confirm the managed installation:
-
-```bash
+```sh
 npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor
 ```
 
-`plan` does not mutate the system. Install, update, and uninstall require confirmation unless `--yes` is supplied. Restart Pi after installation or updating SpecPi to load the delegation runtime.
+Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
-<details>
-<summary><strong>Pin a release or install from audited source</strong></summary>
+Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
-Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
+[Setup, updates & removal](https://tannermidd.github.io/SpecPi/wiki/#getting-started) · [Delegation settings](docs/delegation/README.md)
 
-```bash
-npm install --global specpi@0.16.0
-npx --package specpi@0.16.0 specpi plan
-```
+## Go further
 
-For a source-audited installation, clone the exact release:
+[Commands](https://tannermidd.github.io/SpecPi/wiki/#reference) · [Development](https://tannermidd.github.io/SpecPi/wiki/#development) · [Security](SECURITY_MODEL.md) · [Release notes](CHANGELOG.md)
 
-```bash
-git clone --branch v0.16.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
-cd SpecPi
-./specpi plan
-./specpi install
-./specpi doctor
-```
-
-On Windows source checkouts, use `.\specpi.cmd` in place of `./specpi`. The npm installation provides the `specpi` command on every supported platform.
-
-</details>
-
-<details>
-<summary><strong>Update or uninstall</strong></summary>
-
-Update the npm CLI and its managed installation as two explicit steps:
-
-```bash
-npm install --global specpi@latest
-specpi update
-specpi doctor
-```
-
-Uninstall managed SpecPi resources before removing the CLI. Private wishlist, journal, experiment, and patch state remains local unless explicitly removed:
-
-```bash
-specpi uninstall
-npm uninstall --global specpi
-```
-
-</details>
-
-Direct `pi install npm:specpi` loads extensions, skills, and themes only. It does not run the full installer or provide managed instructions, browser runtime dependencies, supporting Pi packages, optional tools, shell integration, backups, or ownership records.
-
-## Included capabilities
-
-### Define and review work
-
-| Interface     | Purpose                                                                                                                                         |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/task`       | Record the objective, fixed requirements, acceptance checks, expected paths, hypothesis, rollback, and non-goals on the current session branch. |
-| `/scope`      | Declare expected paths and report unacknowledged drift.                                                                                         |
-| `/files`      | Browse source, rendered Markdown, Git diffs, and bounded review comments.                                                                       |
-| `/experiment` | Create detached worktrees with keep, binary patch export, and confirmed discard outcomes.                                                       |
-| `/challenge`  | Review readiness through structured evidence, gaps, contradictions, and residual risk.                                                          |
-
-### Improve from evidence
-
-| Interface              | Purpose                                                                              |
-| ---------------------- | ------------------------------------------------------------------------------------ |
-| `/wishlist`            | Store and curate privacy-minimized local capability-gap reports.                     |
-| `/harness-improvement` | Select one qualified or review-needed item and authorize its bounded implementation. |
-
-### Work inside Pi
-
-| Interface           | Purpose                                                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `/spec`             | Replace normal chrome with a technical run panel, seal live reasoning, hold streaming prose until complete, and keep tools collapsed. |
-| `/guard`            | Deny confirmed host-wide destructive calls and request approval for bounded risk classes.                                             |
-| Browser tools       | Inspect isolated Chromium, diagnose errors, exercise keyboard/select/wait flows, and capture screenshots.                              |
-| `specpi-spec` theme | Bring blueprint blue, technical greys, layered surfaces, and restrained semantic states into Pi.                                      |
-| `specpi` CLI        | Plan, install, update, verify, and uninstall managed state with backups and rollback.                                                 |
-
-`specpi-spec` is the default Pi theme, carrying the site's specification design through message surfaces, tools, Markdown, diffs, syntax highlighting, search, and the full thinking-level scale. **Existing valid theme preferences survive installation and updates.** The original `tea-house` theme remains bundled and selectable from `/settings`.
-
-Capability registry entries include closed offline validators. Completion, `npm run check`, and `specpi doctor` run those validators.
-
-## How SpecPi fits
-
-SpecPi runs inside Pi through extensions, skills, settings, and themes. Pi supplies the agent runtime, tools, sessions, and model connections; SpecPi adds the working agreement, workflow controls, and local improvement loop.
-
-```mermaid
-flowchart TB
-    human["You · goals, selections, review"]
-    subgraph session["Pi session"]
-        specpi["SpecPi · contracts, guard, review, improvement"]
-        pi["Pi · agent loop, tools, sessions"]
-        specpi <-->|extension hooks| pi
-    end
-    human --> specpi
-    human --> pi
-    pi -->|model requests| provider["Selected model provider"]
-    pi -->|tools| project["Project files and commands"]
-    specpi -->|local records| evidence["Task cards, wishlist, verification receipts"]
-```
-
-## Work ownership
-
-### Task contracts and handoff
-
-Use `/task set` when a shared contract would improve continuity. Its card supplies fixed requirement IDs to `/challenge` and can seed an experiment's hypothesis and acceptance checks. `/spec` shows the active task. `/scope task` explicitly imports the card's expected paths; recording a card alone never widens scope. Human edits create a new card revision and invalidate a review of the earlier card.
-
-Use `/task clear` before recording an unrelated task. Within a session, repeated reports for the same capability share the card's task ID across agent runs and card revisions. Without a card, report grouping remains per run.
-
-`/task handoff` displays a review packet containing the original card, observed change information, the latest completion review, and unresolved facts. Inspect the packet before sharing it or opening a separate review session. It does not launch another agent or write an export.
-
-### Scope and completion
-
-`/scope set` declares expected paths. `/scope accept <path>` acknowledges one finding without widening the contract. `/scope add <path>` widens it. `/scope recheck` replaces an uncertain baseline.
-
-`/challenge` requires structured requirement evidence and checks for contradictions, false-positive validation, scope drift, missing runtime or visual checks, and residual risk. Its result supports human review and does not replace direct proof.
-
-### Isolated experiments
-
-Use `/experiment start` when an independent review or trial justifies a separate worktree. Open the reported path in another Pi session. SpecPi does not launch an agent, copy dirty base changes, commit, merge, or touch remotes.
-
-SpecPi's default workflow uses one writer per working directory. Its experimental delegation adds bounded read-only Pi sessions. SpecPi Chat also supports independent conversations that you start explicitly; connected chats can continue concurrently in the same workspace. They share workspace files rather than receiving separate worktrees. A parent determines what context a delegated child receives and verifies what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
-
-## Improvement loop
-
-1. **Record:** A reusable capability gap is stored as a sanitized local report.
-2. **Qualify:** Recurrence, project reach, impact, and recency determine whether the item enters the review menu.
-3. **Select:** `/harness-improvement` authorizes one exact item.
-4. **Implement:** The `specpi-improve` skill makes the narrowest sufficient change and adds direct checks.
-5. **Verify:** The completion gate checks the selected task contract and registry integration, runs `npm run check` and the item's closed validators, and rejects evidence if the checked source changes.
-6. **Retire:** A passing item leaves the queue. Its model-reported evidence and executable verification receipt remain separately identified in the local journal.
-7. **Review again:** Later evidence returns the item as `review-needed`. Implementation does not restart automatically.
-
-<details>
-<summary><strong>View the improvement loop</strong></summary>
-
-<p align="center">
-  <img src="site/self-improvement-loop-v2.svg" width="760" alt="SpecPi improvement loop: local friction becomes qualified evidence; a person chooses one change; verification failure keeps it selected; later evidence returns it to human review.">
-</p>
-
-</details>
-
-### Inspect the record
-
-Use `/wishlist status` for queue and loop-health totals. Use `/wishlist history [gap-id]` for retirement evidence, validators, changed files, reopen signals, and rollback context. `/wishlist` also supports duplicate cleanup, local issue drafts, archive, and reset operations.
-
-With collection enabled, `/wishlist outcome <gap-id>` records an explicit human assessment of the latest local retirement: helped, failed, not exercised, or reverted. Later assessments replace the earlier assessment in totals while history retains both. Failure is a reason to review; it never authorizes another implementation. Unused capabilities remain unassessed.
-
-## Command guard
-
-Every supported model-initiated Pi tool call is classified before execution. Select one mode at session start:
-
-| Mode       | Behavior                                                                                                                |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Guard**  | Denies confirmed host-wide catastrophe and guard tampering, asks before Git destroys work, and otherwise remains quiet. |
-| **Strict** | Adds approval requests for mutation, execution, sensitive reads, and network activity.                                  |
-| **Off**    | Requires confirmation and applies only to the current session.                                                          |
-
-Approvals apply to one exact call and one session. Only a structurally proven critical mutation locks the session. Parser uncertainty and invalid cleanup syntax are denied without locking later work.
-
-The guard covers the documented `bash`, `powershell`, `read`, `write`, and `edit` seams. Direct shell escapes, malicious extensions, unclassified custom tools, approved scripts, TOCTOU changes, and external processes remain outside its scope.
-
-## Data and security boundaries
-
-**Local state.** SpecPi does not persist command text or read Pi credentials, unrelated sessions, or history. Scope and challenge records are bounded entries in the current Pi session; task cards are bounded to the active session branch. Wishlist reports, improvement journals, experiment metadata, and exported patches remain in private local SpecPi state and can survive uninstall. Review local artifacts before sharing.
-
-**Verification receipts.** Improvement verification fingerprints supported source and validation inputs, records actual gate results, and detects changes between verification snapshots. Receipts retain hashes and runtime metadata, not source contents or raw command output. They describe what was checked; they are not cryptographic attestations or proof that a model's acceptance explanation is correct. Older journals remain readable and are identified as lacking a receipt.
-
-**Provider and network access.** Local SpecPi evidence does not make the whole agent offline. Pi sends model requests to the selected provider, browser pages and installed packages may contact the network, and Pi has separate telemetry and update-check settings. The installer explains these boundaries without changing those upstream preferences.
-
-**Host permissions.** Pi extensions run with the current user's permissions. Use OS permissions, a least-privilege account, a container, or a VM for hostile code or data. See [SECURITY_MODEL.md](SECURITY_MODEL.md) for the complete trust model and [SECURITY.md](SECURITY.md) for vulnerability reporting.
-
-## Development
-
-```bash
-npm install --ignore-scripts --omit=peer --no-package-lock
-npm run format
-npm run check
-```
-
-JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one statement per line. The repository check enforces formatting, validates syntax, strictly type-checks the browser extension, runs the Node test suite, executes registry-linked validators, and installs the exact npm tarball through an isolated lifecycle. Maintainers should follow [NPM_RELEASE.md](NPM_RELEASE.md) for release preparation and protected publication.
-
-For application testing, use `browser_diagnostics` alongside rendered inspection, and `browser_press`, `browser_select_option`, and `browser_wait_for` for keyboard, native dropdown, and asynchronous flows. Diagnostics are bounded and best-effort sanitized, not guaranteed secret-free or proof of application health.
-
-Provision repository-local Chromium with `npm run setup:browser`, then run `npm run test:browser` and `npm run test:site:browser`. The required CI browser commands reject skipped coverage; Pages deployment waits for the same rendered check. See [browser testing](docs/browser-testing.md) for tool contracts, privacy limits, type-check scope, and the semantic-navigation assessment.
-
-MIT licensed.
+[MIT License](LICENSE)
