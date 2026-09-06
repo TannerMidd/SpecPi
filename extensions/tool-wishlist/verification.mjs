@@ -25,6 +25,7 @@ export const SOURCE_DIRECTORIES = Object.freeze([
     "templates",
     "tests",
     "themes",
+    "vscode",
 ]);
 
 export const SOURCE_ROOT_FILES = Object.freeze([

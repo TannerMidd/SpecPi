@@ -1113,7 +1113,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                         createdAt: new Date().toISOString(),
                     };
                     pi.appendEntry(TASK_HANDOFF_ENTRY, data);
-                    if (!supportsEntryRenderer && typeof ctx.ui.editor === "function") {
+                    if ((ctx.mode === "rpc" || !supportsEntryRenderer) && typeof ctx.ui.editor === "function") {
                         await ctx.ui.editor("Task handoff (view only)", markdown);
                     }
 
@@ -1738,7 +1738,7 @@ export default function workflowControls(pi: ExtensionAPI) {
 
                 if (!latestChallenge) {
                     ctx.ui.notify("No completed challenge exists on this session branch.", "info");
-                } else if (supportsEntryRenderer) {
+                } else if (supportsEntryRenderer && ctx.mode !== "rpc") {
                     pi.appendEntry(CHALLENGE_ENTRY, { ...latestChallenge, kind: "display" });
                 } else if (typeof ctx.ui.editor === "function") {
                     await ctx.ui.editor("Completion challenge (view only)", latestChallenge.markdown ?? "Unavailable");

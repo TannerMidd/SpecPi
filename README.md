@@ -24,7 +24,13 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-Version `0.14.0` raises the default delegation timeout to 10 minutes and adds saved configuration through `/delegate timeout <minutes>`. Call budgets and read-only worker restrictions remain unchanged. Browser diagnostics, task cards, verification receipts and human outcome assessments remain part of the single-agent workflow. See the [release notes](CHANGELOG.md) for the change list.
+Version `0.15.0` adds the separately packaged SpecPi Chat sidebar and RPC-compatible Guard startup and report dialogs. The terminal harness, optional read-only delegation, browser checks, and human-selected improvement workflow remain available. See the [release notes](CHANGELOG.md) for the change list.
+
+## SpecPi Chat for VS Code
+
+The `vscode/` source contains **SpecPi Chat 0.3.1**, a separately packaged native sidebar with streamed replies, tool results, file and image attachments, model/thinking controls, Pi approvals, and searchable workspace conversation history. Rename or archive chats, switch between independent live conversations, branch or edit an earlier prompt, search and export visible messages, inspect usage, and review changes through VS Code's native diff tools. Switching chats preserves background work, approvals, drafts, and attachments. Connected conversations share workspace files; use separate worktrees for isolated writers. Opening the sidebar does not start Pi.
+
+From a repository checkout, build a local VSIX with `npm --prefix vscode run package`, then install `.specpi-test/vscode/specpi-chat-0.3.1.vsix` through **Extensions: Install from VSIX…**. See the [extension guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) for prerequisites, image/provider limits, commands, privacy, and testing. Pi owns provider authentication and tool execution. Stop and Disconnect affect the selected conversation only; branching does not undo code changes. The extension is separate from the SpecPi npm package and has not been published to a marketplace.
 
 ## Optional delegation
 
@@ -55,14 +61,14 @@ specpi doctor
 Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
 
 ```bash
-npm install --global specpi@0.14.0
-npx --package specpi@0.14.0 specpi plan
+npm install --global specpi@0.15.0
+npx --package specpi@0.15.0 specpi plan
 ```
 
 For a source-audited installation, clone the exact release:
 
 ```bash
-git clone --branch v0.14.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+git clone --branch v0.15.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -167,7 +173,7 @@ Use `/task clear` before recording an unrelated task. Within a session, repeated
 
 Use `/experiment start` when an independent review or trial justifies a separate worktree. Open the reported path in another Pi session. SpecPi does not launch an agent, copy dirty base changes, commit, merge, or touch remotes.
 
-SpecPi keeps one writer per working directory. Its experimental delegation adds bounded read-only Pi sessions. A parent determines what context a child receives and verifies what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
+SpecPi's default workflow uses one writer per working directory. Its experimental delegation adds bounded read-only Pi sessions. SpecPi Chat also supports independent conversations that you start explicitly; connected chats can continue concurrently in the same workspace. They share workspace files rather than receiving separate worktrees. A parent determines what context a delegated child receives and verifies what returns, so either handoff can omit a material constraint. Parallel writers also introduce conflicting assumptions and increase review work.
 
 ## Improvement loop
 

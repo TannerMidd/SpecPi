@@ -84,6 +84,11 @@ test("the real checkout inventory includes check inputs and excludes local/gener
     assert.ok(paths.includes(".prettierignore"));
     assert.ok(paths.includes("tsconfig.browser.json"));
     assert.ok(paths.includes("extensions/browser/core.d.mts"));
+    assert.ok(paths.includes("vscode/src/extension.js"));
+    assert.ok(paths.includes("vscode/media/chat.js"));
+    assert.ok(paths.includes("vscode/media/chat-picker.js"));
+    assert.ok(paths.includes("vscode/src/conversation-coordinator.js"));
+    assert.ok(paths.includes("vscode/package.json"));
     assert.ok(paths.some((value) => value.startsWith(".github/workflows/")));
     assert.ok(paths.includes("tests/fixtures/command-guard-session-approval-harness.ts"));
     assert.equal(

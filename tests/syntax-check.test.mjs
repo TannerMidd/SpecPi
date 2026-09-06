@@ -15,6 +15,8 @@ test("syntax checks discover every delegation source including its TypeScript en
     }
 
     assert.ok(found.has(path.join(directory, "index.ts")));
+    assert.ok(found.has(path.join(root, "vscode", "src", "extension.js")));
+    assert.ok(found.has(path.join(root, "vscode", "media", "chat.js")));
 });
 
 test("nested new modules are checked without a hand-maintained manifest", (t) => {

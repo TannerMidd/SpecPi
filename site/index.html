@@ -6,7 +6,7 @@
         <meta name="theme-color" content="#111619" />
         <meta
             name="description"
-            content="Task scope, command policy, verification records, and human-selected harness improvements for the Pi coding agent."
+            content="A Pi harness with task scope, command policy, evidence-led improvements, and an optional native VS Code chat sidebar."
         />
         <meta property="og:title" content="SpecPi · Single-agent harness for Pi" />
         <meta
@@ -28,7 +28,7 @@
                 ><img src="logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
             >
             <nav class="header-nav" aria-label="Primary navigation">
-                <a href="#loop">Workflow</a><a href="single-agent/">Architecture</a><a href="wiki/">Reference</a
+                <a href="#loop">Workflow</a><a href="#vscode-chat">Chat</a><a href="single-agent/">Architecture</a><a href="wiki/">Reference</a
                 ><a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
             </nav>
         </header>
@@ -38,8 +38,8 @@
                     <p class="eyebrow">
                         <span class="signal" aria-hidden="true"></span>Specification / Pi coding-agent harness
                     </p>
-                    <a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.14.0"
-                        >Release / v0.14.0 <span aria-hidden="true">↗</span></a
+                    <a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.15.0"
+                        >Release / v0.15.0 <span aria-hidden="true">↗</span></a
                     >
                 </div>
                 <div class="hero-grid">
@@ -286,7 +286,7 @@
                         </p>
                         <span class="text-link"
                             >Research → decisions → implementation <span aria-hidden="true">↗</span></span
-                        ><span class="article-date">SpecPi v0.14.0 · Architecture decisions</span>
+                        ><span class="article-date">SpecPi v0.15.0 · Architecture decisions</span>
                     </div>
                 </a>
                 <div class="writer-note">
@@ -405,6 +405,42 @@
                 </p>
             </section>
 
+            <section class="work-section wrap" id="vscode-chat" aria-labelledby="chat-title">
+                <div class="section-kicker"><span>Editor / Optional integration</span><span>SpecPi Chat 0.3.1</span></div>
+                <div class="section-heading">
+                    <h2 id="chat-title">Pi beside your code.</h2>
+                    <p>
+                        A separately packaged VS Code sidebar for your configured Pi runtime. Stream replies, review
+                        exact approvals, and return to searchable conversations. Opening the view never starts Pi.
+                    </p>
+                </div>
+                <div class="work-grid">
+                    <article>
+                        <span class="step-index">01 / Context</span>
+                        <h3>Choose what to share</h3>
+                        <p>Attach workspace text, paste a screenshot, or select an image. Inspect tool output, open
+                            validated code references, and review changes with VS Code's native Git views.</p>
+                        <a href="wiki/#chat-context">Context and privacy <span aria-hidden="true">↗</span></a>
+                    </article>
+                    <article>
+                        <span class="step-index">02 / Conversations</span>
+                        <h3>Keep work in view</h3>
+                        <p>Switch between live conversations without losing drafts, attachments, or approvals. Search,
+                            rename, archive, branch, and inspect reported cost. Stop targets the selected conversation.</p>
+                        <a href="wiki/#chat-conversations">Conversation controls <span aria-hidden="true">↗</span></a>
+                    </article>
+                    <article>
+                        <span class="step-index">03 / Local preview</span>
+                        <h3>Install a separate VSIX</h3>
+                        <p>Build Chat from a repository checkout. Pi, SpecPi, and provider setup remain separate.
+                            Chat is not bundled in the npm package or published to a marketplace.</p>
+                        <a href="wiki/#vscode-chat">Build and install Chat 0.3.1 <span aria-hidden="true">↗</span></a>
+                    </article>
+                </div>
+                <p class="guard-boundary">Live chats share workspace files, not isolated worktrees. Keep one writer per
+                    working directory when changes overlap. Branching a conversation does not undo code changes.</p>
+            </section>
+
             <section class="install-section" id="install" aria-labelledby="install-title">
                 <div class="wrap install-grid">
                     <div>
@@ -423,10 +459,10 @@
                     <div>
                         <div class="terminal">
                             <div class="terminal-bar">
-                                <span>Terminal / pinned release v0.14.0</span
+                                <span>Terminal / pinned release v0.15.0</span
                                 ><button type="button" data-copy-target="install-command" hidden>Copy commands</button>
                             </div>
-                            <pre><code id="install-command">npm install --global specpi@0.14.0
+                            <pre><code id="install-command">npm install --global specpi@0.15.0
 specpi plan
 specpi install
 specpi doctor</code></pre>
@@ -446,7 +482,7 @@ specpi doctor</code></pre>
         </main>
         <footer class="site-footer wrap">
             <a class="brand" href="./"><img src="logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a>
-            <p>Pi harness / v0.14.0</p>
+            <p>Pi harness / v0.15.0</p>
             <nav aria-label="Footer navigation">
                 <a href="wiki/">Reference</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
