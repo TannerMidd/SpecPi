@@ -2,8 +2,9 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
+        <script src="../theme.js"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#111619" />
+        <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
             content="How research shaped SpecPi delegation: one writer, optional read-only Pi workers, explicit context, and parent verification."
@@ -30,10 +31,13 @@
                 ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
             >
             <nav class="header-nav" aria-label="Primary navigation">
-                <a href="../#loop">Workflow</a><a href="./" aria-current="page">Architecture</a
-                ><a href="../wiki/">Reference</a
-                ><a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
+                <a href="../#install">Install</a><a href="../#vscode-chat">VS Code</a
+                ><a href="./" aria-current="page">Research</a><a href="../wiki/">Docs</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
             </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
         </header>
         <main id="article" class="wrap">
             <header class="article-heading">
@@ -50,10 +54,12 @@
                 <section id="evidence">
                     <h2>What the research changed</h2>
                     <p>These are our design inferences from the research. The studies do not benchmark SpecPi.</p>
-                    <p><a href="../wiki/#vscode-chat">SpecPi Chat 0.3.2</a> also supports independent conversations
+                    <p>
+                        <a href="../wiki/#vscode-chat">SpecPi Chat 0.3.2</a> also supports independent conversations
                         started explicitly by the user. Each connected chat has its own Pi process, but chats in the
-                        same workspace share files. This is not delegated work or automatic worktree isolation: keep
-                        one writer per working directory for overlapping changes, or use separate worktrees.</p>
+                        same workspace share files. This is not delegated work or automatic worktree isolation: keep one
+                        writer per working directory for overlapping changes, or use separate worktrees.
+                    </p>
                     <table class="decision-table">
                         <caption>
                             Research → decision → implementation
@@ -137,9 +143,9 @@
                                     <p>Extra compute must not be mistaken for a coordination benefit.</p>
                                 </td>
                                 <td>
-                                    Delegation is on by default at Pi startup, with two worker slots, fixed call limits and human-configurable
-                                    timeouts. The evaluation plan compares it with single-agent and serial workflows at matched
-                                    resource budgets.
+                                    Delegation is on by default at Pi startup, with two worker slots, fixed call limits
+                                    and human-configurable timeouts. The evaluation plan compares it with single-agent
+                                    and serial workflows at matched resource budgets.
                                 </td>
                             </tr>
                         </tbody>
@@ -169,8 +175,8 @@
                     <p id="exceptions">
                         <a href="../wiki/#delegation">Control with <code>/delegate status</code></a
                         >; use <code>/delegate off</code> to revoke work. Each job has four SDK model calls and 10
-                        minutes by default. The process permits four batches and 32 calls. These are local execution limits, not a
-                        provider spending cap. See the
+                        minutes by default. The process permits four batches and 32 calls. These are local execution
+                        limits, not a provider spending cap. See the
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
                             >runtime and compatibility guide</a
                         >.

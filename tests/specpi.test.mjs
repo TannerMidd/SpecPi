@@ -21,7 +21,6 @@ import {
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
-import { CYCLE_STAGES, nextCycleStep, previousCycleStep } from "../site/cycle.js";
 import { acquireSpecPiLock } from "../scripts/lock.mjs";
 import { describeSpecPhase, transformSpecMarkdown } from "../extensions/spec/core.mjs";
 import {
@@ -592,17 +591,11 @@ test("showcase site is self-contained and Pages-ready", () => {
         assert.doesNotMatch(content, /—|real task|real, reusable/i);
     }
 
-    assert.equal(cycle.match(/stage: "/g)?.length, 7);
     assert.match(cycle, /ArrowRight|ArrowDown/);
-    assert.equal(CYCLE_STAGES.length, 7);
-    assert.deepEqual(
-        CYCLE_STAGES.map((stage) => stage.status),
-        ["open", "qualified", "selected", "selected", "verifying", "retired", "review-needed"],
-    );
-    assert.equal(nextCycleStep(0), 1);
-    assert.equal(nextCycleStep(6), 2);
-    assert.equal(previousCycleStep(3), 2);
-    assert.equal(previousCycleStep(0), 0);
+    assert.doesNotMatch(cycle, /CYCLE_STAGES|cycleControls/);
+    assert.doesNotMatch(html, /data-cycle-step|cycle-panel/);
+    assert.match(html, /media\/improvement-workflow\.png/);
+    assert.ok(fs.statSync(path.join(siteDir, "media", "improvement-workflow.png")).size > 0);
     assert.match(workflow, /actions\/configure-pages@v5/);
     assert.match(workflow, /actions\/upload-pages-artifact@v4/);
     assert.match(workflow, /actions\/deploy-pages@v4/);

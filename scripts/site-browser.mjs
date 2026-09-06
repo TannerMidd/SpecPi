@@ -5,7 +5,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { BrowserDiagnostics } from "../extensions/browser/diagnostics.ts";
-import { GUARD_MODES, CYCLE_STAGES } from "../site/cycle.js";
+import { GUARD_MODES } from "../site/cycle.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const mime = {
@@ -149,6 +149,10 @@ export async function checkRenderedPage(page, { origin, route, viewport, fault }
         }
 
         if (!route) {
+            for (const selector of ["#guard"]) {
+                await page.locator(`${selector} > summary`).click();
+            }
+
             for (const [mode, expected] of Object.entries(GUARD_MODES)) {
                 await page.locator(`[data-guard-mode="${mode}"]`).click();
                 await expectText(page, "[data-guard-current]", mode);
@@ -169,17 +173,12 @@ export async function checkRenderedPage(page, { origin, route, viewport, fault }
             );
             await page.keyboard.press("ArrowRight");
             await selectedTab(page, '[data-guard-mode="strict"]', "#guard-comparison");
-            for (let index = 0; index < CYCLE_STAGES.length; index++) {
-                await page.locator(`[data-cycle-step="${index}"]`).click();
-                await expectText(page, "[data-cycle-status]", CYCLE_STAGES[index].status);
-                await expectText(page, "[data-cycle-number]", String(index + 1).padStart(2, "0"));
-                await selectedTab(page, `[data-cycle-step="${index}"]`, "#cycle-panel");
-            }
-
-            await page.locator('[data-cycle-step="6"]').press("Home");
-            await selectedTab(page, '[data-cycle-step="0"]', "#cycle-panel");
-            await page.keyboard.press("End");
-            await selectedTab(page, '[data-cycle-step="6"]', "#cycle-panel");
+            assert.equal(await page.locator("#loop button, #loop summary, #loop [role=tab]").count(), 0);
+            assert.equal(await page.locator("#loop img").isVisible(), true);
+            assert.equal(
+                await page.locator("#loop img").evaluate((image) => image.complete && image.naturalWidth > 0),
+                true,
+            );
             await page.locator("[data-copy-target]").click();
             await expectText(page, "[data-copy-status]", "Commands copied.");
             assert.equal(

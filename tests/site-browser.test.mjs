@@ -27,21 +27,28 @@ test(
     async (t) => {
         await withBrowser(async (browser, origin) => {
             for (const [name, viewport] of Object.entries(VIEWPORT_PRESETS)) {
-                for (const route of ["", "wiki/", "single-agent/"]) {
-                    await t.test(`${name}: /SpecPi/${route}`, async () => {
+                for (const { route, theme } of ["", "wiki/", "single-agent/"].flatMap((route) =>
+                    ["light", "dark"].map((theme) => ({ route, theme })),
+                )) {
+                    await t.test(`${name} ${theme}: /SpecPi/${route}`, async () => {
                         const context = await browser.newContext({
                             reducedMotion: "reduce",
                             serviceWorkers: "block",
                             colorScheme: "light",
                             viewport,
                         });
+                        await context.addInitScript((value) => localStorage.setItem("specpi-site-theme", value), theme);
                         const page = await context.newPage();
                         try {
                             await checkRenderedPage(page, { origin, route, viewport });
+                            assert.equal(await page.locator("html").getAttribute("data-theme"), theme);
                         } catch (error) {
                             const directory = path.join(root, ".specpi-test", "browser-artifacts");
                             await fs.mkdir(directory, { recursive: true });
-                            const file = path.join(directory, `${name}-${route.replaceAll("/", "") || "home"}.png`);
+                            const file = path.join(
+                                directory,
+                                `${name}-${theme}-${route.replaceAll("/", "") || "home"}.png`,
+                            );
                             const image = await page.screenshot({ type: "png", timeout: 5000 }).catch(() => undefined);
                             if (image && image.length <= MAX_PNG_BYTES) {
                                 await fs.writeFile(file, image);
@@ -150,6 +157,81 @@ test(
                 } finally {
                     await context.close();
                 }
+            }
+        });
+    },
+);
+
+test(
+    "theme choice survives navigation and reload, and works without storage",
+    { skip: !enabled, timeout: 60000 },
+    async () => {
+        await withBrowser(async (browser, origin) => {
+            const context = await browser.newContext({ viewport: VIEWPORT_PRESETS.mobile });
+            try {
+                const page = await context.newPage();
+                async function assertPreview(theme) {
+                    const previews = page.locator(".product-preview .preview-panels:visible");
+                    assert.equal(await previews.count(), 1);
+                    assert.equal(await previews.getAttribute("data-preview-theme"), theme);
+                    const expected = theme === "light" ? "media/specpi-chat-light.png" : "media/specpi-chat.png";
+                    assert.deepEqual(
+                        await previews
+                            .locator("img")
+                            .evaluateAll((images) => images.map((image) => image.getAttribute("src"))),
+                        [expected, expected],
+                    );
+                }
+
+                await page.goto(`${origin}/SpecPi/`);
+                assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
+                await assertPreview("light");
+                await page.getByRole("button", { name: "Dark mode" }).press("Enter");
+                assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
+                await assertPreview("dark");
+                for (const route of ["wiki/", "single-agent/", ""]) {
+                    await page.goto(`${origin}/SpecPi/${route}`);
+                    assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
+                    assert.equal(
+                        await page.getByRole("button", { name: "Dark mode" }).getAttribute("aria-pressed"),
+                        "true",
+                    );
+                }
+
+                await page.reload();
+                assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
+                await assertPreview("dark");
+                await page.getByRole("button", { name: "Dark mode" }).click();
+                await page.reload();
+                assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
+                await assertPreview("light");
+                await page.goto(`${origin}/SpecPi/#loop`);
+                assert.equal(await page.locator("#loop img").isVisible(), true);
+                assert.equal(await page.locator("#loop summary, #loop button").count(), 0);
+                await page.goto(`${origin}/SpecPi/#guard`);
+                assert.equal(await page.locator("#guard").evaluate((element) => element.open), true);
+            } finally {
+                await context.close();
+            }
+
+            const privateContext = await browser.newContext();
+            try {
+                await privateContext.addInitScript(() => {
+                    Object.defineProperty(window, "localStorage", {
+                        get() {
+                            throw new Error("Storage disabled");
+                        },
+                    });
+                });
+                const page = await privateContext.newPage();
+                const errors = [];
+                page.on("pageerror", (error) => errors.push(error.message));
+                await page.goto(`${origin}/SpecPi/`);
+                await page.getByRole("button", { name: "Dark mode" }).click();
+                assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
+                assert.deepEqual(errors, []);
+            } finally {
+                await privateContext.close();
             }
         });
     },

@@ -744,3 +744,21 @@
         overflow: visible;
     }
 }
+
+/* Keep prose readable beside the document index. */
+.doc-section > p,
+.wiki-summary,
+.article-deck {
+    max-width: 65ch;
+}
+.wiki-sidebar a:hover,
+.article-body a,
+.doc-section a {
+    color: var(--accent);
+}
+.wiki-release-note,
+.doc-boundary,
+.article-body .article-callout {
+    border-left-width: 2px;
+    background: var(--surface);
+}

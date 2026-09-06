@@ -2,102 +2,86 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
+        <script src="theme.js"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#111619" />
+        <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
             content="A Pi harness with task scope, command policy, evidence-led improvements, and an optional native VS Code chat sidebar."
         />
-        <meta property="og:title" content="SpecPi · Single-agent harness for Pi" />
-        <meta
-            property="og:description"
-            content="Technical reference for SpecPi: single-agent execution, validation, and the harness improvement workflow."
-        />
+        <meta property="og:title" content="SpecPi · Pi, beside your code." />
+        <meta property="og:description" content="Chat in VS Code. Delegate focused research. Review what changes." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://tannermidd.github.io/SpecPi/" />
         <meta name="twitter:card" content="summary" />
         <link rel="canonical" href="https://tannermidd.github.io/SpecPi/" />
         <link rel="icon" href="logo.svg" type="image/svg+xml" />
         <link rel="stylesheet" href="styles.css" />
-        <title>SpecPi · Single-agent harness for Pi</title>
+        <title>SpecPi · Pi, beside your code.</title>
     </head>
-    <body>
+
+    <body class="home-page">
         <a class="skip-link" href="#overview">Skip to content</a>
         <header class="site-header wrap">
             <a class="brand" href="./" aria-label="SpecPi home"
                 ><img src="logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
             >
             <nav class="header-nav" aria-label="Primary navigation">
-                <a href="#loop">Workflow</a><a href="#vscode-chat">Chat</a><a href="single-agent/">Architecture</a><a href="wiki/">Reference</a
-                ><a href="https://github.com/TannerMidd/SpecPi">GitHub <span aria-hidden="true">↗</span></a>
+                <a href="#install">Install</a><a href="#vscode-chat">VS Code</a><a href="single-agent/">Research</a
+                ><a href="wiki/">Docs</a><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
             </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
         </header>
         <main>
             <section class="hero wrap" id="overview" aria-labelledby="hero-title">
-                <div class="hero-meta">
-                    <p class="eyebrow">
-                        <span class="signal" aria-hidden="true"></span>Specification / Pi coding-agent harness
-                    </p>
-                    <a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.16.0"
-                        >Release / v0.16.0 <span aria-hidden="true">↗</span></a
-                    >
-                </div>
                 <div class="hero-grid">
                     <div class="hero-copy">
-                        <h1 id="hero-title">Single-agent<br />harness for Pi.</h1>
-                        <p class="hero-summary">
-                            SpecPi adds task scope, command policy, verification records, and a human-selected
-                            improvement workflow to Pi. One agent owns implementation and integration. Harness changes
-                            require observed evidence and executable checks.
-                        </p>
+                        <h1 id="hero-title">Pi, beside<br />your code.</h1>
+                        <p class="hero-summary">Chat in VS Code. Delegate focused research. Review what changes.</p>
                         <div class="hero-actions">
-                            <a class="button" href="#install">Installation <span aria-hidden="true">↗</span></a
-                            ><a class="text-link" href="single-agent/"
-                                >Architecture rationale <span aria-hidden="true">→</span></a
-                            >
+                            <a class="button" href="#vscode-chat">Get SpecPi Chat</a
+                            ><a class="button button-secondary" href="#install">Install SpecPi</a>
                         </div>
+                        <p class="hero-note">Your Pi setup. Your choice of model.</p>
                     </div>
-                    <figure
-                        class="system-diagram"
-                        aria-label="You direct one accountable agent. Its work is checked, and evidence informs human-selected harness improvements."
-                    >
-                        <figcaption><span>01 / Operating model</span><span>Human-directed</span></figcaption>
-                        <div class="human-node">
-                            <span class="node-tag">YOU</span>
-                            <div>
-                                <strong>Task definition</strong>
-                                <p>Requirements, scope, and approval</p>
-                            </div>
+                    <figure class="product-preview">
+                        <div class="preview-panels" data-preview-theme="light">
+                            <img
+                                class="preview-editor"
+                                src="media/specpi-chat-light.png"
+                                width="3840"
+                                height="1400"
+                                alt="A file-search function open in VS Code."
+                                fetchpriority="high"
+                            />
+                            <img
+                                class="preview-chat"
+                                src="media/specpi-chat-light.png"
+                                width="3840"
+                                height="1400"
+                                alt="SpecPi Chat discussing a small change with filter.mjs attached."
+                            />
                         </div>
-                        <div class="connector" aria-hidden="true">↓</div>
-                        <div class="agent-core">
-                            <div class="core-label"><span>Pi + SpecPi</span><span>One context</span></div>
-                            <div class="core-number">1 agent / 1 writer</div>
-                            <strong>Implementation and verification</strong>
-                            <p>One owner for edits and integration</p>
+                        <div class="preview-panels" data-preview-theme="dark">
+                            <img
+                                class="preview-editor"
+                                src="media/specpi-chat.png"
+                                width="3840"
+                                height="1400"
+                                alt="A file-search function open in VS Code."
+                            />
+                            <img
+                                class="preview-chat"
+                                src="media/specpi-chat.png"
+                                width="3840"
+                                height="1400"
+                                alt="SpecPi Chat discussing a small change with filter.mjs attached."
+                            />
                         </div>
-                        <div class="connector" aria-hidden="true">↓</div>
-                        <div class="output-node">
-                            <span class="check-mark" aria-hidden="true">✓</span>
-                            <div>
-                                <strong>Review artifacts</strong>
-                                <p>Diff, check results, and remaining risk</p>
-                            </div>
-                        </div>
-                        <div class="feedback-node">
-                            <span aria-hidden="true">↺</span>
-                            <div>
-                                <strong>Harness improvement workflow</strong>
-                                <p>Observation → selection → validation</p>
-                            </div>
-                        </div>
+                        <figcaption>SpecPi Chat · Example workspace</figcaption>
                     </figure>
-                </div>
-                <div class="principles" aria-label="Design principles">
-                    <p><span>01</span>Single-agent execution</p>
-                    <p><span>02</span>Executable verification</p>
-                    <p><span>03</span>Human-selected improvements</p>
-                    <p><span>04</span>Local improvement records</p>
                 </div>
                 <details class="showcase" id="showcase">
                     <summary>
@@ -122,7 +106,8 @@
                         </video>
                         <div class="showcase-caption">
                             <p id="showcase-description">
-                                SpecPi Chat, read-only delegation, and human-selected improvements. Staged demonstration.
+                                SpecPi Chat, read-only delegation, and human-selected improvements. Staged
+                                demonstration.
                             </p>
                             <a href="media/specpi-showcase.mp4" download>Download MP4 · 5 MB</a>
                         </div>
@@ -145,13 +130,14 @@
                                     for a decision. Choosing Deny blocks the call.
                                 </li>
                                 <li>
-                                    <strong>0:31 · Switch conversations.</strong> Open another chat while the first stays
-                                    running. Conversations share workspace files.
+                                    <strong>0:31 · Switch conversations.</strong> Open another chat while the first
+                                    stays running. Conversations share workspace files.
                                 </li>
                                 <li>
                                     <strong>0:38 · Select a proposed harness improvement.</strong> Opt-in collection
                                     records recurring capability gaps. Select one qualified item with
-                                    <code>/harness-improvement</code> to authorize implementation, then verify the change.
+                                    <code>/harness-improvement</code> to authorize implementation, then verify the
+                                    change.
                                 </li>
                                 <li>
                                     <strong>0:45 · SpecPi.</strong> A minimal, evidence-led harness for Pi, with a
@@ -159,400 +145,251 @@
                                 </li>
                             </ol>
                             <p>
-                                Music: <a href="https://www.scottbuckley.com.au/library/machina/">“Machina” by Scott Buckley</a>,
-                                released under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
-                                <a href="https://www.scottbuckley.com.au/">www.scottbuckley.com.au</a>.
-                                Excerpt edited and faded. No narration.
+                                Music:
+                                <a href="https://www.scottbuckley.com.au/library/machina/">“Machina” by Scott Buckley</a
+                                >, released under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+                                <a href="https://www.scottbuckley.com.au/">www.scottbuckley.com.au</a>. Excerpt edited
+                                and faded. No narration.
                             </p>
                         </details>
                     </div>
                 </details>
             </section>
-
-            <section class="loop-section" id="loop" aria-labelledby="loop-title">
-                <div class="wrap">
-                    <div class="section-kicker">
-                        <span>01 / Harness improvement</span><span>Selection and verification gates</span>
-                    </div>
-                    <div class="section-heading">
-                        <h2 id="loop-title">Harness improvement workflow</h2>
-                        <p>
-                            Opt-in gap records identify recurring limitations. Human selection authorizes a specific
-                            change. Required validators check the implementation; later outcome feedback records whether
-                            it helped.
-                        </p>
-                    </div>
-                    <div class="cycle-tabs" role="tablist" aria-label="Improvement stages">
-                        <button
-                            id="cycle-friction"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="cycle-panel"
-                            tabindex="-1"
-                            data-cycle-step="0"
-                        >
-                            <span>01</span>Notice
-                        </button>
-                        <button
-                            id="cycle-repeat"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="cycle-panel"
-                            tabindex="-1"
-                            data-cycle-step="1"
-                        >
-                            <span>02</span>Qualify
-                        </button>
-                        <button
-                            id="cycle-choose"
-                            role="tab"
-                            aria-selected="true"
-                            aria-controls="cycle-panel"
-                            data-cycle-step="2"
-                        >
-                            <span>03 / Human gate</span>Choose
-                        </button>
-                        <button
-                            id="cycle-build"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="cycle-panel"
-                            tabindex="-1"
-                            data-cycle-step="3"
-                        >
-                            <span>04</span>Build
-                        </button>
-                        <button
-                            id="cycle-prove"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="cycle-panel"
-                            tabindex="-1"
-                            data-cycle-step="4"
-                        >
-                            <span>05</span>Verify
-                        </button>
-                        <button
-                            id="cycle-retire"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="cycle-panel"
-                            tabindex="-1"
-                            data-cycle-step="5"
-                        >
-                            <span>06</span>Retire
-                        </button>
-                        <button
-                            id="cycle-return"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="cycle-panel"
-                            tabindex="-1"
-                            data-cycle-step="6"
-                        >
-                            <span>07 / Feedback</span>Revisit
-                        </button>
-                    </div>
-                    <div
-                        class="cycle-panel"
-                        id="cycle-panel"
-                        role="tabpanel"
-                        aria-labelledby="cycle-choose"
-                        tabindex="0"
-                    >
-                        <span class="cycle-number" data-cycle-number aria-hidden="true">03</span>
-                        <div class="cycle-explanation">
-                            <p class="eyebrow" data-cycle-authority>Human gate</p>
-                            <h3 data-cycle-title>Authorize a specific improvement</h3>
-                            <p data-cycle-description>
-                                An exact human selection in /harness-improvement authorizes one item. Wishlist evidence
-                                alone does not authorize implementation.
-                            </p>
-                            <code data-cycle-command>/harness-improvement</code>
+            <section class="start-section wrap" id="install" aria-labelledby="install-title">
+                <div id="writer" class="research-intro">
+                    <h2>One agent writes.<br />Others investigate.</h2>
+                    <p>
+                        Read-only workers help with focused questions. The lead agent checks their findings and makes
+                        changes.
+                    </p>
+                    <a class="text-link" href="single-agent/">Read the research</a>
+                    <p class="small-note">
+                        One writer per working directory. Delegation is on at startup; <code>/delegate off</code> turns
+                        it off.
+                    </p>
+                </div>
+                <div>
+                    <div class="terminal">
+                        <div class="terminal-bar">
+                            <h2 id="install-title">Install SpecPi</h2>
+                            <button type="button" data-copy-target="install-command" hidden>Copy commands</button>
                         </div>
-                        <div class="cycle-state">
-                            <span class="eyebrow">Recorded state</span><strong data-cycle-status>selected</strong>
-                            <p data-cycle-note>Selection authorizes only the chosen item.</p>
-                        </div>
-                    </div>
-                    <noscript
-                        ><p class="noscript-note">
-                            The full cycle: notice friction, qualify a gap, choose a change, build, verify, retire, then
-                            revisit with human feedback. Read every stage in the
-                            <a href="wiki/#workflows">improvement guide</a>.
-                        </p></noscript
-                    >
-                    <div class="loop-notes">
-                        <p>
-                            <strong>Local evidence collection.</strong> Collection is disabled by default. Opt-in gap
-                            records stay local; they are sanitized, bounded, and deduplicated.
-                        </p>
-                        <p>
-                            <strong>Verification and follow-up.</strong> A failed check cannot close the loop. Later
-                            human feedback can reopen a retired item for review.
-                        </p>
-                        <a class="text-link" href="wiki/#workflows"
-                            >Workflow reference <span aria-hidden="true">↗</span></a
-                        >
-                    </div>
-                </div>
-            </section>
-
-            <section class="work-section wrap" id="session" aria-labelledby="work-title">
-                <div class="section-kicker">
-                    <span>02 / Execution state</span><span>Task cards, scope, and checks</span>
-                </div>
-                <div class="section-heading">
-                    <h2 id="work-title">Task state and verification</h2>
-                    <p>
-                        The agent carries the task from understanding to verification. The harness keeps the original
-                        ask, working boundaries, and evidence close to the work.
-                    </p>
-                </div>
-                <div class="work-grid">
-                    <article>
-                        <span class="step-index">01 / Define</span>
-                        <h3>Task contract</h3>
-                        <p>
-                            A task card preserves the original goal, acceptance criteria, constraints, and evidence as
-                            work progresses.
-                        </p>
-                        <a href="wiki/#task-records"><code>/task set</code><span aria-hidden="true">↗</span></a>
-                    </article>
-                    <article>
-                        <span class="step-index">02 / Bound</span>
-                        <h3>Working scope</h3>
-                        <p>
-                            Declare task scope. Keep one writer in each working directory. Use an isolated worktree when
-                            an experiment needs its own space.
-                        </p>
-                        <a href="wiki/#work-ownership"><code>/scope task</code><span aria-hidden="true">↗</span></a>
-                    </article>
-                    <article>
-                        <span class="step-index">03 / Challenge</span>
-                        <h3>Completion review</h3>
-                        <p>
-                            Question assumptions and run the relevant checks. A model's confidence is a claim;
-                            executable evidence makes the result reviewable.
-                        </p>
-                        <a href="wiki/#reference"><code>/challenge</code><span aria-hidden="true">↗</span></a>
-                    </article>
-                </div>
-            </section>
-
-            <section class="reason-section wrap" id="writer" aria-labelledby="reason-title">
-                <a class="article-feature" href="single-agent/">
-                    <div class="article-stamp">
-                        <span>Engineering note</span><strong>01</strong><span>Architecture / Research</span>
-                    </div>
-                    <div class="article-feature-copy">
-                        <p class="eyebrow">Architecture decision</p>
-                        <h2 id="reason-title">One writer. Focused delegation.</h2>
-                        <p>
-                            How research shaped the current system: one owner for edits, optional read-only workers, and
-                            evidence the parent must check.
-                        </p>
-                        <span class="text-link"
-                            >Research → decisions → implementation <span aria-hidden="true">↗</span></span
-                        ><span class="article-date">SpecPi v0.16.0 · Architecture decisions</span>
-                    </div>
-                </a>
-                <div class="writer-note">
-                    <strong>One writer per working directory.</strong>
-                    <p>
-                        Delegation is on by default at Pi startup for selective review or analysis. Use
-                        <code>/delegate off</code> to disable it. Workers report findings; the parent verifies them and makes changes.
-                    </p>
-                    <a href="wiki/#delegation">Use delegation <span aria-hidden="true">↗</span></a>
-                </div>
-            </section>
-
-            <section class="guard-section wrap" id="guard" aria-labelledby="guard-title">
-                <div class="section-kicker">
-                    <span>03 / Command policy</span><span>Representative Bash classifications</span>
-                </div>
-                <div class="section-heading">
-                    <h2 id="guard-title">Command policy</h2>
-                    <p>
-                        Command Guard classifies model-initiated commands before execution. The table shows
-                        representative interactive-session decisions. Selecting a mode changes this illustration only.
-                    </p>
-                </div>
-                <div class="guard-controls" role="tablist" aria-label="Command guard modes">
-                    <button
-                        id="guard-mode-guard"
-                        type="button"
-                        role="tab"
-                        data-guard-mode="guard"
-                        aria-selected="true"
-                        aria-controls="guard-comparison"
-                    >
-                        Guard <span>Default</span>
-                    </button>
-                    <button
-                        id="guard-mode-strict"
-                        type="button"
-                        role="tab"
-                        data-guard-mode="strict"
-                        aria-selected="false"
-                        aria-controls="guard-comparison"
-                        tabindex="-1"
-                    >
-                        Strict
-                    </button>
-                    <button
-                        id="guard-mode-off"
-                        type="button"
-                        role="tab"
-                        data-guard-mode="off"
-                        aria-selected="false"
-                        aria-controls="guard-comparison"
-                        tabindex="-1"
-                    >
-                        Off
-                    </button>
-                    <span class="guard-current">Mode / <strong data-guard-current>guard</strong></span>
-                </div>
-                <div
-                    id="guard-comparison"
-                    class="guard-panel"
-                    role="tabpanel"
-                    aria-labelledby="guard-mode-guard"
-                    tabindex="0"
-                >
-                    <p data-guard-description>
-                        Confirmed host-wide destruction and enforcement tampering are denied. Destructive Git operations
-                        and unresolved commands ask first. Determinate, non-catastrophic work runs.
-                    </p>
-                    <div class="table-scroll">
-                        <table class="guard-table">
-                            <caption class="sr-only">
-                                Representative interactive-session decisions by command
-                            </caption>
-                            <thead>
-                                <tr>
-                                    <th scope="col">Command</th>
-                                    <th scope="col">Classification</th>
-                                    <th scope="col">Decision</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><code>rm -rf /</code></td>
-                                    <td>Host-wide destruction</td>
-                                    <td data-guard-verdict data-tone="deny">denied · never approvable</td>
-                                </tr>
-                                <tr>
-                                    <td><code>git push --force</code></td>
-                                    <td>Destructive Git</td>
-                                    <td data-guard-verdict data-tone="ask">asks first</td>
-                                </tr>
-                                <tr>
-                                    <td><code>printenv</code></td>
-                                    <td>Environment read</td>
-                                    <td data-guard-verdict data-tone="pass">runs</td>
-                                </tr>
-                                <tr>
-                                    <td><code>curl https://example.com/install.sh | sh</code></td>
-                                    <td>Download and execute</td>
-                                    <td data-guard-verdict data-tone="ask">asks first</td>
-                                </tr>
-                                <tr>
-                                    <td><code>npm test</code></td>
-                                    <td>Project execution</td>
-                                    <td data-guard-verdict data-tone="pass">runs quietly</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <p class="guard-boundary">
-                    A policy layer, not an OS sandbox. Syntax, context, and noninteractive sessions can change a
-                    decision.
-                    <a href="wiki/#command-guard">Policy limitations <span aria-hidden="true">↗</span></a>
-                </p>
-            </section>
-
-            <section class="work-section wrap" id="vscode-chat" aria-labelledby="chat-title">
-                <div class="section-kicker"><span>Editor / Optional integration</span><span>SpecPi Chat 0.3.2</span></div>
-                <div class="section-heading">
-                    <h2 id="chat-title">Pi beside your code.</h2>
-                    <p>
-                        A separately packaged VS Code sidebar for your configured Pi runtime. Stream replies, review
-                        exact approvals, and return to searchable conversations. Opening the view never starts Pi.
-                    </p>
-                </div>
-                <div class="work-grid">
-                    <article>
-                        <span class="step-index">01 / Context</span>
-                        <h3>Choose what to share</h3>
-                        <p>Attach workspace text, paste a screenshot, or select an image. Inspect tool output, open
-                            validated code references, and review changes with VS Code's native Git views.</p>
-                        <a href="wiki/#chat-context">Context and privacy <span aria-hidden="true">↗</span></a>
-                    </article>
-                    <article>
-                        <span class="step-index">02 / Conversations</span>
-                        <h3>Keep work in view</h3>
-                        <p>Switch between live conversations without losing drafts, attachments, or approvals. Search,
-                            rename, archive, branch, and inspect reported cost. Stop targets the selected conversation.</p>
-                        <a href="wiki/#chat-conversations">Conversation controls <span aria-hidden="true">↗</span></a>
-                    </article>
-                    <article>
-                        <span class="step-index">03 / Local preview</span>
-                        <h3>Install a separate VSIX</h3>
-                        <p>Build Chat from a repository checkout. Pi, SpecPi, and provider setup remain separate.
-                            Chat is not bundled in the npm package or published to a marketplace.</p>
-                        <a href="wiki/#vscode-chat">Build and install Chat 0.3.2 <span aria-hidden="true">↗</span></a>
-                    </article>
-                </div>
-                <p class="guard-boundary">Live chats share workspace files, not isolated worktrees. Keep one writer per
-                    working directory when changes overlap. Branching a conversation does not undo code changes.</p>
-            </section>
-
-            <section class="install-section" id="install" aria-labelledby="install-title">
-                <div class="wrap install-grid">
-                    <div>
-                        <p class="eyebrow">04 / Installation</p>
-                        <h2 id="install-title">Installation and validation</h2>
-                        <p>
-                            The CLI previews managed changes before installation and checks the resulting configuration.
-                        </p>
-                        <p class="install-requirements">
-                            Node.js 22.19+ · npm · Git<br />Pi 0.84.4+; the confirmed install can add Pi if missing.
-                        </p>
-                        <a class="text-link" href="wiki/#getting-started"
-                            >Installer lifecycle reference <span aria-hidden="true">↗</span></a
-                        >
-                    </div>
-                    <div>
-                        <div class="terminal">
-                            <div class="terminal-bar">
-                                <span>Terminal / pinned release v0.16.0</span
-                                ><button type="button" data-copy-target="install-command" hidden>Copy commands</button>
-                            </div>
-                            <pre><code id="install-command">npm install --global specpi@0.16.0
+                        <pre><code id="install-command">npm install --global specpi@0.16.0
 specpi plan
 specpi install
 specpi doctor</code></pre>
-                        </div>
-                        <p class="copy-status" data-copy-status role="status"></p>
-                        <p class="install-detail">
-                            For the latest published release: <code>npm install --global specpi@latest</code>. Already
-                            in Pi? Restart Pi after installation or updating SpecPi.
-                        </p>
-                        <p class="install-detail">
-                            Managed changes are backed up. Unrelated configuration is preserved. Local improvement
-                            records stay on your machine; model requests still follow your configured provider.
-                        </p>
                     </div>
+                    <p class="copy-status" data-copy-status role="status"></p>
+                    <p class="install-detail">
+                        Node.js 22.19+ · npm · Git · Pi 0.84.4+<br />The installer can add Pi if missing. Restart Pi
+                        after setup.
+                    </p>
+                    <details class="install-options">
+                        <summary>Other install options</summary>
+                        <p class="install-detail">
+                            For the latest release: <code>npm install --global specpi@latest</code>
+                        </p>
+                        <a class="text-link" href="wiki/#getting-started">Setup and updates</a>
+                    </details>
                 </div>
             </section>
+            <section class="principles wrap" id="session" aria-label="Design principles">
+                <div>
+                    <h2>Human control</h2>
+                    <p>You choose which improvements to make.</p>
+                </div>
+                <div>
+                    <h2>Small, reversible changes</h2>
+                    <p>Keep each change focused and easy to review.</p>
+                </div>
+                <div>
+                    <h2>Local improvement records</h2>
+                    <p>Collection is disabled by default. Records stay on your machine.</p>
+                </div>
+            </section>
+            <section class="chat-install wrap" id="vscode-chat" aria-labelledby="chat-title">
+                <div>
+                    <p class="eyebrow">SpecPi Chat 0.3.2</p>
+                    <h2 id="chat-title">Add it to VS Code.</h2>
+                    <p>Attach files, review approvals, and switch between conversations.</p>
+                    <a
+                        class="button"
+                        href="https://github.com/TannerMidd/SpecPi/releases/download/v0.16.0/specpi-chat-0.3.2.vsix"
+                        >Download extension</a
+                    >
+                </div>
+                <ol class="install-steps">
+                    <li>
+                        <span>01</span>
+                        <div>
+                            <strong>Set up Pi and SpecPi.</strong>
+                            <p>Follow the install above, then open Pi in a terminal to configure your provider.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span>02</span>
+                        <div>
+                            <strong>Install the downloaded file.</strong>
+                            <p>In VS Code 1.96+, run <b>Extensions: Install from VSIX…</b> and select the download.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span>03</span>
+                        <div>
+                            <strong>Open SpecPi. Connect Pi.</strong>
+                            <p>Open your project, select SpecPi in the Activity Bar, then choose <b>Connect Pi</b>.</p>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+            <div class="reference-demos wrap">
+                <section class="improvement-section" id="loop" aria-labelledby="loop-title">
+                    <div class="improvement-intro">
+                        <h2 id="loop-title">Improving the Pi harness</h2>
+                        <p>
+                            Changes to the instructions, tools and workflows around Pi. You choose what changes;
+                            verification is required before an item can close.
+                        </p>
+                    </div>
+                    <figure class="improvement-diagram">
+                        <picture>
+                            <source
+                                media="(max-width: 600px)"
+                                srcset="media/improvement-workflow-mobile.png"
+                                width="1086"
+                                height="1448"
+                            />
+                            <img
+                                src="media/improvement-workflow.png"
+                                width="1774"
+                                height="887"
+                                loading="lazy"
+                                decoding="async"
+                                alt="Pi harness improvement: observe and qualify a recurring gap; select one change with human authorization; modify the Pi harness; run checks and validation; retire only with evidence; review later outcomes. Failed checks return to Modify. New work requires a new human selection."
+                            />
+                        </picture>
+                        <figcaption>
+                            Evidence collection is opt-in and local.
+                            <a href="wiki/#workflows">Read the workflow <span aria-hidden="true">↗</span></a>
+                        </figcaption>
+                    </figure>
+                </section>
+                <details class="reference-detail" id="guard">
+                    <summary>Command Guard<span>Explore the approval modes</span></summary>
+                    <section class="guard-section" aria-labelledby="guard-title">
+                        <div class="section-kicker">
+                            <span>03 / Command policy</span><span>Representative Bash classifications</span>
+                        </div>
+                        <div class="section-heading">
+                            <h2 id="guard-title">Command policy</h2>
+                            <p>
+                                Command Guard classifies model-initiated commands before execution. The table shows
+                                representative interactive-session decisions. Selecting a mode changes this illustration
+                                only.
+                            </p>
+                        </div>
+                        <div class="guard-controls" role="tablist" aria-label="Command guard modes">
+                            <button
+                                id="guard-mode-guard"
+                                type="button"
+                                role="tab"
+                                data-guard-mode="guard"
+                                aria-selected="true"
+                                aria-controls="guard-comparison"
+                            >
+                                Guard <span>Default</span>
+                            </button>
+                            <button
+                                id="guard-mode-strict"
+                                type="button"
+                                role="tab"
+                                data-guard-mode="strict"
+                                aria-selected="false"
+                                aria-controls="guard-comparison"
+                                tabindex="-1"
+                            >
+                                Strict
+                            </button>
+                            <button
+                                id="guard-mode-off"
+                                type="button"
+                                role="tab"
+                                data-guard-mode="off"
+                                aria-selected="false"
+                                aria-controls="guard-comparison"
+                                tabindex="-1"
+                            >
+                                Off
+                            </button>
+                            <span class="guard-current">Mode / <strong data-guard-current>guard</strong></span>
+                        </div>
+                        <div
+                            id="guard-comparison"
+                            class="guard-panel"
+                            role="tabpanel"
+                            aria-labelledby="guard-mode-guard"
+                            tabindex="0"
+                        >
+                            <p data-guard-description>
+                                Confirmed host-wide destruction and enforcement tampering are denied. Destructive Git
+                                operations and unresolved commands ask first. Determinate, non-catastrophic work runs.
+                            </p>
+                            <div class="table-scroll">
+                                <table class="guard-table">
+                                    <caption class="sr-only">
+                                        Representative interactive-session decisions by command
+                                    </caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Command</th>
+                                            <th scope="col">Classification</th>
+                                            <th scope="col">Decision</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><code>rm -rf /</code></td>
+                                            <td>Host-wide destruction</td>
+                                            <td data-guard-verdict data-tone="deny">denied · never approvable</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>git push --force</code></td>
+                                            <td>Destructive Git</td>
+                                            <td data-guard-verdict data-tone="ask">asks first</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>printenv</code></td>
+                                            <td>Environment read</td>
+                                            <td data-guard-verdict data-tone="pass">runs</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>curl https://example.com/install.sh | sh</code></td>
+                                            <td>Download and execute</td>
+                                            <td data-guard-verdict data-tone="ask">asks first</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>npm test</code></td>
+                                            <td>Project execution</td>
+                                            <td data-guard-verdict data-tone="pass">runs quietly</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <p class="guard-boundary">
+                            A policy layer, not an OS sandbox. Syntax, context, and noninteractive sessions can change a
+                            decision.
+                            <a href="wiki/#command-guard">Policy limitations <span aria-hidden="true">↗</span></a>
+                        </p>
+                    </section>
+                </details>
+            </div>
         </main>
         <footer class="site-footer wrap">
             <a class="brand" href="./"><img src="logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a>
-            <p>Pi harness / v0.16.0</p>
+            <a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.16.0">v0.16.0</a>
             <nav aria-label="Footer navigation">
-                <a href="wiki/">Reference</a
+                <a href="wiki/">Documentation</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
             </nav>
