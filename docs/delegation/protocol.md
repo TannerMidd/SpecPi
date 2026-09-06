@@ -172,9 +172,18 @@ job selection and valid line ranges. `p1` denotes the submitted inline context; 
 does not denote the parent transcript or prove repository behavior. `observed` requires
 at least one reference. At most eight findings and 16 KiB are retained.
 
-Malformed reports fail the attempt. There is no automatic retry. Provider exceptions
-are reduced to a generic failure message because raw errors may contain sensitive URLs
-or content. Missing usage is explicit; failed calls still consume invocation allowance.
+Malformed reports receive a correction prompt in the same child session. Previously
+read passages remain available; each correction must pass the normal inference admission
+and context/deadline checks. Ordinary selected-source argument errors return feedback
+and count their delivered JSON toward the tool-byte allowance. SDK argument-validation
+errors can also be corrected; source changes, revocation and quota exhaustion still abort.
+Provider requests are not automatically retried. Diagnostics distinguish
+source-tool failures, provider requests, stream/context/response bounds, output-token
+truncation, empty reports, JSON parsing, and schema/evidence validation. Only fixed stage
+messages and allowlisted validation reasons are returned; raw provider errors and rejected
+report text may contain sensitive URLs or content and are withheld. The original tool
+diagnostic survives SDK cancellation. Missing usage is explicit; failed calls still
+consume invocation allowance.
 
 ## Follow up and resolve
 
@@ -223,7 +232,8 @@ automatic tool execution, verified completion, or wishlist authorization.
 
 All mutations require `requestId`. Successful runs, follow-ups and final dispositions
 retain their replay receipts for the process lifetime; the fixed batch/job ceilings
-bound these to at most 20 entries. Replaying a retained request returns its stored
+bound these to at most five entries per admitted batch (160 at the default budget;
+1,280 at the maximum). Replaying a retained request returns its stored
 response without another request or transition. Reusing a retained ID with a different
 payload fails. Failed requests do not reserve IDs and may be corrected or retried.
 Successful cancellation and `needs_check` responses use a separate 128-entry oldest-first
@@ -245,10 +255,16 @@ SDK-visible stream/result and prompt settlement. Old payloads are discarded. Nei
 terminal receipt delivery nor SDK settlement proves physical remote execution has ended.
 
 The same in-memory controller survives `/reload` and session switches within the Pi
-process. Its ceilings are two active workers, four batches and 32 SDK model invocations
-per process, with two jobs and 8 invocations per batch and four invocations per logical
-job including one follow-up. Requested output is 8,192 tokens clamped to the model
-maximum. These are experiment limits, not research-derived optimal values.
+process. Defaults are two active workers, 32 batches and 256 SDK model invocations
+per process, with two jobs and 64 invocations per batch and 32 invocations per logical
+job including one follow-up. Source reading allows 96 calls and 512 KiB delivered
+JSON per job. Human `/delegate budget <multiplier>` (1–64, default 8) while off scales
+batch/model/tool counts, source-output bytes, serialized child context and SDK response bytes; it is
+saved across restarts and never resets spent counters or extends old jobs. Exhausted
+jobs reject follow-up admission rather than opening a child with no usable allowance.
+Requested output uses Pi's normal provider/model settings (`outputTokens: null`).
+SDK response acceptance defaults to 1 MiB and scales to 8 MiB at multiplier 64.
+These are experiment limits, not research-derived optimal values.
 Human off/on, task changes,
 branch navigation, model selection, guard changes and reloads revoke old generations;
 they do not create a new resource allowance. Normal parent turns do not revoke a job.

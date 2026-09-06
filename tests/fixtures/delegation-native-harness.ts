@@ -661,7 +661,7 @@ export default async function nativeEntryFixture(pi: any) {
                         "read_source",
                         "search_sources",
                     ]);
-                    assert.equal(request.body.max_tokens ?? request.body.max_completion_tokens, 8192);
+                    assert.equal(request.body.max_tokens ?? request.body.max_completion_tokens, 16384);
                     assert.equal(JSON.stringify(request.body).includes("NATIVE_AMBIENT"), false);
                 }
 
@@ -706,6 +706,8 @@ export default async function nativeEntryFixture(pi: any) {
             assert.deepEqual(JSON.parse(fs.readFileSync(preferenceFile, "utf8")), { schema: 1, timeoutMinutes: 30 });
             await tools.command("timeout reset");
             assert.equal((await tools.status()).limits.jobMs, 600_000);
+            await tools.command("budget 1");
+            assert.equal((await tools.status()).limits.sessionBatches, 4);
             const headless = new Proxy(ctx, {
                 get(target, key) {
                     return key === "hasUI" ? false : Reflect.get(target, key);
@@ -808,7 +810,7 @@ export default async function nativeEntryFixture(pi: any) {
             for (const request of server.requests) {
                 assert.equal(request.body.model, MODEL);
                 assert.equal(request.body.reasoning_effort, "high");
-                assert.equal(request.body.max_tokens ?? request.body.max_completion_tokens, 8192);
+                assert.equal(request.body.max_tokens ?? request.body.max_completion_tokens, 16384);
                 assert.equal(request.authenticated, true);
                 assert.equal(request.parentHeader, undefined);
                 assert.deepEqual(request.body.tools.map((tool: any) => tool.function.name).sort(), [

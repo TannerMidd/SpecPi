@@ -750,7 +750,7 @@ test("cancellation while Pi opens a child releases the late session without infe
 test("a failed child follow-up restores the original handoff while preserving spent calls", async (t) => {
     const bridge = hostBridge((context, _options, number) => {
         if (number === 1) {
-            return message("malformed report");
+            throw new Error("Synthetic provider failure");
         }
 
         const prompt = context.messages[0].content[0].text;
@@ -1251,7 +1251,7 @@ test("foreign source IDs fail before returning sibling content", async (t) => {
     const root = project(t, { "a.md": "A selected text", "b.md": "B selected text" });
     const bridge = hostBridge((context) => {
         const supplied = JSON.parse(context.messages[0].content[0].text);
-        if (supplied.sources[0].path === "a.md") {
+        if (supplied.sources[0].path === "a.md" && !context.messages.some((entry) => entry.role === "toolResult")) {
             return message([
                 {
                     type: "toolCall",
@@ -1277,12 +1277,14 @@ test("foreign source IDs fail before returning sibling content", async (t) => {
             })),
         ),
     );
-    assert.equal(output.results.find((item) => item.receipt.jobId === "j0").receipt.state, "failed");
-    assert.equal(bridge.calls.length, 2);
-    assert.ok(bridge.calls.every((call) => call.context.messages.length === 1));
+    assert.equal(output.results.find((item) => item.receipt.jobId === "j0").receipt.state, "complete");
+    assert.equal(bridge.calls.length, 3);
+    const corrected = bridge.calls.find((call) => call.context.messages.some((entry) => entry.role === "toolResult"));
+    assert.match(JSON.stringify(corrected.context.messages), /Source is not selected/);
+    assert.doesNotMatch(JSON.stringify(corrected.context.messages), /B selected text/);
 });
 
-test("invalid final JSON, coverage, confidence, and source evidence fail without retries", async (t) => {
+test("invalid final JSON, coverage, confidence, and source evidence can be corrected in the same session", async (t) => {
     const invalid = [
         "not JSON",
         "```json\n{}\n```",
@@ -1314,15 +1316,36 @@ test("invalid final JSON, coverage, confidence, and source evidence fail without
     for (const [index, answer] of invalid.entries()) {
         await t.test(`invalid final case ${index + 1}`, async (child) => {
             const root = project(child);
-            const bridge = hostBridge(() => message(answer));
+            const bridge = hostBridge((context, _options, call) => {
+                if (call === 1) {
+                    return message(answer);
+                }
+
+                assert.match(context.messages.at(-1).content[0].text, /Correct your previous report/);
+                assert.equal(context.messages[1].content[0].text, answer);
+
+                return message(JSON.stringify(result()));
+            });
             const value = controller(child, root, bridge);
             value.enable();
             const output = await complete(value);
-            assert.equal(output.results[0].receipt.state, "failed");
-            assert.equal(output.results[0].result, null);
-            assert.equal(bridge.calls.length, 1);
+            assert.equal(output.results[0].receipt.state, "complete");
+            assert.equal(output.results[0].error, null);
+            assert.equal(bridge.calls.length, 2);
         });
     }
+});
+
+test("report correction stops at the original model-call budget without accepting invalid evidence", async (t) => {
+    const bridge = hostBridge(() => message(JSON.stringify(result({ requirements: [] }))));
+    const value = controller(t, project(t), bridge, { limits: { jobCalls: 3 } });
+    value.enable();
+    const output = await complete(value);
+    assert.equal(output.results[0].receipt.state, "failed");
+    assert.equal(output.results[0].result, null);
+    assert.equal(output.results[0].receipt.calls, 3);
+    assert.equal(bridge.calls.length, 3);
+    assert.match(output.results[0].error, /model-call allowance/);
 });
 
 test("tool-free profiles and unavailable recursive tools fail without a retry", async (t) => {
@@ -1355,12 +1378,62 @@ test("tool conversations consume call bounds and never recurse past four calls",
     const bridge = hostBridge((_context, _options, call) =>
         message([{ type: "toolCall", id: `list${call}`, name: "list_sources", arguments: {} }]),
     );
-    const value = controller(t, root, bridge);
+    const value = controller(t, root, bridge, { limits: { jobCalls: 4 } });
     value.enable();
     const output = await complete(value, packet([{ ...packet().jobs[0], mode: "scout", sources: ["demo.md"] }]));
     assert.equal(bridge.calls.length, 4);
     assert.equal(output.results[0].receipt.calls, 4);
     assert.equal(output.results[0].receipt.state, "failed");
+    await assert.rejects(
+        value.execute({
+            operation: "follow_up",
+            requestId: "spent-model-follow",
+            ...binding(output.results[0].receipt),
+            prompt: "Continue reviewing",
+        }),
+        /no usable budget/,
+    );
+    assert.equal(bridge.calls.length, 4);
+});
+
+test("default reviewers read beyond the old byte/tool/turn limits and retain passages for follow-up", async (t) => {
+    const root = project(t, {
+        "demo.md": Array.from({ length: 2000 }, (_, index) => `${index}: ${"evidence ".repeat(8)}`).join("\n"),
+    });
+    const bridge = hostBridge((context, _options, call) => {
+        if (call <= 5) {
+            return message(
+                Array.from({ length: 4 }, (_, offset) => ({
+                    type: "toolCall",
+                    id: `read-${call}-${offset}`,
+                    name: "read_source",
+                    arguments: { sourceId: "s1", startLine: ((call - 1) * 4 + offset) * 100 + 1, maxLines: 100 },
+                })),
+            );
+        }
+
+        assert.ok(context.messages.some((entry) => entry.role === "toolResult"));
+
+        return message(JSON.stringify(result()));
+    });
+    const value = controller(t, root, bridge);
+    value.enable();
+    const output = await complete(value, packet([{ ...packet().jobs[0], mode: "scout", sources: ["demo.md"] }]));
+    const receipt = output.results[0].receipt;
+    assert.equal(receipt.state, "complete");
+    assert.equal(receipt.calls, 6);
+    assert.equal(receipt.toolCalls, 20);
+    assert.ok(receipt.toolBytes > 68_826);
+    await value.execute({
+        operation: "follow_up",
+        requestId: "reading-follow",
+        ...binding(receipt),
+        prompt: "Reassess the passages already read.",
+    });
+    await waitFor(() => value.status().active === 0);
+    const follow = await value.execute({ operation: "collect", batchId: receipt.batchId });
+    assert.equal(follow.results[0].receipt.state, "complete");
+    assert.equal(bridge.calls.length, 7);
 });
 
 test("provider errors are redacted and failed calls retain unknown usage", async (t) => {
@@ -1377,7 +1450,89 @@ test("provider errors are redacted and failed calls retain unknown usage", async
     assert.equal(output.results[0].receipt.usageComplete, false);
     assert.equal(output.results[0].receipt.cost, null);
     assert.equal(JSON.stringify(output).includes(sensitiveFixture), false);
+    assert.match(output.results[0].error, /provider request failed/);
     assert.equal(bridge.calls.length, 1);
+});
+
+test("a bad line range after useful reading recovers without losing passages", async (t) => {
+    const root = project(t, { "demo.md": "evidence ".repeat(600) });
+    const bridge = hostBridge((context, _options, call) => {
+        if (call === 1) {
+            return message([
+                {
+                    type: "toolCall",
+                    id: "read",
+                    name: "read_source",
+                    arguments: { sourceId: "s1", startLine: 1, maxLines: 1 },
+                },
+                {
+                    type: "toolCall",
+                    id: "bad",
+                    name: "read_source",
+                    arguments: { sourceId: "s1", startLine: 2, maxLines: 1 },
+                },
+            ]);
+        }
+
+        const results = context.messages.filter((entry) => entry.role === "toolResult");
+        assert.match(results[0].content[0].text, /evidence/);
+        assert.match(results[1].content[0].text, /read request rejected/);
+        if (call === 2) {
+            return message("malformed report");
+        }
+
+        return message(JSON.stringify(result()));
+    });
+    const value = controller(t, root, bridge);
+    value.enable();
+    const output = await complete(value, packet([{ ...packet().jobs[0], sources: ["demo.md"] }]));
+    const item = output.results[0];
+    assert.equal(item.receipt.state, "complete");
+    assert.equal(item.receipt.toolCalls, 2);
+    assert.equal(item.receipt.calls, 3);
+    assert.ok(item.receipt.toolBytes > 5000 && item.receipt.toolBytes < 6000);
+    assert.equal(item.error, null);
+    await value.execute({
+        operation: "follow_up",
+        requestId: "retry-read",
+        ...binding(item.receipt),
+        prompt: "Recheck the selected file.",
+    });
+    await waitFor(() => value.status().active === 0);
+    const follow = await value.execute({ operation: "collect", batchId: item.receipt.batchId });
+    assert.equal(follow.results[0].error, item.error);
+    assert.equal(bridge.calls.length, 4);
+});
+
+test("output truncation, empty text, and invalid JSON get safe correction prompts", async (t) => {
+    for (const [kind, answer, expected] of [
+        [
+            "truncated",
+            message([{ type: "thinking", thinking: "SENSITIVE_REPORT" }], { stopReason: "length" }),
+            /output-token limit/,
+        ],
+        ["empty", message(""), /no report text/],
+        ["json", message("SENSITIVE_REPORT invalid JSON"), /not valid JSON/],
+    ]) {
+        await t.test(kind, async (child) => {
+            const bridge = hostBridge((context, _options, call) => {
+                if (call === 1) {
+                    return answer;
+                }
+
+                assert.match(context.messages.at(-1).content[0].text, expected);
+                assert.doesNotMatch(context.messages.at(-1).content[0].text, /SENSITIVE_REPORT/);
+
+                return message(JSON.stringify(result()));
+            });
+            const value = controller(child, project(child), bridge);
+            value.enable();
+            const output = await complete(value);
+            assert.equal(output.results[0].receipt.state, "complete");
+            assert.doesNotMatch(JSON.stringify(output), /SENSITIVE_REPORT/);
+            assert.equal(bridge.calls.length, 2);
+        });
+    }
 });
 
 test("lowered context, final-result, and batch-call limits fail without extra provider attempts", async (t) => {
@@ -1389,7 +1544,7 @@ test("lowered context, final-result, and batch-call limits fail without extra pr
         await t.test(`${name} quota`, async (child) => {
             const root = project(child);
             const bridge = hostBridge();
-            const value = controller(child, root, bridge, { limits });
+            const value = controller(child, root, bridge, { limits: { jobCalls: 1, ...limits } });
             value.enable();
             const jobs = name === "batch" ? [packet().jobs[0], { ...packet().jobs[0], id: "j2" }] : [packet().jobs[0]];
             const output = await complete(value, packet(jobs));
@@ -1423,6 +1578,19 @@ test("tool count and serialized output quotas stop the conversation before anoth
                 packet([{ ...packet().jobs[0], mode: "scout", sources: ["demo.md"] }]),
             );
             assert.equal(output.results[0].receipt.state, "failed");
+            assert.equal(bridge.calls.length, 1);
+            assert.ok(output.results[0].receipt.toolCalls <= value.status().limits.toolCalls);
+            assert.ok(output.results[0].receipt.toolBytes <= value.status().limits.toolBytes);
+            assert.match(output.results[0].error, /Worker exhausted its tool-/);
+            await assert.rejects(
+                value.execute({
+                    operation: "follow_up",
+                    requestId: "spent-tools-follow",
+                    ...binding(output.results[0].receipt),
+                    prompt: "Try reading again",
+                }),
+                /no usable budget/,
+            );
             assert.equal(bridge.calls.length, 1);
         });
     }

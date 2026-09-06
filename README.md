@@ -48,6 +48,8 @@ specpi doctor
 
 Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
+To pin this release, use `npm install --global specpi@0.17.0`.
+
 Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
 [Setup, updates & removal](https://tannermidd.github.io/SpecPi/wiki/#getting-started) · [Delegation settings](docs/delegation/README.md)

@@ -437,6 +437,60 @@ async function fixture(t, controllerOptions = {}, options = {}) {
     return { bridge, factory, pi };
 }
 
+test("snapshot diagnostics reach the delegate tool without starting a worker or spending a batch", async (t) => {
+    let workers = 0;
+    const { pi } = await fixture(t, {
+        async worker() {
+            workers += 1;
+
+            return result();
+        },
+    });
+    const input = packet();
+    input.jobs[0].sources = ["missing.md"];
+    const rejected = await pi.tool({ operation: "run", requestId: "missing-source", packet: input });
+    assert.equal(rejected.isError, true);
+    assert.equal(
+        rejected.content[0].text,
+        "Delegation: Snapshot creation rejected (selected source 1): Selected file or working root does not exist.",
+    );
+    assert.equal(workers, 0);
+    const state = (await pi.tool({ operation: "status" })).details;
+    assert.equal(state.sessionCalls, 0);
+    assert.equal(state.sessionBatches, 0);
+    assert.equal(state.active, 0);
+});
+
+test("delegate starts a reviewer with a selected credential URL implementation module", async (t) => {
+    const root = project(t);
+    const relative = "src/lib/security/credential-url.ts";
+    const filename = path.join(root, relative);
+    fs.mkdirSync(path.dirname(filename), { recursive: true });
+    fs.writeFileSync(filename, "export const fixture = true;\n");
+    let captured;
+    const { pi } = await fixture(
+        t,
+        {
+            async worker({ snapshot, admitCall }) {
+                admitCall();
+                assert.equal(snapshot.sources[0].path, relative);
+                captured = snapshot.read(snapshot.sources[0].id).text;
+
+                return result();
+            },
+        },
+        { root },
+    );
+    const input = packet();
+    input.jobs[0].sources = [relative];
+    const started = await pi.tool({ operation: "run", requestId: "credential-source", packet: input });
+    assert.notEqual(started.isError, true);
+    await new Promise(setImmediate);
+    assert.equal(captured, "export const fixture = true;");
+    const collected = await pi.tool({ operation: "collect", batchId: started.details.batchId });
+    assert.equal(collected.details.results[0].receipt.state, "complete");
+});
+
 test("human timeout command saves, reloads, resets and displays the effective policy", async (t) => {
     const agentDir = project(t);
     const timeoutStore = createTimeoutStore(agentDir);
@@ -481,6 +535,44 @@ test("human timeout command saves, reloads, resets and displays the effective po
     await restarted.pi.command("timeout reset");
     assert.equal(timeoutStore.load(), 10);
     assert.equal((await state(restarted.pi)).limits.jobMs, 600_000);
+});
+
+test("human budget changes persist, preserve spent usage and timeout, and cannot be requested by the model", async (t) => {
+    const agentDir = project(t);
+    const timeoutStore = createTimeoutStore(agentDir);
+    const { pi } = await fixture(t, {}, { timeoutStore });
+    assert.equal((await state(pi)).limits.toolCalls, 96);
+    await pi.command("budget 16");
+    assert.match(pi.notices.at(-1).text, /Turn delegation off/);
+    await pi.tool({ operation: "run", requestId: "budget-first", packet: packet() });
+    await new Promise(setImmediate);
+    const calls = (await state(pi)).sessionCalls;
+    assert.equal(calls, 1);
+    await pi.command("off");
+    await pi.command("budget 16");
+    assert.equal((await state(pi)).limits.toolCalls, 192);
+    assert.equal((await state(pi)).limits.jobCalls, 64);
+    assert.equal((await state(pi)).sessionCalls, calls);
+    assert.equal(timeoutStore.loadBudget(), 16);
+    await pi.command("timeout 30");
+    assert.equal(timeoutStore.loadBudget(), 16);
+    assert.equal(timeoutStore.load(), 30);
+    await pi.command("budget 65");
+    assert.match(pi.notices.at(-1).text, /whole multiplier/);
+    assert.equal((await state(pi)).limits.toolCalls, 192);
+    assert.equal((await pi.tool({ operation: "budget", multiplier: 64 })).isError, true);
+    pi.context.hasUI = false;
+    await pi.command("budget 32");
+    assert.match(pi.notices.at(-1).text, /human interactive/);
+    pi.context.hasUI = true;
+    await pi.command("budget reset");
+    assert.equal(timeoutStore.loadBudget(), 8);
+    assert.equal((await state(pi)).limits.toolCalls, 96);
+    assert.equal((await state(pi)).limits.jobMs, 1_800_000);
+    assert.equal((await state(pi)).sessionCalls, calls);
+    const restarted = await fixture(t, {}, { timeoutStore: createTimeoutStore(agentDir) });
+    assert.equal((await state(restarted.pi)).limits.toolCalls, 96);
+    assert.equal((await state(restarted.pi)).limits.jobMs, 1_800_000);
 });
 
 test("invalid, noninteractive, enabled and model-facing timeout changes are rejected", async (t) => {

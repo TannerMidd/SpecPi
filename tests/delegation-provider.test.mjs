@@ -342,7 +342,7 @@ test("repeated non-delta events cannot repeatedly rescan a large partial", async
     });
     const handle = await state.host.openSession({ systemPrompt: "fixture", tools: [] });
     try {
-        await assert.rejects(handle.run("fixture", state.controls), /excessive stream boundaries/);
+        await assert.rejects(handle.run("fixture", state.controls), /response stream failed validation/);
         assert.equal(consumed, 131);
     } finally {
         handle.release();
@@ -359,36 +359,43 @@ for (const kind of [
     "nested-model-mutation",
 ]) {
     test(`stream ${kind} fails before publication and further child tools`, async () => {
-        const state = streamingFixture(async function* (terminal, fixtureState) {
-            yield { type: "start", partial: { ...terminal, content: [] } };
-            if (kind === "nested-model-mutation") {
-                fixtureState.ctx.model.compat.fixture = "changed";
-                terminal.content = [{ type: "toolCall", id: "fixture-tool", name: "read_source", arguments: {} }];
-                terminal.stopReason = "toolUse";
-            }
+        const state = streamingFixture(
+            async function* (terminal, fixtureState) {
+                yield { type: "start", partial: { ...terminal, content: [] } };
+                if (kind === "nested-model-mutation") {
+                    fixtureState.ctx.model.compat.fixture = "changed";
+                    terminal.content = [{ type: "toolCall", id: "fixture-tool", name: "read_source", arguments: {} }];
+                    terminal.stopReason = "toolUse";
+                }
 
-            const partial = { ...terminal, content: [{ type: "text", text: "x" }] };
-            if (kind === "huge-metadata") {
-                partial.providerMetadata = { value: "x".repeat(300_000) };
-            }
+                const partial = { ...terminal, content: [{ type: "text", text: "x" }] };
+                if (kind === "huge-metadata") {
+                    partial.providerMetadata = { value: "x".repeat(300_000) };
+                }
 
-            if (kind === "unreported-oversize") {
-                partial.content[0].text = "x".repeat(300_000);
-            }
+                if (kind === "unreported-oversize") {
+                    partial.content[0].text = "x".repeat(300_000);
+                }
 
-            for (let index = 0; index < (kind === "overflow" ? 3 : 1); index += 1) {
-                yield {
-                    type: kind === "unknown" ? "unknown_delta" : "text_delta",
-                    contentIndex: 0,
-                    delta:
-                        kind === "delta-size" ? "🍎".repeat(100_000) : kind === "overflow" ? "🍎".repeat(30_000) : "x",
-                    partial,
-                    ...(kind === "event-metadata" ? { unexpected: "unreviewed" } : {}),
-                };
-            }
+                for (let index = 0; index < (kind === "overflow" ? 3 : 1); index += 1) {
+                    yield {
+                        type: kind === "unknown" ? "unknown_delta" : "text_delta",
+                        contentIndex: 0,
+                        delta:
+                            kind === "delta-size"
+                                ? "🍎".repeat(100_000)
+                                : kind === "overflow"
+                                  ? "🍎".repeat(30_000)
+                                  : "x",
+                        partial,
+                        ...(kind === "event-metadata" ? { unexpected: "unreviewed" } : {}),
+                    };
+                }
 
-            yield { type: "done", reason: terminal.stopReason, message: terminal };
-        });
+                yield { type: "done", reason: terminal.stopReason, message: terminal };
+            },
+            { limits: { retainedResponseBytes: 256 * 1024 } },
+        );
         const handle = await state.host.openSession({
             systemPrompt: "fixture",
             tools:
@@ -402,7 +409,7 @@ for (const kind of [
                 kind === "nested-model-mutation"
                     ? /lease/
                     : kind === "delta-size"
-                      ? /retained data allowance/
+                      ? /retained-response allowance/
                       : /stream|partial|metadata/,
             );
             assert.equal(state.counts.tools, 0);
@@ -506,7 +513,9 @@ test("worker detaches failed cleanup and redacts tool exceptions before Pi can r
     for (let attempt = 0; attempt < 2; attempt += 1) {
         await assert.rejects(
             runWorker({ packet, job, host, snapshot, ...controls }),
-            (error) => error.message === "Delegation operation failed. Retry after checking Pi configuration.",
+            (error) =>
+                error.message ===
+                "Worker source-tool request failed; check the selected source IDs and tool argument limits.",
         );
         assert.throws(job.release, /SYNTHETIC_CLEANUP_SENTINEL/);
         assert.equal(job.child, undefined);

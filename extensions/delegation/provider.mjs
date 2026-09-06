@@ -1,8 +1,9 @@
-import { DelegationError } from "./errors.mjs";
-import { MAX_JOB_MS } from "./protocol.mjs";
+import { DelegationError, workerFailure } from "./errors.mjs";
+import { MAX_JOB_MS, MAX_BUDGET_MULTIPLIER, budgetLimits } from "./protocol.mjs";
 
 const MAX_CONTEXT_BYTES = 256 * 1024;
-const MAX_OUTPUT_TOKENS = 8192;
+const MAX_RUN_CONTEXT_BYTES = budgetLimits(MAX_BUDGET_MULTIPLIER).contextBytes;
+const MAX_RETAINED_RESPONSE_BYTES = budgetLimits(MAX_BUDGET_MULTIPLIER).retainedResponseBytes;
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const MODEL_FIELDS = [
     "id",
@@ -35,16 +36,16 @@ export function getPiSessionCompatibilityError(sdk) {
         : undefined;
 }
 
-function bounded(value, maximum = MAX_CONTEXT_BYTES) {
+function bounded(value, maximum = MAX_CONTEXT_BYTES, stage) {
     let serialized;
     try {
         serialized = JSON.stringify(value);
     } catch {
-        throw new DelegationError("Delegation data is not serializable");
+        throw stage ? workerFailure(stage) : new DelegationError("Delegation data is not serializable");
     }
 
     if (typeof serialized !== "string" || Buffer.byteLength(serialized, "utf8") > maximum) {
-        throw new DelegationError("Delegation data exceeds its retained data allowance");
+        throw stage ? workerFailure(stage) : new DelegationError("Delegation data exceeds its retained data allowance");
     }
 
     return serialized;
@@ -306,7 +307,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
 
     const check = (streaming = false) => {
         if (!current(streaming)) {
-            throw new DelegationError("Delegation parent lease is no longer current");
+            throw workerFailure("lease");
         }
 
         if (
@@ -459,7 +460,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                     active.controls.signal.aborted ||
                     Date.now() >= active.controls.deadline
                 ) {
-                    throw new DelegationError("Delegation session was cancelled or expired");
+                    throw workerFailure("lease");
                 }
 
                 active.controls.assertLive(streaming);
@@ -478,7 +479,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 try {
                     assertRun();
                     if (!names.includes(call.toolCall.name)) {
-                        throw new DelegationError("Delegation requested an unavailable tool");
+                        throw workerFailure("policy");
                     }
 
                     const result = await beforeToolCall?.call(session.agent, call, signal);
@@ -499,27 +500,30 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                     if (
                         requestModel !== childModel ||
                         !sameValue(descriptor(requestModel), selected) ||
-                        context.tools?.some((tool) => !names.includes(tool.name)) ||
-                        context.messages.some((message) => message.role === "toolResult" && message.isError)
+                        context.tools?.some((tool) => !names.includes(tool.name))
                     ) {
-                        throw new DelegationError("Delegation inference policy changed");
+                        throw workerFailure("policy");
                     }
 
-                    bounded(context, run.controls.limits.contextBytes);
+                    bounded(context, run.controls.limits.contextBytes, "context");
                     run.controls.admitCall();
                     const requestOptions = {
                         ...options,
                         signal: AbortSignal.any(
                             [options.signal, run.controls.signal, run.controller.signal].filter(Boolean),
                         ),
-                        maxTokens: Math.min(MAX_OUTPUT_TOKENS, childModel.maxTokens, run.controls.limits.outputTokens),
+                        // null uses Pi's normal provider/model output and thinking budget.
+                        maxTokens:
+                            run.controls.limits.outputTokens === null
+                                ? options.maxTokens
+                                : Math.min(childModel.maxTokens, run.controls.limits.outputTokens),
                         maxRetries: 0,
                         timeoutMs: Math.max(1, Math.min(MAX_JOB_MS, run.controls.deadline - Date.now())),
                         onPayload: async (payload, providerModel) => {
                             assertRun();
                             const result = (await options.onPayload?.(payload, providerModel)) ?? payload;
                             assertRun();
-                            bounded(result, run.controls.limits.contextBytes);
+                            bounded(result, run.controls.limits.contextBytes, "context");
 
                             return result;
                         },
@@ -536,7 +540,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                         .then(
                             (result) => {
                                 run.controls.onUsage(result?.usage);
-                                bounded(result, run.controls.limits.retainedResponseBytes);
+                                bounded(result, run.controls.limits.retainedResponseBytes, "response");
                                 if (
                                     result?.role !== "assistant" ||
                                     !Array.isArray(result.content) ||
@@ -544,9 +548,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                                         (part) => part.type === "toolCall" && !names.includes(part.name),
                                     )
                                 ) {
-                                    throw new DelegationError(
-                                        "Provider returned an invalid response or unavailable tool",
-                                    );
+                                    throw workerFailure("response");
                                 }
 
                                 return result;
@@ -575,7 +577,11 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                             try {
                                 for await (const event of stream) {
                                     assertRun(event.type?.endsWith("_delta") === true);
-                                    inspectEvent(event);
+                                    try {
+                                        inspectEvent(event);
+                                    } catch (error) {
+                                        throw workerFailure("stream", error);
+                                    }
 
                                     yield event;
                                 }
@@ -621,14 +627,15 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                         ["assertLive", "admitCall", "onUsage", "abort"].some(
                             (key) => typeof controls[key] !== "function",
                         ) ||
-                        !Number.isInteger(controls.limits?.outputTokens) ||
-                        controls.limits.outputTokens < 1 ||
-                        controls.limits.outputTokens > MAX_OUTPUT_TOKENS ||
+                        (controls.limits?.outputTokens !== null &&
+                            (!Number.isSafeInteger(controls.limits?.outputTokens) ||
+                                controls.limits.outputTokens < 1)) ||
                         ["contextBytes", "retainedResponseBytes"].some(
                             (key) =>
                                 !Number.isInteger(controls.limits[key]) ||
                                 controls.limits[key] < 1 ||
-                                controls.limits[key] > MAX_CONTEXT_BYTES,
+                                controls.limits[key] >
+                                    (key === "contextBytes" ? MAX_RUN_CONTEXT_BYTES : MAX_RETAINED_RESPONSE_BYTES),
                         )
                     ) {
                         throw new DelegationError("Invalid bounded delegation session run");
@@ -636,13 +643,13 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
 
                     const run = { controls, controller: new AbortController(), pending: [], failure: undefined };
                     active = run;
-                    const cancel = () => fail(new DelegationError("Delegation session was cancelled or expired"));
+                    const cancel = () => fail(workerFailure("lease"));
                     controls.signal.addEventListener("abort", cancel, { once: true });
                     const timer = setTimeout(cancel, Math.max(1, Math.min(MAX_JOB_MS, controls.deadline - Date.now())));
                     timer.unref?.();
                     try {
                         assertRun();
-                        bounded(prompt, controls.limits.contextBytes);
+                        bounded(prompt, controls.limits.contextBytes, "context");
                         await session.prompt(prompt, { expandPromptTemplates: false });
                         await Promise.allSettled(run.pending);
                         if (run.failure) {
@@ -656,12 +663,14 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                             !Array.isArray(result.content) ||
                             !["stop", "length"].includes(result.stopReason)
                         ) {
-                            throw new DelegationError("Pi worker session did not return a complete assistant response");
+                            throw workerFailure("incomplete");
                         }
 
-                        bounded(result, controls.limits.retainedResponseBytes);
+                        bounded(result, controls.limits.retainedResponseBytes, "response");
 
                         return result;
+                    } catch (error) {
+                        throw workerFailure("provider", run.failure ?? error);
                     } finally {
                         clearTimeout(timer);
                         controls.signal.removeEventListener("abort", cancel);
@@ -679,7 +688,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
 
                     released = true;
                     if (active) {
-                        fail(new DelegationError("Delegation session was released"));
+                        fail(workerFailure("lease"));
                     } else {
                         dispose();
                     }

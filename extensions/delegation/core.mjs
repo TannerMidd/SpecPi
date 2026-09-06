@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createSnapshot } from "./snapshot.mjs";
-import { LIMITS, digest, timeoutLimits, validateOperation } from "./protocol.mjs";
+import { LIMITS, digest, timeoutLimits, budgetLimits, validateOperation } from "./protocol.mjs";
 import { runWorker } from "./worker.mjs";
-import { DelegationError, publicErrorMessage } from "./errors.mjs";
+import { DelegationError, publicErrorMessage, workerFailureMessage } from "./errors.mjs";
 
 const terminal = new Set(["complete", "partial", "needs_context", "failed", "cancelled", "expired", "stale"]);
 const quiet = new Set(["cancelled", "expired", "stale"]);
@@ -21,7 +21,11 @@ export function createDelegationController({
         Object.fromEntries(
             Object.entries(LIMITS).map(([key, maximum]) => {
                 const value = limits[key] ?? maximum;
-                if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
+                const modelDefault = key === "outputTokens" && value === null;
+                if (
+                    !modelDefault &&
+                    (!Number.isSafeInteger(value) || value < 1 || (maximum !== null && value > maximum))
+                ) {
                     throw new DelegationError("Limits may only lower the fixed delegation ceilings");
                 }
 
@@ -137,6 +141,7 @@ export function createDelegationController({
         !batch.retired &&
         !quiet.has(job.state) &&
         !job.disposition &&
+        !job.limitReason &&
         Date.now() < Math.min(job.deadline, batch.deadline) &&
         (!terminal.has(job.state) || job.followUps < 1);
 
@@ -346,6 +351,7 @@ export function createDelegationController({
                                     batch.calls >= policy.batchCalls ||
                                     totalCalls >= policy.sessionCalls
                                 ) {
+                                    job.limitReason = "model-call allowance";
                                     throw new DelegationError("Delegation model-call allowance exhausted");
                                 }
 
@@ -370,14 +376,16 @@ export function createDelegationController({
                         assertJobLive();
                         checkSources(batch);
                         finish(batch, job, result.status, result);
-                    } catch {
+                    } catch (error) {
                         // Provider errors can contain URLs, credentials, or user content. Do not return them.
                         finish(
                             batch,
                             job,
                             "failed",
                             undefined,
-                            "Worker failed or exhausted a bound; inspect status and use one changed-input follow-up if appropriate.",
+                            job.limitReason
+                                ? `Worker exhausted its ${job.limitReason}. Review /delegate limits; a human can raise /delegate budget while off and start a fresh batch.`
+                                : workerFailureMessage(error),
                         );
                     } finally {
                         job.controller.abort();
@@ -520,6 +528,19 @@ export function createDelegationController({
 
         const { batch, job } = findBoundJob(input);
         if (input.operation === "follow_up") {
+            if (
+                job.limitReason ||
+                job.calls >= policy.jobCalls ||
+                batch.calls >= policy.batchCalls ||
+                totalCalls >= policy.sessionCalls ||
+                job.toolCalls >= policy.toolCalls ||
+                job.toolBytes >= policy.toolBytes
+            ) {
+                throw new DelegationError(
+                    "Follow-up has no usable budget remaining. A human can raise /delegate budget while off, then start a fresh batch.",
+                );
+            }
+
             if (
                 job.settling ||
                 job.followUps >= 1 ||
@@ -685,7 +706,7 @@ export function createDelegationController({
         try {
             entry.value = mutate(input);
             // Spending and final-disposition receipts fit the fixed batch/job ceilings
-            // (at most 4 runs + 8 follow-ups + 8 final dispositions). Never evict them.
+            // (one run and at most two follow-ups/two dispositions per batch). Never evict them.
             if (input.operation === "cancel" || (input.operation === "resolve" && input.decision === "needs_check")) {
                 recentRequests.set(input.requestId, entry);
                 if (recentRequests.size > 128) {
@@ -708,6 +729,16 @@ export function createDelegationController({
         presentation,
         invalidate,
         // Human command only; never exposed through execute() or the model schema.
+        setBudgetMultiplier(multiplier) {
+            const budget = budgetLimits(multiplier);
+            if (enabled) {
+                throw new DelegationError("Turn delegation off before changing its budget: /delegate off");
+            }
+
+            invalidate("budget policy changed");
+            policy = Object.freeze({ ...policy, ...budget });
+            changed();
+        },
         setTimeoutMinutes(minutes) {
             const times = timeoutLimits(minutes);
             if (enabled) {
