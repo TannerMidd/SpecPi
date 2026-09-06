@@ -29,7 +29,6 @@ SpecPi extends Pi with chat, review tools, and focused delegation. Its principle
 
 ## What it adds
 
-- **Chat beside your code.** A VS Code sidebar with attachments, approvals, and separate conversations. [Extension guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) · Local preview; install from VSIX.
 - **Focused delegation.** One agent makes changes. Up to two read-only subagents help investigate and review. [Research and design](https://tannermidd.github.io/SpecPi/single-agent/)
 - **Review as you work.** Track changed files, inspect diffs, check pages in a browser, and review risky commands.
 - **Improvements you choose.** Record recurring problems, select one with `/harness-improvement`, and test the change before calling it done.
@@ -53,8 +52,16 @@ Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
 [Setup, updates & removal](https://tannermidd.github.io/SpecPi/wiki/#getting-started) · [Delegation settings](docs/delegation/README.md)
 
+## SpecPi Chat for VS Code
+
+Chat beside your code, attach files, and switch conversations.
+
+[**Download the extension**](https://github.com/TannerMidd/SpecPi/releases/download/v0.16.0/specpi-chat-0.3.2.vsix) · Requires the setup above and VS Code 1.96+.
+
+Run **Extensions: Install from VSIX…** in VS Code and select the download. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
+
 ## Go further
 
-[Commands](https://tannermidd.github.io/SpecPi/wiki/#reference) · [Development](https://tannermidd.github.io/SpecPi/wiki/#development) · [Security](SECURITY_MODEL.md) · [Release notes](CHANGELOG.md)
+[Commands](https://tannermidd.github.io/SpecPi/wiki/#reference) · [Chat help](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) · [Development](https://tannermidd.github.io/SpecPi/wiki/#development) · [Security](SECURITY_MODEL.md) · [Release notes](CHANGELOG.md)
 
 [MIT License](LICENSE)
