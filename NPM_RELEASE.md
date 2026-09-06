@@ -22,7 +22,7 @@ Verify the registry bytes and metadata immediately, then configure trusted publi
 
 1. Select a version that has never appeared on npm. npm versions are immutable.
 2. Update `package.json`, `CHANGELOG.md`, `README.md`, `site/index.html`, `site/wiki/index.html`, `site/single-agent/index.html`, and the delegation guide to the same version. Keep historical changelog entries intact and remove stale unreleased-status wording.
-   If Chat changes are included, increment its independent version in `vscode/package.json` and `vscode/CHANGELOG.md`, and align the VSIX filenames and feature descriptions in the root README, extension README, and Pages guides. Build it with `npm --prefix vscode run package`, run `npm --prefix vscode run test:render` and the isolated `npm --prefix vscode run test:vsix`, and inspect the VSIX allowlist. The editor extension is not part of the npm tarball; creating this local artifact does not publish it or authorize a Marketplace release.
+   If Chat changes are included, increment its independent version in `vscode/package.json` and `vscode/CHANGELOG.md`, and align the VSIX filenames and feature descriptions in the root README, extension README, extension `GUIDE.md`, and Pages guides. Build it with `npm --prefix vscode run package`, run `npm --prefix vscode run test:render` and the isolated `npm --prefix vscode run test:vsix`, and inspect the VSIX allowlist. The editor extension is not part of the npm tarball; creating this local artifact does not publish it or authorize a Marketplace release.
 
 3. For a stable release, add a dated changelog heading. Use a prerelease version when the package should not receive the `latest` dist-tag.
 4. Install the pinned development tools without lifecycle scripts or peers:
