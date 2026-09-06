@@ -1,5 +1,13 @@
 # SpecPi Chat changelog
 
+## 0.3.4
+
+- Include the SpecPi logo as a 256×256 PNG and declare it in the extension and VSIX manifests so Marketplace and VS Code display the logo.
+
+## 0.3.3
+
+- Set the VSIX public-listing flag for Marketplace publication, add installation instructions, and document manual publication of the validated VSIX.
+
 ## 0.3.2
 
 - Expand tool calls by default so progress, results, and images are visible without an extra click. Preserve manual collapse/expand choices during streaming and completion.

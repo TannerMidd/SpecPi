@@ -2,25 +2,28 @@
 
 A native VS Code sidebar for Pi with the SpecPi harness: chat beside your code, attach files or images, follow streamed replies and tool activity, and branch or return to conversations created in the sidebar.
 
-This is a local VSIX preview. It has no runtime dependencies, embedded provider SDK, telemetry, or Marketplace publishing step.
+This extension is a preview. It has no bundled runtime dependencies, embedded provider SDK, or telemetry. Pi, Node.js, and SpecPi are installed separately.
 
 ## Set up
 
 1. Install Node.js **22.19 or newer**, Pi **0.84.4 or newer**, and SpecPi on the machine running your VS Code workspace. Follow the [SpecPi setup guide](https://github.com/TannerMidd/SpecPi#readme). Configure your provider through Pi in a terminal, and confirm Pi works in the intended folder.
 2. Use VS Code **1.96 or newer**. Open and trust a filesystem workspace.
-3. From the SpecPi repository, create the extension package:
+3. Install **SpecPi Chat** by **tannermidd** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=tannermidd.specpi-chat), or run:
 
    ```sh
-   npm --prefix vscode run package
+   code --install-extension tannermidd.specpi-chat
    ```
 
-4. In VS Code, run **Extensions: Install from VSIX…** and select `.specpi-test/vscode/specpi-chat-0.3.2.vsix` from the repository. Alternatively:
+4. Open **SpecPi** in the Activity Bar, or press **Ctrl+Alt+S** (**Cmd+Alt+S** on macOS). Choose **Connect Pi**.
 
-   ```sh
-   code --install-extension .specpi-test/vscode/specpi-chat-0.3.2.vsix
-   ```
+To install a package built from this repository instead, run:
 
-5. Open **SpecPi** in the Activity Bar, or press **Ctrl+Alt+S** (**Cmd+Alt+S** on macOS). Choose **Connect Pi**.
+```sh
+npm --prefix vscode run package
+code --install-extension .specpi-test/vscode/specpi-chat-0.3.4.vsix
+```
+
+You can also run **Extensions: Install from VSIX…** in VS Code and select that file.
 
 If Pi cannot be found, open **SpecPi: Chat Settings** and set `specpi.chat.piPath` to its absolute executable or JavaScript CLI path. For JavaScript entry points, `specpi.chat.nodePath` can select your external Node.js executable. Empty settings discover Pi and Node on PATH. These are application settings; repository settings cannot choose an executable. Supply a path, with no additional command arguments.
 
@@ -137,3 +140,9 @@ code --extensionDevelopmentPath="<absolute-path-to-SpecPi>/vscode" "<your-worksp
 ```
 
 Use the normal connection controls to start Pi. Run full repository validation with `npm run check` before considering the change complete. Packaging uses an exact source allowlist and deterministic ZIP metadata; generated VSIX files remain under the repository's ignored `.specpi-test/vscode` directory.
+
+## Publishing
+
+After validation, run `npm --prefix vscode run package` and upload the resulting VSIX through the [Marketplace publisher dashboard](https://marketplace.visualstudio.com/manage/publishers/) for `tannermidd`. For the first publication, choose **New extension → Visual Studio Code**; for later versions, update the existing extension. Check the dashboard's validation result and the public listing before announcing availability. Packaging alone does not publish anything.
+
+The manifest's `private: true` prevents accidental npm publication; the VS Code Marketplace uses the VSIX and its publisher identity. Publisher sign-in is separate from Pi authentication. Do not put publishing credentials in the repository.

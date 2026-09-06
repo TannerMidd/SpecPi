@@ -71,6 +71,11 @@ test("SpecPi Chat manifest provides a trusted native sidebar and application-onl
     assert.equal(manifest.name, "specpi-chat");
     assert.equal(manifest.publisher, "tannermidd");
     assert.equal(manifest.private, true);
+    assert.equal(manifest.icon, "media/marketplace-icon.png");
+    const icon = fs.readFileSync(path.join(extensionRoot, manifest.icon));
+    assert.equal(icon.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(icon.readUInt32BE(16), 256);
+    assert.equal(icon.readUInt32BE(20), 256);
     assert.equal(manifest.engines.vscode, "^1.96.0");
     assert.deepEqual(manifest.extensionKind, ["workspace"]);
     assert.equal(manifest.capabilities.untrustedWorkspaces.supported, false);
@@ -164,6 +169,17 @@ test("VSIX is deterministic, complete, and excludes every file outside the expli
         /Microsoft\.VisualStudio\.Code\.Engine" Value="\^1\.96\.0"/,
     );
     assert.match(files.get("extension.vsixmanifest").toString(), /Path="extension\/package\.json"/);
+    assert.match(files.get("extension.vsixmanifest").toString(), /<GalleryFlags>Public Preview<\/GalleryFlags>/);
+    assert.match(
+        files.get("extension.vsixmanifest").toString(),
+        /<Icon>extension\/media\/marketplace-icon\.png<\/Icon>/,
+    );
+    assert.match(
+        files.get("extension.vsixmanifest").toString(),
+        /Type="Microsoft\.VisualStudio\.Services\.Icons\.Default" Path="extension\/media\/marketplace-icon\.png"/,
+    );
+    assert.ok(files.has("extension/media/marketplace-icon.png"));
+    assert.match(files.get("[Content_Types].xml").toString(), /Extension="png" ContentType="image\/png"/);
     assert.match(files.get("[Content_Types].xml").toString(), /ContentType="image\/svg\+xml"/);
     assert.match(files.get("extension/LICENSE").toString(), /MIT License/);
     assert.equal(first.archive.includes(Buffer.from("must never package")), false);
