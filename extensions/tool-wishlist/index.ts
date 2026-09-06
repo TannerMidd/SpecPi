@@ -685,7 +685,13 @@ export default function toolWishlist(pi: ExtensionAPI) {
                 reportPath,
                 truncated: display.truncated,
             });
-        } else if ((ctx.mode === "tui" || ctx.mode === undefined) && typeof ctx.ui.editor === "function") {
+        }
+
+        if (
+            (ctx.mode === "rpc" || !supportsReportEntries) &&
+            (ctx.mode === "rpc" || ctx.mode === "tui" || ctx.mode === undefined) &&
+            typeof ctx.ui.editor === "function"
+        ) {
             await ctx.ui.editor(
                 "SpecPi Wishlist (view only; changes are ignored)",
                 `${content}\n\n---\nReport: ${displayPath}`,

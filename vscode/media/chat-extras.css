@@ -1,0 +1,26 @@
+.extras-actions { position: relative; }
+.extras-actions-button { font-size: 20px; line-height: 1; padding-bottom: 10px; }
+.extras-actions-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 20; width: 210px; max-width: calc(100vw - 24px); padding: 4px; border: 1px solid var(--border); border-radius: 5px; background: var(--vscode-menu-background, var(--surface-raised)); color: var(--vscode-menu-foreground, var(--text)); box-shadow: 0 4px 14px #0004; }
+.extras-menu-item { display: block; width: 100%; padding: 7px 9px; background: transparent; text-align: left; font-size: 11px; border-radius: 3px; }
+.extras-menu-item:focus-visible { background: var(--vscode-list-activeSelectionBackground, var(--button)); color: var(--vscode-list-activeSelectionForeground, var(--button-text)); }
+.extras-search { position: sticky; top: 0; z-index: 4; display: flex; align-items: center; gap: 3px; width: 100%; padding: 5px; margin: 0 0 7px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 4px; }
+.extras-search-input { flex: 1; min-width: 0; width: 50px; padding: 4px; border: 1px solid var(--vscode-input-border, var(--border)); border-radius: 3px; background: var(--input); color: var(--text); font-size: 11px; }
+.extras-search-count { flex: 0 0 auto; min-width: 25px; text-align: center; font: 10px/1.5 var(--mono); color: var(--muted); }
+.extras-small-button { flex: 0 0 auto; width: 23px; height: 25px; border-radius: 3px; background: transparent; color: var(--text); font-size: 15px; }
+.extras-search-match { outline: 1px solid var(--vscode-editor-findMatchBorder, var(--focus)); outline-offset: -1px; scroll-margin-top: 42px; }
+.extras-mention-menu { position: absolute; z-index: 7; bottom: calc(100% + 6px); left: -1px; right: -1px; max-height: min(210px, 35vh); overflow: auto; padding: 4px; background: var(--vscode-quickInput-background, var(--surface-raised)); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 3px 12px #0003; }
+.extras-mention-option { display: block; width: 100%; padding: 7px 8px; background: transparent; text-align: left; font: 11px/1.5 var(--mono); border-radius: 3px; overflow-wrap: anywhere; }
+.extras-mention-option[aria-selected="true"] { background: var(--vscode-list-activeSelectionBackground, var(--button)); color: var(--vscode-list-activeSelectionForeground, var(--button-text)); }
+.extras-mention-notice { padding: 7px 8px; color: var(--muted); font-size: 11px; }
+.extras-recovered-drafts { margin: 0 2px 7px; padding: 6px 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface-raised); }
+.extras-recovered-title { color: var(--muted); font-size: 10px; margin-bottom: 3px; }
+.extras-recovered-rows { max-height: 66px; overflow: auto; }
+.extras-recovered-row { display: flex; align-items: center; gap: 6px; min-height: 27px; }
+.extras-recovered-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text); font-size: 10px; }
+.extras-recovered-restore { flex: 0 0 auto; }
+#token-status[role="button"] { cursor: pointer; border-radius: 3px; }
+#token-status[aria-disabled="true"] { cursor: default; }
+#token-status[role="button"]:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 340px) {
+    .topbar .brand-chat { display: none; }
+}

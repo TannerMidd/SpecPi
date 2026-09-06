@@ -229,7 +229,10 @@ export default function registerCommandGuard(
         const startupGeneration = state.generation;
         try {
             subscribeGuardState();
-            const choice = ctx.hasUI ? await startupChoice(ctx, startupTimeoutMs) : undefined;
+            // Pi RPC binds session_start before it starts reading UI responses.
+            // Begin guarded without a startup dialog; /guard remains available
+            // for explicit changes once the RPC client is connected.
+            const choice = ctx.hasUI && ctx.mode !== "rpc" ? await startupChoice(ctx, startupTimeoutMs) : undefined;
             if (state.generation !== startupGeneration) {
                 return;
             }

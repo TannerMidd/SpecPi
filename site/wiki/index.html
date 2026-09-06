@@ -47,20 +47,22 @@
                     <a href="#security"><span>10</span>Security</a>
                     <a href="#development"><span>11</span>Development</a>
                     <a href="#delegation"><span>12</span>Experimental delegation</a>
+                    <a href="#vscode-chat"><span>13</span>VS Code Chat</a>
                 </nav>
-                <div class="index-meta"><span>Reference · v0.14.0</span></div>
+                <div class="index-meta"><span>Reference · v0.15.0</span></div>
             </aside>
 
             <main id="main" class="wiki-content">
                 <header class="wiki-intro" id="overview">
-                    <p class="eyebrow">Documentation / v0.14.0</p>
+                    <p class="eyebrow">Documentation / v0.15.0</p>
                     <h1>Technical reference</h1>
                     <p class="wiki-summary">
                         Install with a plan. Keep one agent focused. Verify the work, then improve the harness from
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.14.0.
+                        Release reference · v0.15.0. <a href="#vscode-chat">SpecPi Chat 0.3.1</a> adds an optional
+                        VS Code sidebar with explicit context, approvals, and independent live conversations.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
                         <a href="#delegation">delegation experiment</a> is optional and disabled by default.
@@ -78,17 +80,17 @@
                         that package installed.
                     </p>
                     <div class="terminal doc-terminal">
-                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.14.0</span></div>
+                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.15.0</span></div>
                         <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
                         <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-                        <pre><code>npm install --global specpi@0.14.0</code></pre>
+                        <pre><code>npm install --global specpi@0.15.0</code></pre>
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Linux, macOS, Git Bash</span>
                         </div>
-                        <pre><code>git clone --branch v0.14.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.15.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -96,7 +98,7 @@ cd SpecPi
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Windows PowerShell / cmd</span>
                         </div>
-                        <pre><code>git clone --branch v0.14.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.15.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
@@ -160,8 +162,8 @@ specpi doctor</code></pre>
                         <li>
                             <span>2</span>
                             <p>
-                                <strong>Enter focused mode.</strong> Run <code>/spec</code> to switch to the focused
-                                execution surface. Run it again to leave.
+                                <strong>Enter focused mode in the terminal.</strong> Run <code>/spec</code> to switch
+                                to the focused execution surface. Run it again to leave. Chat manages its own display.
                             </p>
                         </li>
                         <li>
@@ -330,7 +332,9 @@ specpi doctor</code></pre>
                         <h2 id="guard-doc-title">Command guard</h2>
                     </header>
                     <p>
-                        Choose a mode at session start. Approvals apply to one exact call and one session. Only a
+                        In the terminal, choose a mode at session start. In RPC/Chat, Guard starts without a blocking
+                        startup selector; use <code>/guard</code> after connecting to choose a mode.
+                        Approvals apply to one exact call and one session. Only a
                         structurally proven critical mutation locks the session. Parser uncertainty and invalid cleanup
                         syntax are denied without locking later work.
                     </p>
@@ -504,7 +508,9 @@ npm run format
 npm run check
 npm run setup:browser
 npm run test:browser
-npm run test:site:browser</code></pre>
+npm run test:site:browser
+npm --prefix vscode run test:render
+npm --prefix vscode run test:vsix</code></pre>
                     </div>
                     <p>
                         JavaScript and TypeScript use four-space indentation, explicit braced control flow, and one
@@ -564,13 +570,61 @@ npm run test:site:browser</code></pre>
                         >. Quality, speed, and cost gains remain unmeasured.
                     </p>
                 </section>
+                <section class="doc-section" id="vscode-chat" aria-labelledby="chat-doc-title">
+                    <header><span>13</span><h2 id="chat-doc-title">SpecPi Chat for VS Code</h2></header>
+                    <p>Chat 0.3.1 is a separately packaged local VSIX preview. Install VS Code 1.96+, external Node.js
+                        22.19+, Pi 0.84.4+, and SpecPi 0.15.0 on the workspace extension host. Configure your provider
+                        in Pi first, then open a trusted filesystem workspace. SSH, WSL, and containers use the remote
+                        workspace host; browser-only and virtual workspaces are unsupported.</p>
+                    <p>From the repository checkout used for the source installation above:</p>
+                    <div class="terminal doc-terminal">
+                        <pre><code>npm --prefix vscode run package
+code --install-extension .specpi-test/vscode/specpi-chat-0.3.1.vsix</code></pre>
+                    </div>
+                    <p>You can also use <strong>Extensions: Install from VSIX…</strong>. Open SpecPi in the Activity
+                        Bar and choose <strong>Connect Pi</strong>. Opening the sidebar alone does not launch Pi.
+                        If discovery fails, application-level <code>specpi.chat.piPath</code> and
+                        <code>specpi.chat.nodePath</code> accept executable paths, not shell commands.</p>
+                    <p class="doc-boundary"><strong>Separate installations.</strong> The npm package does not contain
+                        or install Chat. Installing a VSIX does not update the harness. Older Guard installations may
+                        take about 30 seconds to finish startup; Chat waits up to 90 seconds and never approves early
+                        dialogs. Update SpecPi and reconnect to obtain the RPC startup and report-dialog fixes.
+                        No Marketplace publication is implied.</p>
+                    <h3 id="chat-context">Explicit context and privacy</h3>
+                    <p>Attach UTF-8 workspace files/selections, use <code>@</code> file suggestions, or click validated
+                        code references. Select PNG, JPEG, GIF, or WebP images, paste screenshots, or drop image files.
+                        Images may be explicitly selected outside the workspace; text context stays inside it.
+                        Review attachments before sending. Pi owns authentication, tools, and provider requests.</p>
+                    <p>Up to eight mixed attachments: text is limited to 64 KiB each; images to 5 MiB each and 20 MiB
+                        per prompt, 16,384 pixels per side and 40 million pixels. An image-capable model is required.
+                        Media display is bounded and remote images are not fetched by the webview. Sent images persist
+                        in extension-owned Pi conversations. Filename/format checks are not a secret detector.</p>
+                    <h3 id="chat-conversations">Independent conversations and controls</h3>
+                    <p>Search history, rename, or archive/restore conversations without deleting their files.
+                        Switching chats or folders preserves background processes, drafts, attachments, queues, usage,
+                        scroll position, and approvals. Open a conversation marked <strong>Needs input</strong> to
+                        respond; switching never grants approval. Stop and Disconnect target the selected chat.</p>
+                    <p>Use <code>/model</code> or the model selector, choose supported thinking levels including
+                        <code>max</code>, and inspect Pi-reported cost/context usage even during active responses.
+                        Search displayed messages, copy/export visible Markdown, or open native working-tree/staged
+                        diffs. Branching and editing an earlier prompt preserve the source conversation and restore a
+                        draft without sending it or rolling back workspace files.</p>
+                    <p class="doc-boundary"><strong>Shared files, separate processes.</strong> Concurrent chats are
+                        not isolated worktrees. Keep one writer per working directory for overlapping changes.
+                        Use separate workspaces/worktrees for parallel writers. Closing the extension host stops all
+                        its Pi processes; provider availability, billing, and image support remain upstream concerns.</p>
+                    <p>For exact limits, queue recovery, startup troubleshooting, and local/native tests, see the
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md">extension guide</a>.
+                        TUI-only <code>/spec</code> and <code>/files</code> interfaces remain terminal controls;
+                        Chat uses its own display and native Git review.</p>
+                </section>
             </main>
         </div>
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.14.0</p>
+            <p>Pi harness / v0.15.0</p>
             <nav aria-label="Footer navigation">
                 <a href="../single-agent/">Architecture</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a

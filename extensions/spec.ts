@@ -634,6 +634,15 @@ export default function (pi: ExtensionAPI) {
             return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
         },
         handler: async (args, ctx) => {
+            if (ctx.mode === "rpc") {
+                ctx.ui.notify(
+                    "/spec controls the interactive terminal interface. SpecPi Chat manages its own response and tool display.",
+                    "info",
+                );
+
+                return;
+            }
+
             lastContext = ctx;
             const action = args.trim().toLowerCase();
             if (!action) {

@@ -1,5 +1,9 @@
 # Third-party components
 
+SpecPi Chat is a separate VS Code extension built with the public VS Code Webview View API and Pi `0.84.4`'s documented RPC protocol. VS Code and the installed Pi runtime retain their upstream licenses; neither is bundled in the VSIX. The extension and its ZIP/VSIX packager use Node built-ins and first-party source only, with no added runtime or development dependency. Its tests reuse the repository's pinned Playwright and Pi packages. Provider authentication, requests, billing, and normal Pi background behavior remain owned by the configured Pi runtime.
+
+Chat uses Pi's image content blocks, conversation tree/fork/clone operations, and session statistics, plus the installed VS Code Git extension's public API for diff review. Version 0.3.0 retains a separate Pi process for each connected conversation and uses Pi's `--fork <session>` CLI option to copy branch history before runtime extensions initialize; the original live session remains untouched. Image container validation and base64 framing are first-party code; display uses VS Code's embedded browser image decoders. No image codec, provider SDK, export package, or remote image service is added. Local acceptance of PNG, JPEG, GIF, or WebP does not establish that every configured provider accepts the same formats or animation behavior. RPC records and buffered writes are capped at 64 MiB; image prompts and rendered media have separate, smaller limits documented in the extension guide.
+
 Delegation loads `clampThinkingLevel` from the Pi SDK when exported there, otherwise
 from the public `@earendil-works/pi-ai/compat` subpath declared in Pi's
 [package exports](https://github.com/earendil-works/pi/blob/main/packages/ai/package.json).
