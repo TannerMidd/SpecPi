@@ -126,7 +126,7 @@ test("Chat release docs and Pages install examples name the actual VSIX and CI c
         assert.ok(source.includes(`SpecPi Chat ${manifest.version}`), `${name}: stale Chat release text`);
     }
 
-    const changelog = fs.readFileSync(path.join(extensionRoot, "CHANGELOG.md"), "utf8");
+    const changelog = fs.readFileSync(path.join(extensionRoot, "CHANGELOG.md"), "utf8").replaceAll("\r\n", "\n");
     assert.ok(changelog.includes(`\n## ${manifest.version}\n`));
     const workflow = fs.readFileSync(path.join(root, ".github/workflows/browser-tests.yml"), "utf8");
     assert.match(workflow, /run: npm --prefix vscode run test:render/u);
