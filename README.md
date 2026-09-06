@@ -26,6 +26,19 @@ Collection is disabled until explicitly enabled. Reports are sanitized, bounded,
 
 Version `0.16.0` enables bounded read-only delegation by default at Pi startup. One agent still owns edits and verification; worker use remains selective. SpecPi Chat, browser checks, and the human-selected improvement workflow remain available. See the [release notes](CHANGELOG.md) for the change list.
 
+<details>
+<summary>Watch the showcase · 51 seconds</summary>
+
+<p>
+  <a href="https://tannermidd.github.io/SpecPi/#showcase">
+    <img src="https://tannermidd.github.io/SpecPi/media/showcase-poster.jpg" width="560" alt="Watch the 51-second SpecPi showcase: VS Code Chat, read-only delegation, and harness improvements">
+  </a>
+</p>
+
+[Watch on the site](https://tannermidd.github.io/SpecPi/#showcase). Opens a player with controls and a transcript.
+
+</details>
+
 ## SpecPi Chat for VS Code
 
 The `vscode/` source contains **SpecPi Chat 0.3.2**, a separately packaged native sidebar with streamed replies, tool results, file and image attachments, model/thinking controls, Pi approvals, and searchable workspace conversation history. Rename or archive chats, switch between independent live conversations, branch or edit an earlier prompt, search and export visible messages, inspect usage, and review changes through VS Code's native diff tools. Switching chats preserves background work, approvals, drafts, and attachments. Connected conversations share workspace files; use separate worktrees for isolated writers. Opening the sidebar does not start Pi.

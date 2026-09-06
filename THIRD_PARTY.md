@@ -64,6 +64,8 @@ Browser type checking and registered-tool tests additionally use exact project-l
 
 The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mono. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". The font files are distributed under the SIL Open Font License 1.1; the required license text is included at `site/fonts/LICENSE.txt`.
 
+The site showcase at `site/media/specpi-showcase.mp4` incorporates “Machina” by Scott Buckley, released under Creative Commons Attribution 4.0 (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/. Source and composer credit: https://www.scottbuckley.com.au/library/machina/ and https://www.scottbuckley.com.au/. The music excerpt is edited, level-adjusted, and faded; its license is separate from SpecPi's MIT license. Credit appears in the film and the player's transcript/credits disclosure. Preserve that attribution with redistribution; YouTube uploads require it in the video description. See `site/media/README.md`.
+
 The npm release workflow installs `npm@11.19.1` as its pinned publishing client. npm is distributed under the Artistic License 2.0 and runs only on the ephemeral GitHub-hosted release runner.
 
 Repository automation uses these official GitHub Actions. General CI and Pages workflows track the listed major versions; the npm publishing workflow pins exact reviewed commit SHAs so the OIDC job does not execute mutable action tags:

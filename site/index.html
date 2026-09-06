@@ -99,6 +99,74 @@
                     <p><span>03</span>Human-selected improvements</p>
                     <p><span>04</span>Local improvement records</p>
                 </div>
+                <details class="showcase" id="showcase">
+                    <summary>
+                        <span class="showcase-play" aria-hidden="true">▷</span>
+                        <span>Watch the showcase</span>
+                        <span class="showcase-duration">51 seconds</span>
+                    </summary>
+                    <div class="showcase-body">
+                        <video
+                            id="showcase-video"
+                            controls
+                            playsinline
+                            preload="none"
+                            poster="media/showcase-poster.jpg"
+                            width="1920"
+                            height="1080"
+                            aria-label="SpecPi product showcase"
+                            aria-describedby="showcase-description"
+                        >
+                            <source src="media/specpi-showcase.mp4" type="video/mp4" />
+                            <p><a href="media/specpi-showcase.mp4">Watch or download the showcase (MP4).</a></p>
+                        </video>
+                        <div class="showcase-caption">
+                            <p id="showcase-description">
+                                SpecPi Chat, read-only delegation, and human-selected improvements. Staged demonstration.
+                            </p>
+                            <a href="media/specpi-showcase.mp4" download>Download MP4 · 5 MB</a>
+                        </div>
+                        <details class="showcase-transcript">
+                            <summary>Transcript and music credit</summary>
+                            <ol>
+                                <li><strong>0:00 · SpecPi Chat for VS Code.</strong> Connect Pi to your editor.</li>
+                                <li>
+                                    <strong>0:08 · Attach selected code.</strong> Choose Editor selection and add the
+                                    selected lines to your prompt.
+                                </li>
+                                <li>
+                                    <strong>0:15 · Research-led delegation.</strong> One writer owns edits and
+                                    verification. Up to two bounded, read-only Pi subagents analyze selected sources or
+                                    review a frozen artifact. Delegation is experimental; inspect it with
+                                    <code>/delegate status</code>.
+                                </li>
+                                <li>
+                                    <strong>0:23 · Command Guard.</strong> In Strict mode, a package-install call waits
+                                    for a decision. Choosing Deny blocks the call.
+                                </li>
+                                <li>
+                                    <strong>0:31 · Switch conversations.</strong> Open another chat while the first stays
+                                    running. Conversations share workspace files.
+                                </li>
+                                <li>
+                                    <strong>0:38 · Select a proposed harness improvement.</strong> Opt-in collection
+                                    records recurring capability gaps. Select one qualified item with
+                                    <code>/harness-improvement</code> to authorize implementation, then verify the change.
+                                </li>
+                                <li>
+                                    <strong>0:45 · SpecPi.</strong> A minimal, evidence-led harness for Pi, with a
+                                    terminal harness and VS Code extension.
+                                </li>
+                            </ol>
+                            <p>
+                                Music: <a href="https://www.scottbuckley.com.au/library/machina/">“Machina” by Scott Buckley</a>,
+                                released under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+                                <a href="https://www.scottbuckley.com.au/">www.scottbuckley.com.au</a>.
+                                Excerpt edited and faded. No narration.
+                            </p>
+                        </details>
+                    </div>
+                </details>
             </section>
 
             <section class="loop-section" id="loop" aria-labelledby="loop-title">
@@ -490,5 +558,6 @@ specpi doctor</code></pre>
             </nav>
         </footer>
         <script type="module" src="cycle.js"></script>
+        <script type="module" src="showcase.js"></script>
     </body>
 </html>
