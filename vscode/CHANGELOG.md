@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.3.6
+
+- Rewrite the Marketplace overview with a quick start, screenshot, and plain-language feature descriptions. Move detailed help and development instructions to separate guides, and clarify that SpecPi is optional.
+
 ## 0.3.5
 
 - Add Restart Pi to the Chat title bar and Command Palette to reconnect the selected conversation and reload its Pi extensions while other chats keep running.

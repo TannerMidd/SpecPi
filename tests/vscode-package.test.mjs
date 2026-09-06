@@ -126,7 +126,7 @@ test("Chat release docs and Pages install examples name the actual VSIX and CI c
     const basename = `specpi-chat-${manifest.version}.vsix`;
     const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
     assert.match(readme, /https:\/\/github\.com\/TannerMidd\/SpecPi\/blob\/main\/vscode\/README\.md/u);
-    for (const name of ["vscode/README.md", "site/wiki/index.html"]) {
+    for (const name of ["vscode/GUIDE.md", "site/wiki/index.html"]) {
         const source = fs.readFileSync(path.join(root, name), "utf8");
         const references = [...source.matchAll(/specpi-chat-\d+\.\d+\.\d+(?:-[\w.-]+)?\.vsix/gu)].map(
             (match) => match[0],
