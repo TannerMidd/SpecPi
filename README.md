@@ -56,9 +56,9 @@ Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
 Chat beside your code, attach files, and switch conversations.
 
-[**Download the extension**](https://github.com/TannerMidd/SpecPi/releases/download/v0.16.0/specpi-chat-0.3.2.vsix) · Requires the setup above and VS Code 1.96+.
+[**Install from Marketplace**](https://marketplace.visualstudio.com/items?itemName=tannermidd.specpi-chat) · Requires the setup above and VS Code 1.96+.
 
-Run **Extensions: Install from VSIX…** in VS Code and select the download. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
+In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
 
 ## Go further
 

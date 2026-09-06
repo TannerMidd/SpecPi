@@ -24,6 +24,7 @@ export const packageFiles = Object.freeze([
     "src/session-catalog.js",
     "src/webview.js",
     "media/icon.svg",
+    "media/marketplace-icon.png",
     "media/chat.css",
     "media/chat.js",
     "media/chat-extras.js",
@@ -126,7 +127,7 @@ function manifestXml(manifest) {
     <Description xml:space="preserve">${xml(manifest.description)}</Description>
     <Tags>${xml(manifest.keywords.join(","))}</Tags>
     <Categories>${xml(manifest.categories.join(","))}</Categories>
-    <GalleryFlags>Preview</GalleryFlags>
+    <GalleryFlags>Public Preview</GalleryFlags>
     <Properties>
       <Property Id="Microsoft.VisualStudio.Code.Engine" Value="${xml(manifest.engines.vscode)}" />
       <Property Id="Microsoft.VisualStudio.Code.ExtensionKind" Value="workspace" />
@@ -136,6 +137,7 @@ function manifestXml(manifest) {
       <Property Id="Microsoft.VisualStudio.Services.Links.Source" Value="${xml(manifest.repository.url)}" />
     </Properties>
     <License>extension/LICENSE</License>
+    <Icon>extension/${xml(manifest.icon)}</Icon>
   </Metadata>
   <Installation><InstallationTarget Id="Microsoft.VisualStudio.Code" /></Installation>
   <Dependencies />
@@ -144,6 +146,7 @@ function manifestXml(manifest) {
     <Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/README.md" Addressable="true" />
     <Asset Type="Microsoft.VisualStudio.Services.Content.Changelog" Path="extension/CHANGELOG.md" Addressable="true" />
     <Asset Type="Microsoft.VisualStudio.Services.Content.License" Path="extension/LICENSE" Addressable="true" />
+    <Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="extension/${xml(manifest.icon)}" Addressable="true" />
   </Assets>
 </PackageManifest>
 `;
@@ -160,6 +163,7 @@ export function packageExtension({
         !/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(manifest.version) ||
         manifest.main !== "./src/extension.js" ||
         manifest.private !== true ||
+        manifest.icon !== "media/marketplace-icon.png" ||
         Object.keys(manifest.dependencies || {}).length > 0
     ) {
         throw new Error("Unexpected SpecPi Chat manifest; review the package contract before packaging");
@@ -191,6 +195,7 @@ export function packageExtension({
   <Default Extension="js" ContentType="application/javascript" />
   <Default Extension="css" ContentType="text/css" />
   <Default Extension="svg" ContentType="image/svg+xml" />
+  <Default Extension="png" ContentType="image/png" />
   <Default Extension="md" ContentType="text/markdown" />
   <Default Extension="vsixmanifest" ContentType="text/xml" />
   <Override PartName="/extension/LICENSE" ContentType="text/plain" />
