@@ -211,6 +211,10 @@ class ChatController {
 
     async connect() {
         this.requireWorkspace();
+        if (this.restartStopping) {
+            throw new Error("Wait for Pi to stop restarting before connecting.");
+        }
+
         if (this.workspaceSwitching) {
             throw new Error("Wait for the workspace switch to finish before connecting Pi.");
         }
@@ -549,6 +553,39 @@ class ChatController {
         this.state.queueCount = 0;
         this.publish();
         await client?.stop();
+    }
+
+    async restart() {
+        if (this.restartOperation) {
+            return this.restartOperation;
+        }
+
+        this.requireWorkspace();
+        const operation = this.restartConnection();
+        this.restartOperation = operation;
+        try {
+            await operation;
+        } finally {
+            if (this.restartOperation === operation) {
+                this.restartOperation = undefined;
+            }
+        }
+    }
+
+    async restartConnection() {
+        this.restartStopping = true;
+        let generation;
+        try {
+            const stopping = this.disconnect();
+            generation = this.generation;
+            await stopping;
+        } finally {
+            this.restartStopping = false;
+        }
+
+        if (!this.disposed && generation === this.generation) {
+            await this.connect();
+        }
     }
 
     async stop() {
@@ -1765,6 +1802,7 @@ function activate(context) {
         },
         connect: () => controller.connect(),
         disconnect: () => controller.disconnect(),
+        restart: () => controller.restart(),
         new: () => controller.newChat(),
         history: () => controller.history(),
         stop: () => controller.stop(),

@@ -984,6 +984,54 @@ test("malformed runtime status and widget payloads cannot break event handling o
     assert.equal(controller.client, client);
 });
 
+test("restart waits for shutdown, coalesces clicks and cancels approvals without sending queued work", async (t) => {
+    const stopping = deferred();
+    const { controller, client, clients } = await connected(t, { stop: () => stopping.promise });
+    dialog(controller, client, { id: "restart-approval" });
+    client.emit("event", { type: "agent_start" });
+    const first = controller.restart();
+    const second = controller.restart();
+    assert.equal(client.stops, 1);
+    assert.equal(clients.length, 1);
+    await assert.rejects(() => controller.connect(), /restarting/u);
+    stopping.resolve();
+    await Promise.all([first, second]);
+    assert.equal(clients.length, 2);
+    assert.equal(controller.state.status, "ready");
+    assert.equal(controller.state.uiRequest, undefined);
+    assert.deepEqual(client.sent, [{ type: "extension_ui_response", id: "restart-approval", cancelled: true }]);
+    assert.ok(clients.every((item) => item.requests.every((request) => request.type !== "prompt")));
+    client.emit("event", { type: "agent_start" });
+    assert.equal(controller.state.status, "ready", "obsolete events cannot affect the restarted chat");
+});
+
+test("disconnect or disposal during restart prevents a replacement process", async (t) => {
+    for (const action of ["disconnect", "dispose"]) {
+        const stopping = deferred();
+        const { controller, clients } = await connected(t, { stop: () => stopping.promise });
+        const restarting = controller.restart();
+        await controller[action]();
+        stopping.resolve();
+        await restarting;
+        assert.equal(clients.length, 1);
+    }
+});
+
+test("restart connects a disconnected chat and can retry a failed startup", async (t) => {
+    let attempts = 0;
+    const { controller, clients } = fixture(t, {
+        ready: () => {
+            if (++attempts === 1) {
+                throw new Error("Synthetic startup failure");
+            }
+        },
+    });
+    await assert.rejects(() => controller.restart(), /Synthetic startup failure/u);
+    await controller.restart();
+    assert.equal(clients.length, 2);
+    assert.equal(controller.state.status, "ready");
+});
+
 test("disconnect cancels every pending approval and ignores replies afterward", async (t) => {
     const { controller, client } = await connected(t);
     dialog(controller, client, { id: "one" });

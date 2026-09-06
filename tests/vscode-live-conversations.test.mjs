@@ -270,6 +270,30 @@ test("history and new chat do not launch Pi; switching preserves live runtime, a
     assert.equal(nativeDialogs.length, 0);
 });
 
+test("restart resumes only the selected conversation and preserves its draft and attachments", async (t) => {
+    const { coordinator, clients } = fixture(t);
+    await coordinator.connect();
+    const background = coordinator.client;
+    background.emit("event", { type: "agent_start" });
+    await coordinator.newChat();
+    await coordinator.connect();
+    const selected = coordinator.active;
+    const previous = selected.client;
+    const sessionId = selected.activeSessionId;
+    const record = coordinator.records.get(coordinator.activeId);
+    record.draft.text = "Unsent draft";
+    selected.attachments = [{ id: "context", label: "file.js", detail: "1 line" }];
+    await coordinator.restart();
+    assert.equal(clients.length, 3);
+    assert.equal(previous.stops, 1);
+    assert.equal(background.stops, 0);
+    assert.equal(coordinator.active, selected);
+    assert.equal(selected.activeSessionId, sessionId);
+    assert.ok(selected.client.launch.args.includes("--session"));
+    assert.equal(record.draft.text, "Unsent draft");
+    assert.equal(selected.attachments[0].id, "context");
+});
+
 test("live usage reports stay with their conversation across switching and selected-only disconnect", async (t) => {
     const { coordinator } = fixture(t);
     await coordinator.connect();

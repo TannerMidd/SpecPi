@@ -20,7 +20,7 @@ To install a package built from this repository instead, run:
 
 ```sh
 npm --prefix vscode run package
-code --install-extension .specpi-test/vscode/specpi-chat-0.3.4.vsix
+code --install-extension .specpi-test/vscode/specpi-chat-0.3.5.vsix
 ```
 
 You can also run **Extensions: Install from VSIX…** in VS Code and select that file.
@@ -49,6 +49,7 @@ Use SpecPi 0.15.0 or the harness from this checkout to obtain its RPC startup an
 - **Open code references:** click a file reference such as `src/app.ts:12:3` or `src/app.ts#L12-L18` to reveal that location in the editor. Markdown links and inline code references work; plain file-and-line references are also detected. Targets must be regular, non-sensitive files inside the selected workspace. References inside fenced code examples remain copyable source text.
 - **Switch folders:** use **SpecPi: Choose Chat Workspace** in a multi-folder workspace. Each folder has its own history; changing folders preserves the conversations already running elsewhere.
 - **Disconnect:** use **SpecPi: Disconnect Pi** to stop the selected conversation's process. Other conversations keep running. Reconnect to continue; closing the VS Code extension host stops all its Pi processes.
+- **Restart:** click **Restart Pi** in the Chat title bar or run **SpecPi: Restart Pi** from the Command Palette to stop and reconnect the selected chat's Pi process, reloading its extensions and resuming its saved conversation. This interrupts any active response and clears queued sends and pending approval dialogs. Unsent composer text and attachments stay in the chat; other conversations keep running.
 
 Pi extensions can request confirmation, selection, or text input through the sidebar. Responses go back to the requesting conversation's Pi process. A background conversation appears as needing input in history; open it to respond. Switching away does not approve or cancel the request. A cancelled or timed-out dialog does not silently grant approval.
 
