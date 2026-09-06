@@ -14,6 +14,8 @@
   · <a href="https://tannermidd.github.io/SpecPi/wiki/">Documentation</a>
 </p>
 
+SpecPi extends Pi with chat, review tools, and focused delegation. Its principles are simple: you choose the improvements, changes stay small and reversible, improvement records stay local, and checks matter more than an agent's claims.
+
 <details>
 <summary>Watch the showcase · 51 seconds</summary>
 
