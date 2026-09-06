@@ -49,23 +49,23 @@
                     <a href="#delegation"><span>12</span>Experimental delegation</a>
                     <a href="#vscode-chat"><span>13</span>VS Code Chat</a>
                 </nav>
-                <div class="index-meta"><span>Reference · v0.15.0</span></div>
+                <div class="index-meta"><span>Reference · v0.16.0</span></div>
             </aside>
 
             <main id="main" class="wiki-content">
                 <header class="wiki-intro" id="overview">
-                    <p class="eyebrow">Documentation / v0.15.0</p>
+                    <p class="eyebrow">Documentation / v0.16.0</p>
                     <h1>Technical reference</h1>
                     <p class="wiki-summary">
                         Install with a plan. Keep one agent focused. Verify the work, then improve the harness from
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.15.0. <a href="#vscode-chat">SpecPi Chat 0.3.2</a> adds an optional
+                        Release reference · v0.16.0. <a href="#vscode-chat">SpecPi Chat 0.3.2</a> adds an optional
                         VS Code sidebar with explicit context, approvals, and independent live conversations.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
-                        <a href="#delegation">delegation experiment</a> is optional and disabled by default.
+                        <a href="#delegation">delegation experiment</a> is enabled by default at Pi startup; worker use remains selective.
                     </p>
                 </header>
 
@@ -80,17 +80,17 @@
                         that package installed.
                     </p>
                     <div class="terminal doc-terminal">
-                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.15.0</span></div>
+                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.16.0</span></div>
                         <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
                         <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-                        <pre><code>npm install --global specpi@0.15.0</code></pre>
+                        <pre><code>npm install --global specpi@0.16.0</code></pre>
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Linux, macOS, Git Bash</span>
                         </div>
-                        <pre><code>git clone --branch v0.15.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.16.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -98,7 +98,7 @@ cd SpecPi
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Windows PowerShell / cmd</span>
                         </div>
-                        <pre><code>git clone --branch v0.15.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.16.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
@@ -527,8 +527,8 @@ npm --prefix vscode run test:vsix</code></pre>
                         <h2 id="delegation-title">Experimental delegation</h2>
                     </header>
                     <p>
-                        Off by default. Enable up to two read-only Pi workers while the parent owns edits and checks
-                        their findings.
+                        On by default at Pi startup, after compatibility and Guard checks. Up to two read-only Pi
+                        workers can assist while the parent owns edits and checks their findings. Startup launches no workers.
                     </p>
                     <div class="definition-list">
                         <div><code>review</code><span>Check a frozen artifact against its requirements.</span></div>
@@ -536,12 +536,15 @@ npm --prefix vscode run test:vsix</code></pre>
                     </div>
                     <p>Start Pi normally after installing SpecPi. Then use:</p>
                     <div class="terminal doc-terminal">
-                        <pre><code>/delegate on
-/delegate status
+                        <pre><code>/delegate status
 /delegate limits
 /delegate cancel &lt;batchId&gt;
 /delegate off</code></pre>
                     </div>
+                    <p>
+                        Use <code>/delegate on</code> to re-enable after turning it off or a safety revocation.
+                        Off and revocations survive reloads and session switches; restarting Pi reapplies the on default.
+                    </p>
                     <p>
                         The worker panel shows progress; expand tool results to read findings and evidence. Workers
                         receive only assigned context and can read selected snapshots. They have no shell, writes, live
@@ -556,7 +559,7 @@ npm --prefix vscode run test:vsix</code></pre>
                         do not cap provider charges. Restart Pi after updating SpecPi.
                     </p>
                     <p class="doc-boundary">
-                        <strong>Before enabling:</strong> selected context goes to the configured provider. Workers do
+                        <strong>Before delegating:</strong> selected context goes to the configured provider. Workers do
                         not inherit every parent hook or provider setting; unsupported configurations can block
                         activation. Review the
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
@@ -624,7 +627,7 @@ code --install-extension .specpi-test/vscode/specpi-chat-0.3.2.vsix</code></pre>
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.15.0</p>
+            <p>Pi harness / v0.16.0</p>
             <nav aria-label="Footer navigation">
                 <a href="../single-agent/">Architecture</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a

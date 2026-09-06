@@ -24,7 +24,7 @@ SpecPi adds task contracts, workflow controls, and a local improvement loop to P
 
 Collection is disabled until explicitly enabled. Reports are sanitized, bounded, deduplicated by task, and never uploaded. Later evidence can reopen an item for review, but never restarts implementation automatically.
 
-Version `0.15.0` adds the separately packaged SpecPi Chat sidebar and RPC-compatible Guard startup and report dialogs. The terminal harness, optional read-only delegation, browser checks, and human-selected improvement workflow remain available. See the [release notes](CHANGELOG.md) for the change list.
+Version `0.16.0` enables bounded read-only delegation by default at Pi startup. One agent still owns edits and verification; worker use remains selective. SpecPi Chat, browser checks, and the human-selected improvement workflow remain available. See the [release notes](CHANGELOG.md) for the change list.
 
 ## SpecPi Chat for VS Code
 
@@ -32,11 +32,11 @@ The `vscode/` source contains **SpecPi Chat 0.3.2**, a separately packaged nativ
 
 From a repository checkout, build a local VSIX with `npm --prefix vscode run package`, then install `.specpi-test/vscode/specpi-chat-0.3.2.vsix` through **Extensions: Install from VSIX…**. See the [extension guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) for prerequisites, image/provider limits, commands, privacy, and testing. Pi owns provider authentication and tool execution. Stop and Disconnect affect the selected conversation only; branching does not undo code changes. The extension is separate from the SpecPi npm package and has not been published to a marketplace.
 
-## Optional delegation
+## Selective delegation
 
 One agent owns edits and verifies results. Experimental delegation adds up to two read-only Pi workers: `review` checks a frozen artifact; `scout` answers a focused question using selected sources. Workers cannot write, run shell commands, browse the web, or delegate further.
 
-Delegation is **off by default**. In Pi, use `/delegate on` to enable it, `/delegate status` to inspect work, and `/delegate off` to revoke it. Research informed the design; SpecPi quality, speed, and cost gains remain unmeasured.
+Delegation is **on by default at Pi startup**, subject to compatibility, settings, and Guard checks. Startup does not launch workers or model inference. Use `/delegate status` to inspect work and limits, `/delegate off` to revoke it, and `/delegate on` to re-enable it. Off and safety revocations survive reloads and session switches; restarting Pi reapplies the on default. Research informed the design; SpecPi quality, speed, and cost gains remain unmeasured.
 
 See [setup and limits](docs/delegation/README.md) or [how the research shaped the architecture](https://tannermidd.github.io/SpecPi/single-agent/).
 
@@ -61,14 +61,14 @@ specpi doctor
 Pin the reusable CLI when installing a reviewed release, or inspect its plan without retaining a global CLI installation:
 
 ```bash
-npm install --global specpi@0.15.0
-npx --package specpi@0.15.0 specpi plan
+npm install --global specpi@0.16.0
+npx --package specpi@0.16.0 specpi plan
 ```
 
 For a source-audited installation, clone the exact release:
 
 ```bash
-git clone --branch v0.15.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+git clone --branch v0.16.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install

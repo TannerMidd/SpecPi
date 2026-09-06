@@ -1,6 +1,6 @@
 # Bounded delegation
 
-Status: experimental in SpecPi 0.15.0. Disabled by default.
+Status: experimental in SpecPi 0.16.0. Enabled by default at Pi startup.
 The package remains `specpi`; no separate npm package or background service is required.
 
 SpecPi keeps one agent responsible for changes and acceptance. This extension adds
@@ -62,12 +62,16 @@ those inherited controls for every request must keep delegation disabled. Receip
 bind supported model and source descriptors; they cannot certify an unchanged remote
 service or every configuration change behind a stable provider identity.
 
-## Enable deliberately
+## Control delegation
 
-In the interactive session:
+The first session start of each Pi process enables delegation after settings, host and
+Guard checks, in TUI, RPC, print and JSON modes. Startup does not launch workers or
+model inference. Preflight may perform Pi-owned authentication/OAuth preparation.
+Use one agent for small or sequential work; delegate only a justified independent question.
+
+In an interactive session:
 
 ```text
-/delegate on
 /delegate status
 /delegate limits
 /delegate cancel <batchId>
@@ -93,7 +97,10 @@ it does not retain or display live child reasoning. RPC and print mode keep the 
 structured tool responses and do not mount terminal widgets. The UI uses Pi's public
 [widget and tool-rendering APIs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md).
 
-`on` grants the displayed experimental calls/time envelope. There is no model-call
+The startup default enables the documented experimental calls/time envelope. Use
+`/delegate off` to revoke it and `/delegate on` to explicitly re-enable it. Off and
+safety revocations survive `/reload` and session switches; restarting Pi reapplies the
+on default. No on/off preference is written to disk. There is no model-call
 permission toggle in the model-facing tool. `limits` is read-only; prompts cannot
 change timeouts or raise other ceilings. Turning delegation off, changing guard policy, switching
 sessions or models, navigating branches, and changing task/scope bindings revoke the
@@ -108,7 +115,7 @@ unsettled slots and consumed quotas, and checks the new host before resuming dis
 Old jobs are not retried. An unsupported selection pauses delegation with a reason;
 selecting a compatible model resumes it automatically. `/delegate off` remains off
 through later model changes. Guard, task/scope and session lifecycle changes still
-revoke activation. Status separates the user's `requested` choice from `enabled`
+revoke activation. Status separates the default or human `requested` choice from `enabled`
 dispatch, with `updating` and `pauseReason` for model setup.
 
 While delegation is off, its tool is removed from the parent's active tool list.

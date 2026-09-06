@@ -2,7 +2,7 @@
 
 Status: archived target architecture, not the implemented runtime contract.
 
-The experimental implementation is part of `specpi` and is disabled by default.
+The experimental implementation is part of `specpi` and is enabled by default at Pi startup.
 Read the [implemented guide](README.md) and [calls/time protocol](protocol.md) for
 supported commands, tested API compatibility, limits and trust assumptions. This
 document preserves the original broader proposal, including unimplemented live-web,
