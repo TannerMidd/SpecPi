@@ -48,7 +48,7 @@ specpi doctor
 
 Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
-To pin this release, use `npm install --global specpi@0.17.0`.
+To pin this release, use `npm install --global specpi@0.17.1`.
 
 Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
@@ -58,11 +58,11 @@ Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
 Chat beside your code, attach files, and switch conversations.
 
-[**Install from Marketplace**](https://marketplace.visualstudio.com/items?itemName=tannermidd.specpi-chat) · Requires the setup above and VS Code 1.96+.
+[**Install from Marketplace**](https://marketplace.visualstudio.com/items?itemName=tannermidd.specpi-chat) · Requires VS Code 1.96+, Node.js 22.19+, and Pi 0.84.4+. SpecPi is optional.
 
 In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
 
-Chat 0.3.6 includes **Restart Pi** in the Chat title bar and Command Palette to reconnect the selected conversation and reload its Pi extensions. Other conversations keep running.
+Chat 0.3.7 includes **Restart Pi** in the Chat title bar and Command Palette to reconnect the selected conversation and reload its Pi extensions. Other conversations keep running.
 
 ## Go further
 

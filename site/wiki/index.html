@@ -53,19 +53,19 @@
                     <a href="#delegation"><span>12</span>Experimental delegation</a>
                     <a href="#vscode-chat"><span>13</span>VS Code Chat</a>
                 </nav>
-                <div class="index-meta"><span>Reference · v0.17.0</span></div>
+                <div class="index-meta"><span>Reference · v0.17.1</span></div>
             </aside>
 
             <main id="main" class="wiki-content">
                 <header class="wiki-intro" id="overview">
-                    <p class="eyebrow">Documentation / v0.17.0</p>
+                    <p class="eyebrow">Documentation / v0.17.1</p>
                     <h1>Technical reference</h1>
                     <p class="wiki-summary">
                         Install with a plan. Keep one agent focused. Verify the work, then improve the harness from
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.17.0. <a href="#vscode-chat">SpecPi Chat 0.3.6</a> adds an optional VS
+                        Release reference · v0.17.1. <a href="#vscode-chat">SpecPi Chat 0.3.7</a> adds an optional VS
                         Code sidebar with explicit context, approvals, and independent live conversations.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
@@ -85,17 +85,17 @@
                         that package installed.
                     </p>
                     <div class="terminal doc-terminal">
-                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.17.0</span></div>
+                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.17.1</span></div>
                         <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
                         <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-                        <pre><code>npm install --global specpi@0.17.0</code></pre>
+                        <pre><code>npm install --global specpi@0.17.1</code></pre>
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Linux, macOS, Git Bash</span>
                         </div>
-                        <pre><code>git clone --branch v0.17.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.17.1 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -103,7 +103,7 @@ cd SpecPi
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Windows PowerShell / cmd</span>
                         </div>
-                        <pre><code>git clone --branch v0.17.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.17.1 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
@@ -559,12 +559,13 @@ npm --prefix vscode run test:vsix</code></pre>
                         web access, or nested delegation.
                     </p>
                     <p>
-                        Each job allows four SDK model calls and 10 minutes by default. While delegation is off, use
-                        <code>/delegate timeout 15</code> to save a timeout of 1–60 whole minutes, or
-                        <code>/delegate timeout reset</code> to restore 10. Batch timeouts are twice the job timeout;
-                        queue and follow-up time count from admission. The Pi process allows four batches and 32 calls;
-                        toggling, reloading or changing the timeout does not reset those counters. These limits do not
-                        cap provider charges. Restart Pi after updating SpecPi.
+                        Use <code>/delegate limits</code> for the effective call and byte allowances. While delegation
+                        is off, <code>/delegate budget</code> configures their multiplier and
+                        <code>/delegate timeout 15</code> saves a timeout of 1–60 whole minutes;
+                        <code>/delegate timeout reset</code> restores 10. Batch timeouts are twice the job timeout;
+                        queue and follow-up time count from admission. Toggling, reloading or changing settings does
+                        not reset spent counters. These limits do not cap provider charges. Restart Pi after updating
+                        SpecPi.
                     </p>
                     <p class="doc-boundary">
                         <strong>Before delegating:</strong> selected context goes to the configured provider. Workers do
@@ -587,9 +588,9 @@ npm --prefix vscode run test:vsix</code></pre>
                         <h2 id="chat-doc-title">SpecPi Chat for VS Code</h2>
                     </header>
                     <p>
-                        Chat 0.3.6 is a separately installed preview. Install VS Code 1.96+, external Node.js
-                        22.19+, Pi 0.84.4+, and SpecPi 0.15.0 on the workspace extension host. Configure your provider
-                        in Pi first, then open a trusted filesystem workspace. SSH, WSL, and containers use the remote
+                        Chat 0.3.7 is a separately installed preview. Install VS Code 1.96+, external Node.js
+                        22.19+, and Pi 0.84.4+ on the workspace extension host; SpecPi is optional. Configure your
+                        provider in Pi first, then open a trusted filesystem workspace. SSH, WSL, and containers use the remote
                         workspace host; browser-only and virtual workspaces are unsupported.
                     </p>
                     <p>
@@ -598,7 +599,7 @@ npm --prefix vscode run test:vsix</code></pre>
                     </p>
                     <div class="terminal doc-terminal">
                         <pre><code>npm --prefix vscode run package
-code --install-extension .specpi-test/vscode/specpi-chat-0.3.6.vsix</code></pre>
+code --install-extension .specpi-test/vscode/specpi-chat-0.3.7.vsix</code></pre>
                     </div>
                     <p>
                         You can also use <strong>Extensions: Install from VSIX…</strong>. Open SpecPi in the Activity
@@ -665,7 +666,7 @@ code --install-extension .specpi-test/vscode/specpi-chat-0.3.6.vsix</code></pre>
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.17.0</p>
+            <p>Pi harness / v0.17.1</p>
             <nav aria-label="Footer navigation">
                 <a href="../single-agent/">Architecture</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a

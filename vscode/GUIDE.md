@@ -18,7 +18,7 @@ To install a package built from this repository instead, run:
 
 ```sh
 npm --prefix vscode run package
-code --install-extension .specpi-test/vscode/specpi-chat-0.3.6.vsix
+code --install-extension .specpi-test/vscode/specpi-chat-0.3.7.vsix
 ```
 
 You can also run **Extensions: Install from VSIX…** in VS Code and select that file.
