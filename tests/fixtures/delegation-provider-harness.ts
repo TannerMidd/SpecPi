@@ -244,7 +244,7 @@ async function fixture(root: string, label: string, script: any, settings: any =
         },
         ModelRuntime: {
             create: async (options: any) => {
-                assert.deepEqual(options, { allowModelNetwork: false, refreshOnCreate: false });
+                assert.deepEqual(options, { allowModelNetwork: false });
                 childRuntimes += 1;
 
                 return createRuntime();

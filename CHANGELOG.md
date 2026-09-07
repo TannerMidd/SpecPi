@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.18.1 - 2026-09-07
+
+- Restore Pi's cached model catalogs during delegation setup so switching to catalog-added or updated models resumes workers without a manual toggle or restart. Catalog network refresh stays disabled; exact-model checks, safety revocations and spent quotas remain enforced.
+
+- SpecPi Chat 0.4.1 replaces the persistent Delegates panel with a compact live-only activity strip and opens workspace image links in the validated image viewer instead of the text editor. Chat is packaged separately; update the harness for the model-switch fix and Chat for the UI fixes.
+
 ## 0.18.0 - 2026-09-07
 
 - Start Command Guard off in RPC sessions, including new SpecPi Chat conversations. Explicit `/guard guard` and `/guard strict` still enable protection for the current session; the terminal startup chooser is unchanged.

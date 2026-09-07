@@ -79,6 +79,55 @@ async function run() {
         assert.equal(vscode.window.activeTextEditor.selection.end.line, 2);
         checks.push("workspace file references open exact editor lines and ranges");
 
+        const previewFile = vscode.Uri.joinPath(workspace, ".specpi-test", "vscode", "screenshots", "idle preview.png");
+        fs.mkdirSync(path.dirname(previewFile.fsPath), { recursive: true });
+        fs.writeFileSync(previewFile.fsPath, Buffer.from(PNG_DATA, "base64"));
+        const webview = controller.view.webview;
+        const postMessage = webview.postMessage.bind(webview);
+        const previews = [];
+        webview.postMessage = (message) => {
+            if (message.type === "imagePreview") {
+                previews.push(message);
+            }
+
+            return postMessage(message);
+        };
+
+        try {
+            for (const reference of [".specpi-test/vscode/screenshots/idle preview.png", previewFile.toString()]) {
+                const requestId = `linked-preview-${previews.length}`;
+                await controller.handleMessage({
+                    type: "previewImage",
+                    reference,
+                    requestId,
+                    contextToken: controller.state.contextToken,
+                });
+                const result = previews.at(-1);
+                assert.equal(result?.requestId, requestId);
+                assert.equal(result.error, undefined);
+                assert.equal(result.image.mimeType, "image/png");
+                assert.equal(result.image.data, PNG_DATA);
+                assert.equal(vscode.window.activeTextEditor.document.uri.fsPath, targetFile.fsPath);
+            }
+
+            fs.writeFileSync(previewFile.fsPath, "Not image data");
+            await controller.handleMessage({
+                type: "previewImage",
+                reference: previewFile.toString(),
+                requestId: "invalid-image",
+                contextToken: controller.state.contextToken,
+            });
+            assert.equal(previews.at(-1).requestId, "invalid-image");
+            assert.equal(typeof previews.at(-1).error, "string");
+            assert.equal(previews.at(-1).image, undefined);
+        } finally {
+            webview.postMessage = postMessage;
+        }
+
+        assert.equal(controller.client, null, "image previews do not launch Pi");
+        assert.equal(controller.state.attachments.length, 2, "image previews do not attach images to the prompt");
+        checks.push("workspace PNG links return validated previews without opening binary files as text");
+
         await vscode.commands.executeCommand("specpi.chat.connect");
         assert.equal(controller.state.status, "ready", controller.state.error);
         assert.equal(controller.state.model.id, "fixture-model");

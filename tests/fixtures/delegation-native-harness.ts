@@ -564,7 +564,7 @@ export default async function nativeEntryFixture(pi: any) {
             return;
         }
 
-        if (process.env.SPECPI_NATIVE_FIXTURE_MODE === "model-selection") {
+        if (process.env.SPECPI_NATIVE_FIXTURE_MODE?.endsWith("model-selection")) {
             try {
                 await guard.commands.get("guard").handler("strict", ctx);
                 await tools.command("on");
@@ -576,7 +576,11 @@ export default async function nativeEntryFixture(pi: any) {
                 });
                 await finishBatch(tools, first);
                 assert.equal(server.requests.length, 2);
-                const next = ctx.modelRegistry.find("specpi-native-next-fixture", "native-next");
+                const nextProvider =
+                    process.env.SPECPI_NATIVE_FIXTURE_MODE === "cached-model-selection"
+                        ? "groq"
+                        : "specpi-native-next-fixture";
+                const next = ctx.modelRegistry.find(nextProvider, "native-next");
                 assert.ok(next);
                 const switching = fixtureContext(actual, notices, approvals, async () => {
                     assert.equal(await pi.setModel(next), true);
@@ -598,7 +602,7 @@ export default async function nativeEntryFixture(pi: any) {
                 );
                 assert.equal(server.requests.length, 2);
                 const selected = await tools.status();
-                assert.equal(selected.enabled, true, JSON.stringify(notices));
+                assert.equal(selected.enabled, true, JSON.stringify({ selected, notices }));
                 assert.equal(selected.requested, true);
                 assert.equal(selected.model.provider, next.provider);
                 assert.equal(selected.model.id, next.id);
@@ -911,7 +915,7 @@ export default async function nativeEntryFixture(pi: any) {
     };
 
     if (
-        ["guard-absent", "guard-off", "model-selection", "stream-performance"].includes(
+        ["guard-absent", "guard-off", "model-selection", "cached-model-selection", "stream-performance"].includes(
             process.env.SPECPI_NATIVE_FIXTURE_MODE ?? "",
         )
     ) {

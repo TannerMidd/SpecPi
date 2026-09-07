@@ -1041,9 +1041,22 @@
             } else if (token.type === "codeLink") {
                 const link = element("button", "markdown-link code-reference", token.text);
                 link.type = "button";
-                link.title = `Open ${token.reference} in editor`;
+                // This is a routing hint, not file validation. The existing preview
+                // host still checks workspace containment, file identity and image bytes.
+                const target = token.reference.replace(
+                    /(?:#L\d+(?:C\d+)?(?:-L?\d+(?:C\d+)?)?|:\d+(?::\d+)?(?:-\d+)?)$/iu,
+                    "",
+                );
+                const image = /\.(?:png|jpe?g|gif|webp)$/iu.test(target);
+                link.title = image ? `Preview ${token.reference}` : `Open ${token.reference} in editor`;
                 link.setAttribute("role", "link");
-                link.addEventListener("click", () => send({ type: "openCode", reference: token.reference }));
+                link.addEventListener("click", () => {
+                    if (image) {
+                        requestImagePreview(token.reference, token.text, link);
+                    } else {
+                        send({ type: "openCode", reference: token.reference });
+                    }
+                });
                 parent.append(link);
             } else if (token.type === "imagePreview") {
                 const button = element("button", "image-preview-action", `Preview image: ${token.text}`);
