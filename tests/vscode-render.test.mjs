@@ -1922,6 +1922,94 @@ test(
                 },
             );
 
+            await t.test(
+                "wide sidebar status panels stay in the conversation and composer column during resize",
+                async () => {
+                    for (const theme of ["dark", "light", "highcontrast"]) {
+                        await withPage(
+                            browser,
+                            fixtures,
+                            { name: `wide-column-${theme}`, theme, width: 1400 },
+                            async (page) => {
+                                await setState(page, {
+                                    status: "busy",
+                                    messages: sampleMessages(),
+                                    runtimeStatus: {
+                                        "aa-codex-usage": "codex 34% 6d",
+                                        "specpi-command-guard": "Guard enabled",
+                                        "specpi-delegation": "Delegate 0/2 workers · 54/256 calls",
+                                    },
+                                });
+                                await page.locator("#runtime-details summary").click();
+                                await page.locator("#composer-input").fill("Keep this draft while resizing");
+                                for (const width of [1400, 2200, 768, 390, 1200]) {
+                                    await page.setViewportSize({ width, height: 900 });
+                                    const boxes = await page.evaluate(() =>
+                                        Object.fromEntries(
+                                            [
+                                                "#composer",
+                                                ".footer-panels",
+                                                "#runtime-details",
+                                                "#provider-usage",
+                                                "#conversation",
+                                                "#activity",
+                                            ].map((selector) => {
+                                                const rect = document.querySelector(selector).getBoundingClientRect();
+
+                                                return [
+                                                    selector,
+                                                    { left: rect.left, right: rect.right, width: rect.width },
+                                                ];
+                                            }),
+                                        ),
+                                    );
+                                    const composer = boxes["#composer"];
+                                    for (const selector of [".footer-panels", "#runtime-details", "#provider-usage"]) {
+                                        const panel = boxes[selector];
+                                        assert.ok(
+                                            panel.left >= composer.left - 1 && panel.right <= composer.right + 1,
+                                            `${selector} must stay inside the composer column at ${width}px: ${JSON.stringify(boxes)}`,
+                                        );
+                                        assert.ok(
+                                            panel.width >= composer.width - 6,
+                                            `${selector} must not shrink to its text`,
+                                        );
+                                    }
+
+                                    if (width >= 1000) {
+                                        for (const selector of ["#conversation", "#activity"]) {
+                                            assert.ok(
+                                                Math.abs(boxes[selector].left - composer.left) <= 1 &&
+                                                    Math.abs(boxes[selector].right - composer.right) <= 1,
+                                                `${selector} must align with the composer despite the transcript scrollbar`,
+                                            );
+                                        }
+                                    }
+
+                                    assert.equal(await page.locator("#runtime-details").getAttribute("open"), "");
+                                    assert.equal(
+                                        await page.locator("#composer-input").inputValue(),
+                                        "Keep this draft while resizing",
+                                    );
+                                    await assertLayout(page, width);
+                                    if (width === 1400 || width === 2200) {
+                                        await page.screenshot({
+                                            path: path.join(screenshots, `wide-column-${theme}-${width}.png`),
+                                        });
+                                    }
+                                }
+
+                                assert.deepEqual(
+                                    await takeMessages(page),
+                                    [],
+                                    "Resizing must not send the draft or query runtime status",
+                                );
+                            },
+                        );
+                    }
+                },
+            );
+
             await t.test("refreshing status preserves newer drafts without resending an accepted prompt", async () => {
                 await withPage(browser, fixtures, { name: "recovery" }, async (page) => {
                     await setState(page);

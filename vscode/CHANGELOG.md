@@ -2,6 +2,7 @@
 
 ## 0.3.7
 
+- Keep runtime/status panels in the composer's bounded column on wide sidebars, and center the transcript independently of its scrollbar. Preserve drafts and open status details while resizing.
 - Remove unused standalone view, history and conversation-branching paths; retain the coordinator-owned conversation lifecycle without intended user-facing behavior changes.
 - Exercise cancellation, source/target error ownership, image restoration and stale responses through the supported coordinator in regression tests.
 
