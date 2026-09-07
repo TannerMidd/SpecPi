@@ -26,6 +26,8 @@ Use Node.js 22.19 or later. From the repository root:
 
 Run the narrowest relevant test first, then `npm run check` for material changes. Add or update regression tests when behavior changes.
 
+Pi fixtures use the repository's pinned development dependency by default; `SPECPI_TEST_PI` explicitly selects another CLI. Package validation creates its own temporary npm cache. Neither requires changing the user's global PATH, cache, or live Pi installation.
+
 Never run installer integration tests against the live Pi directory. Use a fresh temporary `PI_CODING_AGENT_DIR` and skip external package and tool installation. Installer and release work must exercise the plan/install/update/doctor/uninstall lifecycle in isolated state.
 
 For rendered `site/` or browser changes, validate relevant desktop, tablet, and mobile viewports. Create or replace visual baselines only when explicitly requested, and treat browser artifacts as potentially sensitive.

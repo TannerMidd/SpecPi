@@ -163,7 +163,7 @@ export default function registerCommandGuard(
         approvalTimeoutMs?: number;
     } = {},
 ): void {
-    // Startup only picks a default and falls back to the recommended Guard mode, so it stays short.
+    // The terminal startup chooser falls back to Guard, so it stays short; RPC starts off without a dialog.
     // An approval waits on a person reading severity, category, cwd, affected paths, reason, and alternative;
     // withTimeout cannot cancel the underlying prompt, so a short bound would deny work mid-decision and leave
     // a live selector on screen. Both directions still fail closed, just on a human timescale.
@@ -230,14 +230,14 @@ export default function registerCommandGuard(
         try {
             subscribeGuardState();
             // Pi RPC binds session_start before it starts reading UI responses.
-            // Begin guarded without a startup dialog; /guard remains available
+            // Begin off without a startup dialog; /guard remains available
             // for explicit changes once the RPC client is connected.
             const choice = ctx.hasUI && ctx.mode !== "rpc" ? await startupChoice(ctx, startupTimeoutMs) : undefined;
             if (state.generation !== startupGeneration) {
                 return;
             }
 
-            let mode: "guard" | "strict" | "off" = "guard";
+            let mode: "guard" | "strict" | "off" = ctx.mode === "rpc" ? "off" : "guard";
             if (choice === "Strict") {
                 mode = "strict";
             } else if (choice === "Off for this session") {

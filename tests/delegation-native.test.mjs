@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { runPiFixture } from "../scripts/pi-test-harness.mjs";
+import { decodeDelegates } from "../vscode/src/delegates.js";
 
 function runNativeFixture(context, mode = "main") {
     // Preserve the temp path spelling: the harness resolves both sides consistently,
@@ -147,6 +148,31 @@ test("ordinary native Pi delegation runs real child sessions through configured 
         return;
     }
 
+    const progress = result.stdout.split(/\r?\n/u).flatMap((line) => {
+        try {
+            const event = JSON.parse(line);
+            const view =
+                event.method === "setWidget" && event.widgetKey === "specpi-delegation-v1"
+                    ? decodeDelegates(event.widgetLines)
+                    : null;
+
+            return view ? [view] : [];
+        } catch {
+            return [];
+        }
+    });
+    assert.ok(
+        progress.some((view) => view.active > 0 && view.jobs.some((job) => job.state === "running")),
+        "Real SDK worker starts must reach the RPC display channel",
+    );
+    assert.ok(
+        progress.some((view) => view.jobs.some((job) => job.state === "complete" && !job.settling)),
+        "Real SDK completion must reach the RPC display channel",
+    );
+    assert.ok(
+        progress.some((view) => view.jobs.some((job) => job.state === "cancelled" && job.settling)),
+        "Cancellation must retain occupied slots until SDK settlement",
+    );
     const observed = report(result, "NATIVE_ENTRY_FIXTURE");
     const uiPreview = report(result, "NATIVE_UI_FIXTURE");
     assert.deepEqual(

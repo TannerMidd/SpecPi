@@ -9,6 +9,7 @@ const { collectImageAttachment, normalizeImage, MAX_IMAGE_TOTAL_BYTES } = requir
 const { editPrompt, forkChat, exportChat, showUsage, markdownTranscript } = require("./conversation-actions.js");
 const { findFiles, reviewChanges } = require("./workspace-actions.js");
 const { ImageQueue } = require("./image-queue.js");
+const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./delegates.js");
 const { ConversationCoordinator } = require("./conversation-coordinator.js");
 
 const PREFIX = "specpi.chat";
@@ -27,6 +28,8 @@ class ChatController {
         this.mediaIds = new WeakMap();
         this.sentMediaIds = new Set();
         this.imageQueue = new ImageQueue();
+        this.pendingDelegateStops = new Set();
+        this.delegateSummaries = new Map();
         this.dialogs = [];
         this.client = null;
         this.connection = null;
@@ -96,6 +99,16 @@ class ChatController {
 
         const state = {
             ...this.state,
+            delegation: this.state.delegation
+                ? {
+                      ...this.state.delegation,
+                      canStop: !this.transitioning,
+                      jobs: this.state.delegation.jobs.map((job) => ({
+                          ...job,
+                          stopPending: this.pendingDelegateStops.has(`${job.batchId}/${job.id}/${job.attemptId}`),
+                      })),
+                  }
+                : undefined,
             attachments: this.state.attachments.map((item) => (item.kind === "image" ? projectImage(item) : item)),
             messages: this.state.messages.map((item) =>
                 item.images?.length ? { ...item, images: item.images.map(projectImage) } : item,
@@ -182,10 +195,12 @@ class ChatController {
 
     async startConnection() {
         const generation = ++this.generation;
+        this.delegateSummaries.clear();
         const cwd = this.requireWorkspace();
         resetRunState(this.state);
         this.state.status = "connecting";
         this.state.runtimeStatus = {};
+        this.state.delegation = undefined;
         this.state.error = undefined;
         this.state.connectionMessage = "Starting Pi and loading its extensions. This can take up to 90 seconds.";
         this.publish();
@@ -284,6 +299,7 @@ class ChatController {
                     resetRunState(this.state);
                     this.state.status = "error";
                     this.state.runtimeStatus = {};
+                    this.state.delegation = undefined;
                     this.state.error =
                         "Pi stopped. Reconnect to resume this chat. Check Pi and provider setup in a terminal if this repeats.";
                     this.publish();
@@ -326,6 +342,7 @@ class ChatController {
             if (generation === this.generation) {
                 resetRunState(this.state);
                 this.state.status = "error";
+                this.state.delegation = undefined;
                 this.state.connectionMessage = undefined;
                 this.fail(error);
                 throw error;
@@ -386,6 +403,11 @@ class ChatController {
         const data = Object.fromEntries(types.map((type, index) => [type, values[index]]));
         const runtime = data.get_state;
         if (runtime.sessionId && this.runtimeSessionId !== runtime.sessionId) {
+            if (this.runtimeSessionId) {
+                this.delegateSummaries.clear();
+                this.state.delegation = undefined;
+            }
+
             this.runtimeSessionId = runtime.sessionId;
             this.contextEpoch += 1;
         }
@@ -445,6 +467,9 @@ class ChatController {
             }
 
             this.displaySessionId = runtime.sessionId;
+            for (const [id, summary] of this.delegateSummaries) {
+                appendNotice(this.state, summary.text, summary.isError, id);
+            }
         }
 
         if (runtime.sessionFile && !this.suppressRemember) {
@@ -484,6 +509,7 @@ class ChatController {
         resetRunState(this.state);
         this.state.status = "disconnected";
         this.state.runtimeStatus = {};
+        this.state.delegation = undefined;
         this.state.connectionMessage = undefined;
         this.state.queueCount = 0;
         this.publish();
@@ -1066,6 +1092,40 @@ class ChatController {
             return;
         }
 
+        if (request.method === "setWidget" && request.widgetKey === DELEGATE_WIDGET) {
+            const previous = this.state.delegation;
+            this.state.delegation = decodeDelegates(request.widgetLines) || undefined;
+            for (const job of this.state.delegation?.jobs || []) {
+                const id = `delegate-${job.batchId}-${job.id}-${job.attemptId}`;
+                // Pi disposes full worker input at settlement. Retain only the
+                // already displayed bounded label, within this connection.
+                job.task ||=
+                    previous?.jobs.find(
+                        (item) =>
+                            item.batchId === job.batchId && item.id === job.id && item.attemptId === job.attemptId,
+                    )?.task ||
+                    this.delegateSummaries.get(id)?.task ||
+                    "";
+                if (job.settling || ["queued", "running"].includes(job.state)) {
+                    continue;
+                }
+
+                const summary = { text: delegateCompletionText(job), task: job.task, isError: job.state === "failed" };
+                if (this.delegateSummaries.get(id)?.text !== summary.text) {
+                    this.delegateSummaries.set(id, summary);
+                    if (this.delegateSummaries.size > 32) {
+                        this.delegateSummaries.delete(this.delegateSummaries.keys().next().value);
+                    }
+
+                    appendNotice(this.state, summary.text, summary.isError, id);
+                }
+            }
+
+            this.publish();
+
+            return;
+        }
+
         if (request.method === "set_editor_text") {
             this.post({ type: "draft", text: String(request.text || "").slice(0, MAX_INPUT) });
         } else if (request.method === "notify") {
@@ -1153,6 +1213,54 @@ class ChatController {
         ) {
             if (item.request.method !== "select" || item.request.options.includes(message.value)) {
                 this.finishDialog(item, { value: message.value });
+            }
+        }
+    }
+
+    async stopDelegate(message) {
+        this.requireWorkspace();
+        const client = this.client;
+        const token = this.contextToken();
+        const job = this.state.delegation?.jobs.find(
+            (candidate) =>
+                candidate.batchId === message.batchId &&
+                candidate.id === message.jobId &&
+                candidate.attemptId === message.attemptId,
+        );
+        if (
+            !client ||
+            !this.isForeground() ||
+            this.transitioning ||
+            token !== message.contextToken ||
+            !["ready", "busy", "retrying", "compacting"].includes(this.state.status) ||
+            !this.state.commands.some((command) => command.name === "delegate") ||
+            !job ||
+            !["queued", "running"].includes(job.state)
+        ) {
+            throw new Error("That delegate attempt is no longer available in the selected conversation.");
+        }
+
+        const key = `${job.batchId}/${job.id}/${job.attemptId}`;
+        if (this.pendingDelegateStops.has(key)) {
+            return;
+        }
+
+        this.pendingDelegateStops.add(key);
+        this.publish();
+        try {
+            // An extension command executes immediately, even while the parent
+            // streams. Do not send/clear the user's draft, images or queued work.
+            await client.request("prompt", {
+                message: `/delegate cancel-worker ${job.batchId} ${job.id} ${job.attemptId}`,
+            });
+        } catch (error) {
+            if (this.client === client && this.contextToken() === token) {
+                this.fail(error);
+            }
+        } finally {
+            this.pendingDelegateStops.delete(key);
+            if (this.client === client && this.contextToken() === token) {
+                this.publish();
             }
         }
     }
@@ -1267,6 +1375,9 @@ class ChatController {
                     throw error;
                 }
 
+                break;
+            case "stopDelegate":
+                await this.stopDelegate(message);
                 break;
             case "stop":
                 await this.stop();

@@ -127,6 +127,32 @@ test("Pi harness marks only a missing executable as unavailable", () => {
     }
 });
 
+test("Pi harness defaults to the pinned repository CLI without consulting ambient Pi shims", () => {
+    const root = makeTemporaryRoot("pi-pinned-default");
+    try {
+        const marker = path.join(root, "ambient-pi-executed");
+        const ambient = writeNodeFixture(
+            root,
+            "ambient.mjs",
+            `import fs from "node:fs"; fs.writeFileSync(${JSON.stringify(marker)}, "unexpected"); process.exit(91);`,
+        );
+        fs.writeFileSync(path.join(root, "pi.cmd"), `@echo off\r\n"${process.execPath}" "${ambient}"\r\n`);
+        fs.writeFileSync(path.join(root, "pi"), "#!/bin/sh\nexit 91\n", { mode: 0o755 });
+        const result = runPiFixture(fixture, {
+            args: ["--version"],
+            env: { PATH: root, SPECPI_TEST_PI: undefined },
+        });
+        assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+        const pinned = JSON.parse(
+            fs.readFileSync(path.resolve("node_modules/@earendil-works/pi-coding-agent/package.json"), "utf8"),
+        );
+        assert.equal(result.stdout.trim(), pinned.version);
+        assert.equal(fs.existsSync(marker), false);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 for (const [label, segments] of [
     ["at temporary depth zero", []],
     ["at temporary depth one", ["agent"]],

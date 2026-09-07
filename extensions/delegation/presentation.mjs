@@ -139,6 +139,88 @@ export function createLivePanel(getView, { truncateToWidth }) {
     };
 }
 
+// Versioned display metadata over Pi's supported string-array widget transport.
+// Never send snapshots, full prompts, child transcripts or raw provider diagnostics.
+export function createRpcPanel(getView) {
+    const key = "specpi-delegation-v1";
+    let context;
+    let timer;
+    let signature;
+    const dispose = () => {
+        clearTimeout(timer);
+        timer = undefined;
+        if (context?.mode === "rpc") {
+            try {
+                context.ui.setWidget(key, undefined);
+            } catch {
+                // UI teardown cannot affect worker ownership.
+            }
+        }
+
+        context = undefined;
+        signature = undefined;
+    };
+
+    const update = () => {
+        clearTimeout(timer);
+        timer = undefined;
+        if (context?.mode !== "rpc" || !context.ui?.setWidget) {
+            return;
+        }
+
+        const view = getView();
+        const payload = {
+            version: 1,
+            enabled: view.enabled,
+            active: view.active,
+            concurrency: view.concurrency,
+            calls: view.calls,
+            callLimit: view.callLimit,
+            jobs: view.jobs.slice(0, 8).map((job) => ({
+                id: job.id,
+                batchId: job.batchId,
+                attemptId: job.attemptId,
+                mode: job.mode,
+                state: job.state,
+                settling: job.settling,
+                calls: job.calls,
+                tools: job.tools,
+                elapsedMs: job.elapsedMs,
+                disposition: job.disposition,
+                task: plain(job.task).slice(0, 240),
+                provider: plain(job.provider).slice(0, 128),
+                model: plain(job.model).slice(0, 128),
+                error: job.error ? plain(job.error).slice(0, 512) : null,
+            })),
+        };
+        const next = JSON.stringify(payload);
+        if (next !== signature) {
+            context.ui.setWidget(key, [next]);
+            signature = next;
+        }
+
+        if (view.active > 0) {
+            timer = setTimeout(() => {
+                try {
+                    update();
+                } catch {
+                    // Optional RPC UI failures never escape the sampling timer.
+                }
+            }, 1000);
+            timer.unref?.();
+        }
+    };
+
+    return {
+        update,
+        dispose,
+        bind(ctx) {
+            dispose();
+            context = ctx;
+        },
+    };
+}
+
 export function readableStatus(state) {
     const mode = state.enabled ? "enabled" : state.updating ? "updating model" : state.requested ? "paused" : "off";
     const lines = [

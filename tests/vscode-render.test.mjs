@@ -9,6 +9,9 @@ import { loadBrowserRuntime } from "../extensions/browser/core.mjs";
 
 const require = createRequire(import.meta.url);
 const { getWebviewHtml } = require("../vscode/src/webview.js");
+const { formatPrompt } = require("../vscode/src/context.js");
+const { createState } = require("../vscode/src/chat-state.js");
+const { decodeDelegates, delegateCompletionText } = require("../vscode/src/delegates.js");
 const root = fileURLToPath(new URL("../", import.meta.url));
 const enabled = process.env.SPECPI_VSCODE_BROWSER_TESTS === "1" || process.env.SPECPI_BROWSER_TESTS === "1";
 const directory = path.join(root, ".specpi-test", "vscode", "render");
@@ -78,6 +81,53 @@ function readyState(overrides = {}) {
         contextToken: "fixture-context-1",
         ...overrides,
     };
+}
+
+function sampleDelegates() {
+    return decodeDelegates([
+        JSON.stringify({
+            version: 1,
+            enabled: true,
+            active: 1,
+            concurrency: 2,
+            calls: 3,
+            callLimit: 256,
+            jobs: [
+                {
+                    id: "review-api",
+                    batchId: "batch-1",
+                    attemptId: "attempt-1",
+                    mode: "review",
+                    state: "running",
+                    settling: true,
+                    calls: 2,
+                    tools: 4,
+                    elapsedMs: 65000,
+                    disposition: null,
+                    task: "Review the API changes and report concrete defects with source evidence.",
+                    provider: "fixture",
+                    model: "Fixture Reasoning",
+                    error: null,
+                },
+                {
+                    id: "review-tests",
+                    batchId: "batch-1",
+                    attemptId: "attempt-2",
+                    mode: "review",
+                    state: "complete",
+                    settling: false,
+                    calls: 1,
+                    tools: 2,
+                    elapsedMs: 32000,
+                    disposition: null,
+                    task: "Check the regression tests without changing files.",
+                    provider: "fixture",
+                    model: "Fixture Reasoning",
+                    error: null,
+                },
+            ],
+        }),
+    ]);
 }
 
 function sampleMessages() {
@@ -478,6 +528,52 @@ test(
                             assert.equal(await page.locator("#send-button").isEnabled(), true);
                             await assertLayout(page, width);
                             await page.screenshot({ path: path.join(screenshots, `${name}-conversation.png`) });
+                            const selected = Array.from({ length: 8 }, (_, index) => ({
+                                label:
+                                    index === 0
+                                        ? `src/${"long-directory/".repeat(15)}file.js:10-24`
+                                        : `src/file-${index}.js`,
+                                text: "Synthetic attached source, not transcript text.\n".repeat(1000),
+                            }));
+                            const tagged = createState({
+                                messages: [
+                                    { role: "user", content: formatPrompt("Review the attached files.", selected) },
+                                ],
+                            }).messages;
+                            await setState(page, { messages: tagged });
+                            assert.equal(await page.locator(".message-files .attachment").count(), 8);
+                            assert.equal(
+                                await page.locator(".message-user .message-body").textContent(),
+                                "Review the attached files.",
+                            );
+                            assert.ok(!(await page.locator("#conversation").textContent()).includes(selected[0].text));
+                            assert.equal(
+                                await page.locator(".message-files .attachment-label").first().textContent(),
+                                selected[0].label,
+                            );
+                            assert.ok((await page.locator(".message-user").boundingBox()).height < 420);
+                            await assertLayout(page, width);
+                            await page.screenshot({ path: path.join(screenshots, `${name}-file-tags.png`) });
+                            const delegation = sampleDelegates();
+                            await setState(page, {
+                                delegation,
+                                commands: [{ name: "delegate" }],
+                                messages: [
+                                    ...sampleMessages(),
+                                    {
+                                        id: "delegate-summary",
+                                        role: "notice",
+                                        text: delegateCompletionText(delegation.jobs[1]),
+                                    },
+                                ],
+                            });
+                            assert.equal(await page.locator("#delegates-panel").isVisible(), true);
+                            assert.equal(await page.locator(".delegate-worker").count(), 2);
+                            await page.locator(".delegate-details summary").first().click();
+                            await assertLayout(page, width);
+                            const delegatePanel = await page.locator("#delegates-panel").boundingBox();
+                            assert.ok(delegatePanel.x >= 0 && delegatePanel.x + delegatePanel.width <= width);
+                            await page.screenshot({ path: path.join(screenshots, `${name}-delegates.png`) });
                             await setState(page, { messages: sampleMessages(), conversations: sampleHistory() });
                             await page.locator("#history-button").click();
                             assert.equal(await page.locator("#history-panel").isVisible(), true);
@@ -2189,6 +2285,206 @@ test(
                         await page.keyboard.press("Enter");
                         assert.equal(await search.isVisible(), false);
                         assert.deepEqual(await takeMessages(page), []);
+                    });
+                },
+            );
+
+            await t.test(
+                "delegate progress preserves focus, details and draft while Stop waits for real settlement",
+                async () => {
+                    await withPage(
+                        browser,
+                        fixtures,
+                        { name: "delegate-progress-controls", width: 390 },
+                        async (page) => {
+                            const delegation = sampleDelegates();
+                            const commands = [{ name: "delegate" }];
+                            await setState(page, { delegation, commands, status: "busy" });
+                            const input = page.locator("#composer-input");
+                            await input.fill("Keep my unsent draft");
+                            const details = page.locator(".delegate-details").first();
+                            await details.locator("summary").click();
+                            const stop = page.getByRole("button", { name: "Stop delegate review-api", exact: true });
+                            await stop.focus();
+                            delegation.jobs[0].elapsedMs += 1000;
+                            delegation.jobs[0].tools += 1;
+                            await setState(page, { delegation, commands, status: "busy", sending: true });
+                            assert.equal(
+                                await stop.isEnabled(),
+                                true,
+                                "Worker Stop must remain available while the parent prompt is pending",
+                            );
+                            assert.equal(await stop.evaluate((node) => node === document.activeElement), true);
+                            assert.equal(await details.getAttribute("open"), "");
+                            assert.equal(await input.inputValue(), "Keep my unsent draft");
+                            await stop.press("Enter");
+                            assert.deepEqual(await takeMessages(page), [
+                                {
+                                    type: "stopDelegate",
+                                    batchId: "batch-1",
+                                    jobId: "review-api",
+                                    attemptId: "attempt-1",
+                                    contextToken: "fixture-context-1",
+                                },
+                            ]);
+                            delegation.jobs[0].stopPending = true;
+                            await setState(page, { delegation, commands, status: "busy" });
+                            assert.equal(await stop.isDisabled(), true);
+                            delegation.jobs[0].state = "cancelled";
+                            await setState(page, { delegation, commands, status: "ready" });
+                            assert.equal(await page.locator(".delegate-state").first().textContent(), "Stopping");
+                            assert.match(await page.locator(".delegates-count").textContent(), /1\/2 occupied/);
+                            assert.equal(await stop.isVisible(), false);
+                            delegation.jobs[0].settling = false;
+                            delegation.active = 0;
+                            await setState(page, { delegation, commands });
+                            assert.equal(await page.locator(".delegate-state").first().textContent(), "Stopped");
+                            assert.equal(await input.inputValue(), "Keep my unsent draft");
+                            await setState(page, {
+                                delegation: sampleDelegates(),
+                                commands,
+                                conversationKey: "other-chat",
+                                contextToken: "other-context",
+                            });
+                            assert.equal(await page.locator(".delegate-details").first().getAttribute("open"), null);
+                            await setState(page, { status: "disconnected" });
+                            assert.equal(await page.locator("#delegates-panel").isVisible(), false);
+                        },
+                    );
+                },
+            );
+
+            await t.test("delegate reports render readable summaries and keep request JSON collapsed", async () => {
+                await withPage(browser, fixtures, { name: "delegate-reports", width: 280 }, async (page) => {
+                    const details = {
+                        jobs: [{ jobId: "review-api", state: "complete", settling: false, calls: 2 }],
+                        results: [
+                            {
+                                receipt: { jobId: "review-api" },
+                                result: {
+                                    status: "complete",
+                                    answer: "A synthetic advisory result.",
+                                    findings: [{ claim: "Handle the empty input." }],
+                                    nextStep: "Add a test.",
+                                },
+                            },
+                        ],
+                    };
+                    const messages = createState({
+                        messages: [
+                            {
+                                role: "toolResult",
+                                toolCallId: "delegate-report",
+                                toolName: "delegate",
+                                content: [{ type: "text", text: JSON.stringify(details) }],
+                                details,
+                                input: JSON.stringify({ operation: "collect", batchId: "batch-1" }),
+                            },
+                        ],
+                    }).messages;
+                    await setState(page, { messages });
+                    assert.match(await page.locator(".delegate-output").textContent(), /A synthetic advisory result/);
+                    assert.equal(await page.locator(".delegate-input").getAttribute("open"), null);
+                    assert.equal(await page.locator(".tool-state").textContent(), "Reported");
+                    await page.locator(".delegate-input summary").click();
+                    messages[0].text += "\nUpdated advisory.";
+                    await setState(page, { messages });
+                    assert.equal(await page.locator(".delegate-input").getAttribute("open"), "");
+                    const delegation = sampleDelegates();
+                    delegation.jobs[0].task = "<img src=x onerror=alert(1)>";
+                    await setState(page, { messages, delegation, commands: [{ name: "delegate" }] });
+                    await page.locator(".delegate-details summary").first().click();
+                    assert.equal(await page.locator("#delegates-panel img").count(), 0);
+                    assert.equal(await page.locator(".delegate-task").first().textContent(), delegation.jobs[0].task);
+                    for (const [state, label] of [
+                        ["failed", "Failed"],
+                        ["partial", "Partial result"],
+                        ["needs_context", "Needs context"],
+                        ["expired", "Timed out"],
+                        ["stale", "Invalidated"],
+                    ]) {
+                        delegation.jobs[0].state = state;
+                        delegation.jobs[0].settling = false;
+                        await setState(page, { messages, delegation });
+                        assert.equal(await page.locator(".delegate-state").first().textContent(), label);
+                    }
+
+                    await assertLayout(page, 280);
+                });
+            });
+
+            await t.test(
+                "file mentions stay as compact tags from composer selection through sent transcript refresh",
+                async () => {
+                    await withPage(browser, fixtures, { name: "file-mention-tags" }, async (page) => {
+                        await setState(page);
+                        const input = page.locator("#composer-input");
+                        await input.fill("Inspect @src");
+                        const search = await imageMessage(page, "findFiles");
+                        await sendHost(page, {
+                            type: "fileSuggestions",
+                            requestId: search.requestId,
+                            files: [{ path: "src/sidebar.js", label: "src/sidebar.js" }],
+                        });
+                        await input.press("Enter");
+                        const attachment = await imageMessage(page, "attachMention");
+                        const selected = {
+                            id: "selected",
+                            label: "src/sidebar.js",
+                            detail: "File",
+                            text: "const sourceMustNotRender = true;",
+                        };
+                        await setState(page, {
+                            attachments: [{ id: selected.id, label: selected.label, detail: selected.detail }],
+                        });
+                        await sendHost(page, {
+                            type: "attachmentResult",
+                            requestId: attachment.requestId,
+                            success: true,
+                        });
+                        assert.equal(await input.inputValue(), "Inspect ");
+                        assert.equal(
+                            await page.locator("#attachments .attachment-label").textContent(),
+                            selected.label,
+                        );
+                        assert.equal(
+                            await page.getByRole("button", { name: "Remove src/sidebar.js", exact: true }).isVisible(),
+                            true,
+                        );
+                        await input.press("Enter");
+                        assert.deepEqual(await takeMessages(page), [{ type: "send", text: "Inspect", mode: "prompt" }]);
+                        const messages = createState({
+                            messages: [
+                                { id: "tagged-user", role: "user", content: formatPrompt("Inspect", [selected]) },
+                            ],
+                        }).messages;
+                        for (const status of ["busy", "ready"]) {
+                            await setState(page, { status, messages });
+                            assert.equal(await page.locator("#attachments").isVisible(), false);
+                            assert.equal(await page.locator(".message-user .message-body").textContent(), "Inspect");
+                            assert.equal(
+                                await page.getByRole("list", { name: "Attached files" }).getByRole("listitem").count(),
+                                1,
+                            );
+                            assert.equal(
+                                await page.locator(".message-files .attachment-label").textContent(),
+                                selected.label,
+                            );
+                            assert.ok(!(await page.locator("#conversation").textContent()).includes(selected.text));
+                        }
+
+                        await page.locator(".message-user").hover();
+                        await page.locator(".message-copy").click();
+                        const copy = await imageMessage(page, "copy");
+                        assert.equal(copy.text, "Inspect");
+                        await sendHost(page, { type: "copyResult", requestId: copy.requestId, success: true });
+                        messages[0].files[0].label = "src/updated.js";
+                        await setState(page, { messages });
+                        assert.equal(
+                            await page.locator(".message-files .attachment-label").textContent(),
+                            "src/updated.js",
+                            "File metadata must invalidate the message render cache",
+                        );
                     });
                 },
             );

@@ -185,9 +185,125 @@ test("RPC and print sessions never mount terminal widgets", async (t) => {
         await pi.command("on");
         await pi.tool({ operation: "run", requestId: `headless-${mode}`, packet: packet() });
         await new Promise(setImmediate);
-        assert.equal(pi.widgets.size, 0);
+        assert.equal(pi.widgets.size, mode === "rpc" ? 1 : 0);
+        if (mode === "rpc") {
+            const lines = pi.widgets.get("specpi-delegation-v1");
+            assert.ok(Array.isArray(lines));
+            assert.equal(JSON.parse(lines[0]).version, 1);
+        }
+
         await pi.fire("session_shutdown");
+        assert.equal(pi.widgets.size, 0);
     }
+});
+
+test("RPC delegate progress reports live counters, binds Stop to an attempt and waits for settlement", async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 10000 });
+    let settle;
+    const held = new Promise((resolve) => {
+        settle = resolve;
+    });
+    const bridge = publicHostBridge();
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        controllerOptions: {
+            async worker({ job, admitCall }) {
+                admitCall();
+                job.toolCalls = 3;
+                await held;
+
+                return result();
+            },
+        },
+    });
+    const pi = mockPi();
+    pi.context.mode = "rpc";
+    factory(pi);
+    await pi.fire("session_start");
+    const view = () => JSON.parse(pi.widgets.get("specpi-delegation-v1")[0]);
+    const handoff = packet();
+    handoff.jobs[0].question = "Inspect the public API";
+    handoff.jobs[0].context = "FULL INPUT MUST NOT CROSS THE UI WIDGET";
+    await pi.tool({ operation: "run", requestId: "rpc-progress", packet: handoff });
+    const job = view().jobs[0];
+    assert.equal(job.state, "running");
+    assert.equal(job.task, "Inspect the public API");
+    assert.equal(job.calls, 1);
+    assert.equal(job.tools, 3);
+    assert.equal(view().active, 1);
+    assert.ok(!JSON.stringify(view()).includes(handoff.jobs[0].context));
+    t.mock.timers.tick(1000);
+    assert.equal(view().jobs[0].elapsedMs, 1000);
+    await pi.command(`cancel-worker ${job.batchId} ${job.id} stale-attempt`);
+    assert.equal(view().jobs[0].state, "running");
+    await pi.command(`cancel-worker ${job.batchId} ${job.id} ${job.attemptId}`);
+    assert.equal(view().jobs[0].state, "cancelled");
+    assert.equal(view().jobs[0].settling, true);
+    assert.equal(view().active, 1);
+    settle();
+    await new Promise(setImmediate);
+    assert.equal(view().jobs[0].state, "cancelled");
+    assert.equal(view().jobs[0].settling, false);
+    assert.equal(view().active, 0);
+    const final = pi.widgets.get("specpi-delegation-v1");
+    t.mock.timers.tick(5000);
+    assert.equal(pi.widgets.get("specpi-delegation-v1"), final);
+    await pi.fire("session_shutdown");
+    t.mock.timers.tick(5000);
+    assert.equal(pi.widgets.size, 0);
+});
+
+test("RPC retains a replaced stopping worker through settlement but hides invalidated generations", async (t) => {
+    let settle;
+    const held = new Promise((resolve) => {
+        settle = resolve;
+    });
+    const bridge = publicHostBridge();
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        controllerOptions: {
+            async worker({ admitCall }) {
+                admitCall();
+                await held;
+
+                return result();
+            },
+        },
+    });
+    const pi = mockPi();
+    pi.context.mode = "rpc";
+    const emitted = [];
+    const setWidget = pi.context.ui.setWidget;
+    pi.context.ui.setWidget = (key, lines) => {
+        setWidget(key, lines);
+        if (key === "specpi-delegation-v1" && lines) {
+            emitted.push(JSON.parse(lines[0]));
+        }
+    };
+
+    factory(pi);
+    await pi.fire("session_start");
+    t.after(() => pi.fire("session_shutdown"));
+    t.after(() => settle());
+    const handoff = packet();
+    await pi.tool({ operation: "run", requestId: "first", packet: handoff });
+    const old = emitted.at(-1).jobs[0];
+    await pi.command(`cancel-worker ${old.batchId} ${old.id} ${old.attemptId}`);
+    await pi.tool({ operation: "run", requestId: "replacement", packet: handoff });
+    assert.equal(emitted.at(-1).jobs.length, 2);
+    assert.equal(emitted.at(-1).jobs.find((job) => job.attemptId === old.attemptId).settling, true);
+    assert.equal(emitted.at(-1).active, 2);
+    settle();
+    await new Promise(setImmediate);
+    const finalOld = emitted
+        .flatMap((view) => view.jobs)
+        .find((job) => job.attemptId === old.attemptId && job.state === "cancelled" && !job.settling);
+    assert.equal(finalOld.state, "cancelled");
+    assert.equal(finalOld.task, handoff.jobs[0].question);
+    assert.equal(emitted.at(-1).jobs.length, 1);
+    assert.equal(emitted.at(-1).active, 0);
+    await pi.command("off");
+    assert.deepEqual(emitted.at(-1).jobs, []);
 });
 
 test("tool cards keep structured results intact and strip terminal controls from expanded evidence", () => {
@@ -306,14 +422,16 @@ function mockPi() {
                 if (value) {
                     widgets.set(
                         key,
-                        value(
-                            {
-                                requestRender: () => {
-                                    renders += 1;
-                                },
-                            },
-                            { fg: (_color, text) => text },
-                        ),
+                        Array.isArray(value)
+                            ? value
+                            : value(
+                                  {
+                                      requestRender: () => {
+                                          renders += 1;
+                                      },
+                                  },
+                                  { fg: (_color, text) => text },
+                              ),
                     );
                 } else {
                     widgets.delete(key);

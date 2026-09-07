@@ -1,6 +1,8 @@
 "use strict";
 
 const { normalizeImage } = require("./images.js");
+const { projectFileContext, MAX_ATTACHMENTS } = require("./context.js");
+const { delegateResultText } = require("./delegates.js");
 
 const MAX_MESSAGES = 500;
 const MAX_MESSAGE_CHARS = 100_000;
@@ -177,7 +179,31 @@ function projectMessage(state, message, id) {
 
     const messageId = bounded(id || message.id || (role === "tool" && message.toolCallId) || nextId(state), 256);
     const previousImages = state.messages.find((candidate) => candidate.id === messageId)?.images || [];
-    const projectedContent = projectContent(message.content ?? message.text, previousImages);
+    const files = [];
+    function displayText(text) {
+        const context = role === "user" ? projectFileContext(text) : null;
+        if (!context || files.length + context.files.length > MAX_ATTACHMENTS) {
+            return text;
+        }
+
+        files.push(...context.files);
+
+        return context.text;
+    }
+
+    // Separate attached source before the normal display truncation; otherwise
+    // large snapshots lose their closing envelope and flood the transcript.
+    const content = message.content ?? message.text;
+    const displayContent = Array.isArray(content)
+        ? content
+              .slice(0, 1_000)
+              .map((part) => (part?.type === "text" ? { ...part, text: displayText(part.text) } : part))
+        : displayText(content);
+    const projectedContent = projectContent(displayContent, previousImages);
+    if (role === "tool" && message.toolName === "delegate") {
+        projectedContent.text = delegateResultText(message.details) ?? projectedContent.text;
+    }
+
     if (!Array.isArray(message.content) && Array.isArray(message.images)) {
         const projectedImages = projectContent(
             message.images
@@ -198,6 +224,10 @@ function projectMessage(state, message, id) {
     };
     if (projectedContent.images.length) {
         result.images = projectedContent.images;
+    }
+
+    if (files.length) {
+        result.files = files;
     }
 
     if (role === "assistant") {
@@ -283,7 +313,11 @@ function trimMessages(state) {
             message.input = bounded(message.input, MAX_TOOL_INPUT_CHARS);
         }
 
-        const textBudget = MAX_MESSAGE_CHARS - (message.input?.length || 0);
+        const fileChars = (message.files || []).reduce(
+            (total, file) => total + file.label.length + file.detail.length,
+            0,
+        );
+        const textBudget = MAX_MESSAGE_CHARS - (message.input?.length || 0) - fileChars;
         if (message.text.endsWith(IMAGE_LIMIT_NOTICE)) {
             message.text = `${bounded(message.text.slice(0, -IMAGE_LIMIT_NOTICE.length).trimEnd(), textBudget - IMAGE_LIMIT_NOTICE.length - 2)}\n\n${IMAGE_LIMIT_NOTICE}`;
         } else {
@@ -299,7 +333,11 @@ function trimMessages(state) {
     let start = state.messages.length;
     while (start > 0 && state.messages.length - start < MAX_MESSAGES) {
         const message = state.messages[start - 1];
-        const length = message.text.length + (message.thinking?.length || 0) + (message.input?.length || 0);
+        const fileChars = (message.files || []).reduce(
+            (total, file) => total + file.label.length + file.detail.length,
+            0,
+        );
+        const length = message.text.length + (message.thinking?.length || 0) + (message.input?.length || 0) + fileChars;
         if (size + length > MAX_TRANSCRIPT_CHARS) {
             break;
         }
@@ -313,8 +351,8 @@ function trimMessages(state) {
     }
 }
 
-function appendNotice(state, text, isError = false) {
-    upsert(state, { id: nextId(state, "notice"), role: "notice", text: bounded(text), isError: Boolean(isError) });
+function appendNotice(state, text, isError = false, id = nextId(state, "notice")) {
+    upsert(state, { id: bounded(id, 256), role: "notice", text: bounded(text), isError: Boolean(isError) });
 
     return state;
 }
@@ -580,6 +618,11 @@ function applyEvent(state, event) {
             event.type === "tool_execution_start" ? [] : (event.partialResult || event.result)?.content,
             existing?.images,
         );
+        if ((event.toolName || existing?.toolName) === "delegate") {
+            projectedContent.text =
+                delegateResultText((event.partialResult || event.result)?.details) ?? projectedContent.text;
+        }
+
         upsert(state, {
             id,
             role: "tool",

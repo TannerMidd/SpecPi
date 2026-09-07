@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.0 - 2026-09-07
+
+- Start Command Guard off in RPC sessions, including new SpecPi Chat conversations. Explicit `/guard guard` and `/guard strict` still enable protection for the current session; the terminal startup chooser is unchanged.
+
+- Let installer PATH discovery continue past inaccessible candidates while preserving permission errors for explicit executable paths. Use the pinned repository Pi for test fixtures and a temporary npm cache for package validation, so restricted test accounts do not require personal npm access.
+
+- Publish bounded delegate lifecycle metadata through Pi's RPC widget protocol for SpecPi Chat's live panel. Add exact-attempt human cancellation, stop sampling on settlement/shutdown, and keep prior-generation task labels out of replacement sessions. Worker policy, model-facing operations, quotas and provider behavior are unchanged.
+
 ## 0.17.1 - 2026-09-07
 
 - Reduce the npm package by shipping only runtime scripts; remove obsolete plans, research documents and unused assets, and shorten operational guides.

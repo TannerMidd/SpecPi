@@ -23,6 +23,25 @@
 #token-status[role="button"]:focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 .extras-menu-item, .extras-search-input, .extras-search-count, .extras-mention-option,
 .extras-mention-notice, .extras-recovered-title, .extras-recovered-label { font-size: var(--chat-small-font-size); }
+.delegates-panel { margin: 0 0 7px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); font-size: 12px; }
+.delegates-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 4px; }
+.delegates-count { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.delegates-rows { max-height: 220px; overflow-y: auto; scrollbar-width: thin; }
+.delegate-worker { display: flex; align-items: flex-start; gap: 5px; padding: 5px 0; border-top: 1px solid var(--border); }
+.delegate-details { flex: 1; min-width: 0; }
+.delegate-details summary { cursor: pointer; border-radius: 3px; overflow-wrap: anywhere; }
+.delegate-name { font-weight: 500; }
+.delegate-state { display: inline-block; margin-left: 6px; color: var(--muted); font-size: 12px; }
+.delegate-state[data-state="running"], .delegate-state[data-state="settling"] { color: var(--accent); }
+.delegate-state[data-state="failed"], .delegate-state[data-state="expired"], .delegate-error { color: var(--error); }
+.delegate-metrics { display: block; margin-top: 2px; font: 12px/1.6 var(--mono); color: var(--muted); }
+.delegate-task, .delegate-model, .delegate-error { margin: 7px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.delegate-model { color: var(--muted); }
+.delegate-stop { flex: 0 0 auto; padding: 3px 6px; background: transparent; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
+.delegates-note { margin: 5px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.message-delegate-summary { margin: 10px 0; padding: 9px 11px; border: 1px solid var(--border); border-left: 2px solid var(--accent); border-radius: 5px; background: var(--surface-raised); font-size: 12px; }
+.delegate-output { font-family: var(--vscode-font-family, system-ui, sans-serif); font-size: 14px; }
+.delegate-input > summary { font-size: 12px; }
 @media (max-width: 340px) {
     .topbar .brand-chat { display: none; }
 }

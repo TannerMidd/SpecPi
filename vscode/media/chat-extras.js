@@ -65,6 +65,154 @@
             return node;
         }
 
+        const delegates = element("section", "delegates-panel");
+        delegates.id = "delegates-panel";
+        delegates.setAttribute("aria-label", "Delegates");
+        delegates.hidden = true;
+        const delegateHeader = element("div", "delegates-header");
+        const delegateCount = element("span", "delegates-count");
+        delegateHeader.append(element("strong", "", "Delegates"), delegateCount);
+        const delegateRows = element("div", "delegates-rows");
+        const delegateNote = element(
+            "p",
+            "delegates-note",
+            "Results are advisory. Stopping keeps a slot occupied until Pi reports settlement; remote termination is not guaranteed.",
+        );
+        delegates.append(delegateHeader, delegateRows, delegateNote);
+        document.querySelector(".footer-panels")?.prepend(delegates);
+        const workerRows = new Map();
+        let delegateContext;
+        let delegateStatus = "";
+        function workerLabel(job) {
+            if (job.settling && !["running", "queued"].includes(job.state)) {
+                return ["complete", "partial", "needs_context"].includes(job.state) ? "Finishing" : "Stopping";
+            }
+
+            if (job.disposition) {
+                return job.disposition === "accept"
+                    ? "Parent accepted"
+                    : job.disposition === "discard"
+                      ? "Parent discarded"
+                      : "Needs checking";
+            }
+
+            return (
+                {
+                    queued: "Queued",
+                    running: "Running",
+                    complete: "Ready for review",
+                    partial: "Partial result",
+                    needs_context: "Needs context",
+                    failed: "Failed",
+                    cancelled: "Stopped",
+                    expired: "Timed out",
+                    stale: "Invalidated",
+                }[job.state] || "Unknown"
+            );
+        }
+
+        function updateDelegates() {
+            const state = getState();
+            const context = `${state.conversationKey || ""}/${state.contextToken || ""}`;
+            if (context !== delegateContext) {
+                delegateContext = context;
+                workerRows.clear();
+                delegateRows.replaceChildren();
+                delegateStatus = "";
+            }
+
+            const view = state.delegation;
+            const connected = ["ready", "busy", "retrying", "compacting"].includes(state.status);
+            const jobs = connected && Array.isArray(view?.jobs) ? view.jobs.slice(0, 8) : [];
+            delegates.hidden = !connected || !view || (!jobs.length && !view.active);
+            if (view) {
+                delegateCount.textContent = `${view.active}/${view.concurrency} occupied · ${view.calls}/${view.callLimit} calls${view.enabled ? "" : " · off/paused"}`;
+            }
+
+            if (!jobs.length) {
+                workerRows.clear();
+                delegateRows.replaceChildren();
+                delegateStatus = "";
+
+                return;
+            }
+
+            const keys = new Set();
+            const nodes = [];
+            for (const job of jobs) {
+                const key = `${job.batchId}/${job.id}/${job.attemptId}`;
+                keys.add(key);
+                let row = workerRows.get(key);
+                if (!row) {
+                    const node = element("div", "delegate-worker");
+                    const details = element("details", "delegate-details");
+                    const summary = element("summary");
+                    const name = element("span", "delegate-name");
+                    const status = element("span", "delegate-state");
+                    const metrics = element("span", "delegate-metrics");
+                    const task = element("p", "delegate-task");
+                    const model = element("p", "delegate-model");
+                    const error = element("p", "delegate-error");
+                    summary.append(name, status, metrics);
+                    details.append(summary, task, model, error);
+                    const stop = button("Stop", "delegate-stop");
+                    stop.setAttribute("aria-label", `Stop delegate ${job.id}`);
+                    stop.addEventListener("click", () =>
+                        send({
+                            type: "stopDelegate",
+                            batchId: job.batchId,
+                            jobId: job.id,
+                            attemptId: job.attemptId,
+                            contextToken: getState().contextToken,
+                        }),
+                    );
+                    node.append(details, stop);
+                    row = { node, name, status, metrics, task, model, error, stop };
+                    workerRows.set(key, row);
+                }
+
+                row.name.textContent = `${job.id} · ${job.mode}`;
+                row.status.textContent = workerLabel(job);
+                row.status.dataset.state =
+                    job.settling && !["running", "queued"].includes(job.state) ? "settling" : job.state;
+                const seconds = Math.floor(job.elapsedMs / 1000);
+                row.metrics.textContent = `${Math.floor(seconds / 60)}m ${seconds % 60}s · ${job.calls} model · ${job.tools} tools`;
+                if (job.task) {
+                    row.task.textContent = job.task;
+                }
+
+                row.task.hidden = !row.task.textContent;
+                row.model.textContent = [job.provider, job.model].filter(Boolean).join(" / ");
+                row.error.textContent = job.error || "";
+                row.error.hidden = !job.error;
+                row.stop.hidden = !["queued", "running"].includes(job.state);
+                row.stop.disabled = Boolean(
+                    job.stopPending ||
+                    view.canStop === false ||
+                    !state.commands?.some((command) => command.name === "delegate"),
+                );
+                row.stop.textContent = job.stopPending ? "Requesting…" : "Stop";
+                nodes.push(row.node);
+            }
+
+            for (const key of workerRows.keys()) {
+                if (!keys.has(key)) {
+                    workerRows.delete(key);
+                }
+            }
+
+            const current = Array.from(delegateRows.children);
+            if (nodes.length !== current.length || nodes.some((node, index) => current[index] !== node)) {
+                delegateRows.replaceChildren(...nodes);
+            }
+
+            const nextStatus = jobs.map((job) => `${job.id}: ${workerLabel(job)}`).join("; ");
+            if (nextStatus !== delegateStatus) {
+                delegateStatus = nextStatus;
+                announce(`Delegates — ${nextStatus}`);
+            }
+        }
+
         const actions = element("div", "extras-actions");
         const actionsButton = button("⋯", "icon-button extras-actions-button");
         actionsButton.id = "chat-actions-button";
@@ -641,6 +789,7 @@
             }
 
             updateActions();
+            updateDelegates();
             updateRecoveredDrafts();
             if (usage) {
                 const disabled = !["ready", "busy", "retrying", "compacting"].includes(getState().status);

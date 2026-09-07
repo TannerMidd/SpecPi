@@ -226,7 +226,20 @@ test(
                 rpc.events.some((event) => event.type === "extension_error"),
                 false,
             );
-            await notification("/guard status", /^Mode: guard;/u);
+            await notification("/guard status", /^Mode: off;/u);
+            assert.ok(
+                rpc.events.some(
+                    (event) =>
+                        event.method === "setStatus" &&
+                        event.statusKey === "specpi-command-guard" &&
+                        event.statusText === "Guard Off",
+                ),
+                "New Chat connections must publish Guard Off without requesting a mode change",
+            );
+            assert.equal(
+                rpc.events.some((event) => event.method === "confirm"),
+                false,
+            );
             for (const suffix of ["", " clear"]) {
                 const cursor = rpc.events.length;
                 await notification(`/rpc-usage-probe${suffix}`, /^Synthetic provider usage report/u);
@@ -260,6 +273,18 @@ test(
                 );
             }
 
+            const delegateWidget = rpc.events.find(
+                (event) =>
+                    event.method === "setWidget" &&
+                    event.widgetKey === "specpi-delegation-v1" &&
+                    event.widgetLines?.length,
+            );
+            assert.ok(delegateWidget, "The installed source harness must emit the real RPC delegate widget contract");
+            assert.equal(JSON.parse(delegateWidget.widgetLines[0]).version, 1);
+            await notification("/delegate cancel-worker missing job stale", /no longer running/u);
+
+            await rpc.request("prompt", { message: "/guard guard" });
+            await notification("/guard status", /^Mode: guard;/u);
             await rpc.request("prompt", { message: "/guard strict" });
             await notification("/guard status", /^Mode: strict;/u);
             for (const confirmed of [false, true]) {
@@ -316,7 +341,7 @@ test(
             const afterReset = await rpc.request("get_state");
             assert.notEqual(afterReset.sessionId, initial.sessionId);
             assert.equal(afterReset.sessionFile, undefined);
-            await notification("/guard status", /^Mode: guard;/u);
+            await notification("/guard status", /^Mode: off;/u);
             assert.equal(
                 rpc.events.some((event) => event.type === "agent_start"),
                 false,

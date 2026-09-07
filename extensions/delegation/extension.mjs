@@ -2,7 +2,13 @@ import { DelegationError, publicErrorMessage } from "./errors.mjs";
 import { randomUUID } from "node:crypto";
 import { createDelegationController } from "./core.mjs";
 import { DEFAULT_TIMEOUT_MINUTES, DEFAULT_BUDGET_MULTIPLIER, timeoutLimits, budgetLimits } from "./protocol.mjs";
-import { createLivePanel, createToolRenderers, readableLimits, readableStatus } from "./presentation.mjs";
+import {
+    createLivePanel,
+    createRpcPanel,
+    createToolRenderers,
+    readableLimits,
+    readableStatus,
+} from "./presentation.mjs";
 
 const USAGE =
     "Usage: /delegate [on|off|status|limits|budget [<multiplier>|reset]|timeout [<minutes>|reset]|cancel <batchId>]";
@@ -154,6 +160,7 @@ export function createDelegationExtension(
     };
 
     const panel = presentation ? createLivePanel(() => controller.presentation(), presentation) : undefined;
+    const rpcPanel = createRpcPanel(() => controller.presentation({ includeInactive: true }));
 
     const status = () => ({
         ...controller.status(),
@@ -176,6 +183,7 @@ export function createDelegationExtension(
                   : undefined,
         );
         panel?.update();
+        rpcPanel.update();
     }
 
     function invalidate(reason, preserveStartupDefault = false) {
@@ -207,6 +215,7 @@ export function createDelegationExtension(
 
     const factory = (pi) => {
         panel?.dispose();
+        rpcPanel.dispose();
         detach();
         bindingEpoch += 1;
         const issuedEpoch = bindingEpoch;
@@ -360,6 +369,7 @@ export function createDelegationExtension(
             currentContext = ctx;
             toolsReady = true;
             panel?.bind(ctx);
+            rpcPanel.bind(ctx);
             invalidate("session started or resources reloaded", true);
             try {
                 loadTimeout();
@@ -390,6 +400,7 @@ export function createDelegationExtension(
 
             invalidate("session shutdown");
             panel?.dispose();
+            rpcPanel.dispose();
             prepareContext(undefined, true);
             detach();
             currentContext = undefined;
@@ -443,9 +454,49 @@ export function createDelegationExtension(
                 }
 
                 currentContext = ctx;
-                const [action = "status", id, extra] = args.trim().split(/\s+/u).filter(Boolean);
+                const [action = "status", id, extra, attemptId, ...rest] = args.trim().split(/\s+/u).filter(Boolean);
                 try {
-                    if (extra || (id && !["cancel", "timeout", "budget"].includes(action))) {
+                    // Chat binds Stop to an exact observed attempt, never a future
+                    // follow-up with the same job name. This command starts no model turn.
+                    if (action === "cancel-worker") {
+                        const job = controller
+                            .presentation({ includeInactive: true })
+                            .jobs.find(
+                                (candidate) =>
+                                    candidate.batchId === id &&
+                                    candidate.id === extra &&
+                                    candidate.attemptId === attemptId,
+                            );
+                        if (!ctx.hasUI || rest.length || !job || !["queued", "running"].includes(job.state)) {
+                            ctx.ui.notify(
+                                "That delegate attempt is no longer running. Its state was not changed.",
+                                "warning",
+                            );
+                            updatePresentation();
+
+                            return;
+                        }
+
+                        await controller.execute({
+                            operation: "cancel",
+                            requestId: `human-${randomUUID()}`,
+                            batchId: id,
+                            jobId: extra,
+                        });
+                        ctx.ui.notify(
+                            "Delegate stop requested. The slot stays occupied until Pi reports settlement; remote termination is not guaranteed.",
+                            "info",
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        extra ||
+                        attemptId ||
+                        rest.length ||
+                        (id && !["cancel", "timeout", "budget"].includes(action))
+                    ) {
                         throw new DelegationError(USAGE);
                     }
 

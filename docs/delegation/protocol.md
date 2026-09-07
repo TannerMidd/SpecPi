@@ -240,6 +240,29 @@ cache. After eviction, those operations are revalidated against current state; t
 cannot start inference or restore cancelled jobs. Generation and source checks still
 apply. Neither cache eviction nor failed attempts reset quotas or block cancellation.
 
+## RPC display metadata
+
+In RPC mode, the extension emits `setWidget` with key `specpi-delegation-v1`
+and a single JSON string in `widgetLines`. Version 1 contains `enabled`, occupied
+`active` slots, `concurrency`, process `calls`/`callLimit`, and at most eight job rows.
+Rows contain batch/job/attempt IDs, mode, state, settlement, call/tool counters,
+elapsed milliseconds, a shortened task label, public provider/model names,
+parent disposition and code-owned diagnostics. No source snapshots, full prompts,
+child transcript or provider query is part of this channel. Sampling is at most
+once a second between lifecycle updates and stops when no slots are occupied.
+Invalidated-generation job identities/tasks are omitted; their unsettled slots still
+count. A replaced batch in the same generation remains visible until settlement.
+Shutdown/rebinding clears the old widget and timer. No new persistent store is added.
+
+Chat treats this payload as untrusted, accepts one bounded versioned record, strips
+controls and renders text only. Its Stop button invokes
+`/delegate cancel-worker <batchId> <jobId> <attemptId>` through normal RPC command
+dispatch. This human UI command checks the exact current queued/running attempt
+before cancellation; it cannot cancel a later follow-up under the same job name,
+start inference, raise limits or alter the user's draft/attachments. Parent Stop and
+worker Stop are separate controls. Neither stopping nor settlement proves remote
+termination. Existing model-facing `cancel` requests are unchanged.
+
 ## Cancellation and lifecycle
 
 ```json

@@ -86,8 +86,9 @@ export function createDelegationController({
         cost: "unavailable; no invoice cap",
         batches: [...[...history.values()].map((item) => structuredClone(item)), ...[...batches.values()].map(summary)],
     });
-    // Presentation reads counters only: no source checks, provider queries or retained worker text.
-    const presentation = () => ({
+    // Presentation samples bounded metadata only: no source checks or provider queries.
+    // RPC includes terminal rows so a stopped worker does not silently disappear.
+    const presentation = ({ includeInactive = false } = {}) => ({
         enabled,
         active,
         concurrency: policy.concurrency,
@@ -95,9 +96,24 @@ export function createDelegationController({
         callLimit: policy.sessionCalls,
         jobs: [...batches.values()].flatMap((batch) =>
             [...batch.jobs.values()]
-                .filter((job) => job.settling || (!batch.retired && !quiet.has(job.state) && !job.disposition))
+                .filter((job) =>
+                    includeInactive
+                        ? batch.generation === generation
+                        : job.settling || (!batch.retired && !quiet.has(job.state) && !job.disposition),
+                )
                 .map((job) => ({
                     id: job.spec.id,
+                    ...(includeInactive
+                        ? {
+                              batchId: batch.id,
+                              attemptId: job.attemptId,
+                              task: job.spec.question?.slice(0, 240) || "",
+                              provider: batch.model?.provider,
+                              model: batch.model?.id,
+                              disposition: job.disposition?.decision ?? null,
+                              error: job.error ?? null,
+                          }
+                        : {}),
                     mode: job.mode,
                     state: job.state,
                     settling: job.settling,
@@ -395,6 +411,13 @@ export function createDelegationController({
                         }
 
                         active -= 1;
+                        // A replaced batch can still own a stopping worker. Publish
+                        // its settlement before cleanup removes it, but never expose
+                        // an invalidated generation to the new context.
+                        if (batch.retired && batch.generation === generation) {
+                            changed();
+                        }
+
                         cleanupBatch(batch);
                         changed();
                         pump();
