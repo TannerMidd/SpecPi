@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## Unreleased
+
+- Replace the persistent Delegates panel with a compact activity strip that appears only while workers run or settle. Expand it for tasks and Stop controls; finished workers leave the strip and their reports stay in the conversation. Hide totals and boilerplate from the default view, preserve drafts and keyboard focus, and respect reduced motion.
+
 ## 0.4.0
 
 - With the updated SpecPi harness, new Chat sessions start with Command Guard off. Use `/guard guard` or `/guard strict` to enable it for that session.

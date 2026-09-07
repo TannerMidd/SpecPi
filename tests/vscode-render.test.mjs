@@ -568,8 +568,12 @@ test(
                                 ],
                             });
                             assert.equal(await page.locator("#delegates-panel").isVisible(), true);
-                            assert.equal(await page.locator(".delegate-worker").count(), 2);
-                            await page.locator(".delegate-details summary").first().click();
+                            assert.equal(await page.locator(".delegate-worker").count(), 1);
+                            assert.equal(await page.locator("#delegates-panel").getAttribute("open"), null);
+                            assert.ok((await page.locator("#delegates-panel").boundingBox()).height <= 44);
+                            assert.equal(await page.locator(".delegates-count").textContent(), "1 agent working");
+                            await page.screenshot({ path: path.join(screenshots, `${name}-delegates-compact.png`) });
+                            await page.locator(".delegates-header").click();
                             await assertLayout(page, width);
                             const delegatePanel = await page.locator("#delegates-panel").boundingBox();
                             assert.ok(delegatePanel.x >= 0 && delegatePanel.x + delegatePanel.width <= width);
@@ -2302,8 +2306,8 @@ test(
                             await setState(page, { delegation, commands, status: "busy" });
                             const input = page.locator("#composer-input");
                             await input.fill("Keep my unsent draft");
-                            const details = page.locator(".delegate-details").first();
-                            await details.locator("summary").click();
+                            const details = page.locator("#delegates-panel");
+                            await details.locator(".delegates-header").click();
                             const stop = page.getByRole("button", { name: "Stop delegate review-api", exact: true });
                             await stop.focus();
                             delegation.jobs[0].elapsedMs += 1000;
@@ -2330,15 +2334,22 @@ test(
                             delegation.jobs[0].stopPending = true;
                             await setState(page, { delegation, commands, status: "busy" });
                             assert.equal(await stop.isDisabled(), true);
+                            assert.equal(
+                                await page
+                                    .locator(".delegates-header")
+                                    .evaluate((node) => node === document.activeElement),
+                                true,
+                            );
                             delegation.jobs[0].state = "cancelled";
                             await setState(page, { delegation, commands, status: "ready" });
                             assert.equal(await page.locator(".delegate-state").first().textContent(), "Stopping");
-                            assert.match(await page.locator(".delegates-count").textContent(), /1\/2 occupied/);
+                            assert.equal(await page.locator(".delegates-count").textContent(), "1 agent stopping");
                             assert.equal(await stop.isVisible(), false);
                             delegation.jobs[0].settling = false;
                             delegation.active = 0;
                             await setState(page, { delegation, commands });
-                            assert.equal(await page.locator(".delegate-state").first().textContent(), "Stopped");
+                            assert.equal(await page.locator("#delegates-panel").isVisible(), false);
+                            assert.equal(await page.locator(".delegate-worker").count(), 0);
                             assert.equal(await input.inputValue(), "Keep my unsent draft");
                             await setState(page, {
                                 delegation: sampleDelegates(),
@@ -2346,9 +2357,126 @@ test(
                                 conversationKey: "other-chat",
                                 contextToken: "other-context",
                             });
-                            assert.equal(await page.locator(".delegate-details").first().getAttribute("open"), null);
+                            assert.equal(await page.locator("#delegates-panel").getAttribute("open"), null);
                             await setState(page, { status: "disconnected" });
                             assert.equal(await page.locator("#delegates-panel").isVisible(), false);
+                        },
+                    );
+                },
+            );
+
+            await t.test(
+                "delegate strip shows only live work and resets after idle without losing the draft",
+                async () => {
+                    await withPage(browser, fixtures, { name: "delegate-live-only", width: 390 }, async (page) => {
+                        const delegation = sampleDelegates();
+                        const commands = [{ name: "delegate" }];
+                        const panel = page.locator("#delegates-panel");
+                        const header = page.locator(".delegates-header");
+                        const input = page.locator("#composer-input");
+                        await setState(page, { delegation, commands });
+                        await input.fill("Keep this draft");
+                        assert.equal(await panel.getAttribute("open"), null);
+                        assert.equal(await page.locator(".delegate-worker").count(), 1);
+                        assert.equal(
+                            await page
+                                .locator(".delegates-pulse")
+                                .evaluate((node) => getComputedStyle(node).animationName),
+                            "none",
+                        );
+                        await header.focus();
+                        await header.press("Enter");
+                        assert.equal(await panel.getAttribute("open"), "");
+                        delegation.jobs[1].state = "running";
+                        delegation.jobs[1].settling = true;
+                        delegation.active = 2;
+                        await setState(page, { delegation, commands });
+                        assert.equal(await page.locator(".delegates-count").textContent(), "2 agents working");
+                        assert.equal(await page.locator(".delegate-worker").count(), 2);
+                        assert.equal(await panel.getAttribute("open"), "");
+                        await assertLayout(page, 390);
+                        await page.screenshot({ path: path.join(screenshots, "delegates-two-running.png") });
+                        delegation.jobs[0].state = "complete";
+                        await setState(page, { delegation, commands });
+                        assert.equal(await page.locator(".delegate-state").first().textContent(), "Finishing");
+                        const remainingStop = page.getByRole("button", {
+                            name: "Stop delegate review-tests",
+                            exact: true,
+                        });
+                        await remainingStop.focus();
+                        delegation.jobs[0].settling = false;
+                        delegation.jobs[0].disposition = "accept";
+                        delegation.active = 1;
+                        await setState(page, { delegation, commands });
+                        assert.equal(await page.locator(".delegate-worker").count(), 1);
+                        assert.ok(!(await panel.textContent()).includes("Parent accepted"));
+                        assert.equal(await remainingStop.evaluate((node) => node === document.activeElement), true);
+                        await header.focus();
+                        delegation.jobs[1].state = "complete";
+                        delegation.jobs[1].settling = false;
+                        delegation.active = 0;
+                        await setState(page, { delegation, commands });
+                        assert.equal(await panel.isVisible(), false);
+                        assert.equal(await input.evaluate((node) => node === document.activeElement), true);
+                        assert.equal(await input.inputValue(), "Keep this draft");
+                        delegation.jobs[1].state = "queued";
+                        await setState(page, { delegation, commands });
+                        assert.equal(await panel.isVisible(), false, "queued-only metadata is not running work");
+                        // Revoked generations can retain occupied requests without exposing old task labels.
+                        delegation.jobs = [];
+                        delegation.active = 1;
+                        delegation.enabled = false;
+                        await setState(page, { delegation, commands });
+                        assert.equal(await panel.isVisible(), true);
+                        assert.equal(await panel.getAttribute("open"), null);
+                        assert.equal(await page.locator(".delegates-count").textContent(), "1 agent stopping");
+                        await header.press("Space");
+                        assert.equal(await page.locator(".delegates-note").isVisible(), true);
+                        assert.equal(await page.locator(".delegate-worker").count(), 0);
+                        await setState(page, {
+                            delegation: sampleDelegates(),
+                            commands,
+                            contextToken: "new-generation",
+                        });
+                        assert.equal(await panel.getAttribute("open"), null);
+                        await setState(page, { status: "disconnected", delegation, commands });
+                        assert.equal(await panel.isVisible(), false);
+                        assert.equal(await input.inputValue(), "Keep this draft");
+                        assert.deepEqual(await takeMessages(page), []);
+                    });
+                },
+            );
+
+            await t.test(
+                "delegate generation replacement hands off worker focus without stealing composer focus",
+                async () => {
+                    await withPage(
+                        browser,
+                        fixtures,
+                        { name: "delegate-generation-focus", width: 390 },
+                        async (page) => {
+                            const commands = [{ name: "delegate" }];
+                            for (const replacement of [sampleDelegates(), null]) {
+                                await setState(page, {
+                                    delegation: sampleDelegates(),
+                                    commands,
+                                    contextToken: "before",
+                                });
+                                await page.locator(".delegates-header").click();
+                                await page.locator(".delegate-stop").focus();
+                                await setState(page, { delegation: replacement, commands, contextToken: "after" });
+                                const target = replacement ? ".delegates-header" : "#composer-input";
+                                assert.equal(
+                                    await page.locator(target).evaluate((node) => node === document.activeElement),
+                                    true,
+                                );
+                            }
+
+                            const input = page.locator("#composer-input");
+                            await input.fill("Do not steal focus");
+                            await setState(page, { delegation: sampleDelegates(), commands, contextToken: "another" });
+                            assert.equal(await input.evaluate((node) => node === document.activeElement), true);
+                            assert.equal(await input.inputValue(), "Do not steal focus");
                         },
                     );
                 },
@@ -2393,20 +2521,28 @@ test(
                     const delegation = sampleDelegates();
                     delegation.jobs[0].task = "<img src=x onerror=alert(1)>";
                     await setState(page, { messages, delegation, commands: [{ name: "delegate" }] });
-                    await page.locator(".delegate-details summary").first().click();
+                    await page.locator(".delegates-header").click();
                     assert.equal(await page.locator("#delegates-panel img").count(), 0);
                     assert.equal(await page.locator(".delegate-task").first().textContent(), delegation.jobs[0].task);
-                    for (const [state, label] of [
-                        ["failed", "Failed"],
-                        ["partial", "Partial result"],
-                        ["needs_context", "Needs context"],
-                        ["expired", "Timed out"],
-                        ["stale", "Invalidated"],
+                    for (const state of [
+                        "complete",
+                        "failed",
+                        "partial",
+                        "needs_context",
+                        "expired",
+                        "stale",
+                        "cancelled",
                     ]) {
                         delegation.jobs[0].state = state;
                         delegation.jobs[0].settling = false;
+                        delegation.active = 0;
                         await setState(page, { messages, delegation });
-                        assert.equal(await page.locator(".delegate-state").first().textContent(), label);
+                        assert.equal(await page.locator("#delegates-panel").isVisible(), false, state);
+                        assert.equal(await page.locator(".delegate-worker").count(), 0, state);
+                        assert.match(
+                            await page.locator(".delegate-output").textContent(),
+                            /A synthetic advisory result/,
+                        );
                     }
 
                     await assertLayout(page, 280);

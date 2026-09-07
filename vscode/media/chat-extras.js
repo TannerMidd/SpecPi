@@ -65,19 +65,19 @@
             return node;
         }
 
-        const delegates = element("section", "delegates-panel");
+        const delegates = element("details", "delegates-panel");
         delegates.id = "delegates-panel";
         delegates.setAttribute("aria-label", "Delegates");
         delegates.hidden = true;
-        const delegateHeader = element("div", "delegates-header");
+        const delegateHeader = element("summary", "delegates-header");
+        const delegatePulse = element("span", "delegates-pulse");
+        delegatePulse.setAttribute("aria-hidden", "true");
         const delegateCount = element("span", "delegates-count");
-        delegateHeader.append(element("strong", "", "Delegates"), delegateCount);
+        const delegateElapsed = element("span", "delegates-elapsed");
+        delegateElapsed.setAttribute("aria-hidden", "true");
+        delegateHeader.append(delegatePulse, delegateCount, delegateElapsed);
         const delegateRows = element("div", "delegates-rows");
-        const delegateNote = element(
-            "p",
-            "delegates-note",
-            "Results are advisory. Stopping keeps a slot occupied until Pi reports settlement; remote termination is not guaranteed.",
-        );
+        const delegateNote = element("p", "delegates-note", "Waiting for Pi to release the remaining worker requests.");
         delegates.append(delegateHeader, delegateRows, delegateNote);
         document.querySelector(".footer-panels")?.prepend(delegates);
         const workerRows = new Map();
@@ -112,6 +112,11 @@
         }
 
         function updateDelegates() {
+            // Disabling or removing a focused control can blur it synchronously.
+            // Capture ownership before any state-driven DOM changes.
+            const focused = document.activeElement;
+            const hadDelegateFocus = delegates.contains(focused);
+            const hadWorkerFocus = delegateRows.contains(focused);
             const state = getState();
             const context = `${state.conversationKey || ""}/${state.contextToken || ""}`;
             if (context !== delegateContext) {
@@ -119,23 +124,47 @@
                 workerRows.clear();
                 delegateRows.replaceChildren();
                 delegateStatus = "";
+                delegates.open = false;
             }
 
             const view = state.delegation;
             const connected = ["ready", "busy", "retrying", "compacting"].includes(state.status);
-            const jobs = connected && Array.isArray(view?.jobs) ? view.jobs.slice(0, 8) : [];
-            delegates.hidden = !connected || !view || (!jobs.length && !view.active);
-            if (view) {
-                delegateCount.textContent = `${view.active}/${view.concurrency} occupied · ${view.calls}/${view.callLimit} calls${view.enabled ? "" : " · off/paused"}`;
-            }
-
-            if (!jobs.length) {
+            const allJobs = connected && Array.isArray(view?.jobs) ? view.jobs.slice(0, 8) : [];
+            const liveJobs = allJobs.filter((job) => job.state === "running" || job.settling);
+            const active = connected ? Math.max(view?.active || 0, liveJobs.length) : 0;
+            const jobs = active
+                ? allJobs.filter((job) => ["running", "queued"].includes(job.state) || job.settling)
+                : [];
+            delegates.hidden = !active;
+            if (!active) {
+                delegates.open = false;
                 workerRows.clear();
                 delegateRows.replaceChildren();
+                if (delegateStatus) {
+                    announce("Delegate activity hidden. Reports remain in the conversation.");
+                }
+
                 delegateStatus = "";
+                if (hadDelegateFocus) {
+                    input.focus();
+                }
 
                 return;
             }
+
+            const phase = liveJobs.some((job) => job.state === "running")
+                ? "working"
+                : liveJobs.some((job) => ["complete", "partial", "needs_context"].includes(job.state))
+                  ? "finishing"
+                  : "stopping";
+            delegateCount.textContent = `${active} ${active === 1 ? "agent" : "agents"} ${phase}`;
+            delegates.dataset.phase = phase;
+            const elapsed = Math.floor(Math.max(0, ...liveJobs.map((job) => job.elapsedMs)) / 1000);
+            delegateElapsed.textContent = elapsed
+                ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`
+                : "";
+            delegateNote.hidden = jobs.length > 0;
+            delegateHeader.title = "Live delegation · expand for tasks and worker controls";
 
             const keys = new Set();
             const nodes = [];
@@ -145,18 +174,20 @@
                 let row = workerRows.get(key);
                 if (!row) {
                     const node = element("div", "delegate-worker");
-                    const details = element("details", "delegate-details");
-                    const summary = element("summary");
+                    const details = element("div", "delegate-details");
+                    const summary = element("div", "delegate-heading");
                     const name = element("span", "delegate-name");
                     const status = element("span", "delegate-state");
                     const metrics = element("span", "delegate-metrics");
                     const task = element("p", "delegate-task");
                     const model = element("p", "delegate-model");
                     const error = element("p", "delegate-error");
-                    summary.append(name, status, metrics);
-                    details.append(summary, task, model, error);
+                    summary.append(name, status);
+                    details.append(summary, task, model, metrics, error);
                     const stop = button("Stop", "delegate-stop");
                     stop.setAttribute("aria-label", `Stop delegate ${job.id}`);
+                    stop.title =
+                        "Request cancellation. The worker remains visible until Pi reports settlement; remote termination is not guaranteed.";
                     stop.addEventListener("click", () =>
                         send({
                             type: "stopDelegate",
@@ -171,18 +202,20 @@
                     workerRows.set(key, row);
                 }
 
-                row.name.textContent = `${job.id} · ${job.mode}`;
+                row.name.textContent = job.mode === "review" ? "Review" : "Research";
+                row.name.title = job.id;
                 row.status.textContent = workerLabel(job);
                 row.status.dataset.state =
                     job.settling && !["running", "queued"].includes(job.state) ? "settling" : job.state;
                 const seconds = Math.floor(job.elapsedMs / 1000);
-                row.metrics.textContent = `${Math.floor(seconds / 60)}m ${seconds % 60}s · ${job.calls} model · ${job.tools} tools`;
+                row.metrics.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} · ${job.calls} model calls · ${job.tools} tool calls`;
                 if (job.task) {
                     row.task.textContent = job.task;
                 }
 
                 row.task.hidden = !row.task.textContent;
                 row.model.textContent = [job.provider, job.model].filter(Boolean).join(" / ");
+                row.model.title = row.model.textContent;
                 row.error.textContent = job.error || "";
                 row.error.hidden = !job.error;
                 row.stop.hidden = !["queued", "running"].includes(job.state);
@@ -201,9 +234,20 @@
                 }
             }
 
-            const current = Array.from(delegateRows.children);
-            if (nodes.length !== current.length || nodes.some((node, index) => current[index] !== node)) {
-                delegateRows.replaceChildren(...nodes);
+            for (const node of Array.from(delegateRows.children)) {
+                if (!nodes.includes(node)) {
+                    node.remove();
+                }
+            }
+
+            for (const [index, node] of nodes.entries()) {
+                if (delegateRows.children[index] !== node) {
+                    delegateRows.insertBefore(node, delegateRows.children[index] || null);
+                }
+            }
+
+            if (hadWorkerFocus && (!focused.isConnected || focused.hidden || focused.disabled || !delegates.open)) {
+                delegateHeader.focus();
             }
 
             const nextStatus = jobs.map((job) => `${job.id}: ${workerLabel(job)}`).join("; ");
