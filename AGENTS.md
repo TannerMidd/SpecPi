@@ -43,6 +43,7 @@ For rendered `site/` or browser changes, validate relevant desktop, tablet, and 
 - Do not add or upgrade executable dependencies unless required by the task. Pin reviewed versions and update `THIRD_PARTY.md`, `CHANGELOG.md`, and security documentation when their contracts change.
 - Use four-space indentation, explicit braced control flow, one statement per line, and the project formatter.
 - Do not commit, push, publish, deploy, create releases, or alter remotes unless explicitly requested.
+- When git commits or pull requests are requested, write them to read like a person wrote them: concise, purpose-first messages, a brief body only where it adds context, and no attribution footers, emoji decoration, co-author trailers, or change-statistics dumps.
 
 ## Completion
 
