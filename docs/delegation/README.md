@@ -16,7 +16,7 @@ The parent remains the sole writer and verifies workers' evidence. Use delegatio
 
 Startup enables dispatch only after host, settings and Guard checks; it launches no workers. Preflight may perform Pi-owned authentication/OAuth preparation. Off and safety revocations survive reload/session switches; restarting Pi restores the on default. While off, the tool is absent from model requests.
 
-The TUI panel shows worker state, elapsed time and call counts. **Ready for review** requires a parent disposition; **stopping** still occupies a slot. RPC/print modes return structured results without widgets. Expand tool output for findings and evidence.
+The TUI panel shows worker state, elapsed time and call counts. **Ready for review** requires a parent disposition; **stopping** still occupies a slot. RPC mode additionally publishes bounded, versioned worker metadata for SpecPi Chat's live Delegates panel; print/JSON modes do not mount widgets. Chat shows expandable tasks/metrics, attempt-bound Stop controls, and advisory transcript summaries. Update both Chat and the harness, then restart Pi. Expand tool output for findings and evidence.
 
 Model/thinking changes revoke old results and preflight the new route. Unsupported routes pause dispatch; compatible selections resume it unless explicitly off. Guard, session, branch and task/scope changes revoke the current generation. Ordinary conversation advancement does not. Reload/off/on never reset spent process quotas or release unsettled requests. Restart Pi to load changed runtime code or a different working root.
 

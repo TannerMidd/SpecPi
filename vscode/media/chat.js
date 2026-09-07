@@ -1149,34 +1149,57 @@
         const gallery = imageGallery(message.images, article.querySelector(".message-images"));
         const thinkingOpen = article.querySelector('details[data-section="thinking"]')?.open ?? true;
         const toolOpen = article.querySelector('details[data-section="tool"]')?.open ?? true;
-        article.className = `message message-${role}${message.isError ? " message-is-error" : ""}`;
+        const delegateInputOpen = article.querySelector(".delegate-input")?.open ?? false;
+        article.className = `message message-${role}${message.isError ? " message-is-error" : ""}${role === "notice" && String(message.id).startsWith("delegate-") ? " message-delegate-summary" : ""}`;
         article.replaceChildren();
         if (role === "tool") {
             const details = element("details", `tool-card${message.isError ? " is-error" : ""}`);
             details.dataset.section = "tool";
             details.open = toolOpen;
             const summary = element("summary");
-            summary.append(element("span", "tool-name", message.toolName || "Tool"));
+            summary.append(
+                element(
+                    "span",
+                    "tool-name",
+                    message.toolName === "delegate" ? "Delegate activity" : message.toolName || "Tool",
+                ),
+            );
             summary.append(
                 element(
                     "span",
                     "tool-state",
-                    message.isRunning ? "Running…" : message.isError ? "Failed" : "Completed",
+                    message.isRunning
+                        ? "Running…"
+                        : message.isError
+                          ? "Failed"
+                          : message.toolName === "delegate"
+                            ? "Reported"
+                            : "Completed",
                 ),
             );
             details.append(summary);
             if (message.input) {
-                details.append(
-                    element("div", "tool-section-label", "Input"),
-                    element("pre", "tool-input", message.input),
-                );
-                details.append(element("div", "tool-section-label", "Result"));
+                if (message.toolName === "delegate") {
+                    const input = element("details", "delegate-input");
+                    input.open = delegateInputOpen;
+                    input.append(
+                        element("summary", "", "Delegation request"),
+                        element("pre", "tool-input", message.input),
+                    );
+                    details.append(input);
+                } else {
+                    details.append(
+                        element("div", "tool-section-label", "Input"),
+                        element("pre", "tool-input", message.input),
+                    );
+                    details.append(element("div", "tool-section-label", "Result"));
+                }
             }
 
             details.append(
                 element(
                     "pre",
-                    "tool-output",
+                    message.toolName === "delegate" ? "tool-output delegate-output" : "tool-output",
                     message.text || (message.isRunning ? "Waiting for output…" : "No output"),
                 ),
             );
@@ -1224,6 +1247,22 @@
         }
 
         article.append(body);
+        if (role === "user" && Array.isArray(message.files) && message.files.length) {
+            const files = element("div", "attachments message-files");
+            files.setAttribute("role", "list");
+            files.setAttribute("aria-label", "Attached files");
+            for (const file of message.files.slice(0, 8)) {
+                const chip = element("div", "attachment");
+                chip.setAttribute("role", "listitem");
+                chip.title = [file.label, file.detail].filter(Boolean).join(" · ");
+                chip.append(element("span", "attachment-label", file.label || "Attached file"));
+                files.append(chip);
+            }
+
+            body.hidden = !message.text;
+            article.append(files);
+        }
+
         if (gallery) {
             body.hidden = !message.text;
             article.append(gallery);
@@ -1250,6 +1289,7 @@
                 message.input,
                 message.isError,
                 message.isRunning,
+                message.files,
                 Array.isArray(message.images) ? message.images.map(imageKey) : [],
             ]);
             let record = messageCache.get(id);

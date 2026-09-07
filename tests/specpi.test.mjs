@@ -1545,6 +1545,62 @@ test("installer plan is non-mutating even when browser installation is planned",
     }
 });
 
+test("installer PATH discovery skips permission-denied candidates but preserves unexpected errors", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-path-permissions-"));
+    const agentDir = path.join(root, "agent");
+    const blockedBin = path.join(root, "blocked-bin");
+    const fakeBin = path.join(root, "bin");
+    const hook = path.join(root, "deny-path-stat.mjs");
+    fs.mkdirSync(agentDir);
+    installFakePi(fakeBin);
+    fs.writeFileSync(
+        hook,
+        [
+            'import fs from "node:fs";',
+            'import path from "node:path";',
+            "const original = fs.statSync;",
+            "fs.statSync = function (file, ...args) {",
+            `    if (path.dirname(String(file)) === ${JSON.stringify(blockedBin)} ||`,
+            '        (process.env.SPECPI_DENY_EXPLICIT_NODE === "1" && String(file) === process.execPath)) {',
+            '        throw Object.assign(new Error("Injected PATH lookup failure"), { code: process.env.SPECPI_PATH_FAULT });',
+            "    }",
+            "    return original.call(this, file, ...args);",
+            "};",
+        ].join("\n"),
+    );
+    try {
+        for (const code of ["EACCES", "EPERM", "EIO"]) {
+            const result = invokeCli(agentDir, ["plan", "--skip-shell"], {
+                PATH: [blockedBin, fakeBin].join(path.delimiter),
+                NODE_OPTIONS: `--import=${pathToFileURL(hook).href}`,
+                SPECPI_PATH_FAULT: code,
+            });
+            if (code === "EIO") {
+                assert.notEqual(result.status, 0);
+                assert.match(result.stderr, /Injected PATH lookup failure/u);
+            } else {
+                assert.equal(result.status, 0, result.stderr);
+                assert.match(result.stdout, /Pi runtime:/u);
+            }
+
+            assert.deepEqual(fs.readdirSync(agentDir), [], "Discovery and plan must not mutate agent state");
+        }
+
+        installFakeBrowserNpm(fakeBin);
+        const explicit = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], {
+            PATH: prependPath(fakeBin),
+            NODE_OPTIONS: `--import=${pathToFileURL(hook).href}`,
+            SPECPI_PATH_FAULT: "EACCES",
+            SPECPI_DENY_EXPLICIT_NODE: "1",
+        });
+        assert.notEqual(explicit.status, 0, "An explicitly selected Node executable must not bypass a denial");
+        assert.match(explicit.stderr, /Injected PATH lookup failure/u);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test("--yes installs each missing optional external tool", () => {
     if (process.platform === "win32") {
         return;

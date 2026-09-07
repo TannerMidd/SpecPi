@@ -172,6 +172,12 @@ function resolveCommand(command, env = process.env) {
                     return path.resolve(file);
                 }
 
+                // Like shell PATH lookup, continue past inaccessible candidates.
+                // Explicit executable paths must still report permission failures.
+                if (!hasPath && (error.code === "EACCES" || error.code === "EPERM")) {
+                    continue;
+                }
+
                 if (error.code !== "ENOENT" && error.code !== "ENOTDIR") {
                     throw error;
                 }

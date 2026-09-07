@@ -136,7 +136,10 @@ function runNode(args, options = {}) {
 }
 
 function runNpm(args, options = {}) {
-    return runNode([npmCli, ...args], options);
+    return runNode(
+        [npmCli, "--cache", path.join(temporaryRoot, "npm-cache"), "--update-notifier=false", ...args],
+        options,
+    );
 }
 
 function quoteWindowsCommandArg(value) {

@@ -1,5 +1,13 @@
 # SpecPi Chat changelog
 
+## 0.4.0
+
+- With the updated SpecPi harness, new Chat sessions start with Command Guard off. Use `/guard guard` or `/guard strict` to enable it for that session.
+
+- Add a live Delegates panel with expandable tasks, states, model/tool counters, elapsed time and attempt-bound Stop controls. Keep stopping distinct from settlement, show advisory completion summaries, and render delegate reports readably rather than as raw JSON. Live metadata requires the updated SpecPi harness; no provider polling or child-history store is added.
+
+- Keep sent workspace file and selection attachments, including `@` mentions, in compact transcript tags instead of displaying their full source text. Preserve the context sent to Pi and reconstruct tags when reopening conversations.
+
 ## 0.3.7
 
 - Keep runtime/status panels in the composer's bounded column on wide sidebars, and center the transcript independently of its scrollbar. Preserve drafts and open status details while resizing.

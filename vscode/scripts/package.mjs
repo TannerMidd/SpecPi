@@ -15,6 +15,7 @@ export const packageFiles = Object.freeze([
     "src/rpc-client.js",
     "src/launch.js",
     "src/chat-state.js",
+    "src/delegates.js",
     "src/context.js",
     "src/code-references.js",
     "src/images.js",

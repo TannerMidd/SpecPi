@@ -48,7 +48,7 @@ specpi doctor
 
 Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
-To pin this release, use `npm install --global specpi@0.17.1`.
+To pin this release, use `npm install --global specpi@0.18.0`.
 
 Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
@@ -62,7 +62,7 @@ Chat beside your code, attach files, and switch conversations.
 
 In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
 
-Chat 0.3.7 includes **Restart Pi** in the Chat title bar and Command Palette to reconnect the selected conversation and reload its Pi extensions. Other conversations keep running.
+Chat 0.4.0 adds live delegate progress and worker Stop controls, plus compact tags for attached files. With SpecPi 0.18.0, new Chat sessions start with Guard off; use `/guard guard` or `/guard strict` to enable it. Update the harness and use **Restart Pi** to load these changes.
 
 ## Go further
 

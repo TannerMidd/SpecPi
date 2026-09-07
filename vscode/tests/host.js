@@ -102,9 +102,14 @@ async function run() {
             "streamed assistant reply",
         );
         assert.equal(controller.state.attachments.length, 0);
-        assert.ok(
-            controller.state.messages.some((message) => message.role === "user" && message.text.includes("example.js")),
-        );
+        const sentMessage = controller.state.messages.find((message) => message.role === "user");
+        assert.equal(sentMessage.text, "Explain this fixture.");
+        assert.equal(sentMessage.files.length, 2);
+        assert.ok(sentMessage.files.every((file) => file.label.startsWith("example.js")));
+        assert.ok(sentMessage.files.every((file) => !Object.hasOwn(file, "text")));
+        const sentHistory = JSON.stringify(await controller.client.request("get_messages"));
+        assert.ok(sentHistory.includes("User-selected file context 1:"));
+        assert.ok(sentHistory.includes("export const greeting"), "Pi must still receive the attached source");
         assert.ok(controller.state.messages.some((message) => message.role === "tool"));
         await until(async () => (await controller.catalog.list()).length === 1, "owned session catalog");
         assert.deepEqual(

@@ -318,6 +318,10 @@ function markdownTranscript(state) {
             lines.push(valueText(message.text), "");
         }
 
+        for (const file of Array.isArray(message.files) ? message.files.slice(0, 8) : []) {
+            lines.push(`Attached file: ${JSON.stringify(valueText(file?.label, 1_024))}`, "");
+        }
+
         for (const image of Array.isArray(message.images) ? message.images.slice(0, MAX_IMAGES) : []) {
             const mime =
                 typeof image?.mimeType === "string" && /^image\/[a-zA-Z0-9.+-]+$/.test(image.mimeType)

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const helperRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(helperRoot, "..");
+const defaultPiCommand = path.join(repoRoot, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
 const nodeScriptExtensions = new Set([".cjs", ".js", ".mjs"]);
 const missingPathCodes = new Set(["ENOENT", "ENOTDIR"]);
 const sensitiveEnvironmentName =
@@ -159,7 +160,7 @@ function createChildEnvironment(environmentRoot, agentDir, overrides) {
 }
 
 function resolvePiCommand(options, cwd, environment) {
-    const requested = options.piCommand ?? environment.SPECPI_TEST_PI ?? "pi";
+    const requested = options.piCommand ?? environment.SPECPI_TEST_PI ?? defaultPiCommand;
     if (typeof requested !== "string" || requested.length === 0) {
         throw new TypeError("Pi harness piCommand must be a non-empty string");
     }
@@ -247,7 +248,7 @@ export function runPiFixture(fixture, options = {}) {
     try {
         resolvedCommand = resolvePiCommand(options, cwd, environment);
         if (!resolvedCommand) {
-            const requested = options.piCommand ?? options.env?.SPECPI_TEST_PI ?? "pi";
+            const requested = options.piCommand ?? environment.SPECPI_TEST_PI ?? defaultPiCommand;
             const error = new Error(`Pi executable is not available: ${requested}`);
             error.code = "ENOENT";
 
@@ -295,7 +296,7 @@ export function runPiFixture(fixture, options = {}) {
             error,
             stdout: "",
             stderr: "",
-            command: resolvedCommand ?? options.piCommand ?? "pi",
+            command: resolvedCommand ?? options.piCommand ?? environment.SPECPI_TEST_PI ?? defaultPiCommand,
             commandArgs: args,
             args,
             agentDir: setup.agentDir,
