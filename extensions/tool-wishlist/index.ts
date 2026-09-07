@@ -388,25 +388,6 @@ function assertFinishSelectionStillActive(
     }
 }
 
-function reportField(body: string, label: string) {
-    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-    return body
-        .match(new RegExp(`^- ${escaped}: (.+)$`, "m"))?.[1]
-        ?.replaceAll("`", "")
-        .trim();
-}
-
-function reportBullets(body: string, heading: string) {
-    const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const block = body.match(new RegExp(`\\*\\*${escaped}\\*\\*\\n((?:- .*(?:\\n|$))*)`))?.[1] ?? "";
-
-    return block
-        .split("\n")
-        .filter((line) => line.startsWith("- "))
-        .map((line) => line.slice(2).trim());
-}
-
 function validatorArgs(validator: string, cwd: string) {
     return [
         sourceCheckout(cwd).validatorsFile,
@@ -456,46 +437,6 @@ async function gitLogSince(pi: any, cwd: string, sinceIso: string) {
     } catch {
         return undefined;
     }
-}
-
-export function improvementCandidatesFromRefresh(refreshed: any) {
-    if (Array.isArray(refreshed?.improvements)) {
-        return refreshed.improvements;
-    }
-
-    const candidates: any[] = [];
-    const report = `${String(refreshed?.report ?? "")}\n# END\n`;
-    for (const section of report.matchAll(/^# (Needs review|Selected|Open)\n([\s\S]*?)(?=^# )/gm)) {
-        const sectionName = section[1];
-        const body = `${section[2]}\n## END\n`;
-        for (const match of body.matchAll(/^## (.+)\n([\s\S]*?)(?=^## )/gm)) {
-            const itemBody = match[2];
-            const canonicalKey = reportField(itemBody, "ID");
-            if (!canonicalKey) {
-                continue;
-            }
-
-            candidates.push({
-                canonicalKey,
-                title: match[1].trim(),
-                state: reportField(itemBody, "Status") ?? "open",
-                qualified: reportField(itemBody, "Qualified") === "yes",
-                reviewNeeded: sectionName === "Needs review",
-                occurrences: Number(reportField(itemBody, "Occurrences") ?? 0),
-                sessions: Number(reportField(itemBody, "Distinct sessions") ?? 0),
-                projects: Number(reportField(itemBody, "Distinct projects") ?? 0),
-                impact: reportField(itemBody, "Impact") ?? "minor",
-                scenarios: reportBullets(itemBody, "Observed needs"),
-                limitations: reportBullets(itemBody, "Why current capabilities fell short"),
-            });
-        }
-    }
-
-    const rank = (item: any) => (item.state === "selected" ? 0 : item.reviewNeeded ? 1 : 2);
-
-    return candidates
-        .filter((item) => item.state === "selected" || item.reviewNeeded || (item.state === "open" && item.qualified))
-        .sort((a, b) => rank(a) - rank(b));
 }
 
 function improvementPrompt(group: any, context: ImprovementContext = {}) {
@@ -867,7 +808,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
                 assertImprovementStillCurrent(expectedSelection, generation, ctx, signal);
                 const refreshed = await refreshWishlist({ stateDir, signal });
                 assertImprovementStillCurrent(expectedSelection, generation, ctx, signal);
-                const selected = improvementCandidatesFromRefresh(refreshed).find(
+                const selected = refreshed.improvements.find(
                     (item: any) => item.canonicalKey === expectedSelection.gapId && item.state === "selected",
                 );
                 if (!selected) {
@@ -1012,9 +953,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
                 const refreshed = await refreshWishlist({ stateDir, signal });
                 assertFinishStillCurrent();
-                const selected = improvementCandidatesFromRefresh(refreshed).find(
-                    (item: any) => item.canonicalKey === params.gapId,
-                );
+                const selected = refreshed.improvements.find((item: any) => item.canonicalKey === params.gapId);
                 if (!selected || selected.state !== "selected") {
                     throw new Error(`${params.gapId} is not selected`);
                 }
@@ -1287,7 +1226,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
             const refreshed = await refreshWishlist({ stateDir });
             assertSelectionContextCurrent();
-            const improvements = improvementCandidatesFromRefresh(refreshed);
+            const improvements = refreshed.improvements;
             if (improvements.length === 0) {
                 ctx.ui.notify("No qualified or review-needed harness improvements are available.", "info");
 

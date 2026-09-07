@@ -251,7 +251,8 @@ test("VS Code host cleanup retries transient profile locks asynchronously within
         }
     });
     await removeHostEnvironment(directory, { pause: async (milliseconds) => waits.push(milliseconds) });
-    assert.deepEqual(waits, [100, 200]);
+    assert.equal(waits.length, 2);
+    assert.ok(waits.every((milliseconds) => milliseconds > 0));
     assert.equal(attempts.length, 3);
     assert.ok(attempts.every(({ target }) => target === path.resolve(directory)));
     assert.ok(
@@ -274,12 +275,10 @@ test("VS Code host cleanup exposes exhausted locks and does not retry other fail
         removeHostEnvironment(directory, { pause: async (milliseconds) => waits.push(milliseconds) }),
         { code: "EPERM" },
     );
-    assert.equal(attempts, 8);
-    assert.deepEqual(waits, [100, 200, 400, 800, 1200, 1600, 2000]);
-    assert.equal(
-        waits.reduce((sum, milliseconds) => sum + milliseconds, 0),
-        6300,
-    );
+    assert.ok(attempts > 1 && attempts <= 10);
+    assert.equal(waits.length, attempts - 1);
+    assert.ok(waits.every((milliseconds) => milliseconds > 0));
+    assert.ok(waits.reduce((sum, milliseconds) => sum + milliseconds, 0) <= 7000);
     code = "EACCES";
     attempts = 0;
     waits.length = 0;

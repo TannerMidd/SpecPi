@@ -59,7 +59,6 @@ function capture(controller, vscode) {
                 controller.workspace !== workspace ||
                 controller.generation !== generation ||
                 controller.sessionRevision !== sessionRevision ||
-                controller.workspaceSwitching ||
                 controller.transitioning
             ) {
                 return false;

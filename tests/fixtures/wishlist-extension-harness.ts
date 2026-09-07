@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import registerWishlist, { improvementCandidatesFromRefresh } from "../../extensions/tool-wishlist/index.ts";
+import registerWishlist from "../../extensions/tool-wishlist/index.ts";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -185,9 +185,6 @@ export default async function wishlistExtensionHarness() {
 
     await reportTool.execute("call-2", browserGap, undefined, undefined, ctx);
     const stateDir = path.join(agentDir, "specpi");
-    const legacyCandidate = improvementCandidatesFromRefresh({
-        report: fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"),
-    })[0];
     const completion = {
         gapId: "local-browser-automation",
         acceptanceEvidence: ["Browser interaction and visual comparison smoke passed"],
@@ -314,7 +311,6 @@ export default async function wishlistExtensionHarness() {
                 !reportStableAfterRetirement.includes("# Needs review"),
             improvementMenu: selections[0],
             reopenMenu: selections[1],
-            legacyCandidate,
             unauthorizedCompletion,
             implementationStarted: sentUserMessages[0],
             verificationCommands: execs,

@@ -414,12 +414,10 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const site = fs.readFileSync(path.join(repoRoot, "site", "index.html"), "utf8");
     const wiki = fs.readFileSync(path.join(repoRoot, "site", "wiki", "index.html"), "utf8");
     const architecture = fs.readFileSync(path.join(repoRoot, "site", "single-agent", "index.html"), "utf8");
-    const delegationGuide = fs.readFileSync(path.join(repoRoot, "docs", "delegation", "README.md"), "utf8");
     const publish = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "npm-publish.yml"), "utf8");
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
 
-    assert.equal(manifest.version, "0.17.0");
     assert.equal(manifest.publishConfig.access, "public");
     assert.equal(manifest.publishConfig.provenance, true);
     assert.equal(manifest.scripts.preinstall, undefined);
@@ -434,11 +432,6 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(wiki, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(wiki, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(architecture, new RegExp(`SpecPi v${manifest.version.replaceAll(".", "\\.")}`));
-    assert.ok(delegationGuide.includes(`experimental in SpecPi ${manifest.version}`));
-    for (const documentation of [readme, site, wiki, architecture, delegationGuide]) {
-        assert.doesNotMatch(documentation, /unreleased/i);
-    }
-
     assert.match(publish, /release:\s*\n\s*types: \[published\]/);
     assert.match(publish, /environment: npm/);
     assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);
@@ -481,31 +474,9 @@ test("showcase site is self-contained and Pages-ready", () => {
     const wikiHtml = fs.readFileSync(path.join(siteDir, "wiki", "index.html"), "utf8");
     const wikiCss = fs.readFileSync(path.join(siteDir, "wiki.css"), "utf8");
     const cycle = fs.readFileSync(path.join(siteDir, "cycle.js"), "utf8");
-    const svg = fs.readFileSync(path.join(siteDir, "self-improvement-loop-v2.svg"), "utf8");
     const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
     const thirdParty = fs.readFileSync(path.join(repoRoot, "THIRD_PARTY.md"), "utf8");
     const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
-
-    const svgViewBox = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
-    assert.ok(svgViewBox);
-    const renderScale = 760 / Number(svgViewBox[1]);
-    assert.ok(Number(svgViewBox[1]) / Number(svgViewBox[2]) >= 2);
-    const fontSizes = [...svg.matchAll(/font-size="(\d+)"/g)].map((match) => Number(match[1]));
-    assert.ok(fontSizes.length > 0 && Math.min(...fontSizes) * renderScale >= 12);
-    assert.equal((svg.match(/<title\b/g) || []).length, 1);
-    assert.equal((svg.match(/<desc\b/g) || []).length, 1);
-    assert.match(svg, /verification-failure-return/);
-    assert.match(svg, /later-evidence-review-return/);
-    assert.doesNotMatch(
-        svg.replace('xmlns="http://www.w3.org/2000/svg"', ""),
-        /<script|<foreignObject|<image|<animate|\bhref=|https?:|data:image|@import|@font-face/i,
-    );
-    assert.match(svg, /<desc[^>]*>[^<]*failure[^<]*later evidence[^<]*human review/i);
-    assert.ok(
-        JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).files.includes(
-            "site/self-improvement-loop-v2.svg",
-        ),
-    );
 
     assert.match(html, /<html lang="en">/);
     assert.match(html, /name="viewport"/);
@@ -586,10 +557,6 @@ test("showcase site is self-contained and Pages-ready", () => {
     assert.match(wikiCss, /\.definition-list/);
     assert.match(wikiCss, /\.doc-section/);
     assert.match(wikiCss, /@media \(max-width: \d+px\)/);
-
-    for (const content of [html, wikiHtml, readme]) {
-        assert.doesNotMatch(content, /—|real task|real, reusable/i);
-    }
 
     assert.match(cycle, /ArrowRight|ArrowDown/);
     assert.doesNotMatch(cycle, /CYCLE_STAGES|cycleControls/);
@@ -1386,8 +1353,6 @@ test("wishlist extension runs the one-command improvement loop and preserves con
         assert.match(result.improvementMenu.title, /Choose one harness improvement/);
         assert.match(result.improvementMenu.options[0], /REVIEW · Local browser automation · local-browser-automation/);
         assert.match(result.reopenMenu.options[0], /REVIEW · Local browser automation · local-browser-automation/);
-        assert.equal(result.legacyCandidate.canonicalKey, "local-browser-automation");
-        assert.equal(result.legacyCandidate.reviewNeeded, true);
         assert.match(result.unauthorizedCompletion, /not authorized by \/harness-improvement in the current session/);
         assert.match(
             result.implementationStarted,

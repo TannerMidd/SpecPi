@@ -46,6 +46,8 @@ function fixture(t, options = {}) {
             showWorkspaceFolderPick: async () => options.pickWorkspace?.() || folders[1],
             showQuickPick: async (items) => {
                 nativeDialogs.push(items);
+
+                return options.quickPick?.(items);
             },
             showWarningMessage: async (...args) => {
                 nativeDialogs.push(args);
@@ -134,8 +136,8 @@ function fixture(t, options = {}) {
             await options.ready?.(this);
         }
 
-        async request(type, args) {
-            this.requests.push({ type, args });
+        async request(type, args, requestOptions) {
+            this.requests.push({ type, args, options: requestOptions });
             const result = options.request?.(type, args, this);
             if (result !== undefined) {
                 return result;
@@ -536,6 +538,152 @@ test("fork starts from an isolated CLI copy and preserves source process, draft 
     await coordinator.selectConversation(sourceId);
     assert.equal(coordinator.client, clients[0]);
     assert.equal(coordinator.state.draft.text, "source draft");
+});
+
+test("editing through the real coordinator restores exact text and images only in the new branch", async (t) => {
+    const image = {
+        type: "image",
+        mimeType: "image/png",
+        data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    };
+    const text = "  Exact original prompt\n";
+    const { coordinator, clients } = fixture(t, {
+        quickPick: (items) => items[0],
+        request(type) {
+            if (type === "get_entries") {
+                return {
+                    leafId: "prompt-1",
+                    entries: [
+                        {
+                            type: "message",
+                            id: "prompt-1",
+                            parentId: null,
+                            message: { role: "user", content: [{ type: "text", text }, image] },
+                        },
+                    ],
+                };
+            }
+        },
+    });
+    await coordinator.connect();
+    const source = coordinator.active;
+    const sourceFile = clients[0].runtime.sessionFile;
+    source.attachments = [{ id: "unsent-source", kind: "file", label: "source.js" }];
+    await coordinator.handleMessage({ type: "saveDraft", text: "unsent source draft" });
+    await coordinator.handleMessage({ type: "editPrompt", conversationKey: source.conversationKey });
+    const target = coordinator.active;
+    assert.notEqual(target, source);
+    assert.equal(clients[1].launch.args[clients[1].launch.args.indexOf("--fork") + 1], sourceFile);
+    assert.deepEqual(
+        clients[1].requests.find(({ type }) => type === "fork"),
+        { type: "fork", args: { entryId: "prompt-1" }, options: { timeoutMs: 0 } },
+    );
+    assert.equal(coordinator.state.draft.text, text);
+    assert.equal(target.attachments[0].kind, "image");
+    assert.equal(target.attachments[0].data, image.data);
+    assert.equal(target.attachments[0].width, 1);
+    assert.ok(target.attachments[0].id);
+    assert.equal(source.attachments[0].id, "unsent-source");
+    assert.ok(!clients[0].requests.some(({ type }) => type === "fork"));
+    assert.ok(!clients.some((client) => client.requests.some(({ type }) => type === "prompt")));
+    await coordinator.selectConversation(source.conversationKey);
+    assert.equal(coordinator.state.draft.text, "unsent source draft");
+});
+
+test("cancelled and rejected branches leave the source runtime and draft unchanged", async (t) => {
+    for (const outcome of ["cancel", "reject"]) {
+        const { coordinator, clients } = fixture(t, {
+            request(type) {
+                if (type === "fork") {
+                    if (outcome === "reject") {
+                        throw new Error("Synthetic branch rejection");
+                    }
+
+                    return { cancelled: true };
+                }
+            },
+        });
+        await coordinator.connect();
+        const source = coordinator.active;
+        const sessionId = source.activeSessionId;
+        source.attachments = [{ id: "source-file", kind: "file", label: "source.js" }];
+        await coordinator.handleMessage({ type: "saveDraft", text: "source draft" });
+        assert.equal(
+            await coordinator.branchConversation(
+                source,
+                "fork",
+                { entryId: "entry-1" },
+                { text: "edited", images: [] },
+            ),
+            false,
+        );
+        assert.equal(clients[1].stops, 1);
+        assert.match(
+            coordinator.active.state.error,
+            outcome === "reject" ? /Synthetic branch rejection/ : /branch could not be created/,
+        );
+        assert.equal(source.state.error, undefined);
+        assert.equal(clients[0].stops, 0);
+        assert.equal(source.activeSessionId, sessionId);
+        assert.equal(source.attachments[0].id, "source-file");
+        assert.equal(source.transitioning, false);
+        assert.ok(!clients[0].requests.some(({ type }) => type === "fork" || type === "clone"));
+        await coordinator.selectConversation(source.conversationKey);
+        assert.equal(coordinator.state.draft.text, "source draft");
+    }
+});
+
+test("accepted branch refresh failure preserves its draft and cannot contaminate a reconnected target", async (t) => {
+    for (const replace of [false, true]) {
+        const pending = deferred();
+        const started = deferred();
+        let branched = false;
+        const { coordinator, clients } = fixture(t, {
+            request(type, args, client) {
+                if (type === "fork") {
+                    branched = true;
+                }
+
+                if (type === "get_state" && branched && client === clients[1]) {
+                    started.resolve();
+
+                    return pending.promise;
+                }
+            },
+        });
+        await coordinator.connect();
+        const source = coordinator.active;
+        const result = coordinator.branchConversation(
+            source,
+            "fork",
+            { entryId: "entry-1" },
+            { text: "exact edited draft", images: [] },
+        );
+        await started.promise;
+        const target = coordinator.active;
+        assert.equal(coordinator.state.draft.text, "exact edited draft");
+        if (replace) {
+            await target.disconnect();
+            await target.connect();
+        }
+
+        pending.reject(new Error("Synthetic post-acceptance refresh failure"));
+        assert.equal(await result, false);
+        assert.equal(coordinator.state.draft.text, "exact edited draft");
+        if (replace) {
+            assert.equal(target.client, clients[2]);
+            assert.equal(target.state.error, undefined);
+        } else {
+            assert.match(target.state.error, /branch was created.*draft restored.*do not repeat/);
+            assert.equal(target.client, clients[1]);
+            assert.equal(clients[1].stops, 0);
+        }
+
+        assert.equal(clients.flatMap((client) => client.requests).filter(({ type }) => type === "fork").length, 1);
+        assert.ok(!clients.some((client) => client.requests.some(({ type }) => type === "prompt")));
+        assert.equal(source.client, clients[0]);
+        assert.equal(source.transitioning, false);
+    }
 });
 
 test("dispose stops every live runtime, including archived and other-workspace conversations", async (t) => {

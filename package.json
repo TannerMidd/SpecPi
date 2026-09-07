@@ -24,7 +24,9 @@
   "files": [
     "specpi",
     "specpi.cmd",
-    "scripts",
+    "scripts/specpi.mjs",
+    "scripts/lib.mjs",
+    "scripts/lock.mjs",
     "browser-runtime",
     "templates",
     "extensions",
@@ -35,7 +37,6 @@
     "docs/delegation",
     "docs/browser-testing.md",
     "site/logo.svg",
-    "site/self-improvement-loop-v2.svg",
     "SECURITY.md",
     "SECURITY_MODEL.md",
     "THIRD_PARTY.md",
