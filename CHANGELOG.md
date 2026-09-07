@@ -2,6 +2,8 @@
 
 ## 0.18.0 - 2026-09-07
 
+- Restore Pi's cached model catalogs during delegation setup so switching to catalog-added or updated models resumes workers without a manual toggle or restart. Catalog network refresh stays disabled; exact-model checks, safety revocations and spent quotas remain enforced.
+
 - Start Command Guard off in RPC sessions, including new SpecPi Chat conversations. Explicit `/guard guard` and `/guard strict` still enable protection for the current session; the terminal startup chooser is unchanged.
 
 - Let installer PATH discovery continue past inaccessible candidates while preserving permission errors for explicit executable paths. Use the pinned repository Pi for test fixtures and a temporary npm cache for package validation, so restricted test accounts do not require personal npm access.

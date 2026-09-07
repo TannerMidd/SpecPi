@@ -325,7 +325,8 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
         check();
         initialization ??= (async () => {
             // Pi owns normal configuration and credential access. No credential object is
-            // requested, copied, or exposed. Static catalogs avoid refresh I/O.
+            // requested, copied, or exposed. Restore Pi's persisted catalogs without
+            // network refresh; skipping initialization also skips cached model overlays.
             const configured = sdk.SettingsManager.create(ctx.cwd, undefined, { projectTrusted: false });
             if (
                 configured.getGlobalSettings().httpProxy ||
@@ -343,7 +344,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 compaction: { enabled: false },
                 retry: { enabled: false, maxRetries: 0, provider: { maxRetries: 0 } },
             };
-            const runtime = await sdk.ModelRuntime.create({ allowModelNetwork: false, refreshOnCreate: false });
+            const runtime = await sdk.ModelRuntime.create({ allowModelNetwork: false });
             check();
             const childModel = runtime.getModel(model.provider, model.id);
             if (

@@ -64,13 +64,31 @@ function runNativeFixture(context, mode = "main") {
             },
         }),
     );
-    if (mode === "model-selection") {
+    if (mode.endsWith("model-selection")) {
         const modelsPath = path.join(agentDir, "models.json");
         const models = JSON.parse(fs.readFileSync(modelsPath, "utf8"));
-        models.providers["specpi-native-next-fixture"] = {
-            ...models.providers[provider],
-            models: [{ ...models.providers[provider].models[0], id: "native-next" }],
-        };
+        if (mode === "cached-model-selection") {
+            // A real built-in provider, but a model available only in Pi's persisted
+            // catalog. Its configured route/auth remain synthetic and localhost-only.
+            const { models: entries, ...configured } = models.providers[provider];
+            models.providers.groq = configured;
+            fs.writeFileSync(
+                path.join(agentDir, "models-store.json"),
+                JSON.stringify({
+                    groq: {
+                        models: [{ ...entries[0], id: "native-next", provider: "groq", api: configured.api }],
+                        lastModified: 8640000000000000,
+                        checkedAt: Date.now(),
+                    },
+                }),
+            );
+        } else {
+            models.providers["specpi-native-next-fixture"] = {
+                ...models.providers[provider],
+                models: [{ ...models.providers[provider].models[0], id: "native-next" }],
+            };
+        }
+
         fs.writeFileSync(modelsPath, JSON.stringify(models));
     }
 
@@ -91,7 +109,7 @@ function runNativeFixture(context, mode = "main") {
     ];
     if (mode === "reload") {
         args.push("--print", "/native-fixture-reload", "/native-fixture-replace");
-    } else if (mode.startsWith("guard-") || ["model-selection", "stream-performance"].includes(mode)) {
+    } else if (mode.startsWith("guard-") || mode.endsWith("model-selection") || mode === "stream-performance") {
         args.push("--print", "/native-fixture-command");
     } else {
         args.push("--mode", "rpc");
@@ -109,7 +127,8 @@ function runNativeFixture(context, mode = "main") {
             input:
                 mode === "reload" ||
                 mode.startsWith("guard-") ||
-                ["model-selection", "stream-performance"].includes(mode)
+                mode.endsWith("model-selection") ||
+                mode === "stream-performance"
                     ? ""
                     : undefined,
             env: {
@@ -310,18 +329,20 @@ for (const mode of ["absent", "off"]) {
     });
 }
 
-test("native delegation follows public Pi provider, model and thinking selections without another toggle", (context) => {
-    const result = runNativeFixture(context, "model-selection");
-    if (!result) {
-        return;
-    }
+for (const mode of ["model-selection", "cached-model-selection"]) {
+    test(`native delegation follows ${mode} and thinking without another toggle`, (context) => {
+        const result = runNativeFixture(context, mode);
+        if (!result) {
+            return;
+        }
 
-    assert.deepEqual(report(result, "NATIVE_MODEL_SELECTION_FIXTURE"), {
-        providerModelFollowed: true,
-        thinkingFollowed: true,
-        staleApprovalRejected: true,
-        offPreserved: true,
-        calls: 4,
-        batches: 3,
+        assert.deepEqual(report(result, "NATIVE_MODEL_SELECTION_FIXTURE"), {
+            providerModelFollowed: true,
+            thinkingFollowed: true,
+            staleApprovalRejected: true,
+            offPreserved: true,
+            calls: 4,
+            batches: 3,
+        });
     });
-});
+}

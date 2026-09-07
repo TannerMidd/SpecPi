@@ -84,7 +84,7 @@ function fixture() {
         ModelRuntime: {
             create: async (options) => {
                 initialized += 1;
-                assert.deepEqual(options, { allowModelNetwork: false, refreshOnCreate: false });
+                assert.deepEqual(options, { allowModelNetwork: false });
 
                 return runtime;
             },
