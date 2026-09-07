@@ -118,6 +118,7 @@ function fixture(options = {}) {
     const documents = [];
     const shown = [];
     const refreshes = [];
+    const branches = [];
     const entries = options.entries || tree();
     const controller = {
         workspace: { name: "Fixture workspace" },
@@ -163,13 +164,12 @@ function fixture(options = {}) {
         },
         async refresh(client, full) {
             refreshes.push({ client, full });
-            if (options.refresh) {
-                return options.refresh(controller);
-            }
+            throw new Error("Conversation actions must not refresh the source after branching");
+        },
+        async branchConversation(command, payload, draft) {
+            branches.push({ command, payload, draft });
 
-            this.activeSessionId = "new-session";
-            this.state.title = "New branch";
-            this.state.messages = [];
+            return options.branch ? options.branch(command, payload, draft) : true;
         },
     };
     controller.client = {
@@ -223,7 +223,7 @@ function fixture(options = {}) {
         },
     };
 
-    return { controller, vscode, requests, posts, picks, information, documents, shown, refreshes, entries };
+    return { controller, vscode, requests, posts, picks, information, documents, shown, refreshes, branches, entries };
 }
 
 test("edit earlier prompt selects only active-branch users, forks before the selected message, and restores exact text", async () => {
@@ -237,17 +237,18 @@ test("edit earlier prompt selects only active-branch users, forks before the sel
     assert.match(f.picks[0].items[0].detail, /Code files remain unchanged/);
     assert.deepEqual(
         f.requests.map((request) => request.type),
-        ["get_entries", "get_entries", "fork"],
+        ["get_entries", "get_entries"],
     );
-    assert.deepEqual(f.requests.at(-1).data, { entryId: "user-one" });
-    assert.equal(f.refreshes[0].full, true);
-    assert.equal(f.controller.activeSessionId, "new-session");
-    assert.deepEqual(f.controller.attachments, []);
-    assert.deepEqual(f.posts, [{ type: "draft", text: "  First prompt\nexact spacing  " }, { type: "focus" }]);
-    assert.equal(f.controller.transitioning, false);
-    assert.equal(f.controller.sessionRevision, 4);
-    assert.equal(f.controller.cancelCount, 1);
-    assert.equal(f.controller.imageQueue.cleared, true);
+    assert.deepEqual(f.branches, [
+        {
+            command: "fork",
+            payload: { entryId: "user-one" },
+            draft: { text: "  First prompt\nexact spacing  ", images: [] },
+        },
+    ]);
+    assert.equal(f.controller.activeSessionId, "original-session");
+    assert.equal(f.controller.attachments[0].id, "unsent-file");
+    assert.deepEqual(f.posts, []);
 });
 
 test("edit preserves image-only prompts and multiple text blocks without automatically sending", async () => {
@@ -256,12 +257,11 @@ test("edit preserves image-only prompts and multiple text blocks without automat
     const f = fixture({ entries: original });
     assert.equal(await editPrompt(f.controller, f.vscode), true);
     assert.equal(f.picks[0].items[1].label, "Image prompt");
-    assert.deepEqual(f.posts[0], { type: "draft", text: "" });
-    assert.equal(f.controller.attachments[0].kind, "image");
-    assert.equal(f.controller.attachments[0].data, image().data);
-    assert.equal(f.controller.attachments[0].width, 1);
-    assert.equal(f.controller.attachments[0].byteLength > 0, true);
-    assert.ok(f.controller.attachments[0].id);
+    assert.equal(f.branches[0].draft.text, "");
+    assert.equal(f.branches[0].draft.images[0].data, image().data);
+    assert.equal(f.branches[0].draft.images[0].width, 1);
+    assert.ok(f.branches[0].draft.images[0].byteLength > 0);
+    assert.equal(f.controller.attachments[0].id, "unsent-file");
     assert.equal(
         f.requests.some((request) => request.type === "prompt"),
         false,
@@ -269,7 +269,7 @@ test("edit preserves image-only prompts and multiple text blocks without automat
 
     const second = fixture({ pick: (items) => items.find((item) => item.entryId === "user-two") });
     await editPrompt(second.controller, second.vscode);
-    assert.deepEqual(second.posts[0], { type: "draft", text: "Second prompt" });
+    assert.equal(second.branches[0].draft.text, "Second prompt");
 });
 
 test("live-conversation branching delegates validated drafts without replacing the source runtime or draft", async () => {
@@ -403,21 +403,18 @@ test("invalid, unsupported, excessive, or oversized restored content cannot muta
         entries.entries.find((entry) => entry.id === "user-one").message.content = content;
         const f = fixture({ entries });
         await assert.rejects(editPrompt(f.controller, f.vscode));
-        assert.equal(
-            f.requests.some((request) => request.type === "fork"),
-            false,
-        );
+        assert.deepEqual(f.branches, []);
         assert.equal(f.controller.sessionRevision, 3);
         assert.equal(f.controller.attachments[0].id, "unsent-file");
         assert.deepEqual(f.posts, []);
     }
 });
 
-test("cancelling a picker or a Pi fork preserves conversation, pending attachments, and composer", async () => {
+test("cancelling a picker or delegated branch preserves the source conversation and composer", async () => {
     for (const cancelAt of ["picker", "fork"]) {
         const f = fixture({
             pick: (items) => (cancelAt === "picker" ? undefined : items[0]),
-            request: (type) => (type === "fork" ? { cancelled: true } : undefined),
+            branch: () => false,
         });
         assert.equal(await editPrompt(f.controller, f.vscode), false);
         assert.equal(f.controller.activeSessionId, "original-session");
@@ -437,44 +434,9 @@ test("aggregate image restoration limits reject excess image bytes before a fork
     entries.entries.find((entry) => entry.id === "user-one").message.content = Array.from({ length: 5 }, () => large);
     const f = fixture({ entries });
     await assert.rejects(editPrompt(f.controller, f.vscode), /20 MiB/);
-    assert.equal(
-        f.requests.some((request) => request.type === "fork"),
-        false,
-    );
+    assert.deepEqual(f.branches, []);
     assert.equal(f.controller.sessionRevision, 3);
     assert.equal(f.controller.attachments[0].id, "unsent-file");
-});
-
-test("a rejected transition preserves the draft; a confirmed fork with a refresh failure restores the source for recovery", async () => {
-    const rejected = fixture({
-        request: (type) => {
-            if (type === "fork") {
-                throw new Error("Fork rejected by Pi");
-            }
-        },
-    });
-    await assert.rejects(editPrompt(rejected.controller, rejected.vscode), /Fork rejected/);
-    assert.equal(rejected.controller.transitioning, false);
-    assert.equal(rejected.controller.activeSessionId, "original-session");
-    assert.equal(rejected.controller.attachments[0].id, "unsent-file");
-    assert.deepEqual(rejected.posts, []);
-
-    const refreshFailed = fixture({
-        refresh: (controller) => {
-            assert.deepEqual(controller.attachments, []);
-            assert.deepEqual(controller.state.messages, []);
-            assert.equal(controller.imageQueue.cleared, true);
-            throw new Error("Refresh unavailable");
-        },
-    });
-    await assert.rejects(
-        editPrompt(refreshFailed.controller, refreshFailed.vscode),
-        /branch was created.*Use Refresh.*do not repeat/,
-    );
-    assert.equal(refreshFailed.controller.transitioning, false);
-    assert.equal(refreshFailed.controller.activeSessionId, undefined);
-    assert.deepEqual(refreshFailed.posts[0], { type: "draft", text: "  First prompt\nexact spacing  " });
-    assert.equal(refreshFailed.requests.filter((request) => request.type === "fork").length, 1);
 });
 
 test("editing rejects missing/cyclic branches and refuses an active leaf that changes while choosing", async () => {
@@ -498,10 +460,7 @@ test("editing rejects missing/cyclic branches and refuses an active leaf that ch
             },
         });
         await assert.rejects(editPrompt(f.controller, f.vscode), /incomplete|cyclic|conversation changed/);
-        assert.equal(
-            f.requests.some((request) => request.type === "fork"),
-            false,
-        );
+        assert.deepEqual(f.branches, []);
         assert.deepEqual(f.posts, []);
     }
 });
@@ -567,64 +526,17 @@ test("picker races cannot fork a replacement connection, revision, workspace, or
             },
         });
         assert.equal(await editPrompt(f.controller, f.vscode), false);
-        assert.equal(
-            f.requests.some((request) => request.type === "fork"),
-            false,
-        );
+        assert.deepEqual(f.branches, []);
         assert.deepEqual(f.posts, []);
         assert.equal(f.controller.attachments[0].id, "unsent-file");
     }
 });
 
-test("stale fork/refresh completions cannot restore a draft into another conversation", async () => {
-    for (const at of ["fork", "refresh"]) {
-        const f = fixture({
-            request: (type, data, controller) => {
-                if (at === "fork" && type === "fork") {
-                    controller.generation += 1;
-                }
-            },
-            refresh: (controller) => {
-                if (at === "refresh") {
-                    controller.sessionRevision += 1;
-                }
-            },
-        });
-        assert.equal(await editPrompt(f.controller, f.vscode), false);
-        assert.equal(f.controller.transitioning, false);
-        if (at === "fork") {
-            assert.equal(f.controller.attachments[0].id, "unsent-file");
-        } else {
-            assert.deepEqual(f.controller.attachments, []);
-        }
-
-        assert.deepEqual(f.posts, []);
-    }
-});
-
-test("fork current chat clones its current branch without resending or restoring prior unsent context", async () => {
-    const f = fixture();
-    assert.equal(await forkChat(f.controller, f.vscode), true);
-    assert.deepEqual(
-        f.requests.map((request) => request.type),
-        ["get_entries", "clone"],
-    );
-    assert.deepEqual(f.controller.attachments, []);
-    assert.deepEqual(f.posts, [{ type: "draft", text: "" }, { type: "focus" }]);
-    assert.equal(f.refreshes[0].full, true);
-
-    const cancelled = fixture({ request: (type) => (type === "clone" ? { cancelled: true } : undefined) });
-    assert.equal(await forkChat(cancelled.controller, cancelled.vscode), false);
-    assert.equal(cancelled.controller.attachments[0].id, "unsent-file");
-    assert.deepEqual(cancelled.posts, []);
-
+test("an empty conversation cannot be branched", async () => {
     const empty = fixture({ entries: { entries: [], leafId: null } });
     assert.equal(await forkChat(empty.controller, empty.vscode), false);
     assert.equal(empty.information.length, 1);
-    assert.equal(
-        empty.requests.some((request) => request.type === "clone"),
-        false,
-    );
+    assert.deepEqual(empty.branches, []);
 });
 
 test("visible Markdown export includes reasoning/tool inputs and image placeholders without reading image payloads", async () => {
@@ -673,13 +585,11 @@ test("Markdown export does not open a stale document after a workspace switch", 
     assert.match(markdownTranscript({ messages: [] }), /Visible conversation export/);
 });
 
-test("late rejecting reads and mutations cannot report errors into replacement chat contexts", async () => {
+test("late rejecting reads cannot report errors into replacement chat contexts", async () => {
     const scenarios = [
         { action: editPrompt, type: "get_entries", occurrence: 1 },
         { action: editPrompt, type: "get_entries", occurrence: 2 },
         { action: forkChat, type: "get_entries", occurrence: 1 },
-        { action: editPrompt, type: "fork", occurrence: 1 },
-        { action: forkChat, type: "clone", occurrence: 1 },
         { action: showUsage, type: "get_session_stats", occurrence: 1 },
     ];
     const changes = [
@@ -746,44 +656,7 @@ test("late native picker and export errors cannot escape after the requested con
         pending.reject(new Error("Late native operation failure"));
         assert.equal(await result, false);
         assert.deepEqual(f.posts, []);
-        assert.equal(
-            f.requests.some((request) => request.type === "fork"),
-            false,
-        );
-    }
-});
-
-test("a late rejecting refresh after an accepted fork is silent only when its context was replaced", async () => {
-    for (const replace of [false, true]) {
-        const pending = deferred();
-        const started = deferred();
-        const f = fixture({
-            refresh: (controller) => {
-                controller.activeSessionId = "accepted-new-session";
-                started.resolve();
-
-                return pending.promise;
-            },
-        });
-        const result = editPrompt(f.controller, f.vscode);
-        await started.promise;
-        if (replace) {
-            f.controller.sessionRevision += 1;
-        } else {
-            f.controller.state.status = "error";
-        }
-
-        pending.reject(new Error("Refresh rejected after branch acknowledgement"));
-        if (replace) {
-            assert.equal(await result, false);
-            assert.deepEqual(f.posts, []);
-        } else {
-            await assert.rejects(result, /branch was created.*draft restored.*do not repeat/);
-            assert.deepEqual(f.posts[0], { type: "draft", text: "  First prompt\nexact spacing  " });
-            assert.equal(f.controller.activeSessionId, "accepted-new-session");
-        }
-
-        assert.equal(f.controller.transitioning, false);
+        assert.deepEqual(f.branches, []);
     }
 });
 
@@ -796,19 +669,6 @@ test("current RPC and native errors remain visible even when the current operati
             },
         });
         await assert.rejects(action(f.controller, f.vscode), /Current operation failure/);
-    }
-
-    for (const action of [editPrompt, forkChat]) {
-        const f = fixture({
-            request: (type, data, controller) => {
-                if (type === "fork" || type === "clone") {
-                    controller.state.status = "error";
-                    throw new Error("Current mutation failure");
-                }
-            },
-        });
-        await assert.rejects(action(f.controller, f.vscode), /Current mutation failure/);
-        assert.equal(f.controller.transitioning, false);
     }
 
     const f = fixture({

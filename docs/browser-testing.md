@@ -61,16 +61,8 @@ The shared browser workflow runs for CI and is a prerequisite of Pages deploymen
 
 The existing `local-browser-automation` registry entry and `browser-runtime-smoke` prove their historical rendering/image-comparison contract only. They are not expanded into claims that diagnostics or keyboard behavior have passed that closed validator. Browser diagnostics and interactions in SpecPi 0.13.0 are evidenced by dedicated registered-tool/Chromium tests and CI; no wishlist item is automatically selected or retired and no invented shipped version is entered in the registry.
 
-## Semantic navigation assessment (R6)
+## Semantic navigation decision
 
-**Decision: no new agent-facing semantic tool in this delivery.** Keep project-native compiler/tooling as the default and reassess after concrete larger-refactor friction.
+No agent-facing semantic-navigation tool is implemented. The original feasibility assessment found the existing TypeScript language service adequate for a small alias/reference/diagnostics example; that does not establish product coverage or a productivity improvement. Use project-native compiler/tooling and reassess only after concrete refactor friction.
 
-Run `node --test tests/semantic-navigation.test.mjs`. The existing pinned TypeScript language service resolves an aliased cross-file definition, finds four related symbol references while excluding a shadowed name, and reports diagnostic 2345 after an on-disk argument-type mutation. The fixture creates temporary source files, supplies an explicit language-service host, and disposes it afterward. No language server, plugin, project configuration script, or new executable dependency is loaded. Windows path normalization was necessary when comparing compiler-returned reference paths; the test retains that check.
-
-| Approach | Assessment |
-| --- | --- |
-| Project-native compiler and shell tools | Adequate baseline for this TypeScript fixture and the browser refactor. Text search is easy but cannot distinguish aliases/shadowing; compiler APIs can, at the cost of writing a small explicit host. No measured productivity improvement is claimed. |
-| Narrow TypeScript adapter | Could expose bounded path/line/column results and reuse this compiler if repeated refactor work justifies a maintained tool contract. Not justified by this small fixture alone. |
-| Broad LSP integration | Adds server acquisition/trust, process cleanup, language-specific configuration, and protocol complexity without evidence of a current need. Deferred, not implemented. |
-
-Any later adapter proposal must define supported languages/projects, on-disk versus unsaved buffers, canonical project-root and symlink boundaries, out-of-root declaration references, generated/vendor exclusions, result/time limits, cancellation/subprocess cleanup, and a no-auto-edit/no-auto-install policy. Definitions in dependencies may need an explicit read-only opt-in. Repository plugins/config scripts are executable trust boundaries, not automatically safe navigation inputs.
+A later adapter would need explicit language/project support, on-disk versus unsaved-buffer semantics, path/link and dependency boundaries, bounded results and cancellation, and no automatic edits or server installation. Repository plugins and configuration scripts remain executable trust boundaries.

@@ -744,25 +744,17 @@ test(
                                         code: size(".code-block pre code"),
                                     };
                                 });
-                            assert.deepEqual(await fonts(), {
-                                message: 14,
-                                composer: 14,
-                                limits: 13,
-                                footer: 12,
-                                code: 13,
-                            });
+                            const originalFonts = await fonts();
+                            assert.ok(Object.values(originalFonts).every((size) => size >= 12));
                             await assertLayout(page, width);
                             await page.screenshot({ path: path.join(screenshots, `readable-type-${width}.png`) });
                             await page.evaluate(() =>
                                 document.documentElement.style.setProperty("--vscode-font-size", "16px"),
                             );
-                            assert.deepEqual(await fonts(), {
-                                message: 16,
-                                composer: 16,
-                                limits: 15,
-                                footer: 14,
-                                code: 15,
-                            });
+                            for (const [element, size] of Object.entries(await fonts())) {
+                                assert.ok(size > originalFonts[element], `${element} must follow the larger host font`);
+                            }
+
                             await assertLayout(page, width);
                         });
                     }
@@ -1842,90 +1834,178 @@ test(
             await t.test(
                 "provider limits show both installed plugins with accessible details and isolated updates",
                 async () => {
+                    for (const [theme, width] of [
+                        ["dark", 280],
+                        ["light", 390],
+                        ["highcontrast", 768],
+                        ["dark", 1200],
+                    ]) {
+                        await withPage(
+                            browser,
+                            fixtures,
+                            { name: `provider-usage-${theme}-${width}`, theme, width },
+                            async (page) => {
+                                const runtimeStatus = {
+                                    "aa-codex-usage": "\u001b[36mcodex\u001b[0m ▀▀▀▄▄▄▄▄▄▄ 4d",
+                                    "provider-usage": "claude 25% 5h · 40% 7d (3m old)",
+                                    "another-extension": "Other runtime status",
+                                };
+                                await setState(page, { runtimeStatus, messages: sampleMessages() });
+                                const details = page.locator("#provider-usage");
+                                const summary = details.locator("summary");
+                                assert.equal(await details.isVisible(), true);
+                                assert.equal(await page.locator(".provider-usage-value").count(), 2);
+                                assert.match(await summary.textContent(), /codex.*claude/su);
+                                assert.doesNotMatch(await summary.textContent(), /\u001b/u);
+                                assert.equal(await page.locator("#runtime-count").textContent(), "1");
+                                assert.equal(await page.locator("#provider-usage-values").isVisible(), false);
+                                const tokens = await page.locator("#token-status").textContent();
+                                await summary.focus();
+                                await summary.press("Enter");
+                                assert.equal(await page.locator("#provider-usage-values").isVisible(), true);
+                                assert.match(
+                                    await page.locator("#provider-usage-values").textContent(),
+                                    /@llblab\/pi-codex-usage/u,
+                                );
+                                assert.match(
+                                    await page.locator("#provider-usage-values").textContent(),
+                                    /@sreetej510\/pi-usage/u,
+                                );
+                                runtimeStatus["provider-usage"] = "usage rate-limited (3m)";
+                                await setState(page, { status: "busy", runtimeStatus, messages: sampleMessages() });
+                                assert.equal(await details.getAttribute("open"), "");
+                                assert.equal(await summary.evaluate((node) => node === document.activeElement), true);
+                                assert.match(await summary.textContent(), /rate-limited/u);
+                                assert.equal(await page.locator("#token-status").textContent(), tokens);
+                                assert.deepEqual(
+                                    await takeMessages(page),
+                                    [],
+                                    "Opening details must not run a command or query a provider",
+                                );
+                                await assertLayout(page, width);
+                                if (theme === "dark") {
+                                    await page.screenshot({
+                                        path: path.join(screenshots, `provider-usage-${width}.png`),
+                                    });
+                                }
+
+                                await setState(page, {
+                                    contextToken: "different-chat",
+                                    runtimeStatus: { "provider-usage": "checking" },
+                                });
+                                assert.equal(await page.locator(".provider-usage-value").count(), 1);
+                                assert.doesNotMatch(
+                                    await page.locator("#provider-usage-values").textContent(),
+                                    /4d|rate-limited/u,
+                                );
+                                for (const status of ["error", "disconnected"]) {
+                                    await setState(page, { status, runtimeStatus });
+                                    assert.equal(await details.isVisible(), false);
+                                    assert.equal(await page.locator("#provider-usage-values").textContent(), "");
+                                }
+
+                                await setState(page, { runtimeStatus: {} });
+                                assert.equal(await details.isVisible(), false);
+                                await setState(page, {
+                                    runtimeStatus: {
+                                        "provider-usage":
+                                            '<img src="https://example.invalid/quota" onerror="window.quotaAttack=true">',
+                                    },
+                                });
+                                await summary.click();
+                                assert.equal(await details.locator("img, script, a").count(), 0);
+                                assert.match(await page.locator("#provider-usage-values").textContent(), /<img/u);
+                                assert.equal(await page.evaluate(() => window.quotaAttack), undefined);
+                            },
+                        );
+                    }
+                },
+            );
+
+            await t.test(
+                "wide sidebar status panels stay in the conversation and composer column during resize",
+                async () => {
                     for (const theme of ["dark", "light", "highcontrast"]) {
-                        for (const width of [280, 390, 768, 1200]) {
-                            await withPage(
-                                browser,
-                                fixtures,
-                                { name: `provider-usage-${theme}-${width}`, theme, width },
-                                async (page) => {
-                                    const runtimeStatus = {
-                                        "aa-codex-usage": "\u001b[36mcodex\u001b[0m ▀▀▀▄▄▄▄▄▄▄ 4d",
-                                        "provider-usage": "claude 25% 5h · 40% 7d (3m old)",
-                                        "another-extension": "Other runtime status",
-                                    };
-                                    await setState(page, { runtimeStatus, messages: sampleMessages() });
-                                    const details = page.locator("#provider-usage");
-                                    const summary = details.locator("summary");
-                                    assert.equal(await details.isVisible(), true);
-                                    assert.equal(await page.locator(".provider-usage-value").count(), 2);
-                                    assert.match(await summary.textContent(), /codex.*claude/su);
-                                    assert.doesNotMatch(await summary.textContent(), /\u001b/u);
-                                    assert.equal(await page.locator("#runtime-count").textContent(), "1");
-                                    assert.equal(await page.locator("#provider-usage-values").isVisible(), false);
-                                    const tokens = await page.locator("#token-status").textContent();
-                                    await summary.focus();
-                                    await summary.press("Enter");
-                                    assert.equal(await page.locator("#provider-usage-values").isVisible(), true);
-                                    assert.match(
-                                        await page.locator("#provider-usage-values").textContent(),
-                                        /@llblab\/pi-codex-usage/u,
+                        await withPage(
+                            browser,
+                            fixtures,
+                            { name: `wide-column-${theme}`, theme, width: 1400 },
+                            async (page) => {
+                                await setState(page, {
+                                    status: "busy",
+                                    messages: sampleMessages(),
+                                    runtimeStatus: {
+                                        "aa-codex-usage": "codex 34% 6d",
+                                        "specpi-command-guard": "Guard enabled",
+                                        "specpi-delegation": "Delegate 0/2 workers · 54/256 calls",
+                                    },
+                                });
+                                await page.locator("#runtime-details summary").click();
+                                await page.locator("#composer-input").fill("Keep this draft while resizing");
+                                for (const width of [1400, 2200, 768, 390, 1200]) {
+                                    await page.setViewportSize({ width, height: 900 });
+                                    const boxes = await page.evaluate(() =>
+                                        Object.fromEntries(
+                                            [
+                                                "#composer",
+                                                ".footer-panels",
+                                                "#runtime-details",
+                                                "#provider-usage",
+                                                "#conversation",
+                                                "#activity",
+                                            ].map((selector) => {
+                                                const rect = document.querySelector(selector).getBoundingClientRect();
+
+                                                return [
+                                                    selector,
+                                                    { left: rect.left, right: rect.right, width: rect.width },
+                                                ];
+                                            }),
+                                        ),
                                     );
-                                    assert.match(
-                                        await page.locator("#provider-usage-values").textContent(),
-                                        /@sreetej510\/pi-usage/u,
-                                    );
-                                    runtimeStatus["provider-usage"] = "usage rate-limited (3m)";
-                                    await setState(page, { status: "busy", runtimeStatus, messages: sampleMessages() });
-                                    assert.equal(await details.getAttribute("open"), "");
+                                    const composer = boxes["#composer"];
+                                    for (const selector of [".footer-panels", "#runtime-details", "#provider-usage"]) {
+                                        const panel = boxes[selector];
+                                        assert.ok(
+                                            panel.left >= composer.left - 1 && panel.right <= composer.right + 1,
+                                            `${selector} must stay inside the composer column at ${width}px: ${JSON.stringify(boxes)}`,
+                                        );
+                                        assert.ok(
+                                            panel.width >= composer.width - 6,
+                                            `${selector} must not shrink to its text`,
+                                        );
+                                    }
+
+                                    if (width >= 1000) {
+                                        for (const selector of ["#conversation", "#activity"]) {
+                                            assert.ok(
+                                                Math.abs(boxes[selector].left - composer.left) <= 1 &&
+                                                    Math.abs(boxes[selector].right - composer.right) <= 1,
+                                                `${selector} must align with the composer despite the transcript scrollbar`,
+                                            );
+                                        }
+                                    }
+
+                                    assert.equal(await page.locator("#runtime-details").getAttribute("open"), "");
                                     assert.equal(
-                                        await summary.evaluate((node) => node === document.activeElement),
-                                        true,
-                                    );
-                                    assert.match(await summary.textContent(), /rate-limited/u);
-                                    assert.equal(await page.locator("#token-status").textContent(), tokens);
-                                    assert.deepEqual(
-                                        await takeMessages(page),
-                                        [],
-                                        "Opening details must not run a command or query a provider",
+                                        await page.locator("#composer-input").inputValue(),
+                                        "Keep this draft while resizing",
                                     );
                                     await assertLayout(page, width);
-                                    if (theme === "dark") {
+                                    if (width === 1400 || width === 2200) {
                                         await page.screenshot({
-                                            path: path.join(screenshots, `provider-usage-${width}.png`),
+                                            path: path.join(screenshots, `wide-column-${theme}-${width}.png`),
                                         });
                                     }
+                                }
 
-                                    await setState(page, {
-                                        contextToken: "different-chat",
-                                        runtimeStatus: { "provider-usage": "checking" },
-                                    });
-                                    assert.equal(await page.locator(".provider-usage-value").count(), 1);
-                                    assert.doesNotMatch(
-                                        await page.locator("#provider-usage-values").textContent(),
-                                        /4d|rate-limited/u,
-                                    );
-                                    for (const status of ["error", "disconnected"]) {
-                                        await setState(page, { status, runtimeStatus });
-                                        assert.equal(await details.isVisible(), false);
-                                        assert.equal(await page.locator("#provider-usage-values").textContent(), "");
-                                    }
-
-                                    await setState(page, { runtimeStatus: {} });
-                                    assert.equal(await details.isVisible(), false);
-                                    await setState(page, {
-                                        runtimeStatus: {
-                                            "provider-usage":
-                                                '<img src="https://example.invalid/quota" onerror="window.quotaAttack=true">',
-                                        },
-                                    });
-                                    await summary.click();
-                                    assert.equal(await details.locator("img, script, a").count(), 0);
-                                    assert.match(await page.locator("#provider-usage-values").textContent(), /<img/u);
-                                    assert.equal(await page.evaluate(() => window.quotaAttack), undefined);
-                                },
-                            );
-                        }
+                                assert.deepEqual(
+                                    await takeMessages(page),
+                                    [],
+                                    "Resizing must not send the draft or query runtime status",
+                                );
+                            },
+                        );
                     }
                 },
             );

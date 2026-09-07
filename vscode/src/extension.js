@@ -1,12 +1,9 @@
 const vscode = require("vscode");
-const path = require("node:path");
-const { randomBytes, randomUUID, createHash } = require("node:crypto");
+const { randomUUID, createHash } = require("node:crypto");
 const { RpcClient } = require("./rpc-client.js");
 const { resolveLaunch } = require("./launch.js");
 const { createState, applyEvent, resetRunState, replaceMessages, safeModel, appendNotice } = require("./chat-state.js");
 const { collectAttachment, formatPrompt } = require("./context.js");
-const { SessionCatalog } = require("./session-catalog.js");
-const { getWebviewHtml } = require("./webview.js");
 const { resolveCodeReference } = require("./code-references.js");
 const { collectImageAttachment, normalizeImage, MAX_IMAGE_TOTAL_BYTES } = require("./images.js");
 const { editPrompt, forkChat, exportChat, showUsage, markdownTranscript } = require("./conversation-actions.js");
@@ -43,46 +40,6 @@ class ChatController {
         this.disposed = false;
         this.workspace = options.workspace || vscode.workspace.workspaceFolders?.[0];
         this.state.workspace = this.workspace?.name || "Open a folder to begin";
-        if (!this.coordinator) {
-            this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 25);
-            this.statusBar.command = `${PREFIX}.open`;
-            this.statusBar.name = "SpecPi Chat";
-            this.statusBar.show();
-            context.subscriptions.push(this.statusBar);
-        }
-
-        this.publish();
-    }
-
-    resolveWebviewView(view) {
-        this.view = view;
-        this.sentMediaIds.clear();
-        const media = vscode.Uri.joinPath(this.context.extensionUri, "media");
-        view.webview.options = { enableScripts: true, localResourceRoots: [media] };
-        view.webview.html = getWebviewHtml({
-            cspSource: view.webview.cspSource,
-            scriptUri: view.webview.asWebviewUri(vscode.Uri.joinPath(media, "chat.js")).toString(),
-            styleUri: view.webview.asWebviewUri(vscode.Uri.joinPath(media, "chat.css")).toString(),
-            extrasScriptUri: view.webview.asWebviewUri(vscode.Uri.joinPath(media, "chat-extras.js")).toString(),
-            extrasStyleUri: view.webview.asWebviewUri(vscode.Uri.joinPath(media, "chat-extras.css")).toString(),
-            nonce: randomBytes(24).toString("base64"),
-        });
-        view.webview.onDidReceiveMessage(
-            (message) => {
-                void this.handleMessage(message).catch((error) => this.fail(error));
-            },
-            undefined,
-            this.context.subscriptions,
-        );
-        view.onDidDispose(
-            () => {
-                if (this.view === view) {
-                    this.view = undefined;
-                }
-            },
-            undefined,
-            this.context.subscriptions,
-        );
         this.publish();
     }
 
@@ -103,13 +60,7 @@ class ChatController {
                 ? attachment
                 : { id: attachment.id, label: attachment.label, detail: attachment.detail },
         );
-        const icons = { busy: "sync~spin", connecting: "loading~spin", error: "warning" };
-        if (this.statusBar) {
-            this.statusBar.text = `$(${icons[this.state.status] || "comment-discussion"}) SpecPi`;
-            this.statusBar.tooltip = `SpecPi Chat · ${this.state.status} · ${this.state.workspace}`;
-        }
-
-        if (this.coordinator && !this.isForeground()) {
+        if (!this.isForeground()) {
             this.sentMediaIds.clear();
             this.coordinator.conversationUpdated(this);
 
@@ -151,30 +102,20 @@ class ChatController {
             ),
         };
         this.sentMediaIds = retained;
-        if (this.coordinator) {
-            this.coordinator.conversationUpdated(this, {
-                type: "state",
-                state,
-                media,
-                retainedMediaIds: [...retained],
-            });
-        } else if (this.view) {
-            void this.view.webview.postMessage({ type: "state", state, media, retainedMediaIds: [...retained] });
-        } else {
-            this.sentMediaIds.clear();
-        }
+        this.coordinator.conversationUpdated(this, {
+            type: "state",
+            state,
+            media,
+            retainedMediaIds: [...retained],
+        });
     }
 
     post(message) {
-        if (this.coordinator) {
-            this.coordinator.postConversation(this, message);
-        } else {
-            void this.view?.webview.postMessage(message);
-        }
+        this.coordinator.postConversation(this, message);
     }
 
     isForeground() {
-        return !this.coordinator || this.coordinator.active === this;
+        return this.coordinator.active === this;
     }
 
     fail(error) {
@@ -213,10 +154,6 @@ class ChatController {
         this.requireWorkspace();
         if (this.restartStopping) {
             throw new Error("Wait for Pi to stop restarting before connecting.");
-        }
-
-        if (this.workspaceSwitching) {
-            throw new Error("Wait for the workspace switch to finish before connecting Pi.");
         }
 
         if (this.disposed) {
@@ -270,9 +207,7 @@ class ChatController {
                 throw new Error("VS Code workspace storage is unavailable. Reopen a saved folder or workspace.");
             }
 
-            this.catalog = this.coordinator
-                ? this.coordinator.catalogFor(this.workspace)
-                : new SessionCatalog({ directory: path.join(storage.fsPath, "chat"), workspacePath: cwd });
+            this.catalog = this.coordinator.catalogFor(this.workspace);
             await this.catalog.list();
             const args = [...launch.args, "--mode", "rpc", "--session-dir", this.catalog.sessionDirectory];
             if (this.forkSourceSessionId || this.activeSessionId) {
@@ -367,7 +302,7 @@ class ChatController {
             }
 
             rpcReady = true;
-            await this.coordinator?.applyPendingName(this, client);
+            await this.coordinator.applyPendingName(this, client);
             await this.refresh(client, true);
             if (this.client === client && generation === this.generation && !this.disposed) {
                 this.state.error = undefined;
@@ -512,8 +447,8 @@ class ChatController {
             this.displaySessionId = runtime.sessionId;
         }
 
-        if (runtime.sessionFile && runtime.sessionId !== this.forgottenSessionId && !this.suppressRemember) {
-            this.coordinator?.sessionObserved(this, runtime.sessionId);
+        if (runtime.sessionFile && !this.suppressRemember) {
+            this.coordinator.sessionObserved(this, runtime.sessionId);
             const remembered = await this.catalog.remember(runtime);
             if (!current()) {
                 return;
@@ -521,7 +456,7 @@ class ChatController {
 
             if (remembered) {
                 this.activeSessionId = runtime.sessionId;
-                await this.coordinator?.sessionRemembered(this, runtime.sessionId);
+                await this.coordinator.sessionRemembered(this, runtime.sessionId);
                 if (!current()) {
                     return;
                 }
@@ -859,238 +794,16 @@ class ChatController {
         }
     }
 
-    async allowTransition() {
-        if (!ACTIVE_STATUSES.has(this.state.status)) {
-            return true;
-        }
-
-        const answer = await vscode.window.showWarningMessage(
-            "Stop the current Pi operation before changing chats?",
-            { modal: true },
-            "Stop and continue",
-        );
-        if (answer !== "Stop and continue") {
-            return false;
-        }
-
-        await this.stop();
-
-        return true;
-    }
-
     async newChat() {
-        if (this.coordinator) {
-            return this.coordinator.newChat(this);
-        }
-
-        if (this.transitioning || this.sending) {
-            throw new Error("Wait for the current chat action to finish.");
-        }
-
-        this.transitioning = true;
-        try {
-            if (!(await this.allowTransition())) {
-                return;
-            }
-
-            await this.connect();
-            const client = this.client;
-            const generation = this.generation;
-            this.sessionRevision += 1;
-            this.cancelDialogs();
-            const result = await client.request("new_session", {}, { timeoutMs: 0 });
-            if (client !== this.client || generation !== this.generation) {
-                return;
-            }
-
-            if (result?.cancelled) {
-                throw new Error("A Pi extension cancelled the new chat.");
-            }
-
-            this.activeSessionId = undefined;
-            this.attachments = [];
-            this.imageQueue.clear();
-            this.state.error = undefined;
-            await this.refresh(client, true);
-            if (client !== this.client || generation !== this.generation) {
-                return;
-            }
-
-            this.post({ type: "draft", text: "" });
-            this.post({ type: "focus" });
-        } finally {
-            this.transitioning = false;
-        }
+        return this.coordinator.newChat(this);
     }
 
     async history() {
-        if (this.coordinator) {
-            return this.coordinator.history();
-        }
-
-        await this.connect();
-        const client = this.client;
-        const generation = this.generation;
-        const catalog = this.catalog;
-        const current = () => client === this.client && generation === this.generation;
-        const entries = await catalog.list();
-        if (!current()) {
-            return;
-        }
-
-        if (!entries.length) {
-            await vscode.window.showInformationMessage(
-                "Chats appear here after Pi saves the first response. Only SpecPi Chat conversations are listed.",
-            );
-
-            return;
-        }
-
-        const selection = await vscode.window.showQuickPick(
-            entries.map((entry) => ({
-                label: entry.sessionName || "Untitled chat",
-                description: entry.sessionId === this.activeSessionId ? "Current chat" : undefined,
-                detail: new Date(entry.updatedAt).toLocaleString(),
-                entry,
-            })),
-            { title: "SpecPi Chat · History", placeHolder: "Choose a chat from this workspace" },
-        );
-        if (!selection || !current()) {
-            return;
-        }
-
-        const action = await vscode.window.showQuickPick(["Resume chat", "Rename chat", "Forget from list"], {
-            title: selection.label,
-        });
-        if (!action || !current()) {
-            return;
-        }
-
-        if (action === "Forget from list") {
-            const forgettingActive = selection.entry.sessionId === this.activeSessionId;
-            if (forgettingActive) {
-                this.refreshRevision += 1;
-                this.forgottenSessionId = selection.entry.sessionId;
-                this.activeSessionId = undefined;
-            }
-
-            const forgetRevision = this.sessionRevision;
-            try {
-                await catalog.remove(selection.entry.sessionId);
-            } catch (error) {
-                if (
-                    forgettingActive &&
-                    current() &&
-                    forgetRevision === this.sessionRevision &&
-                    this.forgottenSessionId === selection.entry.sessionId
-                ) {
-                    this.forgottenSessionId = undefined;
-                    this.activeSessionId = selection.entry.sessionId;
-                }
-
-                throw error;
-            }
-
-            await vscode.window.showInformationMessage(
-                "Removed from the list. Pi's conversation file is retained in extension storage.",
-            );
-
-            return;
-        }
-
-        if (this.transitioning || this.sending) {
-            throw new Error("Wait for the current chat action to finish.");
-        }
-
-        this.transitioning = true;
-        try {
-            if (!(await this.allowTransition())) {
-                return;
-            }
-
-            const entry = await catalog.resolve(selection.entry.sessionId);
-            if (!current()) {
-                return;
-            }
-
-            if (!entry) {
-                throw new Error("This chat is no longer in the local catalog.");
-            }
-
-            this.sessionRevision += 1;
-            this.cancelDialogs();
-            const result = await client.request("switch_session", { sessionPath: entry.sessionFile }, { timeoutMs: 0 });
-            if (!current()) {
-                return;
-            }
-
-            if (result?.cancelled) {
-                throw new Error("A Pi extension cancelled the chat switch.");
-            }
-
-            this.attachments = [];
-            this.imageQueue.clear();
-            if (action === "Rename chat") {
-                const name = await vscode.window.showInputBox({
-                    title: "Rename SpecPi chat",
-                    value: entry.sessionName || "",
-                    validateInput: (value) =>
-                        value.trim() && value.length <= 100 ? undefined : "Use 1–100 characters.",
-                });
-                if (name !== undefined && current()) {
-                    await client.request("set_session_name", { name: name.trim() });
-                }
-            }
-
-            if (!current()) {
-                return;
-            }
-
-            await this.refresh(client, true);
-            if (!current()) {
-                return;
-            }
-
-            this.post({ type: "draft", text: "" });
-        } finally {
-            this.transitioning = false;
-        }
+        return this.coordinator.history();
     }
 
     async chooseWorkspace() {
-        if (this.coordinator) {
-            return this.coordinator.chooseWorkspace();
-        }
-
-        const folder = await vscode.window.showWorkspaceFolderPick({
-            placeHolder: "Choose the folder Pi will work in",
-        });
-        if (!folder || folder.uri.toString() === this.workspace?.uri.toString()) {
-            return;
-        }
-
-        if (this.transitioning || this.sending) {
-            return;
-        }
-
-        this.transitioning = true;
-        this.workspaceSwitching = true;
-        try {
-            if (!(await this.allowTransition())) {
-                return;
-            }
-
-            await this.disconnect();
-            this.workspace = folder;
-            this.activeSessionId = undefined;
-            this.catalog = undefined;
-            this.attachments = [];
-            this.state = createState({ workspace: folder.name });
-            this.publish();
-        } finally {
-            this.workspaceSwitching = false;
-            this.transitioning = false;
-        }
+        return this.coordinator.chooseWorkspace();
     }
 
     async attachSelection() {
@@ -1155,7 +868,7 @@ class ChatController {
     }
 
     contextToken() {
-        return `${this.conversationKey ? `${this.conversationKey}:` : ""}${this.generation}-${this.sessionRevision}-${this.contextEpoch}`;
+        return `${this.conversationKey}:${this.generation}-${this.sessionRevision}-${this.contextEpoch}`;
     }
 
     attachmentContextCurrent(workspace, revision) {

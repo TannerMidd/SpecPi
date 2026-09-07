@@ -42,7 +42,7 @@
         <main id="article" class="wrap">
             <header class="article-heading">
                 <div class="article-meta">
-                    <span>Architecture / SpecPi v0.17.0</span><span>Research reviewed 05 Sep 2026</span>
+                    <span>Architecture / SpecPi v0.17.1</span><span>Research reviewed 05 Sep 2026</span>
                 </div>
                 <h1>One writer. Focused delegation.</h1>
                 <p class="article-deck">
@@ -55,7 +55,7 @@
                     <h2>What the research changed</h2>
                     <p>These are our design inferences from the research. The studies do not benchmark SpecPi.</p>
                     <p>
-                        <a href="../wiki/#vscode-chat">SpecPi Chat 0.3.6</a> also supports independent conversations
+                        <a href="../wiki/#vscode-chat">SpecPi Chat 0.3.7</a> also supports independent conversations
                         started explicitly by the user. Each connected chat has its own Pi process, but chats in the
                         same workspace share files. This is not delegated work or automatic worktree isolation: keep one
                         writer per working directory for overlapping changes, or use separate worktrees.
@@ -144,8 +144,7 @@
                                 </td>
                                 <td>
                                     Delegation is on by default at Pi startup, with two worker slots, fixed call limits
-                                    and human-configurable timeouts. The evaluation plan compares it with single-agent
-                                    and serial workflows at matched resource budgets.
+                                    and human-configurable timeouts.
                                 </td>
                             </tr>
                         </tbody>
@@ -174,9 +173,8 @@
                     </p>
                     <p id="exceptions">
                         <a href="../wiki/#delegation">Control with <code>/delegate status</code></a
-                        >; use <code>/delegate off</code> to revoke work. Each job has four SDK model calls and 10
-                        minutes by default. The process permits four batches and 32 calls. These are local execution
-                        limits, not a provider spending cap. See the
+                        >; use <code>/delegate off</code> to revoke work and <code>/delegate limits</code> for
+                        effective limits. These are local execution limits, not a provider spending cap. See the
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/README.md"
                             >runtime and compatibility guide</a
                         >.
@@ -186,24 +184,14 @@
                     <h2>What remains to prove</h2>
                     <p id="improvement">
                         The implementation is experimental. Runtime tests check its controls; they do not establish
-                        better task outcomes. The
-                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/evaluation.md"
-                            >evaluation plan</a
-                        >
-                        measures accepted results, total cost, elapsed time, and review effort against strong
-                        single-agent baselines. SpecPi quality, speed, and cost gains remain unmeasured.
+                        better task outcomes. SpecPi quality, speed, and cost gains remain unmeasured.
                     </p>
                 </section>
                 <details class="research-appendix" id="study-data">
                     <summary>Study data and charts <span>7 sources</span></summary>
                     <p>
                         The original seven-study comparison includes results both for and against multi-agent
-                        approaches. Keep each study's task, budget, and publication limits attached to its results. See
-                        the expanded
-                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/delegation/research.md"
-                            >research ledger</a
-                        >
-                        for additional evidence and caveats.
+                        approaches. Keep each study's task, budget, and publication limits attached to its results.
                     </p>
                     <!-- research-chart:nature -->
                     <figure class="research-chart" id="chart-nature" aria-labelledby="chart-nature-title">
@@ -813,7 +801,7 @@
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.17.0</p>
+            <p>Pi harness / v0.17.1</p>
             <nav aria-label="Footer navigation">
                 <a href="../wiki/">Reference</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a

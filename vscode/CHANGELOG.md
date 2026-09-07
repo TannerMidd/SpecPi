@@ -1,5 +1,11 @@
 # SpecPi Chat changelog
 
+## 0.3.7
+
+- Keep runtime/status panels in the composer's bounded column on wide sidebars, and center the transcript independently of its scrollbar. Preserve drafts and open status details while resizing.
+- Remove unused standalone view, history and conversation-branching paths; retain the coordinator-owned conversation lifecycle without intended user-facing behavior changes.
+- Exercise cancellation, source/target error ownership, image restoration and stale responses through the supported coordinator in regression tests.
+
 ## 0.3.6
 
 - Rewrite the Marketplace overview with a quick start, screenshot, and plain-language feature descriptions. Move detailed help and development instructions to separate guides, and clarify that SpecPi is optional.

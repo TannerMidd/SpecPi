@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.1 - 2026-09-07
+
+- Reduce the npm package by shipping only runtime scripts; remove obsolete plans, research documents and unused assets, and shorten operational guides.
+- Use structured wishlist candidates directly instead of parsing generated Markdown. Human selection and proof-gated retirement remain unchanged.
+- Remove obsolete tests, editorial assertions and duplicate CI execution while retaining supported safety coverage. SpecPi Chat 0.3.7 separately removes unused standalone conversation paths.
+
 ## 0.17.0 - 2026-09-06
 
 - Let delegation workers correct ordinary source-tool arguments and malformed/truncated reports in the same child session, preserving previously read passages and spending the original budgets. Keep source changes, revocations, unavailable tools, and exhausted budgets terminal. Remove the delegation-specific 8,192-token cap in favor of Pi's provider/model settings; scale SDK response acceptance with `/delegate budget` (1 MiB by default).

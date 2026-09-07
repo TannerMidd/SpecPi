@@ -1,8 +1,7 @@
 # Delegation protocol: bounded-pi-sessions-v1
 
 This is the implemented in-process API. It has no HTTP listener, daemon, child process,
-or child session store. The broader [target protocol](design-protocol.md) remains a
-proposal; its stronger transport/attempt/cost gates are not supplied by this version.
+or child session store.
 
 The extension loads through normal `pi` package discovery and enables delegation at
 the first session start of each Pi process, including noninteractive modes. Startup

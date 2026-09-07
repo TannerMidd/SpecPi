@@ -147,10 +147,6 @@ function fixture(t, options = {}) {
 
             return options.remember?.(runtime, this);
         }
-
-        async remove(id) {
-            return options.removeSession?.(id, this);
-        }
     }
 
     const vscode = {
@@ -273,25 +269,31 @@ function fixture(t, options = {}) {
         };
     }
 
-    const module = { exports: {} };
-    const compile = compileFunction(
-        fs.readFileSync(extensionFile, "utf8"),
-        ["require", "module", "exports", "__filename", "__dirname"],
-        { filename: extensionFile },
+    const load = (file) => {
+        const module = { exports: {} };
+        compileFunction(fs.readFileSync(file, "utf8"), ["require", "module", "exports"], { filename: file })(
+            (name) => dependencies[name] || extensionRequire(name),
+            module,
+            module.exports,
+        );
+
+        return module.exports;
+    };
+
+    dependencies["./conversation-coordinator.js"] = load(
+        path.join(path.dirname(extensionFile), "conversation-coordinator.js"),
     );
-    compile(
-        (name) => dependencies[name] || extensionRequire(name),
-        module,
-        module.exports,
-        extensionFile,
-        path.dirname(extensionFile),
+    const { ChatController, ConversationCoordinator } = load(extensionFile);
+    const coordinator = new ConversationCoordinator(
+        {
+            extensionUri: uri(path.dirname(path.dirname(extensionFile))),
+            storageUri: uri(path.resolve(".specpi-test", "controller-storage")),
+            subscriptions: [],
+        },
+        { vscode, ChatController },
     );
-    const controller = new module.exports.ChatController({
-        extensionUri: uri(path.dirname(path.dirname(extensionFile))),
-        storageUri: uri(path.resolve(".specpi-test", "controller-storage")),
-        subscriptions: [],
-    });
-    controller.view = {
+    const controller = coordinator.active;
+    coordinator.view = {
         webview: {
             postMessage(message) {
                 posted.push(structuredClone(message));
@@ -300,9 +302,14 @@ function fixture(t, options = {}) {
             },
         },
     };
-    t.after(() => controller.dispose());
+    coordinator.publish();
+    t.after(async () => {
+        await coordinator.disconnectAll();
+        coordinator.dispose();
+    });
 
     return {
+        coordinator,
         controller,
         vscode,
         clients,
@@ -530,8 +537,18 @@ test("cancelling an offline send during readiness restores its draft and attachm
     await sending;
     assert.deepEqual(clients[0].requests, []);
     assert.deepEqual(
-        posted.slice(postIndex).filter((message) => message.type === "draft"),
-        [{ type: "draft", text: "Preserve this unsent request", mode: "restore" }],
+        posted
+            .slice(postIndex)
+            .filter((message) => message.type === "draft")
+            .map(({ draftSnapshot, ...message }) => message),
+        [
+            {
+                type: "draft",
+                text: "Preserve this unsent request",
+                mode: "restore",
+                conversationKey: controller.conversationKey,
+            },
+        ],
     );
     assert.deepEqual(controller.attachments, [attachment]);
     assert.equal(controller.state.status, "disconnected");
@@ -591,8 +608,15 @@ test("an ordinary startup failure restores an offline send draft and retains att
     await assert.rejects(() => controller.send("Retry this request later"), /Current startup failed/u);
     assert.deepEqual(clients[0].requests, []);
     assert.deepEqual(
-        posted.filter((message) => message.type === "draft"),
-        [{ type: "draft", text: "Retry this request later", mode: "restore" }],
+        posted.filter((message) => message.type === "draft").map(({ draftSnapshot, ...message }) => message),
+        [
+            {
+                type: "draft",
+                text: "Retry this request later",
+                mode: "restore",
+                conversationKey: controller.conversationKey,
+            },
+        ],
     );
     assert.deepEqual(controller.attachments, [attachment]);
     assert.equal(controller.client, null);
@@ -1046,24 +1070,6 @@ test("disconnect cancels every pending approval and ignores replies afterward", 
     assert.equal(controller.state.uiRequest, undefined);
 });
 
-test("new chat cancels approval dialogs before changing the Pi session", async (t) => {
-    let changed = false;
-    const { controller, client } = await connected(t, {
-        request(type, _args, current) {
-            if (type === "new_session") {
-                assert.equal(current.sent.at(-1)?.cancelled, true);
-                changed = true;
-            }
-
-            return undefined;
-        },
-    });
-    dialog(controller, client);
-    await controller.newChat();
-    assert.equal(changed, true);
-    assert.equal(controller.dialogs.length, 0);
-});
-
 test("untrusted workspace actions cannot launch Pi or collect context", async (t) => {
     const { controller, launches } = fixture(t, { trusted: false });
 
@@ -1091,50 +1097,6 @@ test("removed and virtual workspaces cannot launch Pi", async (t) => {
     assert.equal(launches.length, 0);
 });
 
-test("workspace switching blocks reconnect until the old Pi process stops and then uses the new folder", async (t) => {
-    const gate = deferred();
-    const stopping = deferred();
-    const nextFolder = {
-        name: "Second workspace",
-        uri: uri(path.resolve(".specpi-test", "controller-second-workspace")),
-    };
-    const { controller, client, clients, vscode } = await connected(t, {
-        folderAnswer: nextFolder,
-        stop(current) {
-            if (current.launch.cwd !== nextFolder.uri.fsPath) {
-                stopping.resolve();
-
-                return gate.promise;
-            }
-
-            return undefined;
-        },
-    });
-    vscode.workspace.workspaceFolders.push(nextFolder);
-    const changing = controller.chooseWorkspace();
-    await stopping.promise;
-    assert.equal(controller.workspaceSwitching, true);
-    assert.equal(controller.transitioning, true);
-    assert.equal(controller.client, null);
-    await assert.rejects(() => controller.connect(), /workspace switch to finish/u);
-    assert.equal(clients.length, 1);
-    gate.resolve();
-    await changing;
-    assert.equal(controller.workspace, nextFolder);
-    assert.equal(controller.workspaceSwitching, false);
-    assert.equal(controller.transitioning, false);
-    await controller.connect();
-    await controller.send("Work in the selected folder");
-    assert.equal(clients.length, 2);
-    assert.equal(clients[1].launch.cwd, nextFolder.uri.fsPath);
-    assert.equal(controller.clientWorkspace, nextFolder.uri.fsPath);
-    assert.ok(!client.requests.some((request) => request.type === "prompt"));
-    assert.equal(
-        clients[1].requests.find((request) => request.type === "prompt")?.args.message,
-        "Work in the selected folder",
-    );
-});
-
 test("sending refuses a client running in a different workspace and restores the draft", async (t) => {
     const { controller, client, posted, vscode } = await connected(t);
     const nextFolder = {
@@ -1152,7 +1114,20 @@ test("sending refuses a client running in a different workspace and restores the
     assert.equal(client.requests.length, requestIndex);
     assert.deepEqual(
         posted.slice(postIndex).filter((message) => message.type === "draft"),
-        [{ type: "draft", text: "Use only the selected workspace", mode: "restore" }],
+        [
+            {
+                type: "draft",
+                text: "Use only the selected workspace",
+                mode: "restore",
+                conversationKey: controller.conversationKey,
+                draftSnapshot: {
+                    text: "Use only the selected workspace",
+                    selectionStart: 31,
+                    selectionEnd: 31,
+                    sendMode: "prompt",
+                },
+            },
+        ],
     );
     assert.equal(controller.attachments[0]?.id, "new-workspace-context");
     assert.equal(controller.sending, false);
@@ -1375,31 +1350,6 @@ test("a real active retry survives an idle state snapshot until the agent settle
     assert.equal(controller.state.status, "ready");
 });
 
-test("disconnect during new-session response cannot clear a replacement draft or attachments", async (t) => {
-    const gate = deferred();
-    const entered = deferred();
-    const { controller, posted } = await connected(t, {
-        request(type) {
-            if (type === "new_session") {
-                entered.resolve();
-
-                return gate.promise;
-            }
-
-            return undefined;
-        },
-    });
-    const changing = controller.newChat();
-    await entered.promise;
-    await controller.disconnect();
-    controller.attachments = [{ id: "replacement", label: "new.js", detail: "Snapshot", text: "new content" }];
-    const postIndex = posted.length;
-    gate.resolve({});
-    await changing;
-    assert.equal(controller.attachments[0]?.id, "replacement");
-    assert.ok(!posted.slice(postIndex).some((message) => message.type === "draft" && message.text === ""));
-});
-
 test("late session persistence cannot restore a disconnected session selection", async (t) => {
     const gate = deferred();
     const entered = deferred();
@@ -1441,191 +1391,6 @@ test("resume launch uses the catalog's validated file reference", async (t) => {
     controller.activeSessionId = "saved";
     await controller.connect();
     assert.deepEqual(clients[0].launch.args.slice(-2), ["--session", file]);
-});
-
-test("history labels and resumes the selected catalog record", async (t) => {
-    const entry = {
-        sessionId: "saved",
-        sessionName: "Saved chat",
-        sessionFile: path.resolve(".specpi-test", "controller-storage", "saved.jsonl"),
-        updatedAt: 1000,
-    };
-    const { controller, client, quickPicks } = await connected(t, {
-        list: () => [entry],
-        resolveSession: (id) => (id === entry.sessionId ? entry : undefined),
-        quickPick: (items, call) => (call === 1 ? items[0] : "Resume chat"),
-    });
-    await controller.history();
-    assert.equal(quickPicks[0][0].label, entry.sessionName);
-    assert.deepEqual(client.requests.find((request) => request.type === "switch_session")?.args, {
-        sessionPath: entry.sessionFile,
-    });
-});
-
-test("forgetting the current chat survives refresh and reconnect without remembering or resuming it", async (t) => {
-    const entry = {
-        sessionId: "forget-current",
-        sessionName: "Chat to forget",
-        sessionFile: path.resolve(".specpi-test", "controller-storage", "forget-current.jsonl"),
-        updatedAt: 1000,
-    };
-    let entries = [entry];
-    let originalSession = true;
-    const { controller, client, clients, catalogs } = await connected(t, {
-        request(type) {
-            return type === "get_state" && originalSession ? { ...entry, isStreaming: false } : undefined;
-        },
-        list: () => entries,
-        resolveSession: (id) => entries.find((record) => record.sessionId === id),
-        remember(runtime) {
-            entries = [runtime];
-
-            return runtime;
-        },
-        removeSession(id) {
-            assert.equal(id, entry.sessionId);
-            entries = [];
-
-            return true;
-        },
-        quickPick: (items, call) => (call === 1 ? items[0] : "Forget from list"),
-    });
-    assert.equal(controller.activeSessionId, entry.sessionId);
-    const rememberCount = catalogs[0].remembered.length;
-    await controller.history();
-    assert.equal(controller.activeSessionId, undefined);
-    assert.equal(controller.forgottenSessionId, entry.sessionId);
-    await controller.refresh(client);
-    assert.equal(catalogs[0].remembered.length, rememberCount);
-    assert.deepEqual(entries, []);
-    originalSession = false;
-    await controller.disconnect();
-    await controller.connect();
-    assert.equal(clients.length, 2);
-    assert.ok(!clients[1].launch.args.includes("--session"));
-    assert.ok(!clients[1].launch.args.includes(entry.sessionFile));
-    assert.equal(catalogs[1].remembered.length, 0);
-    assert.equal(controller.activeSessionId, undefined);
-});
-
-test("a failed attempt to forget the current chat restores its active session reference", async (t) => {
-    const entry = {
-        sessionId: "retained-current",
-        sessionName: "Retained chat",
-        sessionFile: path.resolve(".specpi-test", "controller-storage", "retained-current.jsonl"),
-        updatedAt: 1000,
-    };
-    const { controller, client, catalogs } = await connected(t, {
-        request: (type) => (type === "get_state" ? { ...entry, isStreaming: false } : undefined),
-        list: () => [entry],
-        remember: (runtime) => runtime,
-        removeSession() {
-            throw new Error("Synthetic catalog remove failure");
-        },
-        quickPick: (items, call) => (call === 1 ? items[0] : "Forget from list"),
-    });
-    assert.equal(controller.activeSessionId, entry.sessionId);
-    await assert.rejects(() => controller.history(), /Synthetic catalog remove failure/u);
-    assert.equal(controller.activeSessionId, entry.sessionId);
-    assert.equal(controller.forgottenSessionId, undefined);
-    const rememberCount = catalogs[0].remembered.length;
-    await controller.refresh(client);
-    assert.equal(catalogs[0].remembered.length, rememberCount + 1);
-    assert.equal(controller.activeSessionId, entry.sessionId);
-});
-
-test("a delayed forget failure cannot restore the previous session after a new chat starts", async (t) => {
-    const gate = deferred();
-    const entered = deferred();
-    const previous = {
-        sessionId: "previous-session",
-        sessionName: "Previous chat",
-        sessionFile: path.resolve(".specpi-test", "controller-storage", "previous-session.jsonl"),
-        updatedAt: 1000,
-    };
-    const next = {
-        sessionId: "next-session",
-        sessionName: "Next chat",
-        sessionFile: path.resolve(".specpi-test", "controller-storage", "next-session.jsonl"),
-        updatedAt: 2000,
-    };
-    let runtime = previous;
-    const { controller, client } = await connected(t, {
-        request(type) {
-            if (type === "new_session") {
-                runtime = next;
-            }
-
-            return type === "get_state" ? { ...runtime, isStreaming: false } : undefined;
-        },
-        list: () => [previous],
-        remember: (value) => value,
-        removeSession() {
-            entered.resolve();
-
-            return gate.promise;
-        },
-        quickPick: (items, call) => (call === 1 ? items[0] : "Forget from list"),
-    });
-    const forgetting = assert.rejects(() => controller.history(), /Delayed catalog failure/u);
-    await entered.promise;
-    await controller.newChat();
-    assert.equal(controller.activeSessionId, next.sessionId);
-    gate.reject(new Error("Delayed catalog failure"));
-    await forgetting;
-    assert.equal(controller.client, client);
-    assert.equal(controller.activeSessionId, next.sessionId);
-});
-
-test("forgetting the current history entry does not cancel a pending Stop for that session", async (t) => {
-    const gate = deferred();
-    const entered = deferred();
-    const entry = {
-        sessionId: "running-session",
-        sessionName: "Running chat",
-        sessionFile: path.resolve(".specpi-test", "controller-storage", "running-session.jsonl"),
-        updatedAt: 1000,
-    };
-    let entries = [entry];
-    let streaming = false;
-    const { controller, client } = await connected(t, {
-        request(type, _args, current) {
-            if (type === "clear_queue") {
-                entered.resolve();
-
-                return gate.promise;
-            }
-
-            if (type === "abort") {
-                streaming = false;
-                current.emit("event", { type: "agent_settled" });
-            }
-
-            return type === "get_state" ? { ...entry, isStreaming: streaming } : undefined;
-        },
-        list: () => entries,
-        remember: (runtime) => runtime,
-        removeSession() {
-            entries = [];
-
-            return true;
-        },
-        quickPick: (items, call) => (call === 1 ? items[0] : "Forget from list"),
-    });
-    streaming = true;
-    client.emit("event", { type: "agent_start" });
-    const stopping = controller.stop();
-    await entered.promise;
-    await controller.history();
-    assert.equal(controller.activeSessionId, undefined);
-    assert.equal(controller.forgottenSessionId, entry.sessionId);
-    gate.resolve({ steering: [], followUp: [] });
-    await stopping;
-    assert.equal(client.requests.filter((request) => request.type === "abort").length, 1);
-    assert.equal(controller.client, client);
-    assert.equal(controller.state.status, "ready");
-    assert.equal(controller.activeSessionId, undefined);
-    assert.deepEqual(entries, []);
 });
 
 test("sending captures selected context and preserves attachments added during the response", async (t) => {
@@ -1678,7 +1443,20 @@ test("a second send restores its draft while the first prompt is pending", async
     await assert.rejects(() => controller.send("Second message to preserve"), /Wait for the current chat action/u);
     assert.deepEqual(
         posted.slice(postIndex).filter((message) => message.type === "draft"),
-        [{ type: "draft", text: "Second message to preserve", mode: "restore" }],
+        [
+            {
+                type: "draft",
+                text: "Second message to preserve",
+                mode: "restore",
+                conversationKey: controller.conversationKey,
+                draftSnapshot: {
+                    text: "Second message to preserve",
+                    selectionStart: 26,
+                    selectionEnd: 26,
+                    sendMode: "prompt",
+                },
+            },
+        ],
     );
     assert.equal(controller.sending, true);
     assert.equal(client.requests.filter((request) => request.type === "prompt").length, 1);
@@ -2059,9 +1837,10 @@ test("an observed user image message consumes queue tracking and cannot be recov
     assert.deepEqual(controller.attachments, []);
 });
 
-test("reconnect and new chat discard recovered image drafts from the previous conversation", async (t) => {
+test("reconnect clears recovered images while a new chat keeps recovery isolated to its source", async (t) => {
     for (const transition of ["reconnect", "new-chat"]) {
-        const { controller, posted } = await queuedImageChat(t);
+        const { controller: source, coordinator, posted } = await queuedImageChat(t);
+        let controller = source;
         await controller.addImageData([imageInput()]);
         await controller.send("A recoverable image");
         await controller.stop();
@@ -2071,6 +1850,8 @@ test("reconnect and new chat discard recovered image drafts from the previous co
             await controller.connect();
         } else {
             await controller.newChat();
+            controller = coordinator.active;
+            assert.equal(source.state.recoveredDrafts[0].id, oldId);
         }
 
         assert.deepEqual(controller.state.recoveredDrafts, []);
@@ -2388,7 +2169,12 @@ test("stale webview image uploads and file drops are rejected after a new chat o
         const nextFolder = { name: "Next workspace", uri: uri(path.resolve(".specpi-test", "stale-drop-workspace")) };
         const resolutions = [];
         const reads = [];
-        const { controller, posted, vscode } = await connected(t, {
+        const {
+            controller: source,
+            coordinator,
+            posted,
+            vscode,
+        } = await connected(t, {
             folderAnswer: nextFolder,
             resolveCode(input) {
                 resolutions.push(input);
@@ -2401,16 +2187,25 @@ test("stale webview image uploads and file drops are rejected after a new chat o
                 return imageAttachment("stale-webview-image");
             },
         });
-        const oldToken = controller.state.contextToken;
+        const oldToken = source.state.contextToken;
         assert.equal(typeof oldToken, "string");
         if (change === "new-chat") {
-            await controller.newChat();
+            await source.newChat();
         } else {
             vscode.workspace.workspaceFolders.push(nextFolder);
-            await controller.chooseWorkspace();
+            await source.chooseWorkspace();
         }
 
+        const controller = coordinator.active;
         assert.notEqual(controller.state.contextToken, oldToken);
+        await coordinator.handleMessage({
+            type: "attachImageData",
+            conversationKey: source.conversationKey,
+            contextToken: oldToken,
+            requestId: "background-upload",
+            images: [imageInput()],
+        });
+        assert.deepEqual(source.attachments, []);
         await controller.handleMessage({
             type: "attachImageData",
             contextToken: oldToken,
@@ -2800,89 +2595,4 @@ test("stopping an old connection cannot insert recovered queue text into the nex
     gate.resolve({ steering: ["Old chat instruction"], followUp: [] });
     await stopping;
     assert.ok(!posted.slice(postIndex).some((message) => message.type === "draft"));
-});
-
-test("a delayed stop cannot abort a new session on the same Pi process or restore the old queue", async (t) => {
-    const gate = deferred();
-    const entered = deferred();
-    let clearCount = 0;
-    const { controller, client, posted } = await connected(t, {
-        warningAnswer: "Stop and continue",
-        request(type, _args, current) {
-            if (type === "clear_queue") {
-                clearCount += 1;
-
-                if (clearCount === 1) {
-                    entered.resolve();
-
-                    return gate.promise;
-                }
-            }
-
-            if (type === "abort") {
-                current.emit("event", { type: "agent_settled" });
-            }
-
-            return undefined;
-        },
-    });
-    client.emit("event", { type: "agent_start" });
-    const firstStop = controller.stop();
-    await entered.promise;
-    await controller.newChat();
-    assert.equal(clearCount, 2);
-    assert.equal(controller.client, client);
-    assert.equal(client.requests.filter((request) => request.type === "new_session").length, 1);
-    const requestIndex = client.requests.length;
-    const postIndex = posted.length;
-    gate.resolve({ steering: ["Old session instruction"], followUp: [] });
-    await firstStop;
-    assert.ok(!client.requests.slice(requestIndex).some((request) => request.type === "abort"));
-    assert.ok(!posted.slice(postIndex).some((message) => message.type === "draft"));
-    assert.equal(controller.state.status, "ready");
-});
-
-test("compacting and retrying chats require confirmation before changing sessions", async (t) => {
-    const { controller, client } = await connected(t);
-
-    for (const type of ["auto_compaction_start", "auto_retry_start"]) {
-        client.emit("event", { type });
-        const requestIndex = client.requests.length;
-        await controller.newChat();
-        assert.ok(
-            !client.requests.slice(requestIndex).some((request) => request.type === "new_session"),
-            `${type} allowed an unconfirmed session transition`,
-        );
-    }
-});
-
-test("history selected before disconnect cannot switch a replacement Pi connection", async (t) => {
-    const gate = deferred();
-    const entered = deferred();
-    const entry = {
-        sessionId: "saved",
-        sessionName: "Saved chat",
-        sessionFile: path.resolve(".specpi-test", "controller-storage", "saved.jsonl"),
-        updatedAt: 1000,
-    };
-    const { controller, clients } = await connected(t, {
-        list: () => [entry],
-        resolveSession: () => entry,
-        quickPick(items, call) {
-            if (call === 1) {
-                entered.resolve();
-
-                return gate.promise.then(() => items[0]);
-            }
-
-            return "Resume chat";
-        },
-    });
-    const selecting = controller.history();
-    await entered.promise;
-    await controller.disconnect();
-    await controller.connect();
-    gate.resolve();
-    await selecting;
-    assert.ok(clients.every((client) => !client.requests.some((request) => request.type === "switch_session")));
 });

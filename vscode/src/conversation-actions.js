@@ -1,6 +1,5 @@
 "use strict";
 
-const { randomUUID } = require("node:crypto");
 const { normalizeImage } = require("./images.js");
 
 const MAX_ENTRIES = 20_000;
@@ -44,7 +43,7 @@ function capture(controller, { connected = true, idle = true } = {}) {
     };
 }
 
-function current(controller, snapshot, { transitioning = false, changedSession = false, identityOnly = false } = {}) {
+function current(controller, snapshot, { identityOnly = false } = {}) {
     try {
         controller.requireWorkspace();
     } catch {
@@ -59,12 +58,12 @@ function current(controller, snapshot, { transitioning = false, changedSession =
         controller.sessionRevision === snapshot.sessionRevision &&
         controller.workspace === snapshot.workspace &&
         controller.catalog === snapshot.catalog &&
-        (changedSession || controller.activeSessionId === snapshot.sessionId) &&
+        controller.activeSessionId === snapshot.sessionId &&
         (identityOnly ||
             !snapshot.idle ||
             (controller.state.status === "ready" &&
                 !controller.sending &&
-                controller.transitioning === transitioning &&
+                !controller.transitioning &&
                 !(controller.state.queueCount > 0)))
     );
 }
@@ -183,72 +182,7 @@ async function transition(controller, snapshot, command, payload, draft) {
         return false;
     }
 
-    if (typeof controller.branchConversation === "function") {
-        return controller.branchConversation(command, payload, draft);
-    }
-
-    controller.transitioning = true;
-    controller.sessionRevision += 1;
-    snapshot.sessionRevision = controller.sessionRevision;
-    let accepted = false;
-    try {
-        const result = await snapshot.client.request(command, payload, { timeoutMs: 0 });
-        if (!current(controller, snapshot, { transitioning: true }) || result?.cancelled === true) {
-            return false;
-        }
-
-        accepted = true;
-        controller.cancelDialogs();
-        controller.imageQueue?.clear();
-        controller.activeSessionId = undefined;
-        controller.forgottenSessionId = undefined;
-        controller.attachments = draft.images.map((image, index) => ({
-            ...image,
-            id: randomUUID(),
-            kind: "image",
-            label: image.name || `Image ${index + 1}`,
-            detail: `${image.width} × ${image.height} · ${image.mimeType}`,
-        }));
-        controller.state.messages = [];
-        controller.state.title = "New branch";
-        let refreshError;
-        try {
-            await controller.refresh(snapshot.client, true);
-        } catch (error) {
-            refreshError = error;
-        }
-
-        if (
-            !current(controller, snapshot, {
-                transitioning: true,
-                changedSession: true,
-                identityOnly: Boolean(refreshError),
-            })
-        ) {
-            return false;
-        }
-
-        controller.state.error = undefined;
-        controller.publish();
-        controller.post({ type: "draft", text: draft.text });
-        controller.post({ type: "focus" });
-        if (refreshError) {
-            throw new Error(
-                "The new conversation branch was created and its draft restored, but its messages could not be refreshed. Use Refresh before continuing; do not repeat the fork.",
-                { cause: refreshError },
-            );
-        }
-
-        return true;
-    } catch (error) {
-        if (!current(controller, snapshot, { identityOnly: true, changedSession: accepted })) {
-            return false;
-        }
-
-        throw error;
-    } finally {
-        controller.transitioning = false;
-    }
+    return controller.branchConversation(command, payload, draft);
 }
 
 async function editPrompt(controller, vscode) {
