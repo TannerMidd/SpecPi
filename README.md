@@ -48,7 +48,7 @@ specpi doctor
 
 Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
-To pin this release, use `npm install --global specpi@0.18.0`.
+To pin this release, use `npm install --global specpi@0.18.1`.
 
 Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
@@ -62,7 +62,7 @@ Chat beside your code, attach files, and switch conversations.
 
 In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
 
-Chat 0.4.0 adds live delegate progress and worker Stop controls, plus compact tags for attached files. With SpecPi 0.18.0, new Chat sessions start with Guard off; use `/guard guard` or `/guard strict` to enable it. Update the harness and use **Restart Pi** to load these changes.
+Chat 0.4.1 shows a compact delegation strip only while workers run or settle, and opens workspace image links in the image viewer. SpecPi 0.18.1 fixes delegation after switching models in the same chat. Update both packages, reload VS Code for the Chat update, and use **Restart Pi** to load the harness update. Later model switches do not require a restart. New Chat sessions start with Guard off; use `/guard guard` or `/guard strict` to enable it.
 
 ## Go further
 

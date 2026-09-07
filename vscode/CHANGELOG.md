@@ -1,6 +1,6 @@
 # SpecPi Chat changelog
 
-## Unreleased
+## 0.4.1
 
 - Open workspace PNG, JPEG, GIF and WebP links in the image viewer instead of trying to open them as text. Normal Markdown links and inline file references use the same validated preview path as Markdown images; remote links still open externally.
 
