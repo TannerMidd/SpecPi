@@ -63,7 +63,7 @@ Stop clears queued work before aborting the active response. Pi returns only the
 | Text/code attachments and editor selections | UTF-8 text, 64 KiB per attachment, inside the selected workspace; up to eight attachments total, including images. |
 | File, line, column, and line-range references | Yes; click to open the validated workspace file in VS Code. |
 | Image attachments, pasted screenshots, and image drag-and-drop | PNG, JPEG, GIF, and WebP; image-only or mixed messages; an image-capable Pi model is required. |
-| Inline images and Markdown image previews | Validated Pi image blocks render inline. Click a local Markdown image reference to preview a validated workspace image. External image URLs open through the browser link action; Chat does not fetch them. |
+| Inline images and Markdown image previews | Validated Pi image blocks render inline. Click a local image reference, ordinary Markdown link, or inline PNG/JPEG/GIF/WebP filename to preview a validated workspace image rather than open it as text. External image URLs open through the browser link action; Chat does not fetch them. |
 | Models and thinking levels | Pi's available options, including `max` when supported by the selected model. |
 | Streaming, tools, approvals, Stop, steering, and follow-ups | Yes, through the local Pi runtime. |
 | Chat history, branching, and earlier-prompt editing | Searchable extension-owned conversations, rename, archive/restore, and independent live processes. Editing restores a draft on a new conversation branch and leaves code files as they are. |

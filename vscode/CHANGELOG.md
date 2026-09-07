@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Open workspace PNG, JPEG, GIF and WebP links in the image viewer instead of trying to open them as text. Normal Markdown links and inline file references use the same validated preview path as Markdown images; remote links still open externally.
+
 - Replace the persistent Delegates panel with a compact activity strip that appears only while workers run or settle. Expand it for tasks and Stop controls; finished workers leave the strip and their reports stay in the conversation. Hide totals and boilerplate from the default view, preserve drafts and keyboard focus, and respect reduced motion.
 
 ## 0.4.0

@@ -3119,6 +3119,73 @@ test(
             );
 
             await t.test(
+                "ordinary image links and code references open the image viewer, not the text editor",
+                async () => {
+                    await withPage(browser, fixtures, { name: "linked-image-preview", width: 390 }, async (page) => {
+                        const references = [
+                            [
+                                "[Running preview](.specpi-test/vscode/screenshots/delegates-live-preview.png)",
+                                ".specpi-test/vscode/screenshots/delegates-live-preview.png",
+                            ],
+                            [
+                                "[Idle preview](file:///f%3A/Development/SpecPi/.specpi-test/vscode/screenshots/delegates-idle-preview.png)",
+                                "file:///f%3A/Development/SpecPi/.specpi-test/vscode/screenshots/delegates-idle-preview.png",
+                            ],
+                            ["[Spaced preview](<artifacts/my%20preview.JPEG>)", "artifacts/my preview.JPEG"],
+                            ["`artifacts/preview.webp`", "artifacts/preview.webp"],
+                            ["`artifacts/preview.png:1`", "artifacts/preview.png:1"],
+                            ["[Preview](artifacts/preview.png#L1)", "artifacts/preview.png#L1"],
+                            ["[Animation](artifacts/preview.gif)", "artifacts/preview.gif"],
+                            ["[Photo](artifacts/preview.jpg)", "artifacts/preview.jpg"],
+                        ];
+                        const input = page.locator("#composer-input");
+                        for (const [text, reference] of references) {
+                            await setState(page, { messages: [{ id: "preview-link", role: "assistant", text }] });
+                            await input.fill("Keep my draft");
+                            assert.deepEqual(await takeMessages(page), [], "Rendering must not read image files");
+                            const link = page.locator(".code-reference");
+                            await link.focus();
+                            await link.press("Enter");
+                            const requests = await takeMessages(page);
+                            assert.equal(requests.length, 1);
+                            const [request] = requests;
+                            assert.equal(request.type, "previewImage");
+                            assert.equal(request.reference, reference);
+                            assert.equal(request.contextToken, "fixture-context-1");
+                            await sendHost(page, {
+                                type: "imagePreview",
+                                requestId: request.requestId,
+                                image: imageFixture(),
+                            });
+                            await assertImageLoaded(page.locator("#image-preview-content img"));
+                            assert.equal(await input.inputValue(), "Keep my draft");
+                            await page.keyboard.press("Escape");
+                            await page.waitForFunction(() =>
+                                document.activeElement?.classList.contains("code-reference"),
+                            );
+                            assert.equal(await link.evaluate((node) => node === document.activeElement), true);
+                            assert.deepEqual(await takeMessages(page), []);
+                        }
+
+                        await setState(page, {
+                            messages: [
+                                {
+                                    id: "remote",
+                                    role: "assistant",
+                                    text: "[Remote](https://example.invalid/preview.png)",
+                                },
+                            ],
+                        });
+                        await page.getByRole("link", { name: "Remote", exact: true }).click();
+                        assert.deepEqual(await takeMessages(page), [
+                            { type: "openLink", url: "https://example.invalid/preview.png" },
+                        ]);
+                        await assertLayout(page, 390);
+                    });
+                },
+            );
+
+            await t.test(
                 "Markdown image previews are explicit local host requests and remote images are external links",
                 async () => {
                     await withPage(browser, fixtures, { name: "markdown-image-preview", width: 280 }, async (page) => {
