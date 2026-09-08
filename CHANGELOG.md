@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.1 - 2026-09-08
+
+- Allow Pi's exact public Copilot catalog identification headers during delegation, fixing Copilot → Anthropic → Copilot switches that were incorrectly rejected as runtime provider overrides. Reconstruct headers independently in the child; retain runtime-auth, extension-provider and other header restrictions. Restart Pi after updating the harness.
+
 ## 0.19.0 - 2026-09-07
 
 - Add session-owned background commands with exact interactive approvals, shared Command Guard admission, bounded logs, and best-effort process cleanup.

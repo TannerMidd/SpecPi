@@ -5,6 +5,14 @@ const MAX_CONTEXT_BYTES = 256 * 1024;
 const MAX_RUN_CONTEXT_BYTES = budgetLimits(MAX_BUDGET_MULTIPLIER).contextBytes;
 const MAX_RETAINED_RESPONSE_BYTES = budgetLimits(MAX_BUDGET_MULTIPLIER).retainedResponseBytes;
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+// Public client identification from https://pi.dev/api/models/providers/github-copilot.
+// Keep this exception exact: other headers may contain credentials or routing overrides.
+const COPILOT_CATALOG_HEADERS = Object.freeze({
+    "User-Agent": "GitHubCopilotChat/0.35.0",
+    "Editor-Version": "vscode/1.107.0",
+    "Editor-Plugin-Version": "copilot-chat/0.35.0",
+    "Copilot-Integration-Id": "vscode-chat",
+});
 const MODEL_FIELDS = [
     "id",
     "provider",
@@ -62,7 +70,41 @@ function closed(value, keys) {
 
 function descriptor(model) {
     // Only public model behavior fields; never serialize a provider, headers, or credentials.
-    return JSON.parse(bounded(Object.fromEntries(MODEL_FIELDS.map((key) => [key, model[key]])), 16 * 1024));
+    return JSON.parse(
+        bounded(
+            {
+                ...Object.fromEntries(MODEL_FIELDS.map((key) => [key, model[key]])),
+                hasModelHeaders: model.headers !== undefined,
+            },
+            16 * 1024,
+        ),
+    );
+}
+
+function supportedModelHeaders(model) {
+    const headers = model.headers;
+    if (headers === undefined) {
+        return true;
+    }
+
+    if (model.provider !== "github-copilot" || !headers || typeof headers !== "object") {
+        return false;
+    }
+
+    try {
+        // Check names before touching values; never evaluate header getters or
+        // inspect arbitrary authentication headers. Retain no parent header data.
+        const keys = Reflect.ownKeys(headers);
+
+        return (
+            Object.getPrototypeOf(headers) === Object.prototype &&
+            keys.length === Object.keys(COPILOT_CATALOG_HEADERS).length &&
+            keys.every((key) => Object.hasOwn(COPILOT_CATALOG_HEADERS, key)) &&
+            keys.every((key) => Object.getOwnPropertyDescriptor(headers, key)?.value === COPILOT_CATALOG_HEADERS[key])
+        );
+    } catch {
+        return false;
+    }
 }
 
 function sameValue(left, right) {
@@ -314,7 +356,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
             !streaming &&
             (registry.getProviderAuthStatus(model.provider)?.source === "runtime" ||
                 registry.getRegisteredProviderIds().includes(model.provider) ||
-                model.headers !== undefined)
+                !supportedModelHeaders(model))
         ) {
             throw new DelegationError("Delegation cannot inherit this parent runtime provider override");
         }
@@ -351,6 +393,7 @@ export function createNativePiHost(ctx, { id, isCurrent, sdk, thinkingLevel } = 
                 runtime.getError() ||
                 !runtime.getProvider(model.provider) ||
                 !childModel ||
+                !supportedModelHeaders(childModel) ||
                 !sameValue(descriptor(childModel), selected)
             ) {
                 throw new DelegationError(
