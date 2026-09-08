@@ -24,7 +24,7 @@ Use Node.js 22.19 or later. From the repository root:
 - Format JavaScript and TypeScript: `npm run format`
 - Run full repository validation: `npm run check`
 
-Run the narrowest relevant test first, then `npm run check` for material changes. Add or update regression tests when behavior changes.
+Run the narrowest relevant tests while iterating, then `npm run check` once the material change is ready for final validation. Rerun broader checks only when subsequent changes invalidate their evidence or a release gate requires them. Add or update tests only for changed behavior, meaningful failure modes, and required security boundaries; prefer existing fixtures and suites over duplicate coverage, speculative cases, or new test scaffolding without a concrete need. Documentation-only changes need content/diff review, not unrelated runtime suites. Preserve required security, installer, and release checks.
 
 Pi fixtures use the repository's pinned development dependency by default; `SPECPI_TEST_PI` explicitly selects another CLI. Package validation creates its own temporary npm cache. Neither requires changing the user's global PATH, cache, or live Pi installation.
 
@@ -47,4 +47,4 @@ For rendered `site/` or browser changes, validate relevant desktop, tablet, and 
 
 ## Completion
 
-Inspect the final diff and report the checks run, their results, and residual risks. Security-sensitive installer, command-guard, provider-isolation, state-retention, or dependency changes require targeted regression coverage and fresh read-only review.
+Inspect the final diff and report the checks run, their results, and residual risks. Keep implementation, tests, documentation, progress updates, and final reports focused on the request: no unrelated cleanup, redundant summaries, decorative workflow artifacts, or extra scaffolding without a concrete benefit. Security-sensitive installer, command-guard, provider-isolation, state-retention, or dependency changes require targeted regression coverage and fresh read-only review.

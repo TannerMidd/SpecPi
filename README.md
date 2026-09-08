@@ -30,6 +30,7 @@ SpecPi extends Pi with chat, review tools, and focused delegation. Its principle
 ## What it adds
 
 - **Focused delegation.** One agent makes changes. Up to two read-only subagents help investigate and review. [Research and design](https://tannermidd.github.io/SpecPi/single-agent/)
+- **Background tasks.** Start an approved dev server, test suite, or watch build, inspect bounded output, and stop it without blocking other work.
 - **Review as you work.** Track changed files, inspect diffs, check pages in a browser, and review risky commands.
 - **Improvements you choose.** Record recurring problems, select one with `/harness-improvement`, and test the change before calling it done.
 
@@ -48,11 +49,19 @@ specpi doctor
 
 Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
-To pin this release, use `npm install --global specpi@0.18.1`.
+To pin this release, use `npm install --global specpi@0.19.0`.
 
 Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
 [Setup, updates & removal](https://tannermidd.github.io/SpecPi/wiki/#getting-started) · [Delegation settings](docs/delegation/README.md)
+
+## Background tasks
+
+Ask Pi to start a long-running command with `background_start`, then use `background_list`, `background_logs`, and `background_stop` to observe and clean up tasks. `background_start` accepts `command`, optional `cwd`/`label`, and `timeoutSeconds` (1–28,800; default 1,800). It requires interactive approval even with Guard off; Guard denials and locks still apply. Headless starts are denied.
+
+Commands use `/bin/sh` on POSIX or system `cmd.exe` on Windows, not Pi's configured Bash. They inherit the process environment except `NODE_OPTIONS` and `NODE_PATH`, which are cleared to keep the supervisor's startup predictable. No PTY or interactive stdin is provided. Four active tasks are allowed; output is capped at 256 KiB per task, reads at 64 KiB, and completed records at 32. Log offsets are absolute bytes in the UTF-8 stream including stdout/stderr markers, before terminal-control escaping; responses report the next cursor and lost bytes.
+
+Stop tasks when finished. Session replacement, reload, tree navigation, and shutdown attempt bounded cleanup. `cleanup: confirmed` means the owned root/group termination was observed, not that escaped descendants are contained; unconfirmed cleanup retains its slot and may need manual process inspection. Spawn success is not service readiness. Output is memory-only in the extension, but returned text may enter Pi conversation/provider retention. See the [security boundary](SECURITY_MODEL.md#background-task-execution).
 
 ## SpecPi Chat for VS Code
 
