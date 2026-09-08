@@ -202,6 +202,38 @@ test("spawn failure and completed record eviction do not leak admission slots", 
     );
 });
 
+test(
+    "POSIX default cleanup skips grace for an observed command exit",
+    { skip: process.platform === "win32" },
+    async (t) => {
+        let cleanupMs;
+        const runner = new TaskRunner({
+            terminate: async (task) => {
+                const started = performance.now();
+                const confirmed = await terminateOwned(task);
+                cleanupMs = performance.now() - started;
+
+                return confirmed;
+            },
+        });
+        try {
+            const started = await runner.start(normalizeStart({ command: "exit 0" }, process.cwd()), 1);
+            const task = runner.get(started.id);
+            await until(() => task.exitCode !== undefined);
+            const stopStarted = performance.now();
+            assert.equal((await runner.stop(task.id)).cleanup, "confirmed");
+            const stopMs = performance.now() - stopStarted;
+            t.diagnostic(
+                `Default natural-exit cleanup: ${Math.round(cleanupMs)}ms; stop of exited task: ${Math.round(stopMs)}ms`,
+            );
+            assert.ok(cleanupMs < 1000, `Natural-exit cleanup took ${cleanupMs}ms`);
+            assert.ok(stopMs < 1000, `Stop of exited task took ${stopMs}ms`);
+        } finally {
+            await runner.shutdown();
+        }
+    },
+);
+
 test("extension approvals and Guard integration fail closed", () => {
     const result = spawnSync(
         process.execPath,

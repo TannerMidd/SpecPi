@@ -182,6 +182,7 @@ try {
             "  extensionPaths: extensionResult.extensions.map((extension) => extension.resolvedPath),\n" +
             "  extensionErrors: extensionResult.errors,\n" +
             "  toolNames: extensionResult.extensions.flatMap((extension) => [...extension.tools.keys()]),\n" +
+            "  toolSources: Object.fromEntries(extensionResult.extensions.flatMap((extension) => [...extension.tools].map(([name, tool]) => [name, tool.sourceInfo.path]))),\n" +
             "  skillNames: loader.getSkills().skills.map((skill) => skill.name),\n" +
             "  themeNames: loader.getThemes().themes.map((theme) => theme.name),\n" +
             "}));\n",
@@ -210,6 +211,11 @@ try {
     assert.deepEqual(resources.extensionErrors, [], `Pi reported extension load errors: ${JSON.stringify(resources)}`);
     for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
         assert.ok(resources.toolNames.includes(name), `Packaged Pi did not register ${name}`);
+        assert.equal(
+            path.resolve(resources.toolSources[name]),
+            path.resolve(specpiRoot, "extensions/background-tasks/index.ts"),
+            `Unexpected registration provenance for ${name}`,
+        );
     }
 
     assert.ok(resources.skillNames.includes("specpi-improve"), "Pi did not discover the SpecPi improvement skill");

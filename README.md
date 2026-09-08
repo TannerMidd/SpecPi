@@ -71,7 +71,7 @@ Chat beside your code, attach files, and switch conversations.
 
 In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
 
-Chat 0.4.1 shows a compact delegation strip only while workers run or settle, and opens workspace image links in the image viewer. SpecPi 0.18.1 fixes delegation after switching models in the same chat. Update both packages, reload VS Code for the Chat update, and use **Restart Pi** to load the harness update. Later model switches do not require a restart. New Chat sessions start with Guard off; use `/guard guard` or `/guard strict` to enable it.
+Chat 0.4.1 shows a compact delegation strip only while workers run or settle, and opens workspace image links in the image viewer. SpecPi 0.19.0 includes the delegation fix for switching models in the same chat. Update both packages, reload VS Code for the Chat update, and use **Restart Pi** to load the harness update. Later model switches do not require a restart. New Chat sessions start with Guard off; use `/guard guard` or `/guard strict` to enable it.
 
 ## Go further
 

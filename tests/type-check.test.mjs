@@ -8,7 +8,7 @@ import ts from "typescript";
 import * as core from "../extensions/browser/core.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-test("scoped no-emit type gate checks first-party browser files and rejects wrong API/input types", () => {
+test("scoped no-emit type gate checks browser/background files and rejects wrong API/input types", () => {
     const read = ts.readConfigFile(path.join(root, "tsconfig.browser.json"), ts.sys.readFile);
     assert.equal(read.error, undefined);
     const config = ts.parseJsonConfigFileContent(read.config, ts.sys, root);
@@ -16,6 +16,7 @@ test("scoped no-emit type gate checks first-party browser files and rejects wron
     assert.equal(config.options.strict, true);
     assert.equal(config.options.noEmit, true);
     assert.ok(config.fileNames.some((file) => file.endsWith("/browser/index.ts")));
+    assert.ok(config.fileNames.some((file) => file.endsWith("/background-tasks/index.ts")));
     const clean = ts.createProgram(config.fileNames, config.options);
     assert.deepEqual(
         ts.getPreEmitDiagnostics(clean).map((item) => ts.flattenDiagnosticMessageText(item.messageText, "\n")),

@@ -86,7 +86,7 @@ export default function registerBackgroundTasks(
         const unconfirmed = outcomes.filter((task: any) => task.cleanup !== "confirmed");
         if (unconfirmed.length) {
             ctx.ui.notify(
-                `Background cleanup unconfirmed for ${unconfirmed.map((task: any) => task.id).join(", ")}. Processes may still be running.`,
+                `Background cleanup unconfirmed for ${unconfirmed.map((task: any) => task.id).join(", ")}. Processes may still be running. background_start is disabled in this runtime: retry background_stop for these IDs, then /reload after cleanup confirms. IDs do not survive runtime replacement; inspect any remaining processes manually.`,
                 "warning",
             );
         }

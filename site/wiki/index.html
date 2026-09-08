@@ -52,6 +52,7 @@
                     <a href="#development"><span>11</span>Development</a>
                     <a href="#delegation"><span>12</span>Experimental delegation</a>
                     <a href="#vscode-chat"><span>13</span>VS Code Chat</a>
+                    <a href="#background-tasks"><span>14</span>Background tasks</a>
                 </nav>
                 <div class="index-meta"><span>Reference · v0.19.0</span></div>
             </aside>
@@ -65,8 +66,9 @@
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.19.0. <a href="#vscode-chat">SpecPi Chat 0.4.1</a> adds an optional VS
-                        Code sidebar with explicit context, approvals, and independent live conversations.
+                        Release reference · v0.19.0. <a href="#background-tasks">Background tasks</a> run approved long
+                        commands while other work continues. <a href="#vscode-chat">SpecPi Chat 0.4.1</a> adds an
+                        optional VS Code sidebar with explicit context, approvals, and independent live conversations.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
                         <a href="#delegation">delegation experiment</a> is enabled by default at Pi startup; worker use
@@ -658,6 +660,70 @@ code --install-extension .specpi-test/vscode/specpi-chat-0.4.1.vsix</code></pre>
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md">extension guide</a>.
                         TUI-only <code>/spec</code> and <code>/files</code> interfaces remain terminal controls; Chat
                         uses its own display and native Git review.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="background-tasks" aria-labelledby="background-title">
+                    <header>
+                        <span>14</span>
+                        <h2 id="background-title">Background tasks</h2>
+                    </header>
+                    <p>
+                        Ask Pi to run a dev server, long test suite, or watch build in the background. These are model
+                        tools, not slash commands. Starting a process is not proof that a service is ready.
+                    </p>
+                    <div class="definition-list">
+                        <div>
+                            <code>background_start</code
+                            ><span
+                                >Start a command with required <code>command</code>, optional <code>cwd</code> and
+                                <code>label</code>, and optional <code>timeoutSeconds</code> (1–28,800; default 1,800).
+                                Returns a task ID.</span
+                            >
+                        </div>
+                        <div>
+                            <code>background_list</code
+                            ><span>List task IDs, bounded previews, status, and cleanup outcomes.</span>
+                        </div>
+                        <div>
+                            <code>background_logs</code
+                            ><span
+                                >Read output using <code>id</code> and optional <code>offset</code>. Reuse
+                                <code>nextOffset</code> for the next page; lost bytes and truncation are reported
+                                explicitly.</span
+                            >
+                        </div>
+                        <div>
+                            <code>background_stop</code
+                            ><span
+                                >Idempotently stop an owned <code>id</code>. Genuine cleanup tools remain available
+                                under Guard locks.</span
+                            >
+                        </div>
+                    </div>
+                    <p>
+                        Starts require interactive approval, including with Guard off; headless starts are denied.
+                        Approval is for the exact execution in this session, with no allow-once option. Guard denials
+                        and locks still apply. At most four active or cleanup-unconfirmed tasks are allowed, with 32
+                        completed records, 256 KiB of output per task, and 64 KiB raw-output reads. Log cursors count
+                        UTF-8 bytes including stdout/stderr markers, before terminal-control escaping.
+                    </p>
+                    <p>
+                        Commands use <code>/bin/sh</code> on POSIX or system <code>cmd.exe /d /s /c</code> on Windows,
+                        not Pi's configured Bash. They inherit the process environment except
+                        <code>NODE_OPTIONS</code> and <code>NODE_PATH</code>. No PTY or interactive stdin is provided.
+                    </p>
+                    <p class="doc-boundary">
+                        <strong>Best-effort cleanup, not a sandbox.</strong> Stop tasks when finished. Deadlines,
+                        session replacement, reload, tree navigation, and shutdown initiate cleanup, but escaped
+                        descendants may survive. If cleanup is unconfirmed, retry <code>background_stop</code> for the
+                        listed IDs, then <code>/reload</code> after cleanup confirms. IDs do not survive runtime
+                        replacement; inspect remaining processes manually. Output is memory-only in the extension, but
+                        returned text may enter conversation/provider retention. Read the
+                        <a
+                            href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md#background-task-execution"
+                            >security boundary</a
+                        >.
                     </p>
                 </section>
             </main>

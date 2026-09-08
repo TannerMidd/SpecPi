@@ -8,9 +8,11 @@
     "strict": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
+    "allowJs": true,
     "skipLibCheck": true
   },
   "files": [
+    "extensions/background-tasks/index.ts",
     "extensions/browser/index.ts",
     "extensions/browser/core.d.mts",
     "extensions/browser/diagnostics.ts",

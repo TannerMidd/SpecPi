@@ -182,7 +182,10 @@ export async function terminateOwned(task, { graceMs = 5000, observeMs = 1000 } 
         return ok && task.rootExited;
     }
 
-    // Keep the supervisor alive through grace; after root exit, never signal again.
+    // Preserve grace for a running command/tree. An observed command exit (including
+    // a null exit code for a signal/failure) needs only the remaining group cleanup.
+    // Keep the supervisor alive until escalation; never signal an observed-dead root.
+    const commandExited = task.exitCode !== undefined;
     if (!task.rootExited) {
         try {
             process.kill(-pid, "SIGTERM");
@@ -192,7 +195,10 @@ export async function terminateOwned(task, { graceMs = 5000, observeMs = 1000 } 
             }
         }
 
-        await delay(graceMs);
+        if (!commandExited) {
+            await delay(graceMs);
+        }
+
         if (!task.rootExited) {
             try {
                 process.kill(-pid, "SIGKILL");

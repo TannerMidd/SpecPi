@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { clearAnalysisCache, decideCommand, decidePath } from "./core.mjs";
 import { boundedReason } from "./redact.mjs";
@@ -238,6 +239,24 @@ export default function registerCommandGuard(
     };
 
     subscribeGuardState();
+    const backgroundSource = fileURLToPath(new URL("../background-tasks/index.ts", import.meta.url));
+    const ownsBackgroundTool = (name: string): boolean => {
+        if (!["background_start", "background_list", "background_logs", "background_stop"].includes(name)) {
+            return false;
+        }
+
+        const matches = pi.getAllTools?.().filter((tool) => tool.name === name) ?? [];
+        const source = matches.length === 1 ? matches[0].sourceInfo?.path : undefined;
+        if (typeof source !== "string" || !path.isAbsolute(source)) {
+            return false;
+        }
+
+        const actual = path.resolve(source);
+        const expected = path.resolve(backgroundSource);
+
+        return process.platform === "win32" ? actual.toLowerCase() === expected.toLowerCase() : actual === expected;
+    };
+
     const delegationPolicy = (input: unknown): { fingerprint: string; summary: string } | undefined => {
         let replies = 0;
         let policy: any;
@@ -491,9 +510,10 @@ export default function registerCommandGuard(
                 return deny(state, "Malformed tool call.");
             }
 
-            // Reviewed background tools enforce exact input/admission again in execute.
-            // Observation and owned-task cleanup must remain usable under a lock.
-            if (["background_start", "background_list", "background_logs", "background_stop"].includes(name)) {
+            // Check Pi's current registration provenance, not a tool name or cached handshake.
+            // Genuine background tools validate again in execute; cleanup remains usable under a lock.
+            // A missing or replaced registration retains normal Strict/locked enforcement.
+            if (ownsBackgroundTool(name)) {
                 return;
             }
 

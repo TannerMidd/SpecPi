@@ -3,11 +3,12 @@ import path from "node:path";
 import registerBackgroundTasks from "../../extensions/background-tasks/index.ts";
 import registerCommandGuard from "../../extensions/command-guard/index.ts";
 
-function harness(guard = true) {
+function harness(guard = true, background = true) {
     const handlers = new Map<string, any[]>();
     const bus = new Map<string, Set<any>>();
     const tools = new Map<string, any>();
     const commands = new Map<string, any>();
+    const notices: string[] = [];
     let starts = 0;
     let prompts = 0;
     let stops = 0;
@@ -35,7 +36,13 @@ function harness(guard = true) {
             handlers.set(name, [...(handlers.get(name) ?? []), handler]);
         },
         registerTool(tool: any) {
-            tools.set(tool.name, tool);
+            tools.set(tool.name, {
+                ...tool,
+                sourceInfo: { path: path.resolve("extensions/background-tasks/index.ts") },
+            });
+        },
+        getAllTools() {
+            return [...tools.values()];
         },
         registerCommand(name: string, value: any) {
             commands.set(name, value);
@@ -69,7 +76,9 @@ function harness(guard = true) {
 
                 return confirm(...args);
             },
-            notify() {},
+            notify(message: string) {
+                notices.push(message);
+            },
             setStatus() {},
         },
     };
@@ -77,7 +86,10 @@ function harness(guard = true) {
         registerCommandGuard(pi);
     }
 
-    registerBackgroundTasks(pi, { runner, approvalMs: 30 });
+    if (background) {
+        registerBackgroundTasks(pi, { runner, approvalMs: 30 });
+    }
+
     async function event(name: string, value: any = {}) {
         for (const handler of handlers.get(name) ?? []) {
             const outcome = await handler(value, ctx);
@@ -95,6 +107,7 @@ function harness(guard = true) {
         ctx,
         tools,
         commands,
+        notices,
         runner,
         event,
         call,
@@ -215,6 +228,60 @@ await races.event("session_start");
 assert.equal((await races.event("tool_call", { toolName: "bash", input: { command: catastrophic } }))?.block, true);
 await assert.rejects(races.call("background_start", { command: catastrophic }));
 assert.equal(races.starts, 0);
+
+const standalone = harness(true, false);
+await standalone.event("session_start");
+await standalone.commands.get("guard").handler("strict", standalone.ctx);
+for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
+    assert.equal(
+        (await standalone.event("tool_call", { toolName: name, input: {} }))?.block,
+        true,
+        `Strict must gate unregistered ${name}`,
+    );
+}
+
+await standalone.event("tool_call", { toolName: "bash", input: { command: "rm -rf /" } });
+assert.equal(
+    (await standalone.event("tool_call", { toolName: "bash", input: { command: "echo locked" } }))?.block,
+    true,
+);
+for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
+    assert.equal(
+        (await standalone.event("tool_call", { toolName: name, input: {} }))?.block,
+        true,
+        `Lock must gate unregistered ${name}`,
+    );
+}
+
+const provenance = harness();
+await provenance.event("session_start");
+await provenance.commands.get("guard").handler("strict", provenance.ctx);
+const ownedStop = provenance.tools.get("background_stop");
+assert.equal(await provenance.event("tool_call", { toolName: "background_stop", input: { id: "fixture" } }), undefined);
+const stopSource = ownedStop.sourceInfo;
+ownedStop.sourceInfo = { path: path.resolve("extensions/foreign/index.ts") };
+assert.equal(
+    (await provenance.event("tool_call", { toolName: "background_stop", input: { id: "fixture" } }))?.block,
+    true,
+);
+ownedStop.sourceInfo = stopSource;
+await provenance.event("tool_call", { toolName: "bash", input: { command: "rm -rf /" } });
+assert.equal(await provenance.event("tool_call", { toolName: "background_stop", input: { id: "fixture" } }), undefined);
+ownedStop.sourceInfo = { path: path.resolve("extensions/foreign/index.ts") };
+assert.equal(
+    (await provenance.event("tool_call", { toolName: "background_stop", input: { id: "fixture" } }))?.block,
+    true,
+);
+
+const recovery = harness();
+const held = [{ id: "held-fixture-task", cleanup: "unconfirmed" }];
+recovery.runner.list = () => held;
+recovery.runner.shutdown = async () => held;
+await recovery.event("session_start");
+await assert.rejects(recovery.call("background_start", { command: "echo blocked" }), /active session/);
+assert.match(recovery.notices.join("\n"), /held-fixture-task.*background_start is disabled.*background_stop.*\/reload/);
+await recovery.call("background_stop", { id: "held-fixture-task" });
+assert.equal(recovery.stops, 1);
 
 const bounded = harness(false);
 await bounded.event("session_start");
