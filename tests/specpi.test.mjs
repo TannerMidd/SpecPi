@@ -2193,6 +2193,13 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             );
         }
 
+        for (const file of ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"]) {
+            assert.deepEqual(
+                fs.readFileSync(path.join(agentDir, "extensions", "background-tasks", file)),
+                fs.readFileSync(path.join(repoRoot, "extensions", "background-tasks", file)),
+            );
+        }
+
         assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "smoke.mjs")));
         assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
 
@@ -2202,6 +2209,7 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
             PATH: prependPath(fakeBin),
         });
         assert.equal(doctor.status, 0, doctor.stderr);
+        assert.match(doctor.stdout, /BACKGROUND_TASKS_SMOKE=passed/);
         assert.match(doctor.stdout, /CAPABILITY command-guard verified by command-guard-smoke/);
         assert.match(doctor.stderr, /Managed browser runtime unavailable: .*installation was skipped/);
 
@@ -2213,6 +2221,15 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.match(driftDoctor.stderr, /Modified command-guard file/);
         assert.doesNotMatch(driftDoctor.stdout, /CAPABILITY command-guard verified/);
         fs.writeFileSync(installedGuardCore, installedGuardCoreBytes);
+
+        const backgroundCore = path.join(agentDir, "extensions", "background-tasks", "core.mjs");
+        const backgroundBytes = fs.readFileSync(backgroundCore);
+        fs.appendFileSync(backgroundCore, "\n// fixture drift\n");
+        const backgroundDrift = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
+        assert.notEqual(backgroundDrift.status, 0);
+        assert.match(backgroundDrift.stderr, /Background task smoke skipped/);
+        assert.doesNotMatch(backgroundDrift.stdout, /BACKGROUND_TASKS_SMOKE=passed/);
+        fs.writeFileSync(backgroundCore, backgroundBytes);
 
         const installedRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
         const installedRegistry = fs.readFileSync(installedRegistryPath);
@@ -2373,6 +2390,10 @@ test("install, update, doctor, and uninstall round trip in an isolated agent dir
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "diagnostics.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "interactions.ts")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "lifecycle.ts")), false);
+        for (const file of ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"]) {
+            assert.equal(fs.existsSync(path.join(agentDir, "extensions", "background-tasks", file)), false);
+        }
+
         assert.equal(fs.existsSync(path.join(agentDir, "themes", "specpi-spec.json")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")), false);
         assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);

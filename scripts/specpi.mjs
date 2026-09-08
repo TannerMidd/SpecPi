@@ -46,6 +46,8 @@ const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
 const browserRuntimeMarker = path.join(browserRuntimeDir, "specpi-runtime.json");
 const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
+const backgroundFiles = ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"];
+const backgroundRoot = path.join(agentDir, "extensions", "background-tasks");
 const capabilityRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
 const managedToolsDir = path.join(stateDir, "optional-tools");
 const managedBinDir = path.join(stateDir, "bin");
@@ -752,6 +754,11 @@ function desiredSettingsOperations() {
 
 function managedFiles(includeShell) {
     const files = [
+        ...backgroundFiles.map((name) => [
+            path.join(repoRoot, "extensions", "background-tasks", name),
+            path.join(backgroundRoot, name),
+            0o644,
+        ]),
         [path.join(repoRoot, "extensions", "spec.ts"), path.join(agentDir, "extensions", "spec.ts"), 0o644],
         [
             path.join(repoRoot, "extensions", "spec", "core.mjs"),
@@ -1134,6 +1141,7 @@ async function confirm(message, yes) {
 
 function assertSources() {
     const required = [
+        ...backgroundFiles.map((name) => `extensions/background-tasks/${name}`),
         "extensions/spec.ts",
         "extensions/spec/core.mjs",
         "extensions/ui-refresh/index.ts",
@@ -1934,6 +1942,29 @@ async function doctor() {
             errors.push(`Missing managed optional tool: ${record.target}`);
         } else if (sha256(fs.readFileSync(record.target)) !== record.installedHash) {
             warnings.push(`Modified managed optional tool: ${record.target}`);
+        }
+    }
+
+    const backgroundIntegrity = backgroundFiles.every((name) => {
+        const target = path.join(backgroundRoot, name);
+        const record = manifest.files?.[target];
+
+        return record && fs.existsSync(target) && sha256(fs.readFileSync(target)) === record.installedHash;
+    });
+    if (!backgroundIntegrity || !commandGuardIntegrity) {
+        errors.push("Background task smoke skipped: installed background/Guard checksum integrity failed.");
+    } else {
+        const smoke = spawnSync(process.execPath, [path.join(backgroundRoot, "smoke.mjs")], {
+            cwd: agentDir,
+            encoding: "utf8",
+            timeout: 30000,
+            maxBuffer: 32768,
+            env: { ...process.env, NODE_OPTIONS: "", NODE_PATH: "" },
+        });
+        if (smoke.status === 0 && smoke.stdout.includes("BACKGROUND_TASKS_SMOKE=passed")) {
+            console.log("BACKGROUND_TASKS_SMOKE=passed");
+        } else {
+            errors.push("Installed background task smoke failed or timed out.");
         }
     }
 

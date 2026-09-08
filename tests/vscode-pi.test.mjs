@@ -151,6 +151,94 @@ function connect(child) {
     return { events, request, send, wait };
 }
 
+test("real Pi background approval, startup cancellation and session cleanup", { timeout: 60000 }, async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-background-rpc-"));
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd);
+    const env = isolatedEnvironment(root);
+    const launch = await resolveLaunch({ piPath: piShim, nodePath: process.execPath, env });
+    const child = spawn(
+        launch.command,
+        [
+            ...launch.args,
+            "--mode",
+            "rpc",
+            "--offline",
+            "--no-session",
+            "--no-context-files",
+            "--no-extensions",
+            "--no-skills",
+            "--no-prompt-templates",
+            "--no-themes",
+            "-e",
+            path.join(repository, "tests/fixtures/vscode-pi-harness.ts"),
+            "-e",
+            path.join(repository, "tests/fixtures/background-rpc-harness.ts"),
+            "--provider",
+            "specpi-rpc-fixture",
+            "--model",
+            "offline-fixture",
+        ],
+        { cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
+    );
+    const closed = once(child, "close");
+    const rpc = connect(child);
+    async function start(action, approved = true) {
+        const cursor = rpc.events.length;
+        const pending = rpc.request("prompt", { message: `/background-fixture ${action}` });
+        const dialog = await rpc.wait(
+            (event) => event.method === "confirm" && event.title === "Start background command for this session?",
+            cursor,
+        );
+        rpc.send({ type: "extension_ui_response", id: dialog.id, confirmed: approved });
+        await pending;
+        const notification = await rpc.wait(
+            (event) => event.method === "notify" && /^BACKGROUND_(RESULT|DENIED)/.test(event.message),
+            cursor,
+        );
+
+        return notification.message === "BACKGROUND_DENIED"
+            ? undefined
+            : JSON.parse(notification.message.slice("BACKGROUND_RESULT=".length));
+    }
+
+    function gone(pid) {
+        assert.throws(
+            () => process.kill(pid, 0),
+            (error) => error.code === "ESRCH",
+        );
+    }
+
+    try {
+        await rpc.request("get_state");
+        assert.equal(await start("denied", false), undefined);
+        const running = await start("running");
+        assert.equal(running.status, "running");
+        await rpc.request("new_session");
+        gone(running.supervisorPid);
+        const cancelled = await start("cancel-start");
+        assert.equal(cancelled.cleanup, "confirmed");
+        gone(cancelled.supervisorPid);
+        const uncertain = await start("unconfirmed");
+        await rpc.request("prompt", { message: "/background-fixture fail-cleanup" });
+        const cursor = rpc.events.length;
+        await rpc.request("new_session");
+        await rpc.wait(
+            (event) => event.method === "notify" && event.message.includes("Background cleanup unconfirmed"),
+            cursor,
+        );
+        gone(uncertain.supervisorPid);
+        assert.equal(
+            rpc.events.some((event) => event.type === "agent_start" || event.type === "extension_error"),
+            false,
+        );
+    } finally {
+        child.stdin.end();
+        await closed;
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test(
     "real isolated Pi RPC starts all SpecPi extensions and preserves guarded, visible command workflows",
     { timeout: 60000 },

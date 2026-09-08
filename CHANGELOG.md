@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.0 - 2026-09-07
+
+- Add session-owned background commands with exact interactive approvals, shared Command Guard admission, bounded logs, and best-effort process cleanup.
+- Install and verify the background tools with an offline doctor smoke; document shell, environment, output-retention, and process-tree limits.
+- Clarify repository guidance for concise commits, pull requests, and necessary risk-focused validation.
+
 ## 0.18.1 - 2026-09-07
 
 - Restore Pi's cached model catalogs during delegation setup so switching to catalog-added or updated models resumes workers without a manual toggle or restart. Catalog network refresh stays disabled; exact-model checks, safety revocations and spent quotas remain enforced.

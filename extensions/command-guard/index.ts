@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { clearAnalysisCache, decideCommand, decidePath } from "./core.mjs";
 import { boundedReason } from "./redact.mjs";
@@ -182,8 +183,54 @@ export default function registerCommandGuard(
         rules: {},
     };
     state.onModeChanged = () => pi.events?.emit("specpi:guard-policy-changed", { reason: "guard policy changed" });
+    let backgroundSubscription: (() => void) | undefined;
     let guardStateSubscription: (() => void) | undefined;
     const subscribeGuardState = () => {
+        if (!backgroundSubscription) {
+            backgroundSubscription = pi.events?.on?.("specpi:background-admission", (request: any) => {
+                if (typeof request?.reply !== "function") {
+                    return;
+                }
+
+                const unavailable = !state.ready || state.startupFailed || state.mode === "locked";
+                if (
+                    unavailable ||
+                    !validCommandInput(request.input) ||
+                    typeof request.cwd !== "string" ||
+                    !["bash", "cmd"].includes(request.shell)
+                ) {
+                    request.reply({
+                        mode: state.mode,
+                        generation: state.generation,
+                        action: "deny",
+                        reason: "Command guard is locked, unavailable, or received invalid background input.",
+                    });
+
+                    return;
+                }
+
+                const decision = decideCommand(request.input.command, {
+                    mode: state.mode,
+                    shell: request.shell,
+                    cwd: request.cwd,
+                    platform: process.platform,
+                    hasUI: request.hasUI === true,
+                    cache: false,
+                });
+                recordDecision(state, decision);
+                if (decision.action === "deny") {
+                    deny(state, decision.reason, decision.lockSession === true);
+                }
+
+                request.reply({
+                    mode: state.mode,
+                    generation: state.generation,
+                    action: decision.action,
+                    reason: decision.reason,
+                });
+            });
+        }
+
         if (!guardStateSubscription) {
             guardStateSubscription = pi.events?.on?.("specpi:guard-state", (request: any) => {
                 request.reply({ mode: state.ready && !state.startupFailed ? state.mode : undefined });
@@ -192,6 +239,24 @@ export default function registerCommandGuard(
     };
 
     subscribeGuardState();
+    const backgroundSource = fileURLToPath(new URL("../background-tasks/index.ts", import.meta.url));
+    const ownsBackgroundTool = (name: string): boolean => {
+        if (!["background_start", "background_list", "background_logs", "background_stop"].includes(name)) {
+            return false;
+        }
+
+        const matches = pi.getAllTools?.().filter((tool) => tool.name === name) ?? [];
+        const source = matches.length === 1 ? matches[0].sourceInfo?.path : undefined;
+        if (typeof source !== "string" || !path.isAbsolute(source)) {
+            return false;
+        }
+
+        const actual = path.resolve(source);
+        const expected = path.resolve(backgroundSource);
+
+        return process.platform === "win32" ? actual.toLowerCase() === expected.toLowerCase() : actual === expected;
+    };
+
     const delegationPolicy = (input: unknown): { fingerprint: string; summary: string } | undefined => {
         let replies = 0;
         let policy: any;
@@ -285,6 +350,8 @@ export default function registerCommandGuard(
     });
     pi.on("session_shutdown", (_event, ctx) => {
         reset();
+        backgroundSubscription?.();
+        backgroundSubscription = undefined;
         if (typeof guardStateSubscription === "function") {
             guardStateSubscription();
             guardStateSubscription = undefined;
@@ -441,6 +508,13 @@ export default function registerCommandGuard(
             const input = event?.input;
             if (!name) {
                 return deny(state, "Malformed tool call.");
+            }
+
+            // Check Pi's current registration provenance, not a tool name or cached handshake.
+            // Genuine background tools validate again in execute; cleanup remains usable under a lock.
+            // A missing or replaced registration retains normal Strict/locked enforcement.
+            if (ownsBackgroundTool(name)) {
+                return;
             }
 
             if (!state.ready || state.startupFailed) {

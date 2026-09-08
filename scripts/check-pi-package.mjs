@@ -181,6 +181,8 @@ try {
             "console.log('SPECPI_RESOURCE_PROBE=' + JSON.stringify({\n" +
             "  extensionPaths: extensionResult.extensions.map((extension) => extension.resolvedPath),\n" +
             "  extensionErrors: extensionResult.errors,\n" +
+            "  toolNames: extensionResult.extensions.flatMap((extension) => [...extension.tools.keys()]),\n" +
+            "  toolSources: Object.fromEntries(extensionResult.extensions.flatMap((extension) => [...extension.tools].map(([name, tool]) => [name, tool.sourceInfo.path]))),\n" +
             "  skillNames: loader.getSkills().skills.map((skill) => skill.name),\n" +
             "  themeNames: loader.getThemes().themes.map((theme) => theme.name),\n" +
             "}));\n",
@@ -190,6 +192,7 @@ try {
     assert.ok(probeLine, `Pi resource probe did not return structured output:\n${probeResult.stdout}`);
     const resources = JSON.parse(probeLine.slice("SPECPI_RESOURCE_PROBE=".length));
     for (const expected of [
+        "/extensions/background-tasks/index.ts",
         "/extensions/browser/index.ts",
         "/extensions/command-guard/index.ts",
         "/extensions/delegation/index.ts",
@@ -206,6 +209,15 @@ try {
     }
 
     assert.deepEqual(resources.extensionErrors, [], `Pi reported extension load errors: ${JSON.stringify(resources)}`);
+    for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
+        assert.ok(resources.toolNames.includes(name), `Packaged Pi did not register ${name}`);
+        assert.equal(
+            path.resolve(resources.toolSources[name]),
+            path.resolve(specpiRoot, "extensions/background-tasks/index.ts"),
+            `Unexpected registration provenance for ${name}`,
+        );
+    }
+
     assert.ok(resources.skillNames.includes("specpi-improve"), "Pi did not discover the SpecPi improvement skill");
     assert.ok(resources.skillNames.includes("donsetch"), "Pi did not discover the DonSeTch skill");
     assert.ok(resources.themeNames.includes("specpi-spec"), "Pi did not discover the SpecPi theme");
