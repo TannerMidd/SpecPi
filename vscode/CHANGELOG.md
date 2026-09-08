@@ -1,8 +1,12 @@
 # SpecPi Chat changelog
 
+## 0.4.3
+
+- Refresh extension documentation.
+
 ## 0.4.2
 
-- Resolve shortened chat file links such as `search-results/product-matches.ts` to a unique nested workspace file while preserving line and column positions. Exact paths take priority; ambiguous matches and misspelled filenames produce actionable errors. Search is bounded and excludes private directories and symlinks, with existing file safety checks retained.
+- Resolve shortened chat file links such as `utils/helper.ts` to a unique nested workspace file while preserving line and column positions. Exact paths take priority; ambiguous matches and misspelled filenames produce actionable errors. Search is bounded and excludes private directories and symlinks, with existing file safety checks retained.
 
 ## 0.4.1
 
