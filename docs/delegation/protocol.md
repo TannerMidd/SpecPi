@@ -17,8 +17,10 @@ fresh Pi `ModelRuntime`. The parent model and thinking level are passed explicit
 subject to Pi's clamping. Standard Pi authentication, environment and `models.json`
 resolution apply. Child transport/thinking budgets come from configured global settings;
 project settings are not loaded. Runtime-only authentication, selected extension-provider
-overrides, model-specific headers, startup proxy configuration and safe model-descriptor
-mismatches fail preflight. Parent request hooks,
+overrides, unsupported model-specific headers, startup proxy configuration and safe model-descriptor
+mismatches fail preflight. The exact public Copilot client-identification header set is
+permitted only when independently reconstructed in the child, as specified in the
+[security model](../../SECURITY_MODEL.md). Parent request hooks,
 ephemeral runtime settings, session affinity and ambient resources are not inherited.
 
 Command Guard is optional. Absent and Off states permit activation; an installed

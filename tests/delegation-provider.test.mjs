@@ -605,6 +605,80 @@ test("configured child model mismatches and parent mutation fail closed without 
     await assert.rejects(async () => host.ready(), /lease/u);
 });
 
+test("only exact public Copilot catalog headers are admitted and independently matched", async () => {
+    const catalogHeaders = {
+        "User-Agent": "GitHubCopilotChat/0.35.0",
+        "Editor-Version": "vscode/1.107.0",
+        "Editor-Plugin-Version": "copilot-chat/0.35.0",
+        "Copilot-Integration-Id": "vscode-chat",
+    };
+    const configured = () => {
+        const state = fixture();
+        state.ctx.model.provider = "github-copilot";
+        state.ctx.model.headers = { ...catalogHeaders };
+        state.runtime.getModel = () => ({ ...state.ctx.model, headers: { ...catalogHeaders } });
+
+        return state;
+    };
+
+    const state = configured();
+    const host = state.create();
+    await host.ready();
+    assert.equal(state.initialized(), 1);
+    state.ctx.model.headers["User-Agent"] = "SYNTHETIC_PRIVATE_SENTINEL";
+    await assert.rejects(async () => host.ready(), /runtime provider override/);
+
+    for (const kind of ["extra", "changed", "missing", "getter", "prototype", "provider", "auth", "extension"]) {
+        const rejected = configured();
+        if (kind === "extra") {
+            Object.defineProperty(rejected.ctx.model.headers, "Authorization", {
+                get() {
+                    assert.fail("Authentication headers must not be read");
+                },
+            });
+        } else if (kind === "changed") {
+            rejected.ctx.model.headers["Editor-Version"] = "SYNTHETIC_PRIVATE_SENTINEL";
+        } else if (kind === "missing") {
+            delete rejected.ctx.model.headers["User-Agent"];
+        } else if (kind === "getter") {
+            Object.defineProperty(rejected.ctx.model.headers, "User-Agent", {
+                get() {
+                    assert.fail("Header getters must not run");
+                },
+            });
+        } else if (kind === "prototype") {
+            Object.setPrototypeOf(rejected.ctx.model.headers, { Authorization: "SYNTHETIC_PRIVATE_SENTINEL" });
+        } else if (kind === "provider") {
+            rejected.ctx.model.provider = "anthropic";
+        } else if (kind === "auth") {
+            rejected.ctx.modelRegistry.getProviderAuthStatus = () => ({ source: "runtime" });
+        } else {
+            rejected.ctx.modelRegistry.getRegisteredProviderIds = () => ["github-copilot"];
+        }
+
+        await assert.rejects(async () => rejected.create().ready(), {
+            message: "Delegation cannot inherit this parent runtime provider override",
+        });
+        assert.equal(rejected.initialized(), 0);
+    }
+
+    for (const headers of [undefined, { ...catalogHeaders, Authorization: "SYNTHETIC_PRIVATE_SENTINEL" }]) {
+        const mismatch = configured();
+        mismatch.runtime.getModel = () => ({ ...mismatch.ctx.model, headers });
+        await assert.rejects(mismatch.create().ready(), {
+            message: "The configured child provider or model does not match the selected parent model",
+        });
+        assert.equal(mismatch.opened(), 0);
+    }
+
+    const changed = configured();
+    const changedHost = changed.create();
+    await changedHost.ready();
+    delete changed.ctx.model.headers;
+    assert.equal(changedHost.isCurrent(), false);
+    await assert.rejects(async () => changedHost.ready(), /lease/);
+});
+
 test("session options are closed and cannot add ambient tools", async () => {
     const state = fixture();
     const host = state.create();
@@ -656,6 +730,7 @@ test("real Pi SDK sessions stream, replay tools, apply thinking and auth, and re
         toolReplay: true,
         thinking: true,
         oauth: true,
+        cachedCopilotRoundTrip: true,
         noAmbientResources: true,
         parentHooksExcluded: true,
         settlement: true,

@@ -770,6 +770,90 @@ async function workerFailureProof(root: string) {
     }
 }
 
+async function cachedCopilotRoundTripProof() {
+    // Reproduce pi.dev's public catalog metadata with synthetic subscription
+    // credentials. No work-machine state or provider inference is accessed.
+    const credentials = new InMemoryCredentialStore();
+    const modelsStore = new InMemoryModelsStore();
+    for (const provider of ["github-copilot", "anthropic"]) {
+        await credentials.modify(provider, async () => ({
+            type: "oauth",
+            access: "synthetic-access",
+            refresh: "synthetic-refresh",
+            expires: 8640000000000000,
+        }));
+    }
+
+    const createRuntime = () =>
+        sdk.ModelRuntime.create({ credentials, modelsStore, modelsPath: null, allowModelNetwork: false });
+    const baseline = await createRuntime();
+    const copilot = baseline.getModel("github-copilot", "gpt-5.6-luna")!;
+    const anthropic = baseline
+        .getModels()
+        .find((model) => model.provider === "anthropic" && model.id.startsWith("claude-opus"))!;
+    assert.ok(copilot);
+    assert.ok(anthropic);
+    await modelsStore.write("github-copilot", {
+        models: [
+            {
+                ...copilot,
+                id: "gpt-5.6-luna",
+                headers: {
+                    "User-Agent": "GitHubCopilotChat/0.35.0",
+                    "Editor-Version": "vscode/1.107.0",
+                    "Editor-Plugin-Version": "copilot-chat/0.35.0",
+                    "Copilot-Integration-Id": "vscode-chat",
+                },
+            },
+        ],
+        lastModified: 8640000000000000,
+        checkedAt: Date.now(),
+    });
+    const parent = await createRuntime();
+    const registry = new sdk.ModelRegistry(parent);
+    const ctx = { cwd: process.cwd(), modelRegistry: registry, model: copilot };
+    const injectedSdk = {
+        ...sdk,
+        clampThinkingLevel,
+        ModelRuntime: {
+            create: (options: any) => {
+                assert.deepEqual(options, { allowModelNetwork: false });
+
+                return createRuntime();
+            },
+        },
+        SettingsManager: {
+            create: () => sdk.SettingsManager.inMemory({}),
+            inMemory: sdk.SettingsManager.inMemory,
+        },
+    };
+    let previous;
+    for (const [provider, id] of [
+        ["github-copilot", "gpt-5.6-luna"],
+        ["anthropic", anthropic.id],
+        ["github-copilot", "gpt-5.6-luna"],
+    ]) {
+        ctx.model = parent.getModel(provider, id)!;
+        assert.ok(ctx.model);
+        assert.equal(registry.getProviderAuthStatus(provider).source, "stored");
+        assert.deepEqual(registry.getRegisteredProviderIds(), []);
+        if (previous) {
+            assert.equal(previous.isCurrent(), false);
+        }
+
+        const host = createNativePiHost(ctx, {
+            id: "catalog-round-trip",
+            isCurrent: () => true,
+            sdk: injectedSdk,
+            thinkingLevel: "low",
+        });
+        await host.ready();
+        const child = await host.openSession({ systemPrompt: "Synthetic round-trip preflight.", tools: [] });
+        child.release();
+        previous = host;
+    }
+}
+
 export default async function () {
     assert.match(sdk.VERSION, /^\d+\.\d+\.\d+/u);
     const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-delegation-fixture-")));
@@ -778,10 +862,11 @@ export default async function () {
         await boundsProof(root);
         await settlementProof(root);
         await oauthProof(root);
+        await cachedCopilotRoundTripProof();
         await workerProof(root);
         await workerFailureProof(root);
         console.log(
-            `DELEGATION_FIXTURE=${JSON.stringify({ sdkVersion: sdk.VERSION, realSessions: true, streaming: true, toolReplay: true, thinking: true, oauth: true, noAmbientResources: true, parentHooksExcluded: true, settlement: true })}`,
+            `DELEGATION_FIXTURE=${JSON.stringify({ sdkVersion: sdk.VERSION, realSessions: true, streaming: true, toolReplay: true, thinking: true, oauth: true, cachedCopilotRoundTrip: true, noAmbientResources: true, parentHooksExcluded: true, settlement: true })}`,
         );
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
