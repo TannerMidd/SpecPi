@@ -14,7 +14,10 @@ function result(value: unknown) {
 
 export default function registerBackgroundTasks(
     pi: ExtensionAPI,
-    dependencies: { runner?: any; approvalMs?: number } = {},
+    dependencies: {
+        runner?: Pick<TaskRunner, "closed" | "list" | "shutdown" | "start" | "get" | "stop">;
+        approvalMs?: number;
+    } = {},
 ) {
     let runner = dependencies.runner ?? new TaskRunner();
     let generation = 0;

@@ -12,8 +12,12 @@ import {
 
 const command = (code) => `"${process.execPath}" -e "${code}"`;
 const looping = command("console.log('READY');setInterval(()=>{},1000)");
-const fastTerminate = (task) => terminateOwned(task, { graceMs: 30, observeMs: 3000 });
-async function until(check, timeout = 10000) {
+// Full-suite parallelism can delay Windows root-exit delivery for four taskkill trees.
+// Give observation scheduling headroom without changing production deadlines or retrying signals.
+const cleanupObserveMs = process.platform === "win32" ? 10000 : 3000;
+const fastTerminate = (task) => terminateOwned(task, { graceMs: 30, observeMs: cleanupObserveMs });
+// Outer waits must cover taskkill's 5s deadline plus the Windows observation budget.
+async function until(check, timeout = process.platform === "win32" ? 20000 : 10000) {
     const end = Date.now() + timeout;
     while (!check()) {
         if (Date.now() >= end) {
@@ -124,8 +128,15 @@ test("owned trees stop idempotently, caps are atomic, and shutdown closes admiss
         const results = await Promise.allSettled(Array.from({ length: 5 }, () => runner.start(spec, 2)));
         assert.equal(results.filter((value) => value.status === "fulfilled").length, 4);
         assert.equal(results.filter((value) => value.status === "rejected").length, 1);
+        // Shell spawn acknowledgement is not fixture readiness. Let each cmd/sh finish
+        // launching its Node child before exercising concurrent tree termination.
+        const admitted = results.filter((value) => value.status === "fulfilled").map((value) => value.value);
+        await until(() => admitted.every((value) => /READY/.test(runner.get(value.id).ring.read().output)));
         const shutdown = await runner.shutdown();
-        assert.ok(shutdown.every((value) => value.cleanup === "confirmed"));
+        assert.ok(
+            shutdown.every((value) => value.cleanup === "confirmed"),
+            JSON.stringify(shutdown),
+        );
         await assert.rejects(runner.start(spec, 2), /closed/);
         assert.throws(() => runner.get("not-a-task"));
     } finally {
@@ -149,6 +160,7 @@ test("natural exit, deadline, cancellation and unconfirmed cleanup remain observ
         await until(() => runner.get(timed.id).cleanup === "unconfirmed");
         assert.equal(runner.get(timed.id).status, "cleanup-unconfirmed");
         assert.equal(runner.get(timed.id).reason, "timeout");
+        await until(() => /READY/.test(runner.get(timed.id).ring.read().output));
         runner.terminate = fastTerminate;
         assert.equal((await runner.stop(timed.id)).status, "killed");
         const controller = new AbortController();
@@ -158,6 +170,7 @@ test("natural exit, deadline, cancellation and unconfirmed cleanup remain observ
         assert.equal(cancelled.cleanup, "confirmed");
         assert.equal(cancelled.status, "killed");
         const owned = await runner.start(normalizeStart({ command: looping }, process.cwd()), 1);
+        await until(() => /READY/.test(runner.get(owned.id).ring.read().output));
         runner.terminate = async () => false;
         assert.equal((await runner.stop(owned.id)).status, "cleanup-unconfirmed");
         assert.ok(runner.tasks.has(owned.id));
