@@ -1273,7 +1273,7 @@ class ChatController {
             this.isForeground() &&
             this.workspace === workspace &&
             this.requireWorkspace() === workspacePath;
-        const target = await resolveCodeReference({ workspacePath, reference });
+        const target = await resolveCodeReference({ workspacePath, reference, allowSuffixMatch: true });
         if (!current()) {
             return;
         }

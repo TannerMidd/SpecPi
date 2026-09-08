@@ -108,7 +108,64 @@ function within(root, candidate) {
     return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-async function resolveCodeReference({ workspacePath, reference }) {
+async function findShortReference(workspace, reference) {
+    const suffix = path.normalize(reference);
+    const compare = (value) => (process.platform === "win32" ? value.toLowerCase() : value);
+    const pending = [workspace];
+    let match;
+    let visited = 0;
+    while (pending.length) {
+        const directory = pending.pop();
+        const canonical = await fs.realpath(directory);
+        if (
+            canonical !== directory ||
+            !within(workspace, canonical) ||
+            sensitivePath(canonical) ||
+            /(?:^|[/\\])(?:\.git|node_modules|\.pi|tannermidd\.specpi-chat)(?:[/\\]|$)/iu.test(canonical)
+        ) {
+            throw new Error(
+                "The workspace changed while finding this reference. Use its full workspace-relative path.",
+            );
+        }
+
+        for await (const entry of await fs.opendir(directory)) {
+            visited += 1;
+            if (visited > 10_000) {
+                throw new Error(
+                    "This shortened reference requires too much searching. Use its full workspace-relative path.",
+                );
+            }
+
+            const candidate = path.join(directory, entry.name);
+            if (
+                [".git", "node_modules", ".pi", "tannermidd.specpi-chat"].includes(entry.name.toLowerCase()) ||
+                sensitivePath(candidate) ||
+                entry.isSymbolicLink()
+            ) {
+                continue;
+            }
+
+            if (entry.isDirectory()) {
+                pending.push(candidate);
+            } else if (
+                entry.isFile() &&
+                compare(path.relative(workspace, candidate)).endsWith(compare(`${path.sep}${suffix}`))
+            ) {
+                if (match) {
+                    throw new Error(
+                        "This shortened reference matches multiple workspace files. Use its full workspace-relative path.",
+                    );
+                }
+
+                match = candidate;
+            }
+        }
+    }
+
+    return match;
+}
+
+async function resolveCodeReference({ workspacePath, reference, allowSuffixMatch = false }) {
     const parsed = parseCodeReference(reference);
     if (!parsed) {
         throw new Error("This is not a supported workspace file reference.");
@@ -124,7 +181,7 @@ async function resolveCodeReference({ workspacePath, reference }) {
     }
 
     const workspace = path.resolve(workspacePath);
-    const selectedPath = path.resolve(workspace, parsed.path);
+    let selectedPath = path.resolve(workspace, parsed.path);
     if (!within(workspace, selectedPath)) {
         throw new Error("Code references must be inside the selected workspace.");
     }
@@ -139,9 +196,32 @@ async function resolveCodeReference({ workspacePath, reference }) {
     let canonicalFile;
     let info;
     try {
-        [canonicalWorkspace, canonicalFile] = await Promise.all([fs.realpath(workspace), fs.realpath(selectedPath)]);
+        canonicalWorkspace = await fs.realpath(workspace);
     } catch {
-        throw new Error("This workspace file is unavailable. Check that it still exists.");
+        throw new Error("This workspace is unavailable. Check that it is accessible.");
+    }
+
+    try {
+        canonicalFile = await fs.realpath(selectedPath);
+    } catch (error) {
+        if (
+            error.code === "ENOENT" &&
+            allowSuffixMatch &&
+            !path.isAbsolute(parsed.path) &&
+            !parsed.path.split("/").includes("..")
+        ) {
+            selectedPath = await findShortReference(canonicalWorkspace, parsed.path);
+        } else {
+            throw new Error("This workspace file is unavailable. Check its path and access permissions.");
+        }
+
+        if (!selectedPath) {
+            throw new Error(
+                "This workspace file is unavailable. No file matches this link; check its spelling and path.",
+            );
+        }
+
+        canonicalFile = await fs.realpath(selectedPath);
     }
 
     if (!within(canonicalWorkspace, canonicalFile)) {

@@ -168,6 +168,60 @@ test("code references preserve literal percent filenames and decode only explici
     }
 });
 
+test("chat links resolve unique shortened paths and preserve positions, with exact paths taking priority", async (t) => {
+    const { workspace } = await fixture(t);
+    const nested = path.join(workspace, "components", "search-results");
+    await fs.mkdir(nested, { recursive: true });
+    const file = path.join(nested, "product-matches.ts");
+    await fs.writeFile(file, "source");
+    const reference = "search-results/product-matches.ts:2:3";
+    await assert.rejects(resolveCodeReference({ workspacePath: workspace, reference }), /unavailable/u);
+    assert.deepEqual(await resolveCodeReference({ workspacePath: workspace, reference, allowSuffixMatch: true }), {
+        path: await fs.realpath(file),
+        line: 2,
+        column: 3,
+    });
+    await fs.mkdir(path.join(workspace, "search-results"));
+    const exact = path.join(workspace, "search-results", "product-matches.ts");
+    await fs.writeFile(exact, "exact");
+    assert.equal(
+        (await resolveCodeReference({ workspacePath: workspace, reference, allowSuffixMatch: true })).path,
+        await fs.realpath(exact),
+    );
+});
+
+test("shortened links reject ambiguity, spelling guesses, and missing absolute paths", async (t) => {
+    const { workspace } = await fixture(t);
+    await fs.mkdir(path.join(workspace, "other"));
+    await fs.writeFile(path.join(workspace, "other", "source.js"), "duplicate");
+    const resolve = (reference) =>
+        resolveCodeReference({ workspacePath: workspace, reference, allowSuffixMatch: true });
+    await assert.rejects(resolve("source.js"), /multiple workspace files/u);
+    await assert.rejects(resolve("sorce.js"), /No file matches/u);
+    await assert.rejects(resolve(path.join(workspace, "source.js")), /unavailable/u);
+    await assert.rejects(resolve("absent/../source.js"), /unavailable/u);
+});
+
+test("shortened links skip private trees and symlinks and still reject hard links", async (t) => {
+    const { directory, workspace } = await fixture(t);
+    const outside = path.join(directory, "outside");
+    await fs.mkdir(outside);
+    await fs.writeFile(path.join(outside, "outside.js"), "synthetic");
+    await fs.symlink(outside, path.join(workspace, "linked"), process.platform === "win32" ? "junction" : "dir");
+    for (const name of [".pi", ".git", "node_modules", ".aws"]) {
+        await fs.mkdir(path.join(workspace, name));
+        await fs.writeFile(path.join(workspace, name, "hidden.js"), "synthetic");
+    }
+
+    const resolve = (reference) =>
+        resolveCodeReference({ workspacePath: workspace, reference, allowSuffixMatch: true });
+    await assert.rejects(resolve("outside.js"), /No file matches/u);
+    await assert.rejects(resolve("hidden.js"), /No file matches/u);
+    await assert.rejects(resolve(".env"), /cannot be opened from chat/u);
+    await fs.link(path.join(outside, "outside.js"), path.join(workspace, "src", "hardlinked.js"));
+    await assert.rejects(resolve("hardlinked.js"), /hard links/u);
+});
+
 test("code references reject missing paths, directories, and malformed requests", async (t) => {
     const { workspace } = await fixture(t);
     await assert.rejects(

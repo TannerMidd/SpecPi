@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.4.2
+
+- Resolve shortened chat file links such as `search-results/product-matches.ts` to a unique nested workspace file while preserving line and column positions. Exact paths take priority; ambiguous matches and misspelled filenames produce actionable errors. Search is bounded and excludes private directories and symlinks, with existing file safety checks retained.
+
 ## 0.4.1
 
 - Open workspace PNG, JPEG, GIF and WebP links in the image viewer instead of trying to open them as text. Normal Markdown links and inline file references use the same validated preview path as Markdown images; remote links still open externally.
