@@ -118,6 +118,9 @@ function getWebviewHtml({
             </div>
             <div class="composer" id="composer">
                 <div id="attachments" class="attachments" aria-label="Attached context" hidden></div>
+                <div id="selection-chip" class="selection-chip" hidden>
+                    <button id="selection-chip-toggle" class="selection-chip-toggle" type="button" aria-pressed="true" title="Include the editor selection with your next message"><span id="selection-chip-text"></span></button>
+                </div>
                 <div id="image-drop-target" class="image-drop-target" hidden>Drop images or workspace files to attach</div>
                 <div id="attach-menu" class="attach-menu" role="menu" aria-label="Attach context" hidden>
                     <button id="attach-file" role="menuitem" type="button">${icon("attach")} Workspace file</button>

@@ -215,10 +215,10 @@ test("file suggestions enumerate only selected-workspace metadata and filter pri
             type: "fileSuggestions",
             requestId: "query-1",
             files: [
-                { path: "sessions/view.ts", label: "sessions/view.ts" },
-                { path: "src/a.js", label: "src/a.js" },
-                { path: "src/auth.ts", label: "src/auth.ts" },
-                { path: "src/b.js", label: "src/b.js" },
+                { path: "sessions/view.ts", label: "sessions/view.ts", kind: "file" },
+                { path: "src/a.js", label: "src/a.js", kind: "file" },
+                { path: "src/auth.ts", label: "src/auth.ts", kind: "file" },
+                { path: "src/b.js", label: "src/b.js", kind: "file" },
             ],
         },
     ]);
@@ -234,7 +234,7 @@ test("file suggestions bound input/output and prefer matching paths and basename
     assert.equal(f.posts[0].files.length, 30);
     assert.equal(f.posts[0].files[0].path, "source.js");
     await findFiles(f.controller, f.vscode, "src\\", 2);
-    assert.deepEqual(f.posts[1].files, [{ path: "src/source.js", label: "src/source.js" }]);
+    assert.deepEqual(f.posts[1].files, [{ path: "src/source.js", label: "src/source.js", kind: "file" }]);
     f.vscode.workspace.findFiles = () => {
         throw new Error("Invalid queries must not perform searches.");
     };
@@ -272,7 +272,14 @@ test("file suggestions narrow filename and directory queries before the 500 matc
         "later/Sub/another.js",
     ]);
     await findFiles(f.controller, f.vscode, "later", 3);
-    assert.equal(f.posts[2].files.length, 3);
+    assert.equal(f.posts[2].files.length, 5);
+    assert.deepEqual(
+        f.posts[2].files
+            .filter((file) => file.kind === "directory")
+            .map((file) => file.path)
+            .sort(),
+        ["later/", "later/Sub/"],
+    );
     await findFiles(f.controller, f.vscode, "", 4);
     assert.equal(f.posts[3].files.length, 30);
     assert.ok(f.posts[3].files.every((file) => file.path.startsWith("ordinary/")));
@@ -694,4 +701,96 @@ test("Git review provides useful empty/missing-Git fallbacks without staging or 
     await reviewChanges(unrelated.controller, unrelated.vscode);
     assert.deepEqual(unrelated.calls, [["workbench.view.scm"]]);
     assert.ok(![missing, empty, unrelated].some((f) => f.calls.some(([type]) => /stage|restore|checkout/u.test(type))));
+});
+
+test("file suggestions respect files.exclude, search.exclude, and the workspace .gitignore", async (t) => {
+    const f = await diskFixture(t);
+    await fs.writeFile(path.join(f.root, "generated.js"), "generated\n");
+    await fs.writeFile(path.join(f.root, "notes.log"), "log\n");
+    await fs.writeFile(path.join(f.root, "keep.log"), "kept log\n");
+    await fs.mkdir(path.join(f.root, "dist"));
+    await fs.writeFile(path.join(f.root, "dist", "bundle.js"), "bundle\n");
+    await fs.writeFile(path.join(f.root, "src", "generated.js"), "nested generated\n");
+    await fs.writeFile(path.join(f.root, ".gitignore"), "*.log\n!keep.log\ndist/\n");
+    f.vscode.workspace.getConfiguration = (section) => ({
+        get(property) {
+            if (section === "files" && property === "exclude") {
+                return { "**/generated.js": true };
+            }
+
+            if (section === "search" && property === "exclude") {
+                return { "**/extra.tmp": true };
+            }
+
+            return undefined;
+        },
+    });
+    f.vscode.workspace.findFiles = async (pattern) =>
+        ["generated.js", "notes.log", "keep.log", "dist/bundle.js", "src/generated.js"]
+            .filter((name) => path.posix.matchesGlob(name, pattern.pattern) || pattern.pattern.includes("*/**"))
+            .map((name) => uri(path.join(f.root, name)));
+
+    await findFiles(f.controller, f.vscode, "generated", "q1");
+    // files.exclude applies at any depth; .gitignore does not re-include settings exclusions.
+    assert.deepEqual(f.posts[0].files, []);
+    await findFiles(f.controller, f.vscode, "log", "q2");
+    assert.deepEqual(
+        f.posts[1].files.map((file) => file.path),
+        ["keep.log"],
+    );
+    await findFiles(f.controller, f.vscode, "dist", "q3");
+    // The directory rule hides both the folder candidate and files beneath it.
+    assert.deepEqual(f.posts[2].files, []);
+    await findFiles(f.controller, f.vscode, "extra", "q4");
+    assert.deepEqual(f.posts[3].files, []);
+});
+
+test("search.useIgnoreFiles=false restores gitignored files in suggestions", async (t) => {
+    const f = await diskFixture(t);
+    await fs.writeFile(path.join(f.root, "notes.log"), "log\n");
+    await fs.writeFile(path.join(f.root, ".gitignore"), "*.log\n");
+    f.vscode.workspace.getConfiguration = (section) => ({
+        get(property) {
+            if (section === "search" && property === "useIgnoreFiles") {
+                return false;
+            }
+
+            return {};
+        },
+    });
+    f.vscode.workspace.findFiles = async () => [uri(path.join(f.root, "notes.log"))];
+
+    await findFiles(f.controller, f.vscode, "log", "q1");
+    assert.deepEqual(f.posts[0].files, [{ path: "notes.log", label: "notes.log", kind: "file" }]);
+});
+
+test("directory suggestions keep matching folders with kind and trailing slash", async (t) => {
+    const f = await diskFixture(t);
+    await fs.mkdir(path.join(f.root, "components", "inner"), { recursive: true });
+    await fs.writeFile(path.join(f.root, "components", "button.tsx"), "button\n");
+    await fs.writeFile(path.join(f.root, "components", "inner", "field.tsx"), "field\n");
+    await fs.writeFile(path.join(f.root, ".gitignore"), "secret/\n");
+    await fs.mkdir(path.join(f.root, "secretFolder"));
+    await fs.writeFile(path.join(f.root, "secretFolder", "hidden.js"), "hidden\n");
+    await fs.mkdir(path.join(f.root, "secret"));
+    await fs.writeFile(path.join(f.root, "secret", "key.txt"), "key\n");
+    f.vscode.workspace.getConfiguration = () => ({ get: () => ({}) });
+    f.vscode.workspace.findFiles = async (pattern) =>
+        ["components/button.tsx", "components/inner/field.tsx", "secretFolder/hidden.js", "secret/key.txt"]
+            .filter((name) => path.posix.matchesGlob(name, pattern.pattern))
+            .map((name) => uri(path.join(f.root, name)));
+
+    await findFiles(f.controller, f.vscode, "components", "q1");
+    const directories = f.posts[0].files.filter((file) => file.kind === "directory");
+    assert.deepEqual(
+        directories.map((file) => file.path),
+        ["components/", "components/inner/"],
+    );
+    await findFiles(f.controller, f.vscode, "secret", "q2");
+    // The gitignored secret/ directory never appears; the similarly named
+    // secretFolder/ does, because it is not itself ignored.
+    assert.deepEqual(
+        f.posts[1].files.filter((file) => file.kind === "directory").map((file) => file.path),
+        ["secretFolder/"],
+    );
 });

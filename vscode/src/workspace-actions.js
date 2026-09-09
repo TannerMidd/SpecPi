@@ -3,10 +3,15 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { sensitivePath } = require("./context");
+const { compileSettingExcludes, isIgnored, isSettingExcluded, parseIgnoreFile } = require("./file-filters");
 const { parseCodeReference, resolveCodeReference } = require("./code-references");
 
 const FILE_EXCLUDES =
     "{**/.git/**,**/node_modules/**,**/.pi/**,**/.ssh/**,**/.gnupg/**,**/.aws/**,**/.azure/**,**/.kube/**}";
+const RESERVED_DIRECTORIES = new Set([".git", ".pi", "node_modules"]);
+const MAX_DIRECTORY_SUGGESTIONS = 200;
+const ignoreCache = new Map();
+const settingCache = new Map();
 const latestSearch = new WeakMap();
 const GROUPS = [
     ["workingTreeChanges", "Working tree"],
@@ -118,6 +123,112 @@ function suggestionPatterns(needle) {
     return [`**/*${literal}*`, `**/*${literal}*/**`];
 }
 
+async function ignoreRules(workspacePath) {
+    // The root .gitignore is re-read only when its size or modification time
+    // changes, so repeated suggestion searches stay cheap.
+    const ignorePath = path.join(workspacePath, ".gitignore");
+    let info;
+    try {
+        info = await fs.stat(ignorePath);
+    } catch {
+        return [];
+    }
+
+    const key = `${info.mtimeMs}:${info.size}`;
+    const cached = ignoreCache.get(workspacePath);
+    if (cached && cached.key === key) {
+        return cached.rules;
+    }
+
+    let rules = [];
+    try {
+        rules = parseIgnoreFile(await fs.readFile(ignorePath, "utf8"));
+    } catch {
+        rules = [];
+    }
+
+    ignoreCache.set(workspacePath, { key, rules });
+    while (ignoreCache.size > 8) {
+        ignoreCache.delete(ignoreCache.keys().next().value);
+    }
+
+    return rules;
+}
+
+function settingEntries(vscode, workspace, section, property) {
+    try {
+        const value = vscode.workspace.getConfiguration(section, workspace.uri).get(property);
+
+        return value && typeof value === "object" ? value : {};
+    } catch {
+        return {};
+    }
+}
+
+function compiledSettingRules(vscode, workspace) {
+    // Every keystroke rebuilds the filter, so the compiled globs are reused
+    // between searches. The serialized entries are the key, which recompiles
+    // as soon as either setting changes.
+    const files = settingEntries(vscode, workspace, "files", "exclude");
+    const search = settingEntries(vscode, workspace, "search", "exclude");
+    const key = JSON.stringify([files, search]);
+    const cached = settingCache.get(key);
+    if (cached) {
+        return cached;
+    }
+
+    const rules = compileSettingExcludes(files, search);
+    settingCache.set(key, rules);
+    while (settingCache.size > 8) {
+        settingCache.delete(settingCache.keys().next().value);
+    }
+
+    return rules;
+}
+
+async function workspaceHiddenFilter(vscode, workspace, workspacePath) {
+    // An explicit findFiles exclude would replace the API's own respect for
+    // files.exclude and search.exclude, so those settings are applied here
+    // together with the root .gitignore instead.
+    const settingRules = compiledSettingRules(vscode, workspace);
+    let useIgnoreFiles = true;
+    try {
+        const configured = vscode.workspace.getConfiguration("search", workspace.uri).get("useIgnoreFiles");
+        if (typeof configured === "boolean") {
+            useIgnoreFiles = configured;
+        }
+    } catch {
+        // Default respect for ignore files stays on when settings are unreadable.
+    }
+
+    const rules = useIgnoreFiles ? await ignoreRules(workspacePath) : [];
+
+    return (relative, isDirectory = false) => {
+        if (isSettingExcluded(settingRules, relative, isDirectory)) {
+            return true;
+        }
+
+        return useIgnoreFiles && isIgnored(rules, relative, isDirectory);
+    };
+}
+
+function reservedDirectory(workspacePath, relative) {
+    return (
+        relative.split("/").some((part) => RESERVED_DIRECTORIES.has(part.toLowerCase())) ||
+        sensitivePath(path.join(workspacePath, ...relative.split("/")))
+    );
+}
+
+function ancestorDirectories(relative) {
+    const segments = relative.split("/");
+    const directories = [];
+    for (let depth = 1; depth < segments.length; depth += 1) {
+        directories.push(segments.slice(0, depth).join("/"));
+    }
+
+    return directories;
+}
+
 async function findFiles(controller, vscode, query, requestId) {
     const context = capture(controller, vscode);
     const search = {};
@@ -165,11 +276,34 @@ async function findWorkspaceFiles(controller, vscode, query, requestId, context,
 
     // File discovery returns names only. The chosen attachment is validated and
     // read by the host's existing attachment collector after human selection.
+    // Directory suggestions derive from ancestor folders of matching files so
+    // no extra workspace walk is needed per keystroke.
+    const hidden = await workspaceHiddenFilter(vscode, context.workspace, context.workspacePath);
+    if (!context.current() || latestSearch.get(controller) !== search) {
+        return;
+    }
+
     const names = new Set();
+    const directories = new Set();
     for (const uri of uris.slice(0, 500)) {
         const relative = relativeFile(context.workspacePath, uri);
-        if (relative && relative.toLowerCase().includes(needle)) {
-            names.add(relative);
+        if (!relative || !relative.toLowerCase().includes(needle) || hidden(relative)) {
+            continue;
+        }
+
+        names.add(relative);
+        for (const directory of needle ? ancestorDirectories(relative) : []) {
+            if (
+                directories.size >= MAX_DIRECTORY_SUGGESTIONS ||
+                directories.has(directory) ||
+                !directory.toLowerCase().includes(needle) ||
+                reservedDirectory(context.workspacePath, directory) ||
+                hidden(directory, true)
+            ) {
+                continue;
+            }
+
+            directories.add(directory);
         }
     }
 
@@ -179,10 +313,16 @@ async function findWorkspaceFiles(controller, vscode, query, requestId, context,
         return lower.startsWith(needle) ? 0 : path.posix.basename(lower).startsWith(needle) ? 1 : 2;
     };
 
-    const files = [...names]
-        .sort((left, right) => score(left) - score(right) || left.localeCompare(right))
-        .slice(0, 30)
-        .map((name) => ({ path: name, label: name }));
+    const files = [
+        ...[...names].map((name) => ({ path: name, label: name, kind: "file" })),
+        ...[...directories].map((directory) => ({
+            path: `${directory}/`,
+            label: `${directory}/`,
+            kind: "directory",
+        })),
+    ]
+        .sort((left, right) => score(left.path) - score(right.path) || left.path.localeCompare(right.path))
+        .slice(0, 30);
     controller.post({ type: "fileSuggestions", requestId, files });
 }
 
@@ -467,4 +607,4 @@ async function reviewWorkspaceChanges(context, vscode) {
     }
 }
 
-module.exports = { findFiles, reviewChanges };
+module.exports = { findFiles, reviewChanges, relativeFile, workspaceHiddenFilter };

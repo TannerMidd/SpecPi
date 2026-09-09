@@ -271,3 +271,100 @@ test("VS Code prompt keeps exact user request and fences hostile source delimite
     );
     assert.throws(() => formatPrompt("x", [{ label: "x", text: "a".repeat(MAX_ATTACHMENT_BYTES + 1) }]), /64 KiB/u);
 });
+
+test("directory listings enumerate bounded, sorted snapshots with sizes", async (t) => {
+    const { collectDirectoryAttachment } = contextModule;
+    const { workspace } = await fixture(t);
+    await fs.mkdir(path.join(workspace, "src", "nested"), { recursive: true });
+    await fs.writeFile(path.join(workspace, "src", "b.txt"), "12345");
+    await fs.writeFile(path.join(workspace, "src", "a.txt"), "1234");
+    await fs.writeFile(path.join(workspace, "src", "nested", "c.txt"), "123");
+    const attachment = await collectDirectoryAttachment({
+        workspacePath: workspace,
+        filePath: path.join(workspace, "src"),
+    });
+    assert.equal(attachment.label, "src/");
+    assert.match(attachment.detail, /^4 entries · Directory listing$/u);
+    assert.equal(attachment.text, "src/\na.txt (4 B)\nb.txt (5 B)\nnested/\n  c.txt (3 B)\n");
+});
+
+test("directory listings skip sensitive paths and honor the ignore filter", async (t) => {
+    const { collectDirectoryAttachment } = contextModule;
+    const { workspace } = await fixture(t);
+    await fs.mkdir(path.join(workspace, "lib", ".ssh"), { recursive: true });
+    await fs.writeFile(path.join(workspace, "lib", ".ssh", "id_rsa"), "secret");
+    await fs.writeFile(path.join(workspace, "lib", "ignored.txt"), "ignored");
+    await fs.writeFile(path.join(workspace, "lib", "kept.txt"), "kept");
+    const attachment = await collectDirectoryAttachment({
+        workspacePath: workspace,
+        filePath: path.join(workspace, "lib"),
+        // Ignore filters receive workspace-relative paths, matching suggestions.
+        hiddenFilter: (relative) => relative === "lib/ignored.txt",
+    });
+    assert.ok(!attachment.text.includes("id_rsa"));
+    assert.ok(!attachment.text.includes("ignored.txt"));
+    assert.ok(attachment.text.includes("kept.txt"));
+});
+
+test("directory listings reject files, traversal, and missing folders", async (t) => {
+    const { collectDirectoryAttachment } = contextModule;
+    const { directory, workspace } = await fixture(t);
+    const textPath = path.join(workspace, "file.txt");
+    await fs.writeFile(textPath, "text");
+    await assert.rejects(
+        collectDirectoryAttachment({ workspacePath: workspace, filePath: textPath }),
+        /Only regular workspace folders/u,
+    );
+    await assert.rejects(
+        collectDirectoryAttachment({ workspacePath: workspace, filePath: "../outside" }),
+        /inside the selected workspace/u,
+    );
+    await assert.rejects(
+        collectDirectoryAttachment({ workspacePath: workspace, filePath: path.join(workspace, "missing") }),
+        /unavailable/u,
+    );
+    await assert.rejects(
+        collectDirectoryAttachment({ workspacePath: workspace, filePath: undefined }),
+        /Choose a workspace/u,
+    );
+    assert.ok(directory);
+});
+
+test("directory listings stop at their entry and byte caps with an explicit notice", async (t) => {
+    const { collectDirectoryAttachment } = contextModule;
+    const { workspace } = await fixture(t);
+    await fs.mkdir(path.join(workspace, "big"));
+    for (let index = 0; index < 250; index += 1) {
+        await fs.writeFile(path.join(workspace, "big", `file${index}.txt`), "x");
+    }
+
+    const attachment = await collectDirectoryAttachment({
+        workspacePath: workspace,
+        filePath: path.join(workspace, "big"),
+    });
+    const nonEmpty = attachment.text.split("\n").filter((line) => line.length > 0);
+    // Header line, exactly 200 entry lines, then the truncation notice.
+    assert.equal(nonEmpty.length, 202);
+    assert.match(attachment.text, /\[Listing truncated at 200 entries or 16 KB\.\]/u);
+});
+
+test("long entry names truncate the listing instead of refusing the folder", async (t) => {
+    const { collectDirectoryAttachment } = contextModule;
+    const { workspace } = await fixture(t);
+    await fs.mkdir(path.join(workspace, "big"));
+    // Few files, but names long enough that one entry line overshoots the
+    // remaining byte budget once the walk records it.
+    for (let index = 0; index < 120; index += 1) {
+        await fs.writeFile(path.join(workspace, "big", `${String(index).padStart(3, "0")}${"n".repeat(200)}.txt`), "x");
+    }
+
+    const attachment = await collectDirectoryAttachment({
+        workspacePath: workspace,
+        filePath: path.join(workspace, "big"),
+    });
+    assert.ok(Buffer.byteLength(attachment.text, "utf8") <= 16 * 1024);
+    assert.match(attachment.text, /\[Listing truncated at 200 entries or 16 KB\.\]/u);
+    const listed = attachment.text.split("\n").filter((line) => line.includes(".txt")).length;
+    assert.ok(listed > 0 && listed < 120);
+    assert.equal(attachment.detail, `${listed} entries · Directory listing`);
+});

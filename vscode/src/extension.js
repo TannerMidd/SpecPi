@@ -1,5 +1,7 @@
 const vscode = require("vscode");
 const { randomUUID, createHash } = require("node:crypto");
+const fs = require("node:fs/promises");
+const path = require("node:path");
 const { RpcClient } = require("./rpc-client.js");
 const { resolveLaunch } = require("./launch.js");
 const {
@@ -11,11 +13,17 @@ const {
     safeModel,
     appendNotice,
 } = require("./chat-state.js");
-const { collectAttachment, formatPrompt } = require("./context.js");
+const {
+    collectAttachment,
+    collectDirectoryAttachment,
+    formatPrompt,
+    sensitivePath,
+    MAX_ATTACHMENTS,
+} = require("./context.js");
 const { resolveCodeReference } = require("./code-references.js");
 const { collectImageAttachment, normalizeImage, MAX_IMAGE_TOTAL_BYTES } = require("./images.js");
 const { editPrompt, forkChat, exportChat, showUsage, markdownTranscript } = require("./conversation-actions.js");
-const { findFiles, reviewChanges } = require("./workspace-actions.js");
+const { findFiles, reviewChanges, relativeFile, workspaceHiddenFilter } = require("./workspace-actions.js");
 const { ImageQueue } = require("./image-queue.js");
 const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./delegates.js");
 const { ConversationCoordinator } = require("./conversation-coordinator.js");
@@ -23,6 +31,13 @@ const { ConversationCoordinator } = require("./conversation-coordinator.js");
 const PREFIX = "specpi.chat";
 const MAX_INPUT = 64 * 1024;
 const DIALOG_METHODS = new Set(["select", "confirm", "input", "editor"]);
+
+function withinWorkspace(root, candidate) {
+    const relative = path.relative(root, candidate);
+
+    return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
 const ACTIVE_STATUSES = new Set(["busy", "retrying", "compacting"]);
 const USAGE_STATUS_KEYS = new Set(["aa-codex-usage", "provider-usage"]);
 
@@ -61,6 +76,7 @@ class ChatController {
 
         this.state.sending = this.sending || this.transitioning;
         this.state.contextToken = this.contextToken();
+        this.state.selectionContext = this.coordinator?.selectionContext || null;
         this.state.recoveredDrafts = this.imageQueue.recovered.map((item) => ({
             id: item.id,
             text: item.text,
@@ -640,9 +656,20 @@ class ChatController {
             throw new Error("Wait for the current chat action to finish.");
         }
 
+        const selectionAttachment = await this.collectSelectionAttachment();
+        if (selectionAttachment && this.attachments.length >= MAX_ATTACHMENTS) {
+            throw new Error(
+                "This message already holds eight attachments. Hide the editor selection above the composer, or remove an attachment, then send again.",
+            );
+        }
+
         this.sending = true;
         this.publish();
         const attached = [...this.attachments];
+        if (selectionAttachment) {
+            attached.push(selectionAttachment);
+        }
+
         const workspace = this.workspace;
         let client;
         let connectionGeneration;
@@ -899,6 +926,134 @@ class ChatController {
         }
     }
 
+    updateSelectionContext() {
+        this.coordinator.updateSelectionContext();
+    }
+
+    currentSelectionContext() {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.selection.isEmpty || editor.document.uri.scheme !== "file") {
+            return null;
+        }
+
+        let workspacePath;
+        try {
+            workspacePath = this.requireWorkspace();
+        } catch {
+            return null;
+        }
+
+        const filePath = editor.document.uri.fsPath;
+        if (!withinWorkspace(workspacePath, filePath) || sensitivePath(filePath)) {
+            return null;
+        }
+
+        const startLine = editor.selection.start.line + 1;
+        const endLine = editor.selection.end.line + 1;
+
+        return {
+            filePath,
+            startLine,
+            endLine,
+            lineCount: Math.max(1, endLine - startLine + 1),
+        };
+    }
+
+    async collectSelectionAttachment() {
+        // The chip's toggle rides the per-conversation draft record, so the
+        // offer is only read when that conversation still includes it.
+        const offered = this.coordinator?.selectionOffer(this);
+        if (!offered) {
+            return null;
+        }
+
+        const workspacePath = this.requireWorkspace();
+        if (!withinWorkspace(workspacePath, offered.filePath)) {
+            return null;
+        }
+
+        let document;
+        try {
+            document = await vscode.workspace.openTextDocument(vscode.Uri.file(offered.filePath));
+        } catch {
+            throw new Error("The selected text is unavailable. Re-select it in the editor, then send again.");
+        }
+
+        if (offered.startLine > document.lineCount) {
+            throw new Error("The selected text is no longer available. Re-select it in the editor, then send again.");
+        }
+
+        const startLine = offered.startLine;
+        const endLine = Math.min(offered.endLine, document.lineCount || offered.endLine);
+        const text = document.getText(
+            new vscode.Range(
+                new vscode.Position(startLine - 1, 0),
+                new vscode.Position(endLine - 1, Number.MAX_SAFE_INTEGER),
+            ),
+        );
+
+        return collectAttachment({ workspacePath, filePath: offered.filePath, text, startLine, endLine });
+    }
+
+    async resolveDirectoryTarget(workspacePath, reference) {
+        const trimmed = typeof reference === "string" ? reference.replaceAll("\\", "/").replace(/\/+$/u, "") : "";
+        if (!trimmed || trimmed.split("/").includes("..")) {
+            throw new Error("Choose a workspace folder to attach.");
+        }
+
+        const workspace = path.resolve(workspacePath);
+        const candidate = path.resolve(workspace, ...trimmed.split("/"));
+        if (!withinWorkspace(workspace, candidate)) {
+            throw new Error("Attachments must be inside the selected workspace.");
+        }
+
+        if (sensitivePath(candidate)) {
+            throw new Error(
+                "Private credentials and Pi authentication, trust, sessions, missions, or history cannot be attached.",
+            );
+        }
+
+        const canonical = await fs.realpath(candidate);
+        if (!withinWorkspace(workspace, canonical) || sensitivePath(canonical)) {
+            throw new Error("The selected folder resolves outside the workspace and cannot be attached.");
+        }
+
+        const info = await fs.stat(canonical);
+        if (!info.isDirectory()) {
+            throw new Error("Only regular workspace folders can produce a directory listing.");
+        }
+
+        return canonical;
+    }
+
+    async insertMention() {
+        const workspacePath = this.requireWorkspace();
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.selection.isEmpty || editor.document.uri.scheme !== "file") {
+            throw new Error("Select text in a workspace file first, then insert an @ mention.");
+        }
+
+        const filePath = editor.document.uri.fsPath;
+        const relative = path.relative(workspacePath, filePath).split(path.sep).join("/");
+        if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+            throw new Error("The selected file must sit inside the selected workspace.");
+        }
+
+        // An editor document is always a file; `@folder/` mentions come from
+        // the suggestion picker, not from this command.
+        try {
+            await fs.stat(filePath);
+        } catch {
+            throw new Error("The selected file is unavailable. Save it before inserting a mention.");
+        }
+
+        const start = editor.selection.start.line + 1;
+        const end = editor.selection.end.line + 1;
+        const token = `@${relative}#L${start}${end > start ? `-L${end}` : ""}`;
+        await vscode.commands.executeCommand(`${PREFIX}.open`);
+        this.post({ type: "insertMention", text: token });
+    }
+
     validRequestId(value) {
         return typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/u.test(value);
     }
@@ -946,6 +1101,19 @@ class ChatController {
             }
 
             return collectImageAttachment({ filePath: target.path });
+        }
+
+        let info;
+        try {
+            info = await fs.stat(filePath);
+        } catch {
+            info = undefined;
+        }
+
+        if (info?.isDirectory()) {
+            const hidden = await workspaceHiddenFilter(vscode, workspace, workspacePath);
+
+            return collectDirectoryAttachment({ workspacePath, filePath, hiddenFilter: hidden });
         }
 
         return collectAttachment({ workspacePath, filePath });
@@ -1286,8 +1454,16 @@ class ChatController {
         const target = await resolveCodeReference({
             workspacePath,
             reference,
-            findFiles: (pattern, exclude) =>
-                vscode.workspace.findFiles(new vscode.RelativePattern(workspace, pattern), exclude),
+            findFiles: async (pattern, exclude) => {
+                const hits = await vscode.workspace.findFiles(new vscode.RelativePattern(workspace, pattern), exclude);
+                const hidden = await workspaceHiddenFilter(vscode, workspace, workspacePath);
+
+                return hits.filter((hit) => {
+                    const relative = relativeFile(workspacePath, hit);
+
+                    return relative && !hidden(relative);
+                });
+            },
         });
         if (!current()) {
             return;
@@ -1511,10 +1687,17 @@ class ChatController {
                 let error;
                 try {
                     const workspacePath = this.requireWorkspace();
-                    const target = await resolveCodeReference({ workspacePath, reference: message.path });
+                    let targetPath;
+                    if (typeof message.path === "string" && message.path.endsWith("/")) {
+                        targetPath = await this.resolveDirectoryTarget(workspacePath, message.path);
+                    } else {
+                        const target = await resolveCodeReference({ workspacePath, reference: message.path });
+                        targetPath = target.path;
+                    }
+
                     if (this.attachmentContextCurrent(workspace, revision)) {
                         const attachment = await this.collectFile(
-                            { workspacePath, filePath: target.path },
+                            { workspacePath, filePath: targetPath },
                             workspace,
                             revision,
                         );
@@ -1646,6 +1829,7 @@ function activate(context) {
         history: () => controller.history(),
         stop: () => controller.stop(),
         attachSelection: () => controller.attachSelection(),
+        insertMention: () => controller.insertMention(),
         attachFile: (uri) => controller.attachFile(uri),
         attachImage: (uri) => controller.attachImage(uri),
         editPrompt: () => controller.handleMessage({ type: "editPrompt" }),
@@ -1674,6 +1858,8 @@ function activate(context) {
     context.subscriptions.push(
         vscode.workspace.onDidChangeWorkspaceFolders(() => controller.workspaceFoldersChanged()),
     );
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => controller.updateSelectionContext()));
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(() => controller.updateSelectionContext()));
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration(PREFIX)) {

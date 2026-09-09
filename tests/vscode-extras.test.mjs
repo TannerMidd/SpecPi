@@ -44,3 +44,12 @@ test("confirmed mentions complete the selected path and preserve surrounding tex
     assert.equal(completeAcceptedMention("", mention, "file.ts"), null);
     assert.equal(completeAcceptedMention(draft, null, "file.ts"), null);
 });
+
+test("confirmed folder mentions keep the trailing slash", () => {
+    const draft = "Review @comp";
+    const mention = mentionAtCursor(draft, draft.length);
+    assert.deepEqual(completeAcceptedMention(draft, mention, "src/components/"), {
+        text: "Review @src/components/ ",
+        cursor: 24,
+    });
+});

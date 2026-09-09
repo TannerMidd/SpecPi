@@ -390,6 +390,7 @@ test("drafts, selection, send mode and delayed failures belong to their original
         selectionStart: 2,
         selectionEnd: 5,
         sendMode: "steer",
+        selectionEnabled: true,
     });
 });
 
@@ -919,4 +920,31 @@ test("160-character saved names retain their complete title when resumed and ren
             .filter((request) => request.type === "set_session_name")
             .every((request) => request.args.name.length === 160),
     );
+});
+
+test("the offered selection is re-derived for the conversation being switched to", async (t) => {
+    const { coordinator, folders, vscode } = fixture(t);
+    await coordinator.connect();
+    const firstId = coordinator.activeId;
+    const selectionPath = path.join(folders[0].uri.fsPath, "helper.ts");
+    fs.mkdirSync(folders[0].uri.fsPath, { recursive: true });
+    fs.writeFileSync(selectionPath, "first\nconst target = true;\nlast\n");
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(selectionPath) },
+        selection: { isEmpty: false, start: { line: 1 }, end: { line: 1 } },
+    };
+    coordinator.updateSelectionContext();
+    assert.equal(coordinator.selectionContext.filePath, selectionPath);
+
+    await coordinator.newChat();
+    const secondId = coordinator.activeId;
+    assert.notEqual(secondId, firstId);
+    // A switch re-derives the offer against the newly selected conversation
+    // rather than leaving the previous chip in place.
+    assert.equal(coordinator.selectionContext.filePath, selectionPath);
+
+    vscode.window.activeTextEditor = undefined;
+    await coordinator.selectConversation(firstId);
+    assert.equal(coordinator.selectionContext, null);
+    assert.equal(coordinator.state.selectionContext, null);
 });

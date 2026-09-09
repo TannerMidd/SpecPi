@@ -411,6 +411,7 @@
     const conversation = byId("conversation");
     const messageCache = new Map();
     let state = { status: "disconnected", messages: [], attachments: [], models: [], commands: [] };
+    let selectionEnabled = true;
     let followScroll = true;
     let modelSignature = "";
     let thinkingSignature = "";
@@ -446,6 +447,7 @@
             selectionStart: input.selectionStart,
             selectionEnd: input.selectionEnd,
             sendMode: byId("send-mode").value,
+            selectionEnabled,
         };
     }
 
@@ -485,6 +487,7 @@
         const end = Number.isSafeInteger(draft.selectionEnd) ? draft.selectionEnd : start;
         input.setSelectionRange(Math.max(0, start), Math.max(0, end));
         byId("send-mode").value = draft.sendMode === "followUp" ? "followUp" : "steer";
+        selectionEnabled = draft.selectionEnabled !== false;
         followScroll = saved?.followScroll ?? true;
         submission = saved?.submission || null;
         busySince = saved?.busySince || null;
@@ -1400,6 +1403,31 @@
         thinking.title = `Thinking level: ${state.thinkingLevel || "off"}`;
     }
 
+    function renderSelectionChip() {
+        const chip = byId("selection-chip");
+        const toggle = byId("selection-chip-toggle");
+        const offered = state.selectionContext;
+        if (!offered || typeof offered.filePath !== "string" || !Number.isSafeInteger(offered.startLine)) {
+            chip.hidden = true;
+
+            return;
+        }
+
+        const name = offered.filePath.split(/[\\/]/u).pop();
+        const range =
+            offered.startLine === offered.endLine
+                ? `L${offered.startLine}`
+                : `L${offered.startLine}-L${offered.endLine}`;
+        const label = `${name}:${range} (${offered.lineCount} ${offered.lineCount === 1 ? "line" : "lines"})`;
+        byId("selection-chip-text").textContent = selectionEnabled ? label : `${label} · hidden`;
+        chip.hidden = false;
+        toggle.setAttribute("aria-pressed", String(selectionEnabled));
+        toggle.dataset.included = String(selectionEnabled);
+        toggle.title = selectionEnabled
+            ? "The editor selection is attached with your next message. Choose to hide it."
+            : "The editor selection is hidden from your next message. Choose to include it.";
+    }
+
     function renderAttachments() {
         const container = byId("attachments");
         const signature = JSON.stringify(
@@ -1926,6 +1954,7 @@
         renderMessages();
         renderModels();
         renderAttachments();
+        renderSelectionChip();
         renderRuntimeStatus();
         renderRequest();
         renderSlashMenu();
@@ -2075,6 +2104,16 @@
     });
 
     byId("send-button").addEventListener("click", submitMessage);
+    byId("selection-chip-toggle").addEventListener("click", () => {
+        selectionEnabled = !selectionEnabled;
+        saveDraft();
+        renderSelectionChip();
+        announce(
+            selectionEnabled
+                ? "Editor selection is attached with your next message"
+                : "Editor selection is hidden from your next message",
+        );
+    });
     byId("send-mode").addEventListener("change", updateComposer);
     byId("error-retry").addEventListener("click", () => {
         if (state.status === "ready") {
@@ -2193,6 +2232,16 @@
         if (message.type === "state" && message.state && typeof message.state === "object") {
             renderState(hydrateMedia(message));
         } else if (message.type === "focus") {
+            input.focus();
+        } else if (message.type === "insertMention" && typeof message.text === "string" && message.text) {
+            const start = Number.isInteger(input.selectionStart) ? input.selectionStart : input.value.length;
+            const end = Number.isInteger(input.selectionEnd) ? input.selectionEnd : start;
+            input.value = input.value.slice(0, start) + message.text + input.value.slice(end);
+            const cursor = start + message.text.length;
+            input.setSelectionRange(cursor, cursor);
+            resizeComposer();
+            updateComposer();
+            saveDraft();
             input.focus();
         } else if (message.type === "draft" && typeof message.text === "string") {
             input.value = restoreDraftText(input.value, message);
