@@ -79,6 +79,22 @@ async function run() {
         assert.equal(vscode.window.activeTextEditor.selection.end.line, 2);
         checks.push("workspace file references open exact editor lines and ranges");
 
+        const largeDirectory = path.join(workspace.fsPath, "unrelated-files");
+        fs.mkdirSync(largeDirectory);
+        for (let index = 0; index < 10_001; index += 1) {
+            fs.writeFileSync(path.join(largeDirectory, `${index}.txt`), "fixture");
+        }
+
+        const nestedFile = vscode.Uri.joinPath(workspace, "src", "utils", "helper[old],{new}.ts");
+        fs.mkdirSync(path.dirname(nestedFile.fsPath), { recursive: true });
+        fs.writeFileSync(nestedFile.fsPath, "// Fixture\nconst target = true;\n");
+        await controller.handleMessage({ type: "openCode", reference: "utils/helper[old],{new}.ts:2:7" });
+        assert.equal(vscode.window.activeTextEditor.document.uri.fsPath, nestedFile.fsPath);
+        assert.equal(vscode.window.activeTextEditor.selection.start.line, 1);
+        assert.equal(vscode.window.activeTextEditor.selection.start.character, 6);
+        checks.push("shortened references use native file search beyond 10000 unrelated files");
+        await controller.handleMessage({ type: "openCode", reference: "navigation target.js#L2-L3" });
+
         const previewFile = vscode.Uri.joinPath(workspace, ".specpi-test", "vscode", "screenshots", "idle preview.png");
         fs.mkdirSync(path.dirname(previewFile.fsPath), { recursive: true });
         fs.writeFileSync(previewFile.fsPath, Buffer.from(PNG_DATA, "base64"));

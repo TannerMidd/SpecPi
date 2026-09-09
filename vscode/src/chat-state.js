@@ -360,6 +360,7 @@ function appendNotice(state, text, isError = false, id = nextId(state, "notice")
 function replaceMessages(state, messages) {
     const value = metadata(state);
     value.activeId = null;
+    value.messageCost = 0;
     value.blocks.clear();
     state.messages = [];
     if (Array.isArray(messages)) {
@@ -411,7 +412,12 @@ function upsert(state, message) {
     trimMessages(state);
 }
 
-function setUsage(state, usage) {
+function setSessionCost(state, cost) {
+    const value = metadata(state);
+    state.cost = Number.isFinite(cost) && cost >= 0 ? cost + (value.activeId ? value.messageCost || 0 : 0) : undefined;
+}
+
+function setUsage(state, usage, trackCost = false) {
     if (!usage || typeof usage !== "object") {
         return;
     }
@@ -425,6 +431,11 @@ function setUsage(state, usage) {
 
     if (Number.isFinite(usage.cost?.total) && usage.cost.total >= 0) {
         result.cost = usage.cost.total;
+        if (trackCost) {
+            const value = metadata(state);
+            state.cost = Math.max(0, (state.cost || 0) - (value.messageCost || 0) + result.cost);
+            value.messageCost = result.cost;
+        }
     }
 
     if (result.totalTokens !== undefined) {
@@ -570,6 +581,7 @@ function applyEvent(state, event) {
         const message = event.message;
         if (message?.role === "assistant" && event.type === "message_start") {
             value.activeId = nextId(state);
+            value.messageCost = 0;
             value.blocks.clear();
             if (Array.isArray(message.content)) {
                 let remaining = MAX_MESSAGE_CHARS;
@@ -603,14 +615,14 @@ function applyEvent(state, event) {
             upsert(state, projected);
         }
 
-        setUsage(state, message?.usage);
+        setUsage(state, message?.usage, message?.role === "assistant");
         if (event.type === "message_end" && message?.role === "assistant") {
             value.activeId = null;
             value.blocks.clear();
         }
     } else if (event.type === "message_update") {
         applyDelta(state, event.assistantMessageEvent);
-        setUsage(state, event.usage);
+        setUsage(state, event.usage || event.assistantMessageEvent?.partial?.usage, true);
     } else if (["tool_execution_start", "tool_execution_update", "tool_execution_end"].includes(event.type)) {
         const id = typeof event.toolCallId === "string" ? bounded(event.toolCallId, 256) : nextId(state, "tool");
         const existing = state.messages.find((message) => message.id === id);
@@ -668,6 +680,7 @@ module.exports = {
     applyEvent,
     resetRunState,
     replaceMessages,
+    setSessionCost,
     safeModel,
     appendNotice,
     enforceBounds: trimMessages,

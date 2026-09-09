@@ -23,12 +23,25 @@
         return { start: tokenStart, end: tokenStart + token.length, token, query: match[1], draft: value };
     }
 
-    function removeAcceptedMention(value, mention) {
-        if (!mention || value !== mention.draft || value.slice(mention.start, mention.end) !== mention.token) {
+    function completeAcceptedMention(value, mention, filePath) {
+        if (
+            !mention ||
+            value !== mention.draft ||
+            value.slice(mention.start, mention.end) !== mention.token ||
+            typeof filePath !== "string" ||
+            !filePath
+        ) {
             return null;
         }
 
-        return { text: value.slice(0, mention.start) + value.slice(mention.end), cursor: mention.start };
+        const token = /\s/u.test(filePath) ? `@"${filePath}"` : `@${filePath}`;
+        const suffix = value.slice(mention.end);
+        const separator = suffix.startsWith(" ") ? "" : " ";
+
+        return {
+            text: value.slice(0, mention.start) + token + separator + suffix,
+            cursor: mention.start + token.length + 1,
+        };
     }
 
     function install({ send, getState, announce }) {
@@ -617,7 +630,7 @@
                 pendingMentions.delete(requestId);
                 announce("The file attachment has not been confirmed. Your draft was kept.");
             }, 30000);
-            pendingMentions.set(requestId, { mention, timeout });
+            pendingMentions.set(requestId, { mention, timeout, filePath: file.path });
             dismissedMention = mentionSignature();
             hideMentions();
             send({ type: "attachMention", path: file.path, requestId, contextToken: getState().contextToken });
@@ -810,7 +823,7 @@
                     return;
                 }
 
-                const updated = removeAcceptedMention(input.value, pending.mention);
+                const updated = completeAcceptedMention(input.value, pending.mention, pending.filePath);
                 if (updated) {
                     input.value = updated.text;
                     input.setSelectionRange(updated.cursor, updated.cursor);
@@ -854,7 +867,7 @@
     }
 
     if (typeof module !== "undefined" && module.exports) {
-        module.exports = { mentionAtCursor, removeAcceptedMention };
+        module.exports = { mentionAtCursor, completeAcceptedMention };
     }
 
     if (typeof window !== "undefined") {

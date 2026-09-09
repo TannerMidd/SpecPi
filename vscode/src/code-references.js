@@ -108,64 +108,75 @@ function within(root, candidate) {
     return relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-async function findShortReference(workspace, reference) {
+async function findShortReference(workspace, reference, findFiles) {
     const suffix = path.normalize(reference);
     const compare = (value) => (process.platform === "win32" ? value.toLowerCase() : value);
-    const pending = [workspace];
+    // Search for the literal suffix through the editor's file search service.
+    // Unrelated workspace entries must never consume a navigation budget.
+    const literal = suffix.replaceAll(path.sep, "/").replace(/[a-zA-Z\[\]{}?,*]/gu, (character) => {
+        if (process.platform === "win32" && /[a-z]/iu.test(character)) {
+            return `[${character.toLowerCase()}${character.toUpperCase()}]`;
+        }
+
+        return /[\[\]{}?,*]/u.test(character) ? `[${character}]` : character;
+    });
+    const excluded =
+        "{**/.git/**,**/node_modules/**,**/.pi/**,**/tannermidd.specpi-chat/**,**/.ssh/**,**/.gnupg/**,**/.aws/**,**/.azure/**,**/.kube/**}";
+    const candidates = await findFiles(`**/${literal}`, excluded);
     let match;
-    let visited = 0;
-    while (pending.length) {
-        const directory = pending.pop();
-        const canonical = await fs.realpath(directory);
+    for (const uri of candidates) {
         if (
-            canonical !== directory ||
-            !within(workspace, canonical) ||
-            sensitivePath(canonical) ||
-            /(?:^|[/\\])(?:\.git|node_modules|\.pi|tannermidd\.specpi-chat)(?:[/\\]|$)/iu.test(canonical)
+            uri?.scheme !== "file" ||
+            uri.authority ||
+            uri.query ||
+            uri.fragment ||
+            typeof uri.fsPath !== "string" ||
+            !path.isAbsolute(uri.fsPath) ||
+            !within(workspace, uri.fsPath)
         ) {
+            continue;
+        }
+
+        const candidate = path.resolve(uri.fsPath);
+        const relative = path.relative(workspace, candidate);
+        if (
+            !compare(relative).endsWith(compare(`${path.sep}${suffix}`)) ||
+            !parseCodeReference(candidate) ||
+            sensitivePath(candidate) ||
+            /(?:^|[/\\])(?:\.git|node_modules|\.pi|tannermidd\.specpi-chat)(?:[/\\]|$)/iu.test(candidate)
+        ) {
+            continue;
+        }
+
+        // Search results are only hints. Reject symlink components before the
+        // existing canonical containment, private-path, and hard-link checks.
+        let current = workspace;
+        let linked = false;
+        for (const segment of relative.split(path.sep)) {
+            current = path.join(current, segment);
+            if ((await fs.lstat(current)).isSymbolicLink()) {
+                linked = true;
+                break;
+            }
+        }
+
+        if (linked || !(await fs.stat(candidate)).isFile()) {
+            continue;
+        }
+
+        if (match && compare(match) !== compare(candidate)) {
             throw new Error(
-                "The workspace changed while finding this reference. Use its full workspace-relative path.",
+                "This shortened reference matches multiple workspace files. Use its full workspace-relative path.",
             );
         }
 
-        for await (const entry of await fs.opendir(directory)) {
-            visited += 1;
-            if (visited > 10_000) {
-                throw new Error(
-                    "This shortened reference requires too much searching. Use its full workspace-relative path.",
-                );
-            }
-
-            const candidate = path.join(directory, entry.name);
-            if (
-                [".git", "node_modules", ".pi", "tannermidd.specpi-chat"].includes(entry.name.toLowerCase()) ||
-                sensitivePath(candidate) ||
-                entry.isSymbolicLink()
-            ) {
-                continue;
-            }
-
-            if (entry.isDirectory()) {
-                pending.push(candidate);
-            } else if (
-                entry.isFile() &&
-                compare(path.relative(workspace, candidate)).endsWith(compare(`${path.sep}${suffix}`))
-            ) {
-                if (match) {
-                    throw new Error(
-                        "This shortened reference matches multiple workspace files. Use its full workspace-relative path.",
-                    );
-                }
-
-                match = candidate;
-            }
-        }
+        match = candidate;
     }
 
     return match;
 }
 
-async function resolveCodeReference({ workspacePath, reference, allowSuffixMatch = false }) {
+async function resolveCodeReference({ workspacePath, reference, findFiles }) {
     const parsed = parseCodeReference(reference);
     if (!parsed) {
         throw new Error("This is not a supported workspace file reference.");
@@ -206,11 +217,11 @@ async function resolveCodeReference({ workspacePath, reference, allowSuffixMatch
     } catch (error) {
         if (
             error.code === "ENOENT" &&
-            allowSuffixMatch &&
+            typeof findFiles === "function" &&
             !path.isAbsolute(parsed.path) &&
             !parsed.path.split("/").includes("..")
         ) {
-            selectedPath = await findShortReference(canonicalWorkspace, parsed.path);
+            selectedPath = await findShortReference(workspace, parsed.path, findFiles);
         } else {
             throw new Error("This workspace file is unavailable. Check its path and access permissions.");
         }

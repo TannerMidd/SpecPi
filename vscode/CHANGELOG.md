@@ -1,5 +1,11 @@
 # SpecPi Chat changelog
 
+## 0.4.4
+
+- Use VS Code's targeted file search for shortened chat links, removing the workspace traversal limit that prevented navigation in large projects. Preserve exact-path priority, unique matching, source positions, and file safety checks.
+- Keep the selected file's full `@path` in the composer after accepting a file mention.
+- Update the conversation price as Pi reports response usage, without counting repeated usage snapshots twice or waiting for the full agent run to finish.
+
 ## 0.4.3
 
 - Refresh extension documentation.
