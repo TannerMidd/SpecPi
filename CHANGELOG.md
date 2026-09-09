@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.0 - 2026-09-09
+
+- Add opt-in `structural_search` with pinned ast-grep 0.45.3, protected explicit source selection, bounded output and subprocess cleanup, and exact-call approval in Strict mode. Enable with `specpi update --structural-search=on`, then restart Pi.
+- Add `browser_accessibility` with axe-core 4.13.0 for the current browser state, fixed WCAG profiles, bounded violations and incomplete findings, and existing browser cancellation. Update the managed browser runtime to provision the scanner.
+- Stage, smoke, verify and roll back structural runtime changes with the installer; preserve enablement and modified runtimes, qualify native hosts in CI, and keep downloaded binaries out of the npm artifact.
+- Defer MCP integration after reviewing the published adapter's cached approvals and automatic metadata/output retention against the restricted-mode requirements. No MCP runtime or server is added.
+
 ## 0.19.1 - 2026-09-08
 
 - Allow Pi's exact public Copilot catalog identification headers during delegation, fixing Copilot → Anthropic → Copilot switches that were incorrectly rejected as runtime provider overrides. Reconstruct headers independently in the child; retain runtime-auth, extension-provider and other header restrictions. Restart Pi after updating the harness.

@@ -1,0 +1,9 @@
+{
+  "name": "specpi-structural-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pinned read-only structural search runtime managed by SpecPi",
+  "license": "MIT",
+  "dependencies": { "@ast-grep/cli": "0.45.3" },
+  "engines": { "node": ">=22.19.0" }
+}

@@ -185,7 +185,20 @@ export default function registerCommandGuard(
     state.onModeChanged = () => pi.events?.emit("specpi:guard-policy-changed", { reason: "guard policy changed" });
     let backgroundSubscription: (() => void) | undefined;
     let guardStateSubscription: (() => void) | undefined;
+    let structuralSubscription: (() => void) | undefined;
     const subscribeGuardState = () => {
+        structuralSubscription ??= pi.events?.on?.("specpi:structural-admission", (request: any) => {
+            request?.reply?.({
+                mode: state.mode,
+                generation: state.generation,
+                action:
+                    !state.ready || state.startupFailed || state.mode === "locked"
+                        ? "deny"
+                        : state.mode === "strict"
+                          ? "ask"
+                          : "allow",
+            });
+        });
         if (!backgroundSubscription) {
             backgroundSubscription = pi.events?.on?.("specpi:background-admission", (request: any) => {
                 if (typeof request?.reply !== "function") {
@@ -240,6 +253,23 @@ export default function registerCommandGuard(
 
     subscribeGuardState();
     const backgroundSource = fileURLToPath(new URL("../background-tasks/index.ts", import.meta.url));
+    const structuralSource = fileURLToPath(new URL("../structural-search/index.ts", import.meta.url));
+    const ownsStructuralTool = (name: string): boolean => {
+        if (name !== "structural_search") {
+            return false;
+        }
+
+        const matches = pi.getAllTools?.().filter((tool) => tool.name === name) ?? [];
+        const source = matches.length === 1 ? matches[0].sourceInfo?.path : undefined;
+        if (typeof source !== "string" || !path.isAbsolute(source)) {
+            return false;
+        }
+
+        return process.platform === "win32"
+            ? path.resolve(source).toLowerCase() === path.resolve(structuralSource).toLowerCase()
+            : path.resolve(source) === path.resolve(structuralSource);
+    };
+
     const ownsBackgroundTool = (name: string): boolean => {
         if (!["background_start", "background_list", "background_logs", "background_stop"].includes(name)) {
             return false;
@@ -352,6 +382,8 @@ export default function registerCommandGuard(
         reset();
         backgroundSubscription?.();
         backgroundSubscription = undefined;
+        structuralSubscription?.();
+        structuralSubscription = undefined;
         if (typeof guardStateSubscription === "function") {
             guardStateSubscription();
             guardStateSubscription = undefined;
@@ -513,7 +545,7 @@ export default function registerCommandGuard(
             // Check Pi's current registration provenance, not a tool name or cached handshake.
             // Genuine background tools validate again in execute; cleanup remains usable under a lock.
             // A missing or replaced registration retains normal Strict/locked enforcement.
-            if (ownsBackgroundTool(name)) {
+            if (ownsBackgroundTool(name) || ownsStructuralTool(name)) {
                 return;
             }
 

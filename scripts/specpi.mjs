@@ -27,6 +27,8 @@ import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
+import { readIntegrations } from "../extensions/structural-search/config.mjs";
+import { changeStructuralRuntime, structuralRuntimeStatus } from "./structural-runtime.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -46,6 +48,15 @@ const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
 const browserRuntimeDir = path.join(stateDir, "browser-runtime");
 const browserRuntimeMarker = path.join(browserRuntimeDir, "specpi-runtime.json");
 const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
+const structuralSourceDir = path.join(repoRoot, "structural-runtime");
+const integrationsPath = path.join(stateDir, "tool-integrations.json");
+const structuralFiles = ["index.ts", "core.mjs", "config.mjs", "smoke.mjs"];
+function smokeStructuralRuntime(directory) {
+    return run(process.execPath, [path.join(repoRoot, "extensions", "structural-search", "smoke.mjs"), directory], {
+        capture: true,
+    });
+}
+
 const backgroundFiles = ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"];
 const backgroundRoot = path.join(agentDir, "extensions", "background-tasks");
 const capabilityRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
@@ -91,9 +102,10 @@ Usage:
 Options:
   --yes                   Do not ask for confirmation; attempt all missing optional tools.
   --force                 Replace locally modified SpecPi-managed files during update.
-  --skip-package-install  Do not bootstrap Pi or install external Pi packages (also skips the browser runtime).
+  --skip-package-install  Do not bootstrap Pi or install external Pi packages (also skips browser/structural runtime acquisition).
   --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
-  --skip-tool-install     Do not offer or install the optional DonSeTch CLI.
+  --skip-tool-install     Skip DonSeTch and structural-search runtime acquisition.
+  --structural-search=on|off  Opt in to structural search or disable/remove its private runtime; omission preserves the choice.
   --skip-shell            Do not install shell profile functions or edit a shell rc file.
 
 Environment:
@@ -110,6 +122,8 @@ function parseArgs(argv) {
         "--skip-browser-install",
         "--skip-tool-install",
         "--skip-shell",
+        "--structural-search=on",
+        "--structural-search=off",
     ]);
     for (const arg of argv.slice(1)) {
         if (!known.has(arg)) {
@@ -117,8 +131,24 @@ function parseArgs(argv) {
         }
     }
 
+    if (argv.includes("--structural-search=on") && argv.includes("--structural-search=off")) {
+        throw new Error("Choose one structural-search mode.");
+    }
+
+    if (
+        argv.some((arg) => arg.startsWith("--structural-search=")) &&
+        !["plan", "install", "update"].includes(command)
+    ) {
+        throw new Error("Structural-search selection is supported by plan/install/update only.");
+    }
+
     return {
         command,
+        structuralSearch: argv.includes("--structural-search=on")
+            ? true
+            : argv.includes("--structural-search=off")
+              ? false
+              : undefined,
         yes: argv.includes("--yes"),
         force: argv.includes("--force"),
         skipPackageInstall: argv.includes("--skip-package-install"),
@@ -490,9 +520,13 @@ function browserRuntimeStatus() {
 
 function smokeBrowserRuntime(directory) {
     try {
-        return run(process.execPath, [path.join(repoRoot, "extensions", "browser", "smoke.mjs"), directory], {
-            capture: true,
-        });
+        return run(
+            process.execPath,
+            [path.join(repoRoot, "extensions", "browser", "smoke.mjs"), directory, "--accessibility"],
+            {
+                capture: true,
+            },
+        );
     } catch (error) {
         throw new Error(
             `${error.message}\nChromium could not launch. Verify the host satisfies Playwright Chromium system dependencies; SpecPi does not install Playwright system dependencies.`,
@@ -754,6 +788,16 @@ function desiredSettingsOperations() {
 
 function managedFiles(includeShell) {
     const files = [
+        ...structuralFiles.map((name) => [
+            path.join(repoRoot, "extensions", "structural-search", name),
+            path.join(agentDir, "extensions", "structural-search", name),
+            0o644,
+        ]),
+        [
+            path.join(repoRoot, "extensions", "browser", "accessibility.ts"),
+            path.join(agentDir, "extensions", "browser", "accessibility.ts"),
+            0o644,
+        ],
         ...backgroundFiles.map((name) => [
             path.join(repoRoot, "extensions", "background-tasks", name),
             path.join(backgroundRoot, name),
@@ -1141,6 +1185,11 @@ async function confirm(message, yes) {
 
 function assertSources() {
     const required = [
+        "scripts/structural-runtime.mjs",
+        "structural-runtime/package.json",
+        "structural-runtime/package-lock.json",
+        ...structuralFiles.map((name) => `extensions/structural-search/${name}`),
+        "extensions/browser/accessibility.ts",
         ...backgroundFiles.map((name) => `extensions/background-tasks/${name}`),
         "extensions/spec.ts",
         "extensions/spec/core.mjs",
@@ -1190,6 +1239,7 @@ function assertSources() {
 }
 
 function printPlan(options) {
+    const structuralEnabled = options.structuralSearch ?? readIntegrations(agentDir).structuralSearch.enabled;
     const shellRc = detectShellRc();
     const manageShell = !options.skipShell && Boolean(shellRc);
     console.log(`SpecPi ${VERSION} installation plan
@@ -1210,6 +1260,15 @@ Managed files:`);
     }
 
     console.log(`  ${manifestPath}`);
+    console.log(
+        `\nStructural search: ${structuralEnabled ? "enabled (ast-grep 0.45.3; private runtime; no global PATH change)" : "disabled"}`,
+    );
+    console.log(`  ${integrationsPath} (owned enablement; existing unrelated fields preserved)`);
+    if (structuralEnabled && (options.skipPackageInstall || options.skipToolInstall)) {
+        console.log("  structural runtime acquisition skipped by explicit flag");
+    }
+
+    console.log("  MCP integration deferred: the reviewed adapter did not pass the restricted-mode gate.");
 
     console.log("\nSettings ownership:");
     console.log("  theme defaults to specpi-spec; existing valid user choices are preserved");
@@ -1364,11 +1423,14 @@ async function installOrUpdate(options, update) {
     let piBootstrapAttempted = false;
     let piInstalledByOperation = false;
     let browserRuntimeTransaction;
+    let structuralTransaction;
     let optionalToolTransaction;
     let backupDir;
     const preservedRetiredTools = [];
     try {
         const previousManifest = readManifest(update);
+        const integrations = readIntegrations(agentDir);
+        const structuralEnabled = options.structuralSearch ?? integrations.structuralSearch.enabled;
         if (!update && previousManifest) {
             throw new Error(`SpecPi is already installed. Run ${CLI} update.`);
         }
@@ -1393,6 +1455,7 @@ async function installOrUpdate(options, update) {
         optionalToolTransaction = await installOptionalTools(selectedOptionalTools);
 
         const watched = [
+            integrationsPath,
             settingsPath,
             ...(previousManifest?.subagentConfigChanges ? [retiredSubagentConfigPath] : []),
             agentsPath,
@@ -1409,6 +1472,35 @@ async function installOrUpdate(options, update) {
 
         const settingsBeforeOperation = readJson(settingsPath, {});
         const warnings = [...optionalToolTransaction.warnings];
+        if (!structuralEnabled || (!options.skipPackageInstall && !options.skipToolInstall)) {
+            structuralTransaction = changeStructuralRuntime({
+                stateDir,
+                sourceDir: structuralSourceDir,
+                enabled: structuralEnabled,
+                run,
+                smoke: smokeStructuralRuntime,
+                warnings,
+            });
+        } else if (!structuralRuntimeStatus(stateDir, structuralSourceDir).installed) {
+            warnings.push(
+                "Structural search is enabled but runtime acquisition was skipped; it is unavailable until setup completes.",
+            );
+        }
+
+        if (options.structuralSearch !== undefined || fs.existsSync(integrationsPath)) {
+            // Back up the owned configuration only, never a whole Pi settings/profile store.
+            if (fs.existsSync(integrationsPath)) {
+                fs.copyFileSync(integrationsPath, path.join(backupDir, "tool-integrations.json"));
+            }
+
+            writeJson(
+                integrationsPath,
+                { ...integrations, structuralSearch: { ...integrations.structuralSearch, enabled: structuralEnabled } },
+                0o600,
+            );
+        }
+
+        injectTestFailure("after-structural-runtime");
         const blockFiles = structuredClone(previousManifest?.blockFiles || {});
         blockFiles.agents ||= { existed: pathExists(agentsPath) };
         if (shellRc) {
@@ -1517,6 +1609,7 @@ async function installOrUpdate(options, update) {
             packageChanges,
             settingsChanges,
             browserRuntime: browserRuntimeStatus(),
+            structuralRuntime: structuralRuntimeStatus(stateDir, structuralSourceDir),
             piBootstrap: piInstalledByOperation
                 ? {
                       package: PI_PACKAGE,
@@ -1536,6 +1629,7 @@ async function installOrUpdate(options, update) {
         }
 
         browserRuntimeTransaction?.commit();
+        structuralTransaction?.commit();
         console.log(`\nSpecPi ${update ? "updated" : "installed"} successfully.`);
         console.log(`Manifest: ${manifestPath}`);
         for (const warning of warnings) {
@@ -1549,6 +1643,7 @@ async function installOrUpdate(options, update) {
         );
     } catch (error) {
         const rollbackErrors = [];
+        rollbackErrors.push(...(structuralTransaction?.rollback() || []));
         try {
             rollbackErrors.push(...(browserRuntimeTransaction?.rollback() || []));
         } catch (rollbackError) {
@@ -1674,6 +1769,7 @@ async function uninstall(options) {
     const releaseLock = acquireLock();
     let transaction;
     let retiredBrowserRuntime;
+    let structuralTransaction;
     const preservedManagedTools = [];
     try {
         const manifest = readManifest(true);
@@ -1696,6 +1792,14 @@ async function uninstall(options) {
 
         transaction = snapshot(watched);
         const warnings = [];
+        structuralTransaction = changeStructuralRuntime({
+            stateDir,
+            sourceDir: structuralSourceDir,
+            enabled: false,
+            run,
+            smoke: smokeStructuralRuntime,
+            warnings,
+        });
 
         const settings = readJson(settingsPath, {});
         restoreSettingChanges(settings, manifest.settingsChanges || [], warnings);
@@ -1778,6 +1882,7 @@ async function uninstall(options) {
         }
 
         retiredBrowserRuntime = undefined;
+        structuralTransaction?.commit();
         console.log("SpecPi configuration, managed optional tools, and managed browser runtime uninstalled.");
         console.log(
             "Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved. Experiment metadata and exported patches were also preserved.",
@@ -1795,6 +1900,8 @@ async function uninstall(options) {
                 rollbackErrors.push(`browser runtime restore: ${rollbackError.message}`);
             }
         }
+
+        rollbackErrors.push(...(structuralTransaction?.rollback() || []));
 
         if (transaction) {
             try {
@@ -1966,6 +2073,42 @@ async function doctor() {
         } else {
             errors.push("Installed background task smoke failed or timed out.");
         }
+    }
+
+    try {
+        const enabled = readIntegrations(agentDir).structuralSearch.enabled;
+        const status = structuralRuntimeStatus(stateDir, structuralSourceDir);
+        const dependencies = [
+            ...structuralFiles.map((name) => path.join(agentDir, "extensions", "structural-search", name)),
+            ...["snapshot.mjs", "errors.mjs"].map((name) => path.join(agentDir, "extensions", "delegation", name)),
+        ];
+        const intact = dependencies.every(
+            (target) =>
+                manifest.files?.[target] &&
+                fs.existsSync(target) &&
+                sha256(fs.readFileSync(target)) === manifest.files[target].installedHash,
+        );
+        if (!enabled) {
+            console.log("STRUCTURAL_SEARCH=disabled");
+        } else if (!intact || !commandGuardIntegrity) {
+            errors.push("Structural search smoke skipped: installed source/Guard integrity failed.");
+        } else if (!status.installed) {
+            (manifest.structuralRuntime?.installed ? errors : warnings).push(
+                `Structural search unavailable: ${status.reason}`,
+            );
+        } else {
+            const smoke = run(
+                process.execPath,
+                [
+                    path.join(agentDir, "extensions", "structural-search", "smoke.mjs"),
+                    path.join(stateDir, "structural-runtime"),
+                ],
+                { capture: true },
+            );
+            console.log(smoke.stdout.trim());
+        }
+    } catch {
+        errors.push("Structural search configuration or smoke failed.");
     }
 
     const runtimeStatus = browserRuntimeStatus();

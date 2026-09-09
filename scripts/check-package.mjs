@@ -41,6 +41,18 @@ const requiredFiles = [
     "THIRD_PARTY.md",
     "browser-runtime/package-lock.json",
     "browser-runtime/package.json",
+    "structural-runtime/package.json",
+    "structural-runtime/package-lock.json",
+    "scripts/structural-runtime.mjs",
+    "extensions/structural-search/index.ts",
+    "extensions/structural-search/core.mjs",
+    "extensions/structural-search/core.d.mts",
+    "extensions/structural-search/config.mjs",
+    "extensions/structural-search/config.d.mts",
+    "extensions/structural-search/smoke.mjs",
+    "extensions/browser/accessibility.ts",
+    "docs/structural-search.md",
+    "docs/mcp-access.md",
     "docs/browser-testing.md",
     "docs/delegation/README.md",
     "docs/delegation/protocol.md",
@@ -117,6 +129,7 @@ const forbiddenPrefixes = [
     "node_modules/",
     "tests/",
     "browser-runtime/node_modules/",
+    "structural-runtime/node_modules/",
 ];
 
 function runNode(args, options = {}) {

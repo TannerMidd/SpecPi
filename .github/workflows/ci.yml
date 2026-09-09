@@ -21,6 +21,8 @@ jobs:
       - name: Install pinned repository development tools
         run: npm install --ignore-scripts --omit=peer --no-package-lock
       - run: npm run check
+      - run: npm run setup:structural
+      - run: npm run test:structural
       - name: Load the packed resources through pinned Pi
         run: npm run check:pi-package
       - run: git diff --check
@@ -42,6 +44,14 @@ jobs:
         run: npm install --ignore-scripts --omit=peer --no-package-lock
       - name: Validate timeout preference portability
         run: node --test tests/delegation-settings.test.mjs tests/delegation-settings-review.test.mjs
+      - name: Provision and test native structural search
+        run: |
+          npm run setup:structural
+          npm run test:structural
+      - name: Smoke the locked browser and accessibility runtime
+        run: |
+          npm run setup:browser
+          node extensions/browser/smoke.mjs .specpi-test/browser-runtime --accessibility
       - name: Exercise packed npm artifact and installer lifecycle
         run: npm run check:package
       - name: Load the packed resources through pinned Pi

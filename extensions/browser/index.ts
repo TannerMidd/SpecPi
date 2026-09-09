@@ -6,6 +6,7 @@ import type { Browser, BrowserContext, Page } from "playwright";
 import { Check } from "typebox/value";
 import { BrowserDiagnostics, DIAGNOSTIC_CATEGORIES } from "./diagnostics.ts";
 import { BrowserCleanupError, settleBrowserCleanup } from "./lifecycle.ts";
+import { AccessibilityError, AccessibilityParams, scanAccessibility } from "./accessibility.ts";
 import {
     PressParams,
     SelectionParams,
@@ -417,9 +418,12 @@ export default function browserExtension(pi: ExtensionAPI) {
                     throw new Error("Invalid browser tool parameters.");
                 }
 
-                const bounded = ["browser_press", "browser_select_option", "browser_wait_for"].includes(
-                    definition.name,
-                );
+                const bounded = [
+                    "browser_press",
+                    "browser_select_option",
+                    "browser_wait_for",
+                    "browser_accessibility",
+                ].includes(definition.name);
                 const controller = new AbortController();
                 const originalSignal = args[2];
                 const signal = AbortSignal.any([
@@ -430,7 +434,10 @@ export default function browserExtension(pi: ExtensionAPI) {
                 const timer = bounded
                     ? setTimeout(
                           () => controller.abort(),
-                          interactionTimeout((args[1] as { timeoutMs?: number }).timeoutMs),
+                          interactionTimeout(
+                              (args[1] as { timeoutMs?: number }).timeoutMs ??
+                                  (definition.name === "browser_accessibility" ? 15000 : undefined),
+                          ),
                       )
                     : undefined;
                 try {
@@ -505,6 +512,35 @@ export default function browserExtension(pi: ExtensionAPI) {
             signal?.removeEventListener("abort", abort);
         }
     }
+
+    register({
+        name: "browser_accessibility",
+        label: "Browser Accessibility",
+        description:
+            "Check the current isolated browser page for automated accessibility violations and incomplete checks. Open and interact with the page first; this does not certify accessibility.",
+        parameters: AccessibilityParams,
+        async execute(_id, params, signal) {
+            if (!state.page || state.page.isClosed()) {
+                throw new Error("Open a page with browser_open before running accessibility checks.");
+            }
+
+            try {
+                const result = await cancellable(() => scanAccessibility(state.page!, runtimeDir, params), signal);
+
+                return { content: [{ type: "text", text: JSON.stringify(result) }], details: {} };
+            } catch (error) {
+                if (error instanceof BrowserCleanupError || signal?.aborted) {
+                    throw error;
+                }
+
+                if (error instanceof AccessibilityError) {
+                    throw error;
+                }
+
+                throw new Error("Accessibility analysis failed. Check the page, scope and runtime, then retry.");
+            }
+        },
+    });
 
     register({
         name: "browser_open",

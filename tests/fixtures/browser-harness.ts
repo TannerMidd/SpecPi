@@ -41,6 +41,18 @@ console.error('startup console api_key=STARTCANARY');
 setTimeout(() => { throw new Error('startup exception secret=STARTCANARY'); }, 0);
 </script></body></html>`;
 
+const accessibilityHtml = `<!doctype html><html lang="en"><head><title>Accessibility fixture</title><link rel="icon" href="data:,"><style>button,input,[role=checkbox]{min-height:32px;min-width:32px;margin:8px}</style></head><body><main><h1>Checkout</h1>
+<button id="reveal">Show form</button><section id="form" hidden><input id="name"><p id="contrast" style="color:#aaa;background:white">Low contrast text</p><div id="aria" role="checkbox" aria-checked="invalid">Choice</div><button id="repair">Repair</button></section>
+<script>window.axe = {runPartial: () => ({fake:true})};
+document.querySelector('#reveal').onclick=()=>document.querySelector('#form').hidden=false;
+document.querySelector('#repair').onclick=()=>{document.querySelector('#name').setAttribute('aria-label','Name');document.querySelector('#contrast').style.color='#000';document.querySelector('#aria').setAttribute('aria-checked','false');};
+</script></main></body></html>`;
+
+const boundariesHtml = `<!doctype html><html lang="en"><head><title>Frame and shadow fixture</title></head><body><main><h1>Boundaries</h1>
+<iframe id="frame" title="Payment details" src="/accessibility-frame"></iframe><div id="open"></div><div id="closed"></div>
+<script>for (const mode of ['open','closed']) document.querySelector('#'+mode).attachShadow({mode}).innerHTML='<button></button>';</script>
+</main></body></html>`;
+
 export default function browserHarness(pi: ExtensionAPI) {
     const tools = new Map<string, ToolDefinition>();
     const shutdownHandlers: Array<() => Promise<void>> = [];
@@ -83,6 +95,7 @@ export default function browserHarness(pi: ExtensionAPI) {
         const wait = async (target: string, value: string) =>
             call("browser_wait_for", { condition: "text", target, text: value });
         const expected = [
+            "browser_accessibility",
             "browser_open",
             "browser_set_viewport",
             "browser_snapshot",
@@ -100,6 +113,7 @@ export default function browserHarness(pi: ExtensionAPI) {
         assert.deepEqual([...tools.keys()].sort(), expected.sort());
         assert.ok([...tools.values()].every((tool) => tool.executionMode === "sequential"));
         assert.equal((await diagnostics()).records.length, 0);
+        await assert.rejects(call("browser_accessibility"), /Open a page/u);
         await assert.rejects(call("browser_press", { key: "Tab", timeoutMs: 0 }), /Invalid browser tool parameters/u);
         if (process.env.SPECPI_BROWSER_REGISTRATION_ONLY === "1") {
             console.log("SPECPI_BROWSER_HARNESS=" + JSON.stringify({ registration: true, tools: tools.size }));
@@ -121,6 +135,24 @@ export default function browserHarness(pi: ExtensionAPI) {
             captureStarted = resolve;
         });
         const server = http.createServer((request, response) => {
+            if (request.url === "/accessibility-boundaries" || request.url === "/accessibility-frame") {
+                response.writeHead(200, { "Content-Type": "text/html" });
+                response.end(
+                    request.url === "/accessibility-boundaries"
+                        ? boundariesHtml
+                        : '<!doctype html><html lang="en"><title>Frame</title><body><button></button></body></html>',
+                );
+
+                return;
+            }
+
+            if (request.url === "/accessibility") {
+                response.writeHead(200, { "Content-Type": "text/html" });
+                response.end(accessibilityHtml);
+
+                return;
+            }
+
             if (request.url === "/font") {
                 fontRequested();
 
@@ -146,7 +178,50 @@ export default function browserHarness(pi: ExtensionAPI) {
         assert.ok(address && typeof address !== "string");
         const url = `http://127.0.0.1:${address.port}/`;
         try {
+            await call("browser_open", { url: `${url}accessibility-boundaries`, waitUntil: "load" });
+            const boundaries = JSON.parse(text(await call("browser_accessibility")));
+            const unnamed = JSON.stringify(
+                boundaries.violations.find((finding: { rule: string }) => finding.rule === "button-name"),
+            );
+            assert.match(unnamed, /#frame/u);
+            assert.match(unnamed, /#open/u);
+            assert.doesNotMatch(unnamed, /#closed/u);
+            assert.match(boundaries.limitations, /closed shadow roots/u);
+
+            for (const preset of ["desktop", "tablet", "mobile"]) {
+                await call("browser_open", { url: `${url}accessibility` });
+                await call("browser_set_viewport", { preset });
+                await call("browser_click", { target: "#reveal" });
+                await call("browser_wait_for", { condition: "visible", target: "#form" });
+                const broken = JSON.parse(text(await call("browser_accessibility")));
+                for (const rule of ["label", "color-contrast", "aria-valid-attr-value"]) {
+                    assert.ok(
+                        broken.violations.some((finding: { rule: string }) => finding.rule === rule),
+                        `${preset}: missing ${rule}`,
+                    );
+                }
+
+                await call("browser_click", { target: "#repair" });
+                const repaired = JSON.parse(text(await call("browser_accessibility")));
+                assert.equal(repaired.violations.length, 0, JSON.stringify(repaired.violations));
+            }
+
             await call("browser_open", { url, waitUntil: "load" });
+            const accessibility = JSON.parse(text(await call("browser_accessibility")));
+            assert.equal(accessibility.scannerVersion, "4.13.0");
+            assert.ok(accessibility.violations.some((finding: { rule: string }) => finding.rule === "label"));
+            assert.ok(!JSON.stringify(accessibility).includes("STARTCANARY"));
+            assert.ok(Buffer.byteLength(JSON.stringify(accessibility)) <= 24 * 1024);
+            await assert.rejects(call("browser_accessibility", { include: "#missing" }), /exactly one region/u);
+            await assert.rejects(call("browser_accessibility", { include: "input" }), /exactly one region/u);
+            await assert.rejects(call("browser_accessibility", { include: "[" }), /analysis failed/u);
+            for (const preset of ["desktop", "tablet", "mobile"]) {
+                await call("browser_set_viewport", { preset });
+                const scoped = JSON.parse(text(await call("browser_accessibility", { include: "#single" })));
+                assert.equal(scoped.violations.length, 0);
+            }
+
+            await call("browser_set_viewport", { preset: "desktop" });
             await wait("#focus", "first");
             const firstSnapshot = await snapshot();
             assert.match(firstSnapshot.text, /Visually healthy/u);
@@ -260,6 +335,22 @@ export default function browserHarness(pi: ExtensionAPI) {
             assert.equal(queuedResults[0].status, "rejected");
             assert.equal(queuedResults[1].status, "rejected");
             assert.ok(Date.now() - queuedStarted < 2500, "queued deadline includes admission wait and bounded cleanup");
+            await call("browser_open", { url });
+            const queuedScanStarted = Date.now();
+            const queuedScan = await Promise.allSettled([
+                call("browser_wait_for", { condition: "visible", target: "#never", timeoutMs: 5000 }),
+                call("browser_accessibility", { timeoutMs: 1000 }),
+            ]);
+            assert.ok(queuedScan.every((result) => result.status === "rejected"));
+            assert.ok(Date.now() - queuedScanStarted < 3500, "scanner deadline includes its queue wait and cleanup");
+            await assert.rejects(call("browser_accessibility"), /Open a page/u);
+            await call("browser_open", { url: `${url}accessibility` });
+            const scanController = new AbortController();
+            const activeScan = call("browser_accessibility", {}, scanController.signal);
+            const scanAbortTimer = setTimeout(() => scanController.abort(), 1);
+            await assert.rejects(activeScan, /aborted/u);
+            clearTimeout(scanAbortTimer);
+            await assert.rejects(call("browser_accessibility"), /Open a page/u);
             await call("browser_open", { url });
             assert.ok((await diagnostics()).records.length > 0);
             const alreadyAborted = new AbortController();

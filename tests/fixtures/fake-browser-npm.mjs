@@ -23,7 +23,7 @@ write(
 function png(value) { const data = Buffer.alloc(256, value); Buffer.from("89504e470d0a1a0a", "hex").copy(data); data.write("IHDR", 12, "ascii"); data.writeUInt32BE(2, 16); data.writeUInt32BE(2, 20); data[24] = value; return data; }
 module.exports = { chromium: { async launch() { return {
   async newContext() { return { async newPage() { let changed = false; return {
-    async setContent() {},
+    async setContent(html) { this.fixtureBroken = html.includes('<button></button>'); },
     locator() { return { async evaluate(callback) { changed = true; callback({ textContent: "" }); } }; },
     async screenshot(options = {}) { const data = png(changed ? 2 : 1); if (options.path) fs.writeFileSync(options.path, data); return data; }
   }; } }; },
@@ -52,4 +52,13 @@ write(
 write(
     "node_modules/pixelmatch/index.js",
     "export default function pixelmatch(left, right) { return left.equals(right) ? 0 : left.length / 4; }\n",
+);
+write("node_modules/axe-core/package.json", JSON.stringify({ name: "axe-core", version: "4.13.0" }));
+write(
+    "node_modules/@axe-core/playwright/package.json",
+    JSON.stringify({ name: "@axe-core/playwright", version: "4.13.0", main: "index.js" }),
+);
+write(
+    "node_modules/@axe-core/playwright/index.js",
+    "module.exports.default = class { constructor({page}) { this.page = page; } withTags() { return this; } async analyze() { return { violations: this.page.fixtureBroken ? [{ id: 'button-name' }] : [] }; } };\n",
 );

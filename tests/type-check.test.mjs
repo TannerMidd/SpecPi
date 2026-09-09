@@ -31,10 +31,12 @@ test("scoped no-emit type gate checks browser/background files and rejects wrong
             .sort(),
         [
             "extensions/background-tasks/index.ts",
+            "extensions/browser/accessibility.ts",
             "extensions/browser/diagnostics.ts",
             "extensions/browser/index.ts",
             "extensions/browser/interactions.ts",
             "extensions/browser/lifecycle.ts",
+            "extensions/structural-search/index.ts",
         ],
     );
     assert.deepEqual(

@@ -15,5 +15,5 @@ test("pinned Pi registers all browser tools without requiring a browser runtime"
     assert.equal(result.error, null, result.error?.message);
     assert.equal(result.status, 0, result.stderr);
     const output = result.stdout + result.stderr;
-    assert.match(output, /SPECPI_BROWSER_HARNESS=\{"registration":true,"tools":13\}/u);
+    assert.match(output, /SPECPI_BROWSER_HARNESS=\{"registration":true,"tools":14\}/u);
 });

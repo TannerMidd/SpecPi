@@ -183,6 +183,8 @@ Completion Challenge activation and structured results are bounded to the curren
 
 ## Browser isolation
 
+The fixed `browser_accessibility` operation loads pinned axe-core/Playwright packages from the private browser runtime and scans an already open page. It exposes no model-supplied JavaScript, custom rules or exclusions. Results retain bounded rule guidance and target examples, not raw HTML/check payloads; selectors and URL paths can still contain private data and normal tool results may persist in Pi history. Findings include incomplete checks, profile/tags, viewport and scan timestamps. Navigation invalidates the result; dynamic DOM changes are not an atomic snapshot. Cancellation uses the existing browser teardown path. No automatic accessibility artifact or new external scanning service is introduced. The historical browser capability validator retains its original contract; installer/doctor request a separate additional accessibility smoke within the same browser launch.
+
 SpecPi launches managed Chromium in a fresh Playwright context. It does not attach to a personal browser profile or load the user's cookies, saved passwords, or extensions. Browser pages still execute untrusted content and can reach URLs available to the host.
 
 Snapshots, screenshots, page text, downloads, console output, and visual baselines may contain sensitive information. Default artifacts remain in SpecPi's private state directory. Explicit output publication is bounded and atomic, and existing artifacts or baselines are not replaced without explicit overwrite authorization.
@@ -193,7 +195,18 @@ Keyboard, native-selection, and condition-wait tools accept bounded declarative 
 
 The browser is not an operating-system or network sandbox. Use a container or VM for hostile applications and dedicated test accounts instead of personal authenticated sessions.
 
+## Structural search
+
+Structural search is disabled until explicitly selected. The owned `specpi/tool-integrations.json` file stores nonsecret enablement; plan does not mutate it, updates back it up and roll it back with managed state, and uninstall preserves it. Runtime acquisition is private, pinned, script-free and transactional. Doctor checks source/runtime integrity before its offline fixture; unverified or modified prior runtime directories are preserved rather than deleted. No global executable search or PATH injection is used.
+
+The parent captures explicit selected source with the existing snapshot path/private-store/link/descriptor/digest checks. A parent-only byte callback rechecks the original digest and clears its buffer after parsing. Existing workers gain no tool or byte API route. Files are capped at 1 MiB, selection at 8 MiB/200 files, pattern at 4 KiB, returned evidence at 24 KiB, raw stdout at 2 MiB and stderr at 8 KiB per call. Source bytes go to a reviewed native parser over stdin; only a neutral configuration is written to private scratch. Files containing secrets under ordinary source names are not automatically detectable.
+
+Native execution uses a fixed argument array, `shell: false`, an absolute private binary, explicit neutral ast-grep configuration and minimal environment. No rewrite, rule import, custom grammar or arbitrary executable is exposed. Guard admission is source-bound and repeated before parsing; Strict uses exact-call approval, Off does not remove tool restrictions, and Locked/ambiguous state denies. Session/policy changes cancel queued work and invalidate pending authorization. A parser that does not confirm termination blocks further starts until cleanup and reload. These controls are not OS containment: trusted same-user native code and extensions retain host privileges.
+
+Selective MCP remains deferred because the reviewed published adapter lacks the required combination of every-call broker authority and bounded in-memory retention. No MCP transport, server, cache or authentication surface is installed by this change. See [MCP decision](docs/mcp-access.md).
+
 ## Website and automation
+
 
 The GitHub Pages workflow publishes the checked-in `site/` directory only after the shared browser test job succeeds for that checked-out revision. The loopback rendered-site server rejects traversal and symlink escapes. Tests block third-party requests, use a synthetic clipboard, and upload only public-site failure screenshots with three-day retention; no visual baselines are created automatically. Required browser commands fail rather than skip when prerequisites are unavailable. Strict no-emit browser type checking uses local pinned development declarations; third-party declaration bodies and other extension implementations are outside that scoped gate.
 

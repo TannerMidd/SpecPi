@@ -5,6 +5,8 @@
   "description": "Pinned local browser runtime managed by the SpecPi installer",
   "license": "MIT",
   "dependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "axe-core": "4.13.0",
     "pixelmatch": "7.2.0",
     "playwright": "1.62.1",
     "pngjs": "7.0.0"
