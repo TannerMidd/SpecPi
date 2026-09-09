@@ -100,7 +100,7 @@ export default function harness(host: any) {
         answer = "Allow once";
         if (process.env.SPECPI_STRUCTURAL_RUNTIME) {
             const success = await call();
-            assert.equal(success.status, "complete");
+            assert.equal(success.status, "complete", JSON.stringify(success));
             assert.equal(success.matches[0].snippet, "target(42)");
         }
 
@@ -120,7 +120,8 @@ export default function harness(host: any) {
         duringPrompt = undefined;
         const before = prompts;
         if (process.env.SPECPI_STRUCTURAL_RUNTIME) {
-            assert.equal((await call()).status, "complete");
+            const allowed = await call();
+            assert.equal(allowed.status, "complete", JSON.stringify(allowed));
             assert.equal(prompts, before);
         }
 
