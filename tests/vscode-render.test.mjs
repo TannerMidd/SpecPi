@@ -10,7 +10,7 @@ import { loadBrowserRuntime } from "../extensions/browser/core.mjs";
 const require = createRequire(import.meta.url);
 const { getWebviewHtml } = require("../vscode/src/webview.js");
 const { formatPrompt } = require("../vscode/src/context.js");
-const { createState } = require("../vscode/src/chat-state.js");
+const { createState, applyEvent } = require("../vscode/src/chat-state.js");
 const { decodeDelegates, delegateCompletionText } = require("../vscode/src/delegates.js");
 const root = fileURLToPath(new URL("../", import.meta.url));
 const enabled = process.env.SPECPI_VSCODE_BROWSER_TESTS === "1" || process.env.SPECPI_BROWSER_TESTS === "1";
@@ -742,6 +742,30 @@ test(
                     assert.equal(await usage.textContent(), "0 · $0.0000");
                     await setState(page, { cost: 0.01234, tokens: undefined });
                     assert.equal(await usage.textContent(), "$0.0123");
+                });
+            });
+
+            await t.test("incoming usage events update the displayed price before the agent settles", async () => {
+                await withPage(browser, fixtures, { name: "streamed-conversation-cost", width: 280 }, async (page) => {
+                    const state = createState({ cost: 1 });
+                    applyEvent(state, { type: "agent_start" });
+                    applyEvent(state, { type: "message_start", message: { role: "assistant", content: [] } });
+                    for (const cost of [0.125, 0.25]) {
+                        applyEvent(state, {
+                            type: "message_update",
+                            message: {
+                                role: "assistant",
+                                content: [{ type: "text", text: "Working" }],
+                                usage: { cost: { total: cost } },
+                            },
+                        });
+                        await setState(page, state);
+                        assert.equal(state.status, "busy");
+                        assert.match(
+                            await page.locator("#token-status").textContent(),
+                            new RegExp(`\\$${(1 + cost).toFixed(4).replace(".", "\\.")}`, "u"),
+                        );
+                    }
                 });
             });
 
@@ -2578,7 +2602,7 @@ test(
                             requestId: attachment.requestId,
                             success: true,
                         });
-                        assert.equal(await input.inputValue(), "Inspect ");
+                        assert.equal(await input.inputValue(), "Inspect @src/sidebar.js ");
                         assert.equal(
                             await page.locator("#attachments .attachment-label").textContent(),
                             selected.label,
@@ -2588,16 +2612,25 @@ test(
                             true,
                         );
                         await input.press("Enter");
-                        assert.deepEqual(await takeMessages(page), [{ type: "send", text: "Inspect", mode: "prompt" }]);
+                        assert.deepEqual(await takeMessages(page), [
+                            { type: "send", text: "Inspect @src/sidebar.js", mode: "prompt" },
+                        ]);
                         const messages = createState({
                             messages: [
-                                { id: "tagged-user", role: "user", content: formatPrompt("Inspect", [selected]) },
+                                {
+                                    id: "tagged-user",
+                                    role: "user",
+                                    content: formatPrompt("Inspect @src/sidebar.js", [selected]),
+                                },
                             ],
                         }).messages;
                         for (const status of ["busy", "ready"]) {
                             await setState(page, { status, messages });
                             assert.equal(await page.locator("#attachments").isVisible(), false);
-                            assert.equal(await page.locator(".message-user .message-body").textContent(), "Inspect");
+                            assert.equal(
+                                await page.locator(".message-user .message-body").textContent(),
+                                "Inspect @src/sidebar.js",
+                            );
                             assert.equal(
                                 await page.getByRole("list", { name: "Attached files" }).getByRole("listitem").count(),
                                 1,
@@ -2612,7 +2645,7 @@ test(
                         await page.locator(".message-user").hover();
                         await page.locator(".message-copy").click();
                         const copy = await imageMessage(page, "copy");
-                        assert.equal(copy.text, "Inspect");
+                        assert.equal(copy.text, "Inspect @src/sidebar.js");
                         await sendHost(page, { type: "copyResult", requestId: copy.requestId, success: true });
                         messages[0].files[0].label = "src/updated.js";
                         await setState(page, { messages });
@@ -2664,7 +2697,7 @@ test(
                         await input.press("Enter");
                         const accepted = await imageMessage(page, "attachMention");
                         await sendHost(page, { type: "attachmentResult", requestId: accepted.requestId });
-                        assert.equal(await input.inputValue(), "Inspect ");
+                        assert.equal(await input.inputValue(), "Inspect @src/sidebar.js ");
                         assert.deepEqual(await takeMessages(page), []);
                         await suggest();
                         await setState(page, { contextToken: "different-ready-conversation" });

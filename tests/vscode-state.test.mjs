@@ -8,6 +8,7 @@ const {
     applyEvent,
     resetRunState,
     replaceMessages,
+    setSessionCost,
     appendNotice,
     enforceBounds,
     MAX_MESSAGES,
@@ -18,6 +19,36 @@ const {
     MAX_TRANSCRIPT_IMAGES,
     MAX_TRANSCRIPT_IMAGE_BYTES,
 } = stateModule;
+
+test("reported streaming cost updates the conversation total without counting snapshots twice", () => {
+    const state = createState({ cost: 1 });
+    const message = (total) => ({ role: "assistant", content: [], usage: { cost: { total } } });
+    applyEvent(state, { type: "agent_start" });
+    applyEvent(state, { type: "message_start", message: message(0) });
+    applyEvent(state, { type: "message_update", message: message(0.125) });
+    assert.equal(state.cost, 1.125);
+    applyEvent(state, { type: "message_update", message: message(0.125) });
+    assert.equal(state.cost, 1.125);
+    setSessionCost(state, 1);
+    assert.equal(state.cost, 1.125, "refresh retains the unfinished response cost");
+    applyEvent(state, { type: "message_end", message: message(0.25) });
+    assert.equal(state.cost, 1.25);
+    setSessionCost(state, 1.25);
+    applyEvent(state, { type: "message_end", message: message(0.25) });
+    assert.equal(state.cost, 1.25);
+    applyEvent(state, { type: "message_start", message: message(0) });
+    applyEvent(state, {
+        type: "message_update",
+        assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Hi", partial: message(0.5) },
+    });
+    assert.equal(state.cost, 1.75);
+    applyEvent(state, { type: "message_update", message: message(Number.NaN) });
+    assert.equal(state.cost, 1.75);
+    applyEvent(state, { type: "message_end", message: message(0.5) });
+    applyEvent(state, { type: "agent_settled" });
+    setSessionCost(state, 1.75);
+    assert.equal(state.cost, 1.75);
+});
 
 function pngChunk(type, bytes) {
     const name = Buffer.from(type);

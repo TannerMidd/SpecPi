@@ -2,7 +2,15 @@ const vscode = require("vscode");
 const { randomUUID, createHash } = require("node:crypto");
 const { RpcClient } = require("./rpc-client.js");
 const { resolveLaunch } = require("./launch.js");
-const { createState, applyEvent, resetRunState, replaceMessages, safeModel, appendNotice } = require("./chat-state.js");
+const {
+    createState,
+    applyEvent,
+    resetRunState,
+    replaceMessages,
+    setSessionCost,
+    safeModel,
+    appendNotice,
+} = require("./chat-state.js");
 const { collectAttachment, formatPrompt } = require("./context.js");
 const { resolveCodeReference } = require("./code-references.js");
 const { collectImageAttachment, normalizeImage, MAX_IMAGE_TOTAL_BYTES } = require("./images.js");
@@ -438,8 +446,10 @@ class ChatController {
                     Number.isFinite(usage[key]) && usage[key] >= 0 ? usage[key] : null,
                 ]),
             );
-        const cost = data.get_session_stats?.cost;
-        this.state.cost = Number.isFinite(cost) && cost >= 0 ? cost : undefined;
+        if (eventRevision === this.eventRevision) {
+            setSessionCost(this.state, data.get_session_stats?.cost);
+        }
+
         if (full) {
             this.state.models = (data.get_available_models?.models || []).map(safeModel).filter(Boolean).slice(0, 1000);
             applyEvent(this.state, {
@@ -1273,7 +1283,12 @@ class ChatController {
             this.isForeground() &&
             this.workspace === workspace &&
             this.requireWorkspace() === workspacePath;
-        const target = await resolveCodeReference({ workspacePath, reference, allowSuffixMatch: true });
+        const target = await resolveCodeReference({
+            workspacePath,
+            reference,
+            findFiles: (pattern, exclude) =>
+                vscode.workspace.findFiles(new vscode.RelativePattern(workspace, pattern), exclude),
+        });
         if (!current()) {
             return;
         }

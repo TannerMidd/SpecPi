@@ -435,6 +435,36 @@ test("code references open validated files and clamp editor lines without connec
     assert.equal(clients.length, 0);
 });
 
+test("code navigation scopes targeted file search to the selected workspace without a result cap", async (t) => {
+    const filePath = path.resolve(".specpi-test", "controller-workspace", "src", "helper.ts");
+    const { controller, vscode } = fixture(t, {
+        async resolveCode({ findFiles }) {
+            assert.deepEqual(
+                (await findFiles("**/helper.ts", "**/.pi/**")).map((file) => file.fsPath),
+                [filePath],
+            );
+
+            return { path: filePath, line: 1, column: 1 };
+        },
+    });
+    vscode.RelativePattern = class {
+        constructor(base, pattern) {
+            this.base = base;
+            this.pattern = pattern;
+        }
+    };
+    vscode.workspace.findFiles = async (...args) => {
+        assert.equal(args.length, 2);
+        assert.equal(args[0].base, controller.workspace);
+        assert.equal(args[0].pattern, "**/helper.ts");
+        assert.equal(args[1], "**/.pi/**");
+
+        return [uri(filePath)];
+    };
+
+    await controller.openCode("helper.ts");
+});
+
 test("unsafe or untrusted code references never reach an editor or external URI opener", async (t) => {
     const { controller, documentOpens, opened } = fixture(t);
     for (const reference of [
@@ -1252,6 +1282,34 @@ test("concurrent connect requests share one launch", async (t) => {
     await Promise.all([first, second]);
     assert.equal(launches.length, 1);
     assert.equal(clients.length, 1);
+});
+
+test("streamed prices publish while busy and a delayed stats response cannot overwrite them", async (t) => {
+    let statsGate;
+    const { controller, clients, posted } = fixture(t, {
+        request(type) {
+            if (type === "get_session_stats") {
+                return statsGate ? statsGate.promise : { cost: 1 };
+            }
+
+            return undefined;
+        },
+    });
+    await controller.connect();
+    const client = clients[0];
+    client.emit("event", { type: "agent_start" });
+    client.emit("event", { type: "message_start", message: { role: "assistant", content: [] } });
+    statsGate = deferred();
+    const refresh = controller.refresh();
+    client.emit("event", {
+        type: "message_update",
+        message: { role: "assistant", content: [], usage: { cost: { total: 0.25 } } },
+    });
+    statsGate.resolve({ cost: 1 });
+    await refresh;
+    controller.publish();
+    assert.equal(controller.state.cost, 1.25);
+    assert.ok(posted.some((entry) => entry.state?.status === "busy" && entry.state.cost === 1.25));
 });
 
 test("reconnect requested during cancelled startup establishes a fresh connection", async (t) => {

@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { mentionAtCursor, removeAcceptedMention } = require("../vscode/media/chat-extras.js");
+const { mentionAtCursor, completeAcceptedMention } = require("../vscode/media/chat-extras.js");
 
 test("file mention discovery follows the cursor and excludes emails or selections", () => {
     const draft = "Please inspect @src/app.ts and explain";
@@ -26,13 +26,21 @@ test("file mention discovery follows the cursor and excludes emails or selection
     });
 });
 
-test("confirmed mentions remove only their exact original draft token", () => {
+test("confirmed mentions complete the selected path and preserve surrounding text", () => {
     const draft = "Compare @src/one.ts with @src/two.ts";
     const cursor = draft.indexOf(" with");
     const mention = mentionAtCursor(draft, cursor);
-    assert.deepEqual(removeAcceptedMention(draft, mention), { text: "Compare  with @src/two.ts", cursor: 8 });
-    assert.equal(removeAcceptedMention(draft + " please", mention), null);
-    assert.equal(removeAcceptedMention(draft.replace("one", "new"), mention), null);
-    assert.equal(removeAcceptedMention("", mention), null);
-    assert.equal(removeAcceptedMention(draft, null), null);
+    assert.deepEqual(completeAcceptedMention(draft, mention, "src/selected.ts"), {
+        text: "Compare @src/selected.ts with @src/two.ts",
+        cursor: 25,
+    });
+    const short = "Inspect @src";
+    assert.deepEqual(completeAcceptedMention(short, mentionAtCursor(short, short.length), "src/my file.ts"), {
+        text: 'Inspect @"src/my file.ts" ',
+        cursor: 26,
+    });
+    assert.equal(completeAcceptedMention(draft + " please", mention, "file.ts"), null);
+    assert.equal(completeAcceptedMention(draft.replace("one", "new"), mention, "file.ts"), null);
+    assert.equal(completeAcceptedMention("", mention, "file.ts"), null);
+    assert.equal(completeAcceptedMention(draft, null, "file.ts"), null);
 });
