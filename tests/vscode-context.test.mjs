@@ -345,7 +345,93 @@ test("directory listings stop at their entry and byte caps with an explicit noti
     const nonEmpty = attachment.text.split("\n").filter((line) => line.length > 0);
     // Header line, exactly 200 entry lines, then the truncation notice.
     assert.equal(nonEmpty.length, 202);
-    assert.match(attachment.text, /\[Listing truncated at 200 entries or 16 KB\.\]/u);
+    assert.match(attachment.text, /\[Listing truncated at 200 entries, 16 KB, or 1000 scanned entries/u);
+});
+
+test("directory enumeration counts hidden entries toward one shared scan budget and closes handles", async (t) => {
+    const { workspace } = await fixture(t);
+    let reads = 0;
+    let closes = 0;
+    let filtered = 0;
+    let failRead = false;
+    t.mock.method(fs, "readdir", () => assert.fail("Unbounded readdir must not be used"));
+    t.mock.method(fs, "opendir", async (directory, options) => {
+        assert.equal(options.bufferSize, 32);
+        const isRoot = directory === workspace;
+        let first = true;
+
+        return {
+            async read() {
+                if (failRead) {
+                    throw new Error("read failed");
+                }
+
+                if (isRoot && !first) {
+                    return null;
+                }
+
+                first = false;
+                reads += 1;
+                assert.ok(reads <= 1000);
+
+                return {
+                    name: isRoot ? "nested" : `hidden${reads}.txt`,
+                    isDirectory: () => isRoot,
+                    isSymbolicLink: () => false,
+                };
+            },
+            async close() {
+                closes += 1;
+            },
+        };
+    });
+    const attachment = await contextModule.collectDirectoryAttachment({
+        workspacePath: workspace,
+        filePath: workspace,
+        hiddenFilter: (relative) => {
+            filtered += 1;
+
+            return relative !== "nested";
+        },
+    });
+    assert.equal(reads, 1000);
+    assert.equal(filtered, 1000);
+    assert.equal(closes, 2);
+    assert.match(attachment.detail, /^1 entries/u);
+    assert.match(attachment.text, /1000 scanned entries \(including hidden entries\)/u);
+
+    reads = 0;
+    await assert.rejects(
+        contextModule.collectDirectoryAttachment({
+            workspacePath: workspace,
+            filePath: workspace,
+            hiddenFilter: () => {
+                throw new Error("filter limit");
+            },
+        }),
+        /filter limit/u,
+    );
+    assert.equal(closes, 3);
+    failRead = true;
+    await assert.rejects(
+        contextModule.collectDirectoryAttachment({ workspacePath: workspace, filePath: workspace }),
+        /read failed/u,
+    );
+    assert.equal(closes, 4);
+});
+
+test("directory listings refuse a root header that cannot fit the final byte cap", async (t) => {
+    const { workspace } = await fixture(t);
+    // Model a long-path-capable filesystem; do not depend on the OS path limit.
+    const filePath = path.join(workspace, ...Array(100).fill("é".repeat(100)));
+    t.mock.method(fs, "realpath", async (value) => value);
+    t.mock.method(fs, "stat", async () => ({ isDirectory: () => true, dev: 1, ino: 2 }));
+    const open = t.mock.method(fs, "opendir", () => assert.fail("An oversized header leaves no enumeration budget"));
+    await assert.rejects(
+        contextModule.collectDirectoryAttachment({ workspacePath: workspace, filePath }),
+        /folder path is too long for a 16 KiB listing/u,
+    );
+    assert.equal(open.mock.callCount(), 0);
 });
 
 test("long entry names truncate the listing instead of refusing the folder", async (t) => {
@@ -363,7 +449,7 @@ test("long entry names truncate the listing instead of refusing the folder", asy
         filePath: path.join(workspace, "big"),
     });
     assert.ok(Buffer.byteLength(attachment.text, "utf8") <= 16 * 1024);
-    assert.match(attachment.text, /\[Listing truncated at 200 entries or 16 KB\.\]/u);
+    assert.match(attachment.text, /\[Listing truncated at 200 entries, 16 KB, or 1000 scanned entries/u);
     const listed = attachment.text.split("\n").filter((line) => line.includes(".txt")).length;
     assert.ok(listed > 0 && listed < 120);
     assert.equal(attachment.detail, `${listed} entries · Directory listing`);

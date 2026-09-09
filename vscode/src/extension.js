@@ -656,26 +656,39 @@ class ChatController {
             throw new Error("Wait for the current chat action to finish.");
         }
 
-        const selectionAttachment = await this.collectSelectionAttachment();
-        if (selectionAttachment && this.attachments.length >= MAX_ATTACHMENTS) {
-            throw new Error(
-                "This message already holds eight attachments. Hide the editor selection above the composer, or remove an attachment, then send again.",
-            );
-        }
-
         this.sending = true;
         this.publish();
         const attached = [...this.attachments];
-        if (selectionAttachment) {
-            attached.push(selectionAttachment);
-        }
-
         const workspace = this.workspace;
+        const generation = this.generation;
+        const revision = this.sessionRevision;
         let client;
         let connectionGeneration;
         let accepted = false;
         let queuedId;
         try {
+            const selectionAttachment = await this.collectSelectionAttachment();
+            if (
+                this.disposed ||
+                this.workspace !== workspace ||
+                this.generation !== generation ||
+                this.sessionRevision !== revision
+            ) {
+                throw new Error(
+                    "The chat changed while collecting the selection. Review the draft before sending again.",
+                );
+            }
+
+            if (selectionAttachment) {
+                if (attached.length >= MAX_ATTACHMENTS) {
+                    throw new Error(
+                        "This message already holds eight attachments. Hide the editor selection above the composer, or remove an attachment, then send again.",
+                    );
+                }
+
+                attached.push(selectionAttachment);
+            }
+
             if (attached.some((item) => item.kind === "image") && text.trimStart().startsWith("/")) {
                 throw new Error(
                     "Pi slash commands do not consume image attachments. Send your images with a normal message, or remove them before running a command.",
@@ -948,14 +961,21 @@ class ChatController {
             return null;
         }
 
-        const startLine = editor.selection.start.line + 1;
-        const endLine = editor.selection.end.line + 1;
+        const { start, end } = editor.selection;
+        const startLine = start.line + 1;
+        // A selection ending at column zero does not include that final line.
+        const endLine = end.line + (end.character === 0 && end.line > start.line ? 0 : 1);
 
         return {
             filePath,
             startLine,
             endLine,
             lineCount: Math.max(1, endLine - startLine + 1),
+            range: {
+                start: { line: start.line, character: start.character },
+                end: { line: end.line, character: end.character },
+            },
+            documentVersion: editor.document.version,
         };
     }
 
@@ -979,16 +999,17 @@ class ChatController {
             throw new Error("The selected text is unavailable. Re-select it in the editor, then send again.");
         }
 
-        if (offered.startLine > document.lineCount) {
+        if (offered.startLine > document.lineCount || document.version !== offered.documentVersion) {
             throw new Error("The selected text is no longer available. Re-select it in the editor, then send again.");
         }
 
+        const { start, end } = offered.range;
         const startLine = offered.startLine;
-        const endLine = Math.min(offered.endLine, document.lineCount || offered.endLine);
+        const endLine = offered.endLine;
         const text = document.getText(
             new vscode.Range(
-                new vscode.Position(startLine - 1, 0),
-                new vscode.Position(endLine - 1, Number.MAX_SAFE_INTEGER),
+                new vscode.Position(start.line, start.character),
+                new vscode.Position(end.line, end.character),
             ),
         );
 
@@ -1860,6 +1881,7 @@ function activate(context) {
     );
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => controller.updateSelectionContext()));
     context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(() => controller.updateSelectionContext()));
+    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(() => controller.updateSelectionContext()));
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration((event) => {
             if (event.affectsConfiguration(PREFIX)) {

@@ -2,10 +2,11 @@
 
 ## 0.5.0
 
-- Offer the active editor selection above the composer as a toggleable context chip. The selection is read and attached when you send, and clicking the chip hides it from the next message. Each conversation remembers whether the chip is included.
+- Offer the active editor selection above the composer as a toggleable context chip. The exact selected characters are read and attached when you send, and clicking the chip hides it from the next message. Each conversation remembers whether the chip is included. Selection-validation failures restore the draft, and changed documents or connections cannot send stale selection context.
 - Insert `@file#Lx-Ly` mentions from the editor with **Alt+K** (or the editor context menu), including folder mentions that keep the trailing slash.
 - Respect `files.exclude`, `search.exclude`, and the workspace-root `.gitignore` in `@` file suggestions and shortened chat-link search. Explicit attachment of an ignored file or folder remains available.
-- Attach folders from `@` suggestions, mentions, or the Explorer context menu as a bounded directory-listing snapshot (200 entries / 16 KiB with an explicit truncation note) instead of reading every file. Sensitive paths are never listed, and Pi still reads folder files through its own tools.
+- Attach folders from `@` suggestions, mentions, or the Explorer context menu as a bounded directory-listing snapshot (200 entries / 16 KiB, scanning at most 1,000 entries including hidden entries, with an explicit truncation note) instead of reading every file. Sensitive paths are never listed, and Pi still reads folder files through its own tools.
+- Validate and bound ignore-file reads, reject linked or special files, and use non-backtracking glob matching with an explicit work limit. Preserve valid rules when a character class is malformed, respect Git ancestor-negation semantics, and treat false VS Code exclusions as same-key overrides only.
 
 ## 0.4.4
 

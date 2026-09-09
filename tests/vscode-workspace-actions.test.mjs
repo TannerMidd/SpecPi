@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import actions from "../vscode/src/workspace-actions.js";
 
-const { findFiles, reviewChanges } = actions;
+const { findFiles, reviewChanges, workspaceHiddenFilter } = actions;
 
 function uri(filePath, properties = {}) {
     return {
@@ -743,6 +743,61 @@ test("file suggestions respect files.exclude, search.exclude, and the workspace 
     assert.deepEqual(f.posts[2].files, []);
     await findFiles(f.controller, f.vscode, "extra", "q4");
     assert.deepEqual(f.posts[3].files, []);
+});
+
+test("ignore reads reject linked, special, oversized and invalid files before using their rules", async (t) => {
+    const f = await diskFixture(t);
+    const ignore = path.join(f.root, ".gitignore");
+    const hidden = () => workspaceHiddenFilter(f.vscode, f.workspace, f.root);
+    const error = /regular, unlinked UTF-8 file of at most 64 KiB/u;
+    // Both targets are synthetic. No real credential or private runtime file is read.
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), "specpi-ignore-outside-"));
+    t.after(() => fs.rm(outside, { recursive: true, force: true }));
+    const targets = [path.join(outside, "example.txt"), path.join(f.root, ".env")];
+    for (const target of targets) {
+        await fs.writeFile(target, "outside-rule.txt\n");
+        await fs.symlink(target, ignore);
+        const open = t.mock.method(fs, "open", () => assert.fail("Linked ignore targets must not be opened"));
+        await assert.rejects(hidden(), error);
+        assert.equal(open.mock.callCount(), 0);
+        open.mock.restore();
+        await fs.unlink(ignore);
+    }
+
+    await fs.link(targets[0], ignore);
+    await assert.rejects(hidden(), error);
+    await fs.unlink(ignore);
+    await fs.mkdir(ignore);
+    await assert.rejects(hidden(), error);
+    await fs.rmdir(ignore);
+    // Simulate a FIFO/device on every platform and prove it is never opened.
+    const stat = t.mock.method(fs, "lstat", async () => ({ isFile: () => false }));
+    const open = t.mock.method(fs, "open", () => assert.fail("Special ignore files must not be opened"));
+    await assert.rejects(hidden(), error);
+    assert.equal(open.mock.callCount(), 0);
+    stat.mock.restore();
+    open.mock.restore();
+    await fs.writeFile(ignore, "x".repeat(64 * 1024 + 1));
+    await assert.rejects(hidden(), error);
+    await fs.writeFile(ignore, Buffer.from([0xff]));
+    await assert.rejects(hidden(), error);
+});
+
+test("ignore reads preserve valid rules, refresh content, and revalidate cached paths", async (t) => {
+    const f = await diskFixture(t);
+    const ignore = path.join(f.root, ".gitignore");
+    const hidden = () => workspaceHiddenFilter(f.vscode, f.workspace, f.root);
+    await fs.writeFile(ignore, "private-notes/\n[z-a]\n");
+    assert.equal((await hidden())("private-notes/draft.txt"), true);
+    assert.equal((await hidden())("public.txt"), false);
+    await fs.writeFile(ignore, "*.log\n");
+    assert.equal((await hidden())("private-notes/draft.txt"), false);
+    assert.equal((await hidden())("error.log"), true);
+    await fs.unlink(ignore);
+    await fs.symlink(path.join(f.root, "src", "file.js"), ignore);
+    await assert.rejects(hidden(), /regular, unlinked/u);
+    await fs.unlink(ignore);
+    assert.equal((await hidden())("error.log"), false);
 });
 
 test("search.useIgnoreFiles=false restores gitignored files in suggestions", async (t) => {

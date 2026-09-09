@@ -1,28 +1,20 @@
 "use strict";
 
-// Dependency-free workspace filtering for file suggestions, folder listings,
-// and mention attachments: VS Code exclude settings plus the workspace-root
-// .gitignore. The SpecPi Chat package ships without dependencies, so these
-// matchers are implemented here and covered directly by unit tests.
-//
-// Gitignore semantics follow git's documented behavior for one root ignore
-// file: blank and comment lines, `!` negation with last-match precedence,
-// trailing-slash directory rules, anchored patterns containing a slash,
-// unanchored basename patterns, `**`, `*`, `?`, and `[...]` classes. One
-// deviation from git: a negation beneath a directory excluded by a bare
-// directory rule (rather than `dir/**`) is honored, because suggestions
-// filter flat paths instead of walking a tree like git.
-//
-// VS Code exclude settings (`files.exclude`, `search.exclude`) use anchored
-// globs with the same wildcard grammar plus `{a,b}` alternation. Entries map
-// a glob to a boolean; `true` excludes and `false` re-includes, evaluated in
-// object-key order with the last match deciding.
-
+// Root-only gitignore and boolean VS Code excludes, without dependencies.
+// Match path components with dynamic programming, never a backtracking glob
+// regex. Ancestors are evaluated independently: an excluded directory cannot
+// be reopened by a rule for a descendant. Settings merge by key; false disables
+// that key, rather than negating other enabled patterns.
 const MAX_RULES = 1000;
 const MAX_EXPANSION = 64;
+const MAX_PATTERN_LENGTH = 4096;
+const MAX_MATCH_WORK = 1_000_000;
 
-function escapeRegex(text) {
-    return text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+function spend(budget, amount = 1) {
+    budget.remaining -= amount;
+    if (budget.remaining < 0) {
+        throw new Error("Workspace ignore/exclude matching exceeded its work limit. Simplify the patterns.");
+    }
 }
 
 function stripUnescapedTrailingSpaces(line) {
@@ -45,199 +37,208 @@ function stripUnescapedTrailingSpaces(line) {
     return line.slice(0, end);
 }
 
-function parseClass(pattern, start) {
-    // Parses `[...]` beginning at `start`. Returns the regex fragment and the
-    // index after the closing bracket, or null when the class is unterminated.
-    let index = start + 1;
-    let body = "";
-    let negated = false;
-    if (pattern[index] === "!" || pattern[index] === "^") {
-        negated = true;
-        index += 1;
-    }
-
-    if (pattern[index] === "]") {
-        body += "\\]";
-        index += 1;
-    }
-
-    while (index < pattern.length && pattern[index] !== "]") {
-        if (pattern[index] === "\\" && index + 1 < pattern.length) {
-            body += escapeRegex(pattern[index + 1]);
-            index += 2;
-        } else {
-            body += pattern[index] === "\\" ? "\\\\" : pattern[index];
-            index += 1;
-        }
-    }
-
-    if (index >= pattern.length) {
-        return null;
-    }
-
-    return { source: `[${negated ? "^" : ""}${body}]`, next: index + 1 };
-}
-
-function globBodyToRegexSource(body) {
-    // Converts the shared wildcard grammar to a regex source for one
-    // slash-delimited path pattern without leading or trailing slashes.
-    let source = "";
-    let index = 0;
-    while (index < body.length) {
-        const char = body[index];
+function compileSegment(segment) {
+    const characters = [...segment];
+    const tokens = [];
+    for (let index = 0; index < characters.length; index += 1) {
+        const char = characters[index];
         if (char === "\\") {
-            const next = body[index + 1];
-            source += next === undefined ? "\\\\" : escapeRegex(next);
-            index += next === undefined ? 1 : 2;
-        } else if (char === "*" && body.startsWith("**", index)) {
-            if (body.startsWith("**/", index)) {
-                source += "(?:.*/)?";
-                index += 3;
-            } else if (index >= 1 && body[index - 1] === "/" && index + 2 === body.length) {
-                // Trailing `/**`: everything beneath, but never the segment
-                // itself. The literal slash was already emitted above.
-                source = `${source.replace(/\/$/u, "")}/.+`;
-                index += 3;
-            } else {
-                source += ".*";
-                index += 2;
-            }
+            tokens.push({ literal: characters[++index] ?? "\\" });
         } else if (char === "*") {
-            source += "[^/]*";
-            index += 1;
+            if (tokens.at(-1)?.kind !== "star") {
+                tokens.push({ kind: "star" });
+            }
         } else if (char === "?") {
-            source += "[^/]";
-            index += 1;
+            tokens.push({ kind: "any" });
         } else if (char === "[") {
-            const parsed = parseClass(body, index);
-            if (!parsed) {
-                source += "\\[";
-                index += 1;
+            let cursor = index + 1;
+            let body = "";
+            if (characters[cursor] === "!" || characters[cursor] === "^") {
+                body = "^";
+                cursor += 1;
+            }
+
+            if (characters[cursor] === "]") {
+                body += "\\]";
+                cursor += 1;
+            }
+
+            for (; cursor < characters.length && characters[cursor] !== "]"; cursor += 1) {
+                const current = characters[cursor];
+                if (current === "\\" && cursor + 1 < characters.length) {
+                    const literal = characters[++cursor];
+                    body += ["\\", "]", "[", "^", "-"].includes(literal) ? `\\${literal}` : literal;
+                } else {
+                    body += current === "[" || current === "^" ? `\\${current}` : current;
+                }
+            }
+
+            if (cursor === characters.length) {
+                tokens.push({ literal: "[" });
             } else {
-                source += parsed.source;
-                index = parsed.next;
+                // A regex is used only for one character class against one
+                // character. Invalid ranges invalidate this rule alone.
+                tokens.push({ class: new RegExp(`^[${body}]$`, "u") });
+                index = cursor;
             }
         } else {
-            source += escapeRegex(char);
-            index += 1;
+            tokens.push({ literal: char });
         }
     }
 
-    return source;
+    return tokens;
 }
 
-function expandBraces(pattern, depth = 0) {
-    if (depth > 4 || !pattern.includes("{")) {
-        return [pattern];
+function matchSegment(tokens, value, budget) {
+    const characters = [...value];
+    spend(budget, (tokens.length + 1) * (characters.length + 1));
+    let previous = new Uint8Array(characters.length + 1);
+    previous[0] = 1;
+    for (const token of tokens) {
+        const next = new Uint8Array(characters.length + 1);
+        if (token.kind === "star") {
+            next[0] = previous[0];
+        }
+
+        for (let index = 1; index <= characters.length; index += 1) {
+            const char = characters[index - 1];
+            next[index] =
+                token.kind === "star"
+                    ? previous[index] || next[index - 1]
+                    : previous[index - 1] &&
+                      (token.kind === "any" || token.literal === char || token.class?.test(char));
+        }
+
+        previous = next;
     }
 
-    const open = pattern.indexOf("{");
-    let nesting = 0;
-    let close = -1;
-    for (let index = open; index < pattern.length; index += 1) {
-        if (pattern[index] === "{") {
-            nesting += 1;
-        } else if (pattern[index] === "}") {
-            nesting -= 1;
-            if (nesting === 0) {
-                close = index;
-                break;
+    return previous[characters.length] === 1;
+}
+
+function matches(rule, segments, budget) {
+    if (!rule.anchored) {
+        return matchSegment(rule.parts[0], segments.at(-1), budget);
+    }
+
+    spend(budget, (rule.parts.length + 1) * (segments.length + 1));
+    let previous = new Uint8Array(segments.length + 1);
+    previous[0] = 1;
+    for (const [partIndex, part] of rule.parts.entries()) {
+        const next = new Uint8Array(segments.length + 1);
+        if (part === null) {
+            // A trailing /** requires a descendant, unlike an intermediate **/.
+            const trailing = partIndex === rule.parts.length - 1;
+            next[0] = trailing ? 0 : previous[0];
+            for (let index = 1; index <= segments.length; index += 1) {
+                next[index] = next[index - 1] || (trailing ? previous[index - 1] : previous[index]);
+            }
+        } else {
+            for (let index = 1; index <= segments.length; index += 1) {
+                next[index] = previous[index - 1] && matchSegment(part, segments[index - 1], budget);
             }
         }
+
+        previous = next;
     }
 
-    if (close === -1) {
-        return [pattern];
-    }
+    return previous[segments.length] === 1;
+}
 
-    const prefix = pattern.slice(0, open);
-    const suffix = pattern.slice(close + 1);
-    const alternatives = [];
-    let current = "";
-    let innerNesting = 0;
-    for (const char of pattern.slice(open + 1, close)) {
-        if (char === "{") {
-            innerNesting += 1;
-            current += char;
-        } else if (char === "}") {
-            innerNesting -= 1;
-            current += char;
-        } else if (char === "," && innerNesting === 0) {
-            alternatives.push(current);
-            current = "";
-        } else {
-            current += char;
+function expandBraces(pattern) {
+    // Bound intermediate expansion too, not just the final result.
+    let pending = [pattern];
+    for (let depth = 0; depth < 5; depth += 1) {
+        const expanded = [];
+        let changed = false;
+        for (const value of pending) {
+            const open = value.indexOf("{");
+            let nesting = 0;
+            let close = -1;
+            const alternatives = [];
+            let start = open + 1;
+            for (let index = open; open !== -1 && index < value.length; index += 1) {
+                if (value[index] === "{") {
+                    nesting += 1;
+                } else if (value[index] === "}") {
+                    nesting -= 1;
+                    if (nesting === 0) {
+                        alternatives.push(value.slice(start, index));
+                        close = index;
+                        break;
+                    }
+                } else if (value[index] === "," && nesting === 1) {
+                    alternatives.push(value.slice(start, index));
+                    start = index + 1;
+                }
+
+                if (alternatives.length >= MAX_EXPANSION) {
+                    return [pattern];
+                }
+            }
+
+            if (close === -1) {
+                expanded.push(value);
+            } else {
+                changed = true;
+                for (const alternative of alternatives) {
+                    expanded.push(value.slice(0, open) + alternative + value.slice(close + 1));
+                    if (expanded.length > MAX_EXPANSION) {
+                        return [pattern];
+                    }
+                }
+            }
+        }
+
+        pending = expanded;
+        if (!changed) {
+            return pending;
         }
     }
 
-    alternatives.push(current);
-    const expanded = [];
-    for (const alternative of alternatives) {
-        for (const tail of expandBraces(`${prefix}${alternative}${suffix}`, depth + 1)) {
-            expanded.push(tail);
+    return pending.some((entry) => entry.includes("{")) ? [pattern] : pending;
+}
+
+function compileBody(body, { anchored, exclude, dirOnly = false }) {
+    if (body.length > MAX_PATTERN_LENGTH) {
+        throw new Error("Workspace ignore/exclude patterns must not exceed 4096 characters.");
+    }
+
+    try {
+        const parts = body.split("/").map((segment) => (segment === "**" && anchored ? null : compileSegment(segment)));
+
+        return { parts, anchored, exclude, dirOnly };
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            return null;
         }
-    }
 
-    if (expanded.length > MAX_EXPANSION || expanded.some((entry) => entry.includes("{"))) {
-        return [pattern];
+        throw error;
     }
-
-    return expanded;
 }
 
-function compileBody(body, { anchored, exclude, dirOnly = false } = {}) {
-    const source = anchored ? `^${globBodyToRegexSource(body)}$` : `^(?:.*/)?${globBodyToRegexSource(body)}$`;
+function addRule(rules, rule) {
+    if (rule) {
+        if (rules.length >= MAX_RULES) {
+            throw new Error("Workspace ignore/exclude filtering supports at most 1000 rules.");
+        }
 
-    return { regex: new RegExp(source, "u"), exclude, dirOnly };
-}
-
-function normalizeRelativePath(value) {
-    if (typeof value !== "string") {
-        return "";
+        rules.push(rule);
     }
-
-    const normalized = value.replaceAll("\\", "/").replace(/^\.\//u, "").replace(/^\/+/u, "");
-    if (!normalized || normalized.split("/").includes("..")) {
-        return "";
-    }
-
-    return normalized;
-}
-
-function pathWithAncestors(value) {
-    const segments = value.split("/");
-    const ancestors = [];
-    for (let depth = 1; depth < segments.length; depth += 1) {
-        ancestors.push(segments.slice(0, depth).join("/"));
-    }
-
-    return [value, ...ancestors];
 }
 
 function parseIgnoreFile(text) {
     const rules = [];
     for (const rawLine of String(text ?? "").split(/\r?\n/u)) {
-        if (rules.length >= MAX_RULES) {
-            break;
-        }
-
         const line = stripUnescapedTrailingSpaces(rawLine);
         if (!line || line.startsWith("#")) {
             continue;
         }
 
-        let body = line;
-        let negated = false;
-        if (body.startsWith("!")) {
-            negated = true;
-            body = body.slice(1);
-        }
-
-        let dirOnly = false;
+        const negated = line.startsWith("!");
+        let body = negated ? line.slice(1) : line;
         const hadLeadingSlash = body.startsWith("/");
-        // A trailing `\/` is an escaped slash, not a directory marker.
-        if (body.endsWith("/") && !body.endsWith("\\/")) {
-            dirOnly = true;
+        const dirOnly = body.endsWith("/") && !body.endsWith("\\/");
+        if (dirOnly) {
             body = body.slice(0, -1);
         }
 
@@ -245,79 +246,77 @@ function parseIgnoreFile(text) {
             body = body.slice(1);
         }
 
-        if (!body) {
-            continue;
+        if (body) {
+            addRule(
+                rules,
+                compileBody(body, { anchored: hadLeadingSlash || body.includes("/"), exclude: !negated, dirOnly }),
+            );
         }
-
-        // Only a slash inside the pattern anchors it; a leading or trailing
-        // slash says where matching happens, not where the name may sit. A
-        // stripped leading slash still anchors the pattern.
-        const anchored = hadLeadingSlash || body.includes("/");
-        rules.push(compileBody(body, { anchored, exclude: !negated, dirOnly }));
     }
 
     return rules;
 }
 
 function excludedBy(rules, relativePath, isDirectory) {
-    // Shared by gitignore rules and setting excludes: both grammars compile to
-    // the same rule shape and both let the last matching rule decide.
-    const normalized = normalizeRelativePath(relativePath);
-    if (!normalized) {
+    if (!rules.length || typeof relativePath !== "string" || !relativePath) {
         return false;
     }
 
-    const targets = pathWithAncestors(normalized);
-    let excluded = false;
-    for (const rule of rules) {
-        if (rule.dirOnly && !isDirectory) {
-            // A directory rule covers files beneath it through ancestor
-            // matching only; it never matches a file that merely shares the
-            // directory's name, so the full path is excluded from targets.
-            if (targets.slice(1).some((target) => rule.regex.test(target))) {
+    if (relativePath.length > MAX_PATTERN_LENGTH) {
+        throw new Error("Workspace paths exceed the ignore/exclude matching limit.");
+    }
+
+    const normalized = relativePath
+        .replaceAll("\\", "/")
+        .replace(/^\.\//u, "")
+        .replace(/^\/+|\/+$/gu, "");
+    const segments = normalized.split("/");
+    if (!normalized || segments.includes("..")) {
+        return false;
+    }
+
+    const budget = { remaining: MAX_MATCH_WORK };
+    // Parent exclusion prevents traversal. A parent negation only reopens
+    // that parent; it does not cancel a rule matching the file itself.
+    for (let depth = 1; depth <= segments.length; depth += 1) {
+        let excluded = false;
+        const directory = depth < segments.length || isDirectory;
+        const target = segments.slice(0, depth);
+        for (const rule of rules) {
+            spend(budget);
+            if ((!rule.dirOnly || directory) && matches(rule, target, budget)) {
                 excluded = rule.exclude;
             }
-
-            continue;
         }
 
-        if (targets.some((target) => rule.regex.test(target))) {
-            excluded = rule.exclude;
+        if (excluded) {
+            return true;
         }
     }
 
-    return excluded;
-}
-
-function isIgnored(rules, relativePath, isDirectory = false) {
-    return excludedBy(rules, relativePath, isDirectory);
+    return false;
 }
 
 function compileSettingExcludes(filesEntries, searchEntries) {
     const rules = [];
-    for (const entries of [filesEntries, searchEntries]) {
-        for (const [pattern, value] of Object.entries(entries || {})) {
-            if (rules.length >= MAX_RULES || typeof pattern !== "string" || !pattern || typeof value !== "boolean") {
-                continue;
-            }
+    for (const [pattern, value] of Object.entries({ ...filesEntries, ...searchEntries })) {
+        if (!pattern || value !== true) {
+            continue;
+        }
 
-            let body = pattern;
-            let dirOnly = false;
-            if (body.startsWith("/")) {
-                body = body.slice(1);
-            }
+        let body = pattern.replace(/^\//u, "");
+        const dirOnly = body.endsWith("/") && !body.endsWith("\\/");
+        if (dirOnly) {
+            body = body.slice(0, -1);
+        }
 
-            if (body.endsWith("/") && !body.endsWith("\\/")) {
-                dirOnly = true;
-                body = body.slice(0, -1);
-            }
+        if (body.length > MAX_PATTERN_LENGTH) {
+            throw new Error("Workspace ignore/exclude patterns must not exceed 4096 characters.");
+        }
 
-            if (!body) {
-                continue;
-            }
-
+        if (body) {
             for (const expanded of expandBraces(body)) {
-                rules.push(compileBody(expanded, { anchored: true, exclude: value, dirOnly }));
+                addRule(rules, compileBody(expanded, { anchored: true, exclude: true, dirOnly }));
             }
         }
     }
@@ -325,15 +324,10 @@ function compileSettingExcludes(filesEntries, searchEntries) {
     return rules;
 }
 
-function isSettingExcluded(rules, relativePath, isDirectory = false) {
-    return excludedBy(rules, relativePath, isDirectory);
-}
-
 module.exports = {
     expandBraces,
-    globBodyToRegexSource,
     compileSettingExcludes,
-    isIgnored,
-    isSettingExcluded,
+    isIgnored: excludedBy,
+    isSettingExcluded: excludedBy,
     parseIgnoreFile,
 };

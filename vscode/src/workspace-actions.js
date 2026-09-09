@@ -2,7 +2,7 @@
 
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const { sensitivePath } = require("./context");
+const { collectAttachment, sensitivePath } = require("./context");
 const { compileSettingExcludes, isIgnored, isSettingExcluded, parseIgnoreFile } = require("./file-filters");
 const { parseCodeReference, resolveCodeReference } = require("./code-references");
 
@@ -124,30 +124,43 @@ function suggestionPatterns(needle) {
 }
 
 async function ignoreRules(workspacePath) {
-    // The root .gitignore is re-read only when its size or modification time
-    // changes, so repeated suggestion searches stay cheap.
     const ignorePath = path.join(workspacePath, ".gitignore");
     let info;
     try {
-        info = await fs.stat(ignorePath);
-    } catch {
-        return [];
+        // Like Git, never follow a symlinked ignore file. Check the type before
+        // opening so a static FIFO/device cannot block an ordinary search.
+        info = await fs.lstat(ignorePath);
+    } catch (error) {
+        if (error.code === "ENOENT") {
+            return [];
+        }
+
+        throw new Error("The workspace .gitignore is unavailable. Check its permissions before searching.");
     }
 
-    const key = `${info.mtimeMs}:${info.size}`;
+    let text;
+    try {
+        if (!info.isFile() || info.nlink !== 1) {
+            throw new Error("Not an ordinary file");
+        }
+
+        // Reuse the bounded UTF-8 reader and its canonical/private-path,
+        // hard-link and identity checks. Validate every read, even cache hits.
+        ({ text } = await collectAttachment({ workspacePath, filePath: ignorePath }));
+    } catch {
+        throw new Error(
+            "The workspace .gitignore must be a regular, unlinked UTF-8 file of at most 64 KiB inside the workspace. " +
+                "Fix it or disable search.useIgnoreFiles before searching or listing folders.",
+        );
+    }
+
     const cached = ignoreCache.get(workspacePath);
-    if (cached && cached.key === key) {
+    if (cached && cached.text === text) {
         return cached.rules;
     }
 
-    let rules = [];
-    try {
-        rules = parseIgnoreFile(await fs.readFile(ignorePath, "utf8"));
-    } catch {
-        rules = [];
-    }
-
-    ignoreCache.set(workspacePath, { key, rules });
+    const rules = parseIgnoreFile(text);
+    ignoreCache.set(workspacePath, { text, rules });
     while (ignoreCache.size > 8) {
         ignoreCache.delete(ignoreCache.keys().next().value);
     }
