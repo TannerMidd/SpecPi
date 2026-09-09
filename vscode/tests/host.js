@@ -157,6 +157,14 @@ async function run() {
         await controller.handleMessage({ type: "setModel", provider: "fixture", modelId: "fixture-model" });
         checks.push("RPC connection and model controls");
 
+        const selectionEditor = vscode.window.activeTextEditor;
+        assert.equal(selectionEditor.document.uri.fsPath, targetFile.fsPath);
+        selectionEditor.selection = new vscode.Selection(1, 15, 1, 19);
+        await until(
+            () => controller.state.selectionContext?.range?.start.character === 15,
+            "exact editor-selection offer",
+        );
+        assert.equal((await controller.active.collectSelectionAttachment()).text, "true");
         await controller.handleMessage({ type: "send", text: "Explain this fixture.", mode: "prompt" });
         await until(
             () =>
@@ -169,12 +177,17 @@ async function run() {
         assert.equal(controller.state.attachments.length, 0);
         const sentMessage = controller.state.messages.find((message) => message.role === "user");
         assert.equal(sentMessage.text, "Explain this fixture.");
-        assert.equal(sentMessage.files.length, 2);
-        assert.ok(sentMessage.files.every((file) => file.label.startsWith("example.js")));
+        assert.equal(sentMessage.files.length, 3);
+        assert.ok(sentMessage.files.slice(0, 2).every((file) => file.label.startsWith("example.js")));
+        assert.equal(sentMessage.files[2].label, "navigation target.js:2");
         assert.ok(sentMessage.files.every((file) => !Object.hasOwn(file, "text")));
         const sentHistory = JSON.stringify(await controller.client.request("get_messages"));
         assert.ok(sentHistory.includes("User-selected file context 1:"));
         assert.ok(sentHistory.includes("export const greeting"), "Pi must still receive the attached source");
+        assert.ok(
+            sentHistory.includes("4 UTF-8 bytes"),
+            "The automatic selection sends only the four selected characters",
+        );
         assert.ok(controller.state.messages.some((message) => message.role === "tool"));
         await until(async () => (await controller.catalog.list()).length === 1, "owned session catalog");
         assert.deepEqual(
@@ -182,7 +195,13 @@ async function run() {
             [],
             "the fixture leaves Pi global state untouched",
         );
-        checks.push("streaming, tool activity, and owned-session retention");
+        checks.push("streaming, exact automatic selection, tool activity, and owned-session retention");
+
+        selectionEditor.selection = new vscode.Selection(0, 0, 0, 0);
+        await until(
+            () => controller.state.selectionContext === null,
+            "withdrawn editor selection before image-only tests",
+        );
 
         const previousClient = controller.client;
         const previousSessionId = controller.activeSessionId;

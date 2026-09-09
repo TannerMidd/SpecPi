@@ -1275,6 +1275,59 @@ test(
                 },
             );
 
+            for (const width of [390, 768, 1200]) {
+                await t.test(`selection chip and rejected-send recovery remain usable at ${width}px`, async () => {
+                    await withPage(browser, fixtures, { name: `selection-recovery-${width}`, width }, async (page) => {
+                        const input = page.locator("#composer-input");
+                        await setState(page, {
+                            conversationKey: "selection-review",
+                            selectionContext: {
+                                filePath: "/synthetic/sample.ts",
+                                startLine: 1,
+                                endLine: 1,
+                                lineCount: 1,
+                            },
+                            attachments: [{ id: "explicit", label: "explicit.ts", detail: "File" }],
+                        });
+                        assert.equal(await page.locator("#selection-chip-text").textContent(), "sample.ts:L1 (1 line)");
+                        await page.locator("#selection-chip-toggle").click();
+                        assert.equal(
+                            await page.locator("#selection-chip-toggle").getAttribute("aria-pressed"),
+                            "false",
+                        );
+                        assert.ok(
+                            (await takeMessages(page)).some(
+                                (m) => m.type === "saveDraft" && m.selectionEnabled === false,
+                            ),
+                        );
+                        assert.equal(await page.locator(".attachment-remove").count(), 1);
+                        await page.locator("#selection-chip-toggle").click();
+                        await input.fill("Keep this draft");
+                        await input.press("Enter");
+                        const send = (await takeMessages(page, { acknowledgeSends: false })).find(
+                            (m) => m.type === "send",
+                        );
+                        assert.ok(send);
+                        assert.equal(await input.inputValue(), "");
+                        await sendHost(page, {
+                            type: "draft",
+                            conversationKey: "selection-review",
+                            text: send.text,
+                            mode: "restore",
+                        });
+                        await sendHost(page, {
+                            type: "sendResult",
+                            conversationKey: "selection-review",
+                            requestId: send.requestId,
+                            accepted: false,
+                        });
+                        assert.equal(await input.inputValue(), "Keep this draft");
+                        assert.equal(await page.locator("#send-button").isEnabled(), true);
+                        await assertLayout(page, width);
+                    });
+                });
+            }
+
             await t.test(
                 "live conversation switches preserve drafts, selection, scrolling and background recovery",
                 async () => {

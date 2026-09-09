@@ -16,7 +16,7 @@ Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4+**. For SSH, WSL
 
 ## In the chat
 
-- **Add context:** attach selected code or files, type `@` to find a file, or paste a screenshot. Images need a model that supports them.
+- **Add context:** the active editor selection appears above the composer and attaches with your next message, or attach selected code or files, type `@` to find a workspace file or folder, press **Alt+K** to insert an `@file#Lx-Ly` mention, or paste a screenshot. Folder attachments send a bounded listing of their contents. Images need a model that supports them.
 - **Follow the work:** see replies and tool output as they arrive. Use **Stop** to interrupt a response.
 - **Keep a few conversations going:** switch chats while Pi continues working in the background. Find older chats in **Chat History**.
 - **Try another direction:** branch a conversation or edit an earlier prompt to start a new branch.

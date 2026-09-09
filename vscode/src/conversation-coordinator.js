@@ -26,6 +26,7 @@ class ConversationCoordinator {
         this.records = new Map();
         this.workspaces = new Map();
         this.disposed = false;
+        this.selectionContext = null;
         this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 25);
         this.statusBar.command = "specpi.chat.open";
         this.statusBar.name = "SpecPi Chat";
@@ -107,7 +108,7 @@ class ConversationCoordinator {
             sessionId: entry?.sessionId,
             archived: entry?.archived === true,
             unread: false,
-            draft: { text: "", selectionStart: 0, selectionEnd: 0, sendMode: "prompt" },
+            draft: { text: "", selectionStart: 0, selectionEnd: 0, sendMode: "prompt", selectionEnabled: true },
             lastEventRevision: 0,
         };
         this.records.set(id, record);
@@ -151,6 +152,9 @@ class ConversationCoordinator {
         record.unread = false;
         this.workspaceRecord(record.workspace).lastActive = record.id;
         this.materialize(record).sentMediaIds.clear();
+        // The offer is validated against the active conversation's workspace,
+        // so a switch must re-derive it instead of showing the previous chip.
+        this.refreshSelectionContext();
         this.publish();
     }
 
@@ -255,7 +259,34 @@ class ConversationCoordinator {
             selectionStart: position(input.selectionStart),
             selectionEnd: position(input.selectionEnd),
             sendMode: ["steer", "followUp", "prompt"].includes(input.sendMode) ? input.sendMode : "prompt",
+            selectionEnabled:
+                typeof input.selectionEnabled === "boolean"
+                    ? input.selectionEnabled
+                    : (record.draft?.selectionEnabled ?? true) === true,
         };
+    }
+
+    refreshSelectionContext() {
+        this.selectionContext = this.active ? this.active.currentSelectionContext() : null;
+    }
+
+    updateSelectionContext() {
+        const previous = JSON.stringify(this.selectionContext);
+        this.refreshSelectionContext();
+        // Editor events fire on every cursor move; republish only on real change.
+        if (JSON.stringify(this.selectionContext) !== previous) {
+            this.publish();
+        }
+    }
+
+    selectionOffer(controller) {
+        const record = this.records.get(controller.conversationKey);
+
+        return record?.draft?.selectionEnabled === false ? null : this.selectionContext;
+    }
+
+    insertMention() {
+        return this.active.insertMention();
     }
 
     postConversation(controller, message) {

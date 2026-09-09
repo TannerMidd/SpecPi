@@ -10,6 +10,7 @@
 .extras-search-match { outline: 1px solid var(--vscode-editor-findMatchBorder, var(--focus)); outline-offset: -1px; scroll-margin-top: 42px; }
 .extras-mention-menu { position: absolute; z-index: 7; bottom: calc(100% + 6px); left: -1px; right: -1px; max-height: min(210px, 35vh); overflow: auto; padding: 4px; background: var(--vscode-quickInput-background, var(--surface-raised)); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 3px 12px #0003; }
 .extras-mention-option { display: block; width: 100%; padding: 7px 8px; background: transparent; text-align: left; font: 11px/1.5 var(--mono); border-radius: 3px; overflow-wrap: anywhere; }
+.extras-mention-directory::before { content: "▸"; margin-right: 6px; color: var(--muted); }
 .extras-mention-option[aria-selected="true"] { background: var(--vscode-list-activeSelectionBackground, var(--button)); color: var(--vscode-list-activeSelectionForeground, var(--button-text)); }
 .extras-mention-notice { padding: 7px 8px; color: var(--muted); font-size: 11px; }
 .extras-recovered-drafts { margin: 0 2px 7px; padding: 6px 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface-raised); }

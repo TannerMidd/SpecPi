@@ -2,7 +2,7 @@
     "name": "specpi-chat",
     "displayName": "SpecPi Chat",
     "description": "A native VS Code chat sidebar for your local Pi agent and SpecPi harness.",
-    "version": "0.4.4",
+    "version": "0.5.0",
     "publisher": "tannermidd",
     "private": true,
     "preview": true,
@@ -121,6 +121,11 @@
                 "icon": "$(file-media)"
             },
             {
+                "command": "specpi.chat.insertMention",
+                "title": "Insert Selection as @ Mention in Chat",
+                "category": "SpecPi"
+            },
+            {
                 "command": "specpi.chat.editPrompt",
                 "title": "Edit Earlier Prompt in New Branch",
                 "category": "SpecPi"
@@ -176,25 +181,36 @@
                 "command": "specpi.chat.open",
                 "key": "ctrl+alt+s",
                 "mac": "cmd+alt+s"
+            },
+            {
+                "command": "specpi.chat.insertMention",
+                "key": "alt+k",
+                "mac": "alt+k",
+                "when": "isWorkspaceTrusted && editorHasSelection && editorFocus && resourceScheme == file"
             }
         ],
         "menus": {
             "editor/context": [
                 {
-                    "command": "specpi.chat.attachSelection",
+                    "command": "specpi.chat.insertMention",
                     "when": "isWorkspaceTrusted && editorHasSelection && resourceScheme == file",
                     "group": "specpi@1"
                 },
                 {
+                    "command": "specpi.chat.attachSelection",
+                    "when": "isWorkspaceTrusted && editorHasSelection && resourceScheme == file",
+                    "group": "specpi@2"
+                },
+                {
                     "command": "specpi.chat.attachFile",
                     "when": "isWorkspaceTrusted && resourceScheme == file",
-                    "group": "specpi@2"
+                    "group": "specpi@3"
                 }
             ],
             "explorer/context": [
                 {
                     "command": "specpi.chat.attachFile",
-                    "when": "isWorkspaceTrusted && resourceScheme == file && !explorerResourceIsFolder",
+                    "when": "isWorkspaceTrusted && resourceScheme == file",
                     "group": "specpi@1"
                 }
             ],

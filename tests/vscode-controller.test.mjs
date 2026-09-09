@@ -1194,6 +1194,7 @@ test("sending refuses a client running in a different workspace and restores the
                     selectionStart: 31,
                     selectionEnd: 31,
                     sendMode: "prompt",
+                    selectionEnabled: true,
                 },
             },
         ],
@@ -1551,6 +1552,7 @@ test("a second send restores its draft while the first prompt is pending", async
                     selectionStart: 26,
                     selectionEnd: 26,
                     sendMode: "prompt",
+                    selectionEnabled: true,
                 },
             },
         ],
@@ -2880,4 +2882,354 @@ test("stopping an old connection cannot insert recovered queue text into the nex
     gate.resolve({ steering: ["Old chat instruction"], followUp: [] });
     await stopping;
     assert.ok(!posted.slice(postIndex).some((message) => message.type === "draft"));
+});
+
+test("offered editor selections attach at send time without persisting as attachments", async (t) => {
+    const { controller, client, vscode, documentOpens } = await connected(t, {
+        openDocument: (file) => ({
+            uri: file,
+            lineCount: 3,
+            getText: (range) =>
+                ["first", "const target = true;", "last"].slice(range.start.line, range.end.line + 1).join("\n"),
+        }),
+    });
+    const workspacePath = controller.workspace.uri.fsPath;
+    const selectionPath = path.join(workspacePath, "helper.ts");
+    await fs.promises.mkdir(path.dirname(selectionPath), { recursive: true });
+    await fs.promises.writeFile(selectionPath, "first\nconst target = true;\nlast\n");
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(selectionPath) },
+        selection: { isEmpty: false, start: { line: 1, character: 0 }, end: { line: 1, character: 20 } },
+    };
+
+    controller.updateSelectionContext();
+    assert.deepEqual(controller.state.selectionContext, {
+        filePath: selectionPath,
+        startLine: 2,
+        endLine: 2,
+        lineCount: 1,
+        range: { start: { line: 1, character: 0 }, end: { line: 1, character: 20 } },
+        documentVersion: undefined,
+    });
+    assert.equal(controller.attachments.length, 0);
+
+    await controller.send("Check this");
+    const prompt = client.requests.find((request) => request.type === "prompt");
+    assert.match(prompt.args.message, /User-selected file context 1: "helper\.ts:2" /u);
+    assert.match(prompt.args.message, /const target = true;/u);
+    assert.equal(controller.attachments.length, 0);
+    assert.ok(documentOpens.length >= 1);
+
+    // Clearing the editor selection withdraws the offer.
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(selectionPath) },
+        selection: { isEmpty: true, start: { line: 1 }, end: { line: 1 } },
+    };
+    controller.updateSelectionContext();
+    assert.equal(controller.state.selectionContext, null);
+});
+
+test("hiding the selection chip keeps the offer out of the sent message", async (t) => {
+    const { controller, coordinator, client, vscode } = await connected(t, {
+        openDocument: (file) => ({
+            uri: file,
+            lineCount: 3,
+            getText: () => "const secret = true;",
+        }),
+    });
+    const workspacePath = controller.workspace.uri.fsPath;
+    const selectionPath = path.join(workspacePath, "helper.ts");
+    await fs.promises.writeFile(selectionPath, "first\nconst secret = true;\nlast\n");
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(selectionPath) },
+        selection: { isEmpty: false, start: { line: 1 }, end: { line: 1 } },
+    };
+    controller.updateSelectionContext();
+
+    // Exactly what the webview posts when the chip toggle is switched off.
+    await coordinator.handleMessage({
+        type: "saveDraft",
+        conversationKey: coordinator.activeId,
+        text: "Check this",
+        selectionStart: 10,
+        selectionEnd: 10,
+        sendMode: "prompt",
+        selectionEnabled: false,
+    });
+    await controller.send("Check this");
+    const hidden = client.requests.find((request) => request.type === "prompt");
+    assert.equal(hidden.args.message, "Check this");
+    assert.doesNotMatch(hidden.args.message, /const secret = true;/u);
+    // The chip itself stays visible so the composer can offer it again.
+    assert.ok(controller.state.selectionContext);
+
+    // Switching the toggle back on restores the offer for the next message.
+    await coordinator.handleMessage({
+        type: "saveDraft",
+        conversationKey: coordinator.activeId,
+        text: "",
+        selectionStart: 0,
+        selectionEnd: 0,
+        sendMode: "prompt",
+        selectionEnabled: true,
+    });
+    await controller.send("Check this again");
+    const included = client.requests.filter((request) => request.type === "prompt").at(-1);
+    assert.match(included.args.message, /const secret = true;/u);
+});
+
+test("a full attachment list refuses the send instead of dropping the offered selection", async (t) => {
+    const { controller, coordinator, client, vscode } = await connected(t, {
+        openDocument: (file) => ({ uri: file, lineCount: 3, getText: () => "const target = true;" }),
+    });
+    const workspacePath = controller.workspace.uri.fsPath;
+    const selectionPath = path.join(workspacePath, "helper.ts");
+    await fs.promises.writeFile(selectionPath, "first\nconst target = true;\nlast\n");
+    for (let index = 0; index < 8; index += 1) {
+        controller.attachments.push({ id: `a${index}`, label: `f${index}.ts`, detail: "", text: "x" });
+    }
+
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(selectionPath) },
+        selection: { isEmpty: false, start: { line: 1 }, end: { line: 1 } },
+    };
+    controller.updateSelectionContext();
+    await assert.rejects(() => controller.send("Check this"), /Hide the editor selection above the composer/u);
+    assert.equal(controller.sending, false);
+    assert.equal(controller.attachments.length, 8);
+
+    // Hiding the chip is the documented way out, and it lets the send through.
+    await coordinator.handleMessage({
+        type: "saveDraft",
+        conversationKey: coordinator.activeId,
+        text: "",
+        selectionStart: 0,
+        selectionEnd: 0,
+        sendMode: "prompt",
+        selectionEnabled: false,
+    });
+    await controller.send("Check this");
+    assert.ok(client.requests.some((request) => request.type === "prompt"));
+});
+
+test("stale offered selections fail the send with a clear error", async (t) => {
+    const { controller, vscode } = await connected(t, {
+        openDocument: () => {
+            throw new Error("Unable to resolve nonexistent file");
+        },
+    });
+    const workspacePath = controller.workspace.uri.fsPath;
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(path.join(workspacePath, "gone.ts")) },
+        selection: { isEmpty: false, start: { line: 0 }, end: { line: 2 } },
+    };
+    controller.updateSelectionContext();
+    await assert.rejects(() => controller.send("Check this"), /Re-select it in the editor/u);
+    assert.equal(controller.sending, false);
+});
+
+test("selection failures restore cleared composer drafts and acknowledge rejection", async (t) => {
+    for (const failure of ["missing", "oversized", "full"]) {
+        await t.test(failure, async (t) => {
+            const f = await connected(t, {
+                openDocument: (file) => {
+                    if (failure === "missing") {
+                        throw new Error("missing");
+                    }
+
+                    return { uri: file, lineCount: 1, getText: () => "selected" };
+                },
+                collectText: async () => {
+                    if (failure === "oversized") {
+                        throw new Error("Select no more than 64 KiB of text per attachment.");
+                    }
+
+                    return { id: "selection", label: "sample.ts", text: "selected" };
+                },
+            });
+            f.vscode.window.activeTextEditor = {
+                document: { uri: uri(path.join(f.controller.workspace.uri.fsPath, "sample.ts")) },
+                selection: { isEmpty: false, start: { line: 0, character: 0 }, end: { line: 0, character: 8 } },
+            };
+            if (failure === "full") {
+                f.controller.attachments = Array.from({ length: 8 }, (_, i) => ({
+                    id: `a${i}`,
+                    label: "file",
+                    text: "x",
+                }));
+            }
+
+            f.controller.updateSelectionContext();
+            const conversationKey = f.coordinator.activeId;
+            const pending = f.coordinator.handleMessage({
+                type: "send",
+                conversationKey,
+                text: "Keep this draft",
+                requestId: "selection-failure",
+            });
+            // The webview clears/saves the composer immediately after posting send.
+            await f.coordinator.handleMessage({ type: "saveDraft", conversationKey, text: "", selectionEnabled: true });
+            await pending;
+            assert.equal(f.coordinator.records.get(conversationKey).draft.text, "Keep this draft");
+            assert.ok(f.posted.some((m) => m.type === "draft" && m.text === "Keep this draft"));
+            assert.ok(
+                f.posted.some(
+                    (m) => m.type === "sendResult" && m.requestId === "selection-failure" && m.accepted === false,
+                ),
+            );
+            assert.equal(f.controller.sending, false);
+            assert.equal(
+                f.client.requests.some((r) => r.type === "prompt"),
+                false,
+            );
+            assert.equal(f.controller.attachments.length, failure === "full" ? 8 : 0);
+        });
+    }
+});
+
+test("automatic selections preserve exact character endpoints and exclusive final lines", async (t) => {
+    const lines = ["prefix publicCall(); suffix", "tail unselected"];
+    const collected = [];
+    const f = await connected(t, {
+        openDocument: (file) => ({
+            uri: file,
+            version: 1,
+            lineCount: 2,
+            getText: ({ start, end }) =>
+                start.line === end.line
+                    ? lines[start.line].slice(start.character, end.character)
+                    : lines[start.line].slice(start.character) + "\n" + lines[end.line].slice(0, end.character),
+        }),
+        collectText: async (input) => {
+            collected.push(input);
+
+            return { id: "selection", label: "sample.ts", text: input.text };
+        },
+    });
+    const editor = {
+        document: { uri: uri(path.join(f.controller.workspace.uri.fsPath, "sample.ts")), version: 1 },
+        selection: { isEmpty: false, start: { line: 0, character: 7 }, end: { line: 0, character: 20 } },
+    };
+    f.vscode.window.activeTextEditor = editor;
+    f.controller.updateSelectionContext();
+    await f.controller.send("Explain selection");
+    assert.equal(collected.at(-1).text, "publicCall();");
+    assert.doesNotMatch(f.client.requests.find((r) => r.type === "prompt").args.message, /prefix|suffix|unselected/u);
+
+    editor.selection.end = { line: 1, character: 0 };
+    f.controller.updateSelectionContext();
+    assert.equal(f.controller.state.selectionContext.endLine, 1);
+    assert.equal(f.controller.state.selectionContext.lineCount, 1);
+    await f.controller.send("Explain multiline selection");
+    assert.equal(collected.at(-1).text, "publicCall(); suffix\n");
+    editor.selection.end = { line: 1, character: 4 };
+    f.controller.updateSelectionContext();
+    await f.controller.send("Explain both lines");
+    assert.equal(collected.at(-1).text, "publicCall(); suffix\ntail");
+    assert.equal(collected.at(-1).endLine, 2);
+});
+
+test("selection collection owns the send lock and rejects changed documents or connections", async (t) => {
+    const gate = deferred();
+    const f = await connected(t, {
+        openDocument: () => gate.promise,
+        collectText: async () => ({ id: "selection", label: "sample.ts", text: "selected" }),
+    });
+    const editor = {
+        document: { uri: uri(path.join(f.controller.workspace.uri.fsPath, "sample.ts")), version: 1 },
+        selection: { isEmpty: false, start: { line: 0, character: 0 }, end: { line: 0, character: 8 } },
+    };
+    f.vscode.window.activeTextEditor = editor;
+    f.controller.updateSelectionContext();
+    const sending = f.controller.send("Original draft");
+    assert.equal(f.controller.sending, true);
+    await assert.rejects(f.controller.send("Second draft"), /Wait for/u);
+    gate.resolve({ lineCount: 1, version: 2, getText: () => assert.fail("Changed selection must not be read") });
+    await assert.rejects(sending, /Re-select/u);
+    assert.equal(f.controller.sending, false);
+    assert.equal(
+        f.client.requests.some((r) => r.type === "prompt"),
+        false,
+    );
+
+    editor.document.version = 2;
+    f.controller.updateSelectionContext();
+    // Disconnection during asynchronous selection collection cannot start a new Pi.
+    gate.promise = Promise.resolve({ lineCount: 1, version: 2, getText: () => "selected" });
+    const cancelled = f.controller.send("Cancelled draft");
+    await f.controller.disconnect();
+    await assert.rejects(cancelled, /chat changed/u);
+    assert.equal(f.clients.length, 1);
+    assert.equal(
+        f.client.requests.some((r) => r.type === "prompt"),
+        false,
+    );
+});
+
+test("insert mention emits a line-ranged workspace mention for the edited file", async (t) => {
+    const { controller, vscode, posted, commands } = fixture(t);
+    const workspacePath = controller.workspace.uri.fsPath;
+    await fs.promises.mkdir(path.join(workspacePath, "src"), { recursive: true });
+    const filePath = path.join(workspacePath, "src", "helper.ts");
+    await fs.promises.writeFile(filePath, "one\ntwo\nthree\n");
+
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(filePath) },
+        selection: { isEmpty: false, start: { line: 1 }, end: { line: 2 } },
+    };
+    await controller.insertMention();
+    assert.deepEqual(commands.at(-1), ["specpi.chat.open"]);
+    const mention = posted.find((message) => message.type === "insertMention");
+    assert.equal(mention.text, "@src/helper.ts#L2-L3");
+
+    // A single-line selection carries one anchor; `@folder/` mentions come
+    // from the suggestion picker, never from an editor document.
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(filePath) },
+        selection: { isEmpty: false, start: { line: 0 }, end: { line: 0 } },
+    };
+    await controller.insertMention();
+    const single = posted.filter((message) => message.type === "insertMention").at(-1);
+    assert.equal(single.text, "@src/helper.ts#L1");
+
+    vscode.window.activeTextEditor = {
+        document: { uri: uri(path.join(workspacePath, "missing.ts")) },
+        selection: { isEmpty: false, start: { line: 0 }, end: { line: 0 } },
+    };
+    await assert.rejects(() => controller.insertMention(), /Save it before inserting a mention/u);
+});
+
+test("folder mentions attach a bounded directory listing", async (t) => {
+    const { controller, client, posted } = await connected(t);
+    const workspacePath = controller.workspace.uri.fsPath;
+    await fs.promises.mkdir(path.join(workspacePath, "assets", "icons"), { recursive: true });
+    await fs.promises.writeFile(path.join(workspacePath, "assets", "logo.png"), "fake-image");
+    await fs.promises.writeFile(path.join(workspacePath, "assets", "icons", "a.svg"), "svg");
+    await fs.promises.writeFile(path.join(workspacePath, "assets", ".env"), "SECRET=1");
+
+    await controller.handleMessage({
+        type: "attachMention",
+        path: "assets/",
+        requestId: "mention-folder-1",
+        contextToken: controller.contextToken(),
+    });
+    const result = posted.find(
+        (message) => message.type === "attachmentResult" && message.requestId === "mention-folder-1",
+    );
+    assert.equal(result.success, true);
+    assert.equal(controller.attachments.length, 1);
+    assert.equal(controller.attachments[0].label, "assets/");
+    assert.match(controller.attachments[0].detail, /^3 entries · Directory listing$/u);
+    const listing = controller.attachments[0].text;
+    assert.ok(listing.includes("icons/"));
+    assert.ok(listing.includes("a.svg"));
+    // Sensitive files are skipped by name even inside an attached folder.
+    assert.ok(!listing.includes(".env"));
+    assert.ok(!listing.includes("SECRET"));
+
+    // Directory references never flow through the file-only reference resolver.
+    assert.equal(
+        client.requests.some((request) => request.type === "prompt"),
+        false,
+    );
 });

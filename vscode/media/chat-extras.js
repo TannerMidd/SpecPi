@@ -647,6 +647,10 @@
 
             for (const [index, file] of mentionItems.entries()) {
                 const item = button(file.label || file.path, "extras-mention-option");
+                if (file.kind === "directory") {
+                    item.classList.add("extras-mention-directory");
+                }
+
                 item.id = `file-mention-${index}`;
                 item.title = file.path;
                 item.tabIndex = -1;
