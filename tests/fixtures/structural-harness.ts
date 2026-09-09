@@ -5,11 +5,12 @@ import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import registerGuard from "../../extensions/command-guard/index.ts";
 import registerStructural from "../../extensions/structural-search/index.ts";
-import { structuralSearch } from "../../extensions/structural-search/core.mjs";
 
 const agentDir = process.env.PI_CODING_AGENT_DIR!;
-const workingRoot = path.join(path.dirname(agentDir), "structural-project");
-fs.mkdirSync(workingRoot, { recursive: true });
+const requestedRoot = path.join(path.dirname(agentDir), "structural-project");
+fs.mkdirSync(requestedRoot, { recursive: true });
+// CI temporary directories can have platform aliases; select their canonical fixture root.
+const workingRoot = fs.realpathSync.native(requestedRoot);
 fs.writeFileSync(path.join(workingRoot, "demo.ts"), "target(42);");
 fs.mkdirSync(path.join(agentDir, "specpi"), { recursive: true });
 fs.writeFileSync(
@@ -100,12 +101,6 @@ export default function harness(host: any) {
         assert.equal((await call()).status, "denied");
         answer = "Allow once";
         if (process.env.SPECPI_STRUCTURAL_RUNTIME) {
-            // Verify the synthetic fixture is readable through Pi's loaded parser module.
-            await structuralSearch(input, {
-                cwd: workingRoot,
-                runtimeDir: path.join(agentDir, "specpi", "structural-runtime"),
-                signal: AbortSignal.timeout(10000),
-            });
             const success = await call();
             assert.equal(success.status, "complete", JSON.stringify(success));
             assert.equal(success.matches[0].snippet, "target(42)");
