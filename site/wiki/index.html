@@ -71,7 +71,7 @@
                         default and matches code structures across formatting with pinned ast-grep.
                         <a href="#accessibility">Accessibility checks</a> scan the current browser state for automated
                         WCAG findings. <a href="#background-tasks">Background tasks</a> run approved long commands while
-                        other work continues. <a href="#vscode-chat">SpecPi Chat 0.5.1</a> adds an optional VS Code
+                        other work continues. <a href="#vscode-chat">SpecPi Chat 0.6.0</a> adds an optional VS Code
                         sidebar with explicit context, approvals, and independent live conversations.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
@@ -628,7 +628,7 @@ npm --prefix vscode run test:vsix</code></pre>
                         <h2 id="chat-doc-title">SpecPi Chat for VS Code</h2>
                     </header>
                     <p>
-                        Chat 0.5.0 is a separately installed preview. Install VS Code 1.96+, external Node.js
+                        Chat 0.6.0 is a separately installed preview. Install VS Code 1.96+, external Node.js
                         22.19+, and Pi 0.84.4+ on the workspace extension host; SpecPi is optional. Configure your
                         provider in Pi first, then open a trusted filesystem workspace. SSH, WSL, and containers use the remote
                         workspace host; browser-only and virtual workspaces are unsupported.
@@ -639,7 +639,7 @@ npm --prefix vscode run test:vsix</code></pre>
                     </p>
                     <div class="terminal doc-terminal">
                         <pre><code>npm --prefix vscode run package
-code --install-extension .specpi-test/vscode/specpi-chat-0.5.1.vsix</code></pre>
+code --install-extension .specpi-test/vscode/specpi-chat-0.6.0.vsix</code></pre>
                     </div>
                     <p>
                         You can also use <strong>Extensions: Install from VSIX…</strong>. Open SpecPi in the Activity
@@ -682,7 +682,8 @@ code --install-extension .specpi-test/vscode/specpi-chat-0.5.1.vsix</code></pre>
                     </p>
                     <p>
                         Use <code>/model</code> or the model selector, choose supported thinking levels including
-                        <code>max</code>, and inspect Pi-reported cost/context usage even during active responses.
+                        <code>max</code>, pick the session's Command Guard mode from the shield beside the composer, and
+                        inspect Pi-reported cost/context usage even during active responses.
                         Search displayed messages, copy/export visible Markdown, or open native working-tree/staged
                         diffs. Branching and editing an earlier prompt preserve the source conversation and restore a
                         draft without sending it or rolling back workspace files.

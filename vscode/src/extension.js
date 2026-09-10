@@ -26,6 +26,7 @@ const { editPrompt, forkChat, exportChat, showUsage, markdownTranscript } = requ
 const { findFiles, reviewChanges, relativeFile, workspaceHiddenFilter } = require("./workspace-actions.js");
 const { ImageQueue } = require("./image-queue.js");
 const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./delegates.js");
+const { GUARD_ACTIONS, GUARD_LABELS, GUARD_DETAILS, guardState } = require("./guard.js");
 const { ConversationCoordinator } = require("./conversation-coordinator.js");
 
 const PREFIX = "specpi.chat";
@@ -75,6 +76,7 @@ class ChatController {
         }
 
         this.state.sending = this.sending || this.transitioning;
+        this.state.guard = guardState(this.state);
         this.state.contextToken = this.contextToken();
         this.state.selectionContext = this.coordinator?.selectionContext || null;
         this.state.recoveredDrafts = this.imageQueue.recovered.map((item) => ({
@@ -1521,6 +1523,65 @@ class ChatController {
         await this.refresh(client);
     }
 
+    async chooseGuard() {
+        this.requireWorkspace();
+        const guard = guardState(this.state);
+        if (!guard || this.state.status !== "ready" || this.transitioning || this.sending) {
+            throw new Error(
+                "Connect Pi with SpecPi's command guard installed, then choose a mode while the chat is idle.",
+            );
+        }
+
+        if (!this.isForeground()) {
+            return;
+        }
+
+        const client = this.client;
+        const selected = await vscode.window.showQuickPick(
+            guard.actions.map((action) => ({
+                label: GUARD_LABELS[action],
+                description: action === guard.mode ? "Current mode" : "",
+                detail: GUARD_DETAILS[action],
+                action,
+            })),
+            { title: `SpecPi Chat · Command Guard (${guard.label})`, placeHolder: guard.detail },
+        );
+        if (!selected || selected.action === guard.mode || this.client !== client || !this.isForeground()) {
+            return;
+        }
+
+        await this.setGuard(selected.action);
+    }
+
+    async setGuard(action) {
+        this.requireWorkspace();
+        if (
+            !GUARD_ACTIONS.includes(action) ||
+            !guardState(this.state) ||
+            this.state.status !== "ready" ||
+            this.transitioning ||
+            this.sending
+        ) {
+            throw new Error("Choose a Command Guard mode while Pi is idle and SpecPi's command guard is installed.");
+        }
+
+        // Command Guard remains the authority. It refuses actions its current mode disallows and
+        // still confirms every weakening change in the chat dialog before applying it.
+        const client = this.client;
+        this.sending = true;
+        this.publish();
+        try {
+            await client.request("prompt", { message: `/guard ${action}` }, { timeoutMs: 0 });
+        } finally {
+            this.sending = false;
+            this.publish();
+        }
+
+        if (this.client === client) {
+            await this.refresh(client);
+        }
+    }
+
     async handleMessage(message) {
         if (!message || typeof message !== "object" || typeof message.type !== "string" || this.disposed) {
             return;
@@ -1798,6 +1859,9 @@ class ChatController {
                 }
 
                 break;
+            case "chooseGuard":
+                await this.chooseGuard();
+                break;
             case "setModel":
                 await this.setModel(message.modelId, message.provider);
                 break;
@@ -1858,6 +1922,7 @@ function activate(context) {
         exportChat: () => controller.handleMessage({ type: "exportChat" }),
         showUsage: () => controller.handleMessage({ type: "showUsage" }),
         chooseWorkspace: () => controller.chooseWorkspace(),
+        guardMode: () => controller.handleMessage({ type: "chooseGuard" }),
         settings: () => controller.handleMessage({ type: "settings" }),
     };
     for (const [name, callback] of Object.entries(commands)) {
