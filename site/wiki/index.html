@@ -53,6 +53,7 @@
                     <a href="#delegation"><span>12</span>Experimental delegation</a>
                     <a href="#vscode-chat"><span>13</span>VS Code Chat</a>
                     <a href="#background-tasks"><span>14</span>Background tasks</a>
+                    <a href="#structural-search"><span>15</span>Structural search</a>
                 </nav>
                 <div class="index-meta"><span>Reference · v0.20.0</span></div>
             </aside>
@@ -66,9 +67,12 @@
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.20.0. <a href="#background-tasks">Background tasks</a> run approved long
-                        commands while other work continues. <a href="#vscode-chat">SpecPi Chat 0.5.0</a> adds an
-                        optional VS Code sidebar with explicit context, approvals, and independent live conversations.
+                        Release reference · v0.20.0. <a href="#structural-search">Structural search</a> is a new opt-in
+                        tool that matches code structures across formatting with pinned ast-grep.
+                        <a href="#accessibility">Accessibility checks</a> scan the current browser state for automated
+                        WCAG findings. <a href="#background-tasks">Background tasks</a> run approved long commands while
+                        other work continues. <a href="#vscode-chat">SpecPi Chat 0.5.0</a> adds an optional VS Code
+                        sidebar with explicit context, approvals, and independent live conversations.
                         <a href="#task-records">Task cards, verification receipts, and outcome feedback</a> keep the
                         task, its checks, and later human feedback connected. The
                         <a href="#delegation">delegation experiment</a> is enabled by default at Pi startup; worker use
@@ -402,6 +406,31 @@ specpi doctor</code></pre>
                         waits for an element state, exact text, or exact URL. These tools default to a five-second
                         deadline (maximum thirty seconds). Refresh snapshot refs after mutations or navigation.
                     </p>
+                    <h3 id="accessibility">Accessibility checks</h3>
+                    <p>
+                        <code>browser_accessibility</code> scans the page already open in the isolated context with
+                        pinned axe-core 4.13.0. Open the page, perform the interaction, wait for the intended visible
+                        state, then scan. It does not launch a browser of its own.
+                    </p>
+                    <p>
+                        Optional <code>include</code> narrows the scan to a CSS selector matching exactly one region;
+                        <code>profile</code> selects <code>wcag22aa</code> (the default) or adds
+                        <code>best-practice</code> checks; <code>maxFindings</code> defaults to 50 per category
+                        (maximum 100); <code>timeoutMs</code> defaults to 15000 (1000–30000, including queueing).
+                        Results separate violations from incomplete checks, report profile, tags, viewport, scan
+                        timestamps, and total counts, and mark truncation explicitly within 24 KiB. There are no custom
+                        scripts, rule suppressions, or exclusion lists.
+                    </p>
+                    <p>
+                        Run <code>specpi update</code> without browser or package skip flags to provision the scanner
+                        into the managed browser runtime. Navigation invalidates a scan.
+                    </p>
+                    <p class="doc-boundary">
+                        <strong>Coverage boundary.</strong> Automated checks cover the observed DOM state only. Dynamic
+                        content is not an atomic snapshot, and inaccessible frames and closed shadow roots limit
+                        coverage. Review incomplete checks, keep keyboard and focus testing, and do not narrow scope or
+                        profile merely to pass. A clean scan is not accessibility certification.
+                    </p>
                     <p class="doc-boundary">
                         <strong>Isolation boundary.</strong> The browser does not attach to a personal Chrome profile,
                         cookies, passwords, or extensions. It runs as a separate process and does not provide
@@ -469,6 +498,15 @@ specpi doctor</code></pre>
                         manages global instructions and shell integration only inside marked blocks. Plan output is
                         non-mutating. Install, update, and uninstall require confirmation unless <code>--yes</code> is
                         supplied.
+                    </p>
+                    <p>
+                        Optional capabilities are opt-in and recorded separately.
+                        <a class="text-link" href="#structural-search">Structural search</a> enablement lives in the
+                        owned <code>&lt;agentDir&gt;/specpi/tool-integrations.json</code>; omitting
+                        <code>--structural-search</code> preserves the existing choice, and unrelated fields in that
+                        file are preserved. If that file becomes unparseable, plan reports it and install or update
+                        stops until you repair or remove it, or pass <code>--structural-search=on</code> or
+                        <code>--structural-search=off</code> to rewrite it.
                     </p>
                 </section>
 
@@ -723,6 +761,97 @@ code --install-extension .specpi-test/vscode/specpi-chat-0.5.0.vsix</code></pre>
                         <a
                             href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md#background-task-execution"
                             >security boundary</a
+                        >.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="structural-search" aria-labelledby="structural-title">
+                    <header>
+                        <span>15</span>
+                        <h2 id="structural-title">Structural search</h2>
+                    </header>
+                    <p>
+                        <code>structural_search</code> is an opt-in, read-only model tool built on pinned ast-grep
+                        0.45.3. It matches code structures across formatting differences. It does not resolve types or
+                        references, does not edit code, and does not replace literal search for comments, strings, and
+                        filenames.
+                    </p>
+                    <p>Enable it through the installer, then restart Pi:</p>
+                    <div class="terminal doc-terminal">
+                        <div class="terminal-bar"><span>Opt in · omission preserves the current choice</span></div>
+                        <pre><code>specpi plan --structural-search=on
+specpi update --structural-search=on</code></pre>
+                        <div class="terminal-bar secondary"><span>Disable and remove the private runtime</span></div>
+                        <pre><code>specpi update --structural-search=off</code></pre>
+                    </div>
+                    <p>
+                        Use <code>install</code> for a fresh setup. <code>--yes</code> confirms the operation but does
+                        not opt in by itself, and <code>--skip-package-install</code> and
+                        <code>--skip-tool-install</code> skip acquisition without disabling an existing runtime.
+                        Installing the Pi package directly does not provision the runtime; use the SpecPi installer.
+                        Enablement lives in <code>&lt;agentDir&gt;/specpi/tool-integrations.json</code>, which the
+                        installer owns, backs up before changes, and rolls back on failure. Unrelated fields are
+                        preserved, and <code>specpi doctor</code> checks integrity and runs an offline fixture smoke.
+                    </p>
+                    <div class="definition-list">
+                        <div>
+                            <code>language</code
+                            ><span
+                                >JavaScript (<code>.js</code>, <code>.mjs</code>, <code>.cjs</code>), JSX, TypeScript
+                                (<code>.ts</code>, <code>.mts</code>, <code>.cts</code>), TSX, or Python.</span
+                            >
+                        </div>
+                        <div>
+                            <code>pattern</code
+                            ><span
+                                >An ast-grep pattern up to 4 KiB, such as
+                                <code>pi.registerTool($OPTIONS)</code>. No rewriting, custom grammars, rule imports, or
+                                configuration discovery.</span
+                            >
+                        </div>
+                        <div>
+                            <code>paths</code
+                            ><span
+                                >1–200 explicit relative files under the active working root, matching the selected
+                                language. Directories and globs are unavailable; use ordinary discovery tools
+                                first.</span
+                            >
+                        </div>
+                        <div>
+                            <code>maxResults</code><span>1–100 returned matches; default 50.</span>
+                        </div>
+                        <div>
+                            <code>timeoutMs</code
+                            ><span>1000–30000 including queueing and approval; default 10000.</span>
+                        </div>
+                    </div>
+                    <p>
+                        Limits are 8 MiB of selected source in aggregate, 1 MiB per file, 512 bytes per snippet, and 24
+                        KiB per result. One parser runs at a time with at most one queued request. Results include
+                        source digests, searched and requested counts, engine version, and explicit truncation. Lines
+                        and UTF-8 byte columns are one-based, and end positions are exclusive.
+                    </p>
+                    <p>
+                        Guard and Off permit these bounded reads; Strict asks for the exact call; locked or ambiguous
+                        Guard state denies. Policy, working root, and enablement are rechecked before parsing. The
+                        parser receives selected source over stdin with a fixed argument list, neutral configuration,
+                        and a minimal environment. Initial native platforms are Windows x64, macOS x64/arm64, and Linux
+                        glibc x64; other combinations report unavailable.
+                    </p>
+                    <p class="doc-boundary">
+                        <strong>Evidence boundary, not a sandbox.</strong> A partial, timed-out, cancelled, or
+                        unavailable result is not proof that other matches do not exist. Captured bytes exclude unsaved
+                        editor buffers and are not an atomic filesystem snapshot. Pattern syntax recovery can accept
+                        malformed patterns, so inspect matches and keep project-native checks. Returned snippets may
+                        persist in conversation history, and a denial must never be retried through another tool. Read
+                        the
+                        <a
+                            href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md#structural-search"
+                            >security boundary</a
+                        >
+                        and
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/structural-search.md"
+                            >usage and limits</a
                         >.
                     </p>
                 </section>
