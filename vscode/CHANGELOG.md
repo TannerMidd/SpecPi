@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.5.1
+
+- Name the provider beside each model in the composer's model selector, so the active provider is visible without hovering. The model name stays first, and the existing `provider / id` tooltip is unchanged.
+
 ## 0.5.0
 
 - Offer the active editor selection above the composer as a toggleable context chip. The exact selected characters are read and attached when you send, and clicking the chip hides it from the next message. Each conversation remembers whether the chip is included. Selection-validation failures restore the draft, and changed documents or connections cannot send stale selection context.

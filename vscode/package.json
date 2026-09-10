@@ -2,7 +2,7 @@
     "name": "specpi-chat",
     "displayName": "SpecPi Chat",
     "description": "A native VS Code chat sidebar for your local Pi agent and SpecPi harness.",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "publisher": "tannermidd",
     "private": true,
     "preview": true,

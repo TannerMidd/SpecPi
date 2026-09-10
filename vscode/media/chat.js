@@ -1342,6 +1342,13 @@
         return JSON.stringify([String(model?.provider || ""), String(model?.id || "")]);
     }
 
+    // Name first so the provider is the part that truncates in a narrow sidebar.
+    function modelLabel(model) {
+        const name = model?.name || model?.id || "";
+
+        return model?.provider ? `${name} · ${model.provider}` : name;
+    }
+
     function renderModels() {
         const select = byId("model-select");
         const models = state.models.filter((model) => model && model.id && model.provider);
@@ -1360,7 +1367,7 @@
             }
 
             for (const model of models) {
-                const option = element("option", "", model.name || model.id);
+                const option = element("option", "", modelLabel(model));
                 option.value = modelValue(model);
                 option.title = `${model.provider} / ${model.id}`;
                 select.append(option);

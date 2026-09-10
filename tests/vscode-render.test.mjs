@@ -1645,6 +1645,11 @@ test(
                                 { name: "/help", description: "Duplicate runtime help" },
                             ],
                         });
+                        // Each option names its provider so the selector shows where the model runs.
+                        assert.deepEqual(await page.locator("#model-select option").allTextContents(), [
+                            "Fixture Reasoning · fixture",
+                            "Fixture Fast · fixture",
+                        ]);
                         await page.locator("#model-select").selectOption(JSON.stringify(["fixture", "fast-model"]));
                         await page.locator("#thinking-select").selectOption("high");
                         assert.deepEqual(await takeMessages(page), [
