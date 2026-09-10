@@ -23,7 +23,7 @@ test(
         assert.ok(marker, output);
         assert.deepEqual(JSON.parse(marker.slice("SPECPI_BROWSER_HARNESS=".length)), {
             registration: true,
-            tools: 13,
+            tools: 14,
             diagnostics: true,
             interactions: true,
             lifecycle: true,

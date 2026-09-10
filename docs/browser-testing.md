@@ -1,5 +1,17 @@
 # Browser application testing
 
+## Accessibility
+
+`browser_accessibility` scans the already open isolated page using `@axe-core/playwright` and axe-core 4.13.0. Open the page, perform the relevant interaction, wait for the intended visible state, scan, repair and repeat the same scan. It does not launch a blank browser. Continue keyboard, focus and functional checks; automated results are not certification.
+
+Optional input: `include` (CSS selector matching exactly one region), `profile` (`wcag22aa`, the default, or `best-practice` to add those checks), `maxFindings` (default 50, maximum 100 per category) and `timeoutMs` (default 15000, 1000–30000 including queueing). The WCAG profile uses `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa` and `wcag22aa`. There are no custom scripts/checks, rule suppressions or exclusion lists. Invalid or ambiguous scope fails without broadening the scan.
+
+Results separate violations and incomplete checks, identify profile/tags, scan ID/timestamps, sanitized location and viewport, and return total counts plus explicit truncation within 24 KiB. Navigation invalidates the scan. Dynamic content is not an atomic snapshot; inaccessible frames and closed shadow roots can limit coverage. No raw HTML/check payloads or automatic scan files are retained, but selectors/paths can contain sensitive data and normal results may remain in Pi history. Cancellation uses the existing browser teardown/recovery path.
+
+The managed browser lock includes the scanner. Run `specpi update` without browser/package skip flags to provision it. Missing scanner packages affect accessibility availability; existing screenshots and browser interactions can still work. Installer/doctor extend their offline browser smoke with a known unnamed button and a corrected control, without changing the historical wishlist validator's default smoke. Real Chromium tests exercise label, contrast, ARIA and repaired dynamic states at desktop/tablet/mobile sizes.
+
+The offline fixtures also verify unnamed controls in a same-origin iframe and an open shadow root. The closed-root control is not reported and remains an explicit coverage limitation; cross-origin frame coverage is not qualified by these fixtures. Queue expiry and cancellation discard the browser, and reopening restores scanning. These seeded-page results do not establish coverage of arbitrary applications or replace keyboard and assistive-technology review.
+
 ## Agent workflow
 
 1. `browser_open` opens an HTTP(S) page in isolated Chromium; `browser_snapshot` exposes bounded rendered text and namespaced control references.
@@ -47,7 +59,7 @@ npm run check:pi-package
 
 ### Scoped types
 
-`tsconfig.browser.json` checks exactly `extensions/browser/index.ts`, `diagnostics.ts`, `interactions.ts`, `lifecycle.ts`, and the `core.d.mts` boundary, with strict checking and no emit. It uses real pinned Pi, TypeBox, Playwright and Node declaration packages from development dependencies. Browser runtime imports remain lazy; Playwright imports in the extension are type-only. The `.mjs` image/runtime helper has narrow declarations backed by existing helper/runtime tests and an export-inventory regression; its JavaScript implementation is **not** fully type-checked. `skipLibCheck` skips third-party declarations, not first-party browser implementation errors. Other extensions remain syntax-checked, not advertised as type-checked. A negative fixture proves invalid key and Playwright API argument types fail without generated JavaScript.
+`tsconfig.browser.json` checks browser `index.ts`, `accessibility.ts`, `diagnostics.ts`, `interactions.ts` and `lifecycle.ts`, plus the background and structural registration files and their narrow declaration boundaries, with strict checking and no emit. It uses real pinned Pi, TypeBox, Playwright and Node declarations. Browser runtime imports remain lazy; Playwright imports in the extension are type-only. The `.mjs` implementations have focused runtime tests and are **not** fully type-checked. `skipLibCheck` skips third-party declarations, not the selected first-party implementations. Other extensions remain syntax-checked, not advertised as type-checked. A negative fixture proves invalid key and Playwright API argument types fail without generated JavaScript.
 
 ### Rendered site
 

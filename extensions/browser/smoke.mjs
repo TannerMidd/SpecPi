@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { comparePngBuffers, loadBrowserRuntime } from "./core.mjs";
 
 const runtimeDir = process.argv[2];
@@ -40,7 +41,34 @@ try {
         throw new Error("Changed browser visual comparison was not detected.");
     }
 
+    if (process.argv.includes("--accessibility")) {
+        const require = createRequire(path.join(path.resolve(runtimeDir), "package.json"));
+        const AxeBuilder = require("@axe-core/playwright").default;
+        if (require("axe-core/package.json").version !== "4.13.0") {
+            throw new Error("Accessibility runtime version mismatch.");
+        }
+
+        await page.setContent(
+            '<!doctype html><html lang="en"><title>Fixture</title><main><button></button></main></html>',
+        );
+        const broken = await new AxeBuilder({ page }).withTags(["wcag2a"]).analyze();
+        if (!broken.violations.some((finding) => finding.id === "button-name")) {
+            throw new Error("Accessibility smoke missed an unnamed button.");
+        }
+
+        await page.setContent(
+            '<!doctype html><html lang="en"><title>Fixture</title><main><button>Save</button></main></html>',
+        );
+        const fixed = await new AxeBuilder({ page }).withTags(["wcag2a"]).analyze();
+        if (fixed.violations.some((finding) => finding.id === "button-name")) {
+            throw new Error("Accessibility smoke did not recognize the repair.");
+        }
+    }
+
     console.log(`Browser smoke passed: ${baseline.length} byte PNG; exact and changed visual comparisons verified`);
+    if (process.argv.includes("--accessibility")) {
+        console.log("ACCESSIBILITY_SMOKE=passed");
+    }
 } finally {
     await browser?.close().catch(() => {});
     await fs.rm(tempDir, { recursive: true, force: true });

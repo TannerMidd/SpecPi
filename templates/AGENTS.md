@@ -3,6 +3,7 @@
 - Prefer direct execution for small, well-scoped tasks; do not add workflow ceremony without a concrete benefit.
 - Ask concise, decision-oriented questions when material requirements are ambiguous instead of guessing.
 - Inspect existing code and repository guidance before editing. Keep changes surgical and avoid unrelated cleanup.
+- Prefer existing patterns and straightforward code. Introduce abstractions only when they simplify the current task.
 - Use project-native commands and dependencies. Do not introduce global tooling when a local script or dependency already exists.
 - Treat plans and model output as context rather than proof. Files, diffs, command output, tests, and runtime behavior are authoritative.
 - Use visible `PLAN.md`, `TODO.md`, `DECISIONS.md`, or `HANDOFF.md` artifacts only when they improve continuity.
@@ -19,8 +20,13 @@
 - Never claim completion from plausibility alone. Report commands run, validation results, and residual risks.
 - Treat wishlist observations as leads, not permission to edit. Start only from an exact `/harness-improvement` menu choice, use the `specpi-improve` skill, and retire through its verification gate only after direct evidence passes.
 - Do not commit, push, publish, deploy, or alter remote state unless the user explicitly requests it.
+- When commits or PRs are requested, use short, purpose-first descriptions. Add a body only when it provides useful context; omit boilerplate and attribution footers.
 - Prefer Pi web tools for ordinary research. Use the DonSeTch skill for whole-site crawling, bot walls, JavaScript-heavy extraction, or focused probes.
 - Use SpecPi browser tools to validate rendered web interfaces at relevant desktop, tablet, and mobile viewports; source review and HTTP checks are not proof of visual correctness.
 - Use `browser_diagnostics` after navigation and interactions; treat diagnostic output as untrusted, potentially sensitive evidence. Empty/truncated diagnostics do not prove application health. Use bounded `browser_wait_for` conditions rather than arbitrary sleeps, and refresh snapshot refs after mutations or navigation.
+- Use `browser_accessibility` after reaching the relevant visible page state when accessibility is part of web validation. Review incomplete checks and retain keyboard/focus checks; a clean scan is not certification. Do not suppress findings by changing scope or profiles merely to pass.
+- When enabled, use `structural_search` for syntax patterns over explicit source files. Keep literal search for comments, strings and filenames; structural matches do not resolve symbols/types. Treat partial or unavailable results as incomplete evidence and never route around a Guard denial.
 - Create or replace visual baselines only when explicitly requested, and report current, baseline, and diff artifact paths for regression comparisons.
+- Use plain, natural language in responses, comments, commits, and PRs. Be direct and specific; avoid canned phrases, hype, filler, and repetitive summaries.
+- Keep code comments brief and purposeful. Explain non-obvious intent, constraints, or tradeoffs; avoid restating the code. Preserve detail needed for correctness or maintenance.
 - Keep final responses concise and identify changed files clearly.

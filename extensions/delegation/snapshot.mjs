@@ -457,6 +457,26 @@ export function createSnapshot(root, paths, options = {}) {
 
     return Object.freeze({
         sources,
+        // Parent-only parser seam. Worker brokers still expose only list/read/search.
+        // Read through the same bindings and require the originally captured digest.
+        async withSourceBytes(id, consume) {
+            ensureOpen();
+            const record = byId.get(id);
+            if (!record || typeof consume !== "function") {
+                fail("byte reader rejected");
+            }
+
+            const bytes = readBoundFile(canonicalRoot, record.relative, record.original, MAX_BYTES);
+            try {
+                if (hash(bytes) !== record.digest) {
+                    fail("source changed");
+                }
+
+                return await consume(bytes);
+            } finally {
+                bytes.fill(0);
+            }
+        },
         read(id, startLine = 1, maxLines = 200) {
             ensureOpen();
             const record = byId.get(id);

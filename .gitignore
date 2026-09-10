@@ -27,3 +27,7 @@ Screenshot*.png
 .idea/
 .vscode/
 *.swp
+
+# Local planning and research notes
+/PLAN.md
+/docs/research/

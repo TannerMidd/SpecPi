@@ -32,6 +32,8 @@ SpecPi extends Pi with chat, review tools, and focused delegation. Its principle
 - **Focused delegation.** One agent makes changes. Up to two read-only subagents help investigate and review. [Research and design](https://tannermidd.github.io/SpecPi/single-agent/)
 - **Background tasks.** Start an approved dev server, test suite, or watch build, inspect bounded output, and stop it without blocking other work.
 - **Review as you work.** Track changed files, inspect diffs, check pages in a browser, and review risky commands.
+- **Structural search.** Opt into bounded ast-grep patterns over selected code with `specpi update --structural-search=on`. [Usage and limits](docs/structural-search.md)
+- **Accessibility checks.** Scan the current browser state for automated WCAG and optional best-practice findings. [Browser verification](docs/browser-testing.md)
 - **Improvements you choose.** Record recurring problems, select one with `/harness-improvement`, and test the change before calling it done.
 
 Problem collection is off by default. Its records stay on your machine. Pi connects to your chosen model provider.
@@ -49,7 +51,7 @@ specpi doctor
 
 Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
-To pin this release, use `npm install --global specpi@0.19.1`.
+To pin this release, use `npm install --global specpi@0.20.0`.
 
 Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
