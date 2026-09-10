@@ -75,6 +75,8 @@ jobs:
           $env:SPECPI_TEST_POWERSHELL_EXE = (Get-Command pwsh.exe).Source
           node tests/fixtures/command-guard-windows-runtime.mjs
           node --test tests/command-guard.test.mjs tests/command-guard-paths.test.mjs tests/command-guard-extension.test.mjs
+      - name: Provision the isolated native fixture before replacing npm with shims
+        run: npm run setup:structural
       - name: Exercise Windows launcher and lifecycle shims
         shell: pwsh
         run: |
@@ -120,6 +122,7 @@ jobs:
           $env:SPECPI_FAKE_BIN = $fakeBin
           $env:SPECPI_FAKE_LOG = $log
           $env:SPECPI_REPO = (Get-Location).Path
+          $env:SPECPI_STRUCTURAL_RUNTIME = Join-Path $env:SPECPI_REPO ".specpi-test\structural-runtime"
           .\specpi.cmd plan --skip-package-install --skip-shell
           .\specpi.cmd install --yes --skip-shell
           .\specpi.cmd doctor

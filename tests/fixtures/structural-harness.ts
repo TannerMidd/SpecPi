@@ -13,10 +13,6 @@ fs.mkdirSync(requestedRoot, { recursive: true });
 const workingRoot = fs.realpathSync.native(requestedRoot);
 fs.writeFileSync(path.join(workingRoot, "demo.ts"), "target(42);");
 fs.mkdirSync(path.join(agentDir, "specpi"), { recursive: true });
-fs.writeFileSync(
-    path.join(agentDir, "specpi", "tool-integrations.json"),
-    '{"schema":1,"structuralSearch":{"enabled":true}}',
-);
 if (process.env.SPECPI_STRUCTURAL_RUNTIME) {
     fs.symlinkSync(
         process.env.SPECPI_STRUCTURAL_RUNTIME,
@@ -57,6 +53,15 @@ const pi: any = {
         return [...tools.keys()].map((name) => ({ name, sourceInfo: { path: source } }));
     },
 };
+const integrations = path.join(agentDir, "specpi", "tool-integrations.json");
+for (const content of ['{"schema":1,"structuralSearch":{"enabled":false}}', "{ broken"]) {
+    fs.writeFileSync(integrations, content);
+    registerStructural(pi);
+    assert.equal(tools.size, 0, "disabled or malformed configuration must not register a tool");
+    assert.equal(handlers.size, 0, "disabled registration must not attach lifecycle handlers");
+}
+
+fs.rmSync(integrations);
 registerGuard(pi, { promptTimeoutMs: 100 });
 registerStructural(pi);
 const ctx: any = {

@@ -7,6 +7,17 @@ if (process.argv[2] !== "ci") {
 }
 
 const root = process.cwd();
+if (JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).name === "specpi-structural-runtime") {
+    if (!process.env.SPECPI_STRUCTURAL_RUNTIME) {
+        throw new Error("Structural acquisition fixture requires a separately provisioned runtime.");
+    }
+
+    fs.cpSync(path.join(process.env.SPECPI_STRUCTURAL_RUNTIME, "node_modules"), path.join(root, "node_modules"), {
+        recursive: true,
+    });
+    process.exit(0);
+}
+
 function write(relative, content, mode = 0o644) {
     const file = path.join(root, relative);
     fs.mkdirSync(path.dirname(file), { recursive: true });

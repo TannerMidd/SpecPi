@@ -131,13 +131,19 @@ test("policy is rechecked before parsing and source metadata cannot bypass quota
         /quota/u,
     );
 });
-test("configuration is opt-in and rejects malformed and linked inputs", (t) => {
+test("configuration defaults on, preserves explicit choices and rejects malformed and linked inputs", (t) => {
     const { root } = fixture(t);
-    assert.equal(readIntegrations(root).structuralSearch.enabled, false);
+    assert.equal(readIntegrations(path.join(root, "missing-agent")).structuralSearch.enabled, true);
+    assert.equal(readIntegrations(root).structuralSearch.enabled, true);
     fs.mkdirSync(path.join(root, "specpi"));
+    assert.equal(readIntegrations(root).structuralSearch.enabled, true);
     const file = path.join(root, "specpi", "tool-integrations.json");
-    fs.writeFileSync(file, '{"schema":1,"structuralSearch":{"enabled":true},"other":7}');
-    assert.equal(readIntegrations(root).other, 7);
+    for (const enabled of [false, true]) {
+        fs.writeFileSync(file, JSON.stringify({ schema: 1, structuralSearch: { enabled }, other: 7 }));
+        assert.equal(readIntegrations(root).structuralSearch.enabled, enabled);
+        assert.equal(readIntegrations(root).other, 7);
+    }
+
     // Content corruption is repairable by an explicit selection and names the file; link/shape failures are not.
     const thrown = (fn) => {
         try {

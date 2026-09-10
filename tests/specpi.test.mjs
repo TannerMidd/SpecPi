@@ -6,7 +6,6 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runPiFixture } from "../scripts/pi-test-harness.mjs";
-import { changeStructuralRuntime } from "../scripts/structural-runtime.mjs";
 import {
     aggregateEvents,
     appendWishlistDecision,
@@ -2417,37 +2416,33 @@ test(
         const stateDir = path.join(agentDir, "specpi");
         fs.mkdirSync(stateDir, { recursive: true });
         installFakePi(fakeBin);
+        installFakeBrowserNpm(fakeBin);
+        writeNodeCommand(fakeBin, "donsetch", 'console.log("3.4.0");');
         const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
-        const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
+        const flags = ["--skip-browser-install", "--skip-shell"];
+        const config = path.join(stateDir, "tool-integrations.json");
+        const runtime = path.join(stateDir, "structural-runtime");
         try {
-            const sourceRuntime = process.env.SPECPI_STRUCTURAL_RUNTIME;
-            assert.ok(sourceRuntime);
-            changeStructuralRuntime({
-                stateDir,
-                sourceDir: path.join(repoRoot, "structural-runtime"),
-                enabled: true,
-                warnings: [],
-                run(_command, _args, options) {
-                    fs.cpSync(path.join(sourceRuntime, "node_modules"), path.join(options.cwd, "node_modules"), {
-                        recursive: true,
-                    });
-                },
-                smoke(directory) {
-                    const result = spawnSync(
-                        process.execPath,
-                        [path.join(repoRoot, "extensions", "structural-search", "smoke.mjs"), directory],
-                        { encoding: "utf8", timeout: 15000, windowsHide: true },
-                    );
-                    assert.equal(result.status, 0, result.stderr);
-                },
-            }).commit();
-            for (const command of ["plan", "install", "update"]) {
-                const result = invokeCli(
-                    agentDir,
-                    [command, ...(command === "plan" ? [] : ["--yes"]), "--structural-search=on", ...skip],
-                    env,
-                );
+            assert.ok(process.env.SPECPI_STRUCTURAL_RUNTIME);
+            const plan = invokeCli(agentDir, ["plan", ...flags], env);
+            assert.equal(plan.status, 0, plan.stderr);
+            assert.match(plan.stdout, /Structural search: enabled/u);
+            assert.equal(fs.existsSync(config), false);
+            assert.equal(fs.existsSync(runtime), false);
+            const failed = invokeCli(agentDir, ["install", "--yes", ...flags], {
+                ...env,
+                SPECPI_TESTING: "1",
+                SPECPI_TEST_FAIL_POINT: "after-structural-runtime",
+            });
+            assert.notEqual(failed.status, 0);
+            assert.match(failed.stderr, /Injected test failure/u);
+            assert.equal(fs.existsSync(config), false);
+            assert.equal(fs.existsSync(runtime), false);
+            for (const command of ["install", "update"]) {
+                const result = invokeCli(agentDir, [command, "--yes", ...flags], env);
                 assert.equal(result.status, 0, result.stderr);
+                assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
+                assert.equal(fs.existsSync(path.join(runtime, "specpi-runtime.json")), true);
             }
 
             const doctor = invokeCli(agentDir, ["doctor"], env);
@@ -2466,7 +2461,7 @@ test(
     },
 );
 
-test("structural enablement is non-mutating in plan, survives update, rolls back and is preserved on uninstall", () => {
+test("default structural enablement is non-mutating in plan, survives update, rolls back and preserves opt-out", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-structural-lifecycle-"));
     const agentDir = path.join(root, "agent");
     const fakeBin = path.join(root, "bin");
@@ -2474,11 +2469,11 @@ test("structural enablement is non-mutating in plan, survives update, rolls back
     const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
     const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
     try {
-        const plan = invokeCli(agentDir, ["plan", "--structural-search=on", ...skip], env);
+        const plan = invokeCli(agentDir, ["plan", ...skip], env);
         assert.equal(plan.status, 0, plan.stderr);
         assert.match(plan.stdout, /Structural search: enabled/u);
         assert.equal(fs.existsSync(agentDir), false);
-        const failed = invokeCli(agentDir, ["install", "--yes", "--structural-search=on", ...skip], {
+        const failed = invokeCli(agentDir, ["install", "--yes", ...skip], {
             ...env,
             SPECPI_TESTING: "1",
             SPECPI_TEST_FAIL_POINT: "after-structural-runtime",
@@ -2486,8 +2481,15 @@ test("structural enablement is non-mutating in plan, survives update, rolls back
         assert.notEqual(failed.status, 0);
         const config = path.join(agentDir, "specpi", "tool-integrations.json");
         assert.equal(fs.existsSync(config), false);
-        const install = invokeCli(agentDir, ["install", "--yes", "--structural-search=on", ...skip], env);
+        const install = invokeCli(agentDir, ["install", "--yes", ...skip], env);
         assert.equal(install.status, 0, install.stderr);
+        assert.match(install.stderr, /runtime acquisition was skipped/u);
+        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "structural-runtime")), false);
+        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
+        // Older installs without an explicit choice gain the default on update.
+        fs.rmSync(config);
+        const upgrade = invokeCli(agentDir, ["update", "--yes", ...skip], env);
+        assert.equal(upgrade.status, 0, upgrade.stderr);
         assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
         fs.writeFileSync(config, '{"schema":1,"structuralSearch":{"enabled":true},"unrelated":{"keep":7}}');
         const update = invokeCli(agentDir, ["update", "--yes", ...skip], env);
@@ -2507,8 +2509,20 @@ test("structural enablement is non-mutating in plan, survives update, rolls back
         const disable = invokeCli(agentDir, ["update", "--yes", "--structural-search=off", ...skip], env);
         assert.equal(disable.status, 0, disable.stderr);
         assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, false);
+        const disabledPlan = invokeCli(agentDir, ["plan", ...skip], env);
+        assert.equal(disabledPlan.status, 0, disabledPlan.stderr);
+        assert.match(disabledPlan.stdout, /Structural search: disabled/u);
+        const disabledUpdate = invokeCli(agentDir, ["update", "--yes", ...skip], env);
+        assert.equal(disabledUpdate.status, 0, disabledUpdate.stderr);
+        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, false);
         assert.equal(invokeCli(agentDir, ["uninstall", "--yes"], env).status, 0);
         assert.equal(JSON.parse(fs.readFileSync(config)).unrelated.keep, 7);
+        const reinstall = invokeCli(agentDir, ["install", "--yes", ...skip], env);
+        assert.equal(reinstall.status, 0, reinstall.stderr);
+        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, false);
+        const reenable = invokeCli(agentDir, ["update", "--yes", "--structural-search=on", ...skip], env);
+        assert.equal(reenable.status, 0, reenable.stderr);
+        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }

@@ -37,7 +37,7 @@ export function readIntegrations(agentDir) {
             }
         } catch (error) {
             if (error.code === "ENOENT") {
-                return { schema: 1, structuralSearch: { enabled: false } };
+                return { schema: 1, structuralSearch: { enabled: true } };
             }
 
             throw error;

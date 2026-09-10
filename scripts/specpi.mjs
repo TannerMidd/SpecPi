@@ -105,7 +105,7 @@ Options:
   --skip-package-install  Do not bootstrap Pi or install external Pi packages (also skips browser/structural runtime acquisition).
   --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
   --skip-tool-install     Skip DonSeTch and structural-search runtime acquisition.
-  --structural-search=on|off  Opt in to structural search or disable/remove its private runtime; omission preserves the choice.
+  --structural-search=on|off  Enable (default) or disable/remove the private runtime; omission preserves a saved choice.
   --skip-shell            Do not install shell profile functions or edit a shell rc file.
 
 Environment:
@@ -1471,16 +1471,13 @@ async function installOrUpdate(options, update) {
         const integrations = readIntegrationsForOperation(options.structuralSearch);
         const structuralEnabled = options.structuralSearch ?? integrations.structuralSearch.enabled;
         // Bound the output before any runtime/configuration mutation, not only when reading the input.
-        const integrationsText =
-            options.structuralSearch !== undefined || fs.existsSync(integrationsPath)
-                ? serializeIntegrations(
-                      {
-                          ...integrations,
-                          structuralSearch: { ...integrations.structuralSearch, enabled: structuralEnabled },
-                      },
-                      integrationsPath,
-                  )
-                : undefined;
+        const integrationsText = serializeIntegrations(
+            {
+                ...integrations,
+                structuralSearch: { ...integrations.structuralSearch, enabled: structuralEnabled },
+            },
+            integrationsPath,
+        );
         if (!update && previousManifest) {
             throw new Error(`SpecPi is already installed. Run ${CLI} update.`);
         }
@@ -1537,14 +1534,12 @@ async function installOrUpdate(options, update) {
             );
         }
 
-        if (integrationsText !== undefined) {
-            // Back up the owned configuration only, never a whole Pi settings/profile store.
-            if (fs.existsSync(integrationsPath)) {
-                fs.copyFileSync(integrationsPath, path.join(backupDir, "tool-integrations.json"));
-            }
-
-            atomicWrite(integrationsPath, integrationsText, 0o600);
+        // Back up the owned configuration only, never a whole Pi settings/profile store.
+        if (fs.existsSync(integrationsPath)) {
+            fs.copyFileSync(integrationsPath, path.join(backupDir, "tool-integrations.json"));
         }
+
+        atomicWrite(integrationsPath, integrationsText, 0o600);
 
         injectTestFailure("after-structural-runtime");
         const blockFiles = structuredClone(previousManifest?.blockFiles || {});
