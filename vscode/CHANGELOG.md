@@ -1,5 +1,10 @@
 # SpecPi Chat changelog
 
+## 0.6.0
+
+- Show Command Guard's mode on a shield beside the composer and change it from a picker, without typing `/guard`. **SpecPi: Choose Command Guard Mode** opens the same picker from the Command Palette. A locked session offers **Unlock** instead of a mode.
+- Keep Command Guard the authority: Chat asks Pi to run the `/guard` command, and the harness still confirms every change that weakens protection and names the critical rule before unlocking. The shield appears only while a connected session reports a mode.
+
 ## 0.5.1
 
 - Name the provider beside each model in the composer's model selector, so the active provider is visible without hovering. The model name stays first, and the existing `provider / id` tooltip is unchanged.

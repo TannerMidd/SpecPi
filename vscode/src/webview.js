@@ -57,6 +57,7 @@ function getWebviewHtml({
             <symbol id="icon-selection" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-13-2 16"/></symbol>
             <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
             <symbol id="icon-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></symbol>
+            <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3.4 5 6.1v5.2c0 4.4 2.8 7.6 7 9.3 4.2-1.7 7-4.9 7-9.3V6.1z"/></symbol>
             <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
             <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
         </defs>
@@ -136,6 +137,7 @@ function getWebviewHtml({
                         <button id="attach-menu-button" class="icon-button" type="button" title="Attach file, image, or selection" aria-label="Attach context" aria-haspopup="menu" aria-expanded="false" aria-controls="attach-menu">${icon("attach")}</button>
                         <button id="attach-selection" class="icon-button" type="button" title="Attach editor selection" aria-label="Attach editor selection">${icon("selection")}</button>
                     </div>
+                    <button id="guard-button" class="guard-chip" type="button" title="Command Guard mode" hidden>${icon("shield")}<span id="guard-label">Guard</span></button>
                     <label class="sr-only" for="model-select">Model</label>
                     <select id="model-select" class="compact-select model-select" title="Model"><option value="">Default model</option></select>
                     <label class="sr-only" for="thinking-select">Thinking level</label>

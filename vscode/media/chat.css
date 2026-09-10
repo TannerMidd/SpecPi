@@ -142,6 +142,12 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .compact-select option { background: var(--vscode-dropdown-background, var(--surface-raised)); color: var(--vscode-dropdown-foreground, var(--text)); }
 .model-select { flex: 1; max-width: 270px; margin-left: auto; }
 .thinking-select { width: 72px; flex: 0 0 72px; }
+.guard-chip { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; max-width: 96px; height: 26px; padding: 4px 6px; color: var(--muted); background: transparent; border-radius: 3px; }
+.guard-chip:hover:not(:disabled) { color: var(--text); }
+.guard-chip .icon { width: 14px; height: 14px; }
+.guard-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guard-chip[data-mode="guard"] .icon, .guard-chip[data-mode="strict"] .icon { color: var(--accent); }
+.guard-chip[data-mode="locked"] { color: var(--error); }
 .composer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 3px 8px; border-top: 1px solid var(--border); }
 .composer-hint { font-size: 9px; color: var(--muted); line-height: 1.5; }
 .send-actions { margin-left: auto; flex: 0 0 auto; }
@@ -245,6 +251,7 @@ textarea.request-input { min-height: 90px; resize: vertical; font-family: var(--
     .composer-hint { max-width: 125px; font-size: 9px; }
     .composer-options { gap: 0; padding-left: 4px; padding-right: 4px; }
     .thinking-select { flex-basis: 63px; width: 63px; }
+    .guard-chip span { display: none; }
     .context-actions { gap: 0; }
     .context-actions .icon-button { width: 25px; }
     .welcome { margin-top: 8px; }
@@ -278,7 +285,7 @@ body.vscode-high-contrast .message-copy, body.vscode-high-contrast-light .messag
 .suggestion-detail, .message-header, .message-avatar, .message-author, .message-copy,
 .message-notice, .code-header, .code-copy, .markdown table, .reasoning summary,
 .tool-card summary, .tool-state, .tool-section-label, .activity, #activity-elapsed,
-.jump-button, .compact-select, .composer-hint, .stop-button, .session-footer, #token-status,
+.jump-button, .compact-select, .guard-chip, .composer-hint, .stop-button, .session-footer, #token-status,
 .attachment, .attachment-image .attachment-label, .image-unavailable, .attach-menu button,
 .attach-menu p, .image-feedback, .vision-warning, .image-preview-meta, .error-banner p,
 .text-button, .queue-notice, .slash-name, .slash-description, .request-option,

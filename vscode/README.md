@@ -20,6 +20,7 @@ Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4+**. For SSH, WSL
 - **Follow the work:** see replies and tool output as they arrive. Use **Stop** to interrupt a response.
 - **Keep a few conversations going:** switch chats while Pi continues working in the background. Find older chats in **Chat History**.
 - **Try another direction:** branch a conversation or edit an earlier prompt to start a new branch.
+- **Set Command Guard:** with SpecPi installed, a shield beside the composer shows the session's Command Guard mode. Click it to pick Guard, Strict, or Off. Pi confirms before protection is weakened.
 - **Review changes:** open file references and Git diffs in your editor.
 - **Reload Pi:** use **Restart Pi** in the Chat title bar to reconnect the current conversation and reload its Pi extensions. Other chats keep running.
 

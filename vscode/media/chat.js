@@ -405,6 +405,7 @@
         { name: "login", description: "How to sign in to a model provider with Pi" },
         { name: "logout", description: "How to manage provider sign-out with Pi" },
     ];
+    const GUARD_MODES = ["guard", "strict", "off", "locked"];
     const byId = (id) => document.getElementById(id);
     const input = byId("composer-input");
     const scrollArea = byId("scroll-area");
@@ -1410,6 +1411,29 @@
         thinking.title = `Thinking level: ${state.thinkingLevel || "off"}`;
     }
 
+    function renderGuard() {
+        const button = byId("guard-button");
+        const connected = ["connecting", "ready", "busy", "retrying", "compacting"].includes(state.status);
+        const guard = connected ? state.guard : null;
+        button.hidden = !guard;
+        if (!guard) {
+            return;
+        }
+
+        const label = String(guard.label || "Guard").slice(0, 24);
+        const detail = String(guard.detail || "").slice(0, 400);
+        byId("guard-label").textContent = label;
+        if (GUARD_MODES.includes(guard.mode)) {
+            button.dataset.mode = guard.mode;
+        } else {
+            delete button.dataset.mode;
+        }
+
+        button.title = detail ? `Command Guard: ${label}\n${detail}` : `Command Guard: ${label}`;
+        button.setAttribute("aria-label", `Command Guard mode: ${label}. Choose a mode.`);
+        button.disabled = state.status !== "ready" || Boolean(state.sending);
+    }
+
     function renderSelectionChip() {
         const chip = byId("selection-chip");
         const toggle = byId("selection-chip-toggle");
@@ -1960,6 +1984,7 @@
 
         renderMessages();
         renderModels();
+        renderGuard();
         renderAttachments();
         renderSelectionChip();
         renderRuntimeStatus();
@@ -2144,6 +2169,10 @@
     byId("thinking-select").addEventListener("change", (event) => {
         send({ type: "setThinking", level: event.target.value });
         renderModels();
+    });
+    // The mode itself is chosen in a VS Code picker; the webview only asks for it to open.
+    byId("guard-button").addEventListener("click", () => {
+        send({ type: "chooseGuard" });
     });
     for (const suggestion of document.querySelectorAll("[data-suggestion]")) {
         suggestion.addEventListener("click", () => {

@@ -7,6 +7,7 @@ import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { parseGuardMode } from "../vscode/src/guard.js";
 import { resolveLaunch } from "../vscode/src/launch.js";
 import { RpcClient } from "../vscode/src/rpc-client.js";
 
@@ -288,6 +289,12 @@ test(
             return event.message;
         }
 
+        function guardStatus() {
+            return rpc.events.findLast(
+                (event) => event.method === "setStatus" && event.statusKey === "specpi-command-guard",
+            )?.statusText;
+        }
+
         async function editCommand(command, title, value) {
             const cursor = rpc.events.length;
             const pending = rpc.request("prompt", { message: command });
@@ -324,6 +331,7 @@ test(
                 ),
                 "New Chat connections must publish Guard Off without requesting a mode change",
             );
+            assert.equal(parseGuardMode(guardStatus()), "off", "Chat's guard chip reads the published status label");
             assert.equal(
                 rpc.events.some((event) => event.method === "confirm"),
                 false,
@@ -373,8 +381,10 @@ test(
 
             await rpc.request("prompt", { message: "/guard guard" });
             await notification("/guard status", /^Mode: guard;/u);
+            assert.equal(parseGuardMode(guardStatus()), "guard");
             await rpc.request("prompt", { message: "/guard strict" });
             await notification("/guard status", /^Mode: strict;/u);
+            assert.equal(parseGuardMode(guardStatus()), "strict");
             for (const confirmed of [false, true]) {
                 const cursor = rpc.events.length;
                 const pending = rpc.request("prompt", { message: "/guard guard" });

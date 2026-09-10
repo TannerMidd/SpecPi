@@ -1055,6 +1055,48 @@ test(
             );
 
             for (const width of [280, 390]) {
+                await t.test(`Command Guard mode stays readable and pickable at ${width}px`, async () => {
+                    await withPage(browser, fixtures, { name: `guard-mode-${width}`, width }, async (page) => {
+                        const chip = page.locator("#guard-button");
+                        const guard = (mode, label) => ({
+                            guard: { mode, label, detail: `Synthetic ${mode} description.`, actions: ["guard"] },
+                        });
+                        assert.equal(await chip.isVisible(), false, "A chat without SpecPi's guard shows no mode");
+                        for (const [mode, label] of [
+                            ["guard", "Guard"],
+                            ["strict", "Strict"],
+                            ["off", "Off"],
+                            ["locked", "Locked"],
+                        ]) {
+                            await setState(page, guard(mode, label));
+                            assert.equal(await chip.isVisible(), true);
+                            assert.equal((await page.locator("#guard-label").textContent()).trim(), label);
+                            // The label collapses to the shield alone in the narrowest sidebar.
+                            assert.equal(await page.locator("#guard-label").isVisible(), width > 330);
+                            assert.match(await chip.getAttribute("aria-label"), new RegExp(label, "u"));
+                            assert.match(await chip.getAttribute("title"), /Synthetic/u);
+                            await assertLayout(page, width);
+                            await page.screenshot({
+                                path: path.join(screenshots, `guard-${mode}-${width}.png`),
+                            });
+                        }
+
+                        await chip.click();
+                        assert.deepEqual(await takeMessages(page), [{ type: "chooseGuard" }]);
+                        await chip.focus();
+                        assert.equal(await page.evaluate(() => document.activeElement?.id), "guard-button");
+                        await page.keyboard.press("Enter");
+                        assert.deepEqual(await takeMessages(page), [{ type: "chooseGuard" }]);
+                        await setState(page, { ...guard("guard", "Guard"), status: "busy" });
+                        assert.equal(await chip.isDisabled(), true);
+                        await setState(page, { ...guard("guard", "Guard"), status: "disconnected" });
+                        assert.equal(await chip.isVisible(), false, "A disconnected chat cannot report a live mode");
+                        assert.deepEqual(await takeMessages(page), []);
+                    });
+                });
+            }
+
+            for (const width of [280, 390]) {
                 await t.test(
                     `composer controls remain stable and keyboard accessible through the agent lifecycle at ${width}px`,
                     async () => {
