@@ -11,6 +11,7 @@
 <p align="center">
   <a href="#install">Install</a>
   · <a href="https://tannermidd.github.io/SpecPi/">Website</a>
+  · <a href="https://tannermidd.github.io/SpecPi/why-pi/">Why Pi?</a>
   · <a href="https://tannermidd.github.io/SpecPi/wiki/">Documentation</a>
 </p>
 

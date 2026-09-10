@@ -30,7 +30,7 @@ test(
                 ...VIEWPORT_PRESETS,
                 fullDesktop: { width: 1920, height: 1080 },
             })) {
-                for (const { route, theme } of ["", "wiki/", "single-agent/"].flatMap((route) =>
+                for (const { route, theme } of ["", "wiki/", "single-agent/", "why-pi/"].flatMap((route) =>
                     ["light", "dark"].map((theme) => ({ route, theme })),
                 )) {
                     await t.test(`${name} ${theme}: /SpecPi/${route}`, async () => {
@@ -192,7 +192,7 @@ test(
                 await page.getByRole("button", { name: "Dark mode" }).press("Enter");
                 assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
                 await assertPreview("dark");
-                for (const route of ["wiki/", "single-agent/", ""]) {
+                for (const route of ["wiki/", "single-agent/", "why-pi/", ""]) {
                     await page.goto(`${origin}/SpecPi/${route}`);
                     assert.equal(await page.locator("html").getAttribute("data-theme"), "dark");
                     assert.equal(

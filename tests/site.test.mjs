@@ -8,7 +8,7 @@ import { decideCommand } from "../extensions/command-guard/core.mjs";
 import { GUARD_MODES } from "../site/cycle.js";
 
 const siteRoot = fileURLToPath(new URL("../site/", import.meta.url));
-const pages = ["index.html", "wiki/index.html", "single-agent/index.html"];
+const pages = ["index.html", "wiki/index.html", "single-agent/index.html", "why-pi/index.html"];
 
 test("the public guard illustration agrees with the actual policy without executing examples", () => {
     const source = fs.readFileSync(path.join(siteRoot, "index.html"), "utf8");

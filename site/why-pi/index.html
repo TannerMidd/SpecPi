@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <script src="../theme.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#fafbfc" />
+        <meta
+            name="description"
+            content="Why SpecPi builds on Pi: control over context, model choice, and an adaptable foundation, with honest evidence and tradeoffs."
+        />
+        <meta property="og:title" content="Why Pi? · SpecPi" />
+        <meta
+            property="og:description"
+            content="A coding-agent foundation you can understand and shape. The reasons, the research, and the tradeoffs."
+        />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/why-pi/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/why-pi/" />
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+        <title>Why Pi? · SpecPi</title>
+    </head>
+    <body class="article-page">
+        <a class="skip-link" href="#article">Skip to article</a>
+        <header class="site-header wrap">
+            <a class="brand" href="../" aria-label="SpecPi home"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="./" aria-current="page">Why Pi?</a><a href="../#install">Install</a
+                ><a href="../#vscode-chat">VS Code</a><a href="../single-agent/">Research</a><a href="../wiki/">Docs</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
+            </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
+        </header>
+        <main id="article" class="wrap">
+            <header class="article-heading">
+                <div class="article-meta"><span>Tanner Middleton</span><span>10 September 2026</span></div>
+                <h1>Why Pi?</h1>
+                <p class="article-deck">
+                    Pi makes the layer between you and the model easier to inspect, control, and adapt. That makes it a
+                    useful foundation for SpecPi.
+                </p>
+            </header>
+            <div class="article-layout">
+                <aside class="wiki-sidebar" aria-label="Article navigation">
+                    <p>On this page</p>
+                    <nav aria-label="Article sections">
+                        <a href="#foundation">The foundation</a>
+                        <a href="#control">Control &amp; transparency</a>
+                        <a href="#evidence">Performance &amp; cost</a>
+                        <a href="#tradeoffs">The tradeoffs</a>
+                        <a href="#your-choice">Is it for you?</a>
+                        <a href="#sources">Sources</a>
+                    </nav>
+                </aside>
+                <article class="article-body" aria-label="Why SpecPi builds on Pi">
+                    <section id="foundation" aria-labelledby="foundation-title">
+                        <h2 id="foundation-title">A foundation you can shape</h2>
+                        <p>
+                            The model generates responses. The <em>harness</em> decides which instructions, files,
+                            tools, and conversation history it receives, then runs its tool calls. That layer has a real
+                            effect on how a coding agent works.
+                        </p>
+                        <p>
+                            Pi is an open-source coding harness created by Mario Zechner. Its small core supports
+                            reading, writing, editing, and shell commands, with extensions for additional behavior. It
+                            also exposes integration interfaces, so the same foundation can support a terminal workflow
+                            or a custom application.<sup
+                                ><a href="#source-pi" aria-label="Source 1: Pi documentation">1</a></sup
+                            >
+                        </p>
+                        <h3>Model choice without rebuilding the workflow</h3>
+                        <p>
+                            Pi supports multiple providers and configurable model endpoints. You can choose a model for
+                            the task while keeping your tools and working conventions. Support does not mean every model
+                            is equally capable, or that switching models preserves identical behavior.<sup
+                                ><a href="#source-pi" aria-label="Source 1: Pi documentation">1</a></sup
+                            >
+                        </p>
+                        <h3>Room for deliberate additions</h3>
+                        <p>
+                            Capabilities should solve observed problems. Pi provides room to add them deliberately.
+                            SpecPi builds on it with task scope, command policy, verification, and an optional VS Code
+                            interface. Each addition still needs inspection and testing.
+                        </p>
+                        <p>
+                            <strong>Pi works on its own.</strong> SpecPi is an optional layer built on it. You can start
+                            with Pi and decide which additions, if any, earn their place.
+                        </p>
+                    </section>
+                    <section id="control" aria-labelledby="control-title">
+                        <h2 id="control-title">Know what shapes the answer</h2>
+                        <p>
+                            What appears in a chat window is only part of what a model sees. Harnesses add instructions
+                            and tool descriptions, manage context, and summarize long conversations. These decisions can
+                            change the result even when the selected model stays the same.
+                        </p>
+                        <p>
+                            Zechner made this a central reason for building Pi. His <em>cchistory</em> investigation
+                            captured changes to Claude Code's system prompts, tool definitions, and additions to user
+                            messages across releases.<sup
+                                ><a href="#source-creator" aria-label="Source 2: Pi creator's rationale">2</a>,
+                                <a href="#source-history" aria-label="Source 3: cchistory investigation">3</a></sup
+                            >
+                        </p>
+                        <p>
+                            There is evidence beyond that critique. In April 2026, Anthropic attributed Claude Code
+                            quality regressions to changes in reasoning effort, context handling, and a verbosity
+                            instruction. It reported that the underlying API was unaffected and that the issues had been
+                            fixed. The harness deserves the same scrutiny as the model.<sup
+                                ><a href="#source-anthropic" aria-label="Source 4: Anthropic postmortem">4</a></sup
+                            >
+                        </p>
+                        <p>
+                            Pi exposes source code and extension interfaces for inspecting and changing that behavior.
+                            It does not guarantee that everything is sent untouched: Pi also compacts history, and
+                            extensions can rewrite messages or the final provider request. Inspecting that final request
+                            matters more than assuming the visible chat is complete.<sup
+                                ><a href="#source-context" aria-label="Source 5: Pi context and extension documentation"
+                                    >5</a
+                                ></sup
+                            >
+                        </p>
+                        <p>
+                            <strong>The practical benefit is control over these decisions.</strong> You can review
+                            changes, pin a version, and test behavior before adopting an update. More of the workflow
+                            becomes open to inspection. A hosted provider's models and service can still change.
+                        </p>
+                    </section>
+                    <section id="evidence" aria-labelledby="evidence-title">
+                        <h2 id="evidence-title">The performance case is promising, with limits</h2>
+                        <p>
+                            The available comparisons show that Pi can be economical without consistently leading on
+                            success rate. These two evaluations offer useful evidence, with limits on what they
+                            establish.
+                        </p>
+                        <div class="evidence-card">
+                            <p class="source-meta">Terminal and repository tasks · FrontierHarness</p>
+                            <h3>Lower cost, two fewer solves</h3>
+                            <p>
+                                With Kimi K3 on 30 tasks, Pi solved <strong>18/30</strong> at
+                                <strong>$2.43 per success</strong>; Codex solved <strong>20/30</strong> at
+                                <strong>$3.47</strong>. Both have complete task-cost coverage. These standardized costs
+                                include failed attempts. One attempt per task and a small sample leave considerable
+                                uncertainty about the success-rate difference.<sup
+                                    ><a href="#source-frontier" aria-label="Source 6: FrontierHarness results"
+                                        >6</a
+                                    ></sup
+                                >
+                            </p>
+                        </div>
+                        <div class="evidence-card">
+                            <p class="source-meta">Enterprise coding · Databricks</p>
+                            <h3>Encouraging efficiency across models</h3>
+                            <p>
+                                Across six matched model-and-effort comparisons with Claude Code or Codex, Pi's
+                                displayed success rate ranged from <strong>7 points lower to 3 points higher</strong>,
+                                with approximately <strong>17–52% lower mean token-priced cost</strong>. The private
+                                tasks and limited published run data prevent an independent replication or a claim of
+                                statistical equivalence.<sup
+                                    ><a href="#source-databricks" aria-label="Source 7: Databricks evaluation"
+                                        >7</a
+                                    ></sup
+                                >
+                            </p>
+                        </div>
+                        <p>
+                            These studies use different tasks and accounting rules. Their results should not be pooled
+                            into a universal ranking or a promised savings multiplier. They also
+                            <strong>do not establish SpecPi's performance</strong>. The evidence supports Pi as a
+                            foundation; SpecPi's particular configuration still needs its own evaluation.
+                        </p>
+                    </section>
+                    <section id="tradeoffs" aria-labelledby="tradeoffs-title">
+                        <h2 id="tradeoffs-title">The tradeoffs</h2>
+                        <h3>More ownership means more maintenance</h3>
+                        <p>
+                            A small core leaves some conveniences to configuration or extensions. That flexibility comes
+                            with responsibility for compatibility, updates, and keeping complexity in check. Someone who
+                            wants a complete, managed workflow may prefer a more integrated product.
+                        </p>
+                        <h3>Transparency is not a security boundary</h3>
+                        <p>
+                            Pi's shell access and installed extensions are powerful. Open source makes review possible;
+                            it does not make unfamiliar code safe. SpecPi's Command Guard adds a policy layer, but it is
+                            not an operating-system sandbox. Sensitive work still needs appropriate isolation and human
+                            review.<sup
+                                ><a href="#source-security" aria-label="Source 8: Pi and SpecPi security boundaries"
+                                    >8</a
+                                ></sup
+                            >
+                        </p>
+                        <h3>Local software does not make hosted inference private</h3>
+                        <p>
+                            Pi runs locally, but requests to a hosted model leave your machine. Provider terms, data
+                            handling, and the content you send still matter. Choosing a local model changes that setup,
+                            and brings its own hardware and capability tradeoffs.<sup
+                                ><a href="#source-pi" aria-label="Source 1: Pi documentation">1</a></sup
+                            >
+                        </p>
+                        <h3>Efficiency is something to measure</h3>
+                        <p>
+                            Model calls still cost money or consume plan allowances. Retries, long contexts, extra
+                            agents, and human review can outweigh a smaller prompt. The useful measure is the cost of
+                            completing real work to an acceptable standard, including the time spent fixing failures.
+                        </p>
+                    </section>
+                    <section id="your-choice" aria-labelledby="choice-title">
+                        <h2 id="choice-title">Is Pi a good fit for you?</h2>
+                        <p>
+                            Pi is worth considering if you want model choice, care about what enters the model's
+                            context, and are comfortable owning some configuration. It is especially appealing if you
+                            want to build a workflow around your tools and conventions.
+                        </p>
+                        <p>
+                            Another harness may suit you better if its defaults already match your work, its built-in
+                            integrations save you time, or it consistently solves more of your important tasks. There is
+                            little value in gaining flexibility you do not want to maintain.
+                        </p>
+                        <p>
+                            Try stock Pi on a few representative tasks alongside your current tool. Compare verified
+                            results, total spend, and how much intervention each needs. Add SpecPi if its approach to
+                            scope, review, and evidence fits how you want to work.
+                        </p>
+                        <p class="lead">
+                            Pi offers a foundation you can understand and shape around the work. That combination of
+                            control, flexibility, and credible performance is why SpecPi builds on it.
+                        </p>
+                        <p>
+                            <a
+                                href="https://github.com/earendil-works/pi/blob/main/packages/coding-agent/README.md#quick-start"
+                                >Start with Pi</a
+                            >
+                            · <a href="../wiki/#getting-started">Explore SpecPi</a>
+                        </p>
+                    </section>
+                    <section id="sources" aria-labelledby="sources-title">
+                        <h2 id="sources-title">Sources &amp; comparison notes</h2>
+                        <p class="source-meta">
+                            Benchmark evidence reviewed 8 September 2026; product documentation checked 10 September
+                            2026. Dollar figures retain the studies' historical pricing. Evaluation methods and
+                            limitations are noted below.
+                        </p>
+                        <ol>
+                            <li id="source-pi">
+                                <a href="https://github.com/earendil-works/pi/blob/main/packages/coding-agent/README.md"
+                                    >Pi documentation</a
+                                >. Core tools, providers, customization, and integration modes.
+                            </li>
+                            <li id="source-creator">
+                                Mario Zechner,
+                                <a href="https://mariozechner.at/posts/2025-11-30-pi-coding-agent/"
+                                    >What I learned building an opinionated and minimal coding agent</a
+                                >. November 2025; the creator's rationale and early evaluation.
+                            </li>
+                            <li id="source-history">
+                                Mario Zechner,
+                                <a href="https://mariozechner.at/posts/2025-08-03-cchistory/"
+                                    >Tracking Claude Code system prompt and tool changes</a
+                                >. August 2025; captured differences between historical releases.
+                            </li>
+                            <li id="source-anthropic">
+                                Anthropic,
+                                <a href="https://www.anthropic.com/engineering/april-23-postmortem"
+                                    >An update on recent Claude Code quality reports</a
+                                >. April 2026; first-party account of regressions and fixes.
+                            </li>
+                            <li id="source-context">
+                                Pi's
+                                <a
+                                    href="https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/compaction.md"
+                                    >compaction</a
+                                >
+                                and
+                                <a
+                                    href="https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md"
+                                    >extension</a
+                                >
+                                documentation. History can be summarized; extensions can alter outgoing requests.
+                            </li>
+                            <li id="source-frontier">
+                                FrontierHarness / Runta,
+                                <a href="https://github.com/frontier-harness-eval/eval">evaluation repository</a> and
+                                <a href="https://github.com/frontier-harness-eval/eval/blob/main/results/eval-data.json"
+                                    >task-level data</a
+                                >. August 2026 dataset; Pi 0.84.2 and Codex 0.148.0. Cost per success means total
+                                recorded task cost, including failures, divided by successful attempts. The evaluator
+                                also develops a competing harness.
+                            </li>
+                            <li id="source-databricks">
+                                Databricks,
+                                <a
+                                    href="https://www.databricks.com/blog/benchmarking-coding-agents-databricks-multi-million-line-codebase"
+                                    >Benchmarking coding agents on Databricks' codebase</a
+                                >. July 2026; internal evaluation. Cost reductions are calculated from the chart's
+                                native-harness/Pi ratios; success differences use its displayed percentages.
+                            </li>
+                            <li id="source-security">
+                                <a
+                                    href="https://github.com/earendil-works/pi/blob/main/packages/coding-agent/README.md#philosophy"
+                                    >Pi's design boundaries</a
+                                >
+                                and
+                                <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md"
+                                    >SpecPi's security model</a
+                                >. Permissions, trusted extensions, and limits of command policy.
+                            </li>
+                        </ol>
+                    </section>
+                </article>
+            </div>
+        </main>
+        <footer class="site-footer wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
+            >
+            <p>A foundation you can shape.</p>
+            <nav aria-label="Footer navigation">
+                <a href="../wiki/">Documentation</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
+            </nav>
+        </footer>
+    </body>
+</html>
