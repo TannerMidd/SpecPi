@@ -1,6 +1,21 @@
 import fs from "node:fs";
 import path from "node:path";
 
+const MAX_INTEGRATIONS_BYTES = 16384;
+
+export function serializeIntegrations(value, file) {
+    let text = `${JSON.stringify(value, null, 2)}\n`;
+    if (Buffer.byteLength(text) > MAX_INTEGRATIONS_BYTES) {
+        text = JSON.stringify(value);
+    }
+
+    if (Buffer.byteLength(text) > MAX_INTEGRATIONS_BYTES) {
+        throw new Error(`Tool integration configuration exceeds ${MAX_INTEGRATIONS_BYTES} bytes: ${file}`);
+    }
+
+    return text;
+}
+
 export function integrationsFile(agentDir) {
     return path.join(agentDir, "specpi", "tool-integrations.json");
 }
@@ -30,7 +45,7 @@ export function readIntegrations(agentDir) {
     }
 
     const stat = fs.statSync(file);
-    if (!stat.isFile() || stat.nlink !== 1 || stat.size > 16384) {
+    if (!stat.isFile() || stat.nlink !== 1 || stat.size > MAX_INTEGRATIONS_BYTES) {
         throw new Error(`Tool integration configuration is not a bounded regular file: ${file}`);
     }
 

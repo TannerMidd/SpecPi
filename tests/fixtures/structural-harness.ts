@@ -86,8 +86,8 @@ async function event(name: string, payload = {}) {
 }
 
 const input = { language: "typescript", pattern: "target($A)", paths: ["demo.ts"] };
-async function call(signal?: AbortSignal) {
-    const value = await tools.get("structural_search").execute("test", input, signal, undefined, ctx);
+async function call(signal?: AbortSignal, timeoutMs = 10000) {
+    const value = await tools.get("structural_search").execute("test", { ...input, timeoutMs }, signal, undefined, ctx);
 
     return JSON.parse(value.content[0].text);
 }
@@ -138,6 +138,88 @@ export default function harness(host: any) {
         assert.equal((await call()).status, "denied");
         ctx.cwd = workingRoot;
         duringPrompt = undefined;
+        const select = ctx.ui.select;
+        try {
+            for (const cause of ["timeout", "cancel", "policy", "session"]) {
+                await commands.get("guard").handler("strict", ctx);
+                const controller = new AbortController();
+                let dialogOpen = false;
+                let approvalCount = 0;
+                ctx.ui.select = async (
+                    _title: string,
+                    _choices: string[],
+                    options?: { signal?: AbortSignal; timeout?: number },
+                ) => {
+                    assert.ok(options?.signal, "Strict approval must receive the operation cancellation signal");
+                    assert.ok(Number.isInteger(options.timeout) && options.timeout! > 0);
+                    if (++approvalCount > 1) {
+                        assert.ok(
+                            options.timeout! <= 2500,
+                            "queued RPC approval must subtract the first call's wait from its 3000ms deadline",
+                        );
+
+                        return "Deny";
+                    }
+
+                    assert.ok(
+                        options.timeout! <= 1000,
+                        "RPC approval expiry must fit the remaining operation deadline",
+                    );
+                    dialogOpen = true;
+                    const prompt = new Promise<undefined>((resolve) => {
+                        const dismiss = () => {
+                            dialogOpen = false;
+                            resolve(undefined);
+                        };
+
+                        options.signal!.addEventListener("abort", dismiss, { once: true });
+                        if (options.signal!.aborted) {
+                            dismiss();
+                        }
+                    });
+                    if (cause === "cancel") {
+                        controller.abort();
+                    } else if (cause === "policy") {
+                        await commands.get("guard").handler("off", ctx);
+                    } else if (cause === "session") {
+                        await event("session_tree");
+                    }
+
+                    return prompt;
+                };
+
+                const active = call(controller.signal, 1000);
+                const queued = cause === "timeout" ? call(undefined, 3000) : undefined;
+                const result = await active;
+                assert.equal(result.status, cause === "timeout" ? "timed_out" : "cancelled", cause);
+                assert.equal(dialogOpen, false, `${cause} must dismiss the approval before returning`);
+                if (queued) {
+                    assert.equal((await queued).status, "denied");
+                    assert.equal(approvalCount, 2);
+                }
+            }
+
+            // A remote client can ignore signal-driven dismissal and reply after cancellation.
+            const remoteAnswer = Promise.withResolvers<string>();
+            const opened = Promise.withResolvers<void>();
+            ctx.ui.select = () => {
+                opened.resolve();
+
+                return remoteAnswer.promise;
+            };
+
+            const controller = new AbortController();
+            const pending = call(controller.signal);
+            await opened.promise;
+            controller.abort();
+            const cancelled = await pending;
+            remoteAnswer.resolve("Allow once");
+            await remoteAnswer.promise;
+            assert.equal(cancelled.status, "cancelled", "late remote approval cannot revive the call");
+        } finally {
+            ctx.ui.select = select;
+        }
+
         answer = "Lock session";
         source = path.join(workingRoot, "spoof.ts");
         await event("tool_call", { toolName: "structural_search", input });

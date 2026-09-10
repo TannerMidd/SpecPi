@@ -163,25 +163,32 @@ test("configuration is opt-in and rejects malformed and linked inputs", (t) => {
     assert.equal(shape.corruptIntegrations, undefined);
     assert.ok(shape.message.includes(file), shape.message);
 });
-test("structural runtime promotion, rollback, removal and integrity are transactional without acquisition", (t) => {
+function runtimeFixture(t) {
     const { root, runtime } = fixture(t);
     const stateDir = path.join(root, "state");
     fs.mkdirSync(stateDir);
-    const warnings = [];
-    let smokes = 0;
-    const params = {
+
+    return {
         stateDir,
         sourceDir: path.join(repo, "structural-runtime"),
         enabled: true,
-        warnings,
+        warnings: [],
         run: (_cmd, args, options) => {
             assert.deepEqual(args, ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]);
             fs.cpSync(path.join(runtime, "node_modules"), path.join(options.cwd, "node_modules"), { recursive: true });
         },
-        smoke: () => {
-            smokes += 1;
-        },
+        smoke() {},
     };
+}
+
+test("structural runtime promotion, rollback, removal and integrity are transactional without acquisition", (t) => {
+    const params = runtimeFixture(t);
+    const { stateDir, warnings } = params;
+    let smokes = 0;
+    params.smoke = () => {
+        smokes += 1;
+    };
+
     const installed = changeStructuralRuntime(params);
     assert.equal(structuralRuntimeStatus(stateDir, params.sourceDir).installed, true);
     assert.equal(smokes, 2);
@@ -209,6 +216,153 @@ test("structural runtime promotion, rollback, removal and integrity are transact
     changeStructuralRuntime({ ...params, enabled: false }).commit();
     assert.equal(fs.existsSync(path.join(stateDir, "structural-runtime")), true);
     assert.ok(warnings.some((warning) => warning.includes("Preserved")));
+});
+test("runtime retirement preserves non-binary changes and legacy ownership markers", async (t) => {
+    const changes = {
+        lockfile(directory) {
+            fs.appendFileSync(path.join(directory, "package-lock.json"), "\n");
+        },
+        addedFile(directory) {
+            fs.writeFileSync(path.join(directory, "local-notes.json"), "{}");
+        },
+        markerPermissions(directory) {
+            const file = path.join(directory, "specpi-runtime.json");
+            fs.chmodSync(file, (fs.statSync(file).mode & 0o7777) ^ 0o200);
+        },
+        filePermissions(directory) {
+            const file = path.join(directory, "package.json");
+            // Windows models read-only permission; POSIX must also preserve special-bit-only changes.
+            fs.chmodSync(file, process.platform === "win32" ? 0o444 : (fs.statSync(file).mode & 0o7777) ^ 0o1000);
+        },
+        removedFile(directory) {
+            fs.unlinkSync(path.join(directory, "package.json"));
+        },
+        emptyDirectory(directory) {
+            fs.mkdirSync(path.join(directory, "local-directory"));
+        },
+        linkedDirectory(directory) {
+            fs.symlinkSync(
+                path.dirname(directory),
+                path.join(directory, "local-link"),
+                process.platform === "win32" ? "junction" : "dir",
+            );
+        },
+        legacyMarker(directory) {
+            const file = path.join(directory, "specpi-runtime.json");
+            const marker = JSON.parse(fs.readFileSync(file, "utf8"));
+            marker.schema = 1;
+            delete marker.treeHash;
+            fs.writeFileSync(file, JSON.stringify(marker));
+        },
+    };
+    for (const [name, change] of Object.entries(changes)) {
+        await t.test(name, (t) => {
+            const params = runtimeFixture(t);
+            changeStructuralRuntime(params).commit();
+            const directory = path.join(params.stateDir, "structural-runtime");
+            change(directory);
+            assert.equal(structuralRuntimeStatus(params.stateDir, params.sourceDir).installed, false);
+            changeStructuralRuntime({ ...params, enabled: false }).commit();
+            assert.ok(fs.existsSync(directory));
+            assert.match(params.warnings.join("\n"), /Preserved/u);
+            changeStructuralRuntime(params).commit();
+            assert.equal(structuralRuntimeStatus(params.stateDir, params.sourceDir).installed, true);
+            const previous = fs
+                .readdirSync(params.stateDir)
+                .find((name) => name.startsWith(".structural-runtime-previous-"));
+            assert.ok(previous, "replacement preserves the unverified prior tree");
+        });
+    }
+});
+test("runtime fingerprinting does not read through directory links", (t) => {
+    const params = runtimeFixture(t);
+    changeStructuralRuntime(params).commit();
+    const directory = path.join(params.stateDir, "structural-runtime");
+    const link = path.join(directory, "outside-link");
+    fs.symlinkSync(path.dirname(directory), link, process.platform === "win32" ? "junction" : "dir");
+    let traversals = 0;
+    for (const name of ["readFileSync", "readdirSync"]) {
+        const original = fs[name];
+        t.mock.method(fs, name, (target, ...args) => {
+            const resolved = path.resolve(target);
+            if (resolved === link || resolved.startsWith(`${link}${path.sep}`)) {
+                traversals += 1;
+                throw new Error("directory link traversed");
+            }
+
+            return original(target, ...args);
+        });
+    }
+
+    try {
+        assert.equal(structuralRuntimeStatus(params.stateDir, params.sourceDir).installed, false);
+        assert.equal(traversals, 0, "a caught traversal failure must not masquerade as safe fingerprinting");
+    } finally {
+        t.mock.restoreAll();
+    }
+});
+test("runtime commit reports the exact retained path when retirement cleanup fails", (t) => {
+    const params = runtimeFixture(t);
+    changeStructuralRuntime(params).commit();
+    const retired = changeStructuralRuntime({ ...params, enabled: false });
+    const previous = path.join(
+        params.stateDir,
+        fs.readdirSync(params.stateDir).find((name) => name.startsWith(".structural-runtime-previous-")),
+    );
+    t.mock.method(fs, "rmSync", () => {
+        throw Object.assign(new Error("injected retirement cleanup failure"), { code: "EACCES" });
+    });
+    try {
+        retired.commit();
+    } finally {
+        t.mock.restoreAll();
+    }
+
+    assert.ok(fs.existsSync(previous));
+    assert.ok(
+        params.warnings.some(
+            (warning) => warning.includes(previous) && warning.includes("injected retirement cleanup failure"),
+        ),
+    );
+});
+test("runtime commit rechecks the retired directory before recursive deletion", (t) => {
+    const params = runtimeFixture(t);
+    changeStructuralRuntime(params).commit();
+    const retired = changeStructuralRuntime({ ...params, enabled: false });
+    const previous = fs.readdirSync(params.stateDir).find((name) => name.startsWith(".structural-runtime-previous-"));
+    const file = path.join(params.stateDir, previous, "late-notes.json");
+    fs.writeFileSync(file, "preserve this change");
+    retired.commit();
+    assert.equal(fs.readFileSync(file, "utf8"), "preserve this change");
+    assert.match(params.warnings.join("\n"), /Preserved/u);
+});
+test("runtime rollback restores the previous directory even when recursive cleanup fails", (t) => {
+    const params = runtimeFixture(t);
+    changeStructuralRuntime(params).commit();
+    const directory = path.join(params.stateDir, "structural-runtime");
+    const original = "modified prior binary";
+    fs.writeFileSync(resolveBinary(directory), original);
+    const replacement = changeStructuralRuntime(params);
+    const remove = fs.rmSync;
+    t.mock.method(fs, "rmSync", (target, options) => {
+        if (path.resolve(target).startsWith(`${params.stateDir}${path.sep}`)) {
+            throw Object.assign(new Error("injected cleanup failure"), { code: "EACCES" });
+        }
+
+        return remove(target, options);
+    });
+    let errors;
+    try {
+        errors = replacement.rollback();
+    } finally {
+        t.mock.restoreAll();
+    }
+
+    assert.match(errors.join("\n"), /cleanup failure/u);
+    assert.equal(fs.readFileSync(resolveBinary(directory), "utf8"), original);
+    assert.ok(fs.readdirSync(params.stateDir).some((name) => name.startsWith(".structural-runtime-failed-")));
+    assert.deepEqual(replacement.rollback(), []);
+    assert.equal(fs.readFileSync(resolveBinary(directory), "utf8"), original);
 });
 test(
     "real pinned parser finds structures across layout, ignores strings, isolates config and returns byte ranges",

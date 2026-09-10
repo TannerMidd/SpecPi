@@ -27,7 +27,7 @@ import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
-import { integrationsFile, readIntegrations } from "../extensions/structural-search/config.mjs";
+import { integrationsFile, readIntegrations, serializeIntegrations } from "../extensions/structural-search/config.mjs";
 import { changeStructuralRuntime, structuralRuntimeStatus } from "./structural-runtime.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -1470,6 +1470,17 @@ async function installOrUpdate(options, update) {
         const previousManifest = readManifest(update);
         const integrations = readIntegrationsForOperation(options.structuralSearch);
         const structuralEnabled = options.structuralSearch ?? integrations.structuralSearch.enabled;
+        // Bound the output before any runtime/configuration mutation, not only when reading the input.
+        const integrationsText =
+            options.structuralSearch !== undefined || fs.existsSync(integrationsPath)
+                ? serializeIntegrations(
+                      {
+                          ...integrations,
+                          structuralSearch: { ...integrations.structuralSearch, enabled: structuralEnabled },
+                      },
+                      integrationsPath,
+                  )
+                : undefined;
         if (!update && previousManifest) {
             throw new Error(`SpecPi is already installed. Run ${CLI} update.`);
         }
@@ -1526,17 +1537,13 @@ async function installOrUpdate(options, update) {
             );
         }
 
-        if (options.structuralSearch !== undefined || fs.existsSync(integrationsPath)) {
+        if (integrationsText !== undefined) {
             // Back up the owned configuration only, never a whole Pi settings/profile store.
             if (fs.existsSync(integrationsPath)) {
                 fs.copyFileSync(integrationsPath, path.join(backupDir, "tool-integrations.json"));
             }
 
-            writeJson(
-                integrationsPath,
-                { ...integrations, structuralSearch: { ...integrations.structuralSearch, enabled: structuralEnabled } },
-                0o600,
-            );
+            atomicWrite(integrationsPath, integrationsText, 0o600);
         }
 
         injectTestFailure("after-structural-runtime");

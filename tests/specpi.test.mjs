@@ -2514,6 +2514,49 @@ test("structural enablement is non-mutating in plan, survives update, rolls back
     }
 });
 
+test("structural configuration serialization stays readable and rejects output overflow before mutation", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-structural-bounds-"));
+    const agentDir = path.join(root, "agent");
+    const fakeBin = path.join(root, "bin");
+    const config = path.join(agentDir, "specpi", "tool-integrations.json");
+    installFakePi(fakeBin);
+    const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
+    const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
+    try {
+        fs.mkdirSync(path.dirname(config), { recursive: true });
+        const value = { schema: 1, structuralSearch: { enabled: true }, unrelated: Array(3000).fill(0) };
+        fs.writeFileSync(config, JSON.stringify(value));
+        assert.ok(Buffer.byteLength(JSON.stringify(value, null, 2)) > 16384);
+        const installed = invokeCli(agentDir, ["install", "--yes", ...skip], env);
+        assert.equal(installed.status, 0, installed.stderr);
+        assert.ok(fs.statSync(config).size <= 16384);
+        assert.deepEqual(JSON.parse(fs.readFileSync(config)), value);
+        assert.equal(invokeCli(agentDir, ["plan", ...skip], env).status, 0);
+        assert.equal(invokeCli(agentDir, ["doctor"], env).status, 0);
+        const disabled = invokeCli(agentDir, ["update", "--yes", "--structural-search=off", ...skip], env);
+        assert.equal(disabled.status, 0, disabled.stderr);
+        assert.ok(fs.statSync(config).size <= 16384);
+        assert.deepEqual(JSON.parse(fs.readFileSync(config)).unrelated, value.unrelated);
+
+        // true -> false adds a byte to an already full compact configuration. No output fits.
+        const full = { schema: 1, structuralSearch: { enabled: true }, unrelated: "" };
+        full.unrelated = "x".repeat(16384 - Buffer.byteLength(JSON.stringify(full)));
+        const before = JSON.stringify(full);
+        fs.writeFileSync(config, before);
+        const manifest = path.join(agentDir, "specpi", "manifest.json");
+        const beforeManifest = fs.readFileSync(manifest, "utf8");
+        const blocked = invokeCli(agentDir, ["update", "--yes", "--structural-search=off", ...skip], env);
+        assert.notEqual(blocked.status, 0);
+        assert.match(blocked.stderr, /configuration exceeds/u);
+        assert.ok(blocked.stderr.includes(config));
+        assert.equal(fs.readFileSync(config, "utf8"), before);
+        assert.equal(fs.readFileSync(manifest, "utf8"), beforeManifest);
+        assert.equal(invokeCli(agentDir, ["plan", ...skip], env).status, 0);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test("an unparseable owned configuration keeps plan working and is repaired only by an explicit selection", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-structural-corrupt-"));
     const agentDir = path.join(root, "agent");

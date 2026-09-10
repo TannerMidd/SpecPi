@@ -98,6 +98,7 @@ export default function registerStructuralSearch(pi: ExtensionAPI) {
                 lifecycle.signal,
                 ...(originalSignal ? [originalSignal] : []),
             ]);
+            const deadline = Date.now() + spec.timeoutMs;
             const timer = setTimeout(() => controller.abort(), spec.timeoutMs);
             const run = async () => {
                 started = true;
@@ -125,6 +126,8 @@ export default function registerStructuralSearch(pi: ExtensionAPI) {
                     const prompt = ctx.ui.select(
                         `Read-only structural search ${JSON.stringify({ cwd, language: spec.language, paths: spec.paths, pattern: spec.pattern }).replace(/[\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, "_")}`,
                         ["Deny", "Allow once"],
+                        // RPC forwards timeout to clients but does not forward signal-driven dismissal.
+                        { signal, timeout: Math.max(1, deadline - Date.now()) },
                     );
                     let cancelApproval: (() => void) | undefined;
                     let answer;
