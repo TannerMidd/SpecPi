@@ -6,7 +6,6 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runPiFixture } from "../scripts/pi-test-harness.mjs";
-import { changeStructuralRuntime } from "../scripts/structural-runtime.mjs";
 import {
     aggregateEvents,
     appendWishlistDecision,
@@ -2417,33 +2416,33 @@ test(
         const stateDir = path.join(agentDir, "specpi");
         fs.mkdirSync(stateDir, { recursive: true });
         installFakePi(fakeBin);
+        installFakeBrowserNpm(fakeBin);
+        writeNodeCommand(fakeBin, "donsetch", 'console.log("3.4.0");');
         const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
-        const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
+        const flags = ["--skip-browser-install", "--skip-shell"];
+        const config = path.join(stateDir, "tool-integrations.json");
+        const runtime = path.join(stateDir, "structural-runtime");
         try {
-            const sourceRuntime = process.env.SPECPI_STRUCTURAL_RUNTIME;
-            assert.ok(sourceRuntime);
-            changeStructuralRuntime({
-                stateDir,
-                sourceDir: path.join(repoRoot, "structural-runtime"),
-                enabled: true,
-                warnings: [],
-                run(_command, _args, options) {
-                    fs.cpSync(path.join(sourceRuntime, "node_modules"), path.join(options.cwd, "node_modules"), {
-                        recursive: true,
-                    });
-                },
-                smoke(directory) {
-                    const result = spawnSync(
-                        process.execPath,
-                        [path.join(repoRoot, "extensions", "structural-search", "smoke.mjs"), directory],
-                        { encoding: "utf8", timeout: 15000, windowsHide: true },
-                    );
-                    assert.equal(result.status, 0, result.stderr);
-                },
-            }).commit();
-            for (const command of ["plan", "install", "update"]) {
-                const result = invokeCli(agentDir, [command, ...(command === "plan" ? [] : ["--yes"]), ...skip], env);
+            assert.ok(process.env.SPECPI_STRUCTURAL_RUNTIME);
+            const plan = invokeCli(agentDir, ["plan", ...flags], env);
+            assert.equal(plan.status, 0, plan.stderr);
+            assert.match(plan.stdout, /Structural search: enabled/u);
+            assert.equal(fs.existsSync(config), false);
+            assert.equal(fs.existsSync(runtime), false);
+            const failed = invokeCli(agentDir, ["install", "--yes", ...flags], {
+                ...env,
+                SPECPI_TESTING: "1",
+                SPECPI_TEST_FAIL_POINT: "after-structural-runtime",
+            });
+            assert.notEqual(failed.status, 0);
+            assert.match(failed.stderr, /Injected test failure/u);
+            assert.equal(fs.existsSync(config), false);
+            assert.equal(fs.existsSync(runtime), false);
+            for (const command of ["install", "update"]) {
+                const result = invokeCli(agentDir, [command, "--yes", ...flags], env);
                 assert.equal(result.status, 0, result.stderr);
+                assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
+                assert.equal(fs.existsSync(path.join(runtime, "specpi-runtime.json")), true);
             }
 
             const doctor = invokeCli(agentDir, ["doctor"], env);
