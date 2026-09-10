@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.20.1 - 2026-09-10
+
+- Enable `structural_search` by default on fresh installs and updates without a saved choice. Persist enablement transactionally and preserve explicit opt-outs; disable with `specpi update --structural-search=off`, then restart Pi.
+- Keep acquisition skip flags, malformed-configuration failures, selected-source limits and Command Guard approvals unchanged. Unsupported native hosts must pass `--structural-search=off` during install/update to avoid runtime acquisition failures.
+
 ## 0.20.0 - 2026-09-09
 
 - Add opt-in `structural_search` with pinned ast-grep 0.45.3, protected explicit source selection, bounded output and subprocess cleanup, and exact-call approval in Strict mode. Enable with `specpi update --structural-search=on`, then restart Pi.

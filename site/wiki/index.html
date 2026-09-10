@@ -55,20 +55,20 @@
                     <a href="#background-tasks"><span>14</span>Background tasks</a>
                     <a href="#structural-search"><span>15</span>Structural search</a>
                 </nav>
-                <div class="index-meta"><span>Reference · v0.20.0</span></div>
+                <div class="index-meta"><span>Reference · v0.20.1</span></div>
             </aside>
 
             <main id="main" class="wiki-content">
                 <header class="wiki-intro" id="overview">
-                    <p class="eyebrow">Documentation / v0.20.0</p>
+                    <p class="eyebrow">Documentation / v0.20.1</p>
                     <h1>Technical reference</h1>
                     <p class="wiki-summary">
                         Install with a plan. Keep one agent focused. Verify the work, then improve the harness from
                         evidence.
                     </p>
                     <p class="wiki-release-note">
-                        Release reference · v0.20.0. <a href="#structural-search">Structural search</a> is a new opt-in
-                        tool that matches code structures across formatting with pinned ast-grep.
+                        Release reference · v0.20.1. <a href="#structural-search">Structural search</a> is enabled by
+                        default and matches code structures across formatting with pinned ast-grep.
                         <a href="#accessibility">Accessibility checks</a> scan the current browser state for automated
                         WCAG findings. <a href="#background-tasks">Background tasks</a> run approved long commands while
                         other work continues. <a href="#vscode-chat">SpecPi Chat 0.5.1</a> adds an optional VS Code
@@ -91,17 +91,17 @@
                         that package installed.
                     </p>
                     <div class="terminal doc-terminal">
-                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.20.0</span></div>
+                        <div class="terminal-bar"><span>npm · all supported platforms</span><span>v0.20.1</span></div>
                         <pre><code>npm install --global specpi@latest
 specpi plan
 specpi install
 specpi doctor</code></pre>
                         <div class="terminal-bar secondary"><span>Pin a reviewed release</span></div>
-                        <pre><code>npm install --global specpi@0.20.0</code></pre>
+                        <pre><code>npm install --global specpi@0.20.1</code></pre>
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Linux, macOS, Git Bash</span>
                         </div>
-                        <pre><code>git clone --branch v0.20.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.20.1 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 ./specpi plan
 ./specpi install
@@ -109,7 +109,7 @@ cd SpecPi
                         <div class="terminal-bar secondary">
                             <span>Source-audited release · Windows PowerShell / cmd</span>
                         </div>
-                        <pre><code>git clone --branch v0.20.0 --depth 1 https://github.com/TannerMidd/SpecPi.git
+                        <pre><code>git clone --branch v0.20.1 --depth 1 https://github.com/TannerMidd/SpecPi.git
 cd SpecPi
 .\specpi.cmd plan
 .\specpi.cmd install
@@ -500,12 +500,12 @@ specpi doctor</code></pre>
                         supplied.
                     </p>
                     <p>
-                        Optional capabilities are opt-in and recorded separately.
                         <a class="text-link" href="#structural-search">Structural search</a> enablement lives in the
                         owned <code>&lt;agentDir&gt;/specpi/tool-integrations.json</code>; omitting
-                        <code>--structural-search</code> preserves the existing choice, and unrelated fields in that
-                        file are preserved. If that file becomes unparseable, plan reports it and install or update
-                        stops until you repair or remove it, or pass <code>--structural-search=on</code> or
+                        <code>--structural-search</code> enables it by default when no choice is saved, otherwise
+                        preserving the saved choice, including opt-outs. Unrelated fields in that file are preserved.
+                        If that file becomes unparseable, plan reports it and install or update stops until you repair
+                        or remove it, or pass <code>--structural-search=on</code> or
                         <code>--structural-search=off</code> to rewrite it.
                     </p>
                 </section>
@@ -771,22 +771,23 @@ code --install-extension .specpi-test/vscode/specpi-chat-0.5.1.vsix</code></pre>
                         <h2 id="structural-title">Structural search</h2>
                     </header>
                     <p>
-                        <code>structural_search</code> is an opt-in, read-only model tool built on pinned ast-grep
+                        <code>structural_search</code> is a default-on, read-only model tool built on pinned ast-grep
                         0.45.3. It matches code structures across formatting differences. It does not resolve types or
                         references, does not edit code, and does not replace literal search for comments, strings, and
                         filenames.
                     </p>
-                    <p>Enable it through the installer, then restart Pi:</p>
+                    <p>Provision it through the installer, then restart Pi:</p>
                     <div class="terminal doc-terminal">
-                        <div class="terminal-bar"><span>Opt in · omission preserves the current choice</span></div>
-                        <pre><code>specpi plan --structural-search=on
-specpi update --structural-search=on</code></pre>
+                        <div class="terminal-bar"><span>Default on · saved choices are preserved</span></div>
+                        <pre><code>specpi plan
+specpi update</code></pre>
                         <div class="terminal-bar secondary"><span>Disable and remove the private runtime</span></div>
                         <pre><code>specpi update --structural-search=off</code></pre>
                     </div>
                     <p>
-                        Use <code>install</code> for a fresh setup. <code>--yes</code> confirms the operation but does
-                        not opt in by itself, and <code>--skip-package-install</code> and
+                        Use <code>install</code> for a fresh setup or <code>--structural-search=on</code> to re-enable
+                        a saved opt-out. <code>--yes</code> confirms the operation without changing the selection.
+                        <code>--skip-package-install</code> and
                         <code>--skip-tool-install</code> skip acquisition without disabling an existing runtime.
                         Installing the Pi package directly does not provision the runtime; use the SpecPi installer.
                         Enablement lives in <code>&lt;agentDir&gt;/specpi/tool-integrations.json</code>, which the
@@ -835,8 +836,10 @@ specpi update --structural-search=on</code></pre>
                         Guard and Off permit these bounded reads; Strict asks for the exact call; locked or ambiguous
                         Guard state denies. Policy, working root, and enablement are rechecked before parsing. The
                         parser receives selected source over stdin with a fixed argument list, neutral configuration,
-                        and a minimal environment. Initial native platforms are Windows x64, macOS x64/arm64, and Linux
-                        glibc x64; other combinations report unavailable.
+                        and a minimal environment. Supported native platforms are Windows x64, macOS x64/arm64, and
+                        Linux glibc x64. On other hosts, pass <code>--structural-search=off</code> during install or
+                        update. Enabled acquisition or smoke failures abort the operation and roll back managed
+                        changes rather than silently disabling the tool.
                     </p>
                     <p class="doc-boundary">
                         <strong>Evidence boundary, not a sandbox.</strong> A partial, timed-out, cancelled, or
@@ -861,7 +864,7 @@ specpi update --structural-search=on</code></pre>
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
             >
-            <p>Pi harness / v0.20.0</p>
+            <p>Pi harness / v0.20.1</p>
             <nav aria-label="Footer navigation">
                 <a href="../single-agent/">Architecture</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
