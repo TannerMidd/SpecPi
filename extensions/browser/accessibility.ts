@@ -39,13 +39,16 @@ type Builder = { withTags(tags: string[]): Builder; include(selector: string): B
 
 export function reduceAccessibility(raw: Analysis, maxFindings = 50) {
     const severity = ["critical", "serious", "moderate", "minor", "unknown"];
+    // Rank an unrecognized impact as "unknown" so ordering matches the value that is reported.
+    const rank = (impact?: string | null) => {
+        const index = severity.indexOf(impact ?? "unknown");
+
+        return index === -1 ? severity.indexOf("unknown") : index;
+    };
+
     const reduce = (findings: Finding[]) =>
         [...findings]
-            .sort(
-                (a, b) =>
-                    severity.indexOf(a.impact ?? "unknown") - severity.indexOf(b.impact ?? "unknown") ||
-                    a.id.localeCompare(b.id),
-            )
+            .sort((a, b) => rank(a.impact) - rank(b.impact) || a.id.localeCompare(b.id))
             .slice(0, maxFindings)
             .map((finding) => ({
                 rule: sanitizeDiagnostic(finding.id, 100),
@@ -69,6 +72,10 @@ export function reduceAccessibility(raw: Analysis, maxFindings = 50) {
     // Reserve space for page/state metadata. Keep both categories represented.
     while (Buffer.byteLength(JSON.stringify(result)) > MAX_ACCESSIBILITY_BYTES - 4096) {
         const list = result.violations.length >= result.incomplete.length ? result.violations : result.incomplete;
+        if (!list.length) {
+            break;
+        }
+
         list.pop();
     }
 
