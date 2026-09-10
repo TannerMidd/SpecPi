@@ -6,7 +6,6 @@
 - Add `browser_accessibility` with axe-core 4.13.0 for the current browser state, fixed WCAG profiles, bounded violations and incomplete findings, and existing browser cancellation. Update the managed browser runtime to provision the scanner.
 - Stage, smoke, verify and roll back structural runtime changes with the installer; preserve enablement and modified runtimes, qualify native hosts in CI, and keep downloaded binaries out of the npm artifact. An unparseable owned configuration is reported with its path instead of aborting `plan`, and only an explicit `--structural-search` selection rewrites it.
 - Fix structural-search merge findings: preserve non-binary runtime changes using full-tree ownership checks, restore prior runtimes before failed cleanup, bound serialized enablement configuration, and dismiss expired/cancelled Strict approvals.
-- Defer MCP integration after reviewing the published adapter's cached approvals and automatic metadata/output retention against the restricted-mode requirements. No MCP runtime or server is added.
 
 ## 0.19.1 - 2026-09-08
 

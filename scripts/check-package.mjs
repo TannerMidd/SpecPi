@@ -52,7 +52,6 @@ const requiredFiles = [
     "extensions/structural-search/smoke.mjs",
     "extensions/browser/accessibility.ts",
     "docs/structural-search.md",
-    "docs/mcp-access.md",
     "docs/browser-testing.md",
     "docs/delegation/README.md",
     "docs/delegation/protocol.md",

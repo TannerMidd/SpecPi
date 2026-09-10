@@ -38,8 +38,6 @@ SpecPi extends Pi with chat, review tools, and focused delegation. Its principle
 
 Problem collection is off by default. Its records stay on your machine. Pi connects to your chosen model provider.
 
-Selective MCP integration remains [deferred after the published-adapter review](docs/mcp-access.md); this release installs no MCP server or adapter.
-
 ## Install
 
 Requires **Node.js 22.19+**, **npm**, and **Git**. SpecPi needs **Pi 0.84.4+**; the installer can add it if missing.
