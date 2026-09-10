@@ -197,7 +197,7 @@ The browser is not an operating-system or network sandbox. Use a container or VM
 
 ## Structural search
 
-Structural search is disabled until explicitly selected. The owned `specpi/tool-integrations.json` file stores nonsecret enablement; plan does not mutate it, updates back it up and roll it back with managed state, and uninstall preserves it. Runtime acquisition is private, pinned, script-free and transactional. Doctor checks source/runtime integrity before its offline fixture; unverified or modified prior runtime directories are preserved rather than deleted. No global executable search or PATH injection is used.
+Structural search is disabled until explicitly selected. The owned `specpi/tool-integrations.json` file stores nonsecret enablement; plan does not mutate it, updates back it up and roll it back with managed state, and uninstall preserves it. Unparseable content does not abort the non-mutating plan and does not silently enable anything: install and update stop and name the file unless an explicit `--structural-search` selection rewrites it, and the prior bytes go to the operation backup first. A configuration that is a link or not a bounded regular file stays a hard failure that no selection rewrites. The extension itself treats any unreadable configuration as disabled. Runtime acquisition is private, pinned, script-free and transactional. Doctor checks source/runtime integrity before its offline fixture; unverified or modified prior runtime directories are preserved rather than deleted. No global executable search or PATH injection is used.
 
 The parent captures explicit selected source with the existing snapshot path/private-store/link/descriptor/digest checks. A parent-only byte callback rechecks the original digest and clears its buffer after parsing. Existing workers gain no tool or byte API route. Files are capped at 1 MiB, selection at 8 MiB/200 files, pattern at 4 KiB, returned evidence at 24 KiB, raw stdout at 2 MiB and stderr at 8 KiB per call. Source bytes go to a reviewed native parser over stdin; only a neutral configuration is written to private scratch. Files containing secrets under ordinary source names are not automatically detectable.
 
@@ -206,7 +206,6 @@ Native execution uses a fixed argument array, `shell: false`, an absolute privat
 Selective MCP remains deferred because the reviewed published adapter lacks the required combination of every-call broker authority and bounded in-memory retention. No MCP transport, server, cache or authentication surface is installed by this change. See [MCP decision](docs/mcp-access.md).
 
 ## Website and automation
-
 
 The GitHub Pages workflow publishes the checked-in `site/` directory only after the shared browser test job succeeds for that checked-out revision. The loopback rendered-site server rejects traversal and symlink escapes. Tests block third-party requests, use a synthetic clipboard, and upload only public-site failure screenshots with three-day retention; no visual baselines are created automatically. Required browser commands fail rather than skip when prerequisites are unavailable. Strict no-emit browser type checking uses local pinned development declarations; third-party declaration bodies and other extension implementations are outside that scoped gate.
 

@@ -27,7 +27,7 @@ import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
 import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
-import { readIntegrations } from "../extensions/structural-search/config.mjs";
+import { integrationsFile, readIntegrations } from "../extensions/structural-search/config.mjs";
 import { changeStructuralRuntime, structuralRuntimeStatus } from "./structural-runtime.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -49,7 +49,7 @@ const browserRuntimeDir = path.join(stateDir, "browser-runtime");
 const browserRuntimeMarker = path.join(browserRuntimeDir, "specpi-runtime.json");
 const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
 const structuralSourceDir = path.join(repoRoot, "structural-runtime");
-const integrationsPath = path.join(stateDir, "tool-integrations.json");
+const integrationsPath = integrationsFile(agentDir);
 const structuralFiles = ["index.ts", "core.mjs", "config.mjs", "smoke.mjs"];
 function smokeStructuralRuntime(directory) {
     return run(process.execPath, [path.join(repoRoot, "extensions", "structural-search", "smoke.mjs"), directory], {
@@ -1238,8 +1238,45 @@ function assertSources() {
     readJson(settingsPath, {});
 }
 
+// An explicit selection may rewrite an unparseable owned file; its prior bytes go to the operation backup.
+// Omission fails closed rather than silently discarding unrelated fields nobody can read.
+function readIntegrationsForOperation(selection) {
+    try {
+        return readIntegrations(agentDir);
+    } catch (error) {
+        if (!error.corruptIntegrations) {
+            throw error;
+        }
+
+        if (selection === undefined) {
+            throw new Error(
+                `${error.message}\nRepair or remove it, or rerun with --structural-search=on or --structural-search=off to rewrite it.`,
+            );
+        }
+
+        return { schema: 1, structuralSearch: { enabled: selection } };
+    }
+}
+
 function printPlan(options) {
-    const structuralEnabled = options.structuralSearch ?? readIntegrations(agentDir).structuralSearch.enabled;
+    let structuralEnabled = options.structuralSearch;
+    let structuralNote;
+    try {
+        const current = readIntegrations(agentDir).structuralSearch.enabled;
+        structuralEnabled ??= current;
+    } catch (error) {
+        if (!error.corruptIntegrations) {
+            throw error;
+        }
+
+        // plan stays non-mutating and still reports: a repairable owned file must not abort the preview.
+        structuralNote =
+            structuralEnabled === undefined
+                ? `${error.message}\n  Repair or remove it, or rerun with --structural-search=on or --structural-search=off to rewrite it.`
+                : `${error.message}\n  The selection above replaces it during install or update.`;
+        structuralEnabled ??= false;
+    }
+
     const shellRc = detectShellRc();
     const manageShell = !options.skipShell && Boolean(shellRc);
     console.log(`SpecPi ${VERSION} installation plan
@@ -1264,11 +1301,13 @@ Managed files:`);
         `\nStructural search: ${structuralEnabled ? "enabled (ast-grep 0.45.3; private runtime; no global PATH change)" : "disabled"}`,
     );
     console.log(`  ${integrationsPath} (owned enablement; existing unrelated fields preserved)`);
+    if (structuralNote) {
+        console.log(`  ${structuralNote}`);
+    }
+
     if (structuralEnabled && (options.skipPackageInstall || options.skipToolInstall)) {
         console.log("  structural runtime acquisition skipped by explicit flag");
     }
-
-    console.log("  MCP integration deferred: the reviewed adapter did not pass the restricted-mode gate.");
 
     console.log("\nSettings ownership:");
     console.log("  theme defaults to specpi-spec; existing valid user choices are preserved");
@@ -1429,7 +1468,7 @@ async function installOrUpdate(options, update) {
     const preservedRetiredTools = [];
     try {
         const previousManifest = readManifest(update);
-        const integrations = readIntegrations(agentDir);
+        const integrations = readIntegrationsForOperation(options.structuralSearch);
         const structuralEnabled = options.structuralSearch ?? integrations.structuralSearch.enabled;
         if (!update && previousManifest) {
             throw new Error(`SpecPi is already installed. Run ${CLI} update.`);
@@ -1643,7 +1682,12 @@ async function installOrUpdate(options, update) {
         );
     } catch (error) {
         const rollbackErrors = [];
-        rollbackErrors.push(...(structuralTransaction?.rollback() || []));
+        try {
+            rollbackErrors.push(...(structuralTransaction?.rollback() || []));
+        } catch (rollbackError) {
+            rollbackErrors.push(`structural runtime rollback: ${rollbackError.message}`);
+        }
+
         try {
             rollbackErrors.push(...(browserRuntimeTransaction?.rollback() || []));
         } catch (rollbackError) {
@@ -1901,7 +1945,11 @@ async function uninstall(options) {
             }
         }
 
-        rollbackErrors.push(...(structuralTransaction?.rollback() || []));
+        try {
+            rollbackErrors.push(...(structuralTransaction?.rollback() || []));
+        } catch (rollbackError) {
+            rollbackErrors.push(`structural runtime rollback: ${rollbackError.message}`);
+        }
 
         if (transaction) {
             try {
@@ -2107,8 +2155,8 @@ async function doctor() {
             );
             console.log(smoke.stdout.trim());
         }
-    } catch {
-        errors.push("Structural search configuration or smoke failed.");
+    } catch (error) {
+        errors.push(error?.corruptIntegrations ? error.message : "Structural search configuration or smoke failed.");
     }
 
     const runtimeStatus = browserRuntimeStatus();

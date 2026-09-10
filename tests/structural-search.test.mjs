@@ -138,11 +138,30 @@ test("configuration is opt-in and rejects malformed and linked inputs", (t) => {
     const file = path.join(root, "specpi", "tool-integrations.json");
     fs.writeFileSync(file, '{"schema":1,"structuralSearch":{"enabled":true},"other":7}');
     assert.equal(readIntegrations(root).other, 7);
-    fs.writeFileSync(file, '{"schema":1,"structuralSearch":{"enabled":"yes"}}');
-    assert.throws(() => readIntegrations(root));
+    // Content corruption is repairable by an explicit selection and names the file; link/shape failures are not.
+    const thrown = (fn) => {
+        try {
+            fn();
+        } catch (error) {
+            return error;
+        }
+
+        assert.fail("expected a rejected configuration");
+    };
+
+    for (const content of ['{"schema":1,"structuralSearch":{"enabled":"yes"}}', "{ broken", '{"schema":2}']) {
+        fs.writeFileSync(file, content);
+        const error = thrown(() => readIntegrations(root));
+        assert.equal(error.corruptIntegrations, true, content);
+        assert.ok(error.message.includes(file), error.message);
+    }
+
     fs.unlinkSync(file);
     fs.linkSync(path.join(root, "sample.ts"), file);
-    assert.throws(() => readIntegrations(root), /regular file/u);
+    const shape = thrown(() => readIntegrations(root));
+    assert.match(shape.message, /regular file/u);
+    assert.equal(shape.corruptIntegrations, undefined);
+    assert.ok(shape.message.includes(file), shape.message);
 });
 test("structural runtime promotion, rollback, removal and integrity are transactional without acquisition", (t) => {
     const { root, runtime } = fixture(t);

@@ -2514,6 +2514,58 @@ test("structural enablement is non-mutating in plan, survives update, rolls back
     }
 });
 
+test("an unparseable owned configuration keeps plan working and is repaired only by an explicit selection", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-structural-corrupt-"));
+    const agentDir = path.join(root, "agent");
+    const fakeBin = path.join(root, "bin");
+    const config = path.join(agentDir, "specpi", "tool-integrations.json");
+    installFakePi(fakeBin);
+    const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
+    const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
+    try {
+        fs.mkdirSync(path.dirname(config), { recursive: true });
+        fs.writeFileSync(config, "{ broken");
+        // plan is non-mutating and must still report rather than abort.
+        const plan = invokeCli(agentDir, ["plan", ...skip], env);
+        assert.equal(plan.status, 0, plan.stderr);
+        assert.match(plan.stdout, /Structural search: disabled/u);
+        assert.ok(plan.stdout.includes(config), plan.stdout);
+        assert.match(plan.stdout, /--structural-search=on/u);
+        assert.equal(fs.readFileSync(config, "utf8"), "{ broken");
+
+        // Omission fails closed, names the file, and leaves it untouched.
+        const blocked = invokeCli(agentDir, ["install", "--yes", ...skip], env);
+        assert.notEqual(blocked.status, 0);
+        assert.ok(blocked.stderr.includes(config), blocked.stderr);
+        assert.match(blocked.stderr, /Repair or remove it/u);
+        assert.equal(fs.readFileSync(config, "utf8"), "{ broken");
+
+        // An explicit selection rewrites it; the prior bytes stay in the operation backup.
+        const repaired = invokeCli(agentDir, ["install", "--yes", "--structural-search=off", ...skip], env);
+        assert.equal(repaired.status, 0, repaired.stderr);
+        assert.deepEqual(JSON.parse(fs.readFileSync(config, "utf8")), {
+            schema: 1,
+            structuralSearch: { enabled: false },
+        });
+        const backups = path.join(agentDir, "specpi", "backups");
+        const saved = fs
+            .readdirSync(backups)
+            .map((entry) => path.join(backups, entry, "tool-integrations.json"))
+            .filter((entry) => fs.existsSync(entry));
+        assert.equal(saved.length, 1);
+        assert.equal(fs.readFileSync(saved[0], "utf8"), "{ broken");
+
+        // A link or wrong file shape stays a hard failure that no selection can rewrite.
+        fs.rmSync(config);
+        fs.symlinkSync(path.join(root, "elsewhere.json"), config);
+        const linked = invokeCli(agentDir, ["update", "--yes", "--structural-search=on", ...skip], env);
+        assert.notEqual(linked.status, 0);
+        assert.match(linked.stderr, /must not be a link/u);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test("managed browser runtime completes install, reuse update, doctor, and uninstall with fake browser", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-browser-lifecycle-"));
     const agentDir = path.join(root, "agent");
