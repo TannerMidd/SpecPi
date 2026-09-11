@@ -1,8 +1,16 @@
 import { markdownPathLabel } from "./task-contract.mjs";
+import {
+    MAX_CHANGED_SINCE,
+    MAX_GATES,
+    describeResolution,
+    normalizeCitedGates,
+    resolveRequirement,
+} from "./ledger.mjs";
 
 const MAX_REQUIREMENTS = 16;
 const MAX_LIST = 12;
 const MAX_REQUIREMENT_ID = 120;
+const RESOLUTION_STATES = ["proven", "stale", "failed", "unavailable", "indeterminate"];
 
 function compact(value, maximum = 360) {
     return String(value ?? "")
@@ -71,6 +79,32 @@ function boundedTaskContract(value) {
     };
 }
 
+export function boundedVerification(value) {
+    if (!value?.active || !value.gates || typeof value.gates !== "object" || Array.isArray(value.gates)) {
+        return { active: false, gates: {} };
+    }
+
+    const gates = {};
+    for (const id of Object.keys(value.gates).sort().slice(0, MAX_GATES)) {
+        const resolution = value.gates[id];
+        const state = RESOLUTION_STATES.includes(resolution?.state) ? resolution.state : "unavailable";
+        gates[id] = {
+            state,
+            exitCode: Number.isInteger(resolution?.exitCode) ? resolution.exitCode : undefined,
+            command: compact(resolution?.command, 240),
+            startedAt: compact(resolution?.startedAt, 40),
+            changedSince: Array.isArray(resolution?.changedSince)
+                ? resolution.changedSince
+                      .map((item) => boundedPath(item))
+                      .filter(Boolean)
+                      .slice(0, MAX_CHANGED_SINCE)
+                : [],
+        };
+    }
+
+    return { active: true, gates };
+}
+
 function contractRequirements(facts) {
     const contract = boundedTaskContract(facts?.taskContract);
     if (!contract) {
@@ -106,6 +140,7 @@ export function validateChallengeSubmission(value, facts = {}) {
         throw new Error(`Completion challenge requires 1-${MAX_REQUIREMENTS} requirement assessments`);
     }
 
+    const verification = boundedVerification(facts?.verification);
     const expectedRequirements = contractRequirements(facts);
     const requirements = value.requirements.map((item) => {
         const id = boundedRequirementId(item?.id);
@@ -134,11 +169,32 @@ export function validateChallengeSubmission(value, facts = {}) {
             throw new Error("A proven requirement must cite concise evidence");
         }
 
+        const cited = normalizeCitedGates(item?.gates);
+        if (verification.active) {
+            for (const gate of cited) {
+                if (!Object.hasOwn(verification.gates, gate)) {
+                    throw new Error(`Cited gate is not declared for this project: ${gate}`);
+                }
+            }
+        } else if (cited.length > 0) {
+            throw new Error("Gates cannot be cited while verification is inactive");
+        }
+
+        const verified = resolveRequirement(cited, verification);
+        // The model's own status stays on the record, but it cannot award itself proof: a claim of `proven` survives
+        // only when the ledger independently resolves every cited gate against the current worktree.
+        if (verified && item.status === "proven" && verified.state !== "proven") {
+            throw new Error(
+                `Requirement ${id || requirement.slice(0, 60)} claims proof the ledger does not support: ${describeResolution(verified)}`,
+            );
+        }
+
         return {
             ...(expectedRequirements ? { id, acceptance: expected.acceptance } : {}),
             requirement,
             status: item.status,
             evidence,
+            ...(verification.active ? { gates: cited, verified } : {}),
         };
     });
     if (expectedRequirements) {
@@ -170,6 +226,18 @@ export function validateChallengeSubmission(value, facts = {}) {
         const unresolved = requirements.some((item) => item.status !== "proven");
         if (unresolved) {
             throw new Error("Ready verdict rejected: one or more requirements remain unresolved");
+        }
+
+        // Defence in depth. The per-requirement rule above already refuses a `proven` claim the ledger does not
+        // support, so this is normally unreachable; it exists so that relaxing that rule cannot silently make a ready
+        // verdict available without gate backing.
+        if (verification.active) {
+            const unverified = requirements.find((item) => item.verified?.state !== "proven");
+            if (unverified) {
+                throw new Error(
+                    `Ready verdict rejected: ${unverified.id || "a requirement"} is not backed by a current passing gate (${describeResolution(unverified.verified)})`,
+                );
+            }
         }
 
         if (contradictions.length > 0) {
@@ -207,6 +275,7 @@ export function validateChallengeSubmission(value, facts = {}) {
         validationGaps,
         residualRisks,
         nextAction,
+        ...(verification.active ? { verification } : {}),
     };
 }
 
@@ -235,6 +304,7 @@ export function boundedChallengeFacts(value = {}) {
         taskContractDigest: taskContractDigest ? compact(taskContractDigest, 64) : undefined,
         challengeGeneration: challengeGeneration ? compact(challengeGeneration, 64) : undefined,
         scopeTaskStale: Boolean(value.scopeTaskStale),
+        verification: boundedVerification(value.verification),
     };
 }
 
@@ -271,6 +341,24 @@ export function challengePrompt(generation, facts) {
         );
     }
 
+    if (bounded.verification.active) {
+        const ids = Object.keys(bounded.verification.gates);
+        lines.push(
+            "",
+            "Verification gates (harness-observed; you cannot author these):",
+            ...ids.map((id) => {
+                const gate = bounded.verification.gates[id];
+                const exit = gate.exitCode === undefined ? "not run" : `exit ${gate.exitCode}`;
+                const changed = gate.changedSince.length
+                    ? `; changed since: ${gate.changedSince.map(markdownPathLabel).join(", ")}`
+                    : "";
+
+                return `- ${id}: ${gate.state} (${exit})${changed}`;
+            }),
+            "Cite gate IDs in the gates array of each requirement assessment. A requirement may be marked proven only when every gate it cites is currently `proven`; a `stale` gate passed against code that has since changed and proves nothing.",
+        );
+    }
+
     if (bounded.experiment) {
         lines.push(
             `Experiment: ${bounded.experiment.name} (${bounded.experiment.id.slice(0, 8)})`,
@@ -297,7 +385,25 @@ export function renderChallengeMarkdown(result, metadata = {}) {
     lines.push("", "### Requirements");
     for (const item of result.requirements) {
         const id = item.id ? ` ${item.id}` : "";
-        lines.push(`- **${item.status}**${id} — ${item.requirement}${item.evidence ? ` — ${item.evidence}` : ""}`);
+        const ledger = item.verified ? ` — ledger: ${describeResolution(item.verified)}` : "";
+        lines.push(
+            `- **${item.status}**${id} — ${item.requirement}${item.evidence ? ` — ${item.evidence}` : ""}${ledger}`,
+        );
+    }
+
+    if (result.verification?.active) {
+        lines.push("", "### Verification gates");
+        const ids = Object.keys(result.verification.gates);
+        lines.push(
+            ...(ids.length > 0
+                ? ids.map((id) => {
+                      const gate = result.verification.gates[id];
+                      const exit = gate.exitCode === undefined ? "not run" : `exit ${gate.exitCode}`;
+
+                      return `- \`${markdownPathLabel(id)}\` — ${gate.state} (${exit})`;
+                  })
+                : ["- None declared."]),
+        );
     }
 
     const sections = [
@@ -316,7 +422,12 @@ export function renderChallengeMarkdown(result, metadata = {}) {
         lines.push("", "### Next action", "", result.nextAction);
     }
 
-    lines.push("", "> This is a model-authored challenge result, not independent verification.");
+    lines.push(
+        "",
+        result.verification?.active
+            ? "> The assessments and prose above are model-authored. The gate states are harness-observed exit codes bound to the worktree each check ran against, and are not a claim that the checks themselves are sufficient."
+            : "> This is a model-authored challenge result, not independent verification.",
+    );
 
     return lines.join("\n");
 }

@@ -18,8 +18,9 @@ test("workflow-controls extension composes scope and completion challenge lifecy
     const match = output.match(/WORKFLOW_CONTROLS_HARNESS=(.+)/u);
     assert.ok(match, output);
     const report = JSON.parse(match[1]);
-    assert.deepEqual(report.commands, ["challenge", "experiment", "guard", "scope", "task"]);
+    assert.deepEqual(report.commands, ["challenge", "experiment", "guard", "scope", "task", "verify"]);
     assert.equal(report.toolRegistered, true);
+    assert.equal(report.runCheckRegistered, true);
     assert.equal(report.nestedCwdOutOfScopeDenied, true);
     assert.equal(report.nestedCwdInScopeAllowed, true);
     assert.equal(report.denied, true);
@@ -64,6 +65,15 @@ test("workflow-controls extension composes scope and completion challenge lifecy
         "treeDelayedHandoffIgnored",
         "treeDelayedRecheckIgnored",
         "shutdownDelayedChallengeIgnored",
+        "gatesDiscovered",
+        "gateRecordedExitCode",
+        "failingGateRecorded",
+        "unknownGateRejected",
+        "challengeSawGates",
+        "provenAccepted",
+        "staleProofRejected",
+        "statusPublishedStale",
+        "ledgerCleared",
     ]) {
         assert.equal(report[observation], true, observation);
     }

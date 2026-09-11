@@ -587,3 +587,8 @@ test("task contract smoke validator covers branch and path controls", async () =
     const message = await runWorkflowControlsSmoke("task-contract-smoke");
     assert.match(message, /^task-contract-smoke passed:/u);
 });
+
+test("verification ledger smoke validator covers gate discovery and stale proof", async () => {
+    const message = await runWorkflowControlsSmoke("verification-ledger-smoke");
+    assert.match(message, /^verification-ledger-smoke passed:/u);
+});

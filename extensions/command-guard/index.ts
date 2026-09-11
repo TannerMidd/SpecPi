@@ -186,7 +186,22 @@ export default function registerCommandGuard(
     let backgroundSubscription: (() => void) | undefined;
     let guardStateSubscription: (() => void) | undefined;
     let structuralSubscription: (() => void) | undefined;
+    let verificationSubscription: (() => void) | undefined;
     const subscribeGuardState = () => {
+        // Verification gates run through an explicit argument array rather than a shell, so there is no command string
+        // to parse: this reports policy only, and the caller still confirms the exact executable and arguments.
+        verificationSubscription ??= pi.events?.on?.("specpi:verification-admission", (request: any) => {
+            request?.reply?.({
+                mode: state.mode,
+                generation: state.generation,
+                action:
+                    !state.ready || state.startupFailed || state.mode === "locked"
+                        ? "deny"
+                        : state.mode === "strict"
+                          ? "ask"
+                          : "allow",
+            });
+        });
         structuralSubscription ??= pi.events?.on?.("specpi:structural-admission", (request: any) => {
             request?.reply?.({
                 mode: state.mode,
@@ -384,6 +399,8 @@ export default function registerCommandGuard(
         backgroundSubscription = undefined;
         structuralSubscription?.();
         structuralSubscription = undefined;
+        verificationSubscription?.();
+        verificationSubscription = undefined;
         if (typeof guardStateSubscription === "function") {
             guardStateSubscription();
             guardStateSubscription = undefined;

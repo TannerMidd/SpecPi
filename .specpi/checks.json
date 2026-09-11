@@ -1,0 +1,33 @@
+{
+    "schema": 1,
+    "gates": {
+        "check": {
+            "command": "npm",
+            "args": ["run", "check"],
+            "windows": { "command": "cmd.exe", "args": ["/c", "npm", "run", "check"] },
+            "timeoutMs": 900000,
+            "label": "Full repository validation: format, syntax, types, tests, package"
+        },
+        "unit": {
+            "command": "npm",
+            "args": ["test"],
+            "windows": { "command": "cmd.exe", "args": ["/c", "npm", "test"] },
+            "timeoutMs": 600000,
+            "label": "Every Node test suite under tests/"
+        },
+        "types": {
+            "command": "npm",
+            "args": ["run", "check:types"],
+            "windows": { "command": "cmd.exe", "args": ["/c", "npm", "run", "check:types"] },
+            "timeoutMs": 300000,
+            "label": "TypeScript check for the browser and tool extensions"
+        },
+        "format": {
+            "command": "npm",
+            "args": ["run", "format:check"],
+            "windows": { "command": "cmd.exe", "args": ["/c", "npm", "run", "format:check"] },
+            "timeoutMs": 300000,
+            "label": "Prettier and ESLint, check only"
+        }
+    }
+}

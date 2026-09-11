@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.21.0 - 2026-09-10
+
+- Add verification gates: declare a project's checks in `.specpi/checks.json`, run one with `run_check` or `/verify run`, and record its harness-observed exit code against a fingerprint of the worktree it finished on. Gates execute an explicit argument array with no shell; model-initiated runs are confirmed per gate spelling and on every call under Strict Guard. A `windows` override replaces the command and arguments together, and a gate naming a `.cmd` or `.bat` is rejected when declared, because a shell-free spawn cannot start one.
+- Derive completion-challenge requirement verification from that ledger instead of accepting the model's `status`. A requirement claiming proof must cite gates that currently resolve `proven`; a gate that passed before a later edit resolves `stale` and names the changed paths. Gates are re-resolved when the submission arrives, not only when the challenge prompt was built.
+- Leave every existing workflow unchanged where no gates are declared. Add `/verify`, a `verification-ledger-smoke` validator, and Command Guard's policy-only `specpi:verification-admission` seam.
+- Publish a `specpi-verification` session status counting how many declared gates currently hold, refreshed each time the agent settles so a stale gate is visible rather than aging into an unchallenged pass. SpecPi Chat renders it in the runtime status panel and needs no update for this release.
+- Declare SpecPi's own gates in `.specpi/checks.json`.
+
 ## 0.20.1 - 2026-09-10
 
 - Enable `structural_search` by default on fresh installs and updates without a saved choice. Persist enablement transactionally and preserve explicit opt-outs; disable with `specpi update --structural-search=off`, then restart Pi.

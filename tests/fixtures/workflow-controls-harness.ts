@@ -30,11 +30,13 @@ const { default: registerWorkflowControls } = await import("../../extensions/wor
 const { default: registerCommandGuard } = await import("../../extensions/command-guard/index.ts");
 
 const events = new Map<string, any[]>();
+const eventSubscribers = new Map<string, any[]>();
 const commands = new Map<string, any>();
 const tools = new Map<string, any>();
 const entries: any[] = [];
 const messages: any[] = [];
 const notifications: any[] = [];
+const statuses: any[] = [];
 const emitted: any[] = [];
 const selectAnswers: string[] = [];
 const renderers = new Map<string, any>();
@@ -63,6 +65,19 @@ const pi: any = {
     events: {
         emit(name: string, data: any) {
             emitted.push({ name, data });
+            for (const handler of eventSubscribers.get(name) || []) {
+                handler(data);
+            }
+        },
+        on(name: string, handler: any) {
+            eventSubscribers.set(name, [...(eventSubscribers.get(name) || []), handler]);
+
+            return () => {
+                eventSubscribers.set(
+                    name,
+                    (eventSubscribers.get(name) || []).filter((item) => item !== handler),
+                );
+            };
         },
     },
     async exec(command: string, args: string[], options: any = {}) {
@@ -116,7 +131,9 @@ const ctx: any = {
         notify(message: string, level: string) {
             notifications.push({ message, level });
         },
-        setStatus() {},
+        setStatus(key: string, text: unknown) {
+            statuses.push({ key, text });
+        },
         setWidget() {},
         async editor() {
             return editorValue;
@@ -764,10 +781,105 @@ await pendingShutdownChallenge;
 const shutdownDelayedChallengeIgnored =
     entries.length === entriesBeforeShutdown && messages.length === messagesBeforeShutdown;
 
+// Verification ledger: a gate the harness runs itself, a proof bound to the worktree it finished on, and the loss of
+// that proof to a later edit. Declared only now so every assertion above ran with verification inactive.
+fs.mkdirSync(path.join(repository, ".specpi"), { recursive: true });
+fs.writeFileSync(
+    path.join(repository, ".specpi", "checks.json"),
+    JSON.stringify({
+        schema: 1,
+        gates: {
+            ok: { command: process.execPath, args: ["-e", "process.exit(0)"] },
+            bad: { command: process.execPath, args: ["-e", "process.exit(3)"] },
+        },
+    }),
+);
+branch = [];
+ctx.cwd = repository;
+await runHandlers("session_start");
+await commands.get("verify").handler("status", ctx);
+const gatesDiscovered = notifications.at(-1)?.message.includes("ok: unavailable") === true;
+
+await tools.get("run_check").execute("gate-ok", { gate: "ok" }, undefined, undefined, ctx);
+const okRecord = entries.filter((entry) => entry.customType === "specpi-verification-ledger").at(-1)?.data;
+const gateRecordedExitCode = okRecord?.kind === "recorded" && okRecord.record.exitCode === 0;
+
+const failed = await tools.get("run_check").execute("gate-bad", { gate: "bad" }, undefined, undefined, ctx);
+const failingGateRecorded = failed.details.exitCode === 3 && failed.details.state === "failed";
+
+let unknownGateRejected = false;
+try {
+    await tools.get("run_check").execute("gate-missing", { gate: "nope" }, undefined, undefined, ctx);
+} catch (error) {
+    unknownGateRejected = /Unknown gate/u.test(String(error));
+}
+
+await commands.get("challenge").handler("", ctx);
+const verifyActivation = entries
+    .filter((entry) => entry.customType === "specpi-completion-challenge" && entry.data.kind === "active")
+    .at(-1)?.data;
+const challengeSawGates = verifyActivation?.facts?.verification?.gates?.ok?.state === "proven";
+const provenSubmission = {
+    generation: verifyActivation.generation,
+    verdict: "incomplete",
+    requirements: [{ requirement: "Gate backed", status: "proven", evidence: "ok exited 0", gates: ["ok"] }],
+    contradictions: [],
+    falsePositiveChecks: [],
+    scopeFindings: [],
+    validationGaps: [],
+    residualRisks: [],
+    nextAction: "Human review",
+};
+const provenResult = await tools
+    .get("submit_completion_challenge")
+    .execute("verify-proven", provenSubmission, undefined, undefined, ctx);
+const provenAccepted = provenResult.details.verdict === "incomplete";
+
+// The edit lands after the gate ran and before the next submission, which is the sequence the ledger exists to catch.
+fs.writeFileSync(path.join(repository, "src", "inside.txt"), "edited after the gate\n");
+await commands.get("challenge").handler("", ctx);
+const staleActivation = entries
+    .filter((entry) => entry.customType === "specpi-completion-challenge" && entry.data.kind === "active")
+    .at(-1)?.data;
+let staleProofRejected = false;
+try {
+    await tools
+        .get("submit_completion_challenge")
+        .execute(
+            "verify-stale",
+            { ...provenSubmission, generation: staleActivation.generation },
+            undefined,
+            undefined,
+            ctx,
+        );
+} catch (error) {
+    staleProofRejected = /claims proof the ledger does not support: stale/u.test(String(error));
+}
+
+// The status string is what SpecPi Chat renders in its runtime status area, so it has to carry the stale count
+// rather than only a pass tally that would read as current proof.
+await commands.get("verify").handler("status", ctx);
+const staleStatus = statuses.filter((item) => item.key === "specpi-verification").at(-1)?.text ?? "";
+const statusPublishedStale = /verify · \d+\/\d+ proven/u.test(staleStatus) && staleStatus.includes("stale");
+
+await commands.get("verify").handler("clear", ctx);
+const ledgerCleared =
+    entries.filter((entry) => entry.customType === "specpi-verification-ledger").at(-1)?.data.kind === "cleared";
+
 process.stdout.write(
     `WORKFLOW_CONTROLS_HARNESS=${JSON.stringify({
         commands: [...commands.keys()].sort(),
         toolRegistered: tools.has("submit_completion_challenge"),
+        runCheckRegistered: tools.has("run_check"),
+        gatesDiscovered,
+        gateRecordedExitCode,
+        failingGateRecorded,
+        unknownGateRejected,
+        challengeSawGates,
+        provenAccepted,
+        staleProofRejected,
+        statusPublishedStale,
+        ledgerCleared,
         nestedCwdOutOfScopeDenied,
         nestedCwdInScopeAllowed,
         denied,

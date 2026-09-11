@@ -20,6 +20,7 @@ import {
     readTaskContract,
     taskContractScopeViolations,
 } from "./task-contract.mjs";
+import { captureVerificationSnapshot, createLedgerRecord, findGate, readGateConfig, resolveLedger } from "./ledger.mjs";
 
 function run(command, args, options = {}) {
     const result = spawnSync(command, args, {
@@ -221,7 +222,75 @@ async function taskContractSmoke() {
     }
 }
 
+async function verificationLedgerSmoke() {
+    const root = repositoryFixture("specpi-verification-ledger-smoke-");
+    try {
+        fs.mkdirSync(path.join(root, ".specpi"), { recursive: true });
+        fs.writeFileSync(
+            path.join(root, ".specpi", "checks.json"),
+            JSON.stringify({ schema: 1, gates: { ok: { command: process.execPath, args: ["--version"] } } }),
+        );
+        const config = readGateConfig(root);
+        assert.equal(config.active, true);
+        const gate = findGate(config, "ok");
+        assert.ok(gate, "the declared gate must be discoverable");
+
+        fs.writeFileSync(path.join(root, "src", "inside.txt"), "edited before the gate\n");
+        const snapshot = await captureVerificationSnapshot(root, run);
+        const record = createLedgerRecord({ gate, exitCode: 0, snapshot, durationMs: 1 });
+        const proven = resolveLedger(config, new Map([["ok", record]]), snapshot);
+        assert.equal(proven.gates.ok.state, "proven");
+        assert.equal(
+            validateChallengeSubmission(
+                {
+                    verdict: "incomplete",
+                    requirements: [{ requirement: "Gate backed", status: "proven", evidence: "ok", gates: ["ok"] }],
+                    contradictions: [],
+                    falsePositiveChecks: [],
+                    scopeFindings: [],
+                    validationGaps: [],
+                    residualRisks: [],
+                    nextAction: "Human review",
+                },
+                { verification: proven },
+            ).requirements[0].verified.state,
+            "proven",
+        );
+
+        fs.writeFileSync(path.join(root, "src", "inside.txt"), "edited after the gate\n");
+        const later = await captureVerificationSnapshot(root, run);
+        const stale = resolveLedger(config, new Map([["ok", record]]), later);
+        assert.equal(stale.gates.ok.state, "stale");
+        assert.deepEqual(stale.gates.ok.changedSince, ["src/inside.txt"]);
+        assert.throws(
+            () =>
+                validateChallengeSubmission(
+                    {
+                        verdict: "incomplete",
+                        requirements: [{ requirement: "Gate backed", status: "proven", evidence: "ok", gates: ["ok"] }],
+                        contradictions: [],
+                        falsePositiveChecks: [],
+                        scopeFindings: [],
+                        validationGaps: [],
+                        residualRisks: [],
+                        nextAction: "Human review",
+                    },
+                    { verification: stale },
+                ),
+            /claims proof the ledger does not support: stale/,
+        );
+
+        return "verification-ledger-smoke passed: gate discovery, exit-code binding, and stale-proof rejection verified";
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+}
+
 export async function runWorkflowControlsSmoke(name) {
+    if (name === "verification-ledger-smoke") {
+        return verificationLedgerSmoke();
+    }
+
     if (name === "scope-drift-monitor-smoke") {
         return scopeSmoke();
     }

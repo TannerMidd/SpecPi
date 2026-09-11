@@ -238,8 +238,11 @@ try {
         "WORKFLOW_CONTROLS_HARNESS=",
         "workflow extension harness",
     );
-    assert.deepEqual(workflowReport.commands, ["challenge", "experiment", "guard", "scope", "task"]);
+    assert.deepEqual(workflowReport.commands, ["challenge", "experiment", "guard", "scope", "task", "verify"]);
     assert.equal(workflowReport.toolRegistered, true);
+    assert.equal(workflowReport.runCheckRegistered, true);
+    assert.equal(workflowReport.gateRecordedExitCode, true);
+    assert.equal(workflowReport.staleProofRejected, true);
     assert.equal(workflowReport.emittedScopeStatus, true);
 
     const wishlistReport = readHarnessReport(

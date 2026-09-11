@@ -42,6 +42,20 @@ import {
     taskContractScopeViolations,
     validateTaskContract,
 } from "./task-contract.mjs";
+import {
+    MAX_CITED_GATES,
+    VERIFICATION_LEDGER_ENTRY,
+    captureVerificationSnapshot,
+    createLedgerRecord,
+    describeResolution,
+    findGate,
+    gateCommandLine,
+    gateConfigLabel,
+    readGateConfig,
+    resolveGate,
+    resolveLedger,
+    restoreLedger,
+} from "./ledger.mjs";
 
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
 const stateDir = path.join(agentDir, "specpi");
@@ -49,6 +63,7 @@ const SCOPE_ENTRY = "specpi-scope-state";
 const CHALLENGE_ENTRY = "specpi-completion-challenge";
 const TASK_HANDOFF_ENTRY = "specpi-task-handoff";
 const SCOPE_STATUS = "specpi-scope";
+const VERIFICATION_STATUS = "specpi-verification";
 const MAX_PENDING_SCOPE = 40;
 // `read` is the one documented Pi seam that cannot mutate the worktree. Every other tool, including extension-provided
 // ones, still gets snapshotted because an unrecognised tool is exactly the case post-hoc detection exists for.
@@ -101,6 +116,13 @@ interface TaskHandoffEntryData {
     contractId: string;
     contractDigest: string;
     indeterminate: boolean;
+    createdAt: string;
+}
+
+interface LedgerEntryData {
+    kind: "recorded" | "cleared";
+    record?: any;
+    reason?: string;
     createdAt: string;
 }
 
@@ -271,6 +293,20 @@ function safeMessage(error: unknown) {
         .slice(0, 500);
 }
 
+const MAX_GATE_OUTPUT = 4000;
+
+// A gate's output reaches the model and the transcript. Keep the tail, because test runners put their summary last,
+// and strip the control characters that would otherwise let output forge structure around itself.
+function gateOutput(result: any): string {
+    const combined = `${result?.stdout ?? ""}${result?.stderr ?? ""}`;
+    const sanitized = combined.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, " ");
+    if (sanitized.length <= MAX_GATE_OUTPUT) {
+        return sanitized.trim();
+    }
+
+    return `…${sanitized.slice(-MAX_GATE_OUTPUT).trim()}`;
+}
+
 export default function workflowControls(pi: ExtensionAPI) {
     let scope = emptyScope(canonicalRoot(process.cwd()));
     let latestTaskContract: any | undefined;
@@ -281,6 +317,12 @@ export default function workflowControls(pi: ExtensionAPI) {
     let experimentBusy = false;
     let latestSnapshot: any;
     let sessionGeneration = 0;
+    let gateConfig: any = { active: false, root: "", gates: [] };
+    let gateConfigError: string | undefined;
+    let ledgerRecords = new Map<string, any>();
+    let gateApprovalGeneration = 0;
+    let gateRunning = false;
+    const gateApprovals = new Set<string>();
     const snapshots = new Map<string, any>();
     const supportsEntryRenderer = typeof pi.registerEntryRenderer === "function";
 
@@ -312,6 +354,231 @@ export default function workflowControls(pi: ExtensionAPI) {
         origin.generation === sessionGeneration &&
         origin.cwd === ctx.cwd &&
         origin.sessionId === ctx.sessionManager.getSessionId();
+
+    const invalidateGateApprovals = () => {
+        gateApprovalGeneration += 1;
+        gateApprovals.clear();
+    };
+
+    const refreshGateConfig = (root: string) => {
+        try {
+            gateConfig = readGateConfig(root);
+            gateConfigError = undefined;
+        } catch (error) {
+            gateConfig = { active: false, root, gates: [] };
+            gateConfigError = safeMessage(error);
+        }
+
+        invalidateGateApprovals();
+
+        return gateConfig;
+    };
+
+    const verificationSnapshot = async () => captureVerificationSnapshot(scope.root, exec);
+
+    const currentVerification = async () => {
+        if (!gateConfig.active) {
+            return { active: false, gates: {} };
+        }
+
+        const snapshot = await verificationSnapshot();
+
+        return resolveLedger(gateConfig, ledgerRecords, snapshot);
+    };
+
+    // Guard reports policy only. The exact executable and arguments are confirmed separately, because no shell parses
+    // a gate command and there is therefore nothing for Guard's command rules to inspect.
+    const gatePolicy = () => {
+        let states = 0;
+        const replies: any[] = [];
+        pi.events.emit("specpi:guard-state", {
+            reply() {
+                states += 1;
+            },
+        });
+        pi.events.emit("specpi:verification-admission", {
+            reply(value: any) {
+                replies.push(value);
+            },
+        });
+        if (states === 0 && replies.length === 0) {
+            return { mode: "absent", generation: 0, action: "allow" };
+        }
+
+        const policy = replies[0];
+        if (
+            states !== 1 ||
+            replies.length !== 1 ||
+            !["guard", "strict", "off", "locked"].includes(policy?.mode) ||
+            !Number.isSafeInteger(policy?.generation) ||
+            !["allow", "ask", "deny"].includes(policy?.action)
+        ) {
+            throw new Error("Command Guard policy for verification gates is unavailable or ambiguous.");
+        }
+
+        return policy;
+    };
+
+    const runGate = async (
+        gate: any,
+        ctx: ExtensionContext,
+        options: { humanInitiated?: boolean; signal?: any } = {},
+    ) => {
+        if (gateRunning) {
+            throw new Error("Another verification gate is already running in this session.");
+        }
+
+        // Claimed before the approval, not after it: two callers that both cleared the check above would otherwise
+        // each await their own prompt and then run concurrently, and the later snapshot would describe both runs.
+        gateRunning = true;
+        try {
+            return await admitAndRunGate(gate, ctx, options);
+        } finally {
+            gateRunning = false;
+        }
+    };
+
+    const admitAndRunGate = async (
+        gate: any,
+        ctx: ExtensionContext,
+        options: { humanInitiated?: boolean; signal?: any },
+    ) => {
+        const origin = captureSession(ctx);
+        const policy = gatePolicy();
+        if (policy.action === "deny") {
+            throw new Error("Command Guard denied verification gate execution.");
+        }
+
+        // A human typing /verify run has already authorized the exact gate they named. A model-initiated run has not,
+        // so it is confirmed once per gate spelling per approval generation, and every time under Strict.
+        if (!options.humanInitiated) {
+            if (!ctx.hasUI) {
+                throw new Error("Model-initiated verification gates require an approval interface.");
+            }
+
+            const key = `${gateApprovalGeneration}:${gate.id}:${gate.command}:${gate.args.join("\u0000")}:${gate.cwd}`;
+            if (policy.action === "ask" || !gateApprovals.has(key)) {
+                const confirmed = await ctx.ui.confirm(
+                    `Run verification gate ${gate.id}?`,
+                    `Command: ${sanitizePathLabel(gateCommandLine(gate))}\nCwd: ${markdownPathLabel(gate.cwd)}\nTimeout: ${Math.round(gate.timeoutMs / 1000)}s\nGuard: ${policy.mode}\nDeclared in ${gateConfigLabel()}. Runs directly with your permissions and inherited environment, without a shell. Not a sandbox; output may enter conversation retention.`,
+                );
+                if (!sessionIsCurrent(origin, ctx)) {
+                    throw new Error("Session changed while the verification gate awaited approval.");
+                }
+
+                if (!confirmed) {
+                    throw new Error(`Verification gate ${gate.id} was not approved.`);
+                }
+
+                if (policy.action !== "ask") {
+                    gateApprovals.add(key);
+                }
+            }
+        }
+
+        const startedAt = new Date().toISOString();
+        const started = Date.now();
+        const result = await exec(gate.command, gate.args, {
+            cwd: path.resolve(scope.root, gate.cwd),
+            timeout: gate.timeoutMs,
+            signal: options.signal,
+        });
+        if (!sessionIsCurrent(origin, ctx)) {
+            throw new Error("Session changed while the verification gate was running; no ledger entry was recorded.");
+        }
+
+        // The snapshot is taken after the process exits, so the fingerprint describes the worktree the gate actually
+        // finished against, including anything the gate itself wrote.
+        const snapshot = await verificationSnapshot();
+        if (!sessionIsCurrent(origin, ctx)) {
+            throw new Error("Session changed while the verification gate was running; no ledger entry was recorded.");
+        }
+
+        const exitCode = Number.isInteger(result?.code) && result.code >= 0 && result.code <= 255 ? result.code : 1;
+        const record = createLedgerRecord({
+            gate,
+            exitCode,
+            snapshot,
+            startedAt,
+            durationMs: Date.now() - started,
+        });
+        ledgerRecords.set(gate.id, record);
+        pi.appendEntry<LedgerEntryData>(VERIFICATION_LEDGER_ENTRY, {
+            kind: "recorded",
+            record,
+            createdAt: new Date().toISOString(),
+        });
+
+        return { record, result, resolution: resolveGate(record, snapshot) };
+    };
+
+    // Published for both terminal Pi and SpecPi Chat, which renders a plain status string in its runtime status area.
+    // The counts describe the worktree as it stood when they were resolved, so this is refreshed once each time the
+    // agent settles rather than being left to age quietly into a claim that is no longer true.
+    const publishVerification = (ctx: ExtensionContext, verification: any) => {
+        if (!verification?.active) {
+            ctx.ui.setStatus(VERIFICATION_STATUS, undefined);
+            ctx.ui.setWidget(VERIFICATION_STATUS, undefined);
+
+            return;
+        }
+
+        const states = Object.values(verification.gates) as any[];
+        const count = (name: string) => states.filter((item) => item.state === name).length;
+        const proven = count("proven");
+        const stale = count("stale");
+        const failed = count("failed");
+        const attention = stale > 0 || failed > 0;
+        const label = [
+            `verify · ${proven}/${states.length} proven`,
+            stale > 0 ? `${stale} stale` : "",
+            failed > 0 ? `${failed} failed` : "",
+        ]
+            .filter(Boolean)
+            .join(" · ");
+        ctx.ui.setStatus(VERIFICATION_STATUS, label);
+        ctx.ui.setWidget(VERIFICATION_STATUS, (_tui, theme) => ({
+            invalidate() {},
+            render(width: number): string[] {
+                return [truncateToWidth(theme.fg(attention ? "warning" : "dim", label), width, "")];
+            },
+        }));
+    };
+
+    const refreshVerificationStatus = async (ctx: ExtensionContext) => {
+        if (!gateConfig.active) {
+            publishVerification(ctx, { active: false, gates: {} });
+
+            return;
+        }
+
+        const origin = captureSession(ctx);
+        let verification;
+        try {
+            verification = await currentVerification();
+        } catch {
+            return;
+        }
+
+        if (sessionIsCurrent(origin, ctx)) {
+            publishVerification(ctx, verification);
+        }
+    };
+
+    const clearLedger = (reason: string) => {
+        if (ledgerRecords.size === 0) {
+            return false;
+        }
+
+        ledgerRecords = new Map();
+        pi.appendEntry<LedgerEntryData>(VERIFICATION_LEDGER_ENTRY, {
+            kind: "cleared",
+            reason,
+            createdAt: new Date().toISOString(),
+        });
+
+        return true;
+    };
 
     const emitTaskContractChanged = (contract: any | undefined, previousDigest?: string) => {
         pi.events.emit("specpi:task-contract-changed", {
@@ -578,6 +845,10 @@ export default function workflowControls(pi: ExtensionAPI) {
         observedToolFailures = 0;
         latestSnapshot = undefined;
         snapshots.clear();
+        ledgerRecords = new Map();
+        gateConfig = { active: false, root: scope.root, gates: [] };
+        gateConfigError = undefined;
+        invalidateGateApprovals();
         emitScopeStatus(ctx);
 
         const root = await resolveRoot(origin.cwd);
@@ -586,6 +857,15 @@ export default function workflowControls(pi: ExtensionAPI) {
         }
 
         scope = emptyScope(root);
+        refreshGateConfig(root);
+        if (gateConfigError) {
+            ctx.ui.notify(`Verification gates unavailable: ${gateConfigError}`, "error");
+        }
+
+        // Ledger records are bound to the worktree root they were taken against, so a branch restored under a
+        // different root contributes nothing rather than silently reporting another project's proof.
+        ledgerRecords = restoreLedger(branchEntries(ctx), root);
+        void refreshVerificationStatus(ctx);
 
         for (const entry of ctx.sessionManager.getBranch?.() ?? []) {
             if (entry.type !== "custom") {
@@ -661,9 +941,19 @@ export default function workflowControls(pi: ExtensionAPI) {
         latestChallenge = undefined;
         experimentBusy = false;
         taskContractError = undefined;
+        ledgerRecords = new Map();
+        gateConfig = { active: false, root: scope.root, gates: [] };
+        gateConfigError = undefined;
+        invalidateGateApprovals();
         ctx.ui.setStatus(SCOPE_STATUS, undefined);
         ctx.ui.setWidget(SCOPE_STATUS, undefined);
+        ctx.ui.setStatus(VERIFICATION_STATUS, undefined);
+        ctx.ui.setWidget(VERIFICATION_STATUS, undefined);
     });
+
+    // A Guard policy change retires cached gate approvals: a spelling approved under one policy is not approved under
+    // the next. Recorded ledger entries are untouched, because a past exit code stays a fact whatever the policy is.
+    pi.events?.on?.("specpi:guard-policy-changed", () => invalidateGateApprovals());
 
     pi.on("input", () => {
         observedToolFailures = 0;
@@ -672,6 +962,7 @@ export default function workflowControls(pi: ExtensionAPI) {
     // The challenge prompt tells the model not to implement anything this turn. If the turn ends without the tool call
     // that retires it, leaving it armed would silently apply that instruction to every later turn, so it expires here.
     pi.on("agent_settled", (_event, ctx) => {
+        void refreshVerificationStatus(ctx);
         if (!activeChallenge?.delivered) {
             return;
         }
@@ -1635,6 +1926,9 @@ export default function workflowControls(pi: ExtensionAPI) {
                         requirement: Type.Optional(Type.String({ minLength: 1, maxLength: 360 })),
                         status: StringEnum(["proven", "partial", "unproven"] as const),
                         evidence: Type.String({ maxLength: 600 }),
+                        gates: Type.Optional(
+                            Type.Array(Type.String({ minLength: 1, maxLength: 32 }), { maxItems: MAX_CITED_GATES }),
+                        ),
                     },
                     { additionalProperties: false },
                 ),
@@ -1683,8 +1977,23 @@ export default function workflowControls(pi: ExtensionAPI) {
                 throw new Error("No matching completion challenge is active for the current task contract");
             }
 
+            // Gates are resolved again here rather than reusing the facts the prompt was built from: an edit made
+            // between the challenge prompt and this submission is exactly the staleness the ledger exists to catch.
+            let verification = activeChallenge.facts?.verification ?? { active: false, gates: {} };
+            if (gateConfig.active) {
+                verification = await currentVerification();
+                if (
+                    !activeChallenge ||
+                    activeChallenge.generation !== params.generation ||
+                    activeChallenge.sessionId !== ctx.sessionManager.getSessionId()
+                ) {
+                    throw new Error("No matching completion challenge is active in this session");
+                }
+            }
+
             const result = validateChallengeSubmission(params, {
                 ...activeChallenge.facts,
+                verification,
                 challengeGeneration: activeChallenge.generation,
                 taskContractDigest: activeChallenge.taskContractDigest,
             });
@@ -1706,6 +2015,182 @@ export default function workflowControls(pi: ExtensionAPI) {
                 details: { generation: data.generation, verdict: result.verdict },
                 terminate: true,
             };
+        },
+    });
+
+    pi.registerTool({
+        name: "run_check",
+        label: "Run Verification Gate",
+        description:
+            "Run one gate declared by a human in .specpi/checks.json and record its observed exit code against a fingerprint of the worktree it finished on. Executes the named program directly with no shell. The recorded result, not a claim about it, is what a completion challenge can cite.",
+        promptSnippet: "Run a declared project check and record harness-observed proof of its result",
+        promptGuidelines: [
+            "Run the gates covering a requirement after the last edit that affects it. A gate that passed before a later edit is recorded as stale and proves nothing. Never describe a gate as passing without running it.",
+        ],
+        parameters: Type.Object(
+            { gate: Type.String({ minLength: 1, maxLength: 32 }) },
+            { additionalProperties: false },
+        ),
+        executionMode: "sequential",
+        async execute(_toolCallId, params: any, signal, _onUpdate, ctx) {
+            if (!gateConfig.active) {
+                throw new Error(
+                    gateConfigError
+                        ? `Verification gates unavailable: ${gateConfigError}`
+                        : `No verification gates are declared. A human must create ${gateConfigLabel()} before gates can run.`,
+                );
+            }
+
+            const gate = findGate(gateConfig, params.gate);
+            if (!gate) {
+                throw new Error(
+                    `Unknown gate: ${sanitizePathLabel(String(params.gate).slice(0, 32))}. Declared gates: ${gateConfig.gates.map((item: any) => item.id).join(", ")}`,
+                );
+            }
+
+            const { record, result, resolution } = await runGate(gate, ctx, { signal });
+            const output = gateOutput(result);
+            const summary = [
+                `Gate ${gate.id} exited ${record.exitCode} after ${Math.round(record.durationMs / 1000)}s.`,
+                `Command: ${gateCommandLine(gate)}`,
+                `Ledger: ${describeResolution(resolution)}${record.indeterminate ? " (worktree snapshot indeterminate; this gate cannot prove a requirement)" : ""}`,
+                output ? `\nOutput (last ${MAX_GATE_OUTPUT} characters):\n${output}` : "",
+            ]
+                .filter(Boolean)
+                .join("\n");
+            void refreshVerificationStatus(ctx);
+
+            return {
+                content: [{ type: "text", text: summary }],
+                details: { gate: gate.id, exitCode: record.exitCode, state: resolution.state },
+            };
+        },
+    });
+
+    pi.registerCommand("verify", {
+        description: "Inspect, run, or clear the verification gates declared for this project",
+        getArgumentCompletions: (prefix: string) => {
+            const trimmed = prefix.trim().toLowerCase();
+            const words = trimmed.split(/\s+/u).filter(Boolean);
+            if (words[0] === "run") {
+                return gateConfig.gates
+                    .filter((gate: any) => gate.id.startsWith(words[1] ?? ""))
+                    .map((gate: any) => ({ value: `run ${gate.id}`, label: `run ${gate.id}` }));
+            }
+
+            return ["status", "run", "clear", "reload"]
+                .filter((value) => value.startsWith(trimmed))
+                .map((value) => ({ value, label: value }));
+        },
+        handler: async (args, ctx) => {
+            const origin = captureSession(ctx);
+            const input = args.trim();
+            const [action = "status", ...rest] = input.split(/\s+/u).filter(Boolean);
+            const verb = action.toLowerCase();
+            if (verb === "reload") {
+                refreshGateConfig(scope.root);
+                ctx.ui.notify(
+                    gateConfigError
+                        ? `Verification gates unavailable: ${gateConfigError}`
+                        : gateConfig.active
+                          ? `Reloaded ${gateConfig.gates.length} gate(s) from ${gateConfigLabel()}.`
+                          : `No ${gateConfigLabel()} found; verification is inactive.`,
+                    gateConfigError ? "error" : "info",
+                );
+                void refreshVerificationStatus(ctx);
+
+                return;
+            }
+
+            if (verb === "clear") {
+                const cleared = clearLedger("cleared by the user");
+                ctx.ui.notify(
+                    cleared ? "Verification ledger cleared." : "Verification ledger is already empty.",
+                    "info",
+                );
+                void refreshVerificationStatus(ctx);
+
+                return;
+            }
+
+            if (verb === "status") {
+                if (gateConfigError) {
+                    ctx.ui.notify(`Verification gates unavailable: ${gateConfigError}`, "error");
+
+                    return;
+                }
+
+                if (!gateConfig.active) {
+                    ctx.ui.notify(
+                        `No verification gates declared. Create ${gateConfigLabel()} to record harness-observed proof for completion challenges.`,
+                        "info",
+                    );
+
+                    return;
+                }
+
+                const verification = await currentVerification();
+                if (!sessionIsCurrent(origin, ctx)) {
+                    return;
+                }
+
+                const lines = gateConfig.gates.map((gate: any) => {
+                    const resolution = verification.gates[gate.id];
+                    const exit = resolution?.exitCode === undefined ? "not run" : `exit ${resolution.exitCode}`;
+
+                    return `${gate.id}: ${resolution?.state ?? "unavailable"} (${exit}) — ${gateCommandLine(gate)}`;
+                });
+                ctx.ui.notify(`Verification gates (${gateConfig.gates.length})\n${lines.join("\n")}`, "info");
+                publishVerification(ctx, verification);
+
+                return;
+            }
+
+            if (verb === "run") {
+                if (!gateConfig.active) {
+                    ctx.ui.notify(
+                        gateConfigError
+                            ? `Verification gates unavailable: ${gateConfigError}`
+                            : `No verification gates declared. Create ${gateConfigLabel()} first.`,
+                        gateConfigError ? "error" : "info",
+                    );
+
+                    return;
+                }
+
+                const gate = findGate(gateConfig, rest[0]?.toLowerCase());
+                if (!gate) {
+                    ctx.ui.notify(
+                        `Usage: /verify run <gate>. Declared gates: ${gateConfig.gates.map((item: any) => item.id).join(", ")}`,
+                        "warning",
+                    );
+
+                    return;
+                }
+
+                try {
+                    const { record, resolution } = await runGate(gate, ctx, { humanInitiated: true });
+                    if (!sessionIsCurrent(origin, ctx)) {
+                        return;
+                    }
+
+                    ctx.ui.notify(
+                        `Gate ${gate.id} exited ${record.exitCode} after ${Math.round(record.durationMs / 1000)}s — ${describeResolution(resolution)}.`,
+                        record.exitCode === 0 ? "info" : "warning",
+                    );
+                    void refreshVerificationStatus(ctx);
+                } catch (error) {
+                    if (!sessionIsCurrent(origin, ctx)) {
+                        return;
+                    }
+
+                    ctx.ui.notify(`Verification gate failed to run: ${safeMessage(error)}`, "error");
+                }
+
+                return;
+            }
+
+            throw new Error("Usage: /verify [status|run <gate>|clear|reload]");
         },
     });
 
@@ -1828,7 +2313,19 @@ export default function workflowControls(pi: ExtensionAPI) {
                 experiment = undefined;
             }
 
+            let verification;
+            try {
+                verification = await currentVerification();
+            } catch {
+                verification = { active: false, gates: {} };
+            }
+
+            if (!sessionIsCurrent(origin, ctx)) {
+                return;
+            }
+
             const facts = boundedChallengeFacts({
+                verification,
                 changedPaths: snapshot?.paths ?? [],
                 scopeEntries: scope.active
                     ? scope.entries.map((item) => `${item.path}${item.directory ? "/" : ""}`)

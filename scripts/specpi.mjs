@@ -840,6 +840,11 @@ function managedFiles(includeShell) {
             0o644,
         ],
         [
+            path.join(repoRoot, "extensions", "workflow-controls", "ledger.mjs"),
+            path.join(agentDir, "extensions", "workflow-controls", "ledger.mjs"),
+            0o644,
+        ],
+        [
             path.join(repoRoot, "extensions", "workflow-controls", "smoke.mjs"),
             path.join(agentDir, "extensions", "workflow-controls", "smoke.mjs"),
             0o755,
@@ -1199,6 +1204,7 @@ function assertSources() {
         "extensions/workflow-controls/task-contract.mjs",
         "extensions/workflow-controls/experiments.mjs",
         "extensions/workflow-controls/challenge.mjs",
+        "extensions/workflow-controls/ledger.mjs",
         "extensions/workflow-controls/smoke.mjs",
         "extensions/files/index.ts",
         "extensions/files/core.mjs",

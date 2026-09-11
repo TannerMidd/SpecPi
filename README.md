@@ -33,6 +33,7 @@ SpecPi extends Pi with chat, review tools, and focused delegation. Its principle
 - **Focused delegation.** One agent makes changes. Up to two read-only subagents help investigate and review. [Research and design](https://tannermidd.github.io/SpecPi/single-agent/)
 - **Background tasks.** Start an approved dev server, test suite, or watch build, inspect bounded output, and stop it without blocking other work.
 - **Review as you work.** Track changed files, inspect diffs, check pages in a browser, and review risky commands.
+- **Verification gates.** Declare your project's checks, and a completion challenge reports their observed exit codes bound to the worktree each one ran against — including checks that passed before a later edit. Off until you declare gates. [Setup and limits](docs/verification.md)
 - **Structural search.** Bounded ast-grep patterns over selected code are enabled by default. Disable with `specpi update --structural-search=off`; on unsupported native hosts, pass `--structural-search=off` during installation too. [Usage and limits](docs/structural-search.md)
 - **Accessibility checks.** Scan the current browser state for automated WCAG and optional best-practice findings. [Browser verification](docs/browser-testing.md)
 - **Improvements you choose.** Record recurring problems, select one with `/harness-improvement`, and test the change before calling it done.
@@ -52,7 +53,7 @@ specpi doctor
 
 Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
 
-To pin this release, use `npm install --global specpi@0.20.1`.
+To pin this release, use `npm install --global specpi@0.21.0`.
 
 Delegation is enabled at startup. Use `/delegate off` to turn it off.
 
@@ -66,7 +67,7 @@ Chat beside your code, attach files, and switch conversations.
 
 In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
 
-Chat 0.4.4 shows a compact delegation strip only while workers run or settle, and opens workspace image links in the image viewer. SpecPi 0.19.1 fixes delegation when switching GitHub Copilot models in the same chat, including Luna → Opus → Luna. Update the harness and use **Restart Pi** to load the fix; this patch does not require a Chat update. Later model switches do not require a restart. New Chat sessions start with Guard off; pick a mode from the shield beside the composer, or use `/guard guard` and `/guard strict`.
+SpecPi 0.21.0 adds verification gates, which need no Chat update: `/verify` and `run_check` work in Chat as they do in the terminal, approvals appear as ordinary dialogs, and a `specpi-verification` line in the runtime status panel reports how many gates currently hold. Chat 0.4.4 shows a compact delegation strip only while workers run or settle, and opens workspace image links in the image viewer. SpecPi 0.19.1 fixes delegation when switching GitHub Copilot models in the same chat, including Luna → Opus → Luna. Update the harness and use **Restart Pi** to load the fix; this patch does not require a Chat update. Later model switches do not require a restart. New Chat sessions start with Guard off; pick a mode from the shield beside the composer, or use `/guard guard` and `/guard strict`.
 
 ## Go further
 
