@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { tasks, suiteVersion } from "../evals/quality/catalog.mjs";
 import { fixtureDigest } from "../evals/quality/fixtures.mjs";
 import { repositoryRoot, sourceDigests, sha256 } from "../evals/quality/provenance.mjs";
-import { buildProviderSchedule, resumeState } from "./openrouter-quality.mjs";
+import { buildProviderSchedule, resumeState, profiles } from "./openrouter-quality.mjs";
 import { gradeFinalFiles, variantKey, portableSourceDigests } from "./replay-quality-results.mjs";
 import { aggregateQuality } from "./quality-results.mjs";
 import { QualityBudget } from "./quality-budget.mjs";
@@ -33,9 +33,12 @@ function sanitize(value, roots) {
 export function collectOpenRouter(directory, ledger, pilotDirectories = [], { allowIncomplete = false } = {}) {
     const root = path.resolve(directory);
     const manifest = read(path.join(root, "manifest.json"));
+    const profile = manifest.profile ?? "glm";
     const schedule = buildProviderSchedule().map(({ task, ...run }) => ({ ...run, task: task.id }));
     if (
         manifest.mode !== "full" ||
+        !Object.hasOwn(profiles, profile) ||
+        manifest.settings?.model !== profiles[profile].model ||
         manifest.suiteVersion !== suiteVersion ||
         JSON.stringify(manifest.schedule) !== JSON.stringify(schedule) ||
         JSON.stringify(manifest.sourceDigests) !== JSON.stringify(sourceDigests()) ||
@@ -123,7 +126,7 @@ export function collectOpenRouter(directory, ledger, pilotDirectories = [], { al
         }
     }
 
-    const budget = new QualityBudget(path.resolve(ledger), 5);
+    const budget = new QualityBudget(path.resolve(ledger), manifest.capUsd);
     const pilots = pilotDirectories.map((item) => {
         const pilot = path.resolve(item);
         const meta = read(path.join(pilot, "manifest.json"));
@@ -135,6 +138,25 @@ export function collectOpenRouter(directory, ledger, pilotDirectories = [], { al
             manifest: meta,
             manifestSha256: sha256(fs.readFileSync(path.join(pilot, "manifest.json"))),
             completion: read(path.join(pilot, "completion.json")),
+            outcomes: fs
+                .readdirSync(pilot)
+                .filter((name) => /-attempt\d+$/u.test(name))
+                .map((name) => {
+                    const file = path.join(pilot, name, "result.json");
+                    if (!fs.existsSync(file)) {
+                        return { directory: name, error: "Interrupted before result was written." };
+                    }
+
+                    const record = read(file);
+
+                    return {
+                        id: record.id,
+                        acceptance: record.acceptance,
+                        error: record.error,
+                        modelFailure: record.modelFailure,
+                        resultSha256: sha256(fs.readFileSync(file)),
+                    };
+                }),
         };
     });
 
@@ -142,7 +164,7 @@ export function collectOpenRouter(directory, ledger, pilotDirectories = [], { al
         schema: 2,
         suiteVersion,
         generatedAt: new Date().toISOString(),
-        providerExperiment: "openrouter-glm",
+        providerExperiment: `openrouter-${profile}`,
         cohortStatus: allowIncomplete ? "interrupted" : "complete",
         completion,
         plannedTrials: manifest.schedule.length,
@@ -166,12 +188,12 @@ export function collectOpenRouter(directory, ledger, pilotDirectories = [], { al
         },
         limitations: [
             "A different model family from the suite author; this is not proof of no training contamination or independent human grading.",
-            "Paired GLM conditions share the frozen Pi provider adapter. Codex and GLM use different transports/system context and output budgets; do not interpret between-model differences as a causal model ranking.",
+            "Paired conditions share the frozen Pi provider adapter. Model cohorts can differ in transport, system context, reasoning settings and output budgets; do not interpret between-model differences as a causal model ranking.",
             "Supplied-context text-only evaluation with no native tools registered; not a full installed Pi conversation or an adversarial grading sandbox.",
             "Review receives an implementation and requested behavior without a proposed Git diff, while the review skill is intended for reviewing changes; this limits transfer to real pull-request review.",
             "Malformed structured responses, refusals and output limits count as behavioral failures, including on otherwise-correct controls.",
             "Transport retries are retained separately, with no hidden acceptance feedback and no retries of valid behavioral failures.",
-            "Reported costs exclude unknown charges; conservative reservations include those unknown requests, pilots, retries and 10% headroom under a shared $5 cap.",
+            "Reported costs exclude unknown charges; conservative reservations include those unknown requests, pilots, retries and 10% headroom under the shared explicitly authorized cap.",
         ],
     };
 }

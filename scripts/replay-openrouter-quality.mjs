@@ -5,14 +5,16 @@ import { gradeFinalFiles, portableSourceDigests, variantKey } from "./replay-qua
 import { aggregateQuality } from "./quality-results.mjs";
 
 export function replayOpenRouter(data) {
+    const models = { "openrouter-glm": "z-ai/glm-5.3-flash", "openrouter-deepseek": "deepseek/deepseek-v4.1-flash" };
     if (
-        data.providerExperiment !== "openrouter-glm" ||
+        !Object.hasOwn(models, data.providerExperiment) ||
+        data.manifest?.settings?.model !== models[data.providerExperiment] ||
         !(data.runs?.length > 0) ||
         data.runs.length > 384 ||
         (data.cohortStatus !== "interrupted" && data.runs.length !== 384) ||
         JSON.stringify(data.grading.portableSourceDigests) !== JSON.stringify(portableSourceDigests())
     ) {
-        throw new Error("Replay requires the complete GLM archive and its frozen grader sources.");
+        throw new Error("Replay requires a supported provider archive and its frozen grader sources.");
     }
 
     const results = new Map();
@@ -26,7 +28,7 @@ export function replayOpenRouter(data) {
             run.error ||
             ["experiment", "task", "condition", "repetition"].some((key) => run[key] !== planned[key])
         ) {
-            throw new Error("Duplicate, invalid or unscheduled GLM trial.");
+            throw new Error("Duplicate, invalid or unscheduled provider trial.");
         }
 
         indexes.add(run.index);
@@ -60,7 +62,7 @@ export function replayOpenRouter(data) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     const [file] = process.argv.slice(2);
     if (!file || process.argv.length !== 3) {
-        throw new Error("Usage: node scripts/replay-openrouter-quality.mjs <public-glm-results.json>");
+        throw new Error("Usage: node scripts/replay-openrouter-quality.mjs <public-provider-results.json>");
     }
 
     process.stdout.write(JSON.stringify(replayOpenRouter(JSON.parse(fs.readFileSync(file, "utf8")))) + "\n");

@@ -15,6 +15,10 @@ import { QualityBudget } from "./quality-budget.mjs";
 
 export const settings = {
     model: "z-ai/glm-5.3-flash",
+    name: "GLM 5.3 Flash",
+    prices: { input: 0.15, output: 0.5 },
+    contextWindow: 1310720,
+    modelMaxTokens: 131072,
     endpoint: "fp8-failover",
     providerName: "OpenRouter FP8 failover",
     endpoints: [
@@ -34,6 +38,21 @@ export const settings = {
     concurrency: 2,
     timeoutMs: 180000,
 };
+export const profiles = {
+    glm: settings,
+    deepseek: {
+        ...settings,
+        model: "deepseek/deepseek-v4.1-flash",
+        name: "DeepSeek V4.1 Flash",
+        prices: { input: 0.3, output: 1.2 },
+        contextWindow: 1048576,
+        modelMaxTokens: 131072,
+        endpoints: ["deepinfra/fp8", "morph/fp8", "parasail/fp8"],
+        providerNames: ["DeepInfra", "Morph", "Parasail"],
+        reasoning: "high",
+    },
+};
+
 const object = (properties) => ({
     type: "object",
     additionalProperties: false,
@@ -87,21 +106,21 @@ export function conforms(value, schema) {
     );
 }
 
-export function requestPayload(payload, schema) {
+export function requestPayload(payload, schema, profile = settings) {
     return {
         ...payload,
-        model: settings.model,
-        max_tokens: settings.maxTokens,
-        reasoning: { effort: settings.reasoning, exclude: true },
+        model: profile.model,
+        max_tokens: profile.maxTokens,
+        reasoning: { effort: profile.reasoning, exclude: true },
         response_format: { type: "json_schema", json_schema: { name: "evaluation", strict: true, schema } },
         provider: {
-            only: settings.endpoints,
+            only: profile.endpoints,
             allow_fallbacks: true,
             quantizations: ["fp8"],
             sort: "throughput",
             require_parameters: true,
             data_collection: "deny",
-            max_price: { prompt: 0.15, completion: 0.5, request: 0 },
+            max_price: { prompt: profile.prices.input, completion: profile.prices.output, request: 0 },
         },
         tools: undefined,
         tool_choice: undefined,
@@ -109,7 +128,7 @@ export function requestPayload(payload, schema) {
     };
 }
 
-async function responseMetadata(response) {
+export async function responseMetadata(response) {
     if (!response.ok) {
         const retryAfter = Number(response.headers.get("retry-after"));
         const metadata = { status: response.status };
@@ -159,16 +178,27 @@ async function responseMetadata(response) {
         }
 
         bytes += part.value.length;
-        if (bytes > 4 * 1024 * 1024) {
-            await reader.cancel();
-            throw new Error("Provider stream exceeded metadata bound.");
+        // Per-token SSE framing can exceed the final response size many times.
+        if (bytes > 32 * 1024 * 1024) {
+            void reader.cancel().catch(() => {});
+
+            return { ...metadata, metadataError: "byte-bound", streamBytes: bytes };
         }
 
         pending += decoder.decode(part.value, { stream: true });
         const lines = pending.split("\n");
         pending = lines.pop();
         for (const line of lines) {
-            if (!line.startsWith("data: ") || line.trim() === "data: [DONE]") {
+            if (line.trim() === "data: [DONE]") {
+                // The protocol is complete even if the server keeps HTTP open.
+                // Cancelling a tee branch can wait for its sibling; do not block
+                // the completed SDK response on that transport cleanup.
+                void reader.cancel().catch(() => {});
+
+                return metadata;
+            }
+
+            if (!line.startsWith("data: ")) {
                 continue;
             }
 
@@ -195,7 +225,7 @@ async function responseMetadata(response) {
     return metadata;
 }
 
-export async function createCaller(budget, credentials = new ReadOnlyAuthStorage()) {
+export async function createCaller(budget, credentials = new ReadOnlyAuthStorage(), profile = settings) {
     // This supported credential store is consumed only by Pi's provider runtime.
     // No agent/settings/resources/sessions are loaded, and no key is extracted.
     const runtime = await ModelRuntime.create({
@@ -207,18 +237,18 @@ export async function createCaller(budget, credentials = new ReadOnlyAuthStorage
     runtime.registerProvider("openrouter", {
         models: [
             {
-                id: settings.model,
-                name: "GLM 5.3 Flash",
+                id: profile.model,
+                name: profile.name,
                 reasoning: true,
                 input: ["text"],
-                cost: { input: 0.15, output: 0.5, cacheRead: 0.15, cacheWrite: 0.15 },
-                contextWindow: 1310720,
-                maxTokens: 131072,
+                cost: { ...profile.prices, cacheRead: profile.prices.input, cacheWrite: profile.prices.input },
+                contextWindow: profile.contextWindow,
+                maxTokens: profile.modelMaxTokens,
                 compat: { thinkingFormat: "openrouter", supportsReasoningEffort: true, maxTokensField: "max_tokens" },
             },
         ],
     });
-    const model = runtime.getModel("openrouter", settings.model);
+    const model = runtime.getModel("openrouter", profile.model);
     let notBefore = 0;
     let transientFailures = 0;
 
@@ -238,13 +268,13 @@ export async function createCaller(budget, credentials = new ReadOnlyAuthStorage
                 },
                 {
                     env: { OPENROUTER_API_KEY: "" },
-                    maxTokens: settings.maxTokens,
-                    reasoning: settings.reasoning,
+                    maxTokens: profile.maxTokens,
+                    reasoning: profile.reasoning,
                     maxRetries: 0,
-                    timeoutMs: settings.timeoutMs,
-                    signal: AbortSignal.timeout(settings.timeoutMs),
+                    timeoutMs: profile.timeoutMs,
+                    signal: AbortSignal.timeout(profile.timeoutMs),
                     onPayload: (payload) => {
-                        const request = requestPayload(payload, schema);
+                        const request = requestPayload(payload, schema, profile);
                         const text = JSON.stringify(request);
                         // UTF-8 bytes plus ample framing/schema overhead conservatively
                         // bounds text tokenization. Refuse unexpected large contexts.
@@ -253,7 +283,7 @@ export async function createCaller(budget, credentials = new ReadOnlyAuthStorage
                             throw new Error("Evaluation request exceeded input bound.");
                         }
 
-                        budget.reserve(id, inputBound, settings.maxTokens);
+                        budget.reserve(id, inputBound, profile.maxTokens, profile.prices);
                         reserved = true;
                         requestDigest = sha256(text);
 
@@ -290,7 +320,10 @@ export async function createCaller(budget, credentials = new ReadOnlyAuthStorage
                             transientFailures = 0;
                         }
 
-                        metadataPromise = responseMetadata(result.clone()).catch(() => ({ metadataError: true }));
+                        metadataPromise = responseMetadata(result.clone()).catch(() => ({
+                            status: result.status,
+                            metadataError: "stream-or-json-error",
+                        }));
 
                         return result;
                     },
@@ -327,16 +360,26 @@ export async function createCaller(budget, credentials = new ReadOnlyAuthStorage
 
         const inputTokens = response.usage.input + response.usage.cacheRead + response.usage.cacheWrite;
         const outputTokens = response.usage.output;
-        budget.settle(id, inputTokens, outputTokens, metadata.reportedCostUsd);
         const usage = {
             input_tokens: inputTokens,
             output_tokens: outputTokens,
             reasoning_tokens: response.usage.reasoning,
             reportedCostUsd: metadata.reportedCostUsd,
         };
+        try {
+            budget.settle(id, inputTokens, outputTokens, metadata.reportedCostUsd);
+        } catch {
+            return {
+                ...evidence,
+                usage,
+                infrastructureError:
+                    "Usage accounting failed; retain the full reservation and inspect numeric evidence.",
+            };
+        }
+
         if (
-            metadata.model !== settings.model ||
-            !settings.providerNames.some((name) => metadata.provider?.toLowerCase() === name.toLowerCase())
+            metadata.model !== profile.model ||
+            !profile.providerNames.some((name) => metadata.provider?.toLowerCase() === name.toLowerCase())
         ) {
             return {
                 ...evidence,
@@ -415,7 +458,7 @@ async function applyEdits(root, task, condition, response) {
     return results;
 }
 
-export async function trial(run, index, output, caller, attempt = 1) {
+export async function trial(run, index, output, caller, attempt = 1, profile = settings) {
     const id = `${run.experiment}-${String(index + 1).padStart(3, "0")}-${run.task.id}-${run.condition}-r${run.repetition}`;
     const directory = path.join(output, `${id}-attempt${attempt}`);
     fs.mkdirSync(directory);
@@ -475,7 +518,7 @@ export async function trial(run, index, output, caller, attempt = 1) {
 
         const condition = run.experiment === "review" ? "native" : run.condition;
         let previous = [];
-        for (let round = 0; round < settings.maxEditRounds && !record.error && !record.modelFailure; round += 1) {
+        for (let round = 0; round < profile.maxEditRounds && !record.error && !record.modelFailure; round += 1) {
             const call = await request("edit", condition, previous);
             if (record.error || record.modelFailure) {
                 break;
@@ -603,16 +646,21 @@ export function resumeState(output, manifest) {
 }
 
 async function main() {
-    const [mode, destination, ledger, qualification] = process.argv.slice(2);
+    const [mode, destination, ledger, qualification, profileName = "glm", cap = "5"] = process.argv.slice(2);
+    const capUsd = Number(cap);
+    const profile = profiles[profileName];
     if (
         !["pilot", "full", "resume"].includes(mode) ||
         !destination ||
         !ledger ||
         !qualification ||
-        process.argv.length !== 6
+        ![6, 7, 8].includes(process.argv.length) ||
+        !Number.isFinite(capUsd) ||
+        capUsd <= 0 ||
+        !Object.hasOwn(profiles, profileName)
     ) {
         throw new Error(
-            "Usage: node scripts/openrouter-quality.mjs <pilot|full|resume> <output> <shared-$5-ledger.json> <qualification.json>",
+            "Usage: node scripts/openrouter-quality.mjs <pilot|full|resume> <output> <shared-ledger.json> <qualification.json> [glm|deepseek] [authorized-total-cap-usd]",
         );
     }
 
@@ -630,7 +678,7 @@ async function main() {
     const lockFd = fs.openSync(lock, "wx");
     fs.writeSync(lockFd, String(process.pid));
     try {
-        const budget = new QualityBudget(path.resolve(ledger), 5);
+        const budget = new QualityBudget(path.resolve(ledger), capUsd);
         budget.save();
         const output = path.resolve(destination);
         if (mode !== "resume") {
@@ -645,7 +693,8 @@ async function main() {
             suiteVersion,
             createdAt: new Date().toISOString(),
             mode: mode === "resume" ? "full" : mode,
-            settings,
+            profile: profileName,
+            settings: profile,
             sourceDigests: sources,
             adapterDigests: adapters,
             fixtureDigests: Object.fromEntries(tasks.map((task) => [task.id, fixtureDigest(task)])),
@@ -656,14 +705,14 @@ async function main() {
             node: process.version,
             platform: process.platform,
             transport: "Pi ModelRuntime / OpenRouter",
-            capUsd: 5,
+            capUsd,
         };
         const retained = mode === "resume" ? resumeState(output, manifest) : { valid: new Map(), attempts: new Map() };
         if (mode !== "resume") {
             fs.writeFileSync(path.join(output, "manifest.json"), JSON.stringify(manifest, null, 2), { flag: "wx" });
         }
 
-        const caller = await createCaller(budget);
+        const caller = await createCaller(budget, undefined, profile);
         let next = 0;
         let halted = false;
         const records = [...retained.valid.values()];
@@ -688,6 +737,7 @@ async function main() {
                     output,
                     caller,
                     (retained.attempts.get(index) ?? 0) + 1,
+                    profile,
                 );
                 records.push(record);
                 if (record.error) {
@@ -698,7 +748,7 @@ async function main() {
 
         try {
             const workers = await Promise.allSettled(
-                Array.from({ length: mode === "pilot" ? 1 : settings.concurrency }, worker),
+                Array.from({ length: mode === "pilot" ? 1 : profile.concurrency }, worker),
             );
             if (workers.some((result) => result.status === "rejected")) {
                 halted = true;

@@ -31,7 +31,14 @@ test(
                 await page.getByLabel("Find a task", { exact: true }).fill("browser");
                 assert.equal(await rows.count(), 3);
                 await page.getByRole("button", { name: "Reset filters" }).click();
-                for (const file of ["results.json", "trials.csv", "glm-results.json", "glm-trials.csv"]) {
+                for (const file of [
+                    "results.json",
+                    "trials.csv",
+                    "glm-results.json",
+                    "glm-trials.csv",
+                    "deepseek-results.json",
+                    "deepseek-trials.csv",
+                ]) {
                     const link = page.locator(`a[download][href="./${file}"]`);
                     assert.equal(await link.count(), 1);
                     const response = await page.request.get(`${origin}/SpecPi/evals/${file}`);
@@ -42,6 +49,10 @@ test(
                         if (file === "glm-results.json") {
                             assert.equal(archive.providerExperiment, "openrouter-glm");
                         }
+
+                        if (file === "deepseek-results.json") {
+                            assert.equal(archive.providerExperiment, "openrouter-deepseek");
+                        }
                     } else {
                         assert.equal((await response.text()).trim().split("\n").length, 385);
                     }
@@ -50,6 +61,9 @@ test(
                 assert.equal(await page.getByRole("heading", { name: "GLM 5.3 Flash", exact: true }).count(), 1);
                 await page.locator("#independent summary").click();
                 assert.equal(await page.locator("#independent details tbody tr").count(), 32);
+                assert.equal(await page.getByRole("heading", { name: "DeepSeek V4.1 Flash", exact: true }).count(), 1);
+                await page.locator("#deepseek summary").click();
+                assert.equal(await page.locator("#deepseek details tbody tr").count(), 32);
                 const interrupted = await page.request.get(`${origin}/SpecPi/evals/glm-morph-interrupted.json`);
                 assert.equal(interrupted.status(), 200);
                 const earlier = await interrupted.json();

@@ -1,8 +1,50 @@
 # Quality evaluation results
 
-The September 13, 2026 expanded comparison covers **32 tasks and two separate 384-trial model cohorts**: `gpt-6-astra` through Codex and `z-ai/glm-5.3-flash` through OpenRouter using Pi's provider runtime. GLM did not help author the suite. Its failures make the feature comparisons more informative than the saturated Codex baseline. These are behavioral results on supplied JavaScript fixtures, not general coding accuracy or the quality effect of installed verification/context features.
+The September 13, 2026 expanded comparison covers **32 tasks and three separate 384-trial model cohorts**: `gpt-6-astra` through Codex, plus `z-ai/glm-5.3-flash` and `deepseek/deepseek-v4.1-flash` through OpenRouter using Pi's provider runtime. GLM and DeepSeek did not help author the suite. These are behavioral results on supplied JavaScript fixtures, not general coding accuracy or the quality effect of installed verification/context features.
 
-**Keep review explicitly selected and anchored editing uninstalled.** GLM review tied at 82/96 passes, with seven gains and seven regressions in matched pairs. Anchored editing passed 80/96 versus native editing's 79/96, with eight gains, seven regressions and seven edit rejections. That one-trial net difference does not establish a dependable advantage. All Codex conditions passed 96/96; saturation does not establish general equivalence.
+**Keep review explicitly selected and anchored editing uninstalled.** DeepSeek review passed 88/96 versus generic review's 80/96, but the net difference came from fewer output-limit failures, and the serving-provider mix differed substantially. Both review conditions had two code failures. DeepSeek anchored editing passed 84/96 versus native editing's 90/96. GLM review tied at 82/96, while anchored editing's 80/96 versus native editing's 79/96 did not establish a dependable advantage. All Codex conditions passed 96/96; saturation does not establish general equivalence.
+
+## Independent DeepSeek comparison
+
+| Condition | Passed / valid trials | First trial attempt passes | Tasks passing all 3 | Median model time | Output-limit failures | Code failures |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Generic review + repair | 80 / 96 | 71 / 96 | 21 / 32 | 70.69 s | 14 | 2 |
+| SpecPi review + repair | 88 / 96 | 80 / 96 | 25 / 32 | 73.10 s | 6 | 2 |
+| Pi native editing | 90 / 96 | 87 / 96 | 28 / 32 | 35.82 s | 4 | 2 |
+| Anchored experiment | 84 / 96 | 82 / 96 | 25 / 32 | 38.54 s | 7 | 5 |
+
+All four conditions had zero edit rejections and zero edited controls. Both review conditions and native editing passed all 12 control trials; anchored editing passed 11/12 because one response hit the output limit. The review skill reported findings on two control trials. Findings are observations, not automatically confirmed defects or false positives.
+
+| Comparison | Difficulty | Candidate only passes | Baseline only passes | Both pass | Both fail |
+| --- | --- | ---: | ---: | ---: | ---: |
+| review | All | 13 | 5 | 75 | 3 |
+| review | easy | 1 | 0 | 23 | 0 |
+| review | medium | 3 | 2 | 30 | 1 |
+| review | hard | 9 | 3 | 22 | 2 |
+| editing | All | 4 | 10 | 80 | 2 |
+| editing | easy | 1 | 3 | 20 | 0 |
+| editing | medium | 2 | 3 | 31 | 0 |
+| editing | hard | 1 | 4 | 29 | 2 |
+
+The profile requested high reasoning, a 16,384-token response limit, two concurrent trials and the same interleaved 384-trial schedule. GLM requested medium reasoning. The 568 completed DeepSeek responses were served by Parasail (480), Morph (87) and DeepInfra (1). Provider and reasoning differences prevent a controlled model ranking.
+
+Routing also limits the within-model review comparison: 64 of 96 review pairs involved multiple providers across their scored calls. Morph served 69 of 191 skill-condition calls but only 11 of 185 generic-condition calls. Requested reasoning does not establish equivalent provider behavior. Review's eight-trial net gain coincides with eight fewer output-limit failures, while both conditions had two code failures. This is a useful lead for a provider-controlled follow-up, not evidence that an automatic review loop reliably improves code. Only 3 of 96 editing pairs involved multiple providers; those observations still do not attest to identical serving implementations.
+
+### What failed and why the run was slow
+
+The 42 failed trials comprise **31 output-limit failures and 11 code failures**. Completed response failures stay in the denominator. Thirty-two incomplete provider attempts remain separate; 31 calls in those attempts reached the approximately 180-second deadline. Their cumulative model wait was 110.35 minutes, overlapping across two workers. No valid behavioral failure was rerun; two interrupted trials required a fourth attempt before completing.
+
+DeepSeek's median completed response took **31.60 seconds**, versus GLM's **3.27 seconds**, with median output counts of **3,549.5 versus 350 tokens**. These are observed service/model measurements, not proof that the reasoning setting alone caused the difference. The full DeepSeek run spanned about 4 hours 39 minutes including pauses and continuations. Trial medians in the table sum response waits within a valid trial and exclude grading and excluded attempts.
+
+Anchored pagination repairs failed all three repetitions: they treated the initial null cursor as a reason to skip the first fetch. Two anchored iterator repairs lost the original source exception when cleanup also threw. Native editing had one event-listener snapshot failure and one iterator exception-preservation failure. The same pagination and iterator contracts account for both code failures in each review condition. All these edits were accepted by the editor; accurate targeting did not ensure correct behavior.
+
+### Cost and retained evidence
+
+OpenRouter reported **$3.697983 for DeepSeek**, including its three setup pilots and incomplete attempts with known costs. The DeepSeek increment is **$5.095235 under conservative accounting**, including 34 unresolved reservations and 10% headroom. Across GLM and DeepSeek, reported charges total **$3.957533** and conservative charges/reservations total **$6.535585**, leaving **$0.939112 under the explicitly amended $7.474697 cap**. These accounting totals are not a final account invoice or current wallet balance.
+
+The original $5 ledger was retained. After 78 valid DeepSeek trials, the user confirmed $5 remaining; the cap was amended while idle, preserving all existing charges, 84 result hashes, the original manifest and generation sources. The model-call implementation, tasks, settings and graders stayed fixed. Later wallet-balance updates did not raise the cap again. The [protocol](quality-evaluation.md) describes the amendment and the pilot stream-accounting fixes.
+
+The [complete DeepSeek archive](../evals/quality/results/2026-09-13-deepseek.json) contains all 384 outcomes, excluded attempts, provider metadata, pilots, budget evidence and **255 distinct final fixture variants in 290 deduplicated file blobs**. Export reconstructed and regraded every variant. The original GLM ledger entries and every result retained at the budget amendment remain unchanged. Codex, GLM, DeepSeek and the interrupted Morph cohort stay separate.
 
 ## Independent GLM comparison
 
@@ -97,12 +139,12 @@ See the [protocol and replay commands](quality-evaluation.md) and the [evaluatio
 
 | Feature | Decision | Remaining evidence needed |
 | --- | --- | --- |
-| Explicit review skill | Keep manually selected | GLM showed seven paired gains and seven regressions; evaluate actual proposed patches and human review burden before any automatic loop |
+| Explicit review skill | Keep manually selected | GLM tied; DeepSeek's net gain came from fewer output-limit failures with a different provider mix. Freeze a provider-controlled comparison using actual proposed patches and human-audited expectations before any automatic loop |
 | Native Pi editor | Keep as the production editor | Realistic discovery and mutation workflows remain outside the adapter |
-| Anchored editing | Keep uninstalled | GLM's eight paired gains, seven regressions and seven edit rejections do not justify replacement; require repeatable gains plus production Guard, scope, stale-file and transaction validation |
+| Anchored editing | Keep uninstalled | GLM's one-trial net gain did not replicate: DeepSeek had four paired gains and ten regressions, including repeated semantic failures despite zero edit rejections. Require repeatable gains plus production Guard, scope, stale-file and transaction validation |
 | Verification receipts and required checks | Keep observed-evidence gates and the reviewed fixes | Their overall model-quality effect was not measured by this supplied-context experiment |
 | Selected editor context | Keep explicit previews and stale-buffer checks | Measure useful context and error reduction on real workspace tasks |
-| Evaluation suite | Keep as a bounded regression screen | Retain both model cohorts and failures; add independently audited holdouts, real proposed patches and repository discovery before making broader claims |
+| Evaluation suite | Keep as a bounded regression screen | Retain all model cohorts and failures; add independently audited holdouts, real proposed patches, fixed serving providers and repository discovery before making broader claims |
 
 ## Earlier eight-task screen
 

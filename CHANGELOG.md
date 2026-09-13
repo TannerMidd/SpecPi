@@ -17,6 +17,7 @@
 - Expand quality evaluation to 32 mixed-difficulty tasks with independent reference and wrong-repair qualification, review-then-repair outcomes, repeated paired trials, browser failure flows and frozen public SpecPi modules. Preserve the original screen separately.
 - Add a GitHub Pages evaluations page with a filterable task catalog, paired results, methodology and downloadable sanitized evidence.
 - Add a separate GLM 5.3 Flash evaluation through Pi's OpenRouter provider, with fixed routing, a shared spending cap, retained transport attempts and resume checks that preserve valid failures.
+- Add a DeepSeek V4.1 Flash profile to the same evaluation adapter, with per-request price ceilings in the existing shared budget and separate published results. Recognize SSE completion markers and retain numeric evidence when usage accounting fails.
 - Count a candidate's unsettled awaited operation as a failed replay outcome when Node exits with status 13 after grading starts; preserve the original evidence when correcting an already recorded classification.
 
 ## 0.20.1 - 2026-09-10

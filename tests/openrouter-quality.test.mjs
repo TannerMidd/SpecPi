@@ -3,15 +3,18 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 import { QualityBudget } from "../scripts/quality-budget.mjs";
 import {
     conforms,
     buildProviderSchedule,
     createCaller,
     requestPayload,
+    responseMetadata,
     resumeState,
     schemas,
     settings,
+    profiles,
     trial,
 } from "../scripts/openrouter-quality.mjs";
 import { AuthStorage } from "../node_modules/@earendil-works/pi-coding-agent/dist/core/auth-storage.js";
@@ -50,6 +53,89 @@ test("spending reservations survive restart and refuse overspend, unknown usage 
     restored.reserve("second", 10000, 16384);
     assert.ok(restored.totalMicros() < 20000);
     assert.throws(() => restored.settle("second", 10001, 100, 0.001), /usage/);
+});
+
+test("an explicit CLI cap cannot silently increase an existing ledger", (t) => {
+    const root = temporary(t);
+    const ledger = path.join(root, "budget.json");
+    new QualityBudget(ledger, 5).save();
+    const qualification = path.join(root, "qualification.json");
+    fs.writeFileSync(qualification, JSON.stringify({ tasks: 32, suiteVersion, sourceDigests: sourceDigests() }));
+    const before = fs.readFileSync(ledger, "utf8");
+    const result = spawnSync(
+        process.execPath,
+        [
+            path.join(repositoryRoot, "scripts/openrouter-quality.mjs"),
+            "pilot",
+            path.join(root, "output"),
+            ledger,
+            qualification,
+            "deepseek",
+            "6",
+        ],
+        { encoding: "utf8", timeout: 10000, windowsHide: true },
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /existing spending cap cannot change/);
+    assert.equal(fs.readFileSync(ledger, "utf8"), before);
+    assert.equal(fs.existsSync(path.join(root, "output")), false);
+    assert.equal(fs.existsSync(`${ledger}.lock`), false);
+});
+
+test("a shared ledger preserves older charges and settles each model at its reserved rates", (t) => {
+    const file = path.join(temporary(t), "budget.json");
+    const original = new QualityBudget(file, 5);
+    original.reserve("glm", 10000, 16384);
+    original.settle("glm", 1000, 100, 0.0001);
+    const older = structuredClone(original.data.requests[0]);
+    delete original.data.requests[0].prices;
+    original.save();
+    const mixed = new QualityBudget(file, 5);
+    mixed.reserve("deepseek", 10000, 16384, profiles.deepseek.prices);
+    const restored = new QualityBudget(file, 5);
+    restored.settle("deepseek", 1000, 100, 0.0002);
+    assert.equal(restored.data.requests[0].chargeMicros, older.chargeMicros);
+    assert.equal(restored.data.requests[1].chargeMicros, Math.ceil((1000 * 0.3 + 100 * 1.2) * 1.1));
+    assert.throws(() => restored.reserve("bad", 100, 100, { input: -1, output: 1 }), /Invalid/);
+    assert.equal(restored.data.capMicros, 5000000);
+});
+
+test("DeepSeek profile uses the same adapter with distinct model identity, routing and cost ceilings", async (t) => {
+    const budget = new QualityBudget(path.join(temporary(t), "budget.json"), 5);
+    const credentials = AuthStorage.inMemory({ openrouter: { type: "api_key", key: "synthetic-deepseek-key" } });
+    const profile = profiles.deepseek;
+    t.mock.method(globalThis, "fetch", async (_input, init) => {
+        const body = JSON.parse(init.body);
+        assert.equal(body.model, "deepseek/deepseek-v4.1-flash");
+        assert.deepEqual(body.provider.only, ["deepinfra/fp8", "morph/fp8", "parasail/fp8"]);
+        assert.deepEqual(body.provider.max_price, { prompt: 0.3, completion: 1.2, request: 0 });
+        assert.deepEqual(body.reasoning, { effort: "high", exclude: true });
+        assert.equal(body.max_tokens, 16384);
+        assert.equal(body.tools, undefined);
+        const chunk = {
+            id: "synthetic-deepseek-response",
+            model: profile.model,
+            provider: "Parasail",
+            choices: [
+                {
+                    index: 0,
+                    delta: { content: JSON.stringify({ calls: [], explanation: "No change." }) },
+                    finish_reason: "stop",
+                },
+            ],
+            usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, cost: 0.000054 },
+        };
+
+        return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+            headers: { "content-type": "text/event-stream" },
+        });
+    });
+    const caller = await createCaller(budget, credentials, profile);
+    const result = await caller("deepseek", "Return an empty edit list.", schemas.native);
+    assert.equal(result.infrastructureError, undefined);
+    assert.equal(result.protocolFailure, false);
+    assert.deepEqual(budget.data.requests[0].prices, profile.prices);
+    assert.equal(JSON.stringify(result).includes("synthetic-deepseek-key"), false);
 });
 
 test("provider adapter uses opaque synthetic credentials, pinned routing, no tools and bounded accounting", async (t) => {
@@ -104,6 +190,58 @@ test("provider adapter uses opaque synthetic credentials, pinned routing, no too
         budget.data.requests.every((item) => item.status === "settled"),
         true,
     );
+});
+
+test("completion markers finish metadata reads and missing cost preserves numeric evidence", async (t) => {
+    const chunk = {
+        id: "synthetic-open-stream",
+        model: settings.model,
+        provider: settings.providerNames[0],
+        choices: [
+            {
+                index: 0,
+                delta: { content: JSON.stringify({ calls: [], explanation: "No change." }) },
+                finish_reason: "stop",
+            },
+        ],
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, cost: 0.00002 },
+    };
+    const streamText = () => `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`;
+    const open = new Response(
+        new ReadableStream({
+            start(controller) {
+                controller.enqueue(new TextEncoder().encode(streamText()));
+            },
+        }),
+    );
+    let timeout;
+    try {
+        const meta = await Promise.race([
+            responseMetadata(open),
+            new Promise((_, reject) => {
+                timeout = setTimeout(() => reject(new Error("Metadata waited past DONE")), 1000);
+            }),
+        ]);
+        assert.equal(meta.reportedCostUsd, 0.00002);
+        const framed = await responseMetadata(new Response(":".repeat(5 * 1024 * 1024) + "\n" + streamText()));
+        assert.equal(framed.reportedCostUsd, 0.00002);
+    } finally {
+        clearTimeout(timeout);
+    }
+
+    delete chunk.usage.cost;
+    t.mock.method(
+        globalThis,
+        "fetch",
+        async () => new Response(streamText(), { headers: { "content-type": "text/event-stream" } }),
+    );
+    const budget = new QualityBudget(path.join(temporary(t), "budget.json"), 5);
+    const credentials = AuthStorage.inMemory({ openrouter: { type: "api_key", key: "synthetic-stream-key" } });
+    const caller = await createCaller(budget, credentials);
+    const missing = await caller("missing-cost", "Return an empty edit list.", schemas.native);
+    assert.match(missing.infrastructureError, /Usage accounting failed/);
+    assert.equal(missing.usage.input_tokens, 100);
+    assert.equal(budget.data.requests[0].status, "reserved");
 });
 
 test("structured model failures count as failures even when the starting control passes", async (t) => {
@@ -197,6 +335,7 @@ test("publication refuses an incomplete experiment or changed provider adapter",
     const manifest = {
         mode: "full",
         suiteVersion,
+        settings,
         sourceDigests: sourceDigests(),
         fixtureDigests: Object.fromEntries(tasks.map((task) => [task.id, fixtureDigest(task)])),
         schedule: buildProviderSchedule().map(({ task, ...run }) => ({ ...run, task: task.id })),

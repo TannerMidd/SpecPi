@@ -22,7 +22,7 @@ const title = (id) =>
 const csv = (value) => '"' + String(value ?? "").replaceAll('"', '""') + '"';
 
 function trialCsv(data) {
-    const providerColumns = data.providerExperiment === "openrouter-glm";
+    const providerColumns = ["openrouter-glm", "openrouter-deepseek"].includes(data.providerExperiment);
     const fields = [
         "task",
         "difficulty",
@@ -82,6 +82,11 @@ export function renderIndependentResults(data) {
         return "";
     }
 
+    const deepseek = data.providerExperiment === "openrouter-deepseek";
+    const family = deepseek ? "DeepSeek" : "GLM";
+    const modelName = deepseek ? "DeepSeek V4.1 Flash" : "GLM 5.3 Flash";
+    const sectionId = deepseek ? "deepseek" : "independent";
+    const slug = deepseek ? "deepseek" : "glm";
     const summary = aggregateQuality(data.runs, data.catalog);
     const firstPass = (condition) =>
         data.runs.filter((run) => run.condition === condition && run.attempt === 1 && run.acceptance === "passed")
@@ -120,19 +125,35 @@ export function renderIndependentResults(data) {
         (sum, run) => sum + run.calls.reduce((n, call) => n + (call.priorAttempts?.length ?? 0), 0),
         0,
     );
+    const responseFailures = (condition) =>
+        data.runs.filter((run) => run.condition === condition && run.modelFailure).length;
+    const mixedReviewPairs = data.runs.filter((run) => {
+        if (run.condition !== "baseline") {
+            return false;
+        }
 
-    return `<section id="independent" class="eval-section" aria-labelledby="independent-title"><p class="eval-eyebrow">INDEPENDENT MODEL / SAME TASKS</p><h2 id="independent-title">GLM 5.3 Flash</h2>
-<p><strong>Provider:</strong> OpenRouter. <strong>Routing:</strong> ${escape(data.manifest.settings.providerName)}. <strong>Adapter:</strong> Pi ${escape(data.manifest.piVersion)} ModelRuntime. <strong>Reasoning:</strong> medium, with a 16,384-token response limit.</p>
-<p>This model family did not help author the suite. These 384 trials use the same frozen 32 task requests and source fixtures, with documented grading corrections. Each GLM condition uses the same provider adapter; the earlier Codex baseline uses different system context and transport. Compare the paired interventions within each model, rather than treating the two runs as a controlled model ranking.</p>
+        const candidate = data.runs.find(
+            (other) => other.condition === "skill" && other.task === run.task && other.repetition === run.repetition,
+        );
+
+        return candidate && new Set([...run.calls, ...candidate.calls].map((call) => call.metadata?.provider)).size > 1;
+    }).length;
+
+    return `<section id="${sectionId}" class="eval-section" aria-labelledby="${sectionId}-title"><p class="eval-eyebrow">INDEPENDENT MODEL / SAME TASKS</p><h2 id="${sectionId}-title">${modelName}</h2>
+<p><strong>Provider:</strong> OpenRouter. <strong>Routing:</strong> ${escape(data.manifest.settings.providerName)}. <strong>Adapter:</strong> Pi ${escape(data.manifest.piVersion)} ModelRuntime. <strong>Reasoning:</strong> ${escape(data.manifest.settings.reasoning)}, with a 16,384-token response limit.</p>
+<p>This model family did not help author the suite. These 384 trials use the same frozen 32 task requests and source fixtures, with documented grading corrections. Each ${family} condition uses the same provider adapter; the earlier Codex baseline uses different system context and transport. Compare the paired interventions within each model, rather than treating separate cohorts as a controlled model ranking.</p>
+${deepseek ? '<p class="eval-note">DeepSeek requested high reasoning; GLM requested medium. Model cohorts keep their own settings and results. This is a feature comparison within each model, not an equal-compute model ranking.</p>' : ""}
+${data.manifest.budgetAmendment ? `<p class="eval-note"><strong>Budget amendment:</strong> After ${data.manifest.budgetAmendment.validTrialsRetained} valid trials, the user confirmed $${data.manifest.budgetAmendment.authorizedRemainingUsd.toFixed(2)} remaining. The shared cap became $${data.manifest.budgetAmendment.newCapUsd.toFixed(6)}. The JSON retains the prior ledger, manifest, generation sources and result hashes. Tasks, model settings and grading stayed fixed.</p>` : ""}
 ${data.manifest.gradingCorrection ? '<p class="eval-note"><strong>Grading correction:</strong> A candidate promise that never resolved exposed an early-exit classification bug. Node exit 13 after grading starts now counts as a behavioral failure. All 64 retained outcomes were checked: 63 stayed unchanged and that one case became a failure. Its original record and manifest remain in the JSON; no new model response was generated for the correction.</p>' : ""}
-<div class="eval-table-scroll" role="region" aria-label="GLM condition results" tabindex="0"><table><caption>GLM behavioral acceptance and first-attempt reliability</caption><thead><tr><th scope="col">Condition</th><th scope="col">Passes / valid trials</th><th scope="col">First trial attempt passes</th><th scope="col">Tasks passing all 3</th><th scope="col">Median model time</th><th scope="col">Edit rejections</th></tr></thead><tbody>${scores}</tbody></table></div>
+<div class="eval-table-scroll" role="region" aria-label="${family} condition results" tabindex="0"><table><caption>${family} behavioral acceptance and first-attempt reliability</caption><thead><tr><th scope="col">Condition</th><th scope="col">Passes / valid trials</th><th scope="col">First trial attempt passes</th><th scope="col">Tasks passing all 3</th><th scope="col">Median model time</th><th scope="col">Edit rejections</th></tr></thead><tbody>${scores}</tbody></table></div>
 <p class="eval-note">First-attempt counts include service availability: a trial that required a restart does not count as a first-attempt pass. Bounded request retries remain part of each attempt. Observed serving providers: ${providers.map(escape).join(", ")}.</p>
-<div class="eval-table-scroll" role="region" aria-label="GLM paired changes" tabindex="0"><table><caption>Matched GLM task/repetition pairs</caption><thead><tr><th scope="col">Comparison / difficulty</th><th scope="col">Candidate only passes</th><th scope="col">Baseline only passes</th><th scope="col">Both pass</th><th scope="col">Both fail</th></tr></thead><tbody>${pairs}</tbody></table></div>
-<p class="eval-note">${retries} recovered transport attempts and ${data.invalidAttempts.length} excluded trial attempts are retained. Completed refusals, malformed responses and output limits count as model failures. Incomplete provider responses remain separate. Median time covers valid trials, including their backoff and provider scheduling; no valid behavioral failure was rerun.</p>
-<p><strong>Spending:</strong> $${data.budget.reportedCostUsd.toFixed(4)} reported by OpenRouter; $${data.budget.conservativeChargeUsd.toFixed(4)} conservatively counted against the $5 cap, including setup pilots, the interrupted fixed-endpoint cohort and unresolved request reservations.</p>
-<details class="eval-history"><summary>GLM scores for all 32 tasks</summary><div class="eval-table-scroll" role="region" aria-label="GLM task scores" tabindex="0"><table><caption>GLM passes / valid trials by task</caption><thead><tr><th scope="col">Task</th><th scope="col">Difficulty</th><th scope="col">Generic + repair</th><th scope="col">Skill + repair</th><th scope="col">Native</th><th scope="col">Anchored</th></tr></thead><tbody>${rows}</tbody></table></div></details>
-<div class="eval-downloads"><a href="./glm-results.json" download>Download GLM evidence (JSON)</a><a href="./glm-trials.csv" download>Download GLM trial metrics (CSV)</a></div>
-<p class="eval-note">The review stage receives an implementation and requested behavior without a proposed Git diff, while the review skill is intended for reviewing changes. Some GLM responses noted that mismatch. This limits what the review comparison establishes about real pull requests. A future frozen evaluation should supply proposed patches and independently audited expectations.</p>
+<div class="eval-table-scroll" role="region" aria-label="${family} paired changes" tabindex="0"><table><caption>Matched ${family} task/repetition pairs</caption><thead><tr><th scope="col">Comparison / difficulty</th><th scope="col">Candidate only passes</th><th scope="col">Baseline only passes</th><th scope="col">Both pass</th><th scope="col">Both fail</th></tr></thead><tbody>${pairs}</tbody></table></div>
+<p class="eval-note">${retries} recovered transport attempts and ${data.invalidAttempts.length} excluded trial attempts are retained. ${data.runs.filter((run) => run.modelFailure).length} trials failed because of a refusal, malformed response or output limit; these count in the scores. Incomplete provider responses remain separate. Median time covers valid trials, including their backoff and provider scheduling; no valid behavioral failure was rerun.</p>
+${deepseek ? `<p class="eval-note"><strong>Review interpretation:</strong> Generic review had ${responseFailures("baseline")} response-contract failures and ${summary.review.conditions.baseline.failed - responseFailures("baseline")} code failures; the review skill had ${responseFailures("skill")} and ${summary.review.conditions.skill.failed - responseFailures("skill")}, respectively. ${mixedReviewPairs} of 96 review pairs involved multiple serving providers. The score difference does not isolate a semantic improvement from the skill. Review remains explicitly selected; a follow-up should control the provider and supply actual proposed patches.</p>` : ""}
+<p><strong>${deepseek ? "Shared GLM + DeepSeek spending" : "Spending"}:</strong> $${data.budget.reportedCostUsd.toFixed(4)} reported by OpenRouter; $${data.budget.conservativeChargeUsd.toFixed(4)} conservatively counted against the $${data.budget.capMicros / 1e6} cap, including ${deepseek ? "the earlier GLM experiments, DeepSeek pilots and" : "setup pilots, the interrupted fixed-endpoint cohort and"} unresolved request reservations.</p>
+<details class="eval-history"><summary>${family} scores for all 32 tasks</summary><div class="eval-table-scroll" role="region" aria-label="${family} task scores" tabindex="0"><table><caption>${family} passes / valid trials by task</caption><thead><tr><th scope="col">Task</th><th scope="col">Difficulty</th><th scope="col">Generic + repair</th><th scope="col">Skill + repair</th><th scope="col">Native</th><th scope="col">Anchored</th></tr></thead><tbody>${rows}</tbody></table></div></details>
+<div class="eval-downloads"><a href="./${slug}-results.json" download>Download ${family} evidence (JSON)</a><a href="./${slug}-trials.csv" download>Download ${family} trial metrics (CSV)</a></div>
+<p class="eval-note">The review stage receives an implementation and requested behavior without a proposed Git diff, while the review skill is intended for reviewing changes. This limits what the review comparison establishes about real pull requests. A future frozen evaluation should supply proposed patches and independently audited expectations.</p>
 <p class="eval-note">Using another model reduces author-model dependence. It does not prove the tasks are absent from training data or replace independent human review of the graders.</p></section>`;
 }
 
@@ -156,7 +177,7 @@ export function renderInterruptedResults(data) {
     return `<section id="glm-interrupted" class="eval-section" aria-labelledby="glm-interrupted-title"><h2 id="glm-interrupted-title">Earlier fixed-endpoint cohort</h2><p>The fixed Morph FP8 cohort stopped after ${data.runs.length} valid trials out of 384 planned because of persistent upstream rate limits. It contains ${data.runs.filter((run) => run.acceptance === "failed").length} behavioral failures and ${data.invalidAttempts.length} excluded trial attempts. Its observed outcomes are preserved separately from the later failover cohort; it did not reach the editing comparison.</p><details class="eval-history"><summary>Inspect the interrupted Morph cohort</summary><div class="eval-table-scroll" role="region" aria-label="Interrupted Morph outcomes" tabindex="0"><table><caption>Observed outcomes from the incomplete schedule</caption><thead><tr><th scope="col">Condition</th><th scope="col">Passes / valid trials</th><th scope="col">Failed trials</th></tr></thead><tbody>${rows}</tbody></table></div><p>No valid behavioral failure was retried within this cohort. The later cohort changed the routing policy and interleaved experiments; it is a separate experiment, and the two cohorts are not pooled.</p><a href="./glm-morph-interrupted.json" download>Download interrupted Morph evidence (JSON)</a></details></section>`;
 }
 
-export function renderEvalsPage(data, independent = null, interrupted = null) {
+export function renderEvalsPage(data, independent = null, interrupted = null, deepseek = null) {
     const catalog =
         data?.catalog ??
         tasks.map((task) => ({
@@ -229,10 +250,11 @@ export function renderEvalsPage(data, independent = null, interrupted = null) {
 <main id="evaluations" class="wrap">
 <header class="eval-heading"><p class="eval-eyebrow">QUALITY EVIDENCE / SUITE ${suiteVersion}</p><h1>Evaluations</h1><p class="eval-deck">Test whether a change improves the work. Keep the result, the method, and the limits visible.</p><p>Paired comparisons on JavaScript tasks, from boundary fixes to concurrent state changes and browser flows. These results measure the tested behaviors; they are not a general coding-accuracy score.</p></header>
 <dl class="eval-stats"><div><dt>Distinct tasks</dt><dd>${catalog.length}</dd></div><div><dt>${independent ? "Trials per model" : data ? "Completed trials" : "Scheduled trials"}</dt><dd>${data?.runs.length ?? catalog.length * 12}</dd></div><div><dt>Negative controls</dt><dd>${catalog.filter((task) => task.negativeControl).length}</dd></div><div><dt>Trials per condition/task</dt><dd>3</dd></div></dl>
-<nav class="eval-jump" aria-label="Evaluation sections"><a href="#results">Codex baseline</a>${independent ? '<a href="#independent">GLM comparison</a>' : ""}<a href="#coverage">Task catalog</a><a href="#method">Method</a><a href="#limits">Limits</a><a href="#evidence">Evidence</a></nav>
+<nav class="eval-jump" aria-label="Evaluation sections"><a href="#results">Codex baseline</a>${independent ? '<a href="#independent">GLM comparison</a>' : ""}${deepseek ? '<a href="#deepseek">DeepSeek comparison</a>' : ""}<a href="#coverage">Task catalog</a><a href="#method">Method</a><a href="#limits">Limits</a><a href="#evidence">Evidence</a></nav>
 <section id="results" class="eval-section" aria-labelledby="results-title"><p class="eval-eyebrow">01 / OUTCOMES</p><h2 id="results-title">Codex baseline</h2><p><strong>Model:</strong> gpt-6-astra, medium reasoning. <strong>Provider:</strong> Codex CLI / ChatGPT subscription. <strong>Editor:</strong> Pi 0.84.4 or the uninstalled anchored experiment.</p>${results}
 <aside class="eval-callout"><strong>Promotion is a separate decision.</strong> Anchored editing remains uninstalled. This adapter does not establish production editing safety or Command Guard equivalence. The review skill remains explicitly selected; successful tests do not replace human review.</aside></section>
 ${renderIndependentResults(independent)}
+${renderIndependentResults(deepseek)}
 ${renderInterruptedResults(interrupted)}
 <section id="coverage" class="eval-section" aria-labelledby="coverage-title"><p class="eval-eyebrow">02 / COVERAGE</p><h2 id="coverage-title">A mix of easy and difficult work</h2>
 <div class="eval-tiers">${["easy", "medium", "hard"].map((difficulty) => `<div><strong>${catalog.filter((task) => task.difficulty === difficulty).length}</strong><span>${difficulty}</span><p>${difficulty === "easy" ? "Boundaries, values, byte limits and compatibility." : difficulty === "medium" ? "Parsing, migrations, state transitions and browser persistence." : "Concurrency, cancellation, rollback, stream boundaries and public modules."}</p></div>`).join("")}</div>
@@ -287,7 +309,20 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         throw new Error("Expected the explicitly interrupted Morph archive.");
     }
 
-    const html = renderEvalsPage(data, independent, interrupted);
+    const deepseekPath = path.join(root, "evals/quality/results/2026-09-13-deepseek.json");
+    const deepseek = data && fs.existsSync(deepseekPath) ? JSON.parse(fs.readFileSync(deepseekPath, "utf8")) : null;
+    if (
+        deepseek &&
+        (deepseek.providerExperiment !== "openrouter-deepseek" ||
+            deepseek.suiteVersion !== suiteVersion ||
+            deepseek.cohortStatus !== "complete" ||
+            deepseek.runs.length !== 384 ||
+            deepseek.runs.some((run) => run.error))
+    ) {
+        throw new Error("DeepSeek results require a complete archive.");
+    }
+
+    const html = renderEvalsPage(data, independent, interrupted, deepseek);
     const artifacts = { "index.html": html };
     if (interrupted) {
         artifacts["glm-morph-interrupted.json"] = JSON.stringify(interrupted, null, 2) + "\n";
@@ -296,6 +331,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (independent) {
         artifacts["glm-results.json"] = JSON.stringify(independent, null, 2) + "\n";
         artifacts["glm-trials.csv"] = trialCsv(independent);
+    }
+
+    if (deepseek) {
+        artifacts["deepseek-results.json"] = JSON.stringify(deepseek, null, 2) + "\n";
+        artifacts["deepseek-trials.csv"] = trialCsv(deepseek);
     }
 
     if (data) {

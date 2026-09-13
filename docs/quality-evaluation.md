@@ -120,6 +120,35 @@ A GLM `bounded-map` candidate returned a promise that never resolved. Node exite
 
 Routing and error handling follow OpenRouter's [provider-selection](https://openrouter.ai/docs/guides/routing/provider-selection) and [rate-limit](https://openrouter.ai/docs/api/reference/limits) contracts. Prices and availability can change; the frozen request limits remain binding for this experiment.
 
+### DeepSeek V4.1 Flash cohort
+
+The additional `deepseek` profile selects `deepseek/deepseek-v4.1-flash`, the latest Flash release listed in OpenRouter's public catalog when checked on September 13, 2026 (released September 10). It uses the same 32 requests, fixtures, schemas, grading assertions, interleaved schedule and three repetitions per condition. High reasoning is explicitly requested, with the same 16,384-token response limit, three edit-response limit, two concurrent trials and 180-second request timeout. Reasoning settings are not calibrated across model families; GLM requested medium. This is another within-model feature comparison, not an equal-compute model ranking.
+
+Only the DeepInfra, Morph and Parasail FP8 endpoints are eligible. Their public endpoint metadata lists structured-output support. Routing requires supported parameters, denies provider data collection and caps input at $0.30/M tokens and output at $1.20/M tokens. The adapter records the resolved serving provider. These route and price choices are frozen in the run manifest.
+
+The user authorized the remainder of the original $5 cap. Reuse `.specpi-test/glm-budget.json`; do not create a fresh allowance. It already counted $1.440350 before DeepSeek, leaving $3.559650. New reservations record per-request rates, and previous GLM charges/reservations retain their original rates. All DeepSeek pilots and retries count toward the same cap.
+
+```text
+node scripts/openrouter-quality.mjs pilot .specpi-test/deepseek-pilot-3 .specpi-test/glm-budget.json .specpi-test/quality-v2-revised-qualification.json deepseek
+node scripts/openrouter-quality.mjs full .specpi-test/deepseek-full .specpi-test/glm-budget.json .specpi-test/quality-v2-revised-qualification.json deepseek
+node scripts/openrouter-quality.mjs resume .specpi-test/deepseek-full .specpi-test/glm-budget.json .specpi-test/quality-v2-revised-qualification.json deepseek
+node scripts/export-openrouter-quality.mjs .specpi-test/deepseek-full .specpi-test/glm-budget.json evals/quality/results/2026-09-13-deepseek.json .specpi-test/deepseek-pilot .specpi-test/deepseek-pilot-2 .specpi-test/deepseek-pilot-3
+node scripts/replay-openrouter-quality.mjs evals/quality/results/2026-09-13-deepseek.json
+node scripts/build-evals-page.mjs evals/quality/results/2026-09-13-v2.json
+```
+
+The first two pilots stopped during usage accounting; both retain full reservations for their incomplete accounting records. The second exposed a completed 16,384-token response whose SSE metadata read failed. Setup changes recognize the SSE completion marker, raise the bounded framing allowance from 4 MiB to 32 MiB, and preserve numeric usage if billing metadata is missing. Synthetic regressions cover terminal markers, large framing and missing costs. The third pilot completed four valid trials: three passes and one output-limit failure. All pilots are excluded from the full cohort, with their manifests and costs retained. These setup changes do not alter the task prompts or graders, and a completed output-limit response counts as a behavioral failure.
+
+During the full run, the user confirmed **$5 remaining**. At the next pause, 78 valid trials and six incomplete provider attempts were retained, and the shared ledger conservatively counted $2.474697. Its cumulative cap was explicitly amended to **$7.474697**, preserving every prior request charge. The manifest's `budgetAmendment` retains the original ledger, manifest, generation sources and all 84 result hashes. Only the adapter's CLI cap argument and manifest cap changed; task requests, schemas, model/routing/reasoning settings, response limits and graders stayed fixed. The runner still refuses a cap argument that differs from the existing ledger; it cannot silently increase the allowance.
+
+After that recorded amendment, continuation uses the explicit cumulative cap:
+
+```text
+node scripts/openrouter-quality.mjs resume .specpi-test/deepseek-full .specpi-test/glm-budget.json .specpi-test/quality-v2-revised-qualification.json deepseek 7.474697
+```
+
+Primary references: [OpenRouter model details](https://openrouter.ai/deepseek/deepseek-v4.1-flash), [public endpoint metadata](https://openrouter.ai/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints), and [DeepSeek's documented reasoning controls](https://api-docs.deepseek.com/guides/thinking_mode/). The native DeepSeek documentation describes its earlier V4 models; the actual OpenRouter request and returned provider are recorded for this V4.1 experiment rather than assuming an undocumented cross-provider reasoning equivalence.
+
 ### Scope of the original Codex baseline
 
 This is a supplied-context Codex adapter, not a complete Pi conversation or repository exploration benchmark. A fresh empty cwd reduces accidental exposure but does not confine all filesystem reads. Native tools are instructed off and detected use is rejected; this is not an adversarial isolation claim. Codex's system context, provider scheduling and hosted model behavior remain outside the fixture.

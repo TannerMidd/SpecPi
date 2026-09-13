@@ -13,3 +13,5 @@ site/evals/trials.csv linguist-generated=true
 site/evals/glm-results.json linguist-generated=true
 site/evals/glm-trials.csv linguist-generated=true
 site/evals/glm-morph-interrupted.json linguist-generated=true
+site/evals/deepseek-results.json linguist-generated=true
+site/evals/deepseek-trials.csv linguist-generated=true

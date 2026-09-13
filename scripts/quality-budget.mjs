@@ -1,5 +1,9 @@
 import fs from "node:fs";
 
+const defaultPrices = { input: 0.15, output: 0.5 };
+const validPrices = (prices) =>
+    prices && [prices.input, prices.output].every((value) => Number.isFinite(value) && value > 0);
+
 // One ledger spans pilots, retries and the full run. Reservations are durable
 // before dispatch; an interrupted request keeps its entire reservation.
 export class QualityBudget {
@@ -24,6 +28,7 @@ export class QualityBudget {
                     typeof item.id !== "string" ||
                     !Number.isSafeInteger(item.chargeMicros) ||
                     item.chargeMicros < 0 ||
+                    (item.prices !== undefined && !validPrices(item.prices)) ||
                     !["reserved", "settled"].includes(item.status),
             ) ||
             this.totalMicros() > this.data.capMicros
@@ -38,24 +43,32 @@ export class QualityBudget {
         fs.renameSync(temporary, this.file);
     }
 
-    reserve(id, inputBound, outputBound) {
+    reserve(id, inputBound, outputBound, prices = defaultPrices) {
         if (
             this.data.requests.some((request) => request.id === id) ||
             !Number.isSafeInteger(inputBound) ||
             inputBound < 1 ||
             !Number.isSafeInteger(outputBound) ||
-            outputBound < 1
+            outputBound < 1 ||
+            !validPrices(prices)
         ) {
             throw new Error("Invalid or duplicate request reservation.");
         }
 
-        // Microdollars: $0.15/M input, $0.50/M output, plus 10% headroom.
-        const chargeMicros = Math.ceil((inputBound * 0.15 + outputBound * 0.5) * 1.1);
+        // $/million-token prices equal microdollars/token; retain 10% headroom.
+        const chargeMicros = Math.ceil((inputBound * prices.input + outputBound * prices.output) * 1.1);
         if (this.totalMicros() + chargeMicros > this.data.capMicros) {
             throw new Error("Evaluation spending cap reached before dispatch.");
         }
 
-        this.data.requests.push({ id, inputBound, outputBound, chargeMicros, status: "reserved" });
+        this.data.requests.push({
+            id,
+            inputBound,
+            outputBound,
+            prices: { ...prices },
+            chargeMicros,
+            status: "reserved",
+        });
         this.save();
     }
 
@@ -76,7 +89,11 @@ export class QualityBudget {
             throw new Error("Missing or out-of-bound usage; retain full reservation and stop.");
         }
 
-        const chargeMicros = Math.ceil(Math.max(input * 0.15 + output * 0.5, reportedCostUsd * 1e6) * 1.1);
+        // Older GLM records predate per-request rates and keep their original ceiling.
+        const prices = request.prices ?? defaultPrices;
+        const chargeMicros = Math.ceil(
+            Math.max(input * prices.input + output * prices.output, reportedCostUsd * 1e6) * 1.1,
+        );
         if (chargeMicros > request.chargeMicros) {
             throw new Error("Provider charge exceeds reservation; stop.");
         }
