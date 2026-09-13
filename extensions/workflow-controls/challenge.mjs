@@ -1,4 +1,5 @@
 import { markdownPathLabel } from "./task-contract.mjs";
+import { renderCheckEvidence } from "./verification.mjs";
 
 const MAX_REQUIREMENTS = 16;
 const MAX_LIST = 12;
@@ -55,6 +56,15 @@ function boundedTaskContract(value) {
         objective: compact(value.objective, 600),
         hypothesis: compact(value.hypothesis, 600),
         requirements,
+        requiredChecks: Array.isArray(value.requiredChecks)
+            ? value.requiredChecks.slice(0, 8).map((check) => ({
+                  id: compact(check.id, 80),
+                  label: compact(check.label, 128),
+                  requirementIds: Array.isArray(check.requirementIds)
+                      ? check.requirementIds.slice(0, 16).map(boundedRequirementId)
+                      : [],
+              }))
+            : [],
         paths: Array.isArray(value.paths)
             ? value.paths
                   .map((item) => compact(item, 240))
@@ -161,12 +171,36 @@ export function validateChallengeSubmission(value, facts = {}) {
     const validationGaps = textList(value.validationGaps, "validationGaps");
     const residualRisks = textList(value.residualRisks, "residualRisks");
     const nextAction = compact(value.nextAction, 500);
+    const checks = (facts.taskContract?.requiredChecks ?? []).map((check) => {
+        const evidence = facts.requiredCheckEvidence?.find((item) => item.checkId === check.id);
+
+        return {
+            checkId: check.id,
+            status: evidence?.status ?? "unknown",
+            receiptId: evidence?.receiptId,
+            requirementIds: check.requirementIds,
+        };
+    });
+    for (const check of checks) {
+        if (
+            check.status !== "passed" &&
+            requirements.some((item) => item.status === "proven" && check.requirementIds.includes(item.id))
+        ) {
+            throw new Error(
+                `A proven requirement needs a current passing receipt for required check ${check.checkId}.`,
+            );
+        }
+    }
 
     if (value.verdict !== "ready-for-human-review" && !nextAction) {
         throw new Error("Incomplete and blocked challenges require a concrete next action");
     }
 
     if (value.verdict === "ready-for-human-review") {
+        if (checks.some((check) => check.status !== "passed")) {
+            throw new Error("Ready verdict rejected: required runtime checks lack current passing receipts.");
+        }
+
         const unresolved = requirements.some((item) => item.status !== "proven");
         if (unresolved) {
             throw new Error("Ready verdict rejected: one or more requirements remain unresolved");
@@ -207,6 +241,7 @@ export function validateChallengeSubmission(value, facts = {}) {
         validationGaps,
         residualRisks,
         nextAction,
+        requiredCheckEvidence: checks,
     };
 }
 
@@ -235,6 +270,21 @@ export function boundedChallengeFacts(value = {}) {
         taskContractDigest: taskContractDigest ? compact(taskContractDigest, 64) : undefined,
         challengeGeneration: challengeGeneration ? compact(challengeGeneration, 64) : undefined,
         scopeTaskStale: Boolean(value.scopeTaskStale),
+        requiredCheckEvidence: Array.isArray(value.requiredCheckEvidence)
+            ? value.requiredCheckEvidence.slice(0, 8).map((item) => ({
+                  checkId: compact(item.checkId, 80),
+                  status: compact(item.status, 16),
+                  receiptId: compact(item.receiptId, 36),
+                  reason: compact(item.reason, 240),
+              }))
+            : [],
+        verificationReceipts: Array.isArray(value.verificationReceipts)
+            ? value.verificationReceipts.slice(-8).map((item) => ({
+                  id: compact(item.id, 36),
+                  status: compact(item.status, 16),
+                  reason: compact(item.reason, 240),
+              }))
+            : [],
     };
 }
 
@@ -280,6 +330,14 @@ export function challengePrompt(generation, facts) {
     }
 
     lines.push(
+        "",
+        renderCheckEvidence(bounded.requiredCheckEvidence),
+        "",
+        "Observed runtime receipts (bounded; only human-selected required checks gate readiness):",
+        ...bounded.verificationReceipts.map((receipt) => `- ${receipt.id}: ${receipt.status} — ${receipt.reason}`),
+    );
+
+    lines.push(
         "A ready-for-human-review verdict is allowed only when every listed requirement is proven, no contradiction or validation gap remains, and no scope drift is pending. When the snapshot above is indeterminate, a ready verdict must also disclose the residual risk that some changes went unobserved. This verdict is a structured model review, not independent verification or completion authority.",
     );
 
@@ -294,6 +352,17 @@ export function renderChallengeMarkdown(result, metadata = {}) {
               ? "Blocked"
               : "Incomplete";
     const lines = [`## Completion Challenge — ${heading}`, "", `Generation: \`${metadata.generation ?? "unknown"}\``];
+    if (result.requiredCheckEvidence?.length) {
+        lines.push(
+            "",
+            "### Runtime checks at submission",
+            ...result.requiredCheckEvidence.map(
+                (item) => `- ${item.checkId}: ${item.status} — receipt ${item.receiptId || "none"}`,
+            ),
+            "- Saved check summaries are historical and require revalidation.",
+        );
+    }
+
     lines.push("", "### Requirements");
     for (const item of result.requirements) {
         const id = item.id ? ` ${item.id}` : "";

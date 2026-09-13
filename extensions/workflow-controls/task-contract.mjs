@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { canonicalRoot, normalizeScopeEntries, sanitizePathLabel, scopeMatches } from "./scope.mjs";
 
 export const TASK_CONTRACT_ENTRY = "specpi-task-contract";
-export const TASK_CONTRACT_SCHEMA = 1;
+export const TASK_CONTRACT_SCHEMA = 2;
 export const MAX_TASK_REQUIREMENTS = 16;
 export const MAX_TASK_PATHS = 40;
 export const MAX_TASK_NON_GOALS = 16;
@@ -159,9 +159,74 @@ function normalizeNonGoals(values) {
     return values.map((value, index) => plainText(value, `Task contract non-goal ${index + 1}`, MAX_NON_GOAL_LENGTH));
 }
 
+export function normalizeRequiredChecks(values, requirements) {
+    if (values === undefined) {
+        return [];
+    }
+
+    if (!Array.isArray(values) || values.length > 8) {
+        throw new Error("A task supports at most eight required checks.");
+    }
+
+    const seen = new Set();
+
+    return values.map((value) => {
+        if (
+            !value ||
+            typeof value !== "object" ||
+            Array.isArray(value) ||
+            Object.keys(value).some(
+                (key) => !["id", "label", "specDigest", "inputs", "requirementIds"].includes(key),
+            ) ||
+            !/^[A-Za-z][A-Za-z0-9_-]{0,79}$/u.test(value.id) ||
+            seen.has(value.id) ||
+            typeof value.label !== "string" ||
+            !value.label.trim() ||
+            value.label.length > 128 ||
+            /[\u0000-\u001f\u007f]/u.test(value.label) ||
+            !/^[a-f0-9]{64}$/u.test(value.specDigest)
+        ) {
+            throw new Error("Required checks need unique IDs, bounded labels and exact execution digests.");
+        }
+
+        seen.add(value.id);
+        if (
+            !Array.isArray(value.requirementIds) ||
+            value.requirementIds.length === 0 ||
+            value.requirementIds.length > 16 ||
+            new Set(value.requirementIds).size !== value.requirementIds.length ||
+            value.requirementIds.some((id) => !requirements.some((item) => item.id === id))
+        ) {
+            throw new Error("Required checks must link exact original requirement IDs.");
+        }
+
+        // These are immutable declaration labels, never filesystem read requests. The runner
+        // owns path/private-state admission and only its live receipts can satisfy them.
+        if (
+            !Array.isArray(value.inputs) ||
+            value.inputs.length === 0 ||
+            value.inputs.length > 40 ||
+            value.inputs.some(
+                (item) => typeof item !== "string" || !item || item.length > 240 || /[\u0000-\u001f\u007f]/u.test(item),
+            ) ||
+            new Set(value.inputs).size !== value.inputs.length
+        ) {
+            throw new Error("Required checks need one to 40 unique bounded input declarations.");
+        }
+
+        return {
+            id: value.id,
+            label: value.label,
+            specDigest: value.specDigest,
+            inputs: [...value.inputs].sort(),
+            requirementIds: [...value.requirementIds],
+        };
+    });
+}
+
 function contractPayload(contract) {
     const payload = {
-        schema: TASK_CONTRACT_SCHEMA,
+        schema: contract.schema,
         id: contract.id,
         root: contract.root,
         origin: contract.origin,
@@ -176,6 +241,10 @@ function contractPayload(contract) {
         rollback: contract.rollback,
         nonGoals: [...contract.nonGoals],
     };
+    if (contract.schema >= 2) {
+        payload.requiredChecks = normalizeRequiredChecks(contract.requiredChecks, contract.requirements);
+    }
+
     if (contract.gapId !== undefined) {
         payload.gapId = contract.gapId;
     }
@@ -198,6 +267,10 @@ function cloneContract(contract) {
         paths: [...contract.paths],
         nonGoals: [...contract.nonGoals],
     };
+    if (contract.schema >= 2) {
+        clone.requiredChecks = normalizeRequiredChecks(contract.requiredChecks, contract.requirements);
+    }
+
     if (contract.gapId === undefined) {
         delete clone.gapId;
     }
@@ -233,7 +306,7 @@ function normalizeContractInput(input, options = {}) {
     }
 
     const payload = {
-        schema: TASK_CONTRACT_SCHEMA,
+        schema: options.schema ?? TASK_CONTRACT_SCHEMA,
         id,
         root,
         origin,
@@ -251,6 +324,12 @@ function normalizeContractInput(input, options = {}) {
         }),
         nonGoals: normalizeNonGoals(input.nonGoals),
     };
+    if (payload.schema >= 2) {
+        payload.requiredChecks = normalizeRequiredChecks(input.requiredChecks, payload.requirements);
+    } else if (input.requiredChecks !== undefined) {
+        throw new Error("Legacy task contracts cannot carry required checks.");
+    }
+
     if (gapId !== undefined) {
         payload.gapId = gapId;
     }
@@ -273,7 +352,7 @@ export function createTaskContract(input, options = {}) {
 
 export function validateTaskContract(contract) {
     assertRecord(contract, "Task contract");
-    if (contract.schema !== TASK_CONTRACT_SCHEMA) {
+    if (![1, TASK_CONTRACT_SCHEMA].includes(contract.schema)) {
         throw new Error("Unsupported task contract schema");
     }
 
@@ -282,6 +361,7 @@ export function validateTaskContract(contract) {
     }
 
     const payload = normalizeContractInput(contract, {
+        schema: contract.schema,
         root: contract.root,
         origin: contract.origin,
         gapId: contract.gapId,
@@ -413,6 +493,19 @@ export function renderTaskContract(contract) {
     }
 
     lines.push("", "### Paths");
+    if (validated.requiredChecks?.length) {
+        lines.splice(
+            lines.length - 2,
+            0,
+            "",
+            "### Required checks",
+            ...validated.requiredChecks.map(
+                (check) =>
+                    `- ${check.id}: ${check.label} — ${check.requirementIds.join(", ")}; execution digest ${check.specDigest}; inputs: ${check.inputs.map(markdownPathLabel).join(", ")}`,
+            ),
+        );
+    }
+
     lines.push(
         ...(validated.paths.length > 0
             ? validated.paths.map((value) => `- \`${markdownPathLabel(value)}\``)

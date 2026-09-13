@@ -20,6 +20,16 @@ test("workflow-controls extension composes scope and completion challenge lifecy
     const report = JSON.parse(match[1]);
     assert.deepEqual(report.commands, ["challenge", "experiment", "guard", "scope", "task"]);
     assert.equal(report.toolRegistered, true);
+    for (const key of [
+        "humanChecksBound",
+        "staleCheckBlockedAtSubmission",
+        "liveCheckReady",
+        "restoredCheckSummaryHistorical",
+        "humanChecksCleared",
+    ]) {
+        assert.equal(report[key], true, key);
+    }
+
     assert.equal(report.nestedCwdOutOfScopeDenied, true);
     assert.equal(report.nestedCwdInScopeAllowed, true);
     assert.equal(report.denied, true);

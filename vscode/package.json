@@ -180,6 +180,21 @@
                 "title": "Choose Chat Workspace",
                 "category": "SpecPi",
                 "icon": "$(folder-opened)"
+            },
+            {
+                "command": "specpi.chat.attachDiagnostics",
+                "title": "Attach Diagnostics to Chat",
+                "category": "SpecPi"
+            },
+            {
+                "command": "specpi.chat.attachReferences",
+                "title": "Attach References to Chat",
+                "category": "SpecPi"
+            },
+            {
+                "command": "specpi.chat.attachDefinition",
+                "title": "Attach Definition to Chat",
+                "category": "SpecPi"
             }
         ],
         "keybindings": [
@@ -210,6 +225,21 @@
                 {
                     "command": "specpi.chat.attachFile",
                     "when": "isWorkspaceTrusted && resourceScheme == file",
+                    "group": "specpi@3"
+                },
+                {
+                    "command": "specpi.chat.attachDiagnostics",
+                    "when": "resourceScheme == file",
+                    "group": "specpi@3"
+                },
+                {
+                    "command": "specpi.chat.attachReferences",
+                    "when": "resourceScheme == file",
+                    "group": "specpi@3"
+                },
+                {
+                    "command": "specpi.chat.attachDefinition",
+                    "when": "resourceScheme == file",
                     "group": "specpi@3"
                 }
             ],

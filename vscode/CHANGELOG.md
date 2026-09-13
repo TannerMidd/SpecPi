@@ -1,5 +1,10 @@
 # SpecPi Chat changelog
 
+## Unreleased
+
+- Add explicit diagnostics, references and definition attachments through existing VS Code providers, with plain-text previews and limits of eight files, 100 results and 16 KiB.
+- Bind language context to the selected conversation, workspace and file/buffer version. Refuse stale sends, exclude private or external locations, and disclose missing providers and cached diagnostic limitations. No additional language server or RPC method is introduced.
+
 ## 0.6.0
 
 - Show Command Guard's mode on a shield beside the composer and change it from a picker, without typing `/guard`. **SpecPi: Choose Command Guard Mode** opens the same picker from the Command Palette. A locked session offers **Unlock** instead of a mode.

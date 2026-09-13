@@ -22,6 +22,7 @@ Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4+**. For SSH, WSL
 - **Try another direction:** branch a conversation or edit an earlier prompt to start a new branch.
 - **Set Command Guard:** with SpecPi installed, a shield beside the composer shows the session's Command Guard mode. Click it to pick Guard, Strict, or Off. Pi confirms before protection is weakened.
 - **Review changes:** open file references and Git diffs in your editor.
+- **Attach editor findings:** in a connected conversation, use **Attach Diagnostics to Chat** for selected files, or **Attach References / Definition to Chat** at a symbol. Inspect the plain-text preview before sending. If a file or buffer changes, remove and collect that attachment again. Empty cached diagnostics do not prove a typecheck passed.
 - **Reload Pi:** use **Restart Pi** in the Chat title bar to reconnect the current conversation and reload its Pi extensions. Other chats keep running.
 
 Press **Enter** to send, **Shift+Enter** for a new line, or type `/` to see available commands.

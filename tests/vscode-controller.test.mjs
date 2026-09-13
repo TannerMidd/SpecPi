@@ -97,6 +97,59 @@ function uri(filePath) {
     };
 }
 
+test("language context commands preview the draft and reject stale buffers before RPC prompt submission", async (t) => {
+    const f = fixture(t);
+    const controller = f.controller;
+    await controller.connect();
+    const filePath = path.join(controller.workspace.uri.fsPath, "language-context.js");
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, "const language = true;\n");
+    t.after(() => fs.rmSync(filePath, { force: true }));
+    const document = { uri: uri(filePath), version: 1, isDirty: false };
+    f.vscode.workspace.textDocuments = [document];
+    f.vscode.languages = { getDiagnostics: () => [] };
+    await controller.attachLanguageContext("Diagnostics", document.uri);
+    assert.equal(controller.attachments.length, 1);
+    assert.match(f.documentOpens.at(-1).content, /No diagnostics reported/);
+    assert.equal(f.documentOpens.at(-1).language, "plaintext");
+    document.version += 1;
+    await assert.rejects(controller.send("Check this file"), /buffer or file changed/);
+    assert.equal(
+        f.clients[0].requests.some((request) => request.type === "prompt"),
+        false,
+    );
+    assert.equal(controller.attachments.length, 1);
+});
+
+test("a language provider finishing after a conversation change cannot attach its result", async (t) => {
+    const f = fixture(t);
+    await f.controller.connect();
+    const filePath = path.join(f.controller.workspace.uri.fsPath, "language-race.js");
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, "const value = true;\n");
+    t.after(() => fs.rmSync(filePath, { force: true }));
+    const document = { uri: uri(filePath), version: 1, isDirty: false };
+    f.vscode.workspace.textDocuments = [document];
+    f.vscode.window.activeTextEditor = { document, selection: { active: { line: 0, character: 6 }, isEmpty: true } };
+    const pending = deferred();
+    let called = false;
+    f.vscode.commands.executeCommand = () => {
+        called = true;
+
+        return pending.promise;
+    };
+
+    const attaching = f.controller.attachLanguageContext("References");
+    while (!called) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+
+    f.controller.contextEpoch += 1;
+    pending.resolve([]);
+    await assert.rejects(attaching, /conversation changed/);
+    assert.equal(f.controller.attachments.length, 0);
+});
+
 function fixture(t, options = {}) {
     const launches = [];
     const clients = [];

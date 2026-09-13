@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn, execFile } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
 import { fileURLToPath } from "node:url";
@@ -86,9 +86,17 @@ export class OutputRing {
         this.capacity = capacity;
         this.bytes = Buffer.alloc(0);
         this.end = 0;
+        this.streams = Object.fromEntries(
+            ["stdout", "stderr"].map((name) => [name, { bytes: 0, hash: createHash("sha256") }]),
+        );
         this.decoders = { stdout: new StringDecoder("utf8"), stderr: new StringDecoder("utf8") };
     }
     append(stream, chunk, final = false) {
+        if (chunk) {
+            this.streams[stream].bytes += chunk.length;
+            this.streams[stream].hash.update(chunk);
+        }
+
         const decoded = final ? this.decoders[stream].end() : this.decoders[stream].write(chunk);
         if (!decoded) {
             return;
@@ -136,6 +144,14 @@ export class OutputRing {
             lostBytes: oldest + start - offset,
             truncated: oldest + start > offset || end < this.bytes.length,
         };
+    }
+    digests() {
+        return Object.fromEntries(
+            Object.entries(this.streams).map(([name, value]) => [
+                name,
+                { bytes: value.bytes, sha256: value.hash.copy().digest("hex") },
+            ]),
+        );
     }
 }
 
@@ -404,6 +420,30 @@ export class TaskRunner {
         task.stopping = undefined;
 
         return result;
+    }
+    async wait(id, signal) {
+        const task = this.get(id);
+        const abort = () => {
+            // Completed tasks may be evicted while this waiter retains their outcome.
+            if (task.cleanup !== "confirmed") {
+                void this.stop(id, "verification cancelled");
+            }
+        };
+
+        signal?.addEventListener("abort", abort, { once: true });
+        try {
+            if (signal?.aborted) {
+                abort();
+            }
+
+            while (task.cleanup === "pending") {
+                await delay(20);
+            }
+
+            return this.summary(task);
+        } finally {
+            signal?.removeEventListener("abort", abort);
+        }
     }
     async shutdown() {
         this.closed = true;

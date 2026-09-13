@@ -1,8 +1,16 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { decideCommand } from "../command-guard/core.mjs";
 import { LIMITS, TaskRunner, normalizeStart, preview, record } from "./core.mjs";
+import {
+    VerificationRegistry,
+    captureInputs,
+    normalizeVerification,
+    verificationOutput,
+    VERIFY_LIMITS,
+} from "./verification.mjs";
 
 function fingerprint(value: unknown): string {
     return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -15,11 +23,12 @@ function result(value: unknown) {
 export default function registerBackgroundTasks(
     pi: ExtensionAPI,
     dependencies: {
-        runner?: Pick<TaskRunner, "closed" | "list" | "shutdown" | "start" | "get" | "stop">;
+        runner?: Pick<TaskRunner, "closed" | "list" | "shutdown" | "start" | "get" | "stop" | "wait">;
         approvalMs?: number;
     } = {},
 ) {
     let runner = dependencies.runner ?? new TaskRunner();
+    const verification = new VerificationRegistry();
     let generation = 0;
     let active = false;
     let pending = 0;
@@ -28,13 +37,28 @@ export default function registerBackgroundTasks(
     const invalidate = () => {
         generation += 1;
         approvals.clear();
+        verification.invalidate();
         lifecycle.abort();
         lifecycle = new AbortController();
     };
 
     let unsubscribe: (() => void) | undefined;
+    let unsubscribeReceipts: (() => void) | undefined;
     const subscribe = () => {
         unsubscribe ??= pi.events.on("specpi:guard-policy-changed", invalidate);
+        unsubscribeReceipts ??= pi.events.on("specpi:verification-receipts", (request: any) => {
+            if (!active || typeof request?.reply !== "function") {
+                return;
+            }
+
+            try {
+                request.reply(
+                    request.id ? verification.resolve(request.id, request.root) : verification.list(request.root),
+                );
+            } catch {
+                request.reply({ status: "unknown", reason: "Receipt workspace unavailable." });
+            }
+        });
     };
 
     subscribe();
@@ -99,6 +123,8 @@ export default function registerBackgroundTasks(
         await cleanup(event, ctx);
         unsubscribe?.();
         unsubscribe = undefined;
+        unsubscribeReceipts?.();
+        unsubscribeReceipts = undefined;
     });
     pi.on("session_start", async (event, ctx) => {
         subscribe();
@@ -125,6 +151,146 @@ export default function registerBackgroundTasks(
         }
     });
 
+    const verificationBinding = async (input: unknown, cwd: string) => {
+        let root = cwd;
+        try {
+            const resolved = await pi.exec("git", ["rev-parse", "--show-toplevel"], { cwd, timeout: 15000 });
+            if (resolved.code === 0 && resolved.stdout.trim()) {
+                root = path.resolve(cwd, resolved.stdout.trim());
+            }
+        } catch {
+            // Match workflow controls: non-Git workspaces use their session cwd.
+        }
+
+        return normalizeVerification(input, cwd, root);
+    };
+
+    const executeStart =
+        (finite: boolean) =>
+        async (_id: string, input: any, signal: AbortSignal | undefined, _update: any, ctx: any) => {
+            if (!active || !ctx.hasUI || pending >= LIMITS.active) {
+                throw new Error(
+                    "Background starts require an active session, approval UI, and an available admission slot.",
+                );
+            }
+
+            pending += 1;
+            try {
+                const entryEpoch = generation;
+                const entryCwd = ctx.cwd;
+                const binding = finite ? await verificationBinding(input, entryCwd) : undefined;
+                if (entryEpoch !== generation || entryCwd !== ctx.cwd || !active || !ctx.hasUI) {
+                    throw new Error("Verification session changed during workspace resolution.");
+                }
+
+                const spec = binding?.spec ?? normalizeStart(input, ctx.cwd);
+                const before = binding ? captureInputs(binding.root, binding.inputs) : undefined;
+                const policy = admission(spec, ctx.hasUI);
+                if (policy.action === "deny") {
+                    throw new Error(preview(policy.reason));
+                }
+
+                const epoch = generation;
+                const key = fingerprint({ spec, policy, generation: epoch, binding, before: before?.digest });
+                const abort = AbortSignal.any([lifecycle.signal, ...(signal ? [signal] : [])]);
+                abort.throwIfAborted();
+                if (!approvals.has(key)) {
+                    const controller = new AbortController();
+                    const promptSignal = AbortSignal.any([abort, controller.signal]);
+                    const timer = setTimeout(() => controller.abort(), dependencies.approvalMs ?? 600000);
+                    let cancel: () => void = () => {};
+
+                    try {
+                        const cancelled = new Promise<boolean>((resolve) => {
+                            cancel = () => resolve(false);
+                            promptSignal.addEventListener("abort", cancel, { once: true });
+                        });
+                        const confirmed = await Promise.race([
+                            ctx.ui.confirm(
+                                finite
+                                    ? "Run verification command for this session?"
+                                    : "Start background command for this session?",
+                                `Shell: ${preview(spec.shell)}\nCwd: ${preview(spec.cwd, LIMITS.cwd)}\nCommand: ${preview(spec.command, LIMITS.command)}\nTimeout: ${spec.timeoutSeconds}s\nGuard: ${preview(policy.mode)} — ${preview(policy.reason)}${binding ? `\nDeclared inputs (workspace relative): ${binding.inputs.map((value: string) => preview(value, 240)).join(", ")}\nInput snapshot: ${before?.digest}\nInclude source, tests, configuration and lockfiles that affect this check. Only these inputs are tracked.` : ""}\nRuns with your permissions and inherited environment. Not a sandbox. Approves this exact execution for this session; output may enter conversation/provider retention.`,
+                                { signal: promptSignal },
+                            ),
+                            cancelled,
+                        ]);
+                        if (!confirmed || promptSignal.aborted) {
+                            throw new Error("Background command was not approved.");
+                        }
+                    } finally {
+                        clearTimeout(timer);
+                        promptSignal.removeEventListener("abort", cancel);
+                    }
+                }
+
+                abort.throwIfAborted();
+                const currentBinding = finite ? await verificationBinding(input, ctx.cwd) : undefined;
+                const current = currentBinding?.spec ?? normalizeStart(input, ctx.cwd);
+                const currentBefore = currentBinding
+                    ? captureInputs(currentBinding.root, currentBinding.inputs)
+                    : undefined;
+                const currentPolicy = admission(current, ctx.hasUI);
+                if (
+                    !active ||
+                    !ctx.hasUI ||
+                    epoch !== generation ||
+                    currentPolicy.action === "deny" ||
+                    fingerprint({
+                        spec: current,
+                        policy: currentPolicy,
+                        generation,
+                        binding: currentBinding,
+                        before: currentBefore?.digest,
+                    }) !== key
+                ) {
+                    throw new Error("Background input or policy changed during approval; start denied.");
+                }
+
+                while (approvals.size >= LIMITS.approvals && !approvals.has(key)) {
+                    approvals.delete(approvals.values().next().value!);
+                }
+
+                approvals.add(key);
+
+                const started = await runner.start(current, generation, abort);
+                if (!currentBinding) {
+                    return result(started);
+                }
+
+                const owned = runner.get(started.id);
+                const outcome = await runner.wait(started.id, abort);
+                let after;
+                try {
+                    after = captureInputs(currentBinding.root, currentBinding.inputs);
+                } catch {
+                    after = undefined;
+                }
+
+                if (!active || epoch !== generation) {
+                    return result({
+                        outcome,
+                        receipt: null,
+                        reason: "Verification session or policy changed; no live receipt was retained.",
+                    });
+                }
+
+                // An ordinary cancellation is a failed attempt in this still-current
+                // session. Keep it so a cancelled rerun cannot leave an older pass latest.
+                const receipt = verification.add(
+                    currentBinding,
+                    currentBefore,
+                    after,
+                    outcome,
+                    verificationOutput(owned.ring),
+                );
+
+                return result(verification.resolve(receipt.id, currentBinding.root));
+            } finally {
+                pending -= 1;
+            }
+        };
+
     pi.registerTool({
         name: "background_start",
         label: "Start background task",
@@ -143,77 +309,28 @@ export default function registerBackgroundTasks(
             },
             { additionalProperties: false },
         ),
-        async execute(_id, input, signal, _update, ctx) {
-            if (!active || !ctx.hasUI || pending >= LIMITS.active) {
-                throw new Error(
-                    "Background starts require an active session, approval UI, and an available admission slot.",
-                );
-            }
-
-            pending += 1;
-            try {
-                const spec = normalizeStart(input, ctx.cwd);
-                const policy = admission(spec, ctx.hasUI);
-                if (policy.action === "deny") {
-                    throw new Error(preview(policy.reason));
-                }
-
-                const epoch = generation;
-                const key = fingerprint({ spec, policy, generation: epoch });
-                const abort = AbortSignal.any([lifecycle.signal, ...(signal ? [signal] : [])]);
-                abort.throwIfAborted();
-                if (!approvals.has(key)) {
-                    const controller = new AbortController();
-                    const promptSignal = AbortSignal.any([abort, controller.signal]);
-                    const timer = setTimeout(() => controller.abort(), dependencies.approvalMs ?? 600000);
-                    let cancel: () => void = () => {};
-
-                    try {
-                        const cancelled = new Promise<boolean>((resolve) => {
-                            cancel = () => resolve(false);
-                            promptSignal.addEventListener("abort", cancel, { once: true });
-                        });
-                        const confirmed = await Promise.race([
-                            ctx.ui.confirm(
-                                "Start background command for this session?",
-                                `Shell: ${preview(spec.shell)}\nCwd: ${preview(spec.cwd, LIMITS.cwd)}\nCommand: ${preview(spec.command, LIMITS.command)}\nTimeout: ${spec.timeoutSeconds}s\nGuard: ${preview(policy.mode)} — ${preview(policy.reason)}\nRuns with your permissions and inherited environment. Not a sandbox. Approves this exact execution for this session; output may enter conversation/provider retention.`,
-                                { signal: promptSignal },
-                            ),
-                            cancelled,
-                        ]);
-                        if (!confirmed || promptSignal.aborted) {
-                            throw new Error("Background command was not approved.");
-                        }
-                    } finally {
-                        clearTimeout(timer);
-                        promptSignal.removeEventListener("abort", cancel);
-                    }
-                }
-
-                abort.throwIfAborted();
-                const current = normalizeStart(input, ctx.cwd);
-                const currentPolicy = admission(current, ctx.hasUI);
-                if (
-                    !active ||
-                    !ctx.hasUI ||
-                    epoch !== generation ||
-                    currentPolicy.action === "deny" ||
-                    fingerprint({ spec: current, policy: currentPolicy, generation }) !== key
-                ) {
-                    throw new Error("Background input or policy changed during approval; start denied.");
-                }
-
-                while (approvals.size >= LIMITS.approvals && !approvals.has(key)) {
-                    approvals.delete(approvals.values().next().value!);
-                }
-
-                approvals.add(key);
-
-                return result(await runner.start(current, generation, abort));
-            } finally {
-                pending -= 1;
-            }
-        },
+        execute: executeStart(false),
+    });
+    pi.registerTool({
+        name: "verify_run",
+        label: "Run verification check",
+        description:
+            "Run a finite, explicitly approved project check with Guard admission and shared background task limits. Returns an in-memory receipt of observed exit, cleanup, output and before/after hashes of declared inputs. Declare source, tests, configuration and lockfiles; this is not a sandbox, hermetic execution or proof of requirement coverage.",
+        promptSnippet: "Run an approved check and record source-bound evidence",
+        parameters: Type.Object(
+            {
+                command: Type.String({ minLength: 1, maxLength: LIMITS.command }),
+                cwd: Type.Optional(Type.String({ minLength: 1, maxLength: LIMITS.cwd })),
+                label: Type.Optional(Type.String({ minLength: 1, maxLength: LIMITS.label })),
+                timeoutSeconds: Type.Optional(Type.Integer({ minimum: 1, maximum: LIMITS.timeout })),
+                inputs: Type.Array(Type.String({ minLength: 1, maxLength: 240 }), {
+                    minItems: 1,
+                    maxItems: VERIFY_LIMITS.declarations,
+                }),
+            },
+            { additionalProperties: false },
+        ),
+        execute: executeStart(true),
     });
     pi.registerTool({
         name: "background_list",

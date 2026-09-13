@@ -57,7 +57,7 @@ function smokeStructuralRuntime(directory) {
     });
 }
 
-const backgroundFiles = ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"];
+const backgroundFiles = ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs", "verification.mjs"];
 const backgroundRoot = path.join(agentDir, "extensions", "background-tasks");
 const capabilityRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
 const managedToolsDir = path.join(stateDir, "optional-tools");
@@ -830,6 +830,11 @@ function managedFiles(includeShell) {
             0o644,
         ],
         [
+            path.join(repoRoot, "extensions", "workflow-controls", "verification.mjs"),
+            path.join(agentDir, "extensions", "workflow-controls", "verification.mjs"),
+            0o644,
+        ],
+        [
             path.join(repoRoot, "extensions", "workflow-controls", "experiments.mjs"),
             path.join(agentDir, "extensions", "workflow-controls", "experiments.mjs"),
             0o644,
@@ -927,6 +932,11 @@ function managedFiles(includeShell) {
         [
             path.join(repoRoot, "skills", "specpi-improve", "SKILL.md"),
             path.join(agentDir, "skills", "specpi-improve", "SKILL.md"),
+            0o644,
+        ],
+        [
+            path.join(repoRoot, "skills", "specpi-review", "SKILL.md"),
+            path.join(agentDir, "skills", "specpi-review", "SKILL.md"),
             0o644,
         ],
         [
@@ -1197,6 +1207,7 @@ function assertSources() {
         "extensions/workflow-controls/index.ts",
         "extensions/workflow-controls/scope.mjs",
         "extensions/workflow-controls/task-contract.mjs",
+        "extensions/workflow-controls/verification.mjs",
         "extensions/workflow-controls/experiments.mjs",
         "extensions/workflow-controls/challenge.mjs",
         "extensions/workflow-controls/smoke.mjs",
@@ -1218,6 +1229,7 @@ function assertSources() {
         "extensions/tool-wishlist/capabilities.json",
         ...COMMAND_GUARD_MANAGED_FILES.map((name) => `extensions/command-guard/${name}`),
         "skills/specpi-improve/SKILL.md",
+        "skills/specpi-review/SKILL.md",
         "skills/donsetch/SKILL.md",
         "themes/tea-house.json",
         "themes/specpi-spec.json",

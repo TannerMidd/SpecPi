@@ -131,7 +131,7 @@ test("task branch reads preserve current-card validation and recorded-root acces
         const branchWith = (value) => [
             { type: "custom", customType: TASK_CONTRACT_ENTRY, data: { kind: "set", contract: value } },
         ];
-        assert.throws(() => readTaskContract(branchWith({ ...contract, schema: 2 }), root), /Unsupported/);
+        assert.throws(() => readTaskContract(branchWith({ ...contract, schema: 3 }), root), /Unsupported/);
         assert.throws(
             () => readTaskContract(branchWith({ ...contract, objective: "tampered" }), root),
             /digest mismatch/,

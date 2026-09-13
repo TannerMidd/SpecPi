@@ -209,7 +209,7 @@ try {
     }
 
     assert.deepEqual(resources.extensionErrors, [], `Pi reported extension load errors: ${JSON.stringify(resources)}`);
-    for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
+    for (const name of ["background_start", "background_list", "background_logs", "background_stop", "verify_run"]) {
         assert.ok(resources.toolNames.includes(name), `Packaged Pi did not register ${name}`);
         assert.equal(
             path.resolve(resources.toolSources[name]),
@@ -219,6 +219,7 @@ try {
     }
 
     assert.ok(resources.skillNames.includes("specpi-improve"), "Pi did not discover the SpecPi improvement skill");
+    assert.ok(resources.skillNames.includes("specpi-review"), "Pi did not discover the SpecPi review skill");
     assert.ok(resources.skillNames.includes("donsetch"), "Pi did not discover the DonSeTch skill");
     assert.ok(resources.themeNames.includes("specpi-spec"), "Pi did not discover the SpecPi theme");
     assert.ok(resources.themeNames.includes("tea-house"), "Pi did not discover the tea-house theme");

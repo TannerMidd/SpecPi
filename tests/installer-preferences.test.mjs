@@ -48,13 +48,18 @@ test("theme preferences survive the isolated installer lifecycle without changin
         assert.match(plan.stdout, /existing valid user choices are preserved/);
         assert.match(plan.stdout, /this does not make Pi offline/);
         run("install", "--yes", ...skip);
+        const reviewSkill = path.join(agentDir, "skills", "specpi-review", "SKILL.md");
+        const sourceSkill = fs.readFileSync(new URL("../skills/specpi-review/SKILL.md", import.meta.url));
+        assert.deepEqual(fs.readFileSync(reviewSkill), sourceSkill);
         assert.equal(settings().theme, "dark", "installation must preserve an existing Pi theme");
         fs.writeFileSync(settingsPath, JSON.stringify({ ...settings(), theme: "light" }));
         run("doctor");
         run("update", "--yes", ...skip);
+        assert.deepEqual(fs.readFileSync(reviewSkill), sourceSkill);
         assert.equal(settings().theme, "light", "update must preserve a changed preference");
         run("doctor");
         run("uninstall", "--yes");
+        assert.equal(fs.existsSync(reviewSkill), false);
         assert.deepEqual(settings(), { ...original, theme: "light" });
     } finally {
         fs.rmSync(root, { recursive: true, force: true });

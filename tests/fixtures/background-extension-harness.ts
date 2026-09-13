@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import path from "node:path";
+import fs from "node:fs";
+import os from "node:os";
+import { OutputRing } from "../../extensions/background-tasks/core.mjs";
 import registerBackgroundTasks from "../../extensions/background-tasks/index.ts";
 import registerCommandGuard from "../../extensions/command-guard/index.ts";
 
@@ -111,6 +114,9 @@ function harness(guard = true, background = true) {
         runner,
         event,
         call,
+        listenerCount(name: string) {
+            return bus.get(name)?.size ?? 0;
+        },
         setConfirm(value: any) {
             confirm = value;
         },
@@ -127,7 +133,7 @@ function harness(guard = true, background = true) {
 }
 
 const h = harness();
-assert.equal(h.tools.size, 4);
+assert.equal(h.tools.size, 5);
 assert.equal(h.tools.get("background_start").parameters.additionalProperties, false);
 await assert.rejects(h.call("background_start", { command: "echo safe" }), /active session/);
 await h.event("session_start");
@@ -232,7 +238,7 @@ assert.equal(races.starts, 0);
 const standalone = harness(true, false);
 await standalone.event("session_start");
 await standalone.commands.get("guard").handler("strict", standalone.ctx);
-for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
+for (const name of ["background_start", "background_list", "background_logs", "background_stop", "verify_run"]) {
     assert.equal(
         (await standalone.event("tool_call", { toolName: name, input: {} }))?.block,
         true,
@@ -245,7 +251,7 @@ assert.equal(
     (await standalone.event("tool_call", { toolName: "bash", input: { command: "echo locked" } }))?.block,
     true,
 );
-for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
+for (const name of ["background_start", "background_list", "background_logs", "background_stop", "verify_run"]) {
     assert.equal(
         (await standalone.event("tool_call", { toolName: name, input: {} }))?.block,
         true,
@@ -292,4 +298,108 @@ for (let index = 0; index < 129; index += 1) {
 assert.equal(bounded.prompts, 129);
 await bounded.call("background_start", { command: "echo 0" });
 assert.equal(bounded.prompts, 130);
+const checkRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-admission-")));
+try {
+    fs.writeFileSync(path.join(checkRoot, "source.js"), "one");
+    const finite = harness();
+    finite.ctx.cwd = checkRoot;
+    finite.runner.get = () => ({ ring: new OutputRing() });
+    finite.runner.wait = async () => ({
+        status: "exited",
+        exitCode: 0,
+        cleanup: "confirmed",
+        reason: "command exited",
+    });
+    const nested = path.join(checkRoot, "nested");
+    fs.mkdirSync(nested);
+    finite.ctx.cwd = nested;
+    finite.pi.exec = async () => ({ code: 0, stdout: checkRoot, stderr: "" });
+    await finite.event("session_start");
+    const input = { command: "echo checked", inputs: ["source.js"] };
+    const result = JSON.parse((await finite.call("verify_run", input)).content[0].text);
+    assert.equal(result.status, "passed");
+    assert.equal(finite.starts, 1);
+    let live: any;
+    const query = () =>
+        finite.pi.events.emit("specpi:verification-receipts", {
+            root: checkRoot,
+            id: result.id,
+            reply(value: any) {
+                live = value;
+            },
+        });
+    query();
+    assert.equal(live.status, "passed");
+    finite.setConfirm(async () => {
+        fs.writeFileSync(path.join(checkRoot, "source.js"), "changed during approval");
+
+        return true;
+    });
+    await assert.rejects(
+        finite.call("verify_run", { ...input, command: "echo new approval" }),
+        /changed during approval/,
+    );
+    assert.equal(finite.starts, 1);
+    query();
+    assert.equal(live.status, "stale");
+    finite.setConfirm(async () => true);
+    await finite.commands.get("guard").handler("strict", finite.ctx);
+    query();
+    assert.equal(live.status, "unknown");
+    const strict = JSON.parse((await finite.call("verify_run", input)).content[0].text);
+    assert.equal(strict.status, "passed");
+    await finite.event("tool_call", { toolName: "bash", input: { command: "rm -rf /" } });
+    await assert.rejects(finite.call("verify_run", input), /locked/);
+    assert.equal(finite.starts, 2);
+    await finite.event("session_tree");
+    query();
+    assert.equal(live.status, "unknown");
+    assert.equal(finite.listenerCount("specpi:verification-receipts"), 1);
+    await finite.event("session_shutdown");
+    assert.equal(finite.listenerCount("specpi:verification-receipts"), 0);
+    await finite.event("session_start");
+    assert.equal(finite.listenerCount("specpi:verification-receipts"), 1);
+    await finite.call("verify_run", input);
+    const cancellation = new AbortController();
+    finite.runner.wait = async (_id: string, signal: AbortSignal) => {
+        cancellation.abort();
+        assert.equal(signal.aborted, true);
+
+        return { status: "killed", exitCode: null, cleanup: "confirmed", reason: "verification cancelled" };
+    };
+
+    const cancelled = JSON.parse((await finite.call("verify_run", input, cancellation.signal)).content[0].text);
+    assert.equal(cancelled.status, "failed");
+    finite.pi.events.emit("specpi:verification-receipts", {
+        root: checkRoot,
+        reply(value: any) {
+            assert.deepEqual(
+                value.map((receipt: any) => receipt.status),
+                ["passed", "failed"],
+            );
+        },
+    });
+    finite.runner.wait = async () => {
+        finite.pi.events.emit("specpi:guard-policy-changed", {});
+
+        return { status: "exited", exitCode: 0, cleanup: "confirmed", reason: "command exited" };
+    };
+
+    const revoked = JSON.parse((await finite.call("verify_run", input)).content[0].text);
+    assert.equal(revoked.receipt, null);
+    finite.pi.events.emit("specpi:verification-receipts", {
+        root: checkRoot,
+        reply(value: any) {
+            assert.deepEqual(value, []);
+        },
+    });
+    const noninteractive = harness(false);
+    noninteractive.ctx.cwd = checkRoot;
+    await noninteractive.event("session_start");
+    noninteractive.ctx.hasUI = false;
+    await assert.rejects(noninteractive.call("verify_run", input), /approval UI/);
+} finally {
+    fs.rmSync(checkRoot, { recursive: true, force: true });
+}
+
 console.log("BACKGROUND_EXTENSION=passed");

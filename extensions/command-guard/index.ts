@@ -271,7 +271,9 @@ export default function registerCommandGuard(
     };
 
     const ownsBackgroundTool = (name: string): boolean => {
-        if (!["background_start", "background_list", "background_logs", "background_stop"].includes(name)) {
+        if (
+            !["background_start", "background_list", "background_logs", "background_stop", "verify_run"].includes(name)
+        ) {
             return false;
         }
 

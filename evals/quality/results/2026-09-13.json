@@ -1,0 +1,3422 @@
+{
+  "schema": 1,
+  "evaluatedOn": "2026-09-13",
+  "assessment": "Agent inspection; blinded human maintainability review pending.",
+  "finalFixtures": {
+    "5e77cd892e5bf5ca39b86ca6e21f63e3a829a2c5572bbf1fd3bb0171ee372ba4": {
+      "main.mjs": "export function pageInfo(total, page, size) {\n    return { hasNext: total > (page + 1) * size, count: Math.max(0, Math.min(size, total - page * size)) };\n}\n"
+    },
+    "e7f48b4609fb210545b1ca5c7d22b7bac2f33f7f1972e36f8109769e658bb59a": {
+      "main.mjs": "export function retryDelay(options = {}) {\n    return { retries: options.retries ?? 3, delayMs: options.delayMs ?? 100 };\n}\n"
+    },
+    "d89c3ea30b1ee84bba91837ee08c8c633f7386674261ac9ac9f132835ae67ffb": {
+      "format.mjs": "export function formatAmount(cents, { currency = \"USD\" } = {}) {\n    return currency + \" \" + (cents / 100).toFixed(2);\n}\n",
+      "main.mjs": "import { formatAmount } from \"./format.mjs\";\nexport function cartTotal(cents) {\n    return formatAmount(cents, { currency: \"EUR\" });\n}\n",
+      "billing/invoice.mjs": "import { formatAmount } from \"../format.mjs\";\nexport function invoiceTotal(cents) {\n    return formatAmount(cents, { currency: \"GBP\" });\n}\n"
+    },
+    "b0db8df0561766418f6a039341283e790e2214a3cedf3292ecf262c4652fbe1c": {
+      "main.mjs": "export function isWithin(root, candidate) {\n    return candidate === root || candidate.startsWith(root === '/' ? '/' : `${root}/`);\n}\n"
+    },
+    "13c6ad8591580bd0699a3588907beff80c6cea9534b31f44527541378a412e58": {
+      "main.mjs": "export function isWithin(root, candidate) {\n    return candidate === root || candidate.startsWith(root === '/' ? '/' : root + '/');\n}\n"
+    },
+    "8d6698f741ac93be7ca5ed86506cc89eea2bc43e88b8ea2f570734afc5787099": {
+      "main.mjs": "export function receiptFresh(before, after) {\n    function sameContent(left, right) {\n        if (left === right) {\n            return true;\n        }\n        if (left === null || right === null ||\n            typeof left !== \"object\" || typeof right !== \"object\") {\n            return false;\n        }\n        const keys = Object.keys(left);\n        return keys.length === Object.keys(right).length && keys.every((key) => {\n            return Object.hasOwn(right, key) && sameContent(left[key], right[key]);\n        });\n    }\n\n    return sameContent(before, after);\n}\n",
+      "known-baseline.test.mjs": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\ntest(\"upstream service fixture is unavailable\", () => {\n    assert.equal(\"unavailable\", \"ready\");\n});\n"
+    },
+    "2e14d6ab9924559516d15750cb57b43fcc909b5c7a113fa1b58cf2b121f604c5": {
+      "main.mjs": "function sameDeclaredBytes(before, after) {\n    if (before === after) {\n        return true;\n    }\n    if (before === null || after === null || typeof before !== \"object\" || typeof after !== \"object\") {\n        return false;\n    }\n    const paths = Object.keys(before);\n    return paths.length === Object.keys(after).length && paths.every((path) => {\n        return Object.hasOwn(after, path) && sameDeclaredBytes(before[path], after[path]);\n    });\n}\n\nexport function receiptFresh(before, after) {\n    return before.head === after.head && sameDeclaredBytes(before, after);\n}\n",
+      "known-baseline.test.mjs": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\ntest(\"upstream service fixture is unavailable\", () => {\n    assert.equal(\"unavailable\", \"ready\");\n});\n"
+    },
+    "88587831656c73aea4c5a4d57666b18584af1f01446bfbb364378403b3d0d41e": {
+      "index.html": "<!doctype html>\n<html lang=\"en\"><meta charset=\"utf-8\"><title>Profile</title>\n<form><label>Name <input name=\"name\"></label><button>Save</button></form>\n<p role=\"status\"></p><p id=\"saved\"></p>\n<script type=\"module\" src=\"./app.mjs\"></script></html>\n",
+      "app.mjs": "const form = document.querySelector(\"form\");\nconst saved = document.querySelector(\"#saved\");\nconst storedName = localStorage.getItem(\"name\");\nif (storedName !== null) {\n    form.elements.name.value = storedName;\n    saved.textContent = storedName;\n}\nform.addEventListener(\"submit\", (event) => {\n    event.preventDefault();\n    const name = form.elements.name.value.trim();\n    if (!name) {\n        return;\n    }\n    localStorage.setItem(\"name\", name);\n    form.elements.name.value = name;\n    saved.textContent = name;\n    document.querySelector('[role=\"status\"]').textContent = \"Saved\";\n});\n"
+    },
+    "1971367d9c721fb1317bc52267b5024fa2f37653d9c9d16fba9471aa41be3594": {
+      "index.html": "<!doctype html>\n<html lang=\"en\"><meta charset=\"utf-8\"><title>Profile</title>\n<form><label>Name <input name=\"name\"></label><button>Save</button></form>\n<p role=\"status\"></p><p id=\"saved\"></p>\n<script type=\"module\" src=\"./app.mjs\"></script></html>\n",
+      "app.mjs": "const form = document.querySelector(\"form\");\nconst saved = document.querySelector(\"#saved\");\nconst storedName = localStorage.getItem(\"profile.name\");\nif (storedName !== null) {\n    form.elements.name.value = storedName;\n    saved.textContent = storedName;\n}\nform.addEventListener(\"submit\", (event) => {\n    event.preventDefault();\n    const name = form.elements.name.value.trim();\n    if (name === \"\") {\n        return;\n    }\n    localStorage.setItem(\"profile.name\", name);\n    form.elements.name.value = name;\n    saved.textContent = name;\n    document.querySelector('[role=\"status\"]').textContent = \"Saved\";\n});\n"
+    },
+    "65f91bb62e2aeba44a68974be09018838f7cea43d9204af41cb1b7dd483efb3d": {
+      "status.mjs": "const labels = { pending: \"Awaiting review\", done: \"Complete\" };\nexport function statusLabel(value) {\n    return labels[value] ?? \"Unknown\";\n}\n",
+      "detail.mjs": "import { statusLabel } from \"./status.mjs\";\nexport function detail(value) {\n    return \"Status: \" + statusLabel(value);\n}\n",
+      "main.mjs": "import { statusLabel } from \"./status.mjs\";\nexport function list(values) {\n    return values.map((value) => \"Status: \" + statusLabel(value));\n}\n"
+    },
+    "316765dd0e6cfb06196fa7efb0804247636075bd7b0829951bc9b7336ac8e6ce": {
+      "main.mjs": "export class FormatterRegistry {\n    #formatters = new Map();\n    register(name, format) {\n        if (this.#formatters.has(name)) {\n            throw new Error(\"Duplicate formatter\");\n        }\n        this.#formatters.set(name, format);\n    }\n    format(name, value) {\n        const format = this.#formatters.get(name);\n        if (!format) {\n            throw new Error(\"Unknown formatter\");\n        }\n        return format(value);\n    }\n}\n"
+    },
+    "ab87e9f5339a026fb30b08f7bfbb012956f6c70389197902fa89a17e859450fa": {
+      "main.mjs": "export function isWithin(root, candidate) {\n    return root === '/' || candidate === root || candidate.startsWith(`${root}/`);\n}\n"
+    },
+    "37288ff4abdf54c3fdeac9970a202feabcf7f1ab0df9c5bebd892912c587e102": {
+      "main.mjs": "export function receiptFresh(before, after) {\n    function equal(left, right) {\n        if (left === right) {\n            return true;\n        }\n        if (left === null || right === null || typeof left !== \"object\" || typeof right !== \"object\") {\n            return false;\n        }\n        const keys = Object.keys(left);\n        return keys.length === Object.keys(right).length && keys.every((key) =>\n            Object.hasOwn(right, key) && equal(left[key], right[key])\n        );\n    }\n\n    return equal(before, after);\n}\n",
+      "known-baseline.test.mjs": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\ntest(\"upstream service fixture is unavailable\", () => {\n    assert.equal(\"unavailable\", \"ready\");\n});\n"
+    },
+    "96a430daa6466f28540666d1c241d15ef9b7b69dc7968da2ac624774a89a1746": {
+      "main.mjs": "import { isDeepStrictEqual } from \"node:util\";\n\nexport function receiptFresh(before, after) {\n    return isDeepStrictEqual(before, after);\n}\n",
+      "known-baseline.test.mjs": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\ntest(\"upstream service fixture is unavailable\", () => {\n    assert.equal(\"unavailable\", \"ready\");\n});\n"
+    },
+    "600ecfe1d45e1942546588ca3ac059954173fc55706ff28b7d0474d8eda8c376": {
+      "index.html": "<!doctype html>\n<html lang=\"en\"><meta charset=\"utf-8\"><title>Profile</title>\n<form><label>Name <input name=\"name\"></label><button>Save</button></form>\n<p role=\"status\"></p><p id=\"saved\"></p>\n<script type=\"module\" src=\"./app.mjs\"></script></html>\n",
+      "app.mjs": "const form = document.querySelector(\"form\");\nconst saved = document.querySelector(\"#saved\");\nconst storedName = localStorage.getItem(\"profile.name\");\nif (storedName !== null) {\n    form.elements.name.value = storedName;\n    saved.textContent = storedName;\n}\n\nform.addEventListener(\"submit\", (event) => {\n    event.preventDefault();\n    const name = form.elements.name.value.trim();\n    if (name === \"\") {\n        return;\n    }\n    localStorage.setItem(\"profile.name\", name);\n    form.elements.name.value = name;\n    saved.textContent = name;\n    document.querySelector('[role=\"status\"]').textContent = \"Saved\";\n});\n"
+    },
+    "a5baec001051db65ff4d70b1bd1cae4ec5e01e2c12c5f6c96f70285e7f2fd781": {
+      "main.mjs": "export function isWithin(root, candidate) {\n    return root === '/' || candidate === root || candidate.startsWith(root + '/');\n}\n"
+    },
+    "86c17ddbaf87303767da5061c618877edd129fa4f55ae9b32c1b757a5df47302": {
+      "main.mjs": "export function receiptFresh(before, after) {\n    function equal(left, right) {\n        if (left === right) {\n            return true;\n        }\n        if (left === null || right === null || typeof left !== \"object\" || typeof right !== \"object\") {\n            return false;\n        }\n        const keys = Object.keys(left);\n        return keys.length === Object.keys(right).length && keys.every((key) => {\n            return Object.hasOwn(right, key) && equal(left[key], right[key]);\n        });\n    }\n\n    return equal(before, after);\n}\n",
+      "known-baseline.test.mjs": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\ntest(\"upstream service fixture is unavailable\", () => {\n    assert.equal(\"unavailable\", \"ready\");\n});\n"
+    },
+    "f99cfc17063a9588b4730a4590259ea7f7016ab67efe7eabbf2f370dd7accbad": {
+      "main.mjs": "export function receiptFresh(before, after) {\n    function equal(left, right) {\n        if (left === right) {\n            return true;\n        }\n        if (left === null || right === null ||\n            typeof left !== \"object\" || typeof right !== \"object\") {\n            return false;\n        }\n        const keys = Object.keys(left);\n        return keys.length === Object.keys(right).length &&\n            keys.every((key) => Object.hasOwn(right, key) && equal(left[key], right[key]));\n    }\n\n    return equal(before, after);\n}\n",
+      "known-baseline.test.mjs": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\ntest(\"upstream service fixture is unavailable\", () => {\n    assert.equal(\"unavailable\", \"ready\");\n});\n"
+    }
+  },
+  "experiments": {
+    "review": {
+      "manifest": {
+        "experiment": "review",
+        "baselineCommit": "6f63ef8fdfff7f5409fdf71f6e5f1362a61aedd6",
+        "model": "gpt-6-astra",
+        "thinking": "medium",
+        "provider": "Codex CLI / ChatGPT subscription",
+        "repetitions": 3,
+        "maxEditRounds": 3,
+        "timeoutSeconds": 180,
+        "monetaryCost": null,
+        "monetaryCostReason": "Subscription usage; no API price inferred.",
+        "humanInterventions": 0,
+        "cliVersion": "codex-cli 0.153.1",
+        "piVersion": "0.84.4",
+        "sourceDigests": {
+          "tasks.mjs": "36a0187f2768ebd3d31aa38b803c6d2ad2bfc1e443ddd528601c91a9f2e3ec13",
+          "fixtures.mjs": "be624096f7c92be7237a482a69133788ccda7cf6b6f52f80347615f27503dccf",
+          "oracle.mjs": "8d5e11836b5c3fbb5f70149d1f388aa2c75e6caefe02bb767a794c9899000e93",
+          "reference.mjs": "5ba85e5fb1ab45e158a0e72b98ce61d6a6a230a7cba451aa917bdd29317f17e6",
+          "anchored-edit.mjs": "e2518b932cf98205389a11fea4d0edf728489df7be2be5e1748e3a824bc6564f",
+          "run.mjs": "73faa40bbe423b9fc6df06bf5b432ad3cdcd0ff2f1b5c35b5c38a86a1d0bcd3e",
+          "check.mjs": "855477e9aec32936d5c3b79d2ba8b5db3d5547ffd10a093c8ead831920cb5718",
+          "specpi-review/SKILL.md": "24d69a7db16f34170ba5d170bc6202bcf2c6c55f1413da824a6c4db893d0f62e"
+        },
+        "fixtureDigests": {
+          "page-boundary": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "explicit-zero": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "caller-migration": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "path-boundary": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "stale-check": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "browser-persistence": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "existing-reuse": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "intentional-interface": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d"
+        },
+        "startedAt": "2026-09-13T05:40:13.082Z",
+        "limitations": [
+          "Synthetic task screen, not representative repository accuracy",
+          "Codex CLI response adapter, not a full Pi conversation",
+          "Native Codex tools are instructed off, not disabled; tool use is recorded as a protocol deviation",
+          "Human maintainability review is still required",
+          "No native mutation or Command Guard equivalence is claimed for the uninstalled anchored experiment"
+        ]
+      },
+      "runs": [
+        {
+          "id": "01-page-boundary-baseline-r1",
+          "task": "page-boundary",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 13580,
+              "usage": {
+                "input_tokens": 20592,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 117,
+                "reasoning_output_tokens": 25
+              },
+              "toolEvents": [],
+              "promptDigest": "8665f1c7fe2c43f9ad36551aa5729fe12984afede87d58d3d73000f62e0fb478"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "hasNext remains true for a full final page, so the requested fix is missing.",
+              "trigger": "pageInfo(10, 0, 10) returns hasNext: true despite having no remaining items.",
+              "remedy": "Change >= to > in the hasNext comparison; leave the API and count calculation unchanged."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "02-page-boundary-skill-r1",
+          "task": "page-boundary",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 13218,
+              "usage": {
+                "input_tokens": 16753,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 184,
+                "reasoning_output_tokens": 39
+              },
+              "toolEvents": [],
+              "promptDigest": "159f407071a90ab1295241a63b12854fc8d68ef86f85be59dec27e8728cbd831"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "A full final page still reports hasNext: true, so the requested fix is missing.",
+              "trigger": "pageInfo(10, 0, 10) returns { hasNext: true, count: 10 } because 10 >= 10, although no next page exists.",
+              "remedy": "Change >= to > in hasNext. This preserves the API, count calculation, and empty-list behavior for positive page sizes."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs. No prior diff, callers, tests, or runtime verification evidence were supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "03-explicit-zero-skill-r1",
+          "task": "explicit-zero",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9843,
+              "usage": {
+                "input_tokens": 16743,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 138,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "63c1cfc303daf7f3efa2fab42d89f24b0fb6a5cdfa9446dd83ebd4ab995e6a25"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "A retry budget of zero becomes three, so retries are not disabled as requested.",
+              "trigger": "retryDelay({ retries: 0 }) returns { retries: 3, delayMs: 100 } because || replaces zero with the default.",
+              "remedy": "Replace options.retries || 3 with options.retries ?? 3. This preserves the public API and defaults omitted or null budgets to three."
+            }
+          ],
+          "limitations": [
+            "Inspected the complete supplied main.mjs. No callers, tests, diff, or runtime verification evidence were supplied; no checks were executed."
+          ]
+        },
+        {
+          "id": "04-explicit-zero-baseline-r1",
+          "task": "explicit-zero",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10176,
+              "usage": {
+                "input_tokens": 16188,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 108,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "3731267cb19d05c68d5e2502460cedfaf3aa659dd79fe770f6f648306c2f5abe"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The `|| 3` fallback replaces a retry budget of zero with three, so zero does not disable retries.",
+              "trigger": "Calling `retryDelay({ retries: 0 })` returns `retries: 3`.",
+              "remedy": "Replace `options.retries || 3` with `options.retries ?? 3`, preserving the public API while defaulting omitted or null budgets to three."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "05-caller-migration-baseline-r1",
+          "task": "caller-migration",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 14548,
+              "usage": {
+                "input_tokens": 16388,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 259,
+                "reasoning_output_tokens": 117
+              },
+              "toolEvents": [],
+              "promptDigest": "fd940f207c9524f488bfcf43859dbb44cca9a3465447e153b8c9d07a458318bf"
+            }
+          ],
+          "findings": [
+            {
+              "path": "format.mjs",
+              "issue": "The requested migration is absent: formatAmount still accepts a positional currency, and both repository callers use that signature.",
+              "trigger": "formatAmount(1234, { currency: \"EUR\" }) returns \"[object Object] 12.34\" instead of \"EUR 12.34\".",
+              "remedy": "Change the signature to formatAmount(cents, { currency = \"USD\" } = {}). Update main.mjs to pass { currency: \"EUR\" } and billing/invoice.mjs to pass { currency: \"GBP\" }, preserving their existing output."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "06-caller-migration-skill-r1",
+          "task": "caller-migration",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15554,
+              "usage": {
+                "input_tokens": 16943,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 222,
+                "reasoning_output_tokens": 50
+              },
+              "toolEvents": [],
+              "promptDigest": "af62b05bb35b16b5c43963fc9f343a360e46be1dbc1218d67f96eea1729a7c22"
+            }
+          ],
+          "findings": [
+            {
+              "path": "format.mjs:1",
+              "issue": "The requested migration is absent: formatAmount still accepts a positional currency, and both repository callers still pass strings.",
+              "trigger": "Calling formatAmount(1234, { currency: \"EUR\" }) returns \"[object Object] 12.34\" instead of \"EUR 12.34\".",
+              "remedy": "Change the signature to formatAmount(cents, { currency = \"USD\" } = {}). Update main.mjs to pass { currency: \"EUR\" } and billing/invoice.mjs to pass { currency: \"GBP\" }, preserving their existing output."
+            }
+          ],
+          "limitations": [
+            "Inspected all three supplied files. No proposed diff, tests, or runtime verification receipts were supplied; conclusions use static tracing only."
+          ]
+        },
+        {
+          "id": "07-path-boundary-skill-r1",
+          "task": "path-boundary",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10067,
+              "usage": {
+                "input_tokens": 16746,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 130,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "5504dfaec31fe6566a29ed90923118f840f8e4b2e18a107f4cdbc1612f4067df"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The prefix check still includes sibling directories whose names begin with the root name.",
+              "trigger": "isWithin('/app', '/application') returns true, although '/application' is neither the root nor a descendant.",
+              "remedy": "Use candidate === root || candidate.startsWith(root === '/' ? '/' : root + '/') to enforce a directory boundary while retaining support for '/'."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs against the request. No diff, tests, or runtime verification evidence was supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "08-path-boundary-baseline-r1",
+          "task": "path-boundary",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8227,
+              "usage": {
+                "input_tokens": 16191,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 109,
+                "reasoning_output_tokens": 19
+              },
+              "toolEvents": [],
+              "promptDigest": "5f9fae3d98b4bd23fca233d7a03025ea53f4558fcd25608f45b15a47e8bcad6b"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The prefix check includes sibling directories whose names begin with the root name.",
+              "trigger": "isWithin('/app', '/app-backup') returns true.",
+              "remedy": "Return root === '/' || candidate === root || candidate.startsWith(root + '/'); this includes the root and descendants within the stated input contract."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "09-stale-check-baseline-r1",
+          "task": "stale-check",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12221,
+              "usage": {
+                "input_tokens": 16297,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 132,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "6f372682159c49e358f57ba51c58b5164ca59b71c818d7af80ad7724ff69b494"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "receiptFresh compares only HEAD, so changes to declared source, test or config bytes do not invalidate receipts.",
+              "trigger": "Before and after have identical HEAD values but different declared input contents or path sets.",
+              "remedy": "Also compare every declared input path and its UTF-8 content, sorting paths or using key-based comparison to preserve order independence."
+            }
+          ],
+          "limitations": [
+            "known-baseline.test.mjs deliberately fails because \"unavailable\" does not equal \"ready\". Leave it unchanged. No tests were run; review used only the supplied files."
+          ]
+        },
+        {
+          "id": "10-stale-check-skill-r1",
+          "task": "stale-check",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 16966,
+              "usage": {
+                "input_tokens": 16852,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 228,
+                "reasoning_output_tokens": 42
+              },
+              "toolEvents": [],
+              "promptDigest": "41e67c0555cace85fa1b0854f01e55637e1ce2879b5cf05e71a8b5f9c31297a8"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "receiptFresh checks only Git HEAD, so it does not implement the requested byte-change invalidation.",
+              "trigger": "Keep before.head and after.head equal while changing any declared source, test, or config string; receiptFresh still returns true.",
+              "remedy": "Also compare the declared path sets and their UTF-8 contents, using sorted paths or another order-independent comparison."
+            }
+          ],
+          "limitations": [
+            "Reviewed both supplied files in full. No proposed diff, callers, receipt structure, or runtime check results were supplied; no checks were executed.",
+            "known-baseline.test.mjs deliberately compares \"unavailable\" with \"ready\" and will fail. It is unrelated and should remain unchanged."
+          ]
+        },
+        {
+          "id": "11-browser-persistence-skill-r1",
+          "task": "browser-persistence",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15830,
+              "usage": {
+                "input_tokens": 21330,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 255,
+                "reasoning_output_tokens": 38
+              },
+              "toolEvents": [],
+              "promptDigest": "68a85e17dffa22bdcfa6b8bced2e45b0c0e36376db02be83a9792385ef111ff2"
+            }
+          ],
+          "findings": [
+            {
+              "path": "app.mjs:3-7",
+              "issue": "The form reports “Saved” without persisting the name, and page load never restores it.",
+              "trigger": "Save a name and reload the page; #saved becomes empty because the name exists only in the DOM.",
+              "remedy": "Write accepted names to localStorage and restore the stored name on page load, continuing to use textContent for safe rendering."
+            },
+            {
+              "path": "app.mjs:5-6",
+              "issue": "Submissions are neither trimmed nor ignored when blank.",
+              "trigger": "Submitting \"  Ada  \" displays surrounding whitespace; submitting only spaces replaces the displayed name and reports “Saved”.",
+              "remedy": "Trim the input and return early when the result is empty, before changing the saved name, storage, or status."
+            }
+          ],
+          "limitations": [
+            "Inspected the complete supplied index.html and app.mjs. No diff or test evidence was supplied, and no execution checks were performed. The existing textContent assignment safely renders HTML characters as text."
+          ]
+        },
+        {
+          "id": "12-browser-persistence-baseline-r1",
+          "task": "browser-persistence",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10642,
+              "usage": {
+                "input_tokens": 16381,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 140,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "3142c9de5241b62d3f1c93d0bda4797eb013783ff673aa2f7f77705dc044dc1d"
+            }
+          ],
+          "findings": [
+            {
+              "path": "app.mjs",
+              "issue": "The name is neither persisted nor restored, despite reporting \"Saved\".",
+              "trigger": "Save a name and reload the page; the name disappears.",
+              "remedy": "Store accepted names in localStorage and restore the stored name using textContent on page load."
+            },
+            {
+              "path": "app.mjs",
+              "issue": "Submissions are not trimmed, and blank submissions overwrite the displayed name and report success.",
+              "trigger": "Submit a name with surrounding whitespace or submit only whitespace.",
+              "remedy": "Trim the input value and return early if it is empty before updating storage, the display, or status."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "13-existing-reuse-baseline-r1",
+          "task": "existing-reuse",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9610,
+              "usage": {
+                "input_tokens": 16370,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 127,
+                "reasoning_output_tokens": 19
+              },
+              "toolEvents": [],
+              "promptDigest": "6b0443ddf06538ceeb48d33e426c2072e10b1730735d2ad6cc12ec1e1c64a5bb"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The list still displays raw status codes instead of using the existing statusLabel source of truth.",
+              "trigger": "list([\"pending\", \"done\", \"other\"]) produces raw values instead of \"Awaiting review\", \"Complete\", and the \"Unknown\" fallback.",
+              "remedy": "Import statusLabel from \"./status.mjs\" and replace value with statusLabel(value) in the map callback."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "14-existing-reuse-skill-r1",
+          "task": "existing-reuse",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11238,
+              "usage": {
+                "input_tokens": 16925,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 161,
+                "reasoning_output_tokens": 25
+              },
+              "toolEvents": [],
+              "promptDigest": "04cccb2003526fdfcc43950dad1603fc0cbab1a734be23746be91e59e38074bf"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The list still displays raw status codes and does not reuse the existing label source.",
+              "trigger": "list([\"pending\", \"done\", \"missing\"]) returns [\"Status: pending\", \"Status: done\", \"Status: missing\"] instead of the detail view’s labels and \"Unknown\" fallback.",
+              "remedy": "Import statusLabel from ./status.mjs and use statusLabel(value) in the map callback."
+            }
+          ],
+          "limitations": [
+            "Reviewed all three supplied files. No edit diff or runtime verification evidence was supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "15-intentional-interface-skill-r1",
+          "task": "intentional-interface",
+          "condition": "skill",
+          "repetition": 1,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10708,
+              "usage": {
+                "input_tokens": 16846,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 105,
+                "reasoning_output_tokens": 32
+              },
+              "toolEvents": [],
+              "promptDigest": "cfa2808018b3c71e8a5f6fb3363c0876afa177e4eda59279351f5dbb3c6129a1"
+            }
+          ],
+          "findings": [],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs for simplicity. No actionable unnecessary complexity was found; the Map and exported register/format interface coherently support the required plugin extension contract.",
+            "No tests or runtime results were supplied, and external plugin implementations were outside the permitted scope."
+          ]
+        },
+        {
+          "id": "16-intentional-interface-baseline-r1",
+          "task": "intentional-interface",
+          "condition": "baseline",
+          "repetition": 1,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 6255,
+              "usage": {
+                "input_tokens": 16291,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 18,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "c53c48c38b50aa91c383fd26b4e19cd9897206d21721b411b88062f2c4a2f708"
+            }
+          ],
+          "findings": [],
+          "limitations": []
+        },
+        {
+          "id": "17-page-boundary-skill-r2",
+          "task": "page-boundary",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11450,
+              "usage": {
+                "input_tokens": 16753,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 167,
+                "reasoning_output_tokens": 29
+              },
+              "toolEvents": [],
+              "promptDigest": "159f407071a90ab1295241a63b12854fc8d68ef86f85be59dec27e8728cbd831"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The requested fix is missing: hasNext remains true on a full final page.",
+              "trigger": "pageInfo(20, 1, 10) returns { hasNext: true, count: 10 }, although no items remain for another page.",
+              "remedy": "Replace total >= (page + 1) * size with total > (page + 1) * size. Preserve the return shape and count calculation."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs. No tests or runtime verification evidence were supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "18-page-boundary-baseline-r2",
+          "task": "page-boundary",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10359,
+              "usage": {
+                "input_tokens": 16198,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 123,
+                "reasoning_output_tokens": 25
+              },
+              "toolEvents": [],
+              "promptDigest": "8665f1c7fe2c43f9ad36551aa5729fe12984afede87d58d3d73000f62e0fb478"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "hasNext still reports a nonexistent next page when the final page is full.",
+              "trigger": "pageInfo(10, 0, 10) returns hasNext: true because total equals (page + 1) * size.",
+              "remedy": "Change >= to > in hasNext, preserving the API, count calculation, and empty-list behavior."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "19-explicit-zero-baseline-r2",
+          "task": "explicit-zero",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9245,
+              "usage": {
+                "input_tokens": 16188,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 108,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "3731267cb19d05c68d5e2502460cedfaf3aa659dd79fe770f6f648306c2f5abe"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The `||` fallback replaces a zero retry budget with three, so zero does not disable retries.",
+              "trigger": "Calling `retryDelay({ retries: 0 })` returns `retries: 3`.",
+              "remedy": "Replace `options.retries || 3` with `options.retries ?? 3` to preserve zero and default omitted or null budgets to three without changing the public API."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "20-explicit-zero-skill-r2",
+          "task": "explicit-zero",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9622,
+              "usage": {
+                "input_tokens": 16743,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 140,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "63c1cfc303daf7f3efa2fab42d89f24b0fb6a5cdfa9446dd83ebd4ab995e6a25"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The truthy fallback converts a zero retry budget to three, violating the requirement to disable retries.",
+              "trigger": "retryDelay({ retries: 0 }) returns { retries: 3, delayMs: 100 }.",
+              "remedy": "Replace options.retries || 3 with options.retries ?? 3. This preserves zero, defaults omitted or null budgets to three, and preserves the public API."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs against the request. No diff, callers, tests, or runtime verification evidence were supplied; no checks were executed."
+          ]
+        },
+        {
+          "id": "21-caller-migration-skill-r2",
+          "task": "caller-migration",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12630,
+              "usage": {
+                "input_tokens": 16943,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 220,
+                "reasoning_output_tokens": 51
+              },
+              "toolEvents": [],
+              "promptDigest": "af62b05bb35b16b5c43963fc9f343a360e46be1dbc1218d67f96eea1729a7c22"
+            }
+          ],
+          "findings": [
+            {
+              "path": "format.mjs:1",
+              "issue": "The requested options-object migration is absent; both in-repository callers still use positional currency strings.",
+              "trigger": "formatAmount(1234, { currency: \"EUR\" }) returns \"[object Object] 12.34\" instead of \"EUR 12.34\" because the second argument is concatenated directly.",
+              "remedy": "Change the signature to formatAmount(cents, { currency = \"USD\" } = {}), and update main.mjs and billing/invoice.mjs to pass { currency: \"EUR\" } and { currency: \"GBP\" }, respectively."
+            }
+          ],
+          "limitations": [
+            "Inspected all three supplied files. No proposed diff or verification results were supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "22-caller-migration-baseline-r2",
+          "task": "caller-migration",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12912,
+              "usage": {
+                "input_tokens": 16388,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 246,
+                "reasoning_output_tokens": 104
+              },
+              "toolEvents": [],
+              "promptDigest": "fd940f207c9524f488bfcf43859dbb44cca9a3465447e153b8c9d07a458318bf"
+            }
+          ],
+          "findings": [
+            {
+              "path": "format.mjs",
+              "issue": "The requested options-object migration is missing; the formatter and both in-repository callers still use the positional currency argument.",
+              "trigger": "formatAmount(100, { currency: \"EUR\" }) returns \"[object Object] 1.00\" instead of \"EUR 1.00\".",
+              "remedy": "Change the signature to formatAmount(cents, { currency = \"USD\" } = {}). Update main.mjs to pass { currency: \"EUR\" } and billing/invoice.mjs to pass { currency: \"GBP\" }, preserving their existing output."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "23-path-boundary-baseline-r2",
+          "task": "path-boundary",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10975,
+              "usage": {
+                "input_tokens": 20585,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 124,
+                "reasoning_output_tokens": 34
+              },
+              "toolEvents": [],
+              "promptDigest": "5f9fae3d98b4bd23fca233d7a03025ea53f4558fcd25608f45b15a47e8bcad6b"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The prefix check includes sibling directories whose names begin with the root name.",
+              "trigger": "isWithin('/app', '/application') returns true.",
+              "remedy": "Use return root === '/' || candidate === root || candidate.startsWith(root + '/'); to enforce a directory boundary while including the root itself and descendants."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "24-path-boundary-skill-r2",
+          "task": "path-boundary",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 14762,
+              "usage": {
+                "input_tokens": 16746,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 159,
+                "reasoning_output_tokens": 31
+              },
+              "toolEvents": [],
+              "promptDigest": "5504dfaec31fe6566a29ed90923118f840f8e4b2e18a107f4cdbc1612f4067df"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The prefix check still includes sibling directories, so the requested fix is missing.",
+              "trigger": "isWithin('/app', '/application') returns true, although '/application' is neither the root nor a descendant.",
+              "remedy": "Use candidate === root || candidate.startsWith(root === '/' ? '/' : root + '/'). This preserves root inclusion and handles '/' within the stated input contract."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs. No tests or execution evidence were supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "25-stale-check-skill-r2",
+          "task": "stale-check",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15445,
+              "usage": {
+                "input_tokens": 16852,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 201,
+                "reasoning_output_tokens": 39
+              },
+              "toolEvents": [],
+              "promptDigest": "41e67c0555cace85fa1b0854f01e55637e1ce2879b5cf05e71a8b5f9c31297a8"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "receiptFresh compares only Git HEAD, so changed source, test, or config bytes do not invalidate a receipt.",
+              "trigger": "With equal before.head and after.head, changing any declared path's UTF-8 content still returns true.",
+              "remedy": "Also compare all declared path/content mappings using a canonical path order so content changes invalidate receipts while insertion-order differences do not."
+            }
+          ],
+          "limitations": [
+            "Inspected both supplied files; no proposed diff or execution receipts were supplied, and no checks were run. Order independence for content comparison remains unverified.",
+            "known-baseline.test.mjs deliberately asserts \"unavailable\" equals \"ready\" and will fail. This unrelated baseline failure remains unchanged."
+          ]
+        },
+        {
+          "id": "26-stale-check-baseline-r2",
+          "task": "stale-check",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11103,
+              "usage": {
+                "input_tokens": 16297,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 124,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "6f372682159c49e358f57ba51c58b5164ca59b71c818d7af80ad7724ff69b494"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "receiptFresh compares only HEAD, so declared source, test, or config byte changes do not invalidate a receipt.",
+              "trigger": "before.head equals after.head while any declared input path or UTF-8 content differs.",
+              "remedy": "Also compare all declared input path/content mappings, sorting paths before comparison to preserve order independence."
+            }
+          ],
+          "limitations": [
+            "known-baseline.test.mjs deliberately fails by comparing \"unavailable\" with \"ready\"; leave it unchanged. Tests were not run because tool use was prohibited."
+          ]
+        },
+        {
+          "id": "27-browser-persistence-baseline-r2",
+          "task": "browser-persistence",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12864,
+              "usage": {
+                "input_tokens": 16381,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 181,
+                "reasoning_output_tokens": 24
+              },
+              "toolEvents": [],
+              "promptDigest": "3142c9de5241b62d3f1c93d0bda4797eb013783ff673aa2f7f77705dc044dc1d"
+            }
+          ],
+          "findings": [
+            {
+              "path": "app.mjs",
+              "issue": "The form reports “Saved” without persisting the name or restoring it on page load.",
+              "trigger": "Submit a name, then reload; the saved name disappears.",
+              "remedy": "Write accepted names to localStorage and read the same key on page load, displaying restored values with textContent."
+            },
+            {
+              "path": "app.mjs",
+              "issue": "Submissions are neither trimmed nor checked for blank values.",
+              "trigger": "Submit a padded name or whitespace-only input; padding is retained, and blank input replaces the displayed name while reporting success.",
+              "remedy": "Trim the input and return immediately if it is empty, before updating storage, displayed text, or status."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "28-browser-persistence-skill-r2",
+          "task": "browser-persistence",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15329,
+              "usage": {
+                "input_tokens": 16936,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 230,
+                "reasoning_output_tokens": 27
+              },
+              "toolEvents": [],
+              "promptDigest": "68a85e17dffa22bdcfa6b8bced2e45b0c0e36376db02be83a9792385ef111ff2"
+            }
+          ],
+          "findings": [
+            {
+              "path": "app.mjs:5",
+              "issue": "The name is never persisted or restored, so reloading still loses it despite the “Saved” status.",
+              "trigger": "Submit a name, then reload. The handler only updates the DOM, and page initialization never reads localStorage.",
+              "remedy": "Store the accepted name in localStorage and restore it on page load using textContent."
+            },
+            {
+              "path": "app.mjs:5",
+              "issue": "Submissions are neither trimmed nor checked for blank input.",
+              "trigger": "Submitting \"  Ada  \" preserves surrounding spaces; submitting only whitespace replaces the displayed name and reports “Saved”.",
+              "remedy": "Trim the input and return immediately when the result is empty, before changing storage, the displayed name, or status."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied index.html and app.mjs. No runtime checks or verification receipts were supplied. The existing textContent assignment safely renders HTML characters as text."
+          ]
+        },
+        {
+          "id": "29-existing-reuse-skill-r2",
+          "task": "existing-reuse",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11656,
+              "usage": {
+                "input_tokens": 16925,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 171,
+                "reasoning_output_tokens": 29
+              },
+              "toolEvents": [],
+              "promptDigest": "04cccb2003526fdfcc43950dad1603fc0cbab1a734be23746be91e59e38074bf"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The list still renders raw status codes and does not use the shared label source.",
+              "trigger": "list([\"pending\", \"done\", \"other\"]) produces [\"Status: pending\", \"Status: done\", \"Status: other\"] instead of the detail view’s labels and \"Unknown\" fallback.",
+              "remedy": "Import statusLabel from ./status.mjs and use statusLabel(value) in the existing map callback."
+            }
+          ],
+          "limitations": [
+            "Inspected all three supplied files. No diff, edit results, tests, or runtime verification were supplied; no checks were executed."
+          ]
+        },
+        {
+          "id": "30-existing-reuse-baseline-r2",
+          "task": "existing-reuse",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10046,
+              "usage": {
+                "input_tokens": 16370,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 127,
+                "reasoning_output_tokens": 22
+              },
+              "toolEvents": [],
+              "promptDigest": "6b0443ddf06538ceeb48d33e426c2072e10b1730735d2ad6cc12ec1e1c64a5bb"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The list still renders raw status codes instead of using the detail view’s labels and unknown-status fallback.",
+              "trigger": "list([\"pending\", \"done\", \"other\"]) returns \"Status: pending\", \"Status: done\", and \"Status: other\".",
+              "remedy": "Import statusLabel from ./status.mjs and replace value in the displayed string with statusLabel(value)."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "31-intentional-interface-baseline-r2",
+          "task": "intentional-interface",
+          "condition": "baseline",
+          "repetition": 2,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 7750,
+              "usage": {
+                "input_tokens": 16291,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 44,
+                "reasoning_output_tokens": 24
+              },
+              "toolEvents": [],
+              "promptDigest": "c53c48c38b50aa91c383fd26b4e19cd9897206d21721b411b88062f2c4a2f708"
+            }
+          ],
+          "findings": [],
+          "limitations": []
+        },
+        {
+          "id": "32-intentional-interface-skill-r2",
+          "task": "intentional-interface",
+          "condition": "skill",
+          "repetition": 2,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8775,
+              "usage": {
+                "input_tokens": 16846,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 66,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "cfa2808018b3c71e8a5f6fb3363c0876afa177e4eda59279351f5dbb3c6129a1"
+            }
+          ],
+          "findings": [],
+          "limitations": [
+            "Inspected the complete supplied main.mjs against the request. No concrete unnecessary complexity was found; the registry preserves the required plugin extension interface.",
+            "No callers, tests, diff, or runtime verification evidence were supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "33-page-boundary-baseline-r3",
+          "task": "page-boundary",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9654,
+              "usage": {
+                "input_tokens": 16198,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 100,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "8665f1c7fe2c43f9ad36551aa5729fe12984afede87d58d3d73000f62e0fb478"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "hasNext remains true on a full final page, so the requested fix is missing.",
+              "trigger": "pageInfo(10, 0, 10) returns hasNext: true even though no next page exists.",
+              "remedy": "Change >= to > in the hasNext comparison. Keep the function signature and count calculation unchanged to preserve the API and empty-list behavior."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "34-page-boundary-skill-r3",
+          "task": "page-boundary",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11934,
+              "usage": {
+                "input_tokens": 16753,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 182,
+                "reasoning_output_tokens": 34
+              },
+              "toolEvents": [],
+              "promptDigest": "159f407071a90ab1295241a63b12854fc8d68ef86f85be59dec27e8728cbd831"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "A full final page still reports hasNext: true, leaving the requested bug unfixed.",
+              "trigger": "pageInfo(10, 0, 10) returns { hasNext: true, count: 10 }, although no items remain for another page.",
+              "remedy": "Change total >= (page + 1) * size to total > (page + 1) * size. This preserves the API and empty-list behavior for positive page sizes."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs. No callers, tests, or runtime verification evidence were supplied; no checks were executed."
+          ]
+        },
+        {
+          "id": "35-explicit-zero-skill-r3",
+          "task": "explicit-zero",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10330,
+              "usage": {
+                "input_tokens": 16743,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 146,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "63c1cfc303daf7f3efa2fab42d89f24b0fb6a5cdfa9446dd83ebd4ab995e6a25"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "A retry budget of zero becomes three, so retries remain enabled contrary to the request.",
+              "trigger": "retryDelay({ retries: 0 }) returns { retries: 3, delayMs: 100 } because || treats zero as falsy.",
+              "remedy": "Replace options.retries || 3 with options.retries ?? 3. This preserves zero, defaults omitted or null budgets to three, and preserves the public API."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs against the request. No callers, tests, diff, or runtime verification evidence were supplied; no execution checks were performed."
+          ]
+        },
+        {
+          "id": "36-explicit-zero-baseline-r3",
+          "task": "explicit-zero",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 13622,
+              "usage": {
+                "input_tokens": 16188,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 94,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "3731267cb19d05c68d5e2502460cedfaf3aa659dd79fe770f6f648306c2f5abe"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The logical OR fallback replaces a retry budget of zero with three, so zero does not disable retries.",
+              "trigger": "retryDelay({ retries: 0 }) returns retries: 3.",
+              "remedy": "Replace options.retries || 3 with options.retries ?? 3 to preserve zero while defaulting omitted or null budgets to three."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "37-caller-migration-baseline-r3",
+          "task": "caller-migration",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15059,
+              "usage": {
+                "input_tokens": 16388,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 307,
+                "reasoning_output_tokens": 68
+              },
+              "toolEvents": [],
+              "promptDigest": "fd940f207c9524f488bfcf43859dbb44cca9a3465447e153b8c9d07a458318bf"
+            }
+          ],
+          "findings": [
+            {
+              "path": "format.mjs",
+              "issue": "The formatter still uses the positional currency signature; the requested options interface is unimplemented.",
+              "trigger": "formatAmount(100, { currency: \"EUR\" }) returns \"[object Object] 1.00\" instead of \"EUR 1.00\".",
+              "remedy": "Change the signature to formatAmount(cents, { currency = \"USD\" } = {})."
+            },
+            {
+              "path": "main.mjs",
+              "issue": "The cart caller still passes a positional currency.",
+              "trigger": "After migrating the formatter, cartTotal(100) would return \"USD 1.00\" instead of the existing \"EUR 1.00\".",
+              "remedy": "Pass { currency: \"EUR\" } as the second argument."
+            },
+            {
+              "path": "billing/invoice.mjs",
+              "issue": "The invoice caller still passes a positional currency.",
+              "trigger": "After migrating the formatter, invoiceTotal(100) would return \"USD 1.00\" instead of the existing \"GBP 1.00\".",
+              "remedy": "Pass { currency: \"GBP\" } as the second argument."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "38-caller-migration-skill-r3",
+          "task": "caller-migration",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 14105,
+              "usage": {
+                "input_tokens": 16943,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 234,
+                "reasoning_output_tokens": 61
+              },
+              "toolEvents": [],
+              "promptDigest": "af62b05bb35b16b5c43963fc9f343a360e46be1dbc1218d67f96eea1729a7c22"
+            }
+          ],
+          "findings": [
+            {
+              "path": "format.mjs:1",
+              "issue": "The requested migration is absent: formatAmount still accepts a positional currency, and main.mjs:3 and billing/invoice.mjs:3 still pass strings.",
+              "trigger": "formatAmount(1234, { currency: \"EUR\" }) returns \"[object Object] 12.34\" instead of \"EUR 12.34\".",
+              "remedy": "Change the signature to formatAmount(cents, { currency = \"USD\" } = {}) and update the cart and invoice callers to pass { currency: \"EUR\" } and { currency: \"GBP\" }, respectively."
+            }
+          ],
+          "limitations": [
+            "Inspected all three supplied files. No proposed diff, tests, or runtime verification evidence was supplied; no checks were executed."
+          ]
+        },
+        {
+          "id": "39-path-boundary-skill-r3",
+          "task": "path-boundary",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11420,
+              "usage": {
+                "input_tokens": 16746,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 157,
+                "reasoning_output_tokens": 25
+              },
+              "toolEvents": [],
+              "promptDigest": "5504dfaec31fe6566a29ed90923118f840f8e4b2e18a107f4cdbc1612f4067df"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The implementation still includes sibling directories whose names begin with the root name.",
+              "trigger": "isWithin('/app', '/app-other') returns true because it checks only the string prefix.",
+              "remedy": "Use candidate === root || candidate.startsWith(root === '/' ? '/' : root + '/') to include the root and descendants while excluding prefix-matching siblings."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs against the request. No proposed diff, callers, tests, or runtime verification evidence were supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "40-path-boundary-baseline-r3",
+          "task": "path-boundary",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11158,
+              "usage": {
+                "input_tokens": 16191,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 126,
+                "reasoning_output_tokens": 35
+              },
+              "toolEvents": [],
+              "promptDigest": "5f9fae3d98b4bd23fca233d7a03025ea53f4558fcd25608f45b15a47e8bcad6b"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The prefix check includes sibling directories whose names begin with the root name.",
+              "trigger": "isWithin('/app', '/application') returns true.",
+              "remedy": "Return candidate === root || candidate.startsWith(root === '/' ? '/' : root + '/'). This includes the root and descendants while excluding prefix-matching siblings."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "41-stale-check-baseline-r3",
+          "task": "stale-check",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12456,
+              "usage": {
+                "input_tokens": 16297,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 163,
+                "reasoning_output_tokens": 28
+              },
+              "toolEvents": [],
+              "promptDigest": "6f372682159c49e358f57ba51c58b5164ca59b71c818d7af80ad7724ff69b494"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "receiptFresh compares only Git HEAD, so declared source, test, or config byte changes do not invalidate a receipt.",
+              "trigger": "HEAD remains unchanged while any declared file content changes, or a declared path is added or removed.",
+              "remedy": "Also compare the declared path-to-content mappings using sorted path keys and exact string values, preserving order independence."
+            }
+          ],
+          "limitations": [
+            "Review used only the supplied files; tests were not run. known-baseline.test.mjs deliberately fails because \"unavailable\" does not equal \"ready\"; leave it unchanged."
+          ]
+        },
+        {
+          "id": "42-stale-check-skill-r3",
+          "task": "stale-check",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 20032,
+              "usage": {
+                "input_tokens": 16852,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 183,
+                "reasoning_output_tokens": 33
+              },
+              "toolEvents": [],
+              "promptDigest": "41e67c0555cace85fa1b0854f01e55637e1ce2879b5cf05e71a8b5f9c31297a8"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "receiptFresh compares only HEAD, so changes to declared source, test, or config bytes do not invalidate a receipt.",
+              "trigger": "With identical before.head and after.head, changing any declared file’s UTF-8 contents still returns true.",
+              "remedy": "Compare HEAD and all declared path/content pairs, sorting paths so object insertion order does not affect freshness."
+            }
+          ],
+          "limitations": [
+            "Inspected both supplied files; no proposed diff or execution receipts were provided, and no checks were run.",
+            "known-baseline.test.mjs deliberately asserts \"unavailable\" equals \"ready\" and will fail. This unrelated baseline failure remains unchanged."
+          ]
+        },
+        {
+          "id": "43-browser-persistence-skill-r3",
+          "task": "browser-persistence",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 14294,
+              "usage": {
+                "input_tokens": 16936,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 248,
+                "reasoning_output_tokens": 41
+              },
+              "toolEvents": [],
+              "promptDigest": "68a85e17dffa22bdcfa6b8bced2e45b0c0e36376db02be83a9792385ef111ff2"
+            }
+          ],
+          "findings": [
+            {
+              "path": "app.mjs:5",
+              "issue": "The form reports “Saved” but never writes to localStorage or restores a stored name on page load, so reloading still loses the name.",
+              "trigger": "Submit a name, then reload the page.",
+              "remedy": "Store the accepted name in localStorage and restore it on page load, continuing to render it with textContent."
+            },
+            {
+              "path": "app.mjs:5",
+              "issue": "Submissions are neither trimmed nor checked for blank input; whitespace-only input replaces the displayed name and reports success.",
+              "trigger": "Submit \"  Alice  \" or submit only whitespace after saving a name.",
+              "remedy": "Trim the input and return immediately if it is empty, before changing storage, displayed text, or status."
+            }
+          ],
+          "limitations": [
+            "Reviewed the complete supplied index.html and app.mjs. Existing textContent rendering safely handles HTML characters. No diff or runtime verification evidence was supplied, and no checks were run."
+          ]
+        },
+        {
+          "id": "44-browser-persistence-baseline-r3",
+          "task": "browser-persistence",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12838,
+              "usage": {
+                "input_tokens": 16381,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 161,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "3142c9de5241b62d3f1c93d0bda4797eb013783ff673aa2f7f77705dc044dc1d"
+            }
+          ],
+          "findings": [
+            {
+              "path": "app.mjs",
+              "issue": "The name is neither persisted in localStorage nor restored on page load.",
+              "trigger": "Save a name and reload; the displayed name disappears despite the “Saved” status.",
+              "remedy": "Store the accepted name in localStorage on submit and restore it on module load, continuing to use textContent for safe display."
+            },
+            {
+              "path": "app.mjs",
+              "issue": "Submissions are not trimmed, and blank names are accepted.",
+              "trigger": "Submit a padded name or whitespace-only input; padding is retained or the displayed name is cleared and “Saved” is shown.",
+              "remedy": "Trim the input value and return immediately if it is empty, before changing storage, display, or status."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "45-existing-reuse-baseline-r3",
+          "task": "existing-reuse",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10244,
+              "usage": {
+                "input_tokens": 16370,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 105,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "6b0443ddf06538ceeb48d33e426c2072e10b1730735d2ad6cc12ec1e1c64a5bb"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs",
+              "issue": "The list still displays raw status codes instead of using the detail view’s shared labels and fallback.",
+              "trigger": "Calling list([\"pending\", \"done\", \"unrecognized\"]) produces raw values instead of \"Awaiting review\", \"Complete\", and \"Unknown\".",
+              "remedy": "Import statusLabel from ./status.mjs and replace value in the output concatenation with statusLabel(value)."
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "id": "46-existing-reuse-skill-r3",
+          "task": "existing-reuse",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12528,
+              "usage": {
+                "input_tokens": 16925,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 174,
+                "reasoning_output_tokens": 23
+              },
+              "toolEvents": [],
+              "promptDigest": "04cccb2003526fdfcc43950dad1603fc0cbab1a734be23746be91e59e38074bf"
+            }
+          ],
+          "findings": [
+            {
+              "path": "main.mjs:2",
+              "issue": "The list still displays raw status codes instead of using the detail view’s labels and unknown-status fallback.",
+              "trigger": "list([\"pending\", \"done\", \"other\"]) returns [\"Status: pending\", \"Status: done\", \"Status: other\"] instead of [\"Status: Awaiting review\", \"Status: Complete\", \"Status: Unknown\"].",
+              "remedy": "Import statusLabel from ./status.mjs and use statusLabel(value) in the existing map callback."
+            }
+          ],
+          "limitations": [
+            "Reviewed all three supplied files. No diff, tests, or execution receipts were supplied; no checks were run."
+          ]
+        },
+        {
+          "id": "47-intentional-interface-skill-r3",
+          "task": "intentional-interface",
+          "condition": "skill",
+          "repetition": 3,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11952,
+              "usage": {
+                "input_tokens": 16846,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 85,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "cfa2808018b3c71e8a5f6fb3363c0876afa177e4eda59279351f5dbb3c6129a1"
+            }
+          ],
+          "findings": [],
+          "limitations": [
+            "Reviewed the complete supplied main.mjs against the request. The Map and duplicate/unknown guards form a coherent implementation; no concrete unnecessary complexity was found. The exported constructor and register/format extension interface should remain intact.",
+            "No tests or runtime receipts were supplied, and no execution was performed. External plugin implementations were outside the supplied scope."
+          ]
+        },
+        {
+          "id": "48-intentional-interface-baseline-r3",
+          "task": "intentional-interface",
+          "condition": "baseline",
+          "repetition": 3,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": null,
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 6635,
+              "usage": {
+                "input_tokens": 16291,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 18,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "c53c48c38b50aa91c383fd26b4e19cd9897206d21721b411b88062f2c4a2f708"
+            }
+          ],
+          "findings": [],
+          "limitations": []
+        }
+      ]
+    },
+    "editing": {
+      "manifest": {
+        "experiment": "editing",
+        "baselineCommit": "6f63ef8fdfff7f5409fdf71f6e5f1362a61aedd6",
+        "model": "gpt-6-astra",
+        "thinking": "medium",
+        "provider": "Codex CLI / ChatGPT subscription",
+        "repetitions": 3,
+        "maxEditRounds": 3,
+        "timeoutSeconds": 180,
+        "monetaryCost": null,
+        "monetaryCostReason": "Subscription usage; no API price inferred.",
+        "humanInterventions": 0,
+        "cliVersion": "codex-cli 0.153.1",
+        "piVersion": "0.84.4",
+        "sourceDigests": {
+          "tasks.mjs": "36a0187f2768ebd3d31aa38b803c6d2ad2bfc1e443ddd528601c91a9f2e3ec13",
+          "fixtures.mjs": "be624096f7c92be7237a482a69133788ccda7cf6b6f52f80347615f27503dccf",
+          "oracle.mjs": "8d5e11836b5c3fbb5f70149d1f388aa2c75e6caefe02bb767a794c9899000e93",
+          "reference.mjs": "5ba85e5fb1ab45e158a0e72b98ce61d6a6a230a7cba451aa917bdd29317f17e6",
+          "anchored-edit.mjs": "e2518b932cf98205389a11fea4d0edf728489df7be2be5e1748e3a824bc6564f",
+          "run.mjs": "73faa40bbe423b9fc6df06bf5b432ad3cdcd0ff2f1b5c35b5c38a86a1d0bcd3e",
+          "check.mjs": "855477e9aec32936d5c3b79d2ba8b5db3d5547ffd10a093c8ead831920cb5718",
+          "specpi-review/SKILL.md": "24d69a7db16f34170ba5d170bc6202bcf2c6c55f1413da824a6c4db893d0f62e"
+        },
+        "fixtureDigests": {
+          "page-boundary": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "explicit-zero": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "caller-migration": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "path-boundary": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "stale-check": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "browser-persistence": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "existing-reuse": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "intentional-interface": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d"
+        },
+        "startedAt": "2026-09-13T05:50:33.340Z",
+        "limitations": [
+          "Synthetic task screen, not representative repository accuracy",
+          "Codex CLI response adapter, not a full Pi conversation",
+          "Native Codex tools are instructed off, not disabled; tool use is recorded as a protocol deviation",
+          "Human maintainability review is still required",
+          "No native mutation or Command Guard equivalence is claimed for the uninstalled anchored experiment"
+        ]
+      },
+      "runs": [
+        {
+          "id": "01-page-boundary-native-r1",
+          "task": "page-boundary",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8213,
+              "usage": {
+                "input_tokens": 16226,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 86,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "709cd0d8cc2f44c08995d8cd7bd16a8714fdd55f750d6a264a306b8c73663336",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use a strict comparison so a full final page has no next page, preserving the API and empty-list behavior."
+            }
+          ],
+          "finalFixture": "5e77cd892e5bf5ca39b86ca6e21f63e3a829a2c5572bbf1fd3bb0171ee372ba4",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "02-page-boundary-anchored-r1",
+          "task": "page-boundary",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10227,
+              "usage": {
+                "input_tokens": 16312,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 145,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "44ff3a705b121d494741d0facfa1c9cd602f7e5bd764a9feec84b196d6ce6fb5",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use a strict comparison so a full final page has no next page, preserving the API and empty-list behavior."
+            }
+          ],
+          "finalFixture": "5e77cd892e5bf5ca39b86ca6e21f63e3a829a2c5572bbf1fd3bb0171ee372ba4",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "03-explicit-zero-anchored-r1",
+          "task": "explicit-zero",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10239,
+              "usage": {
+                "input_tokens": 16286,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 138,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "b3a4066f6d59414cb1758a2ab9e951a66c52fcedcd519a00e0e1512a89fde4c4",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use nullish coalescing to preserve zero retries while defaulting omitted or null budgets to three. The public API remains unchanged."
+            }
+          ],
+          "finalFixture": "e7f48b4609fb210545b1ca5c7d22b7bac2f33f7f1972e36f8109769e658bb59a",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "04-explicit-zero-native-r1",
+          "task": "explicit-zero",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8623,
+              "usage": {
+                "input_tokens": 16216,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 82,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "2b79462f0db206388c97d0a0b1c43dc5bacdd5f721e964600fa5dcfd94c735a7",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use nullish coalescing so zero disables retries, while omitted or null budgets default to three. The public API is unchanged."
+            }
+          ],
+          "finalFixture": "e7f48b4609fb210545b1ca5c7d22b7bac2f33f7f1972e36f8109769e658bb59a",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "05-caller-migration-native-r1",
+          "task": "caller-migration",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12250,
+              "usage": {
+                "input_tokens": 16416,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 173,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "5013859847b3956a8c7d6d821a4a22585929ee6acb1122f9ef7cd5ff9d863c02",
+              "editResults": [
+                {
+                  "path": "format.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "billing/invoice.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Migrates the formatter and both callers to currency options, preserving the USD default and existing EUR cart and GBP invoice output."
+            }
+          ],
+          "finalFixture": "d89c3ea30b1ee84bba91837ee08c8c633f7386674261ac9ac9f132835ae67ffb",
+          "changedFiles": [
+            "format.mjs",
+            "main.mjs",
+            "billing/invoice.mjs"
+          ]
+        },
+        {
+          "id": "06-caller-migration-anchored-r1",
+          "task": "caller-migration",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15365,
+              "usage": {
+                "input_tokens": 16588,
+                "cached_input_tokens": 11904,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 301,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "ccd858d57acf927a93a96df914b1914e267f404786b22af1bb213a6052091025",
+              "editResults": [
+                {
+                  "path": "format.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "billing/invoice.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Migrated the formatter and both callers to an options object, preserving the USD default and existing EUR cart and GBP invoice output."
+            }
+          ],
+          "finalFixture": "d89c3ea30b1ee84bba91837ee08c8c633f7386674261ac9ac9f132835ae67ffb",
+          "changedFiles": [
+            "format.mjs",
+            "main.mjs",
+            "billing/invoice.mjs"
+          ]
+        },
+        {
+          "id": "07-path-boundary-anchored-r1",
+          "task": "path-boundary",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9071,
+              "usage": {
+                "input_tokens": 16275,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 126,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "4b691a7458af1fd2ba2df3ca05b577551b08990a3d27a75e4efc25cc5cd1999f",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Match the root itself or descendants at a directory boundary, with '/' containing all supported paths."
+            }
+          ],
+          "finalFixture": "b0db8df0561766418f6a039341283e790e2214a3cedf3292ecf262c4652fbe1c",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "08-path-boundary-native-r1",
+          "task": "path-boundary",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9595,
+              "usage": {
+                "input_tokens": 16219,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 82,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "630b44ab808c49b41a562d7fb70192b8b1673149f69d72bd54a4c84692b15514",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Match the root itself or descendants across a slash boundary, with '/' including all absolute paths."
+            }
+          ],
+          "finalFixture": "13c6ad8591580bd0699a3588907beff80c6cea9534b31f44527541378a412e58",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "09-stale-check-native-r1",
+          "task": "stale-check",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 21458,
+              "usage": {
+                "input_tokens": 16325,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 458,
+                "reasoning_output_tokens": 211
+              },
+              "toolEvents": [],
+              "promptDigest": "b762d4dbc546f8ba6520391ff3c42a8fe25ce76c4250277275c42a0e3af8f0aa",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Compares HEAD and all declared path/content mappings recursively, independent of key order. Changed bytes, added paths, or removed paths invalidate receipts. Tests were not run. The deliberately failing known-baseline.test.mjs remains unchanged."
+            }
+          ],
+          "finalFixture": "8d6698f741ac93be7ca5ed86506cc89eea2bc43e88b8ea2f570734afc5787099",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "10-stale-check-anchored-r1",
+          "task": "stale-check",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 27556,
+              "usage": {
+                "input_tokens": 16445,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 547,
+                "reasoning_output_tokens": 275
+              },
+              "toolEvents": [],
+              "promptDigest": "14d898e67e4d425758ba865c42f2cf2e325a80ead0056952e1671da9ec57bce0",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Compares HEAD and all declared path/content mappings, detecting changed bytes and added or removed paths independently of key order. Tests were not run. The deliberately failing unrelated known-baseline.test.mjs remains unchanged."
+            }
+          ],
+          "finalFixture": "2e14d6ab9924559516d15750cb57b43fcc909b5c7a113fa1b58cf2b121f604c5",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "11-browser-persistence-anchored-r1",
+          "task": "browser-persistence",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 13441,
+              "usage": {
+                "input_tokens": 16622,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 249,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "28d2c10348e72fb4d01b72500751f58233b650b955dda882bd9b08014764201d",
+              "editResults": [
+                {
+                  "path": "app.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Persists and restores the name, trims submissions, ignores blanks, and safely displays HTML characters using textContent."
+            }
+          ],
+          "finalFixture": "88587831656c73aea4c5a4d57666b18584af1f01446bfbb364378403b3d0d41e",
+          "changedFiles": [
+            "app.mjs"
+          ]
+        },
+        {
+          "id": "12-browser-persistence-native-r1",
+          "task": "browser-persistence",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11696,
+              "usage": {
+                "input_tokens": 16409,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 214,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "598b00df052bf6e69e0200be05acf1b819d4bd33da652f304bfe7a998750be1b",
+              "editResults": [
+                {
+                  "path": "app.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Persists and restores the name, trims submissions, ignores blanks, and uses textContent to safely display HTML characters."
+            }
+          ],
+          "finalFixture": "1971367d9c721fb1317bc52267b5024fa2f37653d9c9d16fba9471aa41be3594",
+          "changedFiles": [
+            "app.mjs"
+          ]
+        },
+        {
+          "id": "13-existing-reuse-native-r1",
+          "task": "existing-reuse",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9037,
+              "usage": {
+                "input_tokens": 16398,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 118,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "ae68aed5185a454b292b1d2aca3b69836313cf9befc4523404c8f76504f12cc8",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Reuse statusLabel so the list matches detail labels and preserves the Unknown fallback."
+            }
+          ],
+          "finalFixture": "65f91bb62e2aeba44a68974be09018838f7cea43d9204af41cb1b7dd483efb3d",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "14-existing-reuse-anchored-r1",
+          "task": "existing-reuse",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10737,
+              "usage": {
+                "input_tokens": 16559,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 145,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "e92ddb352886c306a39c4b2076af57f406f2b1d862e8da9e56b2f9c65fc8d3de",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "The list now uses the shared statusLabel function, matching detail labels and preserving the Unknown fallback."
+            }
+          ],
+          "finalFixture": "65f91bb62e2aeba44a68974be09018838f7cea43d9204af41cb1b7dd483efb3d",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "15-intentional-interface-anchored-r1",
+          "task": "intentional-interface",
+          "condition": "anchored",
+          "repetition": 1,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10674,
+              "usage": {
+                "input_tokens": 20888,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 56,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "e8dc080dfe9cbf0e99e3cf26ed2faa45317e9193677409e8137eedf9dba9676a",
+              "editResults": [],
+              "explanation": "The registry is already concise and coherent: a private Map supports registration, duplicate detection, and formatter lookup. No simplification offers a concrete benefit while preserving the exported constructor and plugin extension interface."
+            }
+          ],
+          "finalFixture": "316765dd0e6cfb06196fa7efb0804247636075bd7b0829951bc9b7336ac8e6ce",
+          "changedFiles": []
+        },
+        {
+          "id": "16-intentional-interface-native-r1",
+          "task": "intentional-interface",
+          "condition": "native",
+          "repetition": 1,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8060,
+              "usage": {
+                "input_tokens": 16319,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 57,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "b6a9dcd58b323f76465da231f4b0dab2f80cd677ee782a34f20a65ed24414173",
+              "editResults": [],
+              "explanation": "The registry is already concise and coherent. Its Map supports plugin registration, and both guards provide clear errors. No simplification offers a concrete benefit while preserving the exported constructor and register/format interface."
+            }
+          ],
+          "finalFixture": "316765dd0e6cfb06196fa7efb0804247636075bd7b0829951bc9b7336ac8e6ce",
+          "changedFiles": []
+        },
+        {
+          "id": "17-page-boundary-anchored-r2",
+          "task": "page-boundary",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10082,
+              "usage": {
+                "input_tokens": 16312,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 145,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "44ff3a705b121d494741d0facfa1c9cd602f7e5bd764a9feec84b196d6ce6fb5",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use a strict comparison so a full final page has no next page, preserving the API and empty-list behavior."
+            }
+          ],
+          "finalFixture": "5e77cd892e5bf5ca39b86ca6e21f63e3a829a2c5572bbf1fd3bb0171ee372ba4",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "18-page-boundary-native-r2",
+          "task": "page-boundary",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9525,
+              "usage": {
+                "input_tokens": 16226,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 86,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "709cd0d8cc2f44c08995d8cd7bd16a8714fdd55f750d6a264a306b8c73663336",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use a strict comparison so a full final page has no next page, preserving the API and empty-list behavior."
+            }
+          ],
+          "finalFixture": "5e77cd892e5bf5ca39b86ca6e21f63e3a829a2c5572bbf1fd3bb0171ee372ba4",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "19-explicit-zero-native-r2",
+          "task": "explicit-zero",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8442,
+              "usage": {
+                "input_tokens": 16216,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 76,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "2b79462f0db206388c97d0a0b1c43dc5bacdd5f721e964600fa5dcfd94c735a7",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Preserves zero retries while defaulting omitted or null budgets to three; the public API is unchanged."
+            }
+          ],
+          "finalFixture": "e7f48b4609fb210545b1ca5c7d22b7bac2f33f7f1972e36f8109769e658bb59a",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "20-explicit-zero-anchored-r2",
+          "task": "explicit-zero",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9727,
+              "usage": {
+                "input_tokens": 16286,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 132,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "b3a4066f6d59414cb1758a2ab9e951a66c52fcedcd519a00e0e1512a89fde4c4",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use nullish coalescing to preserve zero retries while defaulting omitted or null budgets to three."
+            }
+          ],
+          "finalFixture": "e7f48b4609fb210545b1ca5c7d22b7bac2f33f7f1972e36f8109769e658bb59a",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "21-caller-migration-anchored-r2",
+          "task": "caller-migration",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15129,
+              "usage": {
+                "input_tokens": 16588,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 308,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "ccd858d57acf927a93a96df914b1914e267f404786b22af1bb213a6052091025",
+              "editResults": [
+                {
+                  "path": "format.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "billing/invoice.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Migrated the formatter and both callers to currency options, preserving the USD default and existing EUR cart and GBP invoice output. Reviewed supplied snapshots; no tests run."
+            }
+          ],
+          "finalFixture": "d89c3ea30b1ee84bba91837ee08c8c633f7386674261ac9ac9f132835ae67ffb",
+          "changedFiles": [
+            "format.mjs",
+            "main.mjs",
+            "billing/invoice.mjs"
+          ]
+        },
+        {
+          "id": "22-caller-migration-native-r2",
+          "task": "caller-migration",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12081,
+              "usage": {
+                "input_tokens": 16416,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 182,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "5013859847b3956a8c7d6d821a4a22585929ee6acb1122f9ef7cd5ff9d863c02",
+              "editResults": [
+                {
+                  "path": "format.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "billing/invoice.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Migrates the formatter and both callers to an options object, preserving the USD default and existing cart and invoice output."
+            }
+          ],
+          "finalFixture": "d89c3ea30b1ee84bba91837ee08c8c633f7386674261ac9ac9f132835ae67ffb",
+          "changedFiles": [
+            "format.mjs",
+            "main.mjs",
+            "billing/invoice.mjs"
+          ]
+        },
+        {
+          "id": "23-path-boundary-native-r2",
+          "task": "path-boundary",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11025,
+              "usage": {
+                "input_tokens": 16219,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 83,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "630b44ab808c49b41a562d7fb70192b8b1673149f69d72bd54a4c84692b15514",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Match the root itself or descendants across a path boundary, with '/' including all absolute POSIX paths."
+            }
+          ],
+          "finalFixture": "ab87e9f5339a026fb30b08f7bfbb012956f6c70389197902fa89a17e859450fa",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "24-path-boundary-anchored-r2",
+          "task": "path-boundary",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11814,
+              "usage": {
+                "input_tokens": 16275,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 127,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "4b691a7458af1fd2ba2df3ca05b577551b08990a3d27a75e4efc25cc5cd1999f",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Match the root itself or descendants at a directory boundary, with '/' handled as the filesystem root."
+            }
+          ],
+          "finalFixture": "b0db8df0561766418f6a039341283e790e2214a3cedf3292ecf262c4652fbe1c",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "25-stale-check-anchored-r2",
+          "task": "stale-check",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 26444,
+              "usage": {
+                "input_tokens": 16445,
+                "cached_input_tokens": 11904,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 549,
+                "reasoning_output_tokens": 286
+              },
+              "toolEvents": [],
+              "promptDigest": "14d898e67e4d425758ba865c42f2cf2e325a80ead0056952e1671da9ec57bce0",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Compares HEAD and all declared path/content maps independently of key order, detecting changed content, additions, and removals. Tests were not run under the context-only restriction. The deliberately failing unrelated baseline test remains unchanged."
+            }
+          ],
+          "finalFixture": "37288ff4abdf54c3fdeac9970a202feabcf7f1ab0df9c5bebd892912c587e102",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "26-stale-check-native-r2",
+          "task": "stale-check",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15895,
+              "usage": {
+                "input_tokens": 16325,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 297,
+                "reasoning_output_tokens": 146
+              },
+              "toolEvents": [],
+              "promptDigest": "b762d4dbc546f8ba6520391ff3c42a8fe25ce76c4250277275c42a0e3af8f0aa",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Compares all declared paths and contents, including nested source, test and config objects, independently of property order. Changed contents invalidate receipts even when HEAD is unchanged. Tests were not run. The unrelated known-baseline.test.mjs deliberately fails and remains unchanged."
+            }
+          ],
+          "finalFixture": "96a430daa6466f28540666d1c241d15ef9b7b69dc7968da2ac624774a89a1746",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "27-browser-persistence-native-r2",
+          "task": "browser-persistence",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12559,
+              "usage": {
+                "input_tokens": 16409,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 203,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "598b00df052bf6e69e0200be05acf1b819d4bd33da652f304bfe7a998750be1b",
+              "editResults": [
+                {
+                  "path": "app.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Persists trimmed, nonblank names, restores them on load, and safely displays HTML characters using textContent."
+            }
+          ],
+          "finalFixture": "88587831656c73aea4c5a4d57666b18584af1f01446bfbb364378403b3d0d41e",
+          "changedFiles": [
+            "app.mjs"
+          ]
+        },
+        {
+          "id": "28-browser-persistence-anchored-r2",
+          "task": "browser-persistence",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 13556,
+              "usage": {
+                "input_tokens": 21016,
+                "cached_input_tokens": 11904,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 255,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "28d2c10348e72fb4d01b72500751f58233b650b955dda882bd9b08014764201d",
+              "editResults": [
+                {
+                  "path": "app.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Persists trimmed, nonblank names, restores them on load, and uses textContent to display HTML characters safely."
+            }
+          ],
+          "finalFixture": "600ecfe1d45e1942546588ca3ac059954173fc55706ff28b7d0474d8eda8c376",
+          "changedFiles": [
+            "app.mjs"
+          ]
+        },
+        {
+          "id": "29-existing-reuse-anchored-r2",
+          "task": "existing-reuse",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12319,
+              "usage": {
+                "input_tokens": 16559,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 141,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "e92ddb352886c306a39c4b2076af57f406f2b1d862e8da9e56b2f9c65fc8d3de",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use the shared statusLabel function for list labels, preserving the Unknown fallback."
+            }
+          ],
+          "finalFixture": "65f91bb62e2aeba44a68974be09018838f7cea43d9204af41cb1b7dd483efb3d",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "30-existing-reuse-native-r2",
+          "task": "existing-reuse",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10766,
+              "usage": {
+                "input_tokens": 16398,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 124,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "ae68aed5185a454b292b1d2aca3b69836313cf9befc4523404c8f76504f12cc8",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "The list now uses the shared statusLabel function, matching detail labels and preserving the \"Unknown\" fallback."
+            }
+          ],
+          "finalFixture": "65f91bb62e2aeba44a68974be09018838f7cea43d9204af41cb1b7dd483efb3d",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "31-intentional-interface-native-r2",
+          "task": "intentional-interface",
+          "condition": "native",
+          "repetition": 2,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 7717,
+              "usage": {
+                "input_tokens": 16319,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 60,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "b6a9dcd58b323f76465da231f4b0dab2f80cd677ee782a34f20a65ed24414173",
+              "editResults": [],
+              "explanation": "The registry is already minimal and coherent. Its Map supports plugin registration and lookup with clear duplicate and unknown-formatter errors. No simplification offers a concrete benefit while preserving the exported constructor and register/format interface."
+            }
+          ],
+          "finalFixture": "316765dd0e6cfb06196fa7efb0804247636075bd7b0829951bc9b7336ac8e6ce",
+          "changedFiles": []
+        },
+        {
+          "id": "32-intentional-interface-anchored-r2",
+          "task": "intentional-interface",
+          "condition": "anchored",
+          "repetition": 2,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 7792,
+              "usage": {
+                "input_tokens": 16494,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 50,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "e8dc080dfe9cbf0e99e3cf26ed2faa45317e9193677409e8137eedf9dba9676a",
+              "editResults": [],
+              "explanation": "The registry is already concise and coherent. Its private Map, duplicate guard, and lookup directly support the plugin extension interface. No simplification offers a concrete benefit."
+            }
+          ],
+          "finalFixture": "316765dd0e6cfb06196fa7efb0804247636075bd7b0829951bc9b7336ac8e6ce",
+          "changedFiles": []
+        },
+        {
+          "id": "33-page-boundary-native-r3",
+          "task": "page-boundary",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 7270,
+              "usage": {
+                "input_tokens": 16226,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 86,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "709cd0d8cc2f44c08995d8cd7bd16a8714fdd55f750d6a264a306b8c73663336",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use a strict comparison so a full final page has no next page, preserving the API and empty-list behavior."
+            }
+          ],
+          "finalFixture": "5e77cd892e5bf5ca39b86ca6e21f63e3a829a2c5572bbf1fd3bb0171ee372ba4",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "34-page-boundary-anchored-r3",
+          "task": "page-boundary",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "329195efa020e1473261d3c66fd0aafa931330438072b4105faa0cf99d5c5c90",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9562,
+              "usage": {
+                "input_tokens": 16312,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 145,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "44ff3a705b121d494741d0facfa1c9cd602f7e5bd764a9feec84b196d6ce6fb5",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use a strict comparison so a full final page has no next page, preserving the API and empty-list behavior."
+            }
+          ],
+          "finalFixture": "5e77cd892e5bf5ca39b86ca6e21f63e3a829a2c5572bbf1fd3bb0171ee372ba4",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "35-explicit-zero-anchored-r3",
+          "task": "explicit-zero",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10860,
+              "usage": {
+                "input_tokens": 16286,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 138,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "b3a4066f6d59414cb1758a2ab9e951a66c52fcedcd519a00e0e1512a89fde4c4",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Use nullish coalescing to preserve zero retries while defaulting omitted or null budgets to three. The public API is unchanged."
+            }
+          ],
+          "finalFixture": "e7f48b4609fb210545b1ca5c7d22b7bac2f33f7f1972e36f8109769e658bb59a",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "36-explicit-zero-native-r3",
+          "task": "explicit-zero",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "b3ca650da7b55ca72ddf3afa191ef20f11ddcdce892c35f38f14a0383102b72a",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8093,
+              "usage": {
+                "input_tokens": 16216,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 76,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "2b79462f0db206388c97d0a0b1c43dc5bacdd5f721e964600fa5dcfd94c735a7",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Preserves zero retries while defaulting omitted or null budgets to three, with no public API change."
+            }
+          ],
+          "finalFixture": "e7f48b4609fb210545b1ca5c7d22b7bac2f33f7f1972e36f8109769e658bb59a",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "37-caller-migration-native-r3",
+          "task": "caller-migration",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 11407,
+              "usage": {
+                "input_tokens": 16416,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 174,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "5013859847b3956a8c7d6d821a4a22585929ee6acb1122f9ef7cd5ff9d863c02",
+              "editResults": [
+                {
+                  "path": "format.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "billing/invoice.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Migrated the formatter and both callers to an options object, preserving default USD formatting and existing EUR cart and GBP invoice output."
+            }
+          ],
+          "finalFixture": "d89c3ea30b1ee84bba91837ee08c8c633f7386674261ac9ac9f132835ae67ffb",
+          "changedFiles": [
+            "format.mjs",
+            "main.mjs",
+            "billing/invoice.mjs"
+          ]
+        },
+        {
+          "id": "38-caller-migration-anchored-r3",
+          "task": "caller-migration",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "fe49489779799f0bc46a785bdd4e0a59087d55362f6970b170413334821153f7",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 15923,
+              "usage": {
+                "input_tokens": 20982,
+                "cached_input_tokens": 11904,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 308,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "ccd858d57acf927a93a96df914b1914e267f404786b22af1bb213a6052091025",
+              "editResults": [
+                {
+                  "path": "format.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                },
+                {
+                  "path": "billing/invoice.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Migrates the formatter and both callers to an options object, preserving default USD, cart EUR, and invoice GBP output. Reviewed supplied snapshots; no tests run."
+            }
+          ],
+          "finalFixture": "d89c3ea30b1ee84bba91837ee08c8c633f7386674261ac9ac9f132835ae67ffb",
+          "changedFiles": [
+            "format.mjs",
+            "main.mjs",
+            "billing/invoice.mjs"
+          ]
+        },
+        {
+          "id": "39-path-boundary-anchored-r3",
+          "task": "path-boundary",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10489,
+              "usage": {
+                "input_tokens": 16275,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 129,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "4b691a7458af1fd2ba2df3ca05b577551b08990a3d27a75e4efc25cc5cd1999f",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Includes the root and descendants while excluding siblings with the same name prefix; handles '/' for normalized absolute POSIX paths."
+            }
+          ],
+          "finalFixture": "a5baec001051db65ff4d70b1bd1cae4ec5e01e2c12c5f6c96f70285e7f2fd781",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "40-path-boundary-native-r3",
+          "task": "path-boundary",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "407523314b852910a19c2d6d272c4bd893381db141a53bddcc5c836d8932b97f",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9027,
+              "usage": {
+                "input_tokens": 16219,
+                "cached_input_tokens": 11776,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 85,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "630b44ab808c49b41a562d7fb70192b8b1673149f69d72bd54a4c84692b15514",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Match the root itself or descendants separated by '/', while excluding sibling names that merely share the root prefix."
+            }
+          ],
+          "finalFixture": "b0db8df0561766418f6a039341283e790e2214a3cedf3292ecf262c4652fbe1c",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "41-stale-check-native-r3",
+          "task": "stale-check",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 23081,
+              "usage": {
+                "input_tokens": 16325,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 470,
+                "reasoning_output_tokens": 227
+              },
+              "toolEvents": [],
+              "promptDigest": "b762d4dbc546f8ba6520391ff3c42a8fe25ce76c4250277275c42a0e3af8f0aa",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Compares HEAD and all declared path maps by exact string content, independent of key order. Changed, added, or removed entries invalidate receipts. Tests were not run. The unrelated known-baseline.test.mjs deliberately fails and remains unchanged."
+            }
+          ],
+          "finalFixture": "86c17ddbaf87303767da5061c618877edd129fa4f55ae9b32c1b757a5df47302",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "42-stale-check-anchored-r3",
+          "task": "stale-check",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "9fafab9bc9bbc41f1a5b1e05583237e88f7f032e4cfd79b2c44fad1d8947bf8b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 21516,
+              "usage": {
+                "input_tokens": 16445,
+                "cached_input_tokens": 11904,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 392,
+                "reasoning_output_tokens": 147
+              },
+              "toolEvents": [],
+              "promptDigest": "14d898e67e4d425758ba865c42f2cf2e325a80ead0056952e1671da9ec57bce0",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Compares HEAD and all declared path/content mappings, detecting changed bytes and added or removed paths independently of key order. Tests were not run. The deliberately failing unrelated baseline test remains unchanged."
+            }
+          ],
+          "finalFixture": "f99cfc17063a9588b4730a4590259ea7f7016ab67efe7eabbf2f370dd7accbad",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "43-browser-persistence-anchored-r3",
+          "task": "browser-persistence",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 14287,
+              "usage": {
+                "input_tokens": 16622,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 249,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "28d2c10348e72fb4d01b72500751f58233b650b955dda882bd9b08014764201d",
+              "editResults": [
+                {
+                  "path": "app.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Persists and restores the name, trims submissions, ignores blanks, and safely displays HTML characters using textContent."
+            }
+          ],
+          "finalFixture": "88587831656c73aea4c5a4d57666b18584af1f01446bfbb364378403b3d0d41e",
+          "changedFiles": [
+            "app.mjs"
+          ]
+        },
+        {
+          "id": "44-browser-persistence-native-r3",
+          "task": "browser-persistence",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "d47d0e871ba85f8d03c884c8389370825b0c493f8a9e673abbdfbb181719bb88",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 12983,
+              "usage": {
+                "input_tokens": 16409,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 206,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "598b00df052bf6e69e0200be05acf1b819d4bd33da652f304bfe7a998750be1b",
+              "editResults": [
+                {
+                  "path": "app.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Persists and restores the name, trims submissions, ignores blanks, and renders names safely with textContent."
+            }
+          ],
+          "finalFixture": "1971367d9c721fb1317bc52267b5024fa2f37653d9c9d16fba9471aa41be3594",
+          "changedFiles": [
+            "app.mjs"
+          ]
+        },
+        {
+          "id": "45-existing-reuse-native-r3",
+          "task": "existing-reuse",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 9688,
+              "usage": {
+                "input_tokens": 16398,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 113,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "ae68aed5185a454b292b1d2aca3b69836313cf9befc4523404c8f76504f12cc8",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "Reuse statusLabel so the list matches detail labels and preserves the Unknown fallback."
+            }
+          ],
+          "finalFixture": "65f91bb62e2aeba44a68974be09018838f7cea43d9204af41cb1b7dd483efb3d",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "46-existing-reuse-anchored-r3",
+          "task": "existing-reuse",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "8d12c2ee947cb42ce4efca7b4911237e3a15e25ebe97949439bca4319d67458b",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 10132,
+              "usage": {
+                "input_tokens": 16559,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 142,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "e92ddb352886c306a39c4b2076af57f406f2b1d862e8da9e56b2f9c65fc8d3de",
+              "editResults": [
+                {
+                  "path": "main.mjs",
+                  "applied": true
+                }
+              ],
+              "explanation": "The list now uses the shared statusLabel function, preserving the existing Unknown fallback."
+            }
+          ],
+          "finalFixture": "65f91bb62e2aeba44a68974be09018838f7cea43d9204af41cb1b7dd483efb3d",
+          "changedFiles": [
+            "main.mjs"
+          ]
+        },
+        {
+          "id": "47-intentional-interface-anchored-r3",
+          "task": "intentional-interface",
+          "condition": "anchored",
+          "repetition": 3,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 8927,
+              "usage": {
+                "input_tokens": 16494,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 59,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "e8dc080dfe9cbf0e99e3cf26ed2faa45317e9193677409e8137eedf9dba9676a",
+              "editResults": [],
+              "explanation": "The registry is already minimal and coherent: a private Map stores formatters, registration rejects duplicates, and formatting rejects unknown names. No concrete simplification would improve it while preserving the exported constructor and plugin interface."
+            }
+          ],
+          "finalFixture": "316765dd0e6cfb06196fa7efb0804247636075bd7b0829951bc9b7336ac8e6ce",
+          "changedFiles": []
+        },
+        {
+          "id": "48-intentional-interface-native-r3",
+          "task": "intentional-interface",
+          "condition": "native",
+          "repetition": 3,
+          "fixtureDigest": "34c7d99d12d2e38e116087f468ab4d8a172d7215628afb429c899584ff964e9d",
+          "acceptance": "passed",
+          "maintainability": "requires-human-review",
+          "calls": [
+            {
+              "elapsedMs": 7318,
+              "usage": {
+                "input_tokens": 16319,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 53,
+                "reasoning_output_tokens": 0
+              },
+              "toolEvents": [],
+              "promptDigest": "b6a9dcd58b323f76465da231f4b0dab2f80cd677ee782a34f20a65ed24414173",
+              "editResults": [],
+              "explanation": "The registry is already minimal and coherent. Its Map, duplicate check, and unknown-formatter check support the public register/format extension interface; simplifying them offers no concrete benefit."
+            }
+          ],
+          "finalFixture": "316765dd0e6cfb06196fa7efb0804247636075bd7b0829951bc9b7336ac8e6ce",
+          "changedFiles": []
+        }
+      ]
+    }
+  }
+}

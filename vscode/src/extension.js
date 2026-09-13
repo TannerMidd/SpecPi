@@ -28,6 +28,7 @@ const { ImageQueue } = require("./image-queue.js");
 const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./delegates.js");
 const { GUARD_ACTIONS, GUARD_LABELS, GUARD_DETAILS, guardState } = require("./guard.js");
 const { ConversationCoordinator } = require("./conversation-coordinator.js");
+const { collectDiagnostics, collectSymbolContext, validateLanguageAttachments } = require("./language-context.js");
 
 const PREFIX = "specpi.chat";
 const MAX_INPUT = 64 * 1024;
@@ -819,6 +820,14 @@ class ChatController {
                 }
             }
 
+            if (attached.some((item) => item.languageContext)) {
+                const languageToken = this.contextToken();
+                await validateLanguageAttachments(vscode, attached, workspace.uri.fsPath, languageToken);
+                if (this.client !== client || this.contextToken() !== languageToken || this.disposed) {
+                    throw new Error("The conversation changed before sending. Review and re-collect attached context.");
+                }
+            }
+
             await client.request("prompt", options, { timeoutMs: 0 });
             accepted = true;
             if (this.validRequestId(requestId)) {
@@ -938,6 +947,48 @@ class ChatController {
         const attachment = await collectAttachment(input);
         if (this.commitAttachments([attachment], workspace, revision) && this.isForeground()) {
             await vscode.commands.executeCommand(`${PREFIX}.open`);
+        }
+    }
+
+    async attachLanguageContext(kind, uri) {
+        const workspace = this.workspace;
+        const revision = this.sessionRevision;
+        const workspacePath = this.requireWorkspace();
+        const token = this.contextToken();
+        const editor = vscode.window.activeTextEditor;
+        if (!this.client || this.clientWorkspace !== workspacePath || this.transitioning || this.disposed) {
+            throw new Error("Connect this SpecPi conversation before attaching language context.");
+        }
+
+        let attachment;
+        if (kind === "Diagnostics") {
+            const uris = uri
+                ? [uri]
+                : await vscode.window.showOpenDialog({
+                      title: "Attach diagnostics for selected workspace files",
+                      defaultUri: workspace.uri,
+                      canSelectMany: true,
+                      canSelectFolders: false,
+                  });
+            if (!uris?.length || this.contextToken() !== token) {
+                return;
+            }
+
+            attachment = await collectDiagnostics(vscode, { workspacePath, uris, contextToken: token });
+        } else {
+            attachment = await collectSymbolContext(vscode, { workspacePath, editor, kind, contextToken: token });
+        }
+
+        if (this.contextToken() !== token || !this.attachmentContextCurrent(workspace, revision)) {
+            throw new Error("The conversation changed while collecting language context. Collect it again.");
+        }
+
+        if (this.commitAttachments([attachment], workspace, revision) && this.isForeground()) {
+            const preview = await vscode.workspace.openTextDocument({
+                content: attachment.text,
+                language: "plaintext",
+            });
+            await vscode.window.showTextDocument(preview, { preview: true, preserveFocus: true });
         }
     }
 
@@ -1916,6 +1967,9 @@ function activate(context) {
         attachSelection: () => controller.attachSelection(),
         insertMention: () => controller.insertMention(),
         attachFile: (uri) => controller.attachFile(uri),
+        attachDiagnostics: (uri) => controller.active.attachLanguageContext("Diagnostics", uri),
+        attachReferences: () => controller.active.attachLanguageContext("References"),
+        attachDefinition: () => controller.active.attachLanguageContext("Definition"),
         attachImage: (uri) => controller.attachImage(uri),
         editPrompt: () => controller.handleMessage({ type: "editPrompt" }),
         forkChat: () => controller.handleMessage({ type: "forkChat" }),

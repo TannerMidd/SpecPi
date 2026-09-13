@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-harness-"));
+const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-workflow-harness-")));
 const agentDir = path.join(root, "agent");
 const repository = path.join(root, "repo");
 fs.mkdirSync(repository, { recursive: true });
@@ -764,10 +765,101 @@ await pendingShutdownChallenge;
 const shutdownDelayedChallengeIgnored =
     entries.length === entriesBeforeShutdown && messages.length === messagesBeforeShutdown;
 
+// Exercise the explicit human check editor through the real workflow extension, then
+// resolve fresh receipt authority again at challenge submission and handoff.
+branch = [];
+currentCwd = repository;
+await runHandlers("session_start");
+ctx.ui.editor = async () => editorValue;
+editorValue =
+    "Objective: Verify required check behavior\nRequirements:\n- R1: Observe required check\n  Acceptance: A live check passed\nPaths:\n- src/\n";
+await commands.get("task").handler("set", ctx);
+const beforeChecks = entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract;
+const { VerificationRegistry, captureInputs, normalizeVerification } =
+    await import("../../extensions/background-tasks/verification.mjs");
+const registry = new VerificationRegistry();
+const binding = normalizeVerification({ command: "echo check", inputs: ["src/inside.txt"] }, repository);
+const inputSnapshot = captureInputs(repository, binding.inputs);
+const receipt = registry.add(
+    binding,
+    inputSnapshot,
+    inputSnapshot,
+    { status: "exited", exitCode: 0, cleanup: "confirmed", reason: "command exited" },
+    {},
+);
+tools.set("verify_run", {
+    name: "verify_run",
+    sourceInfo: { path: fileURLToPath(new URL("../../extensions/background-tasks/index.ts", import.meta.url)) },
+});
+pi.getAllTools = () => [...tools.values()];
+const originalEmit = pi.events.emit;
+pi.events.emit = (name: string, data: any) => {
+    originalEmit(name, data);
+    if (name === "specpi:verification-receipts") {
+        data.reply(registry.list(data.root));
+    }
+};
+
+editorValue = JSON.stringify([{ id: "C1", label: "Check", receiptId: receipt.id, requirementIds: ["R1"] }]);
+await commands.get("task").handler("checks", ctx);
+const afterChecks = entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract;
+const humanChecksBound = afterChecks.digest !== beforeChecks.digest && afterChecks.requiredChecks[0]?.id === "C1";
+await commands.get("challenge").handler("", ctx);
+const checkActivation = entries
+    .filter((entry) => entry.customType === "specpi-completion-challenge" && entry.data.kind === "active")
+    .at(-1).data;
+const checkSubmission = {
+    generation: checkActivation.generation,
+    taskContractDigest: afterChecks.digest,
+    verdict: "ready-for-human-review",
+    requirements: [{ id: "R1", status: "proven", evidence: "Observed check receipt" }],
+    contradictions: [],
+    falsePositiveChecks: [],
+    scopeFindings: [],
+    validationGaps: [],
+    residualRisks: ["Declared inputs are bounded."],
+    nextAction: "",
+};
+fs.appendFileSync(path.join(repository, "src", "inside.txt"), "changed after challenge started");
+let staleCheckBlockedAtSubmission = false;
+try {
+    await tools.get("submit_completion_challenge").execute("stale-check", checkSubmission, undefined, undefined, ctx);
+} catch (error) {
+    staleCheckBlockedAtSubmission = /current passing receipt/u.test(String(error));
+}
+
+const nextSnapshot = captureInputs(repository, binding.inputs);
+registry.add(
+    binding,
+    nextSnapshot,
+    nextSnapshot,
+    { status: "exited", exitCode: 0, cleanup: "confirmed", reason: "command exited" },
+    {},
+);
+const liveCheckResult = await tools
+    .get("submit_completion_challenge")
+    .execute("live-check", checkSubmission, undefined, undefined, ctx);
+const liveCheckReady = liveCheckResult.details.verdict === "ready-for-human-review";
+registry.invalidate();
+await commands.get("task").handler("handoff", ctx);
+const checksHandoff = entries.filter((entry) => entry.customType === "specpi-task-handoff").at(-1).data.markdown;
+const restoredCheckSummaryHistorical =
+    /C1: unknown/u.test(checksHandoff) && /Historical model verdict/u.test(checksHandoff);
+editorValue = "[]";
+await commands.get("task").handler("checks", ctx);
+const humanChecksCleared =
+    entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract.requiredChecks
+        .length === 0;
+
 process.stdout.write(
     `WORKFLOW_CONTROLS_HARNESS=${JSON.stringify({
         commands: [...commands.keys()].sort(),
         toolRegistered: tools.has("submit_completion_challenge"),
+        humanChecksBound,
+        staleCheckBlockedAtSubmission,
+        liveCheckReady,
+        restoredCheckSummaryHistorical,
+        humanChecksCleared,
         nestedCwdOutOfScopeDenied,
         nestedCwdInScopeAllowed,
         denied,

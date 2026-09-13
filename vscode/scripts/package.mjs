@@ -18,6 +18,7 @@ export const packageFiles = Object.freeze([
     "src/delegates.js",
     "src/guard.js",
     "src/context.js",
+    "src/language-context.js",
     "src/file-filters.js",
     "src/code-references.js",
     "src/images.js",

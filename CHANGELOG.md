@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add an explicitly invoked `specpi-review` skill for evidence-led correctness and simplicity review, with managed installation and removal.
+- Add `verify_run` using the existing background runner, Guard admission and shared process limits. Record bounded in-memory receipts for command outcomes and declared input snapshots; invalidate evidence when inputs or session authority change.
+- Add human-selected `/task checks`, schema-2 task contracts with schema-1 compatibility, and current receipt checks in `/challenge` and `/task handoff`. A newer failing run supersedes an older pass; restored summaries remain historical.
+- Add explicit VS Code diagnostics, references and definition attachments with plain previews, workspace and buffer-version binding, and bounded provider results.
+- Add independent synthetic quality fixtures, a Codex-subscription comparison driver and an uninstalled anchored-edit experiment. No production editing mode or additional executable dependency is added.
+
 ## 0.20.1 - 2026-09-10
 
 - Enable `structural_search` by default on fresh installs and updates without a saved choice. Persist enablement transactionally and preserve explicit opt-outs; disable with `specpi update --structural-search=off`, then restart Pi.

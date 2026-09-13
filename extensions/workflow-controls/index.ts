@@ -42,6 +42,7 @@ import {
     taskContractScopeViolations,
     validateTaskContract,
 } from "./task-contract.mjs";
+import { currentReceipts, requiredCheckEvidence, renderCheckEvidence, selectRequiredChecks } from "./verification.mjs";
 
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
 const stateDir = path.join(agentDir, "specpi");
@@ -956,11 +957,14 @@ export default function workflowControls(pi: ExtensionAPI) {
         }
 
         const violations = indeterminate ? [] : taskContractScopeViolations(contract, snapshot.paths);
+        lines.push("", renderCheckEvidence(requiredCheckEvidence(contract, currentReceipts(pi, root))));
         lines.push("", "### Latest review");
         if (!latestChallenge?.result) {
             lines.push("- No completion challenge review is recorded for this task contract.");
         } else {
-            lines.push(`- Verdict: **${latestChallenge.result.verdict}**.`);
+            lines.push(
+                `- Historical model verdict: **${latestChallenge.result.verdict}**. Runtime evidence is revalidated above.`,
+            );
             for (const item of latestChallenge.result.requirements ?? []) {
                 const id = item.id ? `${item.id}: ` : "";
                 lines.push(`- ${id}${item.status}: ${safeMessage(item.evidence || "No evidence recorded")}`);
@@ -1022,7 +1026,7 @@ export default function workflowControls(pi: ExtensionAPI) {
     pi.registerCommand("task", {
         description: "Set, inspect, or hand off the current task contract",
         getArgumentCompletions: (prefix: string) =>
-            ["set", "clear", "status", "handoff"]
+            ["set", "checks", "clear", "status", "handoff"]
                 .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
                 .map((value) => ({ value, label: value })),
         handler: async (args, ctx) => {
@@ -1073,6 +1077,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                     }
 
                     const card = parseTaskContractCard(edited);
+                    card.requiredChecks = current?.requiredChecks ?? [];
                     const contractOrigin = current?.origin === "improvement" ? "improvement" : "human";
                     const contract = createTaskContract(card, {
                         root,
@@ -1086,6 +1091,62 @@ export default function workflowControls(pi: ExtensionAPI) {
                     persistTaskContract(contract, ctx, "task contract revised by human");
                     ctx.ui.notify(
                         `Task contract set: ${contract.objective} (${contract.requirements.length} requirement(s)).`,
+                        "info",
+                    );
+
+                    return;
+                }
+
+                if (action === "checks") {
+                    if (!current || !ctx.hasUI || typeof ctx.ui.editor !== "function") {
+                        throw new Error("/task checks requires an active task and interactive editor support.");
+                    }
+
+                    const receipts = currentReceipts(pi, root);
+                    const examples = (current.requiredChecks ?? []).map((check: any) => {
+                        const match = requiredCheckEvidence({ ...current, requiredChecks: [check] }, receipts)[0];
+
+                        return {
+                            id: check.id,
+                            label: check.label,
+                            receiptId: match.receiptId ?? "choose-current-receipt",
+                            requirementIds: check.requirementIds,
+                        };
+                    });
+                    const available = receipts
+                        .slice(-8)
+                        .map(
+                            (receipt: any) =>
+                                `${receipt.id}: ${receipt.status}; ${safeMessage(receipt.spec?.command ?? "")}; inputs: ${safeMessage(receipt.inputs?.join(", ") ?? "")}`,
+                        )
+                        .join("\n");
+                    const edited = await ctx.ui.editor(
+                        `Required checks — JSON array of {id,label,receiptId,requirementIds}; [] clears. Current receipts:\n${available || "None. Run verify_run first."}`,
+                        JSON.stringify(examples, null, 2),
+                    );
+                    if (!sessionIsCurrent(origin, ctx) || edited === undefined) {
+                        return;
+                    }
+
+                    const latest = refreshTaskContract(ctx, root);
+                    if (latest?.digest !== current.digest) {
+                        throw new Error("Task changed while selecting required checks; reopen /task checks.");
+                    }
+
+                    const selected = selectRequiredChecks(JSON.parse(edited), current, currentReceipts(pi, root));
+                    const contract = createTaskContract(
+                        { ...current, requiredChecks: selected },
+                        {
+                            root,
+                            origin: current.origin,
+                            id: current.id,
+                            gapId: current.gapId,
+                            selectionId: current.selectionId,
+                        },
+                    );
+                    persistTaskContract(contract, ctx, "required checks selected by human");
+                    ctx.ui.notify(
+                        `${selected.length} required check(s) selected. Runtime evidence will be revalidated at use.`,
                         "info",
                     );
 
@@ -1122,7 +1183,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                     return;
                 }
 
-                ctx.ui.notify("Usage: /task [set|clear|status|handoff]", "error");
+                ctx.ui.notify("Usage: /task [set|checks|clear|status|handoff]", "error");
             } catch (error) {
                 if (!sessionIsCurrent(origin, ctx)) {
                     return;
@@ -1687,6 +1748,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                 ...activeChallenge.facts,
                 challengeGeneration: activeChallenge.generation,
                 taskContractDigest: activeChallenge.taskContractDigest,
+                requiredCheckEvidence: requiredCheckEvidence(currentTask, currentReceipts(pi, activeChallenge.root)),
             });
             const data: ChallengeEntryData = {
                 kind: "result",
@@ -1828,7 +1890,10 @@ export default function workflowControls(pi: ExtensionAPI) {
                 experiment = undefined;
             }
 
+            const receipts = currentReceipts(pi, challengeRoot ?? scope.root);
             const facts = boundedChallengeFacts({
+                verificationReceipts: receipts,
+                requiredCheckEvidence: requiredCheckEvidence(challengeTask, receipts),
                 changedPaths: snapshot?.paths ?? [],
                 scopeEntries: scope.active
                     ? scope.entries.map((item) => `${item.path}${item.directory ? "/" : ""}`)

@@ -33,6 +33,8 @@ SpecPi extends Pi with chat, review tools, and focused delegation. Its principle
 - **Focused delegation.** One agent makes changes. Up to two read-only subagents help investigate and review. [Research and design](https://tannermidd.github.io/SpecPi/single-agent/)
 - **Background tasks.** Start an approved dev server, test suite, or watch build, inspect bounded output, and stop it without blocking other work.
 - **Review as you work.** Track changed files, inspect diffs, check pages in a browser, and review risky commands.
+- **Quality review on request.** Use `/skill:specpi-review` for correctness and simplicity findings, or add `correctness` or `simplicity` to narrow the review. The skill reports evidence and gaps without editing; it is an instruction, not a sandbox.
+- **Runtime check evidence.** Run an approved finite check with `verify_run`, then choose required checks through `/task checks`. Completion challenges and handoffs revalidate source-bound receipts. [Usage and limits](docs/quality-evidence.md)
 - **Structural search.** Bounded ast-grep patterns over selected code are enabled by default. Disable with `specpi update --structural-search=off`; on unsupported native hosts, pass `--structural-search=off` during installation too. [Usage and limits](docs/structural-search.md)
 - **Accessibility checks.** Scan the current browser state for automated WCAG and optional best-practice findings. [Browser verification](docs/browser-testing.md)
 - **Improvements you choose.** Record recurring problems, select one with `/harness-improvement`, and test the change before calling it done.

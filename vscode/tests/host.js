@@ -157,6 +157,70 @@ async function run() {
         await controller.handleMessage({ type: "setModel", provider: "fixture", modelId: "fixture-model" });
         checks.push("RPC connection and model controls");
 
+        const beforeLanguage = [...controller.active.attachments];
+        const languageDocument = await vscode.workspace.openTextDocument(targetFile);
+        const languageEditor = await vscode.window.showTextDocument(languageDocument);
+        languageEditor.selection = new vscode.Selection(1, 6, 1, 6);
+        const diagnostics = vscode.languages.createDiagnosticCollection("specpi-host-fixture");
+        const diagnostic = new vscode.Diagnostic(
+            new vscode.Range(1, 6, 1, 12),
+            "Explicit diagnostic fixture",
+            vscode.DiagnosticSeverity.Warning,
+        );
+        diagnostic.source = "specpi-host-fixture";
+        diagnostic.code = "CHECK1";
+        diagnostics.set(targetFile, [diagnostic]);
+        const references = vscode.languages.registerReferenceProvider(
+            { scheme: "file", language: "javascript" },
+            { provideReferences: () => [new vscode.Location(targetFile, new vscode.Range(1, 6, 1, 12))] },
+        );
+        const definitions = vscode.languages.registerDefinitionProvider(
+            { scheme: "file", language: "javascript" },
+            {
+                provideDefinition: () => [
+                    {
+                        targetUri: targetFile,
+                        targetRange: new vscode.Range(1, 0, 1, 20),
+                        targetSelectionRange: new vscode.Range(1, 6, 1, 12),
+                    },
+                ],
+            },
+        );
+        try {
+            await vscode.commands.executeCommand("specpi.chat.attachDiagnostics", targetFile);
+            assert.match(controller.active.attachments.at(-1).text, /Explicit diagnostic fixture/);
+            for (const [command, kind] of [
+                ["specpi.chat.attachReferences", "References"],
+                ["specpi.chat.attachDefinition", "Definition"],
+            ]) {
+                await vscode.window.showTextDocument(languageDocument);
+                await vscode.commands.executeCommand(command);
+                assert.match(controller.active.attachments.at(-1).label, new RegExp(kind));
+                assert.match(controller.active.attachments.at(-1).text, /navigation target.js/);
+            }
+
+            const changedEditor = await vscode.window.showTextDocument(languageDocument);
+            await changedEditor.edit((builder) =>
+                builder.insert(new vscode.Position(0, 0), "// Unsaved language fixture\n"),
+            );
+            await assert.rejects(controller.active.send("Check attached language context"), /buffer or file changed/);
+            assert.equal(controller.active.attachments.length, beforeLanguage.length + 3);
+            const restoreEditor = await vscode.window.showTextDocument(languageDocument);
+            assert.ok(languageDocument.getText().startsWith("// Unsaved language fixture\n"));
+            await restoreEditor.edit((builder) => builder.delete(new vscode.Range(0, 0, 1, 0)));
+            checks.push(
+                "real editor diagnostics, definition/reference providers, plain previews, and stale-buffer send rejection",
+            );
+        } finally {
+            diagnostics.dispose();
+            references.dispose();
+            definitions.dispose();
+            controller.active.attachments = beforeLanguage;
+            controller.state.error = undefined;
+            controller.publish();
+            await vscode.window.showTextDocument(languageDocument);
+        }
+
         const selectionEditor = vscode.window.activeTextEditor;
         assert.equal(selectionEditor.document.uri.fsPath, targetFile.fsPath);
         selectionEditor.selection = new vscode.Selection(1, 15, 1, 19);

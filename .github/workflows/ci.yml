@@ -44,6 +44,8 @@ jobs:
         run: npm install --ignore-scripts --omit=peer --no-package-lock
       - name: Validate timeout preference portability
         run: node --test tests/delegation-settings.test.mjs tests/delegation-settings-review.test.mjs
+      - name: Validate finite verification and owned process cleanup
+        run: node --test tests/background-tasks.test.mjs tests/verification.test.mjs
       - name: Provision and test native structural search
         run: |
           npm run setup:structural

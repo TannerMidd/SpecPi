@@ -54,6 +54,7 @@ export declare class OutputRing {
     capacity: number;
     bytes: Buffer;
     end: number;
+    digests(): Record<"stdout" | "stderr", { bytes: number; sha256: string }>;
     append(stream: "stdout" | "stderr", chunk: Buffer, final?: boolean): void;
     append(stream: "stdout" | "stderr", chunk: undefined, final: true): void;
     read(offset?: number): {
@@ -86,5 +87,6 @@ export declare class TaskRunner {
     evict(): void;
     start(spec: StartSpec, generation: number, signal?: AbortSignal): Promise<TaskSummary>;
     stop(id: string, reason?: string): Promise<TaskSummary>;
+    wait(id: string, signal?: AbortSignal): Promise<TaskSummary>;
     shutdown(): Promise<TaskSummary[]>;
 }
