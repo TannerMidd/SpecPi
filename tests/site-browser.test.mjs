@@ -31,17 +31,30 @@ test(
                 await page.getByLabel("Find a task", { exact: true }).fill("browser");
                 assert.equal(await rows.count(), 3);
                 await page.getByRole("button", { name: "Reset filters" }).click();
-                for (const file of ["results.json", "trials.csv"]) {
+                for (const file of ["results.json", "trials.csv", "glm-results.json", "glm-trials.csv"]) {
                     const link = page.locator(`a[download][href="./${file}"]`);
                     assert.equal(await link.count(), 1);
                     const response = await page.request.get(`${origin}/SpecPi/evals/${file}`);
                     assert.equal(response.status(), 200);
                     if (file.endsWith("json")) {
-                        assert.equal((await response.json()).runs.length, 384);
+                        const archive = await response.json();
+                        assert.equal(archive.runs.length, 384);
+                        if (file === "glm-results.json") {
+                            assert.equal(archive.providerExperiment, "openrouter-glm");
+                        }
                     } else {
                         assert.equal((await response.text()).trim().split("\n").length, 385);
                     }
                 }
+
+                assert.equal(await page.getByRole("heading", { name: "GLM 5.3 Flash", exact: true }).count(), 1);
+                await page.locator("#independent summary").click();
+                assert.equal(await page.locator("#independent details tbody tr").count(), 32);
+                const interrupted = await page.request.get(`${origin}/SpecPi/evals/glm-morph-interrupted.json`);
+                assert.equal(interrupted.status(), 200);
+                const earlier = await interrupted.json();
+                assert.equal(earlier.cohortStatus, "interrupted");
+                assert.equal(earlier.runs.length, 42);
             } finally {
                 await page.close();
             }

@@ -21,7 +21,142 @@ const title = (id) =>
         .replace(/^./u, (letter) => letter.toUpperCase());
 const csv = (value) => '"' + String(value ?? "").replaceAll('"', '""') + '"';
 
-export function renderEvalsPage(data) {
+function trialCsv(data) {
+    const providerColumns = data.providerExperiment === "openrouter-glm";
+    const fields = [
+        "task",
+        "difficulty",
+        "negativeControl",
+        "experiment",
+        "condition",
+        "repetition",
+        "acceptance",
+        "editRounds",
+        "editRejections",
+        "modelMs",
+        "inputTokens",
+        "outputTokens",
+        ...(providerColumns ? ["trialAttempt", "servingProviders", "modelFailure"] : []),
+    ];
+    const catalog = Object.fromEntries(data.catalog.map((task) => [task.id, task]));
+
+    return (
+        [
+            fields.join(","),
+            ...data.runs.map((run) => {
+                const total = (key) =>
+                    run.calls.every((call) => Number.isFinite(call.usage?.[key]))
+                        ? run.calls.reduce((sum, call) => sum + call.usage[key], 0)
+                        : "";
+
+                return [
+                    run.task,
+                    catalog[run.task].difficulty,
+                    catalog[run.task].negativeControl,
+                    run.experiment,
+                    run.condition,
+                    run.repetition,
+                    run.acceptance,
+                    run.editRounds,
+                    run.editRejections,
+                    run.calls.reduce((sum, call) => sum + call.elapsedMs, 0),
+                    total("input_tokens"),
+                    total("output_tokens"),
+                    ...(providerColumns
+                        ? [
+                              run.attempt,
+                              [...new Set(run.calls.map((call) => call.metadata?.provider).filter(Boolean))].join("; "),
+                              Boolean(run.modelFailure),
+                          ]
+                        : []),
+                ]
+                    .map(csv)
+                    .join(",");
+            }),
+        ].join("\n") + "\n"
+    );
+}
+
+export function renderIndependentResults(data) {
+    if (!data) {
+        return "";
+    }
+
+    const summary = aggregateQuality(data.runs, data.catalog);
+    const firstPass = (condition) =>
+        data.runs.filter((run) => run.condition === condition && run.attempt === 1 && run.acceptance === "passed")
+            .length;
+    const providers = [
+        ...new Set(data.runs.flatMap((run) => run.calls.map((call) => call.metadata?.provider)).filter(Boolean)),
+    ].sort();
+    const scores = Object.entries(summary)
+        .flatMap(([experiment, result]) =>
+            Object.entries(result.conditions).map(
+                ([condition, value]) =>
+                    `<tr><th scope="row">${names[condition]}<small>${experiment === "review" ? "Review then repair" : "Editing comparison"}</small></th><td>${value.passed} / ${value.valid}</td><td>${firstPass(condition)} / ${value.valid}</td><td>${value.tasksPassedEveryRepeat} / ${data.catalog.length}</td><td>${(value.medianModelMs / 1000).toFixed(1)} s</td><td>${value.editRejections}</td></tr>`,
+            ),
+        )
+        .join("");
+    const pairs = Object.entries(summary)
+        .flatMap(([experiment, result]) =>
+            [["All tasks", result.paired], ...Object.entries(result.difficulty)].map(
+                ([difficulty, value]) =>
+                    `<tr><th scope="row">${experiment === "review" ? "Review skill" : "Anchored editing"}<small>${escape(difficulty)}</small></th><td>${value.candidateOnly}</td><td>${value.baselineOnly}</td><td>${value.bothPassed}</td><td>${value.bothFailed}</td></tr>`,
+            ),
+        )
+        .join("");
+    const rows = data.catalog
+        .map((task) => {
+            const score = (condition) => {
+                const runs = data.runs.filter((run) => run.task === task.id && run.condition === condition);
+
+                return `${runs.filter((run) => run.acceptance === "passed").length} / ${runs.length}`;
+            };
+
+            return `<tr><th scope="row">${escape(title(task.id))}</th><td>${escape(task.difficulty)}</td>${["baseline", "skill", "native", "anchored"].map((condition) => `<td>${score(condition)}</td>`).join("")}</tr>`;
+        })
+        .join("");
+    const retries = data.runs.reduce(
+        (sum, run) => sum + run.calls.reduce((n, call) => n + (call.priorAttempts?.length ?? 0), 0),
+        0,
+    );
+
+    return `<section id="independent" class="eval-section" aria-labelledby="independent-title"><p class="eval-eyebrow">INDEPENDENT MODEL / SAME TASKS</p><h2 id="independent-title">GLM 5.3 Flash</h2>
+<p><strong>Provider:</strong> OpenRouter. <strong>Routing:</strong> ${escape(data.manifest.settings.providerName)}. <strong>Adapter:</strong> Pi ${escape(data.manifest.piVersion)} ModelRuntime. <strong>Reasoning:</strong> medium, with a 16,384-token response limit.</p>
+<p>This model family did not help author the suite. These 384 trials use the same frozen 32 task requests and source fixtures, with documented grading corrections. Each GLM condition uses the same provider adapter; the earlier Codex baseline uses different system context and transport. Compare the paired interventions within each model, rather than treating the two runs as a controlled model ranking.</p>
+${data.manifest.gradingCorrection ? '<p class="eval-note"><strong>Grading correction:</strong> A candidate promise that never resolved exposed an early-exit classification bug. Node exit 13 after grading starts now counts as a behavioral failure. All 64 retained outcomes were checked: 63 stayed unchanged and that one case became a failure. Its original record and manifest remain in the JSON; no new model response was generated for the correction.</p>' : ""}
+<div class="eval-table-scroll" role="region" aria-label="GLM condition results" tabindex="0"><table><caption>GLM behavioral acceptance and first-attempt reliability</caption><thead><tr><th scope="col">Condition</th><th scope="col">Passes / valid trials</th><th scope="col">First trial attempt passes</th><th scope="col">Tasks passing all 3</th><th scope="col">Median model time</th><th scope="col">Edit rejections</th></tr></thead><tbody>${scores}</tbody></table></div>
+<p class="eval-note">First-attempt counts include service availability: a trial that required a restart does not count as a first-attempt pass. Bounded request retries remain part of each attempt. Observed serving providers: ${providers.map(escape).join(", ")}.</p>
+<div class="eval-table-scroll" role="region" aria-label="GLM paired changes" tabindex="0"><table><caption>Matched GLM task/repetition pairs</caption><thead><tr><th scope="col">Comparison / difficulty</th><th scope="col">Candidate only passes</th><th scope="col">Baseline only passes</th><th scope="col">Both pass</th><th scope="col">Both fail</th></tr></thead><tbody>${pairs}</tbody></table></div>
+<p class="eval-note">${retries} recovered transport attempts and ${data.invalidAttempts.length} excluded trial attempts are retained. Completed refusals, malformed responses and output limits count as model failures. Incomplete provider responses remain separate. Median time covers valid trials, including their backoff and provider scheduling; no valid behavioral failure was rerun.</p>
+<p><strong>Spending:</strong> $${data.budget.reportedCostUsd.toFixed(4)} reported by OpenRouter; $${data.budget.conservativeChargeUsd.toFixed(4)} conservatively counted against the $5 cap, including setup pilots, the interrupted fixed-endpoint cohort and unresolved request reservations.</p>
+<details class="eval-history"><summary>GLM scores for all 32 tasks</summary><div class="eval-table-scroll" role="region" aria-label="GLM task scores" tabindex="0"><table><caption>GLM passes / valid trials by task</caption><thead><tr><th scope="col">Task</th><th scope="col">Difficulty</th><th scope="col">Generic + repair</th><th scope="col">Skill + repair</th><th scope="col">Native</th><th scope="col">Anchored</th></tr></thead><tbody>${rows}</tbody></table></div></details>
+<div class="eval-downloads"><a href="./glm-results.json" download>Download GLM evidence (JSON)</a><a href="./glm-trials.csv" download>Download GLM trial metrics (CSV)</a></div>
+<p class="eval-note">The review stage receives an implementation and requested behavior without a proposed Git diff, while the review skill is intended for reviewing changes. Some GLM responses noted that mismatch. This limits what the review comparison establishes about real pull requests. A future frozen evaluation should supply proposed patches and independently audited expectations.</p>
+<p class="eval-note">Using another model reduces author-model dependence. It does not prove the tasks are absent from training data or replace independent human review of the graders.</p></section>`;
+}
+
+export function renderInterruptedResults(data) {
+    if (!data) {
+        return "";
+    }
+
+    const summary = aggregateQuality(data.runs, data.catalog);
+    const rows = Object.values(summary)
+        .flatMap((result) =>
+            Object.entries(result.conditions)
+                .filter(([, value]) => value.valid > 0)
+                .map(
+                    ([condition, value]) =>
+                        `<tr><th scope="row">${names[condition]}</th><td>${value.passed} / ${value.valid}</td><td>${value.failed}</td></tr>`,
+                ),
+        )
+        .join("");
+
+    return `<section id="glm-interrupted" class="eval-section" aria-labelledby="glm-interrupted-title"><h2 id="glm-interrupted-title">Earlier fixed-endpoint cohort</h2><p>The fixed Morph FP8 cohort stopped after ${data.runs.length} valid trials out of 384 planned because of persistent upstream rate limits. It contains ${data.runs.filter((run) => run.acceptance === "failed").length} behavioral failures and ${data.invalidAttempts.length} excluded trial attempts. Its observed outcomes are preserved separately from the later failover cohort; it did not reach the editing comparison.</p><details class="eval-history"><summary>Inspect the interrupted Morph cohort</summary><div class="eval-table-scroll" role="region" aria-label="Interrupted Morph outcomes" tabindex="0"><table><caption>Observed outcomes from the incomplete schedule</caption><thead><tr><th scope="col">Condition</th><th scope="col">Passes / valid trials</th><th scope="col">Failed trials</th></tr></thead><tbody>${rows}</tbody></table></div><p>No valid behavioral failure was retried within this cohort. The later cohort changed the routing policy and interleaved experiments; it is a separate experiment, and the two cohorts are not pooled.</p><a href="./glm-morph-interrupted.json" download>Download interrupted Morph evidence (JSON)</a></details></section>`;
+}
+
+export function renderEvalsPage(data, independent = null, interrupted = null) {
     const catalog =
         data?.catalog ??
         tasks.map((task) => ({
@@ -93,23 +228,25 @@ export function renderEvalsPage(data) {
 <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>Dark mode</button></header>
 <main id="evaluations" class="wrap">
 <header class="eval-heading"><p class="eval-eyebrow">QUALITY EVIDENCE / SUITE ${suiteVersion}</p><h1>Evaluations</h1><p class="eval-deck">Test whether a change improves the work. Keep the result, the method, and the limits visible.</p><p>Paired comparisons on JavaScript tasks, from boundary fixes to concurrent state changes and browser flows. These results measure the tested behaviors; they are not a general coding-accuracy score.</p></header>
-<dl class="eval-stats"><div><dt>Distinct tasks</dt><dd>${catalog.length}</dd></div><div><dt>${data ? "Completed trials" : "Scheduled trials"}</dt><dd>${data?.runs.length ?? catalog.length * 12}</dd></div><div><dt>Negative controls</dt><dd>${catalog.filter((task) => task.negativeControl).length}</dd></div><div><dt>Trials per condition/task</dt><dd>3</dd></div></dl>
-<nav class="eval-jump" aria-label="Evaluation sections"><a href="#results">Results</a><a href="#coverage">Task catalog</a><a href="#method">Method</a><a href="#limits">Limits</a><a href="#evidence">Evidence</a></nav>
-<section id="results" class="eval-section" aria-labelledby="results-title"><p class="eval-eyebrow">01 / OUTCOMES</p><h2 id="results-title">Measured behavior</h2><p><strong>Model:</strong> gpt-6-astra, medium reasoning. <strong>Provider:</strong> Codex CLI / ChatGPT subscription. <strong>Editor:</strong> Pi 0.84.4 or the uninstalled anchored experiment.</p>${results}
+<dl class="eval-stats"><div><dt>Distinct tasks</dt><dd>${catalog.length}</dd></div><div><dt>${independent ? "Trials per model" : data ? "Completed trials" : "Scheduled trials"}</dt><dd>${data?.runs.length ?? catalog.length * 12}</dd></div><div><dt>Negative controls</dt><dd>${catalog.filter((task) => task.negativeControl).length}</dd></div><div><dt>Trials per condition/task</dt><dd>3</dd></div></dl>
+<nav class="eval-jump" aria-label="Evaluation sections"><a href="#results">Codex baseline</a>${independent ? '<a href="#independent">GLM comparison</a>' : ""}<a href="#coverage">Task catalog</a><a href="#method">Method</a><a href="#limits">Limits</a><a href="#evidence">Evidence</a></nav>
+<section id="results" class="eval-section" aria-labelledby="results-title"><p class="eval-eyebrow">01 / OUTCOMES</p><h2 id="results-title">Codex baseline</h2><p><strong>Model:</strong> gpt-6-astra, medium reasoning. <strong>Provider:</strong> Codex CLI / ChatGPT subscription. <strong>Editor:</strong> Pi 0.84.4 or the uninstalled anchored experiment.</p>${results}
 <aside class="eval-callout"><strong>Promotion is a separate decision.</strong> Anchored editing remains uninstalled. This adapter does not establish production editing safety or Command Guard equivalence. The review skill remains explicitly selected; successful tests do not replace human review.</aside></section>
+${renderIndependentResults(independent)}
+${renderInterruptedResults(interrupted)}
 <section id="coverage" class="eval-section" aria-labelledby="coverage-title"><p class="eval-eyebrow">02 / COVERAGE</p><h2 id="coverage-title">A mix of easy and difficult work</h2>
 <div class="eval-tiers">${["easy", "medium", "hard"].map((difficulty) => `<div><strong>${catalog.filter((task) => task.difficulty === difficulty).length}</strong><span>${difficulty}</span><p>${difficulty === "easy" ? "Boundaries, values, byte limits and compatibility." : difficulty === "medium" ? "Parsing, migrations, state transitions and browser persistence." : "Concurrency, cancellation, rollback, stream boundaries and public modules."}</p></div>`).join("")}</div>
 <p>Difficulty is a design label, not a calibrated model ranking. Four controls start correct: changing them requires a concrete reason. Four cases use frozen public SpecPi modules with seeded regressions; they are not historical issue-resolution benchmarks.</p>
 <form class="eval-filters" data-eval-filters hidden><label><span id="eval-difficulty-label">Difficulty</span><select name="difficulty" aria-labelledby="eval-difficulty-label"><option value="all">All difficulties</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></label><label><span id="eval-type-label">Task type</span><select name="control" aria-labelledby="eval-type-label"><option value="all">All tasks</option><option value="yes">Negative controls</option><option value="no">Repair tasks</option></select></label><label>Find a task<input name="search" type="search" placeholder="e.g. cache or browser" /></label><button type="reset">Reset filters</button></form>
 <p data-eval-count class="eval-note" role="status">Showing ${catalog.length} of ${catalog.length} tasks.</p>
 <div class="eval-table-scroll" role="region" aria-label="Task catalog and condition scores" tabindex="0"><table class="eval-catalog"><caption>Passes / valid trials for each task and condition${data ? "" : " — results pending"}</caption><thead><tr><th scope="col">Task / category</th><th scope="col">Difficulty</th><th scope="col">Context</th><th scope="col">Generic + repair</th><th scope="col">Skill + repair</th><th scope="col">Native</th><th scope="col">Anchored</th></tr></thead><tbody>${rows}</tbody></table></div>
-<p class="eval-note">All rows remain readable with JavaScript disabled. Source files, requirements and per-trial evidence are available below.</p></section>
+<p class="eval-note">These catalog scores describe the Codex baseline. All rows remain readable with JavaScript disabled. Source files, requirements and per-trial evidence are available below.</p></section>
 <section id="method" class="eval-section" aria-labelledby="method-title"><p class="eval-eyebrow">03 / METHOD</p><h2 id="method-title">Compare one intervention at a time</h2>
 <div class="eval-method-grid"><div><h3>Review, then repair</h3><p>Generic review and the complete SpecPi review skill each receive the same request and files. Each review feeds a matched repair phase using Pi's native edit tool. The primary outcome is the repaired program's behavior, not how many findings a model claims.</p></div><div><h3>Native versus anchored edits</h3><p>Both editing conditions receive the same task and file content. The anchored condition also receives line numbers and content digests. Each gets up to three edit responses; retries receive edit rejection details, never hidden acceptance feedback.</p></div><div><h3>Qualify and audit the graders</h3><p>All 28 seeded failures must fail, all 4 unchanged controls must pass, and all 32 reference outcomes must pass (28 repairs and four unchanged controls). A deliberately incomplete repair or compatibility regression must fail for every task. Three browser tasks run in Chromium.</p></div><div><h3>Keep the comparison traceable</h3><p>Every task runs three times per condition. Pair order is counterbalanced. Fresh fixtures, source and prompt hashes, CLI/model versions, token observations, edit outcomes and final file digests are retained. Invalid runs stop a batch and are not counted as behavioral failures.</p></div></div>
 <p class="eval-note"><strong>Grader correction:</strong> Model findings exposed an exception-preservation defect in a task initially labeled a correct control. The request and source stayed unchanged; the task was reclassified and missing checks were added. Every final output was graded with the corrected oracle. The archive retains original outcomes, correction details and interrupted-batch provenance.</p>
 <p>This method uses final-state checks, repeat trials and explicit grading limits, informed by <a href="https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents">Anthropic's agent-evaluation guidance</a> and <a href="https://www.swebench.com/SWE-bench/guides/quickstart/">SWE-bench's reproducible evaluation harness</a>. SpecPi's suite is its own bounded evaluation, not a result on either project's benchmark.</p></section>
 <section id="limits" class="eval-section" aria-labelledby="limits-title"><p class="eval-eyebrow">04 / INTERPRETATION</p><h2 id="limits-title">What this evidence can establish</h2>
-<ul class="eval-limits"><li><strong>Behavioral acceptance has a defined scope.</strong> Hidden checks cover selected requirements and regressions. Maintainability, review-finding precision and broader requirement coverage still need human assessment.</li><li><strong>Context is supplied.</strong> This is a Codex response adapter. It does not measure full Pi sessions, repository exploration, long-running work, installed verification gates, VS Code context attachments, or other programming languages.</li><li><strong>Fresh directories reduce accidental exposure.</strong> They do not restrict all reads. Native external tools are instructed off and detected use invalidates the controlled protocol; this is not an adversarial isolation benchmark.</li><li><strong>Repeated trials share a task.</strong> Three attempts are not three independent tasks. Paired counts and consistency describe this curated suite; no population confidence interval or general accuracy claim is made.</li><li><strong>Runtime regressions are another layer.</strong> SpecPi separately tests installer transactions, command admission, receipt freshness, workflow gates and editor attachments. Those deterministic tests do not demonstrate a model-quality gain.</li></ul></section>
+<ul class="eval-limits"><li><strong>Behavioral acceptance has a defined scope.</strong> Hidden checks cover selected requirements and regressions. Maintainability, review-finding precision and broader requirement coverage still need human assessment.</li><li><strong>Context is supplied.</strong> These are supplied-context response adapters. They do not measure full Pi sessions, repository exploration, long-running work, installed verification gates, VS Code context attachments, or other programming languages.</li><li><strong>Fresh directories reduce accidental exposure.</strong> They do not restrict all reads. Native external tools are instructed off and detected use invalidates the controlled protocol; this is not an adversarial isolation benchmark.</li><li><strong>Repeated trials share a task.</strong> Three attempts are not three independent tasks. Paired counts and consistency describe this curated suite; no population confidence interval or general accuracy claim is made.</li><li><strong>Runtime regressions are another layer.</strong> SpecPi separately tests installer transactions, command admission, receipt freshness, workflow gates and editor attachments. Those deterministic tests do not demonstrate a model-quality gain.</li></ul></section>
 <section id="evidence" class="eval-section" aria-labelledby="evidence-title"><p class="eval-eyebrow">05 / REPRODUCIBILITY</p><h2 id="evidence-title">Inspect the evidence</h2>
 ${data ? `<div class="eval-downloads"><a href="./results.json" download>Download complete v2 evidence (JSON)</a><a href="./trials.csv" download>Download trial metrics (CSV)</a></div><p>The JSON contains sanitized run metrics, findings, graders' outcomes, source/prompt hashes and deduplicated final fixture text. It excludes host paths, credentials and raw provider traces. All source fixtures are authored or public repository material.</p>` : `<p>The complete version 2 evidence will be added after the fixed run schedule completes.</p>`}
 <p><a href="https://github.com/TannerMidd/SpecPi/tree/main/evals/quality">Suite source and independent graders</a> · <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/quality-evaluation.md">Run and interpret the evaluation</a> · <a href="https://github.com/TannerMidd/SpecPi/blob/main/docs/quality-results.md">Results and adoption decisions</a></p>
@@ -130,52 +267,40 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         throw new Error("Evals page requires the complete version 2 archive.");
     }
 
-    const html = renderEvalsPage(data);
+    const independentPath = path.join(root, "evals/quality/results/2026-09-13-glm.json");
+    const independent =
+        data && fs.existsSync(independentPath) ? JSON.parse(fs.readFileSync(independentPath, "utf8")) : null;
+    if (
+        independent &&
+        (independent.providerExperiment !== "openrouter-glm" ||
+            independent.suiteVersion !== suiteVersion ||
+            independent.runs.length !== 384 ||
+            independent.runs.some((run) => run.error))
+    ) {
+        throw new Error("Independent results require a complete GLM archive.");
+    }
+
+    const interruptedPath = path.join(root, "evals/quality/results/2026-09-13-glm-morph-interrupted.json");
+    const interrupted =
+        data && fs.existsSync(interruptedPath) ? JSON.parse(fs.readFileSync(interruptedPath, "utf8")) : null;
+    if (interrupted && interrupted.cohortStatus !== "interrupted") {
+        throw new Error("Expected the explicitly interrupted Morph archive.");
+    }
+
+    const html = renderEvalsPage(data, independent, interrupted);
     const artifacts = { "index.html": html };
+    if (interrupted) {
+        artifacts["glm-morph-interrupted.json"] = JSON.stringify(interrupted, null, 2) + "\n";
+    }
+
+    if (independent) {
+        artifacts["glm-results.json"] = JSON.stringify(independent, null, 2) + "\n";
+        artifacts["glm-trials.csv"] = trialCsv(independent);
+    }
+
     if (data) {
         artifacts["results.json"] = JSON.stringify(data, null, 2) + "\n";
-        const fields = [
-            "task",
-            "difficulty",
-            "negativeControl",
-            "experiment",
-            "condition",
-            "repetition",
-            "acceptance",
-            "editRounds",
-            "editRejections",
-            "modelMs",
-            "inputTokens",
-            "outputTokens",
-        ];
-        const catalog = Object.fromEntries(data.catalog.map((task) => [task.id, task]));
-        artifacts["trials.csv"] =
-            [
-                fields.join(","),
-                ...data.runs.map((run) => {
-                    const total = (key) =>
-                        run.calls.every((call) => Number.isFinite(call.usage?.[key]))
-                            ? run.calls.reduce((sum, call) => sum + call.usage[key], 0)
-                            : "";
-
-                    return [
-                        run.task,
-                        catalog[run.task].difficulty,
-                        catalog[run.task].negativeControl,
-                        run.experiment,
-                        run.condition,
-                        run.repetition,
-                        run.acceptance,
-                        run.editRounds,
-                        run.editRejections,
-                        run.calls.reduce((sum, call) => sum + call.elapsedMs, 0),
-                        total("input_tokens"),
-                        total("output_tokens"),
-                    ]
-                        .map(csv)
-                        .join(",");
-                }),
-            ].join("\n") + "\n";
+        artifacts["trials.csv"] = trialCsv(data);
     }
 
     if (option === "--check") {

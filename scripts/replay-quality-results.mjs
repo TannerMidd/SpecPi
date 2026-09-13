@@ -62,6 +62,17 @@ export function gradeFinalFiles(taskId, finalFiles, blobs) {
             return { task: taskId, acceptance: "failed", reason: "Candidate exceeded the 30-second grading budget." };
         }
 
+        // Node exits with 13 when top-level await cannot settle and no work
+        // remains in the event loop. After the grader starts this is an
+        // incomplete candidate operation, not a retryable infrastructure error.
+        if (checked.status === 13 && lines.some((line) => line.includes('"event":"oracle.started"'))) {
+            return {
+                task: taskId,
+                acceptance: "failed",
+                reason: "Candidate left an awaited operation unsettled after the event loop drained.",
+            };
+        }
+
         let result;
         try {
             result = JSON.parse(lines.at(-1));

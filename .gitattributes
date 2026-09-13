@@ -10,3 +10,6 @@ evals/quality/results/*.json linguist-generated=true
 site/evals/index.html linguist-generated=true
 site/evals/results.json linguist-generated=true
 site/evals/trials.csv linguist-generated=true
+site/evals/glm-results.json linguist-generated=true
+site/evals/glm-trials.csv linguist-generated=true
+site/evals/glm-morph-interrupted.json linguist-generated=true

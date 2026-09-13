@@ -26,6 +26,8 @@ The child uses configured global transport/thinking budgets without loading proj
 
 Architecture charts are committed static SVG/CSV/JSON assets. Their optional authoring script uses ReportLab 4.4.9 (BSD license); it is not installed by SpecPi or shipped as a runtime dependency. The site runs without a plotting library or remote chart service.
 
+The opt-in GLM quality experiment reuses the pinned Pi 0.84.4 development packages' `ModelRuntime`, `ReadOnlyAuthStorage` and native edit tool. It adds no executable dependency and is not shipped by the installer. Paid inference uses OpenRouter's JSON-schema response, FP8 provider-routing, usage and price-limit contracts; authentication stays inside Pi's provider runtime. The requested model, routing policy, resolved providers and request costs are recorded with the experiment's source fingerprints. The interrupted Morph cohort and later failover cohort retain separate evidence.
+
 SpecPi pins but does not vendor these Pi packages:
 
 - `pi-web-access@0.25.0`

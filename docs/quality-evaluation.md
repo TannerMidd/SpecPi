@@ -84,6 +84,44 @@ See the [results and adoption decisions](quality-results.md) and the [public eva
 
 ## Interpretation limits
 
+### Independent model run through Pi
+
+`scripts/openrouter-quality.mjs` adds a separate GLM 5.3 Flash experiment through Pi 0.84.4's provider runtime. It reuses the frozen version 2 task requests, fixtures, prompt builder, Pi native edit implementation, anchored buffer implementation and executable graders. It does not change the historical Codex archive or its fingerprints. GLM is from a different model family than the suite's author; this reduces author-model dependence but does not establish training-data independence or independently authored graders.
+
+The profile is OpenRouter `z-ai/glm-5.3-flash`, a fixed allowlist of eight FP8 endpoints with provider failover, medium reasoning, a 16,384-token response limit, at most three edit responses, three repetitions and two concurrent trials. Review and editing conditions are interleaved for each task/repetition. Every response records its resolved provider. No native tools are registered. There is no Pi agent session, extension/resource discovery, local model configuration, settings load or session persistence. Pi's supported `ReadOnlyAuthStorage` supplies the existing login directly to its provider runtime; the adapter never extracts, copies or logs a credential. Synthetic credential fixtures cover the adapter tests.
+
+The shared spending ledger reserves before each HTTP dispatch, includes pilots and retries, and refuses requests that could exceed $5 at the configured price limits. Routing allows provider failover within the FP8 allowlist and caps prices at $0.15 per million input tokens and $0.50 per million output tokens, with no per-request fee. Reservations use a conservative input bound and the full output limit, with 10% headroom. Successful responses settle against observed token counts and reported cost; interrupted requests retain their full reservation. A process lock prevents concurrent ledger writers. Do not remove reservations to make a run fit a budget.
+
+An earlier cohort fixed routing to Morph FP8 and scheduled review before editing. Persistent upstream rate limits stopped it at 42 valid review trials, including 14 failures. Its complete observed evidence and generation sources are archived in `2026-09-13-glm-morph-interrupted.json`; the failures are preserved. The later failover profile is a separate cohort, with a new frozen schedule and source fingerprints. The cohorts are not pooled or used to claim a causal provider ranking. Changing routing after observing service failures is disclosed rather than presented as one uninterrupted preregistered experiment.
+
+Only HTTP 429 and selected transient server failures receive up to three request attempts with backoff. Attempts remain in the evidence and ledger. Malformed JSON, completed refusals and output-limit responses count as model failures, including on correct controls. Incomplete provider streams remain separate; the first-trial-attempt pass counts include this service-availability limitation instead of hiding it behind a later successful restart. Hidden acceptance results never feed back into repair. A transport/evaluator error stops dispatch; `resume` preserves every valid pass and failure and allocates a new attempt directory for interrupted trials. It rejects changes to the source fingerprints, profile, runtime and schedule.
+
+After explicitly authorizing provider spending, run:
+
+```text
+node scripts/openrouter-quality.mjs pilot .specpi-test/glm-routing-pilot .specpi-test/glm-budget.json .specpi-test/quality-v2-revised-qualification.json
+node scripts/openrouter-quality.mjs full .specpi-test/glm-routing-full .specpi-test/glm-budget.json .specpi-test/quality-v2-revised-qualification.json
+node scripts/openrouter-quality.mjs resume .specpi-test/glm-routing-full .specpi-test/glm-budget.json .specpi-test/quality-v2-revised-qualification.json
+```
+
+Use the same ledger for the complete experiment, including every pilot. `pilot` and `full` require new output directories; `resume` requires the existing full directory. The exporter requires all 384 valid outcomes, validates the retained final bytes and replays every distinct final variant before publication:
+
+```text
+node scripts/export-openrouter-quality.mjs .specpi-test/glm-routing-full .specpi-test/glm-budget.json evals/quality/results/2026-09-13-glm.json .specpi-test/glm-routing-pilot
+node scripts/replay-openrouter-quality.mjs evals/quality/results/2026-09-13-glm.json
+node scripts/build-evals-page.mjs evals/quality/results/2026-09-13-v2.json
+```
+
+Pass every excluded pilot directory to the exporter. An explicit `--partial` before the exporter arguments preserves an interrupted cohort and labels it incomplete; it cannot become the page's complete GLM comparison. The page builder adds the separate GLM archive when it exists. GLM and Codex use different provider adapters, system context and output budgets; compare the paired feature conditions within each model. A between-model score or timing difference is not a controlled model ranking. Provider routing can also affect outcomes, and resolved-provider observations do not attest to identical underlying serving implementations. These experiments do not make the grader an adversarial execution sandbox.
+
+The review screen supplies the current defective implementation and requested behavior, without an original/proposed Git diff. This differs from the skill's intended use reviewing completed changes. Some GLM reviews interpreted the absent diff as a reason to report no findings. The recorded outcome still measures the subsequent repair, but this adapter should not be used alone to estimate the skill's effectiveness on real pull requests. A future frozen review benchmark should supply baseline and proposed changes and include plausible incomplete patches, with human-audited expectations.
+
+A GLM `bounded-map` candidate returned a promise that never resolved. Node exited with status 13 after `oracle.started`; the replay driver initially called the missing final report an infrastructure error. The corrected classifier treats this drained-event-loop state as a behavioral failure. A targeted regression reproduces it. All 64 retained outcomes were regraded: 63 were unchanged and this one became a failure, without another model call. The original result, manifest and grader source remain in the archive alongside the correction and revised grader fingerprint. Task requests, supplied files, hidden assertions, prompts, model settings and the model-call implementation did not change. The historical Codex driver remains the frozen source for that earlier cohort; this correction applies to the replay/provider evaluation path.
+
+Routing and error handling follow OpenRouter's [provider-selection](https://openrouter.ai/docs/guides/routing/provider-selection) and [rate-limit](https://openrouter.ai/docs/api/reference/limits) contracts. Prices and availability can change; the frozen request limits remain binding for this experiment.
+
+### Scope of the original Codex baseline
+
 This is a supplied-context Codex adapter, not a complete Pi conversation or repository exploration benchmark. A fresh empty cwd reduces accidental exposure but does not confine all filesystem reads. Native tools are instructed off and detected use is rejected; this is not an adversarial isolation claim. Codex's system context, provider scheduling and hosted model behavior remain outside the fixture.
 
 The suite does not measure long-running missions, all languages, native installed verification gates, language-server attachments, or real production mutation safety. The anchored buffer experiment has no demonstrated Command Guard or filesystem-transaction equivalence and remains uninstalled. Promotion requires relevant gains, no material regressions, manageable execution cost, human review and production-boundary validation.
