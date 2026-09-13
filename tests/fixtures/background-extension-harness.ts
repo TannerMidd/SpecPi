@@ -386,7 +386,11 @@ try {
     };
 
     const revoked = JSON.parse((await finite.call("verify_run", input)).content[0].text);
-    assert.equal(revoked.receipt, null);
+    // A session change reports the same { status, reason } shape the registry uses,
+    // so a caller never has to infer the outcome from which fields are present.
+    assert.equal(revoked.status, "unknown");
+    assert.match(revoked.reason, /no live receipt was retained/u);
+    assert.equal(revoked.outcome.cleanup, "confirmed");
     finite.pi.events.emit("specpi:verification-receipts", {
         root: checkRoot,
         reply(value: any) {

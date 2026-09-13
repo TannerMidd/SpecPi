@@ -28,31 +28,64 @@ function inside(root, candidate) {
     );
 }
 
-export function verificationRoot(value) {
-    const absolute = path.resolve(value);
-    // Reject known private state before inspecting the requested directory.
-    for (const privateRoot of [path.join(os.homedir(), ".pi"), process.env.PI_CODING_AGENT_DIR].filter(Boolean)) {
-        if (inside(path.resolve(privateRoot), absolute)) {
+function privateRoots() {
+    return [path.join(os.homedir(), ".pi"), process.env.PI_CODING_AGENT_DIR].filter(Boolean).flatMap((entry) => {
+        const resolved = path.resolve(entry);
+        try {
+            return [resolved, fs.realpathSync.native(resolved)];
+        } catch {
+            return [resolved];
+        }
+    });
+}
+
+function rejectPrivateRoot(candidate, roots = privateRoots()) {
+    for (const privateRoot of roots) {
+        if (inside(privateRoot, candidate)) {
             throw new Error("Verification inputs cannot include Pi private state.");
         }
     }
 
-    if (absolute.split(/[\\/]/u).some((part) => deniedDirectories.test(part))) {
+    if (candidate.split(/[\\/]/u).some((part) => deniedDirectories.test(part))) {
         throw new Error("Verification root is a private or excluded directory.");
     }
+}
 
+export function verificationRoot(value) {
+    const absolute = path.resolve(value);
+    // Reject known private state before inspecting the requested directory.
+    rejectPrivateRoot(absolute);
     const stat = fs.lstatSync(absolute);
     if (stat.isSymbolicLink() || !stat.isDirectory()) {
         throw new Error("Verification root must be a real directory.");
     }
 
+    // Ancestor links can lead into private state, so screen the resolved path too
+    // rather than rejecting every root whose spelling is not already canonical:
+    // /var/folders on macOS and a lowercase Windows drive letter are both
+    // ordinary workspaces. Callers compare against this canonical return value.
     const canonical = fs.realpathSync.native(absolute);
-    if (canonical !== absolute) {
-        // Ancestor links can lead into private state. Require the canonical spelling.
-        throw new Error("Use the canonical verification root without directory links.");
-    }
+    rejectPrivateRoot(canonical);
 
     return canonical;
+}
+
+// The same rules normalizeManifest applies to a declared path segment, asked of a
+// name discovered by the directory walk. Declared paths still fail loudly; only
+// entries found inside a declared directory are skipped.
+function excludedEntry(name) {
+    return (
+        typeof name !== "string" ||
+        !name ||
+        name.length > 240 ||
+        /[\u0000-\u001f\u007f:*?<>|/\\]/u.test(name) ||
+        name === "." ||
+        name === ".." ||
+        name !== name.trim() ||
+        name.endsWith(".") ||
+        deniedDirectories.test(name) ||
+        deniedFile.test(name)
+    );
 }
 
 export function normalizeManifest(values) {
@@ -101,19 +134,25 @@ export function normalizeVerification(input, cwd, workspaceRoot = cwd) {
     record(input, ["command", "cwd", "label", "timeoutSeconds", "inputs"]);
     const { inputs, ...execution } = input;
     const root = verificationRoot(workspaceRoot);
-    if (!inside(root, path.resolve(cwd))) {
+    // Compare canonical against canonical: verificationRoot resolves links, and
+    // normalizeStart resolves spec.cwd with a different realpath API, so the two
+    // spellings only agree once both have been put through the same resolution.
+    if (!inside(root, verificationRoot(cwd))) {
         throw new Error("Verification workspace must contain the active cwd.");
     }
 
     verificationRoot(path.resolve(cwd, execution.cwd ?? cwd));
     const spec = normalizeStart(execution, cwd);
-    if (!inside(root, spec.cwd)) {
+    const specRoot = verificationRoot(spec.cwd);
+    if (!inside(root, specRoot)) {
         throw new Error("Verification command cwd must be within the active workspace.");
     }
 
-    verificationRoot(spec.cwd);
-
-    return Object.freeze({ root, spec, inputs: Object.freeze(normalizeManifest(inputs)) });
+    return Object.freeze({
+        root,
+        spec: Object.freeze({ ...spec, cwd: specRoot }),
+        inputs: Object.freeze(normalizeManifest(inputs)),
+    });
 }
 
 export function executionSpecDigest(spec) {
@@ -128,27 +167,53 @@ export function executionSpecDigest(spec) {
 
 export function captureInputs(root, declarations) {
     const canonical = verificationRoot(root);
+    const blockedRoots = privateRoots();
     const inputs = normalizeManifest(declarations);
     const files = new Map();
     let total = 0;
     let visited = 0;
-    const visit = (relative, directory, depth = 0) => {
-        normalizeManifest([`${relative}${directory ? "/" : ""}`]);
+    let skipped = 0;
+    const directories = new Map();
+    const countEntry = () => {
         visited += 1;
-        if (visited > VERIFY_LIMITS.entries || depth > VERIFY_LIMITS.depth) {
+        if (visited > VERIFY_LIMITS.entries) {
             throw new Error("Verification directory inventory exceeds its bound.");
         }
+    };
 
+    const inspectPath = (relative) => {
         let candidate = canonical;
-        for (const part of relative.split("/")) {
-            candidate = path.join(candidate, part);
-            const stat = fs.lstatSync(candidate);
+        let stat;
+        for (const part of ["", ...relative.split("/")]) {
+            candidate = part ? path.join(candidate, part) : candidate;
+            rejectPrivateRoot(candidate, blockedRoots);
+            stat = fs.lstatSync(candidate);
             if (stat.isSymbolicLink() || !inside(canonical, fs.realpathSync.native(candidate))) {
                 throw new Error("Verification inputs cannot traverse links.");
             }
+
+            if (stat.isDirectory()) {
+                const identity = `${stat.dev}:${stat.ino}`;
+                if (directories.has(candidate) && directories.get(candidate) !== identity) {
+                    throw new Error("Verification input directory changed during capture.");
+                }
+
+                directories.set(candidate, identity);
+            }
         }
 
-        const stat = fs.lstatSync(candidate);
+        return stat;
+    };
+
+    const visit = (relative, candidate, directory, depth) => {
+        if (depth > VERIFY_LIMITS.depth) {
+            throw new Error("Verification directory inventory exceeds its bound.");
+        }
+
+        normalizeManifest([`${relative}${directory ? "/" : ""}`]);
+        // Recheck the full chain: an open directory handle does not pin the path
+        // used to open its children when another process replaces an ancestor.
+        const stat = inspectPath(relative);
         if (directory) {
             if (!stat.isDirectory()) {
                 throw new Error("Declared verification directory is not a directory.");
@@ -158,11 +223,28 @@ export function captureInputs(root, declarations) {
             try {
                 let entry;
                 while ((entry = handle.readSync())) {
-                    visit(`${relative}/${entry.name}`, entry.isDirectory(), depth + 1);
+                    countEntry();
+                    // A declared directory that happens to contain a secret, a build
+                    // cache or an unusable name skips that entry. Aborting the whole
+                    // capture would make an already-recorded receipt go stale the
+                    // moment a build drops a .sqlite beside the sources it declared.
+                    if (excludedEntry(entry.name)) {
+                        skipped += 1;
+                        continue;
+                    }
+
+                    visit(
+                        `${relative}/${entry.name}`,
+                        path.join(candidate, entry.name),
+                        entry.isDirectory(),
+                        depth + 1,
+                    );
                 }
             } finally {
                 handle.closeSync();
             }
+
+            inspectPath(relative);
 
             return;
         }
@@ -183,6 +265,7 @@ export function captureInputs(root, declarations) {
         const descriptor = fs.openSync(candidate, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
         try {
             const opened = fs.fstatSync(descriptor);
+            inspectPath(relative);
             if (
                 !opened.isFile() ||
                 opened.nlink !== 1 ||
@@ -222,7 +305,9 @@ export function captureInputs(root, declarations) {
     };
 
     for (const declaration of inputs) {
-        visit(declaration.replace(/\/$/u, ""), declaration.endsWith("/"));
+        const relative = declaration.replace(/\/$/u, "");
+        countEntry();
+        visit(relative, path.join(canonical, relative), declaration.endsWith("/"), 0);
     }
 
     if (files.size === 0) {
@@ -236,6 +321,7 @@ export function captureInputs(root, declarations) {
         inputs,
         files: entries,
         bytes: total,
+        skipped,
         digest: verificationDigest({ root: canonical, inputs, files: entries }),
     };
 }
@@ -246,17 +332,27 @@ export function verificationOutput(ring) {
         start += 1;
     }
 
-    const escaped = Buffer.from(safeText(ring.bytes.subarray(start).toString("utf8")));
-    let escapedStart = Math.max(0, escaped.length - VERIFY_LIMITS.output);
-    while (escapedStart < escaped.length && (escaped[escapedStart] & 0xc0) === 0x80) {
-        escapedStart += 1;
+    // Escape per character and keep whole units from the end. Cutting the escaped
+    // buffer at a byte offset can split a \uXXXX expansion, and the leftover
+    // fragment would be presented as output the command never produced.
+    const units = [...ring.bytes.subarray(start).toString("utf8")].map((character) => {
+        const escaped = safeText(character);
+
+        return { escaped, bytes: Buffer.byteLength(escaped) };
+    });
+    let budget = VERIFY_LIMITS.output;
+    let kept = units.length;
+    while (kept > 0 && units[kept - 1].bytes <= budget) {
+        kept -= 1;
+        budget -= units[kept].bytes;
     }
 
-    const output = escaped.subarray(escapedStart).toString("utf8");
-
     return {
-        text: output,
-        truncated: start > 0 || ring.end > ring.bytes.length || escapedStart > 0,
+        text: units
+            .slice(kept)
+            .map((unit) => unit.escaped)
+            .join(""),
+        truncated: start > 0 || ring.end > ring.bytes.length || kept > 0,
         observedStreams: ring.digests(),
         scope: "Digest covers observed raw stream bytes; output is an untrusted bounded tail, not complete command output.",
     };
@@ -294,16 +390,28 @@ export class VerificationRegistry {
 
         return structuredClone(receipt);
     }
-    resolve(id, root) {
+    resolve(id, root, captures = new Map()) {
+        const canonical = verificationRoot(root);
         const receipt = this.receipts.get(id);
-        if (!receipt || receipt.generation !== this.generation || receipt.root !== verificationRoot(root)) {
+        if (!receipt || receipt.generation !== this.generation || receipt.root !== canonical) {
             return { id, status: "unknown", reason: "No current receipt for this workspace and session generation." };
         }
 
-        let current;
-        try {
-            current = captureInputs(root, receipt.inputs);
-        } catch {
+        // Receipts commonly declare the same inputs, and re-reading and hashing an
+        // inventory per receipt is what makes resolving a full list expensive.
+        const key = verificationDigest(receipt.inputs);
+        let current = captures.get(key);
+        if (current === undefined) {
+            try {
+                current = captureInputs(canonical, receipt.inputs);
+            } catch {
+                current = null;
+            }
+
+            captures.set(key, current);
+        }
+
+        if (current === null) {
             return {
                 ...structuredClone(receipt),
                 status: "stale",
@@ -329,8 +437,13 @@ export class VerificationRegistry {
         };
     }
     list(root) {
+        // Stored roots are canonical, so the caller's spelling has to be resolved
+        // the same way resolve() does or every receipt silently filters out.
+        const canonical = verificationRoot(root);
+        const captures = new Map();
+
         return [...this.receipts.values()]
-            .filter((receipt) => receipt.root === root)
-            .map((receipt) => this.resolve(receipt.id, root));
+            .filter((receipt) => receipt.root === canonical)
+            .map((receipt) => this.resolve(receipt.id, canonical, captures));
     }
 }

@@ -6,3 +6,7 @@ specpi text eol=lf
 *.ts text eol=lf
 *.tsx text eol=lf
 *.cmd text eol=crlf
+evals/quality/results/*.json linguist-generated=true
+site/evals/index.html linguist-generated=true
+site/evals/results.json linguist-generated=true
+site/evals/trials.csv linguist-generated=true

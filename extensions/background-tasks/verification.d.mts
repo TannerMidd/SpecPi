@@ -5,6 +5,7 @@ export type InputSnapshot = {
     inputs: string[];
     files: { path: string; bytes: number; sha256: string }[];
     bytes: number;
+    skipped: number;
     digest: string;
 };
 export declare const VERIFY_LIMITS: Readonly<
@@ -33,6 +34,6 @@ export declare class VerificationRegistry {
         outcome: TaskSummary,
         output: ReturnType<typeof verificationOutput>,
     ): any;
-    resolve(id: string, root: string): any;
+    resolve(id: string, root: string, captures?: Map<string, InputSnapshot | null>): any;
     list(root: string): any[];
 }

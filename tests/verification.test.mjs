@@ -165,6 +165,134 @@ test("receipt output stays bounded while raw stream digests cover discarded byte
     assert.ok(Buffer.byteLength(verificationOutput(controls).text) <= VERIFY_LIMITS.output);
 });
 
+test("bounded output never begins inside a control-character escape", () => {
+    // safeText expands one control byte to the six ASCII characters \u001b, so a
+    // byte-offset cut can leave a "001b" fragment the command never produced.
+    for (const filler of ["a", "😀"]) {
+        for (let offset = 0; offset < 8; offset += 1) {
+            const ring = new OutputRing();
+            ring.append("stdout", Buffer.from(filler.repeat(offset) + "\u0007".repeat(9000)));
+            const { text } = verificationOutput(ring);
+            assert.ok(Buffer.byteLength(text) <= VERIFY_LIMITS.output);
+            // Whole escapes only: nothing between them, and no leading fragment.
+            assert.equal(text.replaceAll("\\u0007", "").replaceAll(filler, ""), "");
+        }
+    }
+});
+
+test("declared directories skip excluded entries instead of failing the whole capture", (t) => {
+    const root = fixture(t);
+    const inputs = ["src/", "config.json"];
+    const before = captureInputs(root, inputs);
+    assert.equal(before.skipped, 0);
+    // A build or test run dropping any of these beside declared sources must not
+    // make an already-recorded receipt unresolvable.
+    fs.writeFileSync(path.join(root, "src", "cache.sqlite"), "binary");
+    fs.writeFileSync(path.join(root, "src", "settings.local.json"), "{}");
+    fs.mkdirSync(path.join(root, "src", "node_modules"));
+    fs.writeFileSync(path.join(root, "src", "node_modules", "index.js"), "module");
+    const after = captureInputs(root, inputs);
+    assert.equal(after.digest, before.digest);
+    assert.equal(after.skipped, 3);
+    // An explicitly declared excluded path is still a hard error.
+    assert.throws(() => captureInputs(root, ["src/cache.sqlite"]), /private, excluded or unsafe/u);
+});
+
+test("excluded names consume the scanned-entry budget", (t) => {
+    const root = fixture(t);
+    for (let index = 0; index < VERIFY_LIMITS.entries; index += 1) {
+        fs.writeFileSync(path.join(root, "src", `cache-${index}.sqlite`), "synthetic cache");
+    }
+
+    assert.throws(() => captureInputs(root, ["src/"]), /inventory exceeds its bound/);
+});
+
+test("a configured Pi directory nested inside a declared source tree is never read", (t) => {
+    const root = fixture(t);
+    const privateRoot = path.join(root, "src", "custom-agent-state");
+    fs.mkdirSync(privateRoot);
+    const canaryPath = path.join(privateRoot, "ordinary-name.mjs");
+    fs.writeFileSync(canaryPath, "synthetic private bytes");
+    const canary = fs.statSync(canaryPath);
+    const original = process.env.PI_CODING_AGENT_DIR;
+    process.env.PI_CODING_AGENT_DIR = privateRoot;
+    t.after(() => {
+        if (original === undefined) {
+            delete process.env.PI_CODING_AGENT_DIR;
+        } else {
+            process.env.PI_CODING_AGENT_DIR = original;
+        }
+    });
+    const read = fs.readSync;
+    let readCanary = false;
+    t.mock.method(fs, "readSync", (descriptor, ...args) => {
+        const stat = fs.fstatSync(descriptor);
+        readCanary ||= stat.dev === canary.dev && stat.ino === canary.ino;
+
+        return read(descriptor, ...args);
+    });
+    assert.throws(() => captureInputs(root, ["src/"]), /private state/);
+    assert.equal(readCanary, false);
+});
+
+test("replacing a scanned ancestor cannot redirect a child read outside the workspace", (t) => {
+    const root = fixture(t);
+    const outside = fixture(t);
+    const source = path.join(root, "src");
+    fs.writeFileSync(path.join(outside, "main.js"), "synthetic private canary");
+    const canary = fs.statSync(path.join(outside, "main.js"));
+    const openDirectory = fs.opendirSync;
+    const read = fs.readSync;
+    let replaced = false;
+    t.mock.method(fs, "readSync", (descriptor, ...args) => {
+        const stat = fs.fstatSync(descriptor);
+        assert.ok(stat.dev !== canary.dev || stat.ino !== canary.ino, "must reject before reading the canary");
+
+        return read(descriptor, ...args);
+    });
+    t.mock.method(fs, "opendirSync", (...args) => {
+        const handle = openDirectory(...args);
+        if (path.resolve(args[0]) === source && !replaced) {
+            replaced = true;
+            // Both move targets are explicitly beneath this disposable fixture.
+            fs.renameSync(source, path.join(root, "original-src"));
+            fs.symlinkSync(outside, source, process.platform === "win32" ? "junction" : "dir");
+        }
+
+        return handle;
+    });
+    assert.throws(() => captureInputs(root, ["src/"]), /links|directory changed/);
+    assert.equal(replaced, true);
+});
+
+test("non-canonical root spellings resolve to the same receipts as the canonical one", (t) => {
+    const root = fixture(t);
+    const spellings = [
+        `${root}${path.sep}`,
+        path.join(root, "src", ".."),
+        ...(process.platform === "win32" ? [root[0].toLowerCase() + root.slice(1)] : []),
+    ];
+    const registry = new VerificationRegistry();
+    const binding = normalizeVerification({ command: "echo check", inputs: ["src/", "config.json"] }, root);
+    const before = captureInputs(root, binding.inputs);
+    const receipt = registry.add(binding, before, before, {
+        status: "exited",
+        exitCode: 0,
+        cleanup: "confirmed",
+        reason: "command exited",
+    });
+    for (const spelling of spellings) {
+        assert.equal(normalizeVerification({ command: "echo check", inputs: ["src/"] }, spelling).root, root);
+        assert.equal(registry.resolve(receipt.id, spelling).status, "passed");
+        // list() filtered on the caller's spelling, so a trailing separator used to
+        // hide every receipt and leave required checks permanently unresolvable.
+        assert.deepEqual(
+            registry.list(spelling).map((entry) => entry.id),
+            [receipt.id],
+        );
+    }
+});
+
 test("human check selection is digest-bound and challenge readiness uses live registry evidence", (t) => {
     const root = fixture(t);
     const task = createTaskContract(

@@ -229,17 +229,17 @@
                 },
                 {
                     "command": "specpi.chat.attachDiagnostics",
-                    "when": "resourceScheme == file",
+                    "when": "isWorkspaceTrusted && resourceScheme == file",
                     "group": "specpi@3"
                 },
                 {
                     "command": "specpi.chat.attachReferences",
-                    "when": "resourceScheme == file",
+                    "when": "isWorkspaceTrusted && resourceScheme == file",
                     "group": "specpi@3"
                 },
                 {
                     "command": "specpi.chat.attachDefinition",
-                    "when": "resourceScheme == file",
+                    "when": "isWorkspaceTrusted && resourceScheme == file",
                     "group": "specpi@3"
                 }
             ],

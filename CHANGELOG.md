@@ -7,6 +7,15 @@
 - Add human-selected `/task checks`, schema-2 task contracts with schema-1 compatibility, and current receipt checks in `/challenge` and `/task handoff`. A newer failing run supersedes an older pass; restored summaries remain historical.
 - Add explicit VS Code diagnostics, references and definition attachments with plain previews, workspace and buffer-version binding, and bounded provider results.
 - Add independent synthetic quality fixtures, a Codex-subscription comparison driver and an uninstalled anchored-edit experiment. No production editing mode or additional executable dependency is added.
+- Fix verification root handling: resolve the workspace root before checking it instead of demanding an already-canonical spelling, so projects reached through an ancestor directory link or a lowercase Windows drive letter are usable while private state behind a link is still rejected. Canonicalize the root in receipt listing as well as lookup; a trailing separator no longer hides every receipt and blocks required checks permanently.
+- Skip excluded entries found inside a declared verification directory instead of failing the whole capture, and report the skipped count in the approval prompt and receipt. A build artifact appearing beside declared sources no longer makes a recorded receipt unresolvable.
+- Require explicit confirmation before `/task set` removes any required check links when requirement IDs change. Cancellation preserves the existing task and its checks; partial link removals are also shown.
+- Report a Guard denial before reading declared inputs, return one `{ status, reason }` shape from `verify_run` on session change, and stop truncated output from beginning inside a split control-character escape.
+- Require workspace trust for the VS Code diagnostics, references and definition menu entries, matching the sibling attachment commands.
+- Await task cleanup instead of polling it, and reuse one input capture across receipts that declare the same inventory.
+- Recheck directory ancestors during verification capture, count excluded names against the scan bound, and reject configured Pi state nested beneath declared input directories before reading it.
+- Expand quality evaluation to 32 mixed-difficulty tasks with independent reference and wrong-repair qualification, review-then-repair outcomes, repeated paired trials, browser failure flows and frozen public SpecPi modules. Preserve the original screen separately.
+- Add a GitHub Pages evaluations page with a filterable task catalog, paired results, methodology and downloadable sanitized evidence.
 
 ## 0.20.1 - 2026-09-10
 

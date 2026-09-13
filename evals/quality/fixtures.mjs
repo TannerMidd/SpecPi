@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { tasks, baselineCommit } from "./tasks.mjs";
+import { tasks, baselineCommit, suiteVersion } from "./catalog.mjs";
 
 export function qualityTask(id) {
     const task = tasks.find((entry) => entry.id === id);
@@ -14,7 +14,16 @@ export function qualityTask(id) {
 
 export function fixtureDigest(task) {
     return createHash("sha256")
-        .update(JSON.stringify({ base: baselineCommit, request: task.request, files: task.files }))
+        .update(
+            JSON.stringify({
+                suiteVersion,
+                base: baselineCommit,
+                request: task.request,
+                files: task.files,
+                acceptance: task.acceptance,
+                provenance: task.provenance,
+            }),
+        )
         .digest("hex");
 }
 

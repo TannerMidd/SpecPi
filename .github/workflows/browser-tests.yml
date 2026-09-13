@@ -20,6 +20,8 @@ jobs:
       - name: Provision locked Chromium in disposable repository test state
         run: npm run setup:browser -- --with-deps
       - run: npm run check:types
+      - name: Verify generated evaluation evidence matches the public page
+        run: node scripts/build-evals-page.mjs evals/quality/results/2026-09-13-v2.json --check
       - run: npm run test:browser
       - run: npm run test:site:browser
       - name: Validate the separately packaged Chat sidebar

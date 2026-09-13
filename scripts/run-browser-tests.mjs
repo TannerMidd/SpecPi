@@ -42,6 +42,7 @@ async function main() {
             "--test",
             "--test-reporter=tap",
             path.join(root, "tests", mode === "site" ? "site-browser.test.mjs" : "browser-extension.test.mjs"),
+            ...(mode === "site" ? [path.join(root, "tests", "quality-browser.test.mjs")] : []),
         ],
         {
             cwd: root,

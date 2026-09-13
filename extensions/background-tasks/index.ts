@@ -56,7 +56,12 @@ export default function registerBackgroundTasks(
                     request.id ? verification.resolve(request.id, request.root) : verification.list(request.root),
                 );
             } catch {
-                request.reply({ status: "unknown", reason: "Receipt workspace unavailable." });
+                // Match the requested shape: a list caller expects an array, and an
+                // unreadable workspace must read as no current evidence, not as one
+                // unknown receipt.
+                request.reply(
+                    request.id ? { id: request.id, status: "unknown", reason: "Receipt workspace unavailable." } : [],
+                );
             }
         });
     };
@@ -184,12 +189,15 @@ export default function registerBackgroundTasks(
                 }
 
                 const spec = binding?.spec ?? normalizeStart(input, ctx.cwd);
-                const before = binding ? captureInputs(binding.root, binding.inputs) : undefined;
                 const policy = admission(spec, ctx.hasUI);
+                // Decide admission before reading anything: a capture failure on a
+                // denied command would otherwise hide the denial behind a
+                // filesystem message and invite a retry with narrower inputs.
                 if (policy.action === "deny") {
                     throw new Error(preview(policy.reason));
                 }
 
+                const before = binding ? captureInputs(binding.root, binding.inputs) : undefined;
                 const epoch = generation;
                 const key = fingerprint({ spec, policy, generation: epoch, binding, before: before?.digest });
                 const abort = AbortSignal.any([lifecycle.signal, ...(signal ? [signal] : [])]);
@@ -210,7 +218,7 @@ export default function registerBackgroundTasks(
                                 finite
                                     ? "Run verification command for this session?"
                                     : "Start background command for this session?",
-                                `Shell: ${preview(spec.shell)}\nCwd: ${preview(spec.cwd, LIMITS.cwd)}\nCommand: ${preview(spec.command, LIMITS.command)}\nTimeout: ${spec.timeoutSeconds}s\nGuard: ${preview(policy.mode)} — ${preview(policy.reason)}${binding ? `\nDeclared inputs (workspace relative): ${binding.inputs.map((value: string) => preview(value, 240)).join(", ")}\nInput snapshot: ${before?.digest}\nInclude source, tests, configuration and lockfiles that affect this check. Only these inputs are tracked.` : ""}\nRuns with your permissions and inherited environment. Not a sandbox. Approves this exact execution for this session; output may enter conversation/provider retention.`,
+                                `Shell: ${preview(spec.shell)}\nCwd: ${preview(spec.cwd, LIMITS.cwd)}\nCommand: ${preview(spec.command, LIMITS.command)}\nTimeout: ${spec.timeoutSeconds}s\nGuard: ${preview(policy.mode)} — ${preview(policy.reason)}${binding ? `\nDeclared inputs (workspace relative): ${binding.inputs.map((value: string) => preview(value, 240)).join(", ")}\nInput snapshot: ${before?.digest}${before?.skipped ? `\nSkipped inside declared directories: ${before.skipped} excluded entr${before.skipped === 1 ? "y" : "ies"} (dependency trees, caches, credential filenames). These are not covered by this receipt.` : ""}\nInclude source, tests, configuration and lockfiles that affect this check. Only these inputs are tracked.` : ""}\nRuns with your permissions and inherited environment. Not a sandbox. Approves this exact execution for this session; output may enter conversation/provider retention.`,
                                 { signal: promptSignal },
                             ),
                             cancelled,
@@ -227,10 +235,10 @@ export default function registerBackgroundTasks(
                 abort.throwIfAborted();
                 const currentBinding = finite ? await verificationBinding(input, ctx.cwd) : undefined;
                 const current = currentBinding?.spec ?? normalizeStart(input, ctx.cwd);
+                const currentPolicy = admission(current, ctx.hasUI);
                 const currentBefore = currentBinding
                     ? captureInputs(currentBinding.root, currentBinding.inputs)
                     : undefined;
-                const currentPolicy = admission(current, ctx.hasUI);
                 if (
                     !active ||
                     !ctx.hasUI ||
@@ -268,10 +276,13 @@ export default function registerBackgroundTasks(
                 }
 
                 if (!active || epoch !== generation) {
+                    // Same shape the registry returns, so a caller can read `status`
+                    // without first working out which branch produced the result.
                     return result({
-                        outcome,
-                        receipt: null,
+                        id: started.id,
+                        status: "unknown",
                         reason: "Verification session or policy changed; no live receipt was retained.",
+                        outcome,
                     });
                 }
 

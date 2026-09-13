@@ -851,6 +851,71 @@ const humanChecksCleared =
     entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract.requiredChecks
         .length === 0;
 
+// Removing even part of a check's requirement links needs explicit human consent.
+const relinkSnapshot = captureInputs(repository, binding.inputs);
+const relinkReceipt = registry.add(
+    binding,
+    relinkSnapshot,
+    relinkSnapshot,
+    { status: "exited", exitCode: 0, cleanup: "confirmed", reason: "command exited" },
+    {},
+);
+editorValue = JSON.stringify([{ id: "C1", label: "Check", receiptId: relinkReceipt.id, requirementIds: ["R1"] }]);
+await commands.get("task").handler("checks", ctx);
+const boundBeforeRename =
+    entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract.requiredChecks
+        .length === 1;
+const beforeRenameDigest = entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data
+    .contract.digest;
+const checkRemovalPrompts: string[] = [];
+ctx.ui.confirm = async (_title: string, body: string) => {
+    checkRemovalPrompts.push(body);
+
+    return false;
+};
+
+editorValue =
+    "Objective: Verify required check behavior\nRequirements:\n- R1-auth: Observe required check\n  Acceptance: A live check passed\nPaths:\n- src/\n";
+await commands.get("task").handler("set", ctx);
+const renameDeclinedKeptGates =
+    entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract.digest ===
+        beforeRenameDigest && checkRemovalPrompts.at(-1)?.includes("C1 → R1");
+ctx.ui.confirm = async () => true;
+await commands.get("task").handler("set", ctx);
+const renamed = entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract;
+const renameKeptEdit =
+    boundBeforeRename && renamed.requirements[0].id === "R1-auth" && renamed.requiredChecks.length === 0;
+const renameWarnedAboutDroppedChecks = /required check link\(s\) explicitly removed/u.test(
+    notifications.at(-1)?.message ?? "",
+);
+editorValue =
+    "Objective: Partial check links\nRequirements:\n- R1: First\n  Acceptance: Check first\n- R2: Second\n  Acceptance: Check second\nPaths:\n- src/\n";
+await commands.get("task").handler("set", ctx);
+editorValue = JSON.stringify([{ id: "C1", label: "Both", receiptId: relinkReceipt.id, requirementIds: ["R1", "R2"] }]);
+await commands.get("task").handler("checks", ctx);
+ctx.ui.confirm = async (_title: string, body: string) => {
+    checkRemovalPrompts.push(body);
+
+    return false;
+};
+
+editorValue =
+    "Objective: Partial check links\nRequirements:\n- R1: First\n  Acceptance: Check first\n- R2-auth: Second\n  Acceptance: Check second\nPaths:\n- src/\n";
+await commands.get("task").handler("set", ctx);
+const partialRemovalNeedsConsent =
+    checkRemovalPrompts.at(-1)?.includes("C1 → R2") &&
+    entries.filter((entry) => entry.customType === "specpi-task-contract").at(-1).data.contract.requiredChecks[0]
+        .requirementIds.length === 2;
+ctx.ui.confirm = async () => {
+    await runHandlers("session_tree");
+
+    return true;
+};
+
+const entriesBeforeRemovalRace = entries.length;
+await commands.get("task").handler("set", ctx);
+const changedSessionRejectsRemoval = entries.length === entriesBeforeRemovalRace;
+
 process.stdout.write(
     `WORKFLOW_CONTROLS_HARNESS=${JSON.stringify({
         commands: [...commands.keys()].sort(),
@@ -860,6 +925,11 @@ process.stdout.write(
         liveCheckReady,
         restoredCheckSummaryHistorical,
         humanChecksCleared,
+        renameKeptEdit,
+        renameWarnedAboutDroppedChecks,
+        renameDeclinedKeptGates,
+        partialRemovalNeedsConsent,
+        changedSessionRejectsRemoval,
         nestedCwdOutOfScopeDenied,
         nestedCwdInScopeAllowed,
         denied,

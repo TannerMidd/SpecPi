@@ -26,6 +26,11 @@ test("workflow-controls extension composes scope and completion challenge lifecy
         "liveCheckReady",
         "restoredCheckSummaryHistorical",
         "humanChecksCleared",
+        "renameKeptEdit",
+        "renameWarnedAboutDroppedChecks",
+        "renameDeclinedKeptGates",
+        "partialRemovalNeedsConsent",
+        "changedSessionRejectsRemoval",
     ]) {
         assert.equal(report[key], true, key);
     }

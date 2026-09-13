@@ -1077,7 +1077,43 @@ export default function workflowControls(pi: ExtensionAPI) {
                     }
 
                     const card = parseTaskContractCard(edited);
-                    card.requiredChecks = current?.requiredChecks ?? [];
+                    // Changing a requirement ID must not silently remove its gate.
+                    // Show every affected link, including checks that retain others.
+                    const editedIds = new Set(
+                        card.requirements.map((requirement: any, index: number) =>
+                            requirement.id ? String(requirement.id) : `R${index + 1}`,
+                        ),
+                    );
+                    const relinked = (current?.requiredChecks ?? []).map((check: any) => ({
+                        ...check,
+                        requirementIds: check.requirementIds.filter((id: string) => editedIds.has(id)),
+                    }));
+                    const removedLinks = (current?.requiredChecks ?? []).flatMap((check: any) =>
+                        check.requirementIds
+                            .filter((id: string) => !editedIds.has(id))
+                            .map((id: string) => `${check.id} → ${id}`),
+                    );
+                    if (removedLinks.length) {
+                        const confirmed = await ctx.ui.confirm(
+                            "Remove required check links from this task?",
+                            `This revision removes these verification requirements:\n${removedLinks.join("\n")}\nRenamed requirements will have no replacement link. Cancel to keep the existing task, or confirm removal and use /task checks to select new links.`,
+                        );
+                        if (!sessionIsCurrent(origin, ctx)) {
+                            return;
+                        }
+
+                        if (refreshTaskContract(ctx, root)?.digest !== current?.digest) {
+                            throw new Error("Task changed while confirming check removal; reopen /task set.");
+                        }
+
+                        if (confirmed !== true) {
+                            ctx.ui.notify("Task revision cancelled; existing required checks were preserved.", "info");
+
+                            return;
+                        }
+                    }
+
+                    card.requiredChecks = relinked.filter((check: any) => check.requirementIds.length > 0);
                     const contractOrigin = current?.origin === "improvement" ? "improvement" : "human";
                     const contract = createTaskContract(card, {
                         root,
@@ -1090,8 +1126,12 @@ export default function workflowControls(pi: ExtensionAPI) {
                     });
                     persistTaskContract(contract, ctx, "task contract revised by human");
                     ctx.ui.notify(
-                        `Task contract set: ${contract.objective} (${contract.requirements.length} requirement(s)).`,
-                        "info",
+                        `Task contract set: ${contract.objective} (${contract.requirements.length} requirement(s)).${
+                            removedLinks.length
+                                ? ` ${removedLinks.length} required check link(s) explicitly removed; run /task checks to select replacement links.`
+                                : ""
+                        }`,
+                        removedLinks.length ? "warning" : "info",
                     );
 
                     return;

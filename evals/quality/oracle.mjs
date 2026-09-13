@@ -4,10 +4,20 @@ import path from "node:path";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 import { qualityTask } from "./fixtures.mjs";
+import { challengeOracles, evaluateChallenge } from "./challenge-oracle.mjs";
+import { evaluateRepository, repositoryOracleIds } from "./repository-oracle.mjs";
 
 export async function evaluateTask(id, directory, { chromium } = {}) {
     const root = path.resolve(directory);
     const task = qualityTask(id);
+    if (Object.hasOwn(challengeOracles, id)) {
+        return evaluateChallenge(id, root, { chromium });
+    }
+
+    if (repositoryOracleIds.includes(id)) {
+        return evaluateRepository(id, root);
+    }
+
     const load = (file) => import(pathToFileURL(path.join(root, file)).href);
     if (id === "page-boundary") {
         const { pageInfo } = await load("main.mjs");
@@ -122,6 +132,10 @@ export async function evaluateTask(id, directory, { chromium } = {}) {
             server.closeAllConnections();
             await new Promise((resolve) => server.close(resolve));
         }
+    } else {
+        // A judge that accepts what it cannot assess is not a judge. Membership in
+        // tasks.mjs is not an acceptance oracle.
+        throw new Error(`No acceptance oracle is defined for task ${id}.`);
     }
 
     return { task: id, acceptance: "passed", maintainability: "requires-human-review" };

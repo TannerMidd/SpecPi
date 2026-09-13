@@ -291,6 +291,11 @@ export class TaskRunner {
             ring: new OutputRing(),
             rootExited: false,
         };
+        // Resolved exactly when cleanup leaves "pending", so waiters can await the
+        // transition instead of polling for it.
+        task.finished = new Promise((resolve) => {
+            task.finish = resolve;
+        });
         // Reserve synchronously before any await, including supervisor startup.
         this.tasks.set(task.id, task);
         let settle;
@@ -396,6 +401,7 @@ export class TaskRunner {
             }
 
             task.cleanup = confirmed ? "confirmed" : "unconfirmed";
+            task.finish?.();
             task.status = !confirmed
                 ? "cleanup-unconfirmed"
                 : task.failed
@@ -436,8 +442,8 @@ export class TaskRunner {
                 abort();
             }
 
-            while (task.cleanup === "pending") {
-                await delay(20);
+            if (task.cleanup === "pending") {
+                await task.finished;
             }
 
             return this.summary(task);

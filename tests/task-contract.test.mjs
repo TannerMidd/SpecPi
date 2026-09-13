@@ -58,6 +58,36 @@ test("task contracts canonicalize text and return immutable verified clones", ()
         assert.match(markdown, /Requirements \(2\)/);
         assert.match(markdown, /R2/);
 
+        const checked = createTaskContract(
+            {
+                ...card(),
+                requiredChecks: [
+                    {
+                        id: "unit",
+                        label: "Unit tests",
+                        specDigest: "a".repeat(64),
+                        inputs: ["src/"],
+                        requirementIds: ["R1"],
+                    },
+                ],
+            },
+            { root, origin: "human", id: "task-checked" },
+        );
+        // Sections keep their order: required checks sit between the requirements
+        // they prove and the declared paths.
+        const sections = renderTaskContract(checked)
+            .split("\n")
+            .filter((line) => line.startsWith("### "));
+        assert.deepEqual(sections, [
+            "### Objective",
+            "### Hypothesis",
+            "### Requirements (2)",
+            "### Required checks",
+            "### Paths",
+            "### Rollback",
+            "### Non-goals",
+        ]);
+
         const hostilePath = "evil\nline\u2028format\u202epercent%tick`name.ts";
         const safePathLabel = markdownPathLabel(hostilePath);
         assert.doesNotMatch(safePathLabel, /[\r\n\u2028\u202e`]/u);

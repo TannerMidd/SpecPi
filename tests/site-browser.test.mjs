@@ -8,6 +8,59 @@ import { startSiteServer, checkRenderedPage } from "../scripts/site-browser.mjs"
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const enabled = process.env.SPECPI_BROWSER_TESTS === "1";
+
+test(
+    "evaluation catalog filters, reset, downloads and script-free content work",
+    { skip: !enabled, timeout: 60000 },
+    async () => {
+        await withBrowser(async (browser, origin) => {
+            const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+            try {
+                await page.goto(`${origin}/SpecPi/evals/`);
+                const rows = page.locator("[data-eval-task]:visible");
+                assert.equal(await rows.count(), 32);
+                await page.getByLabel("Difficulty", { exact: true }).selectOption("hard");
+                assert.equal(await rows.count(), 12);
+                await page.getByLabel("Task type", { exact: true }).selectOption("yes");
+                assert.equal(await rows.count(), 0);
+                await page.getByLabel("Find a task", { exact: true }).fill("no matching task");
+                assert.equal(await rows.count(), 0);
+                assert.equal(await page.locator("[data-eval-count]").textContent(), "Showing 0 of 32 tasks.");
+                await page.getByRole("button", { name: "Reset filters" }).click();
+                assert.equal(await rows.count(), 32);
+                await page.getByLabel("Find a task", { exact: true }).fill("browser");
+                assert.equal(await rows.count(), 3);
+                await page.getByRole("button", { name: "Reset filters" }).click();
+                for (const file of ["results.json", "trials.csv"]) {
+                    const link = page.locator(`a[download][href="./${file}"]`);
+                    assert.equal(await link.count(), 1);
+                    const response = await page.request.get(`${origin}/SpecPi/evals/${file}`);
+                    assert.equal(response.status(), 200);
+                    if (file.endsWith("json")) {
+                        assert.equal((await response.json()).runs.length, 384);
+                    } else {
+                        assert.equal((await response.text()).trim().split("\n").length, 385);
+                    }
+                }
+            } finally {
+                await page.close();
+            }
+
+            const context = await browser.newContext({
+                javaScriptEnabled: false,
+                viewport: { width: 390, height: 844 },
+            });
+            try {
+                const staticPage = await context.newPage();
+                await staticPage.goto(`${origin}/SpecPi/evals/`);
+                assert.equal(await staticPage.locator("[data-eval-task]:visible").count(), 32);
+                assert.equal(await staticPage.locator("[data-eval-filters]").isVisible(), false);
+            } finally {
+                await context.close();
+            }
+        });
+    },
+);
 async function withBrowser(operation) {
     const server = await startSiteServer();
     let browser;
@@ -30,7 +83,7 @@ test(
                 ...VIEWPORT_PRESETS,
                 fullDesktop: { width: 1920, height: 1080 },
             })) {
-                for (const { route, theme } of ["", "wiki/", "single-agent/", "why-pi/"].flatMap((route) =>
+                for (const { route, theme } of ["", "wiki/", "single-agent/", "why-pi/", "evals/"].flatMap((route) =>
                     ["light", "dark"].map((theme) => ({ route, theme })),
                 )) {
                     await t.test(`${name} ${theme}: /SpecPi/${route}`, async () => {

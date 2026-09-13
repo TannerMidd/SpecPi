@@ -492,11 +492,8 @@ export function renderTaskContract(contract) {
         );
     }
 
-    lines.push("", "### Paths");
     if (validated.requiredChecks?.length) {
-        lines.splice(
-            lines.length - 2,
-            0,
+        lines.push(
             "",
             "### Required checks",
             ...validated.requiredChecks.map(
@@ -506,6 +503,7 @@ export function renderTaskContract(contract) {
         );
     }
 
+    lines.push("", "### Paths");
     lines.push(
         ...(validated.paths.length > 0
             ? validated.paths.map((value) => `- \`${markdownPathLabel(value)}\``)

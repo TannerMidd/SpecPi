@@ -1,8 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
+import { challengeReference } from "./challenge-reference.mjs";
+import { repositorySources, repositoryMutations } from "./repository-tasks.mjs";
 
 // Oracle qualification only. Never placed in model fixtures or used as a candidate answer.
 export function applyReferenceRepair(id, root) {
+    const mutation = repositoryMutations[id];
+    const files = mutation ? { [mutation.path]: repositorySources.files[mutation.path] } : challengeReference[id];
+    if (files) {
+        for (const [name, content] of Object.entries(files)) {
+            fs.writeFileSync(path.join(root, name), content);
+        }
+
+        return;
+    }
+
     const change = (file, before, after) => {
         const target = path.join(root, file);
         const source = fs.readFileSync(target, "utf8");

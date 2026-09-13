@@ -1,82 +1,69 @@
-# Quality tooling evaluation results
+# Quality evaluation results
 
-The September 13, 2026 screen found **no defect-detection or behavioral-acceptance advantage** for the review skill or anchored editing over their controls. Keep review explicitly invoked and leave anchored editing uninstalled. The production additions focus on observed check evidence, freshness and selected editor context; this experiment does not measure their effect on overall coding accuracy.
+The September 13, 2026 expanded comparison covers **32 tasks and 384 selected trials**, using `gpt-6-astra` at medium reasoning through Codex CLI 0.153.1 and the user's ChatGPT subscription. Review remains explicitly selected and anchored editing remains an uninstalled experiment. These are behavioral results on supplied JavaScript fixtures, not a measure of general coding accuracy or of the installed verification/context features.
 
-## Scope and reproducibility
+All four conditions passed 96/96 trials with no edit rejections. The expanded suite still saturates: it establishes no behavioral advantage for the review skill or anchored editing and does not establish general equivalence. Keep review optional and the anchored experiment uninstalled.
 
-Two frozen comparisons each ran eight synthetic tasks three times in two conditions: 96 completed runs, 48 per comparison. A separate two-run review pilot is excluded. The model was `gpt-6-astra`, medium reasoning, through Codex CLI 0.153.1 using the user's ChatGPT subscription. The native editing backend was Pi 0.84.4's actual multiple-replacement edit implementation. Both comparisons completed without model-call failures, recovery responses, native Codex tool events or human interventions.
+## Measured outcomes
 
-The [protocol](quality-evaluation.md) defines the tasks, independent oracles, ordering and limits. The [sanitized result archive](../evals/quality/results/2026-09-13.json) contains all 96 per-run records, token counts, timings, prompt/source/fixture hashes, review findings and all 18 distinct final fixture variants. It excludes host paths and private state. The original requests and seed files are in [tasks.mjs](../evals/quality/tasks.mjs). Source hashes were checked against both frozen manifests before export. Baseline repository revision: `6f63ef8fdfff7f5409fdf71f6e5f1362a61aedd6`.
+| Condition | Passed / valid trials | Tasks passing all 3 | Median model time | Edit rejections | Controls flagged | Controls edited |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Generic review + repair | 96 / 96 | 32 / 32 | 26.31 s | 0 | 0 | 0 |
+| SpecPi review + repair | 96 / 96 | 32 / 32 | 28.37 s | 0 | 0 | 0 |
+| Pi native editing | 96 / 96 | 32 / 32 | 13.23 s | 0 | 0 | 0 |
+| Anchored experiment | 96 / 96 | 32 / 32 | 12.93 s | 0 | 0 | 0 |
 
-All reported assessment of findings and diffs below is **agent inspection**, not a completed blinded human maintainability review. Human review remains part of the PR.
+Each condition has 96 trials, including 12 negative-control trials. Controls flagged/edited are observations, not automatically false positives or regressions. Findings and maintainability require human assessment. Model time sums response time within a trial, includes provider scheduling, and excludes grading. Subscription dollar cost is unavailable; token fields and missing-value counts are retained in the archive. Timing is descriptive, not a causal speed estimate.
 
-## Review: optional skill versus a short concrete-review prompt
+| Comparison | Difficulty | Candidate only passes | Baseline only passes | Both pass | Both fail |
+| --- | --- | ---: | ---: | ---: | ---: |
+| review | All | 0 | 0 | 96 | 0 |
+| review | easy | 0 | 0 | 24 | 0 |
+| review | medium | 0 | 0 | 36 | 0 |
+| review | hard | 0 | 0 | 36 | 0 |
+| editing | All | 0 | 0 | 96 | 0 |
+| editing | easy | 0 | 0 | 24 | 0 |
+| editing | medium | 0 | 0 | 36 | 0 |
+| editing | hard | 0 | 0 | 36 | 0 |
 
-| Measure | Baseline | `specpi-review` |
-| --- | ---: | ---: |
-| Seeded issue cases identified | 21 / 21 | 21 / 21 |
-| Intentional-interface controls left unflagged | 3 / 3 | 3 / 3 |
-| Unsupported findings identified in agent inspection | 0 | 0 |
-| Responses explicitly describing review limitations | 3 / 24 | 24 / 24 |
-| Findings returned | 26 | 24 |
-| Median model-response time | 10.81 s | 12.24 s |
-| Reported input tokens, total | 399,700 | 408,626 |
-| Reported cached input tokens, total | 117,760 | 153,088 |
-| Reported output tokens, total | 3,161 | 4,186 |
-| Reported reasoning output tokens, total | 544 | 649 |
+The candidate is the review skill or anchored editor. Three repetitions share a task, and some cases share public-module context; these are descriptive paired counts, not independent population samples or significance estimates. Difficulty labels describe task design rather than calibrated model difficulty.
 
-Both conditions identified the pagination, zero-default, caller-migration, containment, stale-receipt, browser-persistence and shared-label issues on every repetition. Both also found the browser's separate whitespace/blank-input defect. The baseline split one coordinated caller migration into three findings; that accounts for its larger finding count, not additional defect coverage. All six stale-receipt reviews disclosed the deliberately unrelated baseline failure.
+## Coverage and qualification
 
-The skill consistently stated what was inspected and that runtime evidence was absent. This is useful reporting behavior, with extra response length and latency. The screen does not establish that it repairs more defects or reduces a maintainer's review effort. Ship it as a human-selected review aid, with no automatic review loop or automatic rewriting.
+The suite contains 8 easy, 12 medium and 12 hard tasks: text/byte boundaries, parsing, multi-file migration, cancellation, cache and worker races, rollback, streaming and public interfaces. Three tasks exercise actual Chromium flows. Four seed regressions into public MIT-licensed SpecPi modules frozen at commit `00b952eefc6ebb40e884860cc1475d75cfe29ed0`. They are not historical issue-resolution benchmarks or four independent repositories.
 
-## Editing: native multiple replacements versus snapshot anchors
+The corrected qualification rejects all 28 defective seeds and all 32 deliberately wrong repairs, accepts all four unchanged controls, and accepts all 32 reference outcomes (28 repairs and four unchanged controls). Passing those checks is evidence about the graders' selected cases, not exhaustive requirement coverage.
 
-| Measure | Pi native | Anchored candidate |
-| --- | ---: | ---: |
-| Independent behavioral acceptance | 24 / 24 | 24 / 24 |
-| Rejected edit calls | 0 | 0 |
-| Recovery responses | 0 | 0 |
-| Negative-control fixtures left byte-for-byte unchanged | 3 / 3 | 3 / 3 |
-| Unrelated baseline-test files preserved | 3 / 3 | 3 / 3 |
-| Unexpected file targets | 0 | 0 |
-| Median model-response time | 9.64 s | 10.80 s |
-| Reported input tokens, total | 391,584 | 407,925 |
-| Reported cached input tokens, total | 35,328 | 59,520 |
-| Reported output tokens, total | 3,644 | 4,976 |
-| Reported reasoning output tokens, total | 584 | 708 |
+## Correction, interruptions and exclusions
 
-| Task | Native acceptance | Anchored acceptance | Inspection of final changes |
-| --- | ---: | ---: | --- |
-| Page boundary | 3 / 3 | 3 / 3 | Same single comparison correction |
-| Explicit zero | 3 / 3 | 3 / 3 | Same nullish-default correction |
-| Caller migration | 3 / 3 | 3 / 3 | Same formatter and both caller updates |
-| Path containment | 3 / 3 | 3 / 3 | Equivalent boundary predicates within the stated POSIX input contract |
-| Receipt freshness | 3 / 3 | 3 / 3 | All detect declared-input changes; five repairs introduce general recursive comparison and one uses Node's deep equality |
-| Browser persistence | 3 / 3 | 3 / 3 | All pass real Chromium reload, blank input and safe-text checks; storage-key and formatting differences |
-| Existing reuse | 3 / 3 | 3 / 3 | Same reuse of the existing formatter; no duplicated mapping |
-| Intentional interface | 3 / 3 | 3 / 3 | No changes |
+Model findings exposed a real bug in `lazy-iterator`, initially mislabeled a negative control: an exception from iterator cleanup replaced the original source exception. Local reproduction confirmed it. The grader and reference were corrected and the task reclassified. The model request, supplied files, tool implementations and fixture digest stayed unchanged. All final outputs were regraded under the corrected revision without additional model repair calls. The archive retains the original outcome beside the corrected outcome.
 
-Agent inspection found no unrelated file edits or broken intentional interfaces. The receipt-freshness repairs are broader than a comparison specialized to the declared string-map contract; the fixture prompt does not show a complete receipt schema, which may encourage general comparison. Treat that as a maintainability question and fixture limitation, not as evidence that passing checks establish optimal code quality. All six editing responses disclosed the unrelated failure and preserved its bytes.
+No final acceptance outcome changed after the corrected grader was applied.
 
-The anchored candidate achieved no acceptance or recovery improvement and used more output tokens with higher median latency in this screen. It remains a pure, uninstalled experiment. Unit coverage for stale hashes, overlapping ranges, duplicate lines, BOM, CRLF and Unicode supports its buffer behavior only. Production Command Guard, scope interception, file-race handling and platform integration have not been established for an anchored tool; no production adapter or setting is enabled.
+The full batches had 2 invalid provider/protocol attempts:
 
-## Implementation decisions
+- review: `122-repo-output-streams-baseline-r2`, Codex evaluation failed (1): Codex reported a failed turn or stream error. Retained separately and replaced by the first valid continuation attempt.
+- editing: `181-browser-search-race-native-r3`, Codex evaluation failed (0): Codex reported a failed turn or stream error. Retained separately and replaced by the first valid continuation attempt.
 
-| Recommendation | Result | Basis and remaining limit |
+Four pilot review trials were excluded before the full schedule. Continuations retained every valid pass and failure and ran only missing/invalid trials; none of the completed behavioral failures was retried. Parent manifests, all source epochs, retained result hashes and invalid-call metrics remain in the sanitized archive. The continuation counter records an operator intervention, not a blinded human review. All assessment reported here is agent inspection.
+
+## Reproducibility and decisions
+
+The [complete v2 archive](../evals/quality/results/2026-09-13-v2.json) contains all 384 selected outcomes, invalid attempts, prompt/source fingerprints, phase metrics, findings, per-case grades and 162 distinct final fixture variants as deduplicated text. Export reconstructed and graded every distinct variant in a fresh directory. It checked final-file hashes and refused duplicate valid trials or incomplete schedules. Portable source hashes tolerate Git's CRLF/LF checkout conversion while raw generation hashes remain preserved.
+
+See the [protocol and replay commands](quality-evaluation.md) and the [evaluations page](https://tannermidd.github.io/SpecPi/evals/), which provides the catalog, tables, JSON and CSV. Raw provider traces, host paths and private state are excluded.
+
+| Feature | Decision | Remaining evidence needed |
 | --- | --- | --- |
-| Reproducible evaluation before promotion | Implemented | Eight independent fixtures, control/candidate repeats and retained evidence; broader real tasks are needed before claiming general accuracy |
-| Explicit correctness/simplicity review | Implemented and installed as a manual skill | Tied detection, more explicit limitations; human chooses when the cost is worthwhile |
-| Finite checks with runtime receipts | Implemented as `verify_run` | Existing runner and Guard admission; bounded declared-input hashes, observed output/exit/cleanup, no model-created pass receipts |
-| Human-selected required checks | Implemented as `/task checks` | Checks bind to original requirements and task digest; challenge submission and handoff revalidate current inputs; restored summaries remain historical |
-| Selected editor diagnostics and symbol context | Implemented in VS Code | Existing providers and attachment transport; previews and stale-buffer rejection; cached diagnostics are not a typecheck result |
-| Anchored editing | Experiment completed; not promoted | No observed quality or recovery advantage over native editing |
+| Explicit review skill | Keep manually selected | Human review burden and maintainability on real changes; this comparison does not justify an automatic review loop |
+| Native Pi editor | Keep as the production editor | Realistic discovery and mutation workflows remain outside the adapter |
+| Anchored editing | Keep uninstalled | Repeatable gains plus production Guard, scope, stale-file and transaction validation before promotion |
+| Verification receipts and required checks | Keep observed-evidence gates and the reviewed fixes | Their overall model-quality effect was not measured by this supplied-context experiment |
+| Selected editor context | Keep explicit previews and stale-buffer checks | Measure useful context and error reduction on real workspace tasks |
+| Evaluation suite | Keep as a bounded regression screen | Broader real-repository tasks, blind holdouts and less prompt-explicit discovery; avoid interpreting saturated cases as equivalence |
 
-Runtime regression coverage includes nonzero exit, timeout, cancellation, cleanup uncertainty, stale/missing inputs, source/test/config changes, bounds, private paths and links, session/policy invalidation, receipt eviction, newer failure after an older pass, forged or ambiguous provenance, task selection and schema-1 compatibility. Installer fixtures use disposable Pi state; packaged resources are loaded by pinned Pi. Editor unit/controller tests and a real VS Code host exercise diagnostics, definitions, references, previews and stale-send rejection. CI also runs the runner and verification regressions on macOS and Windows, alongside the full Linux suite.
+## Earlier eight-task screen
 
-## Interpretation limits
+The original [96-trial archive](../evals/quality/results/2026-09-13.json) and [original report at its recorded commit](https://github.com/TannerMidd/SpecPi/blob/00b952eefc6ebb40e884860cc1475d75cfe29ed0/docs/quality-results.md) remain separate. Both review conditions identified 21/21 seeded issues and left 3/3 intentional-interface controls unflagged; both editors passed 24/24 behavioral trials. Version 1 measured review findings, while version 2 measures review followed by repair. The results are not pooled.
 
-These small, prompt-explicit tasks saturated both controls. Three repetitions per task do not establish equivalence or estimate real-repository accuracy. Requests largely describe the intended bug; supplied files represent a synthetic proposed change rather than realistic discovery through repository history. Review did not include an implement-review-repair cycle. The anchored screen did not force model recovery from injected concurrent edits; stale-buffer behavior is separately unit tested.
-
-The Codex response adapter retains CLI system context and service scheduling. Its native tools were instructed off rather than disabled; none appeared in the recorded calls. Tokens include the CLI's context and should not be interpreted as fixture-only prompt size. Cached and reasoning token fields are reported separately as the CLI returned them, not added to totals. Subscription dollar cost is unavailable; API prices were not substituted. Timing is descriptive and cannot establish a causal speed difference.
-
-Keep the existing native editor, collect evidence from real use, and require a fresh, frozen comparison plus production boundary tests before revisiting anchored-tool promotion. See [quality-evidence.md](quality-evidence.md) for using the implemented features and their trust boundaries.
+This adapter supplies the complete task context and instructs native Codex tools off; it does not enforce adversarial read isolation or test full Pi conversations, long-running work, other languages, repository exploration or production editing safety. The independent runtime, installer, provider and editor regression suites remain release requirements, not evidence of a general accuracy gain.

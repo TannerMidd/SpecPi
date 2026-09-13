@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "evals/quality/**"
+      - "scripts/*quality*"
+      - "scripts/build-evals-page.mjs"
+      - "tests/quality*"
       - "extensions/browser/**"
       - "browser-runtime/**"
       - "tests/*browser*"
