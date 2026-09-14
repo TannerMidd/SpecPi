@@ -79,15 +79,17 @@ test("Pi harness preserves an explicit agent directory two levels below temporar
             "fake-pi.mjs",
             [
                 'import fs from "node:fs";',
+                'import os from "node:os";',
                 'fs.writeFileSync(`${process.env.PI_CODING_AGENT_DIR}/seen.txt`, "ok\\n");',
-                'const environmentNames = ["HOME", "USERPROFILE", "TEMP", "TMP", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME"];',
+                'const environmentNames = ["HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME"];',
                 "const environment = Object.fromEntries(environmentNames.map((name) => [name, process.env[name]]));",
-                "console.log(`PI_HARNESS_PROBE=${JSON.stringify({ agentDir: process.env.PI_CODING_AGENT_DIR, environment })}`);",
+                "console.log(`PI_HARNESS_PROBE=${JSON.stringify({ agentDir: process.env.PI_CODING_AGENT_DIR, temporaryDirectory: os.tmpdir(), environment })}`);",
             ].join("\n"),
         );
         const result = runPiFixture(fixture, {
             piCommand: cli,
             agentDir,
+            env: { TMPDIR: path.join(root, "ambient-temporary-directory") },
         });
 
         assert.equal(result.unavailable, false);
@@ -96,11 +98,13 @@ test("Pi harness preserves an explicit agent directory two levels below temporar
         const probe = readMarker(result.stdout);
         const environmentRoot = fs.realpathSync.native(runDirectory);
         assert.equal(probe.agentDir, agentDir);
+        assert.equal(probe.temporaryDirectory, environmentRoot);
         assert.deepEqual(probe.environment, {
             HOME: environmentRoot,
             USERPROFILE: environmentRoot,
             TEMP: environmentRoot,
             TMP: environmentRoot,
+            TMPDIR: environmentRoot,
             APPDATA: path.join(environmentRoot, "AppData", "Roaming"),
             LOCALAPPDATA: path.join(environmentRoot, "AppData", "Local"),
             XDG_CONFIG_HOME: path.join(environmentRoot, ".config"),

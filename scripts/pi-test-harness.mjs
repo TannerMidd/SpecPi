@@ -151,6 +151,7 @@ function createChildEnvironment(environmentRoot, agentDir, overrides) {
 
     environment.TEMP = environmentRoot;
     environment.TMP = environmentRoot;
+    environment.TMPDIR = environmentRoot;
     fs.mkdirSync(environment.APPDATA, { recursive: true });
     fs.mkdirSync(environment.LOCALAPPDATA, { recursive: true });
     fs.mkdirSync(environment.XDG_CONFIG_HOME, { recursive: true });
