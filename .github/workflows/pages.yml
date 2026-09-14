@@ -5,15 +5,10 @@ on:
     branches: [main]
     paths:
       - "site/**"
-      - "extensions/browser/**"
-      - "browser-runtime/**"
-      - "tests/*browser*"
-      - "tests/site*"
-      - "tests/fixtures/browser*"
-      - "scripts/*browser*"
+      - "scripts/check-site.mjs"
+      - "templates/settings.json"
       - "package.json"
-      - "tsconfig.browser.json"
-      - ".github/workflows/browser-tests.yml"
+      - "vscode/package.json"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -25,11 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rendered-check:
-    uses: ./.github/workflows/browser-tests.yml
-
   deploy:
-    needs: rendered-check
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -41,6 +32,16 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+      - name: Install pinned development tools
+        run: npm install --ignore-scripts --omit=peer --no-package-lock
+      - name: Install browser
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Check content and layouts
+        run: npm run check:site
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

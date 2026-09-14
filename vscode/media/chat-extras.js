@@ -97,6 +97,10 @@
         let delegateContext;
         let delegateStatus = "";
         function workerLabel(job) {
+            if (job.source === "pi-subagents") {
+                return "Active";
+            }
+
             if (job.settling && !["running", "queued"].includes(job.state)) {
                 return ["complete", "partial", "needs_context"].includes(job.state) ? "Finishing" : "Stopping";
             }
@@ -143,10 +147,24 @@
             const view = state.delegation;
             const connected = ["ready", "busy", "retrying", "compacting"].includes(state.status);
             const allJobs = connected && Array.isArray(view?.jobs) ? view.jobs.slice(0, 8) : [];
+            const fleet = connected ? state.subagents : undefined;
+            const fleetJobs = (fleet?.entries || []).slice(0, 16).map((entry) => ({
+                source: "pi-subagents",
+                id: entry.key,
+                batchId: "pi-subagents",
+                attemptId: "display",
+                mode: entry.agent,
+                state: "running",
+                task: entry.goal,
+                model: entry.model,
+                effort: entry.effort,
+                tokens: entry.tokens.total,
+                elapsedMs: entry.startedAt ? Math.max(0, Date.now() - entry.startedAt) : 0,
+            }));
             const liveJobs = allJobs.filter((job) => job.state === "running" || job.settling);
-            const active = connected ? Math.max(view?.active || 0, liveJobs.length) : 0;
+            const active = connected ? Math.max(view?.active || 0, liveJobs.length) + (fleet?.totalActive || 0) : 0;
             const jobs = active
-                ? allJobs.filter((job) => ["running", "queued"].includes(job.state) || job.settling)
+                ? [...allJobs.filter((job) => ["running", "queued"].includes(job.state) || job.settling), ...fleetJobs]
                 : [];
             delegates.hidden = !active;
             if (!active) {
@@ -165,24 +183,28 @@
                 return;
             }
 
-            const phase = liveJobs.some((job) => job.state === "running")
-                ? "working"
-                : liveJobs.some((job) => ["complete", "partial", "needs_context"].includes(job.state))
-                  ? "finishing"
-                  : "stopping";
+            const phase =
+                fleet?.totalActive || liveJobs.some((job) => job.state === "running")
+                    ? "working"
+                    : liveJobs.some((job) => ["complete", "partial", "needs_context"].includes(job.state))
+                      ? "finishing"
+                      : "stopping";
             delegateCount.textContent = `${active} ${active === 1 ? "agent" : "agents"} ${phase}`;
             delegates.dataset.phase = phase;
-            const elapsed = Math.floor(Math.max(0, ...liveJobs.map((job) => job.elapsedMs)) / 1000);
+            const elapsed = Math.floor(Math.max(0, ...[...liveJobs, ...fleetJobs].map((job) => job.elapsedMs)) / 1000);
             delegateElapsed.textContent = elapsed
                 ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`
                 : "";
-            delegateNote.hidden = jobs.length > 0;
-            delegateHeader.title = "Live delegation · expand for tasks and worker controls";
+            delegateNote.textContent = fleet?.omitted
+                ? `${fleet.omitted} more active ${fleet.omitted === 1 ? "agent" : "agents"} outside this view.`
+                : "Waiting for Pi to release the remaining worker requests.";
+            delegateNote.hidden = jobs.length > 0 && !fleet?.omitted;
+            delegateHeader.title = "Live agents · expand for tasks and progress";
 
             const keys = new Set();
             const nodes = [];
             for (const job of jobs) {
-                const key = `${job.batchId}/${job.id}/${job.attemptId}`;
+                const key = `${job.source || "specpi"}/${job.batchId}/${job.id}/${job.attemptId}`;
                 keys.add(key);
                 let row = workerRows.get(key);
                 if (!row) {
@@ -215,26 +237,27 @@
                     workerRows.set(key, row);
                 }
 
-                row.name.textContent = job.mode === "review" ? "Review" : "Research";
+                row.name.textContent =
+                    job.source === "pi-subagents" ? job.mode : job.mode === "review" ? "Review" : "Research";
                 row.name.title = job.id;
                 row.status.textContent = workerLabel(job);
                 row.status.dataset.state =
                     job.settling && !["running", "queued"].includes(job.state) ? "settling" : job.state;
                 const seconds = Math.floor(job.elapsedMs / 1000);
-                row.metrics.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} · ${job.calls} model calls · ${job.tools} tool calls`;
+                row.metrics.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} · ${job.source === "pi-subagents" ? `${job.tokens.toLocaleString()} tokens` : `${job.calls} model calls · ${job.tools} tool calls`}`;
                 if (job.task) {
                     row.task.textContent = job.task;
                 }
 
                 row.task.hidden = !row.task.textContent;
-                row.model.textContent = [job.provider, job.model].filter(Boolean).join(" / ");
+                row.model.textContent = [job.provider, job.model, job.effort].filter(Boolean).join(" / ");
                 row.model.title = row.model.textContent;
                 row.error.textContent = job.error || "";
                 row.error.hidden = !job.error;
-                row.stop.hidden = !["queued", "running"].includes(job.state);
+                row.stop.hidden = job.source === "pi-subagents" || !["queued", "running"].includes(job.state);
                 row.stop.disabled = Boolean(
                     job.stopPending ||
-                    view.canStop === false ||
+                    view?.canStop === false ||
                     !state.commands?.some((command) => command.name === "delegate"),
                 );
                 row.stop.textContent = job.stopPending ? "Requesting…" : "Stop";

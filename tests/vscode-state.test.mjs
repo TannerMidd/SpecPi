@@ -3,6 +3,30 @@ import test from "node:test";
 import { deflateSync } from "node:zlib";
 import stateModule from "../vscode/src/chat-state.js";
 
+test("visible upstream goal and background notices survive streaming and history without exposing hidden payloads", () => {
+    const messages = ["goal-event", "background-task-complete"].map((customType) => ({
+        role: "custom",
+        customType,
+        display: true,
+        content: `Visible ${customType}`,
+        details: { private: "synthetic hidden metadata" },
+    }));
+    const state = stateModule.createState();
+    for (const message of messages) {
+        stateModule.applyEvent(state, { type: "message_end", message });
+    }
+
+    assert.equal(state.messages.length, 2);
+    const restored = stateModule.createState({
+        messages: [...messages, { ...messages[0], display: false }, { ...messages[0], display: undefined }],
+    });
+    assert.deepEqual(
+        restored.messages.map((message) => message.text),
+        messages.map((message) => message.content),
+    );
+    assert.doesNotMatch(JSON.stringify(restored), /synthetic hidden metadata/);
+});
+
 const {
     createState,
     applyEvent,

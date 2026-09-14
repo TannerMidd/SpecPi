@@ -9,8 +9,11 @@ Wishlist observations are leads, not authorization. Only an exact human selectio
 ## Repository map
 
 - `scripts/specpi.mjs` and `scripts/lib.mjs`: installer lifecycle, managed-state transactions, and CLI behavior.
-- `templates/`, `extensions/`, `skills/`, `themes/`, and `shell/`: installable source-of-truth files. Edit these, not installed copies.
-- `tests/`: installer, command-guard, provider, browser, and wishlist regressions.
+- `scripts/packages.mjs` and `templates/settings.json`: the eight pinned upstream packages installed by default. First-party features remain limited to `/scope` and the harness improvement loop.
+- `templates/`, `extensions/`, and `skills/`: installable source-of-truth files for scope and the improvement loop. Edit these, not installed copies.
+- `tests/`: installer, scope, and improvement-loop regressions.
+- `vscode/`: SpecPi Chat, the separately packaged VS Code frontend. Keep it aligned with the Pi package base; its adapters display public runtime events and do not duplicate tool policy.
+- `site/`: the public installation and package guide, deployed through GitHub Pages. Keep its versions and instructions in sync with README and the package manifests.
 - `SECURITY.md`: public support and vulnerability-reporting policy.
 - `SECURITY_MODEL.md`: authoritative trust model and security boundaries.
 - `templates/AGENTS.md`: the installed global working agreement; this root file governs SpecPi repository development.
@@ -28,9 +31,9 @@ Run the narrowest relevant tests while iterating, then `npm run check` once the 
 
 Pi fixtures use the repository's pinned development dependency by default; `SPECPI_TEST_PI` explicitly selects another CLI. Package validation creates its own temporary npm cache. Neither requires changing the user's global PATH, cache, or live Pi installation.
 
-Never run installer integration tests against the live Pi directory. Use a fresh temporary `PI_CODING_AGENT_DIR` and skip external package and tool installation. Installer and release work must exercise the plan/install/update/doctor/uninstall lifecycle in isolated state.
+For website changes, run `npm run check:site` and inspect desktop, tablet, and mobile screenshots. Do not create or replace visual baselines unless requested.
 
-For rendered `site/` or browser changes, validate relevant desktop, tablet, and mobile viewports. Create or replace visual baselines only when explicitly requested, and treat browser artifacts as potentially sensitive.
+Never run installer integration tests against the live Pi directory. Use a fresh temporary `PI_CODING_AGENT_DIR` and skip external package and tool installation. Installer and release work must exercise the plan/install/update/doctor/uninstall lifecycle in isolated state.
 
 ## Invariants
 
@@ -38,7 +41,6 @@ For rendered `site/` or browser changes, validate relevant desktop, tablet, and 
 - Merge only documented settings paths and preserve unrelated configuration. Manage global AGENTS and shell integration only inside SpecPi marker blocks.
 - Back up before mutation, write atomically, retain checksums, and roll configuration files back on failure.
 - Never inspect, copy, log, or modify Pi authentication, provider credentials, trust decisions, sessions, missions, or history.
-- Treat Command Guard denials as hard constraints. Never evade them through encoding, command splitting, indirection, or alternate tools.
 - Do not edit dependencies under `node_modules/` or installed SpecPi resources.
 - Do not add or upgrade executable dependencies unless required by the task. Pin reviewed versions and update `THIRD_PARTY.md`, `CHANGELOG.md`, and security documentation when their contracts change.
 - Use four-space indentation, explicit braced control flow, one statement per line, and the project formatter.
@@ -47,4 +49,4 @@ For rendered `site/` or browser changes, validate relevant desktop, tablet, and 
 
 ## Completion
 
-Inspect the final diff and report the checks run, their results, and residual risks. Keep implementation, tests, documentation, progress updates, and final reports focused on the request: no unrelated cleanup, redundant summaries, decorative workflow artifacts, or extra scaffolding without a concrete benefit. Security-sensitive installer, command-guard, provider-isolation, state-retention, or dependency changes require targeted regression coverage and fresh read-only review.
+Inspect the final diff and report the checks run, their results, and residual risks. Keep implementation, tests, documentation, progress updates, and final reports focused on the request: no unrelated cleanup, redundant summaries, decorative workflow artifacts, or extra scaffolding without a concrete benefit. Security-sensitive installer, scope, improvement-authority, state-retention, or dependency changes require targeted regression coverage and fresh read-only review.

@@ -96,8 +96,8 @@ function resolveExecutable(command, cwd, environment) {
 }
 
 function getIsolationRoot(agentDir) {
-    const temporaryDirectory = fs.realpathSync(os.tmpdir());
-    const canonicalAgentDir = fs.realpathSync(agentDir);
+    const temporaryDirectory = fs.realpathSync.native(os.tmpdir());
+    const canonicalAgentDir = fs.realpathSync.native(agentDir);
     const relative = path.relative(temporaryDirectory, canonicalAgentDir);
     if (relative.split(path.sep).length < 2 || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
         throw new Error(`Pi harness agentDir must be a dedicated directory under ${temporaryDirectory}`);
@@ -151,6 +151,7 @@ function createChildEnvironment(environmentRoot, agentDir, overrides) {
 
     environment.TEMP = environmentRoot;
     environment.TMP = environmentRoot;
+    environment.TMPDIR = environmentRoot;
     fs.mkdirSync(environment.APPDATA, { recursive: true });
     fs.mkdirSync(environment.LOCALAPPDATA, { recursive: true });
     fs.mkdirSync(environment.XDG_CONFIG_HOME, { recursive: true });

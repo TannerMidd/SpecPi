@@ -405,7 +405,6 @@
         { name: "login", description: "How to sign in to a model provider with Pi" },
         { name: "logout", description: "How to manage provider sign-out with Pi" },
     ];
-    const GUARD_MODES = ["guard", "strict", "off", "locked"];
     const byId = (id) => document.getElementById(id);
     const input = byId("composer-input");
     const scrollArea = byId("scroll-area");
@@ -1160,6 +1159,81 @@
         return container;
     }
 
+    function subagentCards(view) {
+        const container = element("div", "subagent-results");
+        container.setAttribute("aria-label", "Subagents");
+        const labels = {
+            queued: "Queued",
+            running: "Running",
+            completed: "Completed",
+            failed: "Failed",
+            timed_out: "Timed out",
+            stopped: "Stopped",
+            interrupted: "Interrupted",
+            detached: "In background",
+            unknown: "Reported",
+        };
+        for (const row of view.rows || []) {
+            const card = element("section", "subagent-result");
+            card.dataset.agentIndex = String(row.index);
+            const heading = element("div", "delegate-heading");
+            const status = element("span", "delegate-state", labels[row.state] || "Reported");
+            status.dataset.state = row.state;
+            heading.append(element("span", "delegate-name", row.agent), status);
+            card.append(heading);
+            if (row.task) {
+                card.append(element("p", "delegate-task", row.task));
+            }
+
+            const model = [row.model, row.effort].filter(Boolean).join(" / ");
+            if (model) {
+                card.append(element("p", "delegate-model", model));
+            }
+
+            const metrics = [];
+            if (row.elapsedMs !== null) {
+                const seconds = Math.floor(row.elapsedMs / 1000);
+                metrics.push(`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`);
+            }
+
+            if (row.tokens !== null) {
+                metrics.push(`${row.tokens.toLocaleString()} tokens`);
+            }
+
+            if (row.tools !== null) {
+                metrics.push(`${row.tools} tool calls`);
+            }
+
+            if (row.state === "running" && row.currentTool) {
+                metrics.push(row.currentTool);
+            }
+
+            if (metrics.length) {
+                card.append(element("p", "delegate-metrics", metrics.join(" · ")));
+            }
+
+            if (row.error) {
+                card.append(element("p", "delegate-error", row.error));
+            }
+
+            container.append(card);
+        }
+
+        if (view.background || view.omitted) {
+            container.append(
+                element(
+                    "p",
+                    "subagent-result-note",
+                    view.omitted
+                        ? `${view.omitted} more agents in this result.`
+                        : "Started in the background. Follow active agents above the composer.",
+                ),
+            );
+        }
+
+        return container;
+    }
+
     function renderMessage(message, existing) {
         const role = ["user", "assistant", "tool", "notice"].includes(message.role) ? message.role : "notice";
         const article = existing || element("article");
@@ -1178,7 +1252,11 @@
                 element(
                     "span",
                     "tool-name",
-                    message.toolName === "delegate" ? "Delegate activity" : message.toolName || "Tool",
+                    message.toolName === "subagent"
+                        ? "Subagents"
+                        : message.toolName === "delegate"
+                          ? "Delegate activity"
+                          : message.toolName || "Tool",
                 ),
             );
             summary.append(
@@ -1189,14 +1267,16 @@
                         ? "Running…"
                         : message.isError
                           ? "Failed"
-                          : message.toolName === "delegate"
-                            ? "Reported"
-                            : "Completed",
+                          : message.subagents?.background
+                            ? "Background"
+                            : ["delegate", "subagent"].includes(message.toolName)
+                              ? "Reported"
+                              : "Completed",
                 ),
             );
             details.append(summary);
             if (message.input) {
-                if (message.toolName === "delegate") {
+                if (["delegate", "subagent"].includes(message.toolName)) {
                     const input = element("details", "delegate-input");
                     input.open = delegateInputOpen;
                     input.append(
@@ -1211,6 +1291,10 @@
                     );
                     details.append(element("div", "tool-section-label", "Result"));
                 }
+            }
+
+            if (message.toolName === "subagent" && message.subagents) {
+                details.append(subagentCards(message.subagents));
             }
 
             details.append(
@@ -1306,6 +1390,7 @@
                 message.input,
                 message.isError,
                 message.isRunning,
+                message.subagents,
                 message.files,
                 Array.isArray(message.images) ? message.images.map(imageKey) : [],
             ]);
@@ -1411,26 +1496,19 @@
         thinking.title = `Thinking level: ${state.thinkingLevel || "off"}`;
     }
 
-    function renderGuard() {
-        const button = byId("guard-button");
-        const connected = ["connecting", "ready", "busy", "retrying", "compacting"].includes(state.status);
-        const guard = connected ? state.guard : null;
-        button.hidden = !guard;
-        if (!guard) {
+    function renderPermissions() {
+        const button = byId("permissions-button");
+        const connected = ["ready", "busy", "retrying", "compacting"].includes(state.status);
+        const permissions = connected ? state.permissions : null;
+        button.hidden = !permissions;
+        if (!permissions) {
             return;
         }
 
-        const label = String(guard.label || "Guard").slice(0, 24);
-        const detail = String(guard.detail || "").slice(0, 400);
-        byId("guard-label").textContent = label;
-        if (GUARD_MODES.includes(guard.mode)) {
-            button.dataset.mode = guard.mode;
-        } else {
-            delete button.dataset.mode;
-        }
-
-        button.title = detail ? `Command Guard: ${label}\n${detail}` : `Command Guard: ${label}`;
-        button.setAttribute("aria-label", `Command Guard mode: ${label}. Choose a mode.`);
+        byId("permissions-label").textContent = permissions.yolo ? "YOLO" : "Permissions";
+        button.dataset.mode = permissions.yolo ? "yolo" : "configured";
+        button.title = String(permissions.detail || "View Permission System settings").slice(0, 400);
+        button.setAttribute("aria-label", "View Permission System settings");
         button.disabled = state.status !== "ready" || Boolean(state.sending);
     }
 
@@ -1984,7 +2062,7 @@
 
         renderMessages();
         renderModels();
-        renderGuard();
+        renderPermissions();
         renderAttachments();
         renderSelectionChip();
         renderRuntimeStatus();
@@ -2171,8 +2249,8 @@
         renderModels();
     });
     // The mode itself is chosen in a VS Code picker; the webview only asks for it to open.
-    byId("guard-button").addEventListener("click", () => {
-        send({ type: "chooseGuard" });
+    byId("permissions-button").addEventListener("click", () => {
+        send({ type: "showPermissions" });
     });
     for (const suggestion of document.querySelectorAll("[data-suggestion]")) {
         suggestion.addEventListener("click", () => {

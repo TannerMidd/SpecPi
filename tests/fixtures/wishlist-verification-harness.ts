@@ -9,7 +9,7 @@ const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR!);
 const repositoryRoot = path.resolve(process.cwd());
 const stateDir = path.join(agentDir, "specpi");
 const browserGap = {
-    capability: "Local browser automation",
+    capability: "Scope drift monitor",
     scenario: "Interact with a locally rendered application",
     limitation: "Browser interaction needed explicit revalidation",
     impact: "degraded",
@@ -634,7 +634,7 @@ async function runContractScenario() {
         cardReportDeduped:
             firstContractReport.details?.duplicate === false && secondContractReport.details?.duplicate === true,
         stableContractId:
-            retry.details?.contract?.id === recordedContract?.id && active.gapId === "local-browser-automation",
+            retry.details?.contract?.id === recordedContract?.id && active.gapId === "scope-drift-monitor",
     };
 }
 

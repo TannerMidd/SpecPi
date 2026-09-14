@@ -53,8 +53,9 @@ function sensitivePath(filePath) {
 
         const roots = [path.resolve(agentDirectory)];
         try {
-            // Resolve directory metadata only, never enumerate/read Pi state.
-            roots.push(realpathSync(agentDirectory));
+            // Match fs.promises.realpath used by attachment/navigation checks,
+            // including Windows drive aliases. Resolve directory metadata only.
+            roots.push(realpathSync.native(agentDirectory));
         } catch {
             // Missing/inaccessible roots still receive lexical protection.
         }

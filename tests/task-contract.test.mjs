@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
+
 import fs from "node:fs";
+
 import os from "node:os";
+
 import path from "node:path";
+
 import test from "node:test";
+
 import {
     TASK_CONTRACT_ENTRY,
     createTaskContract,
@@ -12,7 +17,6 @@ import {
     taskContractScopeViolations,
     validateTaskContract,
 } from "../extensions/workflow-controls/task-contract.mjs";
-import { validateChallengeSubmission } from "../extensions/workflow-controls/challenge.mjs";
 
 function createRoot() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-task-contract-test-"));
@@ -210,76 +214,6 @@ test("improvement contracts require explicit bounded scope and provenance", () =
         assert.throws(
             () => createTaskContract(card({ paths: ["x".repeat(241)] }), { root, origin: "human" }),
             /path 1/,
-        );
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("card-backed completion challenges require the exact original requirement IDs and generation", () => {
-    const root = createRoot();
-    try {
-        const contract = createTaskContract(card(), { root, origin: "human", id: "task-three" });
-        const facts = {
-            taskContract: contract,
-            taskContractDigest: contract.digest,
-            challengeGeneration: "generation-one",
-            pendingScope: [],
-        };
-        const valid = {
-            generation: "generation-one",
-            taskContractDigest: contract.digest,
-            verdict: "ready-for-human-review",
-            requirements: [
-                { id: "R1", status: "proven", evidence: "digest check passed" },
-                { id: "R2", requirement: "Keep scope explicit", status: "proven", evidence: "scope check passed" },
-            ],
-            contradictions: [],
-            falsePositiveChecks: [],
-            scopeFindings: [],
-            validationGaps: [],
-            residualRisks: ["Model-authored review"],
-            nextAction: "Human reviews the evidence",
-        };
-        assert.equal(validateChallengeSubmission(valid, facts).requirements[0].id, "R1");
-
-        for (const taskContractDigest of [undefined, null, "", "0".repeat(64)]) {
-            assert.throws(
-                () => validateChallengeSubmission({ ...valid, taskContractDigest }, facts),
-                /Task contract digest is stale/,
-            );
-        }
-
-        assert.throws(
-            () => validateChallengeSubmission({ ...valid, generation: "stale-generation" }, facts),
-            /generation is stale/,
-        );
-        assert.throws(
-            () =>
-                validateChallengeSubmission(
-                    { ...valid, requirements: [{ ...valid.requirements[0], id: "R3" }, valid.requirements[1]] },
-                    facts,
-                ),
-            /Unknown task contract requirement ID/,
-        );
-        assert.throws(
-            () =>
-                validateChallengeSubmission(
-                    {
-                        ...valid,
-                        requirements: [{ ...valid.requirements[0], requirement: "rewritten" }, valid.requirements[1]],
-                    },
-                    facts,
-                ),
-            /text was altered/,
-        );
-        assert.throws(
-            () =>
-                validateChallengeSubmission(
-                    { ...valid, requirements: [valid.requirements[0], valid.requirements[0]] },
-                    facts,
-                ),
-            /unique/,
         );
     } finally {
         fs.rmSync(root, { recursive: true, force: true });

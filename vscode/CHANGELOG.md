@@ -1,5 +1,21 @@
 # SpecPi Chat changelog
 
+## 0.7.1
+
+- Bump the VSIX version and update install examples for the SpecPi 0.21.0 base.
+- Resolve custom Pi state directories with the same native path resolver used for attachments and navigation, preserving privacy checks through Windows drive aliases. Make temporary-path fixtures portable across Windows and macOS runners.
+
+## 0.7.0
+
+- Keep SpecPi Chat as the VS Code frontend for SpecPi 0.21.0 and its eight upstream packages. Preserve chat, attachments, history, model controls, and separate VSIX packaging.
+- Replace the retired Command Guard mode picker with a read-only Permission System settings button. Show reported YOLO status and preserve complete multiline approval context; oversized requests are cancelled without approval.
+- Render visible custom messages from all packages, including background-task and goal updates, while preserving hidden-message choices. Keep generic tools, images, widgets, commands, and usage reporting on Pi's RPC transport.
+
+- Show pi-subagents in the live agent panel, including foreground and background agents, model, thinking level, elapsed time, token usage, and overflow counts. Clear activity when work ends or the connection changes.
+- Show individual agent cards in streamed and saved `subagent` results, including parallel and chain progress, failed or stopped children, and background handoffs. Keep the original tool output below the cards.
+- Preserve visible pi-subagents completion notices and slash-command text in live and restored conversations, respecting the package's hidden-message setting.
+- Include a read-only adapter that registers no tools or commands and leaves Pi configuration unchanged. Live activity requires the `fleetStatus` v1 capability, reviewed against pi-subagents 0.67.0's published contract; older packages retain tool-result cards and text. The live list provides no per-agent controls.
+
 ## 0.6.0
 
 - Show Command Guard's mode on a shield beside the composer and change it from a picker, without typing `/guard`. **SpecPi: Choose Command Guard Mode** opens the same picker from the Command Palette. A locked session offers **Unlock** instead of a mode.

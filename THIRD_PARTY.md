@@ -1,89 +1,33 @@
 # Third-party components
 
-Structural search privately installs `@ast-grep/cli` **0.45.3**, its matching platform-specific native binary package, and `detect-libc` **2.1.2**, under the exact `structural-runtime/package-lock.json` graph. These packages use MIT licenses. Installation uses `npm ci --ignore-scripts`; SpecPi resolves the pinned platform binary directly and does not execute the CLI's postinstall copier, invoke a global `sg`, download a fallback or modify PATH. Source: [ast-grep](https://github.com/ast-grep/ast-grep). Windows x64, macOS x64/arm64 and Linux glibc x64 are the implemented platform mappings; CI and offline fixture smokes qualify the corresponding hosts.
+SpecPi's npm artifact contains first-party source and no bundled runtime dependencies. Its installer separately acquires the default packages below through Pi. Its own extensions use the host Pi installation's public extension API, UI components, enum helper, and TypeBox schemas through optional peer dependencies:
 
-Browser accessibility adds `@axe-core/playwright` **4.13.0** and `axe-core` **4.13.0** to the existing locked browser runtime, retaining Playwright **1.62.1**. Both Deque packages are MPL-2.0, remain unmodified, and retain their installed license/source notices. SpecPi's npm artifact ships dependency manifests/locks, not vendored scanner code; npm acquires the packages during confirmed browser setup. Source: [axe-core](https://github.com/dequelabs/axe-core), [Playwright integration](https://github.com/dequelabs/axe-core-npm). The fixed scanner runs in the existing isolated Chromium context, with no new external accessibility service.
+- `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, and `@earendil-works/pi-tui`: MIT, from [Pi](https://github.com/earendil-works/pi).
+- `typebox`: MIT, from [TypeBox](https://github.com/sinclairzx81/typebox).
 
-SpecPi Chat is a separate VS Code extension built with the public VS Code Webview View API and Pi `0.84.4`'s documented RPC protocol. VS Code and the installed Pi runtime retain their upstream licenses; neither is bundled in the VSIX. The extension and its ZIP/VSIX packager use Node built-ins and first-party source only, with no added runtime or development dependency. Its tests reuse the repository's pinned Playwright and Pi packages. Provider authentication, requests, billing, and normal Pi background behavior remain owned by the configured Pi runtime.
+Development fixtures pin Pi packages to **0.84.4** and TypeBox to **1.3.7**. Host installations retain their upstream licenses and manage provider connections themselves. SpecPi does not install or configure providers.
 
-Chat's provider Limits row recognizes the public RPC `setStatus` presentation contracts of `@llblab/pi-codex-usage` **0.9.3** (`aa-codex-usage`) and `@sreetej510/pi-usage` **0.9.9** (`provider-usage`). Public source was checked at commits `1a97ee5560c5d7dd3b99ce34e2dcfe456592f8a0` and `9dee3b590f736c723011e3bc3717b3f0d6e8072b`, respectively. Tests reproduce their status/notification contracts through synthetic local Pi RPC, not live accounts or upstream provider requests. Text retains each plugin's quota semantics rather than converting or aggregating measurements. Neither plugin is bundled in the VSIX; this compatibility change does not install pi-usage or change SpecPi's existing package pins. Plugins retain ownership of authentication, caching, refresh/backoff, and explicit reset-consumption confirmation.
+Development formatting uses Prettier **3.9.6** (MIT), ESLint **10.9.1** (MIT), `@stylistic/eslint-plugin` **5.10.0** (MIT), `@typescript-eslint/parser` **8.68.0** (BSD-2-Clause), and TypeScript **6.0.3** (Apache-2.0). Exact versions are recorded in `package.json`; installed packages retain upstream notices. Git and Node.js are external prerequisites.
 
-Chat uses Pi's image content blocks, conversation tree/fork/clone operations, and session statistics, plus the installed VS Code Git extension's public API for diff review. Version 0.3.0 retains a separate Pi process for each connected conversation and uses Pi's `--fork <session>` CLI option to copy branch history before runtime extensions initialize; the original live session remains untouched. Image container validation and base64 framing are first-party code; display uses VS Code's embedded browser image decoders. No image codec, provider SDK, export package, or remote image service is added. Local acceptance of PNG, JPEG, GIF, or WebP does not establish that every configured provider accepts the same formats or animation behavior. RPC records and buffered writes are capped at 64 MiB; image prompts and rendered media have separate, smaller limits documented in the extension guide.
+## Default upstream packages
 
-Delegation loads `clampThinkingLevel` from the Pi SDK when exported there, otherwise
-from the public `@earendil-works/pi-ai/compat` subpath declared in Pi's
-[package exports](https://github.com/earendil-works/pi/blob/main/packages/ai/package.json).
-That fallback is guarded: a missing module or function leaves `/delegate` registered
-and produces a capability error on activation, rather than an extension-load failure.
+Reviewed on 2026-09-14 against published npm metadata and integrity-verified source archives. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
 
-When Pi is absent, SpecPi can install the reviewed `@earendil-works/pi-coding-agent@0.84.4` npm package globally after confirmation. The package provides the `pi` executable, is installed with lifecycle scripts disabled, retains its upstream license, and remains external system state after SpecPi uninstall.
+SpecPi requests exact npm dependency saves for these pins and checks installed top-level versions before completing installation. The override applies to package acquisition without changing the user's global npm configuration.
 
-The experimental delegation extension uses native discovery and public Pi SDK `createAgentSession`, in-memory sessions and a fresh `ModelRuntime`, with **public SDK capability checks instead of an exact-version allowlist**. Compatible Pi updates can activate without a SpecPi release. Missing APIs are named in the activation error; actual SDK/provider behavior remains subject to runtime checks and regression testing. The installer floor and pinned 0.84.4 bootstrap package are unchanged. Pi supplies the conversation/tool loop, standard configuration, authentication and OAuth. The child receives the parent model and thinking level with Pi clamping; unsupported runtime-only authentication, selected extension-provider overrides and safe descriptor mismatches fail preflight. Children load no ambient extensions, skills, AGENTS files or parent history. Parent hooks, ephemeral settings and session affinity are not inherited. Each SDK invocation is admitted before dispatch. SDK provider retries and compaction are disabled; ordinary tool-argument and report corrections use admitted calls in the same child session. Output length follows Pi's normal provider/model settings without a delegation-specific token cap, and SDK-visible streams are checked without claiming hard raw-transport, hidden-attempt, memory or invoice bounds. SpecPi does not install or vendor another runtime, add a launcher/service, or introduce a direct `pi-agent-core` dependency or additional runtime library. Parent Pi startup, resources and trust remain unchanged.
+| Package | Version | Upstream |
+| --- | --- | --- |
+| pi-web-access | 0.29.0 | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) |
+| betterwright | 2.8.1 | [BetterWright/betterwright](https://github.com/BetterWright/betterwright) |
+| pi-subagents | 0.67.0 | [nicobailon/pi-subagents](https://github.com/nicobailon/pi-subagents) |
+| pi-lens | 4.1.6 | [apmantza/pi-lens](https://github.com/apmantza/pi-lens) |
+| pi-background-tasks | 2.5.0 | [ismailsaleekh/pi-background-tasks](https://github.com/ismailsaleekh/pi-background-tasks) |
+| pi-goal-x | 0.31.2 | [tmonk/pi-goal-x](https://github.com/tmonk/pi-goal-x) |
+| @sreetej510/pi-usage | 0.10.0 | [Sreetej510/pi-extensions](https://github.com/Sreetej510/pi-extensions) |
+| @gotgenes/pi-permission-system | 32.0.2 | [gotgenes/pi-packages](https://github.com/gotgenes/pi-packages) |
 
-The [Pi 0.85.0 release](https://github.com/earendil-works/pi/releases/tag/v0.85.0), published 4 September 2026, prompted the additional compatibility review. It does not change the installer pin or imply that every provider/setup has passed. Pi 0.85.1 also passes the isolated native/provider fixtures; its SDK session, agent-session and model-runtime modules match 0.85.0. Compatibility evidence is not an activation allowlist or proof of full parent inference parity.
+Transitive dependencies and their notices remain in Pi's npm installation tree. Top-level pins do not freeze upstream dependency ranges or constitute a full transitive security audit. Pi invokes npm with its upstream package-management semantics, including dependency lifecycle scripts. BetterWright has no browser-download install hook; its separate setup requires Bun 1.4+ and fetches its managed browser. Pi Lens includes native structural tooling and bundled grammars; configured diagnostics and autofixes may invoke additional tools. Pi Subagents includes `@earendil-works/pi-server`. Usage reporting and web packages make their own provider/service connections. Consult upstream licenses and security policies before redistributing their components.
 
-The child uses configured global transport/thinking budgets without loading project settings. Startup proxy configuration and model-specific headers are unsupported and fail preflight; parent configuration stays unchanged. These limits are part of the experimental SDK integration, not claims about what Pi itself supports.
+The combined base is tested with Pi 0.84.4. Pi Goal X declares Pi `>=0.83.0 <0.85.0`; compatibility with newer hosts is not assumed. SpecPi's former custom browser, structural-search, delegation, background-task, and command-guard implementations, DonSeTch, themes, and bundled website fonts have been removed. The current website uses system fonts and no third-party scripts. Removal restores owned package settings but does not delete downloaded upstream packages or tools. Retired private runtimes remain in local backups with their notices.
 
-Architecture charts are committed static SVG/CSV/JSON assets. Their optional authoring script uses ReportLab 4.4.9 (BSD license); it is not installed by SpecPi or shipped as a runtime dependency. The site runs without a plotting library or remote chart service.
-
-SpecPi pins but does not vendor these Pi packages:
-
-- `pi-web-access@0.25.0`
-- `@juicesharp/rpiv-ask-user-question@2.7.1`
-- `@llblab/pi-codex-usage@0.9.3`
-- `@tunnckocore/pi-gpt-fast-mode@0.4.0`
-- `@narumitw/pi-goal@0.54.3`
-
-They retain their own copyright and license terms. Pi downloads them from npm when the installer runs `pi install`. SpecPi does not patch, fork, vendor, or use unsupported deep imports from these packages.
-
-The published `specpi` npm package declares the Pi host runtime modules its extensions import as optional peer dependencies, each at Pi's documented `"*"` range:
-
-- `@earendil-works/pi-coding-agent` — extension API, theme, markdown, and highlighting helpers
-- `@earendil-works/pi-ai` — the `StringEnum` tool-schema helper
-- `@earendil-works/pi-tui` — terminal component, key, and width primitives
-- `typebox` — the unscoped TypeBox package Pi bundles, used for tool input schemas
-
-They retain their own copyright and license terms. SpecPi never vendors, bundles, or installs them for end users; the Pi host supplies them at extension load time through loader aliases. Repository development additionally pins local copies for type checking and isolated test launches, as listed below. Pi disables peer resolution for managed package installs, so a peer range would not enforce the host version there. Marking the peers optional also keeps an ordinary npm CLI installation from adding a second copy beside or inside SpecPi. The full managed installation enforces its supported Pi floor through the installer's `MIN_PI_VERSION` compatibility check, and the limited direct Pi mode documents the same host prerequisite.
-
-SpecPi also installs these exact browser-runtime packages from the reviewed `browser-runtime/package-lock.json`:
-
-- `playwright@1.62.1` and `playwright-core@1.62.1` — Apache-2.0
-- `pixelmatch@7.2.0` — ISC
-- `pngjs@7.0.0` — MIT
-- optional `fsevents@2.3.2` on macOS — MIT
-
-Playwright downloads its matching Chromium build into SpecPi's private runtime directory. Chromium retains its upstream BSD and third-party component licenses. None of these executables are installed globally.
-
-Repository development uses these exact, project-local formatting and linting packages:
-
-- `prettier@3.9.6` — MIT
-- `eslint@10.9.1` — MIT
-- `@stylistic/eslint-plugin@5.10.0` — MIT
-- `@typescript-eslint/parser@8.68.0` — MIT
-- `typescript@6.0.3` — Apache-2.0
-
-They are development-only dependencies, are not shipped by the SpecPi installer, and enforce the repository's JavaScript and TypeScript readability rules. TypeScript also runs strict no-emit checking for the browser extension.
-
-Browser type checking and registered-tool tests additionally use exact project-local development dependencies: `@earendil-works/pi-coding-agent@0.84.4`, `@earendil-works/pi-ai@0.84.4`, `@earendil-works/pi-tui@0.84.4` (MIT), `typebox@1.3.7` (MIT), `@types/node@22.20.1` (MIT), and `playwright@1.62.1` (Apache-2.0). These reuse the reviewed Pi/runtime versions, do not alter the optional production-peer contract, and are not bundled or installed by SpecPi. Direct development dependencies are pinned; this is not a claim that the development transitive graph is locked. The browser executable test runtime still uses the separately reviewed lockfile. `setup:browser` provisions only `.specpi-test/browser-runtime/`; its explicit `--with-deps` option invokes Playwright OS dependency setup on disposable Linux CI runners. No language-server executable or additional automation framework was added.
-
-The GitHub Pages site vendors the Latin subsets of IBM Plex Sans and IBM Plex Mono. Copyright © 2017 IBM Corp. with Reserved Font Name "Plex". The font files are distributed under the SIL Open Font License 1.1; the required license text is included at `site/fonts/LICENSE.txt`.
-
-The site showcase at `site/media/specpi-showcase.mp4` incorporates “Machina” by Scott Buckley, released under Creative Commons Attribution 4.0 (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/. Source and composer credit: https://www.scottbuckley.com.au/library/machina/ and https://www.scottbuckley.com.au/. The music excerpt is edited, level-adjusted, and faded; its license is separate from SpecPi's MIT license. Credit appears in the film and the player's transcript/credits disclosure. Preserve that attribution with redistribution; YouTube uploads require it in the video description. See `site/media/README.md`.
-
-The npm release workflow installs `npm@11.19.1` as its pinned publishing client. npm is distributed under the Artistic License 2.0 and runs only on the ephemeral GitHub-hosted release runner.
-
-Repository automation uses these official GitHub Actions. General CI and Pages workflows track the listed major versions; the npm publishing workflow pins exact reviewed commit SHAs so the OIDC job does not execute mutable action tags:
-
-- `actions/checkout@v4`
-- `actions/setup-node@v4`
-- `actions/configure-pages@v5`
-- `actions/upload-pages-artifact@v4`
-- `actions/deploy-pages@v4`
-- `actions/upload-artifact@v4`
-- `actions/download-artifact@v4`
-
-They retain their own copyright and license terms. These actions receive only the permissions declared in their respective workflows.
-
-The optional DonSeTch CLI is distributed under AGPL-3.0-only and is not bundled in this repository. When selected during installation, SpecPi installs `donsetch@3.4.0` globally through npm; that package downloads and verifies its platform binary. The included skill documents how to invoke it.
-
-Git is not bundled and retains its own license. SpecPi's in-house `/files` extension uses Pi's built-in themed renderers and invokes Git directly when repository status or diffs are available.
+SpecPi Chat 0.7.1 is a separately packaged VS Code extension with no bundled runtime dependencies. It uses VS Code's host APIs and Pi's RPC protocol. Its read-only pi-subagents adapter consumes the upstream `fleetStatus` v1 contract reviewed at 0.67.0. Generic tool output, visible custom messages, widgets, and dialogs stay owned by their upstream packages. Playwright **1.62.1** (Apache-2.0, [Microsoft Playwright](https://github.com/microsoft/playwright)) is a pinned development dependency for Chat's rendering tests; its browser is installed only for those checks and is not shipped in either artifact.

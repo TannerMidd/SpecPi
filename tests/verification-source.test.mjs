@@ -37,6 +37,22 @@ function descriptor(size = 0) {
     return { type: "file", mode: 0o644, size, sha256: "0".repeat(64) };
 }
 
+test("source evidence tracks changes in the retained VS Code frontend", () => {
+    const root = createSourceRoot("vscode");
+    try {
+        fs.mkdirSync(path.join(root, "vscode", "src"), { recursive: true });
+        const file = path.join(root, "vscode", "src", "extension.js");
+        fs.writeFileSync(file, "module.exports = {};\n");
+        const before = captureSourceSnapshot(root);
+        fs.writeFileSync(file, "module.exports = {updated: true};\n");
+        assert.deepEqual(compareSourceSnapshots(before, captureSourceSnapshot(root)).changed, [
+            "vscode/src/extension.js",
+        ]);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 function syntheticSnapshot(root, entries) {
     return {
         schema: VERIFICATION_SCHEMA,
@@ -82,15 +98,9 @@ test("the real checkout inventory includes check inputs and excludes local/gener
     assert.ok(paths.includes(".gitattributes"));
     assert.ok(paths.includes(".gitignore"));
     assert.ok(paths.includes(".prettierignore"));
-    assert.ok(paths.includes("tsconfig.browser.json"));
-    assert.ok(paths.includes("extensions/browser/core.d.mts"));
-    assert.ok(paths.includes("vscode/src/extension.js"));
-    assert.ok(paths.includes("vscode/media/chat.js"));
-    assert.ok(paths.includes("vscode/media/chat-picker.js"));
-    assert.ok(paths.includes("vscode/src/conversation-coordinator.js"));
-    assert.ok(paths.includes("vscode/package.json"));
+    assert.ok(paths.includes("extensions/workflow-controls/index.ts"));
+    assert.ok(paths.includes("tests/fixtures/wishlist-verification-harness.ts"));
     assert.ok(paths.some((value) => value.startsWith(".github/workflows/")));
-    assert.ok(paths.includes("tests/fixtures/command-guard-session-approval-harness.ts"));
     assert.equal(
         paths.some((value) => value.startsWith("desktop/")),
         false,

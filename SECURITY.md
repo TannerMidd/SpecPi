@@ -6,6 +6,6 @@ Report vulnerabilities privately through [GitHub Security Advisories](https://gi
 
 Responses and fixes are best-effort, without a guaranteed timeline or bug bounty. Coordinate disclosure with the maintainer. Updates appear in [advisories](https://github.com/TannerMidd/SpecPi/security/advisories) and [release notes](CHANGELOG.md).
 
-Reports covering SpecPi's installer, extensions, Chat, website, automation, or dependency integration are welcome. Upstream-only problems may be redirected to the responsible project.
+Reports covering SpecPi's installer, scope monitor, improvement loop, or dependency integration are welcome. Upstream-only problems may be redirected to the responsible project.
 
 See [SECURITY_MODEL.md](SECURITY_MODEL.md) for trust boundaries and [THIRD_PARTY.md](THIRD_PARTY.md) for dependencies and licenses. SpecPi is not an OS sandbox; use least privilege and containers or VMs for hostile code.

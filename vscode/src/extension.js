@@ -26,7 +26,9 @@ const { editPrompt, forkChat, exportChat, showUsage, markdownTranscript } = requ
 const { findFiles, reviewChanges, relativeFile, workspaceHiddenFilter } = require("./workspace-actions.js");
 const { ImageQueue } = require("./image-queue.js");
 const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./delegates.js");
-const { GUARD_ACTIONS, GUARD_LABELS, GUARD_DETAILS, guardState } = require("./guard.js");
+const { SUBAGENT_WIDGET, decodeFleet } = require("./subagents.js");
+const { permissionState } = require("./permissions.js");
+const { stripVTControlCharacters } = require("node:util");
 const { ConversationCoordinator } = require("./conversation-coordinator.js");
 
 const PREFIX = "specpi.chat";
@@ -76,7 +78,7 @@ class ChatController {
         }
 
         this.state.sending = this.sending || this.transitioning;
-        this.state.guard = guardState(this.state);
+        this.state.permissions = permissionState(this.state);
         this.state.contextToken = this.contextToken();
         this.state.selectionContext = this.coordinator?.selectionContext || null;
         this.state.recoveredDrafts = this.imageQueue.recovered.map((item) => ({
@@ -227,6 +229,7 @@ class ChatController {
         this.state.status = "connecting";
         this.state.runtimeStatus = {};
         this.state.delegation = undefined;
+        this.state.subagents = undefined;
         this.state.error = undefined;
         this.state.connectionMessage = "Starting Pi and loading its extensions. This can take up to 90 seconds.";
         this.publish();
@@ -251,6 +254,7 @@ class ChatController {
             this.catalog = this.coordinator.catalogFor(this.workspace);
             await this.catalog.list();
             const args = [...launch.args, "--mode", "rpc", "--session-dir", this.catalog.sessionDirectory];
+            args.push("--extension", path.join(this.context.extensionUri.fsPath, "src", "subagents-bridge.mjs"));
             if (this.forkSourceSessionId || this.activeSessionId) {
                 const session = await this.catalog.resolve(this.forkSourceSessionId || this.activeSessionId);
                 if (session) {
@@ -326,6 +330,7 @@ class ChatController {
                     this.state.status = "error";
                     this.state.runtimeStatus = {};
                     this.state.delegation = undefined;
+                    this.state.subagents = undefined;
                     this.state.error =
                         "Pi stopped. Reconnect to resume this chat. Check Pi and provider setup in a terminal if this repeats.";
                     this.publish();
@@ -369,6 +374,7 @@ class ChatController {
                 resetRunState(this.state);
                 this.state.status = "error";
                 this.state.delegation = undefined;
+                this.state.subagents = undefined;
                 this.state.connectionMessage = undefined;
                 this.fail(error);
                 throw error;
@@ -432,6 +438,7 @@ class ChatController {
             if (this.runtimeSessionId) {
                 this.delegateSummaries.clear();
                 this.state.delegation = undefined;
+                this.state.subagents = undefined;
             }
 
             this.runtimeSessionId = runtime.sessionId;
@@ -538,6 +545,7 @@ class ChatController {
         this.state.status = "disconnected";
         this.state.runtimeStatus = {};
         this.state.delegation = undefined;
+        this.state.subagents = undefined;
         this.state.connectionMessage = undefined;
         this.state.queueCount = 0;
         this.publish();
@@ -1261,6 +1269,18 @@ class ChatController {
 
     handleUiRequest(request, client) {
         if (DIALOG_METHODS.has(request.method)) {
+            if (String(request.title || "").length + String(request.message || "").length > 24_000) {
+                client.send({ type: "extension_ui_response", id: request.id, cancelled: true });
+                appendNotice(
+                    this.state,
+                    "Pi's approval request exceeded the display limit and was cancelled without approval.",
+                    true,
+                );
+                this.publish();
+
+                return;
+            }
+
             if (
                 typeof request.id !== "string" ||
                 request.id.length > 200 ||
@@ -1289,6 +1309,13 @@ class ChatController {
             item.timer = setTimeout(() => this.finishDialog(item, { cancelled: true }), timeout);
             this.dialogs.push(item);
             this.showDialog();
+
+            return;
+        }
+
+        if (request.method === "setWidget" && request.widgetKey === SUBAGENT_WIDGET) {
+            this.state.subagents = decodeFleet(request.widgetLines) || undefined;
+            this.publish();
 
             return;
         }
@@ -1362,12 +1389,17 @@ class ChatController {
 
     showDialog() {
         const request = this.dialogs[0]?.request;
+        // RPC select prompts can put the complete tool request in their title.
+        // Keep that review context in the scrollable body instead of truncating it to a heading.
+        const [heading, ...details] = stripVTControlCharacters(String(request?.title || "Pi request")).split("\n");
         this.state.uiRequest = request
             ? {
                   id: request.id,
                   method: request.method,
-                  title: String(request.title || "Pi request").slice(0, 1000),
-                  message: String(request.message || "").slice(0, 24_000),
+                  title: heading.slice(0, 1000),
+                  message: stripVTControlCharacters(
+                      [heading.slice(1000), ...details, String(request.message || "")].filter(Boolean).join("\n"),
+                  ).slice(0, 24_000),
                   options: request.options,
                   placeholder: String(request.placeholder || "").slice(0, 1000),
                   prefill: String(request.prefill || "").slice(0, MAX_INPUT),
@@ -1523,55 +1555,24 @@ class ChatController {
         await this.refresh(client);
     }
 
-    async chooseGuard() {
-        this.requireWorkspace();
-        const guard = guardState(this.state);
-        if (!guard || this.state.status !== "ready" || this.transitioning || this.sending) {
-            throw new Error(
-                "Connect Pi with SpecPi's command guard installed, then choose a mode while the chat is idle.",
-            );
-        }
-
-        if (!this.isForeground()) {
-            return;
-        }
-
-        const client = this.client;
-        const selected = await vscode.window.showQuickPick(
-            guard.actions.map((action) => ({
-                label: GUARD_LABELS[action],
-                description: action === guard.mode ? "Current mode" : "",
-                detail: GUARD_DETAILS[action],
-                action,
-            })),
-            { title: `SpecPi Chat · Command Guard (${guard.label})`, placeHolder: guard.detail },
-        );
-        if (!selected || selected.action === guard.mode || this.client !== client || !this.isForeground()) {
-            return;
-        }
-
-        await this.setGuard(selected.action);
-    }
-
-    async setGuard(action) {
+    async showPermissions() {
         this.requireWorkspace();
         if (
-            !GUARD_ACTIONS.includes(action) ||
-            !guardState(this.state) ||
+            !this.client ||
+            !this.isForeground() ||
+            !permissionState(this.state) ||
             this.state.status !== "ready" ||
             this.transitioning ||
             this.sending
         ) {
-            throw new Error("Choose a Command Guard mode while Pi is idle and SpecPi's command guard is installed.");
+            throw new Error("Connect Pi with Permission System installed and wait for the chat to be idle.");
         }
 
-        // Command Guard remains the authority. It refuses actions its current mode disallows and
-        // still confirms every weakening change in the chat dialog before applying it.
         const client = this.client;
         this.sending = true;
         this.publish();
         try {
-            await client.request("prompt", { message: `/guard ${action}` }, { timeoutMs: 0 });
+            await client.request("prompt", { message: "/permission-system show" }, { timeoutMs: 0 });
         } finally {
             this.sending = false;
             this.publish();
@@ -1859,8 +1860,8 @@ class ChatController {
                 }
 
                 break;
-            case "chooseGuard":
-                await this.chooseGuard();
+            case "showPermissions":
+                await this.showPermissions();
                 break;
             case "setModel":
                 await this.setModel(message.modelId, message.provider);
@@ -1922,7 +1923,7 @@ function activate(context) {
         exportChat: () => controller.handleMessage({ type: "exportChat" }),
         showUsage: () => controller.handleMessage({ type: "showUsage" }),
         chooseWorkspace: () => controller.chooseWorkspace(),
-        guardMode: () => controller.handleMessage({ type: "chooseGuard" }),
+        permissions: () => controller.handleMessage({ type: "showPermissions" }),
         settings: () => controller.handleMessage({ type: "settings" }),
     };
     for (const [name, callback] of Object.entries(commands)) {

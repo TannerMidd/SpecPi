@@ -7,7 +7,6 @@ import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { parseGuardMode } from "../vscode/src/guard.js";
 import { resolveLaunch } from "../vscode/src/launch.js";
 import { RpcClient } from "../vscode/src/rpc-client.js";
 
@@ -52,6 +51,81 @@ function isolatedEnvironment(root) {
 
     return environment;
 }
+
+test(
+    "real isolated Pi forwards public subagent fleet metadata and resets it on new sessions",
+    { timeout: 30000 },
+    async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-vscode-subagents-"));
+        const cwd = path.join(root, "workspace");
+        fs.mkdirSync(cwd);
+        const env = isolatedEnvironment(root);
+        const launch = await resolveLaunch({
+            piPath: process.env.SPECPI_TEST_PI || piShim,
+            nodePath: process.execPath,
+            env,
+        });
+        const child = spawn(
+            launch.command,
+            [
+                ...launch.args,
+                "--mode",
+                "rpc",
+                "--offline",
+                "--no-session",
+                "--no-context-files",
+                "--no-extensions",
+                "--no-skills",
+                "--no-prompt-templates",
+                "--no-themes",
+                "-e",
+                path.join(repository, "vscode/src/subagents-bridge.mjs"),
+                "-e",
+                path.join(repository, "tests/fixtures/vscode-pi-subagents.ts"),
+            ],
+            { cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
+        );
+        const closed = once(child, "close");
+        const rpc = connect(child);
+        const fleetEvent = (event) =>
+            event.method === "setWidget" &&
+            event.widgetKey === "specpi-chat-subagents-v1" &&
+            event.widgetLines?.length === 1;
+        try {
+            await rpc.request("get_state");
+            const initial = await rpc.wait(fleetEvent);
+            assert.equal(JSON.parse(initial.widgetLines[0]).entries[0].goal, "Synthetic session 1");
+            const cursor = rpc.events.length;
+            await rpc.request("new_session");
+            const replacement = await rpc.wait(
+                (event) =>
+                    fleetEvent(event) && JSON.parse(event.widgetLines[0]).entries[0]?.goal === "Synthetic session 2",
+                cursor,
+            );
+            assert.equal(JSON.parse(replacement.widgetLines[0]).totalActive, 1);
+            const finishCursor = rpc.events.length;
+            await rpc.request("prompt", { message: "/fleet-fixture-finish" });
+            const finished = await rpc.wait(
+                (event) => fleetEvent(event) && JSON.parse(event.widgetLines[0]).totalActive === 0,
+                finishCursor,
+            );
+            assert.deepEqual(JSON.parse(finished.widgetLines[0]).entries, []);
+            assert.equal(
+                rpc.events.some((event) => event.type === "agent_start" || event.type === "extension_error"),
+                false,
+            );
+            assert.doesNotMatch(JSON.stringify(rpc.events.filter(fleetEvent)), /NOT_FOR_THE_WEBVIEW/u);
+        } finally {
+            child.stdin.end();
+            await closed;
+            assert.ok(
+                path.dirname(path.resolve(root)) === path.resolve(os.tmpdir()) &&
+                    path.basename(root).startsWith("specpi-vscode-subagents-"),
+            );
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    },
+);
 
 function connect(child) {
     const events = [];
@@ -152,96 +226,8 @@ function connect(child) {
     return { events, request, send, wait };
 }
 
-test("real Pi background approval, startup cancellation and session cleanup", { timeout: 60000 }, async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-background-rpc-"));
-    const cwd = path.join(root, "workspace");
-    fs.mkdirSync(cwd);
-    const env = isolatedEnvironment(root);
-    const launch = await resolveLaunch({ piPath: piShim, nodePath: process.execPath, env });
-    const child = spawn(
-        launch.command,
-        [
-            ...launch.args,
-            "--mode",
-            "rpc",
-            "--offline",
-            "--no-session",
-            "--no-context-files",
-            "--no-extensions",
-            "--no-skills",
-            "--no-prompt-templates",
-            "--no-themes",
-            "-e",
-            path.join(repository, "tests/fixtures/vscode-pi-harness.ts"),
-            "-e",
-            path.join(repository, "tests/fixtures/background-rpc-harness.ts"),
-            "--provider",
-            "specpi-rpc-fixture",
-            "--model",
-            "offline-fixture",
-        ],
-        { cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
-    );
-    const closed = once(child, "close");
-    const rpc = connect(child);
-    async function start(action, approved = true) {
-        const cursor = rpc.events.length;
-        const pending = rpc.request("prompt", { message: `/background-fixture ${action}` });
-        const dialog = await rpc.wait(
-            (event) => event.method === "confirm" && event.title === "Start background command for this session?",
-            cursor,
-        );
-        rpc.send({ type: "extension_ui_response", id: dialog.id, confirmed: approved });
-        await pending;
-        const notification = await rpc.wait(
-            (event) => event.method === "notify" && /^BACKGROUND_(RESULT|DENIED)/.test(event.message),
-            cursor,
-        );
-
-        return notification.message === "BACKGROUND_DENIED"
-            ? undefined
-            : JSON.parse(notification.message.slice("BACKGROUND_RESULT=".length));
-    }
-
-    function gone(pid) {
-        assert.throws(
-            () => process.kill(pid, 0),
-            (error) => error.code === "ESRCH",
-        );
-    }
-
-    try {
-        await rpc.request("get_state");
-        assert.equal(await start("denied", false), undefined);
-        const running = await start("running");
-        assert.equal(running.status, "running");
-        await rpc.request("new_session");
-        gone(running.supervisorPid);
-        const cancelled = await start("cancel-start");
-        assert.equal(cancelled.cleanup, "confirmed");
-        gone(cancelled.supervisorPid);
-        const uncertain = await start("unconfirmed");
-        await rpc.request("prompt", { message: "/background-fixture fail-cleanup" });
-        const cursor = rpc.events.length;
-        await rpc.request("new_session");
-        await rpc.wait(
-            (event) => event.method === "notify" && event.message.includes("Background cleanup unconfirmed"),
-            cursor,
-        );
-        gone(uncertain.supervisorPid);
-        assert.equal(
-            rpc.events.some((event) => event.type === "agent_start" || event.type === "extension_error"),
-            false,
-        );
-    } finally {
-        child.stdin.end();
-        await closed;
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
 test(
-    "real isolated Pi RPC starts all SpecPi extensions and preserves guarded, visible command workflows",
+    "real isolated Pi RPC starts all SpecPi extensions and preserves scope, wishlist, and visible command workflows",
     { timeout: 60000 },
     async () => {
         assert.ok(
@@ -289,12 +275,6 @@ test(
             return event.message;
         }
 
-        function guardStatus() {
-            return rpc.events.findLast(
-                (event) => event.method === "setStatus" && event.statusKey === "specpi-command-guard",
-            )?.statusText;
-        }
-
         async function editCommand(command, title, value) {
             const cursor = rpc.events.length;
             const pending = rpc.request("prompt", { message: command });
@@ -321,93 +301,19 @@ test(
                 rpc.events.some((event) => event.type === "extension_error"),
                 false,
             );
-            await notification("/guard status", /^Mode: off;/u);
-            assert.ok(
-                rpc.events.some(
-                    (event) =>
-                        event.method === "setStatus" &&
-                        event.statusKey === "specpi-command-guard" &&
-                        event.statusText === "Guard Off",
-                ),
-                "New Chat connections must publish Guard Off without requesting a mode change",
-            );
-            assert.equal(parseGuardMode(guardStatus()), "off", "Chat's guard chip reads the published status label");
-            assert.equal(
-                rpc.events.some((event) => event.method === "confirm"),
-                false,
-            );
-            for (const suffix of ["", " clear"]) {
-                const cursor = rpc.events.length;
-                await notification(`/rpc-usage-probe${suffix}`, /^Synthetic provider usage report/u);
-                const statuses = rpc.events.slice(cursor).filter((event) => event.method === "setStatus");
-                assert.deepEqual(
-                    statuses.map((event) => event.statusKey),
-                    ["aa-codex-usage", "provider-usage"],
-                );
-                assert.deepEqual(
-                    statuses.map((event) => event.statusText),
-                    suffix ? [undefined, undefined] : ["\u001b[36mcodex\u001b[0m ▀▀▀▄▄ 4d", "claude 25% 5h 40% 7d"],
-                );
-            }
-
             const { commands } = await rpc.request("get_commands");
-            for (const name of [
-                "guard",
-                "task",
-                "scope",
-                "experiment",
-                "challenge",
-                "spec",
-                "files",
-                "wishlist",
-                "harness-improvement",
-                "delegate",
-            ]) {
+            for (const name of ["scope", "wishlist", "harness-improvement"]) {
                 assert.ok(
                     commands.some((command) => command.name === name),
                     `Missing loaded SpecPi command: ${name}`,
                 );
             }
 
-            const delegateWidget = rpc.events.find(
-                (event) =>
-                    event.method === "setWidget" &&
-                    event.widgetKey === "specpi-delegation-v1" &&
-                    event.widgetLines?.length,
-            );
-            assert.ok(delegateWidget, "The installed source harness must emit the real RPC delegate widget contract");
-            assert.equal(JSON.parse(delegateWidget.widgetLines[0]).version, 1);
-            await notification("/delegate cancel-worker missing job stale", /no longer running/u);
-
-            await rpc.request("prompt", { message: "/guard guard" });
-            await notification("/guard status", /^Mode: guard;/u);
-            assert.equal(parseGuardMode(guardStatus()), "guard");
-            await rpc.request("prompt", { message: "/guard strict" });
-            await notification("/guard status", /^Mode: strict;/u);
-            assert.equal(parseGuardMode(guardStatus()), "strict");
-            for (const confirmed of [false, true]) {
-                const cursor = rpc.events.length;
-                const pending = rpc.request("prompt", { message: "/guard guard" });
-                const dialog = await rpc.wait(
-                    (event) => event.method === "confirm" && event.title === "Switch to Guard mode?",
-                    cursor,
-                );
-                rpc.send({ type: "extension_ui_response", id: dialog.id, confirmed });
-                await pending;
-                await notification("/guard status", confirmed ? /^Mode: guard;/u : /^Mode: strict;/u);
-            }
-
-            const challenge = await editCommand("/challenge status", "Completion challenge (view only)");
-            assert.match(challenge.prefill, /Synthetic review evidence/u);
-            const task =
-                "Objective: Verify RPC commands\nHypothesis: RPC editors preserve explicit choices\nRequirements:\n- R1: Show the handoff\n  Acceptance: The editor contains the objective\nPaths:\n- example.txt\nRollback: Clear the task contract\nNon-goals:\n- Model requests";
-            await editCommand("/task set", "Task contract", task);
-            const handoff = await editCommand("/task handoff", "Task handoff (view only)");
-            assert.match(handoff.prefill, /Verify RPC commands/u);
+            assert.ok(!commands.some((command) => ["guard", "task", "delegate", "spec"].includes(command.name)));
+            await editCommand("/scope set", "Scope paths — one project-relative path per line", "example.txt");
+            await notification("/scope status", /example.txt/);
             const wishlist = await editCommand("/wishlist", "SpecPi Wishlist (view only; changes are ignored)");
             assert.match(wishlist.prefill, /Wishlist|Capability/u);
-            await notification("/spec on", /controls the interactive terminal interface/u);
-            await notification("/files", /interactive TUI mode/u);
 
             const cursor = rpc.events.length;
             const dialogProbe = rpc.request("prompt", { message: "/rpc-dialog-probe" });
@@ -439,7 +345,6 @@ test(
             const afterReset = await rpc.request("get_state");
             assert.notEqual(afterReset.sessionId, initial.sessionId);
             assert.equal(afterReset.sessionFile, undefined);
-            await notification("/guard status", /^Mode: off;/u);
             assert.equal(
                 rpc.events.some((event) => event.type === "agent_start"),
                 false,

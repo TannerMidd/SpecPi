@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -9,7 +10,7 @@ import codeReferenceModule from "../vscode/src/code-references.js";
 const { collectAttachment, formatPrompt, sensitivePath, MAX_ATTACHMENT_BYTES } = contextModule;
 
 async function fixture(t) {
-    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "specpi-vscode-context-"));
+    const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "specpi-vscode-context-")));
     t.after(() => fs.rm(directory, { recursive: true, force: true }));
     const workspace = path.join(directory, "workspace");
     await fs.mkdir(workspace);
@@ -181,6 +182,34 @@ test("custom Pi agent roots protect state and canonical aliases without blocking
     await fs.symlink(agent, path.join(workspace, ".pi", "agent"), process.platform === "win32" ? "junction" : "dir");
     assert.equal(sensitivePath(path.join(agent, "history.jsonl")), true);
     assert.equal(sensitivePath(path.join(workspace, "src", "history.js")), false);
+});
+
+test("native agent-directory aliases protect canonical state before attachment reads or navigation", async (t) => {
+    const { workspace } = await fixture(t);
+    const agent = path.join(workspace, "private-agent");
+    const file = path.join(agent, "sessions", "one.jsonl");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, "synthetic");
+    const previous = process.env.PI_CODING_AGENT_DIR;
+    t.after(() => {
+        if (previous === undefined) {
+            delete process.env.PI_CODING_AGENT_DIR;
+        } else {
+            process.env.PI_CODING_AGENT_DIR = previous;
+        }
+    });
+    const alias = path.join(workspace, "native-agent-alias");
+    process.env.PI_CODING_AGENT_DIR = alias;
+    // Some host aliases resolve through the OS but not the legacy JS resolver.
+    const nativeRealpath = realpathSync.native;
+    t.mock.method(realpathSync, "native", (value) => (value === alias ? agent : nativeRealpath(value)));
+    t.mock.method(fs, "open", () => assert.fail("Private state must be rejected before opening it"));
+    await assert.rejects(collectAttachment({ workspacePath: workspace, filePath: file }), /cannot be attached/u);
+    await assert.rejects(
+        codeReferenceModule.resolveCodeReference({ workspacePath: workspace, reference: `${file}:1` }),
+        /cannot be opened from chat/u,
+    );
+    assert.equal(sensitivePath(path.join(workspace, "private-agent-other", "sessions", "source.js")), false);
 });
 
 test("relative Pi agent overrides remain fail-closed when the child workspace is unknown", (t) => {

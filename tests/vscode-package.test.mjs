@@ -120,13 +120,13 @@ test("SpecPi Chat manifest provides a trusted native sidebar and application-onl
     );
 });
 
-test("Chat release docs and Pages install examples name the actual VSIX and CI checks its rendering", () => {
+test("Chat release docs and install examples name the actual VSIX and CI checks its rendering", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(extensionRoot, "package.json"), "utf8"));
     const root = path.dirname(extensionRoot);
     const basename = `specpi-chat-${manifest.version}.vsix`;
     const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
     assert.match(readme, /https:\/\/github\.com\/TannerMidd\/SpecPi\/blob\/main\/vscode\/README\.md/u);
-    for (const name of ["vscode/GUIDE.md", "site/wiki/index.html"]) {
+    for (const name of ["vscode/GUIDE.md"]) {
         const source = fs.readFileSync(path.join(root, name), "utf8");
         const references = [...source.matchAll(/specpi-chat-\d+\.\d+\.\d+(?:-[\w.-]+)?\.vsix/gu)].map(
             (match) => match[0],
@@ -138,14 +138,9 @@ test("Chat release docs and Pages install examples name the actual VSIX and CI c
         );
     }
 
-    for (const name of ["site/index.html", "site/wiki/index.html", "site/single-agent/index.html"]) {
-        const source = fs.readFileSync(path.join(root, name), "utf8");
-        assert.ok(source.includes(`SpecPi Chat ${manifest.version}`), `${name}: stale Chat release text`);
-    }
-
     const changelog = fs.readFileSync(path.join(extensionRoot, "CHANGELOG.md"), "utf8").replaceAll("\r\n", "\n");
     assert.ok(changelog.includes(`\n## ${manifest.version}\n`));
-    const workflow = fs.readFileSync(path.join(root, ".github/workflows/browser-tests.yml"), "utf8");
+    const workflow = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8");
     assert.match(workflow, /run: npm --prefix vscode run test:render/u);
 });
 

@@ -7,7 +7,6 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -39,60 +38,12 @@ const requiredFiles = [
     "SECURITY.md",
     "SECURITY_MODEL.md",
     "THIRD_PARTY.md",
-    "browser-runtime/package-lock.json",
-    "browser-runtime/package.json",
-    "structural-runtime/package.json",
-    "structural-runtime/package-lock.json",
-    "scripts/structural-runtime.mjs",
-    "extensions/structural-search/index.ts",
-    "extensions/structural-search/core.mjs",
-    "extensions/structural-search/core.d.mts",
-    "extensions/structural-search/config.mjs",
-    "extensions/structural-search/config.d.mts",
-    "extensions/structural-search/smoke.mjs",
-    "extensions/browser/accessibility.ts",
-    "docs/structural-search.md",
-    "docs/browser-testing.md",
-    "docs/delegation/README.md",
-    "docs/delegation/protocol.md",
-    "extensions/background-tasks/core.mjs",
-    "extensions/background-tasks/core.d.mts",
-    "extensions/background-tasks/index.ts",
-    "extensions/background-tasks/supervisor.mjs",
-    "extensions/background-tasks/smoke.mjs",
-    "extensions/browser/core.mjs",
-    "extensions/browser/core.d.mts",
-    "extensions/browser/diagnostics.ts",
-    "extensions/browser/interactions.ts",
-    "extensions/browser/lifecycle.ts",
-    "extensions/browser/index.ts",
-    "extensions/browser/smoke.mjs",
-    "extensions/command-guard/bash.mjs",
-    "extensions/command-guard/cmd.mjs",
-    "extensions/command-guard/core.mjs",
-    "extensions/command-guard/core.d.mts",
-    "extensions/command-guard/index.ts",
-    "extensions/command-guard/managed-files.mjs",
-    "extensions/command-guard/paths.mjs",
-    "extensions/command-guard/powershell-parser.ps1",
-    "extensions/command-guard/powershell.mjs",
-    "extensions/command-guard/redact.mjs",
-    "extensions/command-guard/rules.mjs",
-    "extensions/command-guard/smoke.mjs",
-    "extensions/files/core.mjs",
-    ...DELEGATION_MANAGED_FILES.map((name) => `extensions/delegation/${name}`),
-    "extensions/files/index.ts",
-    "extensions/spec.ts",
-    "extensions/spec/core.mjs",
     "extensions/tool-wishlist/capabilities.json",
     "extensions/tool-wishlist/core.mjs",
     "extensions/tool-wishlist/index.ts",
     "extensions/tool-wishlist/registry.mjs",
     "extensions/tool-wishlist/validators.mjs",
     "extensions/tool-wishlist/verification.mjs",
-    "extensions/ui-refresh/index.ts",
-    "extensions/workflow-controls/challenge.mjs",
-    "extensions/workflow-controls/experiments.mjs",
     "extensions/workflow-controls/index.ts",
     "extensions/workflow-controls/scope.mjs",
     "extensions/workflow-controls/smoke.mjs",
@@ -100,17 +51,13 @@ const requiredFiles = [
     "package.json",
     "scripts/lib.mjs",
     "scripts/lock.mjs",
+    "scripts/packages.mjs",
     "scripts/specpi.mjs",
-    "shell/pi-profiles.sh",
-    "site/logo.svg",
-    "skills/donsetch/SKILL.md",
     "skills/specpi-improve/SKILL.md",
     "specpi",
     "specpi.cmd",
     "templates/AGENTS.md",
     "templates/settings.json",
-    "themes/specpi-spec.json",
-    "themes/tea-house.json",
 ];
 
 const hostPeerPackages = [
@@ -259,14 +206,13 @@ function assertPackageMetadata(packageJson) {
     assert.equal(packageJson.author, "Tanner Middleton");
     assert.equal(packageJson.repository?.url, "git+https://github.com/TannerMidd/SpecPi.git");
     assert.equal(packageJson.bugs?.url, "https://github.com/TannerMidd/SpecPi/issues");
-    assert.equal(packageJson.homepage, "https://github.com/TannerMidd/SpecPi#readme");
+    assert.equal(packageJson.homepage, "https://tannermidd.github.io/SpecPi/");
     assert.equal(packageJson.engines?.node, ">=22.19.0");
     assert.equal(packageJson.bin?.specpi, "./scripts/specpi.mjs");
     assert.ok(packageJson.keywords?.includes("pi-package"));
     assert.deepEqual(packageJson.pi, {
         extensions: ["./extensions"],
         skills: ["./skills"],
-        themes: ["./themes"],
     });
     assert.equal(packageJson.publishConfig?.access, "public");
     assert.equal(packageJson.publishConfig?.provenance, true);
@@ -327,7 +273,6 @@ function assertReadmeAssets(packageRoot) {
     const localSources = [...readme.matchAll(/<img\s+[^>]*src="([^"]+)"/g)]
         .map((match) => match[1])
         .filter((source) => !/^https?:\/\//.test(source));
-    assert.ok(localSources.length > 0, "README package check did not find any local image assets");
     for (const source of localSources) {
         assert.ok(fs.existsSync(path.join(packageRoot, source)), `README image is missing from package: ${source}`);
     }
@@ -396,7 +341,7 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         fs.writeFileSync(file, content, { mode: 0o600 });
     }
 
-    const guardDirectory = path.join(agentDir, "extensions", "command-guard");
+    const guardDirectory = path.join(agentDir, "extensions", "workflow-controls");
     const driftedGuardPath = path.join(guardDirectory, "index.ts");
     fs.appendFileSync(driftedGuardPath, "\n// package-check rollback drift\n");
     const treeBeforeFailure = snapshotTree(agentDir, ["specpi/backups"]);
@@ -405,7 +350,7 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
         env: {
             ...env,
             SPECPI_TESTING: "1",
-            SPECPI_TEST_FAIL_POINT: "after-first-command-guard-file",
+            SPECPI_TEST_FAIL_POINT: "after-first-managed-file",
         },
     });
     assert.match(`${failedUpdate.stdout}\n${failedUpdate.stderr}`, /SpecPi-managed changes rolled back/);
@@ -420,18 +365,10 @@ function assertInstalledLifecycle(packageRoot, binPath, temporaryRoot, baseEnv) 
     runCli(["uninstall", "--yes"]);
 
     assert.equal(
-        fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")),
+        fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "index.ts")),
         false,
         "uninstall left a managed extension behind",
     );
-    for (const file of DELEGATION_MANAGED_FILES) {
-        assert.equal(
-            fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
-            false,
-            `uninstall left a managed delegation file: ${file}`,
-        );
-    }
-
     for (const [file, expected] of privateEvidence) {
         assert.equal(fs.existsSync(file), true, `uninstall removed private SpecPi evidence: ${file}`);
         assert.equal(fs.readFileSync(file, "utf8"), expected, `uninstall changed private SpecPi evidence: ${file}`);
@@ -472,7 +409,7 @@ try {
     assert.ok(packResult.size < 340_000, `packed artifact unexpectedly exceeds 340 KB: ${packResult.size}`);
     assert.ok(
         packResult.unpackedSize < 1_400_000,
-        `unpacked artifact unexpectedly exceeds 1.4 MB (including browser tools and testing documentation): ${packResult.unpackedSize}`,
+        `unpacked artifact unexpectedly exceeds 1.4 MB: ${packResult.unpackedSize}`,
     );
 
     assert.ok(fs.existsSync(tarball), "the reported npm tarball does not exist");

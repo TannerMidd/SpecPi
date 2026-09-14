@@ -4,8 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import readline from "node:readline/promises";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import {
     AGENTS_END,
     AGENTS_START,
@@ -13,8 +12,6 @@ import {
     SHELL_START,
     deepEqual,
     deletePath,
-    mergePackages,
-    packageIdentity,
     readPath,
     removeManagedBlock,
     restorePackageChanges,
@@ -22,99 +19,54 @@ import {
     sha256,
     upsertManagedBlock,
 } from "./lib.mjs";
-import { validateCapabilityRegistry, isValidValidatorName } from "../extensions/tool-wishlist/registry.mjs";
+import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
-import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
-import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
-import { integrationsFile, readIntegrations, serializeIntegrations } from "../extensions/structural-search/config.mjs";
-import { changeStructuralRuntime, structuralRuntimeStatus } from "./structural-runtime.mjs";
+import { basePackages, checkBasePackages, installBasePackages, packageChanges } from "./packages.mjs";
 
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(scriptDir, "..");
-const packageJson = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-const VERSION = packageJson.version;
-const MIN_PI_VERSION = "0.84.4";
-const PI_PACKAGE = "@earendil-works/pi-coding-agent";
-const PI_PACKAGE_VERSION = "0.84.4";
-const CLI = process.platform === "win32" ? ".\\specpi.cmd" : "./specpi";
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const VERSION = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
+const CLI = "specpi";
 const agentDir = path.resolve(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"));
 const stateDir = path.join(agentDir, "specpi");
 const manifestPath = path.join(stateDir, "manifest.json");
 const settingsPath = path.join(agentDir, "settings.json");
-const retiredSubagentConfigPath = path.join(agentDir, "extensions", "subagent", "config.json");
 const agentsPath = path.join(agentDir, "AGENTS.md");
-const browserRuntimeSourceDir = path.join(repoRoot, "browser-runtime");
-const browserRuntimeDir = path.join(stateDir, "browser-runtime");
-const browserRuntimeMarker = path.join(browserRuntimeDir, "specpi-runtime.json");
-const browserSmokePath = path.join(agentDir, "extensions", "browser", "smoke.mjs");
-const structuralSourceDir = path.join(repoRoot, "structural-runtime");
-const integrationsPath = integrationsFile(agentDir);
-const structuralFiles = ["index.ts", "core.mjs", "config.mjs", "smoke.mjs"];
-function smokeStructuralRuntime(directory) {
-    return run(process.execPath, [path.join(repoRoot, "extensions", "structural-search", "smoke.mjs"), directory], {
-        capture: true,
-    });
-}
-
-const backgroundFiles = ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"];
-const backgroundRoot = path.join(agentDir, "extensions", "background-tasks");
-const capabilityRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
-const managedToolsDir = path.join(stateDir, "optional-tools");
-const managedBinDir = path.join(stateDir, "bin");
-function injectTestFailure(point) {
-    if (process.env.SPECPI_TESTING === "1" && process.env.SPECPI_TEST_FAIL_POINT === point) {
-        throw new Error(`Injected test failure at ${point}`);
-    }
-}
-
-process.env.PATH = (process.env.PATH || "")
-    .split(path.delimiter)
-    .filter((entry) => path.resolve(entry || ".").toLowerCase() !== path.resolve(managedBinDir).toLowerCase())
-    .join(path.delimiter);
-if (hasValidatedManagedTools()) {
-    process.env.PATH = `${managedBinDir}${path.delimiter}${process.env.PATH || ""}`;
-}
-
-const PACKAGES = [
-    "npm:pi-web-access@0.25.0",
-    "npm:@juicesharp/rpiv-ask-user-question@2.7.1",
-    "npm:@llblab/pi-codex-usage@0.9.3",
-    "npm:@tunnckocore/pi-gpt-fast-mode@0.4.0",
-    "npm:@narumitw/pi-goal@0.54.3",
+const resourcePaths = [
+    "extensions/workflow-controls/index.ts",
+    "extensions/workflow-controls/scope.mjs",
+    "extensions/workflow-controls/task-contract.mjs",
+    "extensions/workflow-controls/smoke.mjs",
+    "extensions/tool-wishlist/index.ts",
+    "extensions/tool-wishlist/core.mjs",
+    "extensions/tool-wishlist/verification.mjs",
+    "extensions/tool-wishlist/registry.mjs",
+    "extensions/tool-wishlist/validators.mjs",
+    "extensions/tool-wishlist/capabilities.json",
+    "skills/specpi-improve/SKILL.md",
 ];
-
-const OPTIONAL_TOOLS = [
-    { id: "donsetch", label: "DonSeTch", commands: ["donsetch"], purpose: "advanced web crawling skill" },
-];
-const DONSETCH_VERSION = "3.4.0";
 
 function usage() {
     console.log(`SpecPi ${VERSION}
 
 Usage:
-  ${CLI} plan
-  ${CLI} install [--yes] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
-  ${CLI} update [--yes] [--force] [--skip-package-install] [--skip-browser-install] [--skip-tool-install] [--skip-shell]
-  ${CLI} doctor
-  ${CLI} uninstall [--yes]
+  specpi plan
+  specpi install [--yes]
+  specpi update [--yes] [--force]
+  specpi doctor
+  specpi uninstall [--yes]
 
-Options:
-  --yes                   Do not ask for confirmation; attempt all missing optional tools.
-  --force                 Replace locally modified SpecPi-managed files during update.
-  --skip-package-install  Do not bootstrap Pi or install external Pi packages (also skips browser/structural runtime acquisition).
-  --skip-browser-install  Install browser tools but skip the managed Playwright/Chromium runtime.
-  --skip-tool-install     Skip DonSeTch and structural-search runtime acquisition.
-  --structural-search=on|off  Enable (default) or disable/remove the private runtime; omission preserves a saved choice.
-  --skip-shell            Do not install shell profile functions or edit a shell rc file.
-
-Environment:
-  PI_CODING_AGENT_DIR     Override the Pi agent directory (default: ~/.pi/agent).
-`);
+Installs /scope, the harness improvement loop, and eight pinned upstream packages.
+The base is tested with Pi 0.84.4. Run specpi plan to see package versions.
+--skip-package-install installs only the core, or preserves an existing base on update.
+--force replaces modified retained resources after backing them up.
+SPECPI_PI selects a Pi CLI path instead of pi on PATH.
+PI_CODING_AGENT_DIR overrides the default ~/.pi/agent destination.`);
 }
 
 function parseArgs(argv) {
     const command = argv[0] || "help";
+    // Obsolete browser/tool/shell flags remain accepted for older automation.
     const known = new Set([
         "--yes",
         "--force",
@@ -122,556 +74,438 @@ function parseArgs(argv) {
         "--skip-browser-install",
         "--skip-tool-install",
         "--skip-shell",
-        "--structural-search=on",
-        "--structural-search=off",
     ]);
-    for (const arg of argv.slice(1)) {
-        if (!known.has(arg)) {
-            throw new Error(`Unknown option: ${arg}`);
+    for (const flag of argv.slice(1)) {
+        if (!known.has(flag)) {
+            throw new Error(`Unknown option: ${flag}`);
         }
-    }
-
-    if (argv.includes("--structural-search=on") && argv.includes("--structural-search=off")) {
-        throw new Error("Choose one structural-search mode.");
-    }
-
-    if (
-        argv.some((arg) => arg.startsWith("--structural-search=")) &&
-        !["plan", "install", "update"].includes(command)
-    ) {
-        throw new Error("Structural-search selection is supported by plan/install/update only.");
     }
 
     return {
         command,
-        structuralSearch: argv.includes("--structural-search=on")
-            ? true
-            : argv.includes("--structural-search=off")
-              ? false
-              : undefined,
         yes: argv.includes("--yes"),
         force: argv.includes("--force"),
-        skipPackageInstall: argv.includes("--skip-package-install"),
-        skipBrowserInstall: argv.includes("--skip-browser-install") || argv.includes("--skip-package-install"),
-        skipToolInstall: argv.includes("--skip-tool-install"),
-        skipShell: argv.includes("--skip-shell"),
+        skipPackages: argv.includes("--skip-package-install"),
     };
+}
+
+function injectTestFailure(point) {
+    if (process.env.SPECPI_TESTING === "1" && process.env.SPECPI_TEST_FAIL_POINT === point) {
+        throw new Error(`Injected test failure at ${point}`);
+    }
+}
+
+function managedFiles() {
+    return resourcePaths.map((relative) => [path.join(repoRoot, relative), path.join(agentDir, relative), 0o644]);
+}
+
+function assertSources() {
+    for (const relative of [...resourcePaths, "templates/AGENTS.md"]) {
+        if (!fs.statSync(path.join(repoRoot, relative)).isFile()) {
+            throw new Error(`Missing repository source: ${relative}`);
+        }
+    }
+
+    const [major, minor] = process.versions.node.split(".").map(Number);
+    if (major < 22 || (major === 22 && minor < 19)) {
+        throw new Error("Node 22.19 or newer is required");
+    }
+}
+
+function assertLocalPath(file, root) {
+    const relative = path.relative(root, file);
+    if (!relative || path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`)) {
+        throw new Error(`Managed path is outside its expected directory: ${file}`);
+    }
+
+    let current = file;
+    while (current !== path.dirname(root)) {
+        if (lstatMaybe(current)?.isSymbolicLink()) {
+            throw new Error(`Managed paths must not be symlinks: ${current}`);
+        }
+
+        if (current === root) {
+            break;
+        }
+
+        current = path.dirname(current);
+    }
+}
+
+function validateManifestPaths(manifest) {
+    for (const [target, record] of Object.entries(manifest?.files || {})) {
+        assertLocalPath(target, agentDir);
+        const relative = path.relative(agentDir, target).replaceAll("\\", "/");
+        if (
+            !/^(extensions\/(?:workflow-controls|tool-wishlist|browser|command-guard|delegation|background-tasks|structural-search|files|spec|specpi-ui-refresh)\/[^/]+|extensions\/spec\.ts|skills\/(?:specpi-improve|donsetch)\/SKILL\.md|themes\/(?:tea-house|specpi-spec)\.json|specpi\/pi-profiles\.sh)$/.test(
+                relative,
+            )
+        ) {
+            throw new Error(`Unrecognized managed resource: ${target}`);
+        }
+
+        if (record.existed) {
+            assertLocalPath(path.resolve(stateDir, record.backup || ""), path.join(stateDir, "backups"));
+        }
+    }
+
+    for (const change of manifest?.settingsChanges || []) {
+        if (
+            !Array.isArray(change.path) ||
+            !["theme", "disabledExtensions", "models"].includes(change.path[0]) ||
+            change.path.some((part) => ["__proto__", "constructor", "prototype"].includes(part))
+        ) {
+            throw new Error("Unrecognized legacy settings ownership; review the manifest before updating");
+        }
+    }
+}
+
+function printPlan(options = {}) {
+    const manifest = readManifest();
+    console.log(
+        `SpecPi ${VERSION}: /scope and the harness improvement loop\nPi agent directory: ${agentDir}\nManaged files:`,
+    );
+    for (const [, target] of managedFiles()) {
+        console.log(`  ${target}`);
+    }
+
+    console.log(`  ${agentsPath} (SpecPi marker block only)\n  ${manifestPath}`);
+    const wanted = new Set(managedFiles().map(([, target]) => target));
+    for (const target of Object.keys(manifest?.files || {})) {
+        if (!wanted.has(target)) {
+            console.log(`Retire with backup: ${target}`);
+        }
+    }
+
+    if (manifest) {
+        console.log(
+            "Restore previously managed settings and remove the old shell marker block. Preserve unrelated configuration and local evidence.",
+        );
+    }
+
+    console.log(
+        options.skipPackages
+            ? "Package installation skipped; existing base packages are preserved."
+            : "Default packages (pi install):",
+    );
+    if (!options.skipPackages) {
+        for (const source of basePackages) {
+            console.log(`  ${source}`);
+        }
+    }
+
+    console.log(
+        "Only package settings are merged. No SpecPi theme, shell integration, or separate browser/tool bootstrap. Wishlist collection starts off. Backups precede mutation; downloaded packages and upstream script effects cannot be rolled back.",
+    );
+}
+
+function restoreLegacySettings(manifest, warnings) {
+    if (!(manifest?.settingsChanges?.length || manifest?.packageChanges?.length)) {
+        return;
+    }
+
+    const settings = readJson(settingsPath, {});
+    restoreSettingChanges(settings, manifest.settingsChanges || [], warnings);
+    if (manifest.packageChanges?.length) {
+        if (Array.isArray(settings.packages)) {
+            settings.packages = restorePackageChanges(settings.packages, manifest.packageChanges, warnings);
+            if (!manifest.packagesKeyBeforeExists && settings.packages.length === 0) {
+                delete settings.packages;
+            }
+        } else {
+            warnings.push("Preserved removed or non-array package setting during migration");
+        }
+    }
+
+    writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
+}
+
+function removeLegacyShell(manifest) {
+    if (manifest?.shellRc && fs.existsSync(manifest.shellRc)) {
+        const result = removeManagedBlock(fs.readFileSync(manifest.shellRc, "utf8"), SHELL_START, SHELL_END);
+        finishManagedBlockRemoval(manifest.shellRc, result, manifest.blockFiles?.shell?.existed ?? true);
+    }
+}
+
+function backupTransaction(transaction, backupDir) {
+    fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const inventory = [];
+    for (const [target, previous] of transaction) {
+        const name = `${inventory.length}.backup`;
+        if (previous.exists) {
+            atomicWrite(path.join(backupDir, name), previous.data, 0o600);
+        }
+
+        inventory.push({
+            target,
+            existed: previous.exists,
+            mode: previous.mode,
+            ...(previous.exists ? { file: name, sha256: sha256(previous.data) } : {}),
+        });
+    }
+
+    writeJson(path.join(backupDir, "inventory.json"), inventory);
+}
+
+async function mutate(options, operation) {
+    assertSources();
+    assertLocalPath(manifestPath, agentDir);
+    if (operation !== "uninstall") {
+        printPlan(options);
+    }
+
+    await confirm(`${operation} SpecPi ${VERSION}?`, options.yes);
+    const releaseLock = acquireLock();
+    let transaction;
+    let acquisitionStarted = false;
+    const moved = [];
+    try {
+        const previous = readManifest(operation !== "install");
+        if (operation === "install" && previous) {
+            throw new Error("SpecPi is already installed. Run specpi update.");
+        }
+
+        validateManifestPaths(previous);
+        const files = operation === "uninstall" ? [] : managedFiles();
+        validateManagedUpdate(previous, files, options.force);
+        const watched = [
+            agentsPath,
+            manifestPath,
+            ...files.map(([, target]) => target),
+            ...Object.keys(previous?.files || {}),
+        ];
+        if (!options.skipPackages || previous?.settingsChanges?.length || previous?.packageChanges?.length) {
+            watched.push(settingsPath);
+        }
+
+        if (previous?.shellRc) {
+            watched.push(previous.shellRc);
+        }
+
+        for (const file of watched) {
+            if (file !== previous?.shellRc) {
+                assertLocalPath(file, agentDir);
+            }
+        }
+
+        assertNoBrokenSymlinks(watched);
+        transaction = snapshot(watched);
+        const backupDir = path.join(stateDir, "backups", `${timestamp()}-${operation}`);
+        backupTransaction(transaction, backupDir);
+        const warnings = [];
+        const preserveBase = operation !== "uninstall" && options.skipPackages && previous?.basePackages?.length;
+        restoreLegacySettings(preserveBase ? { ...previous, packageChanges: [] } : previous, warnings);
+        removeLegacyShell(previous);
+        let packageState = preserveBase
+            ? {
+                  basePackages: previous.basePackages,
+                  packageChanges: previous.packageChanges,
+                  packagesKeyBeforeExists: previous.packagesKeyBeforeExists,
+              }
+            : { basePackages: [] };
+        if (operation !== "uninstall" && !options.skipPackages) {
+            const before = readJson(settingsPath, {});
+            if (before.packages !== undefined && !Array.isArray(before.packages)) {
+                throw new Error("settings.json packages must be an array; preserved existing configuration");
+            }
+
+            assertLocalPath(path.join(agentDir, "npm", "package.json"), agentDir);
+            assertLocalPath(path.join(agentDir, "npm", "node_modules"), agentDir);
+            acquisitionStarted = true;
+            installBasePackages(agentDir);
+            const after = readJson(settingsPath, {});
+            const packageErrors = checkBasePackages(agentDir, after);
+            if (packageErrors.length) {
+                throw new Error(packageErrors.join("\n"));
+            }
+
+            packageState = {
+                basePackages,
+                packagesKeyBeforeExists: Object.hasOwn(before, "packages"),
+                packageChanges: packageChanges(before.packages || [], after.packages || []),
+            };
+        }
+
+        injectTestFailure("after-settings");
+        const records = {};
+        const wanted = new Set(files.map(([, target]) => target));
+        for (const [target, record] of Object.entries(previous?.files || {})) {
+            if (wanted.has(target)) {
+                continue;
+            }
+
+            // A retired local edit is backed up outside Pi's resource discovery before deactivation.
+            if (fs.existsSync(target) && sha256(fs.readFileSync(target)) !== record.installedHash) {
+                warnings.push(`Retired modified resource; saved in ${backupDir}: ${target}`);
+                if (record.existed) {
+                    atomicWrite(target, fs.readFileSync(path.join(stateDir, record.backup)), record.mode || 0o644);
+                } else {
+                    fs.rmSync(target);
+                }
+            } else {
+                restoreFileRecord(target, record, warnings, operation);
+            }
+        }
+
+        for (const [source, target, mode] of files) {
+            const record = createOriginalFileRecord(
+                target,
+                backupDir,
+                previous?.files?.[target],
+                Object.keys(records).length,
+            );
+            const data = fs.readFileSync(source);
+            atomicWrite(target, data, mode);
+            record.installedHash = sha256(data);
+            records[target] = record;
+            injectTestFailure("after-first-managed-file");
+        }
+
+        // Preserve legacy runtime bytes wholesale; never traverse private evidence or downloaded tool trees.
+        const retiredRuntimes = [
+            ["browser-runtime", previous?.browserRuntime?.installed === true],
+            ["structural-runtime", previous?.structuralRuntime?.installed === true],
+        ];
+        for (const [name, owned] of retiredRuntimes) {
+            const source = path.join(stateDir, name);
+            if (!owned || !fs.existsSync(source)) {
+                continue;
+            }
+
+            assertLocalPath(source, stateDir);
+            const destination = path.join(backupDir, name);
+            fs.renameSync(source, destination);
+            moved.push({ source, destination });
+        }
+
+        injectTestFailure("after-retirement");
+        if (operation === "uninstall") {
+            if (fs.existsSync(agentsPath)) {
+                finishManagedBlockRemoval(
+                    agentsPath,
+                    removeManagedBlock(fs.readFileSync(agentsPath, "utf8"), AGENTS_START, AGENTS_END),
+                    previous.blockFiles?.agents?.existed ?? true,
+                );
+            }
+
+            fs.rmSync(manifestPath);
+        } else {
+            const existing = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, "utf8") : "";
+            atomicWrite(
+                agentsPath,
+                upsertManagedBlock(existing, AGENTS_START, AGENTS_END, makeAgentsBlock()),
+                existingMode(agentsPath, 0o644),
+            );
+            writeJson(manifestPath, {
+                schema: 1,
+                version: VERSION,
+                agentDir,
+                installedAt: previous?.installedAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                blockFiles: { agents: previous?.blockFiles?.agents || { existed: transaction.get(agentsPath).exists } },
+                files: records,
+                ...packageState,
+                backups: [...(previous?.backups || []), path.relative(stateDir, backupDir)],
+            });
+        }
+
+        injectTestFailure("after-manifest");
+        console.log(`SpecPi ${operation} complete. Backup: ${backupDir}`);
+        for (const warning of warnings) {
+            console.warn(`Warning: ${warning}`);
+        }
+
+        console.log(
+            "Local wishlist and other private evidence were preserved. Restart Pi to unload retired resources.",
+        );
+    } catch (error) {
+        const failures = [];
+        for (const { source, destination } of moved.reverse()) {
+            try {
+                fs.renameSync(destination, source);
+            } catch (failure) {
+                failures.push(failure.message);
+            }
+        }
+
+        if (transaction) {
+            try {
+                restoreSnapshot(transaction);
+            } catch (failure) {
+                failures.push(failure.message);
+            }
+        }
+
+        throw new Error(
+            `${transaction ? "SpecPi-managed changes rolled back: " : ""}${error.message}${acquisitionStarted ? "; downloaded packages and upstream install-script effects may remain" : ""}${failures.length ? `; rollback errors: ${failures.join("; ")}` : ""}`,
+        );
+    } finally {
+        releaseLock();
+    }
+}
+
+async function installOrUpdate(options, update) {
+    return mutate(options, update ? "update" : "install");
+}
+
+async function uninstall(options) {
+    return mutate(options, "uninstall");
+}
+
+async function doctor() {
+    const manifest = readManifest(true);
+    validateManifestPaths(manifest);
+    const errors = [];
+    if (manifest.basePackages?.length) {
+        errors.push(...checkBasePackages(agentDir, readJson(settingsPath, {})));
+    } else {
+        console.log("Core-only installation: default package installation was skipped.");
+    }
+
+    const wanted = new Set(managedFiles().map(([, target]) => target));
+    for (const target of wanted) {
+        const record = manifest.files?.[target];
+        if (!record || !fs.existsSync(target) || sha256(fs.readFileSync(target)) !== record.installedHash) {
+            errors.push(`Missing or modified managed file: ${target}`);
+        }
+    }
+
+    for (const target of Object.keys(manifest.files || {})) {
+        if (!wanted.has(target)) {
+            errors.push(`Retired resource is still managed; run specpi update: ${target}`);
+        }
+    }
+
+    if (!fs.existsSync(agentsPath) || !fs.readFileSync(agentsPath, "utf8").includes(makeAgentsBlock())) {
+        errors.push("SpecPi working agreement is missing or outdated");
+    }
+
+    const registry = validateCapabilityRegistry(
+        JSON.parse(fs.readFileSync(path.join(agentDir, "extensions/tool-wishlist/capabilities.json"), "utf8")),
+    );
+    for (const name of new Set(registry.capabilities.flatMap((item) => item.validations))) {
+        const result = runValidator(name);
+        if (result.code !== 0) {
+            errors.push(`validator ${name} failed: ${result.stderr || result.stdout}`);
+        } else {
+            console.log(result.stdout.trim());
+        }
+    }
+
+    for (const error of errors) {
+        console.error(error);
+    }
+
+    console.log(
+        errors.length ? `Doctor failed with ${errors.length} error(s).` : "OK: scope and improvement loop verified.",
+    );
+    if (errors.length) {
+        process.exitCode = 1;
+    }
 }
 
 function timestamp() {
     return new Date().toISOString().replaceAll(":", "").replaceAll(".", "-");
-}
-
-function envValue(env, name) {
-    if (env[name] !== undefined) {
-        return env[name];
-    }
-
-    const key = Object.keys(env).find((item) => item.toLowerCase() === name.toLowerCase());
-
-    return key ? env[key] : undefined;
-}
-
-function resolveCommand(command, env = process.env) {
-    const hasPath = command.includes("/") || command.includes("\\");
-    const directories = hasPath ? [""] : (envValue(env, "PATH") || "").split(path.delimiter);
-    const extension = path.extname(command);
-    const candidates =
-        process.platform === "win32" && !extension
-            ? (envValue(env, "PATHEXT") || ".COM;.EXE;.BAT;.CMD").split(";").map((item) => `${command}${item}`)
-            : [command];
-
-    for (const directory of directories) {
-        for (const candidate of candidates) {
-            const file = hasPath ? candidate : path.join(directory || ".", candidate);
-            try {
-                const stat = fs.statSync(file);
-                if (stat.isFile() && (process.platform === "win32" || (stat.mode & 0o111) !== 0)) {
-                    return path.resolve(file);
-                }
-            } catch (error) {
-                const windowsAppsWinget = envValue(env, "LOCALAPPDATA")
-                    ? path.join(envValue(env, "LOCALAPPDATA"), "Microsoft", "WindowsApps", "winget.exe")
-                    : undefined;
-                if (
-                    process.platform === "win32" &&
-                    (error.code === "EACCES" || error.code === "EPERM") &&
-                    windowsAppsWinget &&
-                    path.resolve(file).toLowerCase() === path.resolve(windowsAppsWinget).toLowerCase()
-                ) {
-                    // The winget App Execution Alias can execute even when Windows denies
-                    // metadata access to its reparse point under WindowsApps.
-                    return path.resolve(file);
-                }
-
-                // Like shell PATH lookup, continue past inaccessible candidates.
-                // Explicit executable paths must still report permission failures.
-                if (!hasPath && (error.code === "EACCES" || error.code === "EPERM")) {
-                    continue;
-                }
-
-                if (error.code !== "ENOENT" && error.code !== "ENOTDIR") {
-                    throw error;
-                }
-            }
-        }
-    }
-
-    return undefined;
-}
-
-function commandExists(command) {
-    return resolveCommand(command) !== undefined;
-}
-
-function powerShellVersion(executable) {
-    if (!executable) {
-        return undefined;
-    }
-
-    try {
-        const result = run(
-            executable,
-            ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.ToString()"],
-            { capture: true },
-        );
-        const version = String(result.stdout || "").trim();
-
-        return /^\d+\.\d+(?:\.\d+){0,2}$/.test(version) ? version : "unknown";
-    } catch {
-        return "unknown";
-    }
-}
-
-function hasValidatedManagedTools() {
-    if (!fs.existsSync(manifestPath) || !fs.existsSync(managedBinDir)) {
-        return false;
-    }
-
-    try {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-        const records = manifest.managedOptionalTools || [];
-        if (records.length === 0) {
-            return false;
-        }
-
-        const expectedNames = new Set();
-        for (const record of records) {
-            if (path.dirname(record.target) !== managedBinDir || path.dirname(record.marker) !== managedToolsDir) {
-                return false;
-            }
-
-            const targetStat = fs.lstatSync(record.target);
-            const markerStat = fs.lstatSync(record.marker);
-            if (
-                !targetStat.isFile() ||
-                targetStat.isSymbolicLink() ||
-                !markerStat.isFile() ||
-                markerStat.isSymbolicLink()
-            ) {
-                return false;
-            }
-
-            if (sha256(fs.readFileSync(record.target)) !== record.installedHash) {
-                return false;
-            }
-
-            expectedNames.add(path.basename(record.target));
-        }
-
-        const actualNames = fs.readdirSync(managedBinDir).filter((name) => !name.startsWith("."));
-
-        return actualNames.length === expectedNames.size && actualNames.every((name) => expectedNames.has(name));
-    } catch {
-        return false;
-    }
-}
-
-function compareVersions(left, right) {
-    const leftParts = left.split(".").map(Number);
-    const rightParts = right.split(".").map(Number);
-    for (let index = 0; index < 3; index += 1) {
-        if (leftParts[index] !== rightParts[index]) {
-            return leftParts[index] - rightParts[index];
-        }
-    }
-
-    return 0;
-}
-
-function npmGlobalBinDir() {
-    const result = run("npm", ["prefix", "--global"], { capture: true });
-    const prefix = (result.stdout || "").trim();
-    if (!prefix) {
-        throw new Error("Could not determine npm's global installation prefix.");
-    }
-
-    return process.platform === "win32" ? prefix : path.join(prefix, "bin");
-}
-
-function installPi() {
-    run("npm", [
-        "install",
-        "--global",
-        "--ignore-scripts",
-        `${PI_PACKAGE}@${PI_PACKAGE_VERSION}`,
-        "--no-audit",
-        "--no-fund",
-    ]);
-    if (!commandExists("pi")) {
-        const binDir = npmGlobalBinDir();
-        throw new Error(
-            `Pi was installed by npm, but ${binDir} is not available on PATH. Add that directory to PATH, open a new terminal, and rerun SpecPi install.`,
-        );
-    }
-
-    assertPiVersion();
-}
-
-function assertPiVersion() {
-    const result = run("pi", ["--version"], { capture: true });
-    const match = (result.stdout || "").match(/\b(\d+\.\d+\.\d+)\b/);
-    if (!match) {
-        throw new Error("Could not determine the installed Pi version from `pi --version`.");
-    }
-
-    if (compareVersions(match[1], MIN_PI_VERSION) < 0) {
-        throw new Error(`Pi ${MIN_PI_VERSION} or newer is required; found ${match[1]}.`);
-    }
-
-    return match[1];
-}
-
-function quoteWindowsCommandArg(value) {
-    return `"${String(value).replaceAll("%", "%%").replaceAll('"', '""')}"`;
-}
-
-function run(command, args, options = {}) {
-    const env = { ...process.env, ...(options.env || {}) };
-    const executable = resolveCommand(command, env) || command;
-    const needsWindowsCommandProcessor = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
-    const spawnOptions = {
-        cwd: options.cwd || os.homedir(),
-        env,
-        encoding: "utf8",
-        stdio: options.capture ? "pipe" : "inherit",
-    };
-    const result = needsWindowsCommandProcessor
-        ? spawnSync([executable, ...args].map(quoteWindowsCommandArg).join(" "), {
-              ...spawnOptions,
-              shell: envValue(env, "ComSpec") || "cmd.exe",
-          })
-        : spawnSync(executable, args, spawnOptions);
-    if (result.error) {
-        throw result.error;
-    }
-
-    if (result.status !== 0) {
-        const detail = options.capture ? `\n${result.stderr || result.stdout || ""}` : "";
-        throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status}${detail}`);
-    }
-
-    return result;
-}
-
-function optionalToolInstalled(tool) {
-    return tool.commands.some(commandExists);
-}
-
-function optionalToolInstallSpec(_tool) {
-    if (!commandExists("npm")) {
-        return { unavailable: "npm is not available" };
-    }
-
-    return {
-        command: "npm",
-        args: ["install", "--global", `donsetch@${DONSETCH_VERSION}`, "--no-audit", "--no-fund"],
-    };
-}
-
-function shellDisplay(value) {
-    const text = String(value);
-
-    return /^[A-Za-z0-9_@%+=:,./\\-]+$/.test(text) ? text : JSON.stringify(text);
-}
-
-function formatInstallSpec(spec) {
-    if (spec.unavailable) {
-        return `unavailable: ${spec.unavailable}`;
-    }
-
-    return [spec.command, ...spec.args].map(shellDisplay).join(" ");
-}
-
-async function chooseOptionalTools(options) {
-    if (options.skipToolInstall) {
-        return [];
-    }
-
-    const missing = OPTIONAL_TOOLS.filter((tool) => !optionalToolInstalled(tool));
-    if (missing.length === 0) {
-        return [];
-    }
-
-    if (options.yes) {
-        return missing;
-    }
-
-    if (!process.stdin.isTTY) {
-        throw new Error(
-            `Optional tool selection requires a TTY; pass --yes to install all missing tools or --skip-tool-install.`,
-        );
-    }
-
-    const selected = [];
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    try {
-        console.log("\nOptional tools (global npm installs are external and are not removed on uninstall):");
-        for (const tool of missing) {
-            const spec = optionalToolInstallSpec(tool);
-            if (spec.unavailable) {
-                console.warn(`  ${tool.label}: ${spec.unavailable}`);
-                continue;
-            }
-
-            const answer = (
-                await rl.question(`Install ${tool.label} for ${tool.purpose}?\n  ${formatInstallSpec(spec)}\n[y/N] `)
-            )
-                .trim()
-                .toLowerCase();
-            if (answer === "y" || answer === "yes") {
-                selected.push(tool);
-            }
-        }
-    } finally {
-        rl.close();
-    }
-
-    return selected;
-}
-
-async function installOptionalTools(tools) {
-    const warnings = [];
-    const externalAttempts = [];
-    for (const tool of tools) {
-        const spec = optionalToolInstallSpec(tool);
-        if (spec.unavailable) {
-            warnings.push(`Could not install optional tool ${tool.label}: ${spec.unavailable}.`);
-            continue;
-        }
-
-        console.log(`\nInstalling optional tool ${tool.label}:`);
-        console.log(`  ${formatInstallSpec(spec)}`);
-        try {
-            externalAttempts.push(tool.label);
-            run(spec.command, spec.args);
-            if (!optionalToolInstalled(tool)) {
-                warnings.push(
-                    `${tool.label} installed successfully but is not visible on the current PATH; restart the terminal before using it.`,
-                );
-            }
-        } catch (error) {
-            warnings.push(`Optional tool ${tool.label} failed to install: ${error.message}`);
-        }
-    }
-
-    return {
-        warnings,
-        managedRecords: [],
-        externalAttempts,
-        rollback() {
-            return [];
-        },
-    };
-}
-
-function browserRuntimeLockHash() {
-    return sha256(fs.readFileSync(path.join(browserRuntimeSourceDir, "package-lock.json")));
-}
-
-function browserRuntimeStatus() {
-    if (!fs.existsSync(browserRuntimeMarker)) {
-        return { installed: false, reason: "runtime marker is missing" };
-    }
-
-    try {
-        const marker = readJson(browserRuntimeMarker, {});
-        const playwright = readJson(path.join(browserRuntimeDir, "node_modules", "playwright", "package.json"), {});
-        const browsersDir = path.join(browserRuntimeDir, "browsers");
-        const hasBrowser =
-            fs.existsSync(browsersDir) && fs.readdirSync(browsersDir).some((entry) => !entry.startsWith("."));
-        if (marker.schema !== 1 || marker.lockHash !== browserRuntimeLockHash()) {
-            return { installed: false, reason: "runtime lock does not match this SpecPi release" };
-        }
-
-        if (playwright.version !== "1.62.1") {
-            return { installed: false, reason: "Playwright 1.62.1 is not installed" };
-        }
-
-        if (!hasBrowser) {
-            return { installed: false, reason: "managed Chromium is missing" };
-        }
-
-        return { installed: true, version: playwright.version, lockHash: marker.lockHash };
-    } catch (error) {
-        return { installed: false, reason: error.message };
-    }
-}
-
-function smokeBrowserRuntime(directory) {
-    try {
-        return run(
-            process.execPath,
-            [path.join(repoRoot, "extensions", "browser", "smoke.mjs"), directory, "--accessibility"],
-            {
-                capture: true,
-            },
-        );
-    } catch (error) {
-        throw new Error(
-            `${error.message}\nChromium could not launch. Verify the host satisfies Playwright Chromium system dependencies; SpecPi does not install Playwright system dependencies.`,
-        );
-    }
-}
-
-function installBrowserRuntime(warnings) {
-    const current = browserRuntimeStatus();
-    if (current.installed) {
-        try {
-            smokeBrowserRuntime(browserRuntimeDir);
-            console.log(
-                "Managed browser runtime is current and passed its launch smoke; reusing Playwright 1.62.1 and Chromium.",
-            );
-
-            return {
-                commit() {},
-                rollback() {
-                    return [];
-                },
-                changed: false,
-            };
-        } catch (error) {
-            warnings.push(`Existing managed browser runtime failed validation and will be replaced: ${error.message}`);
-        }
-    }
-
-    const operationStamp = `${process.pid}-${Date.now()}`;
-    const stage = path.join(stateDir, `.browser-runtime-stage-${operationStamp}`);
-    const previous = path.join(stateDir, `.browser-runtime-previous-${operationStamp}`);
-    const failed = path.join(stateDir, `.browser-runtime-failed-${operationStamp}`);
-    let promoted = false;
-    try {
-        fs.rmSync(stage, { recursive: true, force: true });
-        fs.rmSync(previous, { recursive: true, force: true });
-        fs.mkdirSync(stage, { recursive: true, mode: 0o700 });
-        fs.copyFileSync(path.join(browserRuntimeSourceDir, "package.json"), path.join(stage, "package.json"));
-        fs.copyFileSync(path.join(browserRuntimeSourceDir, "package-lock.json"), path.join(stage, "package-lock.json"));
-        run("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], { cwd: stage });
-        const browsersPath = path.join(stage, "browsers");
-        run(process.execPath, [path.join(stage, "node_modules", "playwright", "cli.js"), "install", "chromium"], {
-            cwd: stage,
-            env: { PLAYWRIGHT_BROWSERS_PATH: browsersPath },
-        });
-        writeJson(
-            path.join(stage, "specpi-runtime.json"),
-            { schema: 1, playwrightVersion: "1.62.1", lockHash: browserRuntimeLockHash() },
-            0o600,
-        );
-
-        if (fs.existsSync(browserRuntimeDir)) {
-            fs.renameSync(browserRuntimeDir, previous);
-        }
-
-        fs.renameSync(stage, browserRuntimeDir);
-        promoted = true;
-        smokeBrowserRuntime(browserRuntimeDir);
-    } catch (error) {
-        const cleanupErrors = [];
-        try {
-            fs.rmSync(stage, { recursive: true, force: true });
-        } catch (cleanupError) {
-            cleanupErrors.push(cleanupError.message);
-        }
-
-        if (promoted && fs.existsSync(browserRuntimeDir)) {
-            try {
-                fs.renameSync(browserRuntimeDir, failed);
-            } catch (cleanupError) {
-                cleanupErrors.push(`quarantine failed runtime: ${cleanupError.message}`);
-            }
-        }
-
-        if (fs.existsSync(previous) && !fs.existsSync(browserRuntimeDir)) {
-            try {
-                fs.renameSync(previous, browserRuntimeDir);
-            } catch (cleanupError) {
-                cleanupErrors.push(`restore previous runtime: ${cleanupError.message}`);
-            }
-        }
-
-        if (fs.existsSync(failed)) {
-            try {
-                fs.rmSync(failed, { recursive: true, force: true });
-            } catch (cleanupError) {
-                cleanupErrors.push(`remove failed runtime: ${cleanupError.message}`);
-            }
-        }
-
-        throw new Error(
-            `${error.message}${cleanupErrors.length ? `\nRuntime cleanup also failed: ${cleanupErrors.join("; ")}` : ""}`,
-        );
-    }
-
-    let settled = false;
-
-    return {
-        changed: true,
-        commit() {
-            if (settled) {
-                return;
-            }
-
-            settled = true;
-            try {
-                fs.rmSync(previous, { recursive: true, force: true });
-            } catch (error) {
-                warnings.push(`Could not remove retired browser runtime ${previous}: ${error.message}`);
-            }
-        },
-        rollback() {
-            if (settled) {
-                return [];
-            }
-
-            settled = true;
-            const errors = [];
-            if (fs.existsSync(browserRuntimeDir)) {
-                try {
-                    fs.renameSync(browserRuntimeDir, failed);
-                } catch (error) {
-                    errors.push(`quarantine new runtime: ${error.message}`);
-                }
-            }
-
-            if (fs.existsSync(previous) && !fs.existsSync(browserRuntimeDir)) {
-                try {
-                    fs.renameSync(previous, browserRuntimeDir);
-                } catch (error) {
-                    errors.push(`restore previous runtime: ${error.message}`);
-                }
-            }
-
-            if (fs.existsSync(failed)) {
-                try {
-                    fs.rmSync(failed, { recursive: true, force: true });
-                } catch (error) {
-                    errors.push(`remove rolled-back runtime: ${error.message}`);
-                }
-            }
-
-            return errors;
-        },
-    };
 }
 
 function readJson(file, fallback = {}) {
@@ -740,27 +574,6 @@ function existingMode(file, fallback) {
     }
 }
 
-function detectShellRc() {
-    if (process.env.SPECPI_SHELL_RC) {
-        return path.resolve(process.env.SPECPI_SHELL_RC);
-    }
-
-    const shell = path.basename(process.env.SHELL || "");
-    if (shell === "bash") {
-        return path.join(os.homedir(), ".bashrc");
-    }
-
-    if (shell === "zsh") {
-        return path.join(os.homedir(), ".zshrc");
-    }
-
-    return undefined;
-}
-
-function shellQuote(value) {
-    return `'${String(value).replaceAll("'", `'"'"'`)}'`;
-}
-
 function validManagedModelScope(value) {
     return (
         value?.enforce === true &&
@@ -769,179 +582,6 @@ function validManagedModelScope(value) {
         value.allow.length === 1 &&
         (value.allow[0] === "inherit" || /^[^/*]+\/\*$/.test(value.allow[0]))
     );
-}
-
-function desiredSettingsOperations() {
-    return [
-        {
-            path: ["theme"],
-            value: "specpi-spec",
-            userTunable: true,
-            validate: (value) =>
-                typeof value === "string" &&
-                value.trim().length > 0 &&
-                value.length <= 128 &&
-                !/[\u0000-\u001f\u007f]/u.test(value),
-        },
-    ];
-}
-
-function managedFiles(includeShell) {
-    const files = [
-        ...structuralFiles.map((name) => [
-            path.join(repoRoot, "extensions", "structural-search", name),
-            path.join(agentDir, "extensions", "structural-search", name),
-            0o644,
-        ]),
-        [
-            path.join(repoRoot, "extensions", "browser", "accessibility.ts"),
-            path.join(agentDir, "extensions", "browser", "accessibility.ts"),
-            0o644,
-        ],
-        ...backgroundFiles.map((name) => [
-            path.join(repoRoot, "extensions", "background-tasks", name),
-            path.join(backgroundRoot, name),
-            0o644,
-        ]),
-        [path.join(repoRoot, "extensions", "spec.ts"), path.join(agentDir, "extensions", "spec.ts"), 0o644],
-        [
-            path.join(repoRoot, "extensions", "spec", "core.mjs"),
-            path.join(agentDir, "extensions", "spec", "core.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "ui-refresh", "index.ts"),
-            path.join(agentDir, "extensions", "specpi-ui-refresh", "index.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "workflow-controls", "index.ts"),
-            path.join(agentDir, "extensions", "workflow-controls", "index.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "workflow-controls", "scope.mjs"),
-            path.join(agentDir, "extensions", "workflow-controls", "scope.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "workflow-controls", "task-contract.mjs"),
-            path.join(agentDir, "extensions", "workflow-controls", "task-contract.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "workflow-controls", "experiments.mjs"),
-            path.join(agentDir, "extensions", "workflow-controls", "experiments.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "workflow-controls", "challenge.mjs"),
-            path.join(agentDir, "extensions", "workflow-controls", "challenge.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "workflow-controls", "smoke.mjs"),
-            path.join(agentDir, "extensions", "workflow-controls", "smoke.mjs"),
-            0o755,
-        ],
-        [
-            path.join(repoRoot, "extensions", "files", "index.ts"),
-            path.join(agentDir, "extensions", "files", "index.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "files", "core.mjs"),
-            path.join(agentDir, "extensions", "files", "core.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "browser", "index.ts"),
-            path.join(agentDir, "extensions", "browser", "index.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "browser", "core.mjs"),
-            path.join(agentDir, "extensions", "browser", "core.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "browser", "diagnostics.ts"),
-            path.join(agentDir, "extensions", "browser", "diagnostics.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "browser", "lifecycle.ts"),
-            path.join(agentDir, "extensions", "browser", "lifecycle.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "browser", "interactions.ts"),
-            path.join(agentDir, "extensions", "browser", "interactions.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "browser", "smoke.mjs"),
-            path.join(agentDir, "extensions", "browser", "smoke.mjs"),
-            0o755,
-        ],
-        [
-            path.join(repoRoot, "extensions", "tool-wishlist", "index.ts"),
-            path.join(agentDir, "extensions", "tool-wishlist", "index.ts"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "tool-wishlist", "core.mjs"),
-            path.join(agentDir, "extensions", "tool-wishlist", "core.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "tool-wishlist", "verification.mjs"),
-            path.join(agentDir, "extensions", "tool-wishlist", "verification.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "tool-wishlist", "registry.mjs"),
-            path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "tool-wishlist", "validators.mjs"),
-            path.join(agentDir, "extensions", "tool-wishlist", "validators.mjs"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "extensions", "tool-wishlist", "capabilities.json"),
-            path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json"),
-            0o644,
-        ],
-        ...COMMAND_GUARD_MANAGED_FILES.map((name) => [
-            path.join(repoRoot, "extensions", "command-guard", name),
-            path.join(agentDir, "extensions", "command-guard", name),
-            0o644,
-        ]),
-        ...DELEGATION_MANAGED_FILES.map((name) => [
-            path.join(repoRoot, "extensions", "delegation", name),
-            path.join(agentDir, "extensions", "delegation", name),
-            0o644,
-        ]),
-        [
-            path.join(repoRoot, "skills", "specpi-improve", "SKILL.md"),
-            path.join(agentDir, "skills", "specpi-improve", "SKILL.md"),
-            0o644,
-        ],
-        [
-            path.join(repoRoot, "skills", "donsetch", "SKILL.md"),
-            path.join(agentDir, "skills", "donsetch", "SKILL.md"),
-            0o644,
-        ],
-        [path.join(repoRoot, "themes", "tea-house.json"), path.join(agentDir, "themes", "tea-house.json"), 0o644],
-        [path.join(repoRoot, "themes", "specpi-spec.json"), path.join(agentDir, "themes", "specpi-spec.json"), 0o644],
-    ];
-    if (includeShell) {
-        files.push([path.join(repoRoot, "shell", "pi-profiles.sh"), path.join(stateDir, "pi-profiles.sh"), 0o644]);
-    }
-
-    return files;
 }
 
 function snapshot(files) {
@@ -996,111 +636,6 @@ function createOriginalFileRecord(target, backupDir, existingRecord, index) {
     };
 }
 
-function applySettings(settings, operations, previousChanges = []) {
-    const changesByPath = new Map(previousChanges.map((change) => [change.path.join("."), change]));
-    const changes = [];
-    for (const operation of operations) {
-        const key = operation.path.join(".");
-        const existingChange = changesByPath.get(key);
-        const current = readPath(settings, operation.path);
-        const before = existingChange || {
-            path: operation.path,
-            beforeExists: current.exists,
-            ...(current.exists ? { before: structuredClone(current.value) } : {}),
-        };
-        const currentMatchesPrevious = existingChange
-            ? existingChange.installedExists
-                ? current.exists && deepEqual(current.value, existingChange.installed)
-                : !current.exists
-            : false;
-        const currentIsValid = current.exists && (!operation.validate || operation.validate(current.value));
-        const preserveTunable = operation.userTunable && currentIsValid && (!existingChange || !currentMatchesPrevious);
-        const preserveDynamicPolicy = operation.dynamicPolicy && currentIsValid;
-
-        if (operation.arrayIncludes) {
-            const original = existingChange
-                ? {
-                      path: structuredClone(existingChange.path),
-                      beforeExists: existingChange.beforeExists,
-                      ...(existingChange.beforeExists ? { before: structuredClone(existingChange.before) } : {}),
-                  }
-                : structuredClone(before);
-            const existingValues = current.exists && Array.isArray(current.value) ? current.value : [];
-            const installed = [...existingValues];
-            for (const entry of operation.arrayIncludes) {
-                if (!installed.some((value) => deepEqual(value, entry))) {
-                    installed.push(structuredClone(entry));
-                }
-            }
-
-            setPath(settings, operation.path, installed);
-            changes.push({
-                ...original,
-                managedArrayEntries: structuredClone(operation.arrayIncludes),
-                installedExists: true,
-                installed: structuredClone(installed),
-            });
-            continue;
-        }
-
-        if (preserveTunable) {
-            changes.push({ ...structuredClone(before), userTunable: true });
-            continue;
-        }
-
-        if (preserveDynamicPolicy) {
-            changes.push({
-                ...structuredClone(before),
-                dynamicPolicy: true,
-                installedExists: true,
-                installed: structuredClone(current.value),
-            });
-            continue;
-        }
-
-        if (operation.delete) {
-            deletePath(settings, operation.path);
-        } else {
-            setPath(settings, operation.path, operation.value);
-        }
-
-        changes.push({
-            ...structuredClone(before),
-            ...(operation.userTunable ? { userTunable: true } : {}),
-            ...(operation.dynamicPolicy ? { dynamicPolicy: true } : {}),
-            installedExists: !operation.delete,
-            ...(!operation.delete ? { installed: structuredClone(operation.value) } : {}),
-        });
-    }
-
-    return changes;
-}
-
-function retireSettings(settings, previousChanges, operations, warnings) {
-    const desired = new Set(operations.map((operation) => operation.path.join(".")));
-    const retired = previousChanges.filter((change) => !desired.has(change.path.join(".")));
-    restoreSettingChanges(settings, retired, warnings);
-}
-
-function buildPackageChanges(packagesBeforeOperation, previousChanges = []) {
-    return PACKAGES.map((installed) => {
-        const identity = packageIdentity(installed);
-        const previous = previousChanges.find((change) => change.identity === identity);
-        if (previous) {
-            return { ...structuredClone(previous), installed };
-        }
-
-        const before = (packagesBeforeOperation || []).find((entry) => packageIdentity(entry) === identity);
-
-        return {
-            identity,
-            beforeExists: before !== undefined,
-            ...(before !== undefined ? { before: structuredClone(before) } : {}),
-            installed,
-        };
-    });
-}
-
 function restoreFileRecord(target, record, warnings, reason) {
     if (!fs.existsSync(target)) {
         return;
@@ -1128,12 +663,6 @@ function makeAgentsBlock() {
     const template = fs.readFileSync(path.join(repoRoot, "templates", "AGENTS.md"), "utf8").trim();
 
     return `_SpecPi-managed guidance, version ${VERSION}._\n\n${template}`;
-}
-
-function makeShellBlock() {
-    const profile = path.join(stateDir, "pi-profiles.sh");
-
-    return `[ -f ${shellQuote(profile)} ] && . ${shellQuote(profile)}`;
 }
 
 function finishManagedBlockRemoval(file, result, existedBefore) {
@@ -1183,205 +712,6 @@ async function confirm(message, yes) {
     }
 }
 
-function assertSources() {
-    const required = [
-        "scripts/structural-runtime.mjs",
-        "structural-runtime/package.json",
-        "structural-runtime/package-lock.json",
-        ...structuralFiles.map((name) => `extensions/structural-search/${name}`),
-        "extensions/browser/accessibility.ts",
-        ...backgroundFiles.map((name) => `extensions/background-tasks/${name}`),
-        "extensions/spec.ts",
-        "extensions/spec/core.mjs",
-        "extensions/ui-refresh/index.ts",
-        "extensions/workflow-controls/index.ts",
-        "extensions/workflow-controls/scope.mjs",
-        "extensions/workflow-controls/task-contract.mjs",
-        "extensions/workflow-controls/experiments.mjs",
-        "extensions/workflow-controls/challenge.mjs",
-        "extensions/workflow-controls/smoke.mjs",
-        "extensions/files/index.ts",
-        "extensions/files/core.mjs",
-        "extensions/browser/index.ts",
-        "extensions/browser/core.mjs",
-        "extensions/browser/diagnostics.ts",
-        "extensions/browser/interactions.ts",
-        "extensions/browser/lifecycle.ts",
-        "extensions/browser/smoke.mjs",
-        "browser-runtime/package.json",
-        "browser-runtime/package-lock.json",
-        "extensions/tool-wishlist/index.ts",
-        "extensions/tool-wishlist/core.mjs",
-        "extensions/tool-wishlist/verification.mjs",
-        "extensions/tool-wishlist/registry.mjs",
-        "extensions/tool-wishlist/validators.mjs",
-        "extensions/tool-wishlist/capabilities.json",
-        ...COMMAND_GUARD_MANAGED_FILES.map((name) => `extensions/command-guard/${name}`),
-        "skills/specpi-improve/SKILL.md",
-        "skills/donsetch/SKILL.md",
-        "themes/tea-house.json",
-        "themes/specpi-spec.json",
-        "templates/AGENTS.md",
-        "shell/pi-profiles.sh",
-    ];
-    for (const relative of required) {
-        if (!fs.existsSync(path.join(repoRoot, relative))) {
-            throw new Error(`Missing repository source: ${relative}`);
-        }
-    }
-
-    const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
-    if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 19)) {
-        throw new Error(`Node 22.19 or newer is required; found ${process.versions.node}`);
-    }
-
-    readJson(settingsPath, {});
-}
-
-// An explicit selection may rewrite an unparseable owned file; its prior bytes go to the operation backup.
-// Omission fails closed rather than silently discarding unrelated fields nobody can read.
-function readIntegrationsForOperation(selection) {
-    try {
-        return readIntegrations(agentDir);
-    } catch (error) {
-        if (!error.corruptIntegrations) {
-            throw error;
-        }
-
-        if (selection === undefined) {
-            throw new Error(
-                `${error.message}\nRepair or remove it, or rerun with --structural-search=on or --structural-search=off to rewrite it.`,
-            );
-        }
-
-        return { schema: 1, structuralSearch: { enabled: selection } };
-    }
-}
-
-function printPlan(options) {
-    let structuralEnabled = options.structuralSearch;
-    let structuralNote;
-    try {
-        const current = readIntegrations(agentDir).structuralSearch.enabled;
-        structuralEnabled ??= current;
-    } catch (error) {
-        if (!error.corruptIntegrations) {
-            throw error;
-        }
-
-        // plan stays non-mutating and still reports: a repairable owned file must not abort the preview.
-        structuralNote =
-            structuralEnabled === undefined
-                ? `${error.message}\n  Repair or remove it, or rerun with --structural-search=on or --structural-search=off to rewrite it.`
-                : `${error.message}\n  The selection above replaces it during install or update.`;
-        structuralEnabled ??= false;
-    }
-
-    const shellRc = detectShellRc();
-    const manageShell = !options.skipShell && Boolean(shellRc);
-    console.log(`SpecPi ${VERSION} installation plan
-
-Pi agent directory:
-  ${agentDir}
-
-Managed files:`);
-    for (const [, target] of managedFiles(manageShell)) {
-        console.log(`  ${target}`);
-    }
-
-    console.log(`  ${agentsPath} (managed block only)`);
-    if (!options.skipShell && shellRc) {
-        console.log(`  ${shellRc} (managed source block only)`);
-    } else if (!options.skipShell) {
-        console.log("  shell integration skipped (only bash and zsh are supported)");
-    }
-
-    console.log(`  ${manifestPath}`);
-    console.log(
-        `\nStructural search: ${structuralEnabled ? "enabled (ast-grep 0.45.3; private runtime; no global PATH change)" : "disabled"}`,
-    );
-    console.log(`  ${integrationsPath} (owned enablement; existing unrelated fields preserved)`);
-    if (structuralNote) {
-        console.log(`  ${structuralNote}`);
-    }
-
-    if (structuralEnabled && (options.skipPackageInstall || options.skipToolInstall)) {
-        console.log("  structural runtime acquisition skipped by explicit flag");
-    }
-
-    console.log("\nSettings ownership:");
-    console.log("  theme defaults to specpi-spec; existing valid user choices are preserved");
-    console.log("  pinned package entries (merged by npm package identity)");
-    console.log("  command-guard mode and approvals are session-only and no raw commands are persisted");
-    console.log("  scope and completion state stays in the active Pi session branch without raw tool content");
-    console.log("  experiment metadata and exported patches stay in private local SpecPi state");
-    console.log("  provider, default model, authentication, trust, sessions, and history are untouched");
-    console.log("  capability-gap events use sanitized summaries and salted task/session/project hashes");
-    console.log("  collection requires one explicit local on/off decision and never uploads data");
-    console.log("  wishlist lifecycle decisions are explicit, append-only, and reversible");
-    console.log("  isolated browser contexts never reuse the user's Chrome profile or cookies");
-    console.log("\nPrivacy boundaries:");
-    console.log("  SpecPi keeps its wishlist and improvement evidence local; this does not make Pi offline");
-    console.log(
-        "  model requests go to the selected provider; browser pages and installed packages may use the network",
-    );
-    console.log("  Pi controls its own telemetry and update checks; review Pi settings separately");
-
-    console.log("\nManaged browser runtime:");
-    if (options.skipBrowserInstall) {
-        console.log(
-            "  skipped by explicit flag (browser tools remain installed but unavailable without an existing runtime)",
-        );
-    } else {
-        console.log(`  ${browserRuntimeDir}`);
-        console.log("  Playwright 1.62.1 + matching managed Chromium");
-        console.log("  staged before atomic promotion; no global executable installation");
-    }
-
-    console.log("\nPi runtime:");
-    if (options.skipPackageInstall) {
-        console.log("  bootstrap skipped by explicit flag");
-    } else if (commandExists("pi")) {
-        console.log("  existing Pi installation will be used");
-    } else {
-        console.log(`  missing; npm will globally install ${PI_PACKAGE}@${PI_PACKAGE_VERSION} after confirmation`);
-        console.log("  this external installation is preserved by SpecPi uninstall");
-    }
-
-    console.log("\nPinned packages:");
-    for (const spec of PACKAGES) {
-        console.log(`  ${spec}`);
-    }
-
-    console.log("\nOptional tools:");
-    if (options.skipToolInstall) {
-        console.log("  installation skipped by explicit flag");
-    }
-
-    for (const tool of OPTIONAL_TOOLS) {
-        if (optionalToolInstalled(tool)) {
-            console.log(`  ${tool.label}: already available`);
-        } else if (options.skipToolInstall) {
-            console.log(`  ${tool.label}: missing`);
-        } else {
-            console.log(`  ${tool.label}: ${formatInstallSpec(optionalToolInstallSpec(tool))}`);
-        }
-    }
-
-    if (!options.skipToolInstall) {
-        console.log(
-            options.yes
-                ? "  --yes attempts every missing optional tool"
-                : "  interactive install asks about each available missing tool individually",
-        );
-        console.log("  global npm changes are external and remain after uninstall");
-    }
-
-    console.log("  Chromium is installed by default inside the managed browser runtime");
-    console.log("\nEvery install/update creates timestamped backups under:");
-    console.log(`  ${path.join(stateDir, "backups")}`);
-}
-
 function validateManagedUpdate(manifest, files, force) {
     if (!manifest || force) {
         return;
@@ -1397,357 +727,6 @@ function validateManagedUpdate(manifest, files, force) {
         if (currentHash !== record.installedHash) {
             throw new Error(`Managed file was modified after installation: ${target}\nUse --force to replace it.`);
         }
-    }
-}
-
-function retireManagedOptionalToolRecords(records, warnings, preserved) {
-    for (const record of records || []) {
-        if (path.dirname(record.target) !== managedBinDir || path.dirname(record.marker) !== managedToolsDir) {
-            throw new Error(`Legacy managed optional tool path is outside SpecPi state: ${record.target}`);
-        }
-
-        if (lstatMaybe(record.target)?.isSymbolicLink() || lstatMaybe(record.marker)?.isSymbolicLink()) {
-            throw new Error(`Legacy managed optional tool paths must not be symlinks: ${record.target}`);
-        }
-
-        if (fs.existsSync(record.target) && sha256(fs.readFileSync(record.target)) !== record.installedHash) {
-            const preserveDir = path.join(stateDir, "preserved-modified-tools");
-            fs.mkdirSync(preserveDir, { recursive: true, mode: 0o700 });
-            const destination = path.join(preserveDir, `${path.basename(record.target)}-${timestamp()}`);
-            fs.renameSync(record.target, destination);
-            preserved.push(destination);
-            warnings.push(`Moved retired modified optional tool outside trusted PATH: ${destination}`);
-        } else {
-            fs.rmSync(record.target, { force: true });
-        }
-
-        fs.rmSync(record.marker, { force: true });
-    }
-
-    try {
-        fs.rmdirSync(managedBinDir);
-    } catch (error) {
-        if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") {
-            throw error;
-        }
-    }
-
-    try {
-        fs.rmdirSync(managedToolsDir);
-    } catch (error) {
-        if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") {
-            throw error;
-        }
-    }
-}
-
-async function installOrUpdate(options, update) {
-    assertSources();
-    const piAvailable = commandExists("pi");
-    const shouldBootstrapPi = !piAvailable && !options.skipPackageInstall;
-    if (shouldBootstrapPi && !commandExists("npm")) {
-        throw new Error(`npm is required to install missing Pi ${PI_PACKAGE}@${PI_PACKAGE_VERSION}.`);
-    }
-
-    if (piAvailable) {
-        assertPiVersion();
-    }
-
-    if (!options.skipBrowserInstall && !commandExists("npm")) {
-        throw new Error("npm is required to install the managed browser runtime.");
-    }
-
-    const releaseLock = acquireLock();
-    let transaction;
-    let piBootstrapAttempted = false;
-    let piInstalledByOperation = false;
-    let browserRuntimeTransaction;
-    let structuralTransaction;
-    let optionalToolTransaction;
-    let backupDir;
-    const preservedRetiredTools = [];
-    try {
-        const previousManifest = readManifest(update);
-        const integrations = readIntegrationsForOperation(options.structuralSearch);
-        const structuralEnabled = options.structuralSearch ?? integrations.structuralSearch.enabled;
-        // Bound the output before any runtime/configuration mutation, not only when reading the input.
-        const integrationsText = serializeIntegrations(
-            {
-                ...integrations,
-                structuralSearch: { ...integrations.structuralSearch, enabled: structuralEnabled },
-            },
-            integrationsPath,
-        );
-        if (!update && previousManifest) {
-            throw new Error(`SpecPi is already installed. Run ${CLI} update.`);
-        }
-
-        const shellRc = previousManifest?.shellRc || (options.skipShell ? undefined : detectShellRc());
-        const manageShellNow = Boolean(shellRc) && !options.skipShell;
-        if (!options.skipShell && !shellRc) {
-            console.warn("Shell integration skipped: SpecPi currently supports bash and zsh only.");
-        }
-
-        const files = managedFiles(manageShellNow);
-        validateManagedUpdate(previousManifest, files, options.force);
-        printPlan({ ...options, skipShell: !manageShellNow });
-        await confirm(`${update ? "Update" : "Install"} SpecPi ${VERSION}?`, options.yes);
-        if (shouldBootstrapPi) {
-            piBootstrapAttempted = true;
-            installPi();
-            piInstalledByOperation = true;
-        }
-
-        const selectedOptionalTools = await chooseOptionalTools(options);
-        optionalToolTransaction = await installOptionalTools(selectedOptionalTools);
-
-        const watched = [
-            integrationsPath,
-            settingsPath,
-            ...(previousManifest?.subagentConfigChanges ? [retiredSubagentConfigPath] : []),
-            agentsPath,
-            manifestPath,
-            ...(shellRc ? [shellRc] : []),
-            ...files.map(([, target]) => target),
-            ...Object.keys(previousManifest?.files || {}),
-            ...(previousManifest?.managedOptionalTools || []).flatMap((record) => [record.target, record.marker]),
-        ];
-        assertNoBrokenSymlinks(watched);
-        transaction = snapshot(watched);
-        backupDir = path.join(stateDir, "backups", timestamp());
-        fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
-
-        const settingsBeforeOperation = readJson(settingsPath, {});
-        const warnings = [...optionalToolTransaction.warnings];
-        if (!structuralEnabled || (!options.skipPackageInstall && !options.skipToolInstall)) {
-            structuralTransaction = changeStructuralRuntime({
-                stateDir,
-                sourceDir: structuralSourceDir,
-                enabled: structuralEnabled,
-                run,
-                smoke: smokeStructuralRuntime,
-                warnings,
-            });
-        } else if (!structuralRuntimeStatus(stateDir, structuralSourceDir).installed) {
-            warnings.push(
-                "Structural search is enabled but runtime acquisition was skipped; it is unavailable until setup completes.",
-            );
-        }
-
-        // Back up the owned configuration only, never a whole Pi settings/profile store.
-        if (fs.existsSync(integrationsPath)) {
-            fs.copyFileSync(integrationsPath, path.join(backupDir, "tool-integrations.json"));
-        }
-
-        atomicWrite(integrationsPath, integrationsText, 0o600);
-
-        injectTestFailure("after-structural-runtime");
-        const blockFiles = structuredClone(previousManifest?.blockFiles || {});
-        blockFiles.agents ||= { existed: pathExists(agentsPath) };
-        if (shellRc) {
-            blockFiles.shell ||= { existed: pathExists(shellRc) };
-        }
-
-        const packageChanges = buildPackageChanges(
-            settingsBeforeOperation.packages || [],
-            previousManifest?.packageChanges || [],
-        );
-
-        if (!options.skipBrowserInstall) {
-            browserRuntimeTransaction = installBrowserRuntime(warnings);
-        } else if (!browserRuntimeStatus().installed) {
-            warnings.push(
-                "Managed browser runtime installation was explicitly skipped; browser tools will be unavailable.",
-            );
-        }
-
-        if (!options.skipPackageInstall) {
-            for (const spec of PACKAGES) {
-                run("pi", ["install", spec]);
-            }
-        }
-
-        const settings = readJson(settingsPath, {});
-        const desiredPackageIds = new Set(PACKAGES.map(packageIdentity));
-        const retiredPackageChanges = (previousManifest?.packageChanges || []).filter(
-            (change) => !desiredPackageIds.has(change.identity),
-        );
-        settings.packages = restorePackageChanges(settings.packages, retiredPackageChanges, warnings);
-        settings.packages = mergePackages(settings.packages, PACKAGES);
-
-        const operations = desiredSettingsOperations();
-        retireSettings(settings, previousManifest?.settingsChanges || [], operations, warnings);
-        const settingsChanges = applySettings(settings, operations, previousManifest?.settingsChanges || []);
-        writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
-        injectTestFailure("after-settings");
-
-        if (previousManifest?.subagentConfigChanges) {
-            const retiredConfig = readJson(retiredSubagentConfigPath, {});
-            restoreSettingChanges(retiredConfig, previousManifest.subagentConfigChanges, warnings);
-            if (previousManifest.subagentConfigExisted === false && Object.keys(retiredConfig).length === 0) {
-                fs.rmSync(retiredSubagentConfigPath, { force: true });
-            } else {
-                writeJson(retiredSubagentConfigPath, retiredConfig, existingMode(retiredSubagentConfigPath, 0o600));
-            }
-        }
-
-        const fileRecords = structuredClone(previousManifest?.files || {});
-        const desiredTargets = new Set(files.map(([, target]) => target));
-        if (update && options.skipShell && previousManifest?.shellRc) {
-            desiredTargets.add(path.join(stateDir, "pi-profiles.sh"));
-        }
-
-        for (const [target, record] of Object.entries(fileRecords)) {
-            if (desiredTargets.has(target)) {
-                continue;
-            }
-
-            restoreFileRecord(target, record, warnings, "update retirement");
-            delete fileRecords[target];
-        }
-
-        let fileIndex = Object.keys(fileRecords).length;
-        for (const [source, target, mode] of files) {
-            const record = createOriginalFileRecord(target, backupDir, fileRecords[target], fileIndex++);
-            const data = fs.readFileSync(source);
-            atomicWrite(target, data, mode);
-            if (target.startsWith(`${path.join(agentDir, "extensions", "command-guard")}${path.sep}`)) {
-                injectTestFailure("after-first-command-guard-file");
-            }
-
-            record.installedHash = sha256(data);
-            fileRecords[target] = record;
-        }
-
-        const existingAgents = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, "utf8") : "";
-        atomicWrite(
-            agentsPath,
-            upsertManagedBlock(existingAgents, AGENTS_START, AGENTS_END, makeAgentsBlock()),
-            existingMode(agentsPath, 0o644),
-        );
-
-        if (manageShellNow) {
-            const existingShell = fs.existsSync(shellRc) ? fs.readFileSync(shellRc, "utf8") : "";
-            atomicWrite(
-                shellRc,
-                upsertManagedBlock(existingShell, SHELL_START, SHELL_END, makeShellBlock()),
-                existingMode(shellRc, 0o644),
-            );
-        }
-
-        retireManagedOptionalToolRecords(previousManifest?.managedOptionalTools, warnings, preservedRetiredTools);
-
-        const manifest = {
-            schema: 1,
-            version: VERSION,
-            installedAt: previousManifest?.installedAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            agentDir,
-            shellRc,
-            blockFiles,
-            packagesKeyBeforeExists:
-                previousManifest?.packagesKeyBeforeExists ?? Object.hasOwn(settingsBeforeOperation, "packages"),
-            packageChanges,
-            settingsChanges,
-            browserRuntime: browserRuntimeStatus(),
-            structuralRuntime: structuralRuntimeStatus(stateDir, structuralSourceDir),
-            piBootstrap: piInstalledByOperation
-                ? {
-                      package: PI_PACKAGE,
-                      version: PI_PACKAGE_VERSION,
-                      installedAt: new Date().toISOString(),
-                      external: true,
-                  }
-                : previousManifest?.piBootstrap,
-            managedOptionalTools: optionalToolTransaction.managedRecords,
-            files: fileRecords,
-            backups: [...(previousManifest?.backups || []), path.relative(stateDir, backupDir)],
-        };
-        writeJson(manifestPath, manifest, 0o600);
-
-        if (!options.skipPackageInstall) {
-            run("pi", ["--offline", "--list-models", "gpt"], { capture: true });
-        }
-
-        browserRuntimeTransaction?.commit();
-        structuralTransaction?.commit();
-        console.log(`\nSpecPi ${update ? "updated" : "installed"} successfully.`);
-        console.log(`Manifest: ${manifestPath}`);
-        for (const warning of warnings) {
-            console.warn(`Warning: ${warning}`);
-        }
-
-        console.log(
-            update
-                ? `Run ${CLI} doctor, then restart active Pi sessions.`
-                : `Run ${CLI} doctor, then /reload in active Pi sessions.`,
-        );
-    } catch (error) {
-        const rollbackErrors = [];
-        try {
-            rollbackErrors.push(...(structuralTransaction?.rollback() || []));
-        } catch (rollbackError) {
-            rollbackErrors.push(`structural runtime rollback: ${rollbackError.message}`);
-        }
-
-        try {
-            rollbackErrors.push(...(browserRuntimeTransaction?.rollback() || []));
-        } catch (rollbackError) {
-            rollbackErrors.push(`browser runtime rollback: ${rollbackError.message}`);
-        }
-
-        try {
-            rollbackErrors.push(...(optionalToolTransaction?.rollback() || []));
-        } catch (rollbackError) {
-            rollbackErrors.push(`managed optional tool rollback: ${rollbackError.message}`);
-        }
-
-        if (transaction) {
-            try {
-                restoreSnapshot(transaction);
-            } catch (rollbackError) {
-                rollbackErrors.push(`configuration rollback: ${rollbackError.message}`);
-            }
-        }
-
-        for (const preserved of preservedRetiredTools) {
-            try {
-                fs.rmSync(preserved, { force: true });
-            } catch (rollbackError) {
-                rollbackErrors.push(`retired tool cleanup: ${rollbackError.message}`);
-            }
-        }
-
-        if (backupDir) {
-            try {
-                fs.rmSync(backupDir, { recursive: true, force: true });
-            } catch (rollbackError) {
-                rollbackErrors.push(`backup cleanup: ${rollbackError.message}`);
-            }
-        }
-
-        const optionalWarnings = optionalToolTransaction?.warnings.length
-            ? `\nOptional tool warnings: ${optionalToolTransaction.warnings.join("; ")}`
-            : "";
-        const externalNotes = [];
-        if (piBootstrapAttempted) {
-            externalNotes.push(
-                `Pi bootstrap ${PI_PACKAGE}@${PI_PACKAGE_VERSION} was attempted and is not rolled back automatically`,
-            );
-        }
-
-        if (optionalToolTransaction?.externalAttempts.length) {
-            externalNotes.push(
-                `External optional tool changes were not rolled back: ${optionalToolTransaction.externalAttempts.join(", ")}`,
-            );
-        }
-
-        const externalNote = externalNotes.length ? `\n${externalNotes.join("\n")}` : "";
-        throw new Error(
-            `${transaction ? "SpecPi-managed changes rolled back: " : ""}${error.message}${optionalWarnings}${externalNote}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`,
-        );
-    } finally {
-        releaseLock();
     }
 }
 
@@ -1811,480 +790,6 @@ function restoreSettingChanges(settings, changes, warnings) {
     }
 }
 
-async function uninstall(options) {
-    const releaseLock = acquireLock();
-    let transaction;
-    let retiredBrowserRuntime;
-    let structuralTransaction;
-    const preservedManagedTools = [];
-    try {
-        const manifest = readManifest(true);
-        await confirm(`Uninstall SpecPi ${manifest.version}?`, options.yes);
-        const watched = [
-            settingsPath,
-            ...(manifest.subagentConfigChanges ? [retiredSubagentConfigPath] : []),
-            agentsPath,
-            manifestPath,
-            ...(manifest.shellRc ? [manifest.shellRc] : []),
-            ...Object.keys(manifest.files || {}),
-            ...(manifest.managedOptionalTools || []).flatMap((record) => [record.target, record.marker]),
-        ];
-        assertNoBrokenSymlinks(watched);
-        for (const record of manifest.managedOptionalTools || []) {
-            if (lstatMaybe(record.target)?.isSymbolicLink() || lstatMaybe(record.marker)?.isSymbolicLink()) {
-                throw new Error(`Managed optional tool paths must not be symlinks during uninstall: ${record.target}`);
-            }
-        }
-
-        transaction = snapshot(watched);
-        const warnings = [];
-        structuralTransaction = changeStructuralRuntime({
-            stateDir,
-            sourceDir: structuralSourceDir,
-            enabled: false,
-            run,
-            smoke: smokeStructuralRuntime,
-            warnings,
-        });
-
-        const settings = readJson(settingsPath, {});
-        restoreSettingChanges(settings, manifest.settingsChanges || [], warnings);
-        settings.packages = restorePackageChanges(settings.packages, manifest.packageChanges || [], warnings);
-        if (!manifest.packagesKeyBeforeExists && settings.packages.length === 0) {
-            delete settings.packages;
-        }
-
-        writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
-
-        if (manifest.subagentConfigChanges) {
-            const retiredConfig = readJson(retiredSubagentConfigPath, {});
-            restoreSettingChanges(retiredConfig, manifest.subagentConfigChanges, warnings);
-            if (manifest.subagentConfigExisted === false && Object.keys(retiredConfig).length === 0) {
-                fs.rmSync(retiredSubagentConfigPath, { force: true });
-            } else {
-                writeJson(retiredSubagentConfigPath, retiredConfig, existingMode(retiredSubagentConfigPath, 0o600));
-            }
-        }
-
-        for (const [target, record] of Object.entries(manifest.files || {})) {
-            restoreFileRecord(target, record, warnings, "uninstall");
-        }
-
-        if (fs.existsSync(agentsPath)) {
-            const result = removeManagedBlock(fs.readFileSync(agentsPath, "utf8"), AGENTS_START, AGENTS_END);
-            finishManagedBlockRemoval(agentsPath, result, manifest.blockFiles?.agents?.existed ?? true);
-        }
-
-        if (manifest.shellRc && fs.existsSync(manifest.shellRc)) {
-            const result = removeManagedBlock(fs.readFileSync(manifest.shellRc, "utf8"), SHELL_START, SHELL_END);
-            finishManagedBlockRemoval(manifest.shellRc, result, manifest.blockFiles?.shell?.existed ?? true);
-        }
-
-        for (const record of manifest.managedOptionalTools || []) {
-            if (fs.existsSync(record.target) && sha256(fs.readFileSync(record.target)) !== record.installedHash) {
-                const preserveDir = path.join(stateDir, "preserved-modified-tools");
-                fs.mkdirSync(preserveDir, { recursive: true, mode: 0o700 });
-                const preserved = path.join(preserveDir, `${path.basename(record.target)}-${timestamp()}`);
-                fs.renameSync(record.target, preserved);
-                fs.rmSync(record.marker, { force: true });
-                preservedManagedTools.push(preserved);
-                warnings.push(`Moved modified managed optional tool outside trusted PATH: ${preserved}`);
-                continue;
-            }
-
-            fs.rmSync(record.target, { force: true });
-            fs.rmSync(record.marker, { force: true });
-        }
-
-        try {
-            fs.rmdirSync(managedBinDir);
-        } catch (error) {
-            if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") {
-                throw error;
-            }
-        }
-
-        try {
-            fs.rmdirSync(managedToolsDir);
-        } catch (error) {
-            if (error.code !== "ENOENT" && error.code !== "ENOTEMPTY") {
-                throw error;
-            }
-        }
-
-        if (fs.existsSync(browserRuntimeDir)) {
-            retiredBrowserRuntime = path.join(stateDir, `.browser-runtime-uninstall-${process.pid}-${Date.now()}`);
-            fs.renameSync(browserRuntimeDir, retiredBrowserRuntime);
-        }
-
-        fs.rmSync(manifestPath, { force: true });
-
-        if (retiredBrowserRuntime) {
-            try {
-                fs.rmSync(retiredBrowserRuntime, { recursive: true, force: true });
-            } catch (error) {
-                warnings.push(`Could not remove retired browser runtime ${retiredBrowserRuntime}: ${error.message}`);
-            }
-        }
-
-        retiredBrowserRuntime = undefined;
-        structuralTransaction?.commit();
-        console.log("SpecPi configuration, managed optional tools, and managed browser runtime uninstalled.");
-        console.log(
-            "Externally installed Pi, optional tools, browser artifacts, downloaded Pi package caches, and local wishlist state/archives were preserved. Experiment metadata and exported patches were also preserved.",
-        );
-        console.log(`Wishlist state: ${stateDir}`);
-        for (const warning of warnings) {
-            console.warn(`Warning: ${warning}`);
-        }
-    } catch (error) {
-        const rollbackErrors = [];
-        if (retiredBrowserRuntime && fs.existsSync(retiredBrowserRuntime) && !fs.existsSync(browserRuntimeDir)) {
-            try {
-                fs.renameSync(retiredBrowserRuntime, browserRuntimeDir);
-            } catch (rollbackError) {
-                rollbackErrors.push(`browser runtime restore: ${rollbackError.message}`);
-            }
-        }
-
-        try {
-            rollbackErrors.push(...(structuralTransaction?.rollback() || []));
-        } catch (rollbackError) {
-            rollbackErrors.push(`structural runtime rollback: ${rollbackError.message}`);
-        }
-
-        if (transaction) {
-            try {
-                restoreSnapshot(transaction);
-            } catch (rollbackError) {
-                rollbackErrors.push(`configuration rollback: ${rollbackError.message}`);
-            }
-        }
-
-        for (const preserved of preservedManagedTools) {
-            try {
-                fs.rmSync(preserved, { force: true });
-            } catch (rollbackError) {
-                rollbackErrors.push(`preserved tool cleanup: ${rollbackError.message}`);
-            }
-        }
-
-        throw new Error(
-            `${transaction ? "Uninstall rolled back: " : ""}${error.message}${rollbackErrors.length ? `\nSecondary rollback errors: ${rollbackErrors.join("; ")}` : ""}`,
-        );
-    } finally {
-        releaseLock();
-    }
-}
-
-async function doctor() {
-    assertSources();
-    const manifest = readManifest(true);
-    const errors = [];
-    const warnings = [];
-    const commandGuardRoot = path.resolve(agentDir, "extensions", "command-guard");
-    let commandGuardIntegrity = true;
-    const settings = readJson(settingsPath, {});
-    const commandGuardHelper = path.join(commandGuardRoot, "powershell-parser.ps1");
-    try {
-        fs.accessSync(commandGuardHelper, fs.constants.R_OK);
-    } catch {
-        errors.push(`PowerShell parser helper is missing or unreadable: ${commandGuardHelper}`);
-        commandGuardIntegrity = false;
-    }
-
-    const windowsPowerShellPath =
-        process.platform === "win32"
-            ? resolveCommand("powershell.exe") ||
-              (process.env.SystemRoot
-                  ? path.join(process.env.SystemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
-                  : undefined)
-            : undefined;
-    const powerShell7Path =
-        process.platform === "win32"
-            ? resolveCommand("pwsh.exe") ||
-              (process.env.ProgramFiles
-                  ? path.join(process.env.ProgramFiles, "PowerShell", "7", "pwsh.exe")
-                  : undefined)
-            : undefined;
-    const powershellStatus =
-        process.platform === "win32"
-            ? {
-                  windowsPowerShell:
-                      windowsPowerShellPath && fs.existsSync(windowsPowerShellPath)
-                          ? powerShellVersion(windowsPowerShellPath)
-                          : undefined,
-                  powerShell7:
-                      powerShell7Path && fs.existsSync(powerShell7Path)
-                          ? powerShellVersion(powerShell7Path)
-                          : undefined,
-              }
-            : undefined;
-    // The guard parses with whichever installed host accepts the command text, so either one is sufficient.
-    if (powershellStatus && !powershellStatus.windowsPowerShell && !powershellStatus.powerShell7) {
-        errors.push("No PowerShell parser host is available; PowerShell tool calls will be denied.");
-    } else if (powershellStatus && !powershellStatus.windowsPowerShell) {
-        warnings.push("Windows PowerShell 5.1 is unavailable; the command guard parses with PowerShell 7 only.");
-    } else if (powershellStatus && !powershellStatus.powerShell7) {
-        warnings.push(
-            "PowerShell 7 is unavailable; the command guard parses with Windows PowerShell 5.1 only, which rejects PowerShell 7 syntax.",
-        );
-    }
-
-    let capabilityRegistry;
-    try {
-        capabilityRegistry = validateCapabilityRegistry(JSON.parse(fs.readFileSync(capabilityRegistryPath, "utf8")));
-    } catch (error) {
-        errors.push(`Capability registry invalid: ${error.message}`);
-    }
-
-    for (const operation of desiredSettingsOperations()) {
-        const current = readPath(settings, operation.path);
-        const valid = operation.delete
-            ? !current.exists
-            : operation.arrayIncludes
-              ? current.exists &&
-                Array.isArray(current.value) &&
-                operation.arrayIncludes.every((entry) => current.value.some((value) => deepEqual(value, entry)))
-              : operation.userTunable || operation.dynamicPolicy
-                ? current.exists && (!operation.validate || operation.validate(current.value))
-                : current.exists && deepEqual(current.value, operation.value);
-        if (!valid) {
-            errors.push(
-                `${operation.userTunable ? "Invalid user-tunable setting" : "Setting drift"}: ${operation.path.join(".")}`,
-            );
-        }
-    }
-
-    for (const spec of PACKAGES) {
-        const found = (settings.packages || []).find((entry) => packageIdentity(entry) === packageIdentity(spec));
-        if (!deepEqual(found, spec)) {
-            errors.push(`Missing or unpinned package setting: ${spec}`);
-        }
-    }
-
-    for (const [target, record] of Object.entries(manifest.files || {})) {
-        const resolvedTarget = path.resolve(target);
-        const commandGuardFile =
-            resolvedTarget === commandGuardRoot || resolvedTarget.startsWith(`${commandGuardRoot}${path.sep}`);
-        if (!fs.existsSync(target)) {
-            errors.push(`Missing managed file: ${target}`);
-            if (commandGuardFile) {
-                commandGuardIntegrity = false;
-            }
-        } else if (sha256(fs.readFileSync(target)) !== record.installedHash) {
-            if (commandGuardFile) {
-                commandGuardIntegrity = false;
-                errors.push(`Modified command-guard file: ${target}`);
-            } else {
-                warnings.push(`Modified managed file: ${target}`);
-            }
-        }
-    }
-
-    const agents = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, "utf8") : "";
-    if (!agents.includes(AGENTS_START) || !agents.includes(AGENTS_END)) {
-        errors.push("Missing SpecPi AGENTS.md block");
-    }
-
-    if (manifest.shellRc) {
-        const shell = fs.existsSync(manifest.shellRc) ? fs.readFileSync(manifest.shellRc, "utf8") : "";
-        if (!shell.includes(SHELL_START) || !shell.includes(SHELL_END)) {
-            errors.push("Missing SpecPi shell block");
-        }
-    }
-
-    for (const record of manifest.managedOptionalTools || []) {
-        if (!fs.existsSync(record.target)) {
-            errors.push(`Missing managed optional tool: ${record.target}`);
-        } else if (sha256(fs.readFileSync(record.target)) !== record.installedHash) {
-            warnings.push(`Modified managed optional tool: ${record.target}`);
-        }
-    }
-
-    const backgroundIntegrity = backgroundFiles.every((name) => {
-        const target = path.join(backgroundRoot, name);
-        const record = manifest.files?.[target];
-
-        return record && fs.existsSync(target) && sha256(fs.readFileSync(target)) === record.installedHash;
-    });
-    if (!backgroundIntegrity || !commandGuardIntegrity) {
-        errors.push("Background task smoke skipped: installed background/Guard checksum integrity failed.");
-    } else {
-        const smoke = spawnSync(process.execPath, [path.join(backgroundRoot, "smoke.mjs")], {
-            cwd: agentDir,
-            encoding: "utf8",
-            timeout: 30000,
-            maxBuffer: 32768,
-            env: { ...process.env, NODE_OPTIONS: "", NODE_PATH: "" },
-        });
-        if (smoke.status === 0 && smoke.stdout.includes("BACKGROUND_TASKS_SMOKE=passed")) {
-            console.log("BACKGROUND_TASKS_SMOKE=passed");
-        } else {
-            errors.push("Installed background task smoke failed or timed out.");
-        }
-    }
-
-    try {
-        const enabled = readIntegrations(agentDir).structuralSearch.enabled;
-        const status = structuralRuntimeStatus(stateDir, structuralSourceDir);
-        const dependencies = [
-            ...structuralFiles.map((name) => path.join(agentDir, "extensions", "structural-search", name)),
-            ...["snapshot.mjs", "errors.mjs"].map((name) => path.join(agentDir, "extensions", "delegation", name)),
-        ];
-        const intact = dependencies.every(
-            (target) =>
-                manifest.files?.[target] &&
-                fs.existsSync(target) &&
-                sha256(fs.readFileSync(target)) === manifest.files[target].installedHash,
-        );
-        if (!enabled) {
-            console.log("STRUCTURAL_SEARCH=disabled");
-        } else if (!intact || !commandGuardIntegrity) {
-            errors.push("Structural search smoke skipped: installed source/Guard integrity failed.");
-        } else if (!status.installed) {
-            (manifest.structuralRuntime?.installed ? errors : warnings).push(
-                `Structural search unavailable: ${status.reason}`,
-            );
-        } else {
-            const smoke = run(
-                process.execPath,
-                [
-                    path.join(agentDir, "extensions", "structural-search", "smoke.mjs"),
-                    path.join(stateDir, "structural-runtime"),
-                ],
-                { capture: true },
-            );
-            console.log(smoke.stdout.trim());
-        }
-    } catch (error) {
-        errors.push(error?.corruptIntegrations ? error.message : "Structural search configuration or smoke failed.");
-    }
-
-    const runtimeStatus = browserRuntimeStatus();
-    let browserSmoke;
-    if (!runtimeStatus.installed) {
-        const message = `Managed browser runtime unavailable: ${runtimeStatus.reason}`;
-        if (manifest.browserRuntime?.installed === false) {
-            warnings.push(`${message} (installation was skipped)`);
-        } else {
-            errors.push(message);
-        }
-    } else if (!fs.existsSync(browserSmokePath)) {
-        errors.push(`Browser smoke probe is missing: ${browserSmokePath}`);
-    } else {
-        try {
-            const result = smokeBrowserRuntime(browserRuntimeDir);
-            browserSmoke = (result.stdout || "").trim();
-        } catch (error) {
-            errors.push(`Browser smoke failed: ${error.message}`);
-        }
-    }
-
-    if (!commandExists("pi")) {
-        errors.push("pi is not available on PATH");
-    } else {
-        try {
-            assertPiVersion();
-        } catch (error) {
-            errors.push(error.message);
-        }
-    }
-
-    if (!commandExists("donsetch")) {
-        warnings.push("donsetch is missing (optional skill prerequisite)");
-    }
-
-    console.log(`SpecPi ${manifest.version} doctor`);
-    console.log(`Agent directory: ${agentDir}`);
-    if (powershellStatus) {
-        console.log(
-            `POWERSHELL WindowsPowerShell=${powershellStatus.windowsPowerShell || "unavailable"} PowerShell7=${powershellStatus.powerShell7 || "unavailable"}`,
-        );
-    }
-
-    if (browserSmoke) {
-        console.log(`BROWSER ${browserSmoke}`);
-    }
-
-    const validatorOutcomes = new Map();
-    for (const capability of capabilityRegistry?.capabilities || []) {
-        for (const validator of capability.validations || []) {
-            if (!isValidValidatorName(validator)) {
-                errors.push(`Capability ${capability.id} links unknown validator ${validator}`);
-                continue;
-            }
-
-            if (validatorOutcomes.has(validator)) {
-                continue;
-            }
-
-            if (validator === "command-guard-smoke" && !commandGuardIntegrity) {
-                validatorOutcomes.set(validator, {
-                    status: "fail",
-                    detail: "installed command-guard checksum integrity failed",
-                });
-                continue;
-            }
-
-            if (validator === "browser-runtime-smoke") {
-                // The browser smoke already ran above; reuse its outcome instead of launching Chromium twice.
-                validatorOutcomes.set(
-                    validator,
-                    browserSmoke
-                        ? { status: "pass" }
-                        : { status: manifest.browserRuntime?.installed === false ? "skipped" : "fail" },
-                );
-                continue;
-            }
-
-            const run = runValidator(validator, { cwd: repoRoot });
-            validatorOutcomes.set(
-                validator,
-                run.code === 0
-                    ? { status: "pass" }
-                    : { status: "fail", detail: `${(run.stderr || run.stdout || "").trim().slice(0, 300)}` },
-            );
-        }
-    }
-
-    for (const capability of capabilityRegistry?.capabilities || []) {
-        for (const validator of capability.validations || []) {
-            const outcome = validatorOutcomes.get(validator);
-            if (!outcome) {
-                continue;
-            }
-
-            if (outcome.status === "pass") {
-                console.log(`CAPABILITY ${capability.id} verified by ${validator}`);
-            } else if (validator === "browser-runtime-smoke" && outcome.status === "skipped") {
-                warnings.push(
-                    `Capability ${capability.id} could not be verified because browser runtime installation was skipped`,
-                );
-            } else {
-                errors.push(
-                    `Capability ${capability.id} validator ${validator} failed${outcome.detail ? `: ${outcome.detail}` : ""}`,
-                );
-            }
-        }
-    }
-
-    for (const warning of warnings) {
-        console.warn(`WARN  ${warning}`);
-    }
-
-    for (const error of errors) {
-        console.error(`ERROR ${error}`);
-    }
-
-    if (errors.length) {
-        console.error(`\nDoctor failed with ${errors.length} error(s).`);
-        process.exitCode = 1;
-    } else {
-        console.log(`\nOK (${warnings.length} warning${warnings.length === 1 ? "" : "s"})`);
-    }
-}
-
 async function main() {
     const options = parseArgs(process.argv.slice(2));
     switch (options.command) {
@@ -2315,6 +820,6 @@ async function main() {
 }
 
 main().catch((error) => {
-    console.error(`SpecPi: ${error.message}`);
+    console.error("SpecPi: " + error.message);
     process.exitCode = 1;
 });

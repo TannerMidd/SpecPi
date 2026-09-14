@@ -16,15 +16,11 @@ export const MAX_RECEIPT_GATES = 8;
 // never pulled into a proof merely because they happen to live in the root.
 export const SOURCE_DIRECTORIES = Object.freeze([
     ".github",
-    "browser-runtime",
     "extensions",
     "scripts",
-    "shell",
-    "site",
     "skills",
     "templates",
     "tests",
-    "themes",
     "vscode",
 ]);
 
@@ -45,7 +41,6 @@ export const SOURCE_ROOT_FILES = Object.freeze([
     "eslint.config.js",
     "package.json",
     "prettier.config.mjs",
-    "tsconfig.browser.json",
     "specpi",
     "specpi.cmd",
 ]);

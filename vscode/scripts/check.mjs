@@ -4,7 +4,7 @@ import path from "node:path";
 import { extensionRoot, packageFiles, packageExtension } from "./package.mjs";
 
 let failed = false;
-for (const file of packageFiles.filter((name) => name.endsWith(".js"))) {
+for (const file of packageFiles.filter((name) => /\.[cm]?js$/u.test(name))) {
     const result = spawnSync(process.execPath, ["--check", path.join(extensionRoot, file)], {
         encoding: "utf8",
         windowsHide: true,

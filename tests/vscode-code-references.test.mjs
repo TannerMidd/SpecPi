@@ -9,7 +9,7 @@ import referencesModule from "../vscode/src/code-references.js";
 const { parseCodeReference, resolveCodeReference } = referencesModule;
 
 async function fixture(t) {
-    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "specpi-code-references-"));
+    const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "specpi-code-references-")));
     t.after(() => fs.rm(directory, { recursive: true, force: true }));
     const workspace = path.join(directory, "workspace");
     await fs.mkdir(path.join(workspace, "src"), { recursive: true });

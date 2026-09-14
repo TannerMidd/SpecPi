@@ -6,7 +6,7 @@
  * Validators are deterministic, offline, bounded in time, and never touch the
  * live Pi agent directory: each run proves its capability in temporary state.
  *
- * CLI: node validators.mjs <validator> [--state-dir <dir>] [--cwd <dir>] [--browser-runtime <dir>]
+ * CLI: node validators.mjs <validator> [--state-dir <dir>] [--cwd <dir>]
  * Exit 0 proves the validator; any other exit code fails the capability gate.
  */
 
@@ -17,32 +17,14 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 export const VALIDATOR_CATALOG = Object.freeze({
-    "browser-runtime-smoke": Object.freeze({
-        description: "Launches the managed browser runtime and proves exact and changed-pixel visual comparisons",
-        timeoutMs: 2 * 60 * 1000,
-    }),
     "wishlist-state-smoke": Object.freeze({
         description:
             "Drives the wishlist core API in a temporary state directory through record, select, retire with journal, reopen, metrics, and history",
         timeoutMs: 2 * 60 * 1000,
     }),
-    "command-guard-smoke": Object.freeze({
-        description:
-            "Classifies safe, destructive, malformed, protected-path, and nested-shell fixtures with the real command-guard policy",
-        timeoutMs: 2 * 60 * 1000,
-    }),
     "scope-drift-monitor-smoke": Object.freeze({
         description:
             "Proves bounded scope paths and observed outside-scope mutation detection in a temporary repository",
-        timeoutMs: 2 * 60 * 1000,
-    }),
-    "guided-experiment-worktrees-smoke": Object.freeze({
-        description:
-            "Proves detached experiment creation, byte-exact appliable export of committed and uncommitted work measured from the recorded base commit, disclosure of ignored work a patch cannot carry, base isolation, and explicit discard",
-        timeoutMs: 2 * 60 * 1000,
-    }),
-    "completion-challenge-smoke": Object.freeze({
-        description: "Proves structured readiness validation and deterministic unresolved-evidence rejection",
         timeoutMs: 2 * 60 * 1000,
     }),
 });
@@ -60,8 +42,6 @@ function parseEnvironment(args) {
             environment.stateDir = value;
         } else if (flag === "--cwd") {
             environment.cwd = value;
-        } else if (flag === "--browser-runtime") {
-            environment.browserRuntime = value;
         } else {
             throw new Error(`Unknown validator flag: ${flag}`);
         }
@@ -74,23 +54,6 @@ function parseEnvironment(args) {
     }
 
     return environment;
-}
-
-function runBrowserRuntimeSmoke(environment) {
-    if (!environment.browserRuntime) {
-        throw new Error("browser-runtime-smoke requires --browser-runtime <managed-runtime-dir>");
-    }
-
-    const smokeScript = fileURLToPath(new URL("../browser/smoke.mjs", import.meta.url));
-    const result = spawnSync(process.execPath, [smokeScript, environment.browserRuntime], {
-        encoding: "utf8",
-        timeout: VALIDATOR_CATALOG["browser-runtime-smoke"].timeoutMs,
-    });
-    if (result.status !== 0) {
-        throw new Error(`${(result.stderr || result.stdout || "browser smoke exited non-zero").trim().slice(0, 300)}`);
-    }
-
-    return (result.stdout || "Browser runtime smoke passed").trim().split("\n").at(-1);
 }
 
 async function runWishlistStateSmoke() {
@@ -216,15 +179,6 @@ async function runWishlistStateSmoke() {
     }
 }
 
-async function runCommandGuardSmoke() {
-    const smoke = await import("../command-guard/smoke.mjs");
-    if (typeof smoke.runCommandGuardSmoke !== "function") {
-        throw new Error("command guard smoke export is unavailable");
-    }
-
-    return smoke.runCommandGuardSmoke();
-}
-
 async function runWorkflowControlsSmoke(validator) {
     const smoke = await import("../workflow-controls/smoke.mjs");
     if (typeof smoke.runWorkflowControlsSmoke !== "function") {
@@ -234,24 +188,12 @@ async function runWorkflowControlsSmoke(validator) {
     return smoke.runWorkflowControlsSmoke(validator);
 }
 
-async function runValidatorInProcess(validator, environment) {
-    if (validator === "browser-runtime-smoke") {
-        return runBrowserRuntimeSmoke(environment);
-    }
-
+async function runValidatorInProcess(validator) {
     if (validator === "wishlist-state-smoke") {
         return runWishlistStateSmoke();
     }
 
-    if (validator === "command-guard-smoke") {
-        return runCommandGuardSmoke();
-    }
-
-    if (
-        validator === "scope-drift-monitor-smoke" ||
-        validator === "guided-experiment-worktrees-smoke" ||
-        validator === "completion-challenge-smoke"
-    ) {
+    if (validator === "scope-drift-monitor-smoke") {
         return runWorkflowControlsSmoke(validator);
     }
 
@@ -277,10 +219,6 @@ export function runValidator(validator, environment = {}, options = {}) {
         args.push("--cwd", environment.cwd);
     }
 
-    if (environment.browserRuntime) {
-        args.push("--browser-runtime", environment.browserRuntime);
-    }
-
     const timeoutMs = options.timeoutMs ?? entry.timeoutMs;
     const result = spawnSync(process.execPath, args, {
         encoding: "utf8",
@@ -297,9 +235,7 @@ export function runValidator(validator, environment = {}, options = {}) {
 async function main() {
     const [validator, ...flags] = process.argv.slice(2);
     if (!validator || validator.startsWith("-")) {
-        console.error(
-            "Usage: node validators.mjs <validator> [--state-dir <dir>] [--cwd <dir>] [--browser-runtime <dir>]",
-        );
+        console.error("Usage: node validators.mjs <validator> [--state-dir <dir>] [--cwd <dir>]");
         process.exitCode = 2;
 
         return;

@@ -2,7 +2,7 @@
     "name": "specpi-chat",
     "displayName": "SpecPi Chat",
     "description": "A native VS Code chat sidebar for your local Pi agent and SpecPi harness.",
-    "version": "0.6.0",
+    "version": "0.7.1",
     "publisher": "tannermidd",
     "private": true,
     "preview": true,
@@ -146,8 +146,8 @@
                 "category": "SpecPi"
             },
             {
-                "command": "specpi.chat.guardMode",
-                "title": "Choose Command Guard Mode",
+                "command": "specpi.chat.permissions",
+                "title": "Show Permission Settings",
                 "category": "SpecPi",
                 "icon": "$(shield)"
             },

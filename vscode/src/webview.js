@@ -137,7 +137,7 @@ function getWebviewHtml({
                         <button id="attach-menu-button" class="icon-button" type="button" title="Attach file, image, or selection" aria-label="Attach context" aria-haspopup="menu" aria-expanded="false" aria-controls="attach-menu">${icon("attach")}</button>
                         <button id="attach-selection" class="icon-button" type="button" title="Attach editor selection" aria-label="Attach editor selection">${icon("selection")}</button>
                     </div>
-                    <button id="guard-button" class="guard-chip" type="button" title="Command Guard mode" hidden>${icon("shield")}<span id="guard-label">Guard</span></button>
+                    <button id="permissions-button" class="permissions-chip" type="button" title="Permission System settings" hidden>${icon("shield")}<span id="permissions-label">Permissions</span></button>
                     <label class="sr-only" for="model-select">Model</label>
                     <select id="model-select" class="compact-select model-select" title="Model"><option value="">Default model</option></select>
                     <label class="sr-only" for="thinking-select">Thinking level</label>

@@ -25,7 +25,6 @@ import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const validatorsCli = path.join(repoRoot, "extensions", "tool-wishlist", "validators.mjs");
 const capabilitiesPath = path.join(repoRoot, "extensions", "tool-wishlist", "capabilities.json");
-const fakeBrowserNpm = path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs");
 const cli = path.join(repoRoot, "scripts", "specpi.mjs");
 
 async function seedLifecycle(stateDir, { withJournal = true } = {}) {
@@ -736,14 +735,7 @@ test("validator catalog, registry, and capability links stay in sync", () => {
         assert.deepEqual(entry.validations, ["wishlist-state-smoke"]);
     }
 
-    const commandGuard = registry.capabilities.find((capability) => capability.id === "command-guard");
-    assert.ok(commandGuard, "missing registry entry for command-guard");
-    assert.deepEqual(commandGuard.validations, ["command-guard-smoke"]);
-    const workflowCapabilities = new Map([
-        ["scope-drift-monitor", "scope-drift-monitor-smoke"],
-        ["guided-experiment-worktree", "guided-experiment-worktrees-smoke"],
-        ["completion-challenge", "completion-challenge-smoke"],
-    ]);
+    const workflowCapabilities = new Map([["scope-drift-monitor", "scope-drift-monitor-smoke"]]);
     for (const [id, validator] of workflowCapabilities) {
         const capability = registry.capabilities.find((item) => item.id === id);
         assert.ok(capability, `missing registry entry for ${id}`);
@@ -754,31 +746,12 @@ test("validator catalog, registry, and capability links stay in sync", () => {
 test("every registry-linked validator executes through the shared CLI with isolated prerequisites", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-registry-validators-"));
     try {
-        const runtime = path.join(root, "browser-runtime");
-        fs.mkdirSync(runtime, { recursive: true });
-        fs.writeFileSync(path.join(runtime, "package.json"), "{}\n");
-        const prepared = spawnSync(process.execPath, [fakeBrowserNpm, "ci"], {
-            cwd: runtime,
-            encoding: "utf8",
-            timeout: 30000,
-        });
-        assert.equal(prepared.status, 0, `${prepared.stderr}\n${prepared.stdout}`);
-
         const registry = validateCapabilityRegistry(JSON.parse(fs.readFileSync(capabilitiesPath, "utf8")));
         const validators = [...new Set(registry.capabilities.flatMap((capability) => capability.validations))].sort();
         for (const validator of validators) {
             const result = spawnSync(
                 process.execPath,
-                [
-                    validatorsCli,
-                    validator,
-                    "--state-dir",
-                    path.join(root, "state"),
-                    "--cwd",
-                    repoRoot,
-                    "--browser-runtime",
-                    runtime,
-                ],
+                [validatorsCli, validator, "--state-dir", path.join(root, "state"), "--cwd", repoRoot],
                 { encoding: "utf8", timeout: 120000 },
             );
             assert.equal(result.status, 0, `${validator} failed\n${result.stderr}\n${result.stdout}`);
@@ -817,10 +790,7 @@ test("unknown validators fail closed with the registered set", () => {
     });
     assert.equal(result.status, 2);
     assert.match(result.stderr, /Unknown validator: made-up-validator/);
-    assert.match(result.stderr, /browser-runtime-smoke, wishlist-state-smoke, command-guard-smoke/);
     assert.match(result.stderr, /scope-drift-monitor-smoke/);
-    assert.match(result.stderr, /guided-experiment-worktrees-smoke/);
-    assert.match(result.stderr, /completion-challenge-smoke/);
 });
 
 test("validator runs are killed at their timeout and reported as failures", () => {

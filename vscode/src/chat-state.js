@@ -3,6 +3,7 @@
 const { normalizeImage } = require("./images.js");
 const { projectFileContext, MAX_ATTACHMENTS } = require("./context.js");
 const { delegateResultText } = require("./delegates.js");
+const { projectSubagentDetails } = require("./subagents.js");
 
 const MAX_MESSAGES = 500;
 const MAX_MESSAGE_CHARS = 100_000;
@@ -172,7 +173,8 @@ function projectMessage(state, message, id) {
         return null;
     }
 
-    const role = message.role === "toolResult" ? "tool" : message.role;
+    const visibleNotice = message.role === "custom" && message.display === true;
+    const role = visibleNotice ? "notice" : message.role === "toolResult" ? "tool" : message.role;
     if (!["user", "assistant", "tool", "notice"].includes(role)) {
         return null;
     }
@@ -246,6 +248,10 @@ function projectMessage(state, message, id) {
 
     if (role === "tool") {
         result.toolName = bounded(message.toolName || "tool", 128);
+        if (result.toolName === "subagent") {
+            result.subagents = projectSubagentDetails(message.details, Boolean(message.isRunning)) || undefined;
+        }
+
         result.isError = Boolean(message.isError);
         if (typeof message.input === "string") {
             result.input = bounded(message.input, MAX_TOOL_INPUT_CHARS);
@@ -317,7 +323,8 @@ function trimMessages(state) {
             (total, file) => total + file.label.length + file.detail.length,
             0,
         );
-        const textBudget = MAX_MESSAGE_CHARS - (message.input?.length || 0) - fileChars;
+        const agentChars = message.subagents ? JSON.stringify(message.subagents).length : 0;
+        const textBudget = MAX_MESSAGE_CHARS - (message.input?.length || 0) - fileChars - agentChars;
         if (message.text.endsWith(IMAGE_LIMIT_NOTICE)) {
             message.text = `${bounded(message.text.slice(0, -IMAGE_LIMIT_NOTICE.length).trimEnd(), textBudget - IMAGE_LIMIT_NOTICE.length - 2)}\n\n${IMAGE_LIMIT_NOTICE}`;
         } else {
@@ -337,7 +344,13 @@ function trimMessages(state) {
             (total, file) => total + file.label.length + file.detail.length,
             0,
         );
-        const length = message.text.length + (message.thinking?.length || 0) + (message.input?.length || 0) + fileChars;
+        const agentChars = message.subagents ? JSON.stringify(message.subagents).length : 0;
+        const length =
+            message.text.length +
+            (message.thinking?.length || 0) +
+            (message.input?.length || 0) +
+            fileChars +
+            agentChars;
         if (size + length > MAX_TRANSCRIPT_CHARS) {
             break;
         }
@@ -554,6 +567,14 @@ function resetRunState(state) {
     value.blocks.clear();
     state.queueCount = 0;
     for (const message of state.messages) {
+        if (message.isRunning && message.subagents) {
+            for (const row of message.subagents.rows) {
+                if (["running", "queued"].includes(row.state)) {
+                    row.state = "unknown";
+                }
+            }
+        }
+
         message.isRunning = false;
     }
 }
@@ -639,6 +660,15 @@ function applyEvent(state, event) {
             id,
             role: "tool",
             toolName: bounded(event.toolName || existing?.toolName || "tool", 128),
+            ...((event.toolName || existing?.toolName) === "subagent"
+                ? {
+                      subagents:
+                          projectSubagentDetails(
+                              (event.partialResult || event.result)?.details,
+                              event.type !== "tool_execution_end",
+                          ) || undefined,
+                  }
+                : {}),
             input:
                 event.type === "tool_execution_start"
                     ? toolInput(event.args)

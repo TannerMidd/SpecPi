@@ -102,9 +102,6 @@ jobs:
             - name: Install pinned repository development tools
               run: npm install --ignore-scripts --omit=peer --no-package-lock
 
-            - name: Validate timeout preference portability
-              run: node --test tests/delegation-settings.test.mjs tests/delegation-settings-review.test.mjs
-
             - name: Run repository checks
               if: ${{ matrix.os == 'ubuntu-latest' }}
               run: npm run check
@@ -125,6 +122,7 @@ jobs:
                   node scripts/verify-artifact.mjs "${TARBALL}" "${TARBALL}.sha512"
                   npm run check:package -- --artifact "${TARBALL}" --manifest "${MANIFEST}"
                   npm run check:pi-package -- --artifact "${TARBALL}"
+                  npm run check:base
                   npm publish --dry-run --ignore-scripts --provenance=false "${TARBALL}"
 
     publish:

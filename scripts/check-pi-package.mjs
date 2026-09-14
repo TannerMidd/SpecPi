@@ -55,7 +55,10 @@ function runNode(args, options = {}) {
 }
 
 function runNpm(args, options = {}) {
-    return runNode([npmCli, ...args], options);
+    return runNode(
+        [npmCli, "--cache", path.join(temporaryRoot, "npm-cache"), "--update-notifier=false", ...args],
+        options,
+    );
 }
 
 function readHarnessReport(result, marker, label) {
@@ -86,6 +89,7 @@ try {
         PI_CODING_AGENT_DIR: agentDir,
         npm_config_audit: "false",
         npm_config_fund: "false",
+        npm_config_cache: path.join(temporaryRoot, "npm-cache"),
     };
     let tarball;
     let artifactLabel;
@@ -137,7 +141,7 @@ try {
             `const candidate = ${JSON.stringify(tarball)};\n` +
             `const requested = ${JSON.stringify(`specpi@${specpiVersion}`)};\n` +
             `const args = process.argv.slice(2).map((arg) => arg === requested ? candidate : arg);\n` +
-            `const result = spawnSync(process.execPath, [npmCli, ...args], { env: process.env, stdio: "inherit" });\n` +
+            `const result = spawnSync(process.execPath, [npmCli, "--cache", ${JSON.stringify(path.join(temporaryRoot, "npm-cache"))}, "--update-notifier=false", ...args], { env: process.env, stdio: "inherit" });\n` +
             `if (result.error) throw result.error;\n` +
             `process.exitCode = result.status ?? 1;\n`,
     );
@@ -191,37 +195,16 @@ try {
     const probeLine = probeResult.stdout.split(/\r?\n/).find((line) => line.startsWith("SPECPI_RESOURCE_PROBE="));
     assert.ok(probeLine, `Pi resource probe did not return structured output:\n${probeResult.stdout}`);
     const resources = JSON.parse(probeLine.slice("SPECPI_RESOURCE_PROBE=".length));
-    for (const expected of [
-        "/extensions/background-tasks/index.ts",
-        "/extensions/browser/index.ts",
-        "/extensions/command-guard/index.ts",
-        "/extensions/delegation/index.ts",
-        "/extensions/files/index.ts",
-        "/extensions/spec.ts",
-        "/extensions/tool-wishlist/index.ts",
-        "/extensions/ui-refresh/index.ts",
-        "/extensions/workflow-controls/index.ts",
-    ]) {
+    for (const expected of ["/extensions/tool-wishlist/index.ts", "/extensions/workflow-controls/index.ts"]) {
         assert.ok(
             resources.extensionPaths.some((entry) => entry.replaceAll("\\", "/").endsWith(expected)),
             `Pi did not discover ${expected}: ${JSON.stringify(resources)}`,
         );
     }
 
+    assert.equal(resources.extensionPaths.length, 2, "Unexpected packaged extension");
     assert.deepEqual(resources.extensionErrors, [], `Pi reported extension load errors: ${JSON.stringify(resources)}`);
-    for (const name of ["background_start", "background_list", "background_logs", "background_stop"]) {
-        assert.ok(resources.toolNames.includes(name), `Packaged Pi did not register ${name}`);
-        assert.equal(
-            path.resolve(resources.toolSources[name]),
-            path.resolve(specpiRoot, "extensions/background-tasks/index.ts"),
-            `Unexpected registration provenance for ${name}`,
-        );
-    }
-
     assert.ok(resources.skillNames.includes("specpi-improve"), "Pi did not discover the SpecPi improvement skill");
-    assert.ok(resources.skillNames.includes("donsetch"), "Pi did not discover the DonSeTch skill");
-    assert.ok(resources.themeNames.includes("specpi-spec"), "Pi did not discover the SpecPi theme");
-    assert.ok(resources.themeNames.includes("tea-house"), "Pi did not discover the tea-house theme");
 
     // The resource probe above exercises discovery. These isolated extension fixtures additionally exercise Pi's
     // actual extension loader and event/command hooks through the pinned host runtime.
@@ -238,8 +221,8 @@ try {
         "WORKFLOW_CONTROLS_HARNESS=",
         "workflow extension harness",
     );
-    assert.deepEqual(workflowReport.commands, ["challenge", "experiment", "guard", "scope", "task"]);
-    assert.equal(workflowReport.toolRegistered, true);
+    assert.deepEqual(workflowReport.commands, ["scope"]);
+    assert.equal(workflowReport.toolRegistered, false);
     assert.equal(workflowReport.emittedScopeStatus, true);
 
     const wishlistReport = readHarnessReport(
@@ -263,12 +246,8 @@ try {
         [
             "--test",
             "--test-reporter=tap",
-            path.join(repoRoot, "tests", "browser-registration.test.mjs"),
             path.join(repoRoot, "tests", "workflow-controls-extension.test.mjs"),
-            path.join(repoRoot, "tests", "spec-task-extension.test.mjs"),
             path.join(repoRoot, "tests", "wishlist-verification-extension.test.mjs"),
-            path.join(repoRoot, "tests", "delegation-provider.test.mjs"),
-            path.join(repoRoot, "tests", "delegation-native.test.mjs"),
         ],
         { cwd: repoRoot, env: fixtureTestEnvironment, timeout: 120_000 },
     );
@@ -316,23 +295,14 @@ try {
     assert.equal(commandsResponse?.success, true, `Pi RPC get_commands failed:\n${rpcResult.stdout}`);
     assert.equal(stateResponse?.success, true, `Pi RPC get_state failed:\n${rpcResult.stdout}`);
     const registeredCommands = commandsResponse.data?.commands?.map((command) => command.name) ?? [];
-    assert.ok(registeredCommands.includes("guard"), JSON.stringify(registeredCommands));
-    assert.ok(registeredCommands.includes("delegate"), JSON.stringify(registeredCommands));
     assert.ok(registeredCommands.includes("scope"), JSON.stringify(registeredCommands));
-    assert.ok(registeredCommands.includes("task"), JSON.stringify(registeredCommands));
+    assert.ok(registeredCommands.includes("harness-improvement"), JSON.stringify(registeredCommands));
+    for (const name of ["guard", "delegate", "task", "experiment", "challenge", "spec", "files"]) {
+        assert.ok(!registeredCommands.includes(name), name);
+    }
+
     assert.equal(stateResponse.data?.isStreaming, false, JSON.stringify(stateResponse));
     assert.equal(fs.readFileSync(authPath, "utf8"), authCanary, "Pi package smoke modified authentication state");
-    assert.equal(
-        fs.existsSync(path.join(specpiRoot, "browser-runtime", "node_modules")),
-        false,
-        "native package unexpectedly bundled the managed browser runtime",
-    );
-    const browserCore = await import(pathToFileURL(path.join(specpiRoot, "extensions", "browser", "core.mjs")).href);
-    await assert.rejects(
-        browserCore.loadBrowserRuntime(path.join(agentDir, "specpi", "browser-runtime")),
-        /SpecPi browser runtime is not installed.*Run specpi update/s,
-    );
-
     console.log(`Pi package check passed: ${artifactLabel} loaded through Pi ${piVersion}`);
 } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true });

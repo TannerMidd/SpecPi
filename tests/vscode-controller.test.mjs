@@ -1100,119 +1100,65 @@ async function guarded(t, choose) {
     };
 }
 
-test("Command Guard mode is published from Pi's status and changed only through a picked /guard command", async (t) => {
-    let choice;
-    const { controller, quickPicks, publishGuard, prompts, posted } = await guarded(t, () => choice);
-
-    publishGuard("Guard Off");
-    assert.equal(controller.state.guard.mode, "off");
-    assert.equal(controller.state.guard.label, "Off");
-    assert.deepEqual(controller.state.guard.actions, ["guard", "strict", "off"]);
-    assert.ok(posted.some((message) => message.type === "state" && message.state.guard?.mode === "off"));
-
-    choice = "off";
-    await controller.handleMessage({ type: "chooseGuard" });
-    assert.deepEqual(prompts(), [], "Selecting the mode Pi already reports must not prompt Pi");
-    assert.deepEqual(
-        quickPicks.at(-1).map((item) => [item.label, item.description]),
-        [
-            ["Guard", ""],
-            ["Strict", ""],
-            ["Off", "Current mode"],
-        ],
-    );
-
-    choice = "strict";
-    await controller.handleMessage({ type: "chooseGuard" });
-    assert.deepEqual(prompts(), ["/guard strict"]);
-    assert.equal(controller.sending, false);
-
-    // A critical attempt locks the session; unlocking is the only mode change the harness accepts.
-    publishGuard("\u{1F6E1} Locked");
-    assert.equal(controller.state.guard.mode, "locked");
-    choice = "unlock";
-    await controller.handleMessage({ type: "chooseGuard" });
-    assert.deepEqual(
-        quickPicks.at(-1).map((item) => item.action),
-        ["unlock"],
-    );
-    assert.deepEqual(prompts(), ["/guard strict", "/guard unlock"]);
-
-    // An older harness reports no mode; the command stays available without inventing one.
-    publishGuard(undefined);
-    assert.equal(controller.state.guard.mode, undefined);
-    assert.equal(controller.state.guard.label, "Guard");
-});
-
-test("Turning Command Guard off from the picker still waits for the harness confirmation dialog", async (t) => {
-    const confirmation = deferred();
+test("Permissions opens only the upstream read-only settings command and reflects reported YOLO mode", async (t) => {
     const { controller, client } = await connected(t, {
-        request: (type, args, fake) => {
-            if (type === "get_commands") {
-                return { commands: [{ name: "guard", description: "Show or change the session command guard" }] };
-            }
-
-            if (type === "prompt" && args.message === "/guard off") {
-                fake.emit("event", {
-                    type: "extension_ui_request",
-                    method: "confirm",
-                    id: "guard-confirm-1",
-                    title: "Turn command guard off?",
-                    message: "This applies only to the current top-level session and removes defense in depth.",
-                });
-
-                return confirmation.promise;
-            }
-
-            return undefined;
-        },
-        quickPick: (items) => items.find((item) => item.action === "off"),
+        request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
     });
-    const publishGuard = (statusText) =>
-        client.emit("event", {
-            type: "extension_ui_request",
-            method: "setStatus",
-            statusKey: "specpi-command-guard",
-            statusText,
-        });
-
-    publishGuard("\u{1F6E1} Strict");
-    const pending = controller.handleMessage({ type: "chooseGuard" });
-    await Promise.resolve();
-    assert.equal(controller.state.uiRequest?.title, "Turn command guard off?");
-    assert.equal(controller.state.sending, true, "The chat stays busy while Command Guard waits for an answer");
-    await controller.handleMessage({ type: "uiResponse", id: "guard-confirm-1", confirmed: true });
-    assert.deepEqual(client.sent, [{ type: "extension_ui_response", id: "guard-confirm-1", confirmed: true }]);
-    confirmation.resolve({});
-    await pending;
-    publishGuard("Guard Off");
-    assert.equal(controller.state.guard.mode, "off");
-    assert.equal(controller.state.sending, false);
+    assert.equal(controller.state.permissions.label, "Permissions");
+    client.emit("event", {
+        type: "extension_ui_request",
+        method: "setStatus",
+        statusKey: "pi-permission-system",
+        statusText: "yolo",
+    });
+    assert.equal(controller.state.permissions.yolo, true);
+    await controller.handleMessage({ type: "showPermissions" });
+    assert.ok(
+        client.requests.some(
+            (request) => request.type === "prompt" && request.args.message === "/permission-system show",
+        ),
+    );
+    controller.state.status = "busy";
+    await assert.rejects(controller.handleMessage({ type: "showPermissions" }), /idle/);
+    const { controller: plain } = await connected(t);
+    await assert.rejects(plain.handleMessage({ type: "showPermissions" }), /Permission System/);
 });
 
-test("Command Guard selection is refused without the harness command, an idle chat, or a known action", async (t) => {
-    let choice = "off";
-    const { controller, client, publishGuard, prompts } = await guarded(t, () => choice);
+test("package approval prompts preserve multiline tool context and require an exact human response", async (t) => {
+    const { controller, client } = await connected(t);
+    const details = "Read synthetic workspace file\n" + "context ".repeat(250);
+    dialog(controller, client, {
+        method: "select",
+        title: "Permission Required\n" + details,
+        options: ["Yes", "Yes, for this session", "No", "No, provide reason"],
+    });
+    assert.equal(controller.state.uiRequest.title, "Permission Required");
+    assert.equal(controller.state.uiRequest.message, details);
+    assert.equal(client.sent.length, 0);
+    controller.respondToDialog({ id: "permission", value: "unknown" });
+    assert.equal(client.sent.length, 0);
+    controller.respondToDialog({ id: "permission", value: "No" });
+    assert.equal(client.sent.at(-1).value, "No");
+});
 
-    for (const action of ["status", "clear-approvals", "guard extra", "", null]) {
-        await assert.rejects(() => controller.setGuard(action), /Command Guard mode/u);
-    }
+test("oversized package approval context is cancelled before any choice is displayed", async (t) => {
+    const { controller, client } = await connected(t);
+    dialog(controller, client, {
+        method: "select",
+        title: "Permission Required\n" + "x".repeat(24_000),
+        options: ["Yes", "No"],
+    });
+    assert.equal(controller.state.uiRequest, undefined);
+    assert.equal(client.sent.at(-1).cancelled, true);
+    assert.match(controller.state.messages.at(-1).text, /cancelled without approval/);
+});
 
-    publishGuard("\u{1F6E1} Guard");
-    controller.state.status = "busy";
-    await assert.rejects(() => controller.handleMessage({ type: "chooseGuard" }), /idle/u);
-    await assert.rejects(() => controller.setGuard("off"), /Command Guard mode/u);
-    controller.state.status = "ready";
-    assert.deepEqual(prompts(), []);
-
-    const { controller: plain } = await connected(t);
-    assert.equal(plain.state.guard, undefined);
-    await assert.rejects(() => plain.handleMessage({ type: "chooseGuard" }), /command guard/u);
-    await assert.rejects(() => plain.setGuard("off"), /Command Guard mode/u);
-    assert.equal(
-        client.requests.some((request) => request.type === "prompt"),
-        false,
-    );
+test("long single-line approval titles retain their full context in the dialog body", async (t) => {
+    const { controller, client } = await connected(t);
+    const title = "Permission context ".repeat(100);
+    dialog(controller, client, { method: "select", title, options: ["Yes", "No"] });
+    assert.equal(controller.state.uiRequest.title + controller.state.uiRequest.message, title);
+    assert.equal(client.sent.length, 0);
 });
 
 test("restart waits for shutdown, coalesces clicks and cancels approvals without sending queued work", async (t) => {
@@ -2173,6 +2119,40 @@ test("oversized same-session history preserves visible messages during manual re
     assert.equal(controller.state.historyTruncated, true);
     assert.equal(controller.state.status, "ready");
     assert.equal(controller.state.error, undefined);
+});
+
+test("pi-subagents fleet stays scoped to its connection and never enables delegate controls", async (t) => {
+    const { controller, client, clients } = await connected(t);
+    const view = {
+        version: 1,
+        totalActive: 1,
+        omitted: 0,
+        entries: [{ key: "opaque-key", agent: "worker", startedAt: 1000, tokens: { input: 1, output: 2, total: 3 } }],
+    };
+    const event = {
+        type: "extension_ui_request",
+        method: "setWidget",
+        widgetKey: "specpi-chat-subagents-v1",
+        widgetLines: [JSON.stringify(view)],
+    };
+    client.emit("event", event);
+    assert.equal(controller.state.subagents.entries[0].agent, "worker");
+    assert.equal(controller.state.runtimeStatus["specpi-chat-subagents-v1"], undefined);
+    assert.equal(controller.state.delegation, undefined);
+    assert.ok(client.launch.args.includes("--extension"));
+    assert.ok(client.launch.args.some((arg) => arg.endsWith("subagents-bridge.mjs")));
+    client.emit("event", { ...event, widgetLines: ["malformed"] });
+    assert.equal(controller.state.subagents, undefined);
+    client.emit("event", event);
+    await controller.disconnect();
+    assert.equal(controller.state.subagents, undefined);
+    await controller.connect();
+    client.emit("event", event);
+    assert.equal(controller.state.subagents, undefined);
+    clients.at(-1).emit("event", event);
+    assert.equal(controller.state.subagents.totalActive, 1);
+    clients.at(-1).emit("exit");
+    assert.equal(controller.state.subagents, undefined);
 });
 
 test("delegate progress stays live during parent streaming and Stop targets only the observed attempt", async (t) => {
