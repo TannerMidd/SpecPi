@@ -13,7 +13,7 @@ const piRoot = path.join(repoRoot, "node_modules/@earendil-works/pi-coding-agent
 const piCli = path.join(piRoot, "dist/cli.js");
 assert.equal(JSON.parse(fs.readFileSync(path.join(piRoot, "package.json"))).version, "0.84.4");
 const cli = path.join(repoRoot, "scripts/specpi.mjs");
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-base-check-"));
+const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-base-check-")));
 const agentDir = path.join(root, "agent");
 fs.mkdirSync(agentDir);
 const userConfig = path.join(root, "npmrc");
