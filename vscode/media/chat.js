@@ -1508,7 +1508,7 @@
         byId("permissions-label").textContent = permissions.yolo ? "YOLO" : "Permissions";
         button.dataset.mode = permissions.yolo ? "yolo" : "configured";
         button.title = String(permissions.detail || "View Permission System settings").slice(0, 400);
-        button.setAttribute("aria-label", "View Permission System settings");
+        button.setAttribute("aria-label", "Edit Permission System settings");
         button.disabled = state.status !== "ready" || Boolean(state.sending);
     }
 
@@ -2063,6 +2063,7 @@
         renderMessages();
         renderModels();
         renderPermissions();
+        permissionSettings?.render();
         renderAttachments();
         renderSelectionChip();
         renderRuntimeStatus();
@@ -2306,6 +2307,10 @@
         }
     });
     document.addEventListener("keydown", (event) => {
+        if (byId("permission-settings").open) {
+            return;
+        }
+
         if (event.key === "Escape" && byId("image-preview").open) {
             event.preventDefault();
             closeImagePreview();
@@ -2343,6 +2348,7 @@
             return;
         }
 
+        permissionSettings?.handleMessage(message);
         if (message.type === "state" && message.state && typeof message.state === "object") {
             renderState(hydrateMedia(message));
         } else if (message.type === "focus") {
@@ -2399,6 +2405,7 @@
                 seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
         }
     }, 1000);
+    const permissionSettings = window.SpecPiPermissionSettings?.install({ send, getState: () => state });
     extras = window.SpecPiExtras?.install({ send, getState: () => state, announce });
     history = window.SpecPiHistory?.install({ send, getState: () => state, announce });
     input.addEventListener("input", saveDraft);

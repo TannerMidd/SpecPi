@@ -267,6 +267,7 @@ async function writeFixture(themeName) {
         extrasStyleUri: pathToFileURL(path.join(root, "vscode", "media", "chat-extras.css")).href,
         historyScriptUri: pathToFileURL(path.join(root, "vscode", "media", "chat-picker.js")).href,
         historyStyleUri: pathToFileURL(path.join(root, "vscode", "media", "chat-picker.css")).href,
+        permissionStyleUri: pathToFileURL(path.join(root, "vscode", "media", "permission-settings.css")).href,
         nonce: "specpi-render-fixture-37064d6a9f204b48",
     }).replace("<body>", `<body class="${theme.className}">`);
     const htmlPath = path.join(directory, `${themeName}.html`);
@@ -1284,6 +1285,134 @@ test(
                         assert.equal(await chip.isVisible(), false, "A disconnected chat cannot report a live mode");
                         assert.deepEqual(await takeMessages(page), []);
                     });
+                });
+            }
+
+            for (const [width, theme] of [
+                [280, "dark"],
+                [768, "light"],
+                [1000, "highcontrast"],
+            ]) {
+                await t.test(`editable permissions preserve drafts and explicit saves at ${width}px`, async () => {
+                    await withPage(
+                        browser,
+                        fixtures,
+                        { name: `permission-editor-${width}`, width, theme },
+                        async (page) => {
+                            const permissions = { yolo: false, label: "Permissions" };
+                            await setState(page, { permissions });
+                            const settings = {
+                                id: "settings-1",
+                                contextToken: "fixture-context-1",
+                                scope: "global",
+                                path: "/synthetic/pi/extensions/pi-permission-system/config.json",
+                                text: "{}\n",
+                                exists: false,
+                                revision: "missing",
+                            };
+                            await sendHost(page, { type: "permissionSettings", settings });
+                            const editor = page.locator("#permission-settings");
+                            assert.equal(await editor.isVisible(), true);
+                            assert.equal(
+                                await editor.evaluate((element) => getComputedStyle(element).borderRadius),
+                                "6px",
+                                "Permission settings stylesheet must load",
+                            );
+                            await page.locator("#permission-yoloMode").selectOption("true");
+                            const rules = '{"*":"ask","bash":{"*":"deny","git status":"allow"},"read":"allow"}';
+                            await page.locator("#permission-permission").fill(rules);
+                            await page.locator("#permission-forwardingTimeoutMs").fill("5000");
+                            const draft = await page.locator("#permission-source").inputValue();
+                            assert.equal(JSON.parse(draft).yoloMode, true);
+                            assert.deepEqual(Object.keys(JSON.parse(draft).permission.bash), ["*", "git status"]);
+                            assert.deepEqual(await takeMessages(page), []);
+                            await setState(page, { permissions, cost: 5 });
+                            assert.equal(await page.locator("#permission-source").inputValue(), draft);
+                            await page.locator("#permission-save").click();
+                            const requests = await takeMessages(page);
+                            assert.deepEqual(requests, [
+                                {
+                                    type: "savePermissions",
+                                    id: settings.id,
+                                    contextToken: settings.contextToken,
+                                    text: draft,
+                                },
+                            ]);
+                            assert.equal(await page.locator("#permission-save").isDisabled(), true);
+                            await sendHost(page, {
+                                type: "permissionSaveResult",
+                                id: settings.id,
+                                error: "Synthetic disk conflict. Reload settings.",
+                            });
+                            assert.equal(await page.locator("#permission-source").inputValue(), draft);
+                            assert.match(await page.locator("#permission-feedback").textContent(), /conflict/u);
+                            assert.equal(await page.locator("#permission-save").isEnabled(), true);
+                            await page.locator("#permission-save").click();
+                            await takeMessages(page);
+                            await sendHost(page, {
+                                type: "permissionSaveResult",
+                                id: settings.id,
+                                settings: {
+                                    ...settings,
+                                    text: draft,
+                                    exists: true,
+                                    revision: "saved",
+                                    backup: "/synthetic/config.json.bak",
+                                },
+                            });
+                            assert.equal(await page.locator("#permission-restart").isEnabled(), true);
+                            assert.match(await page.locator("#permission-feedback").textContent(), /Saved to disk/u);
+                            assert.doesNotMatch(
+                                await page.locator("#permission-path").textContent(),
+                                /not created yet/u,
+                            );
+                            assert.equal(
+                                await page.locator("#permissions-label").textContent(),
+                                "Permissions",
+                                "Saving YOLO must not invent runtime status",
+                            );
+                            await editor.evaluate((node) => {
+                                node.scrollTop = node.scrollHeight;
+                            });
+                            await page.screenshot({ path: path.join(screenshots, `permission-editor-${width}.png`) });
+                            await editor.evaluate((node) => {
+                                node.scrollTop = 0;
+                            });
+                            await page.screenshot({
+                                path: path.join(screenshots, `permission-editor-top-${width}.png`),
+                            });
+                            const box = await editor.boundingBox();
+                            assert.ok(box.x >= 0 && box.x + box.width <= width);
+                            await page.locator("#permission-advanced summary").click();
+                            await page.locator("#permission-source").fill('{"yoloMode":');
+                            assert.equal(await page.locator("#permission-save").isDisabled(), true);
+                            assert.equal(await page.locator("#permission-yoloMode").isDisabled(), true);
+                            await page.locator("#permission-source").fill("{}");
+                            assert.equal(await page.locator("#permission-yoloMode").isEnabled(), true);
+                            await page.locator("#permission-scope").selectOption("project");
+                            assert.deepEqual(await takeMessages(page), []);
+                            await page.locator("#permission-reload").click();
+                            assert.deepEqual(await takeMessages(page), [{ type: "showPermissions", scope: "project" }]);
+                            await sendHost(page, {
+                                type: "permissionSettings",
+                                settings: { ...settings, id: "project-settings", scope: "project" },
+                            });
+                            await page.keyboard.press("Escape");
+                            assert.equal(await editor.isVisible(), false);
+                            await page.waitForFunction(() => document.activeElement?.id === "permissions-button");
+                            await sendHost(page, { type: "permissionSettings", settings });
+                            await page.locator("#permission-yoloMode").selectOption("true");
+                            assert.match(await page.locator("#permission-effective").textContent(), /discard draft/u);
+                            await page.locator("#permission-effective").click();
+                            assert.equal(await editor.isVisible(), false);
+                            assert.deepEqual(await takeMessages(page), [{ type: "showEffectivePermissions" }]);
+                            await sendHost(page, { type: "permissionSettings", settings });
+                            assert.equal(await page.locator("#permission-yoloMode").inputValue(), "");
+                            await setState(page, { permissions, contextToken: "different-conversation" });
+                            assert.equal(await editor.isVisible(), false);
+                            assert.deepEqual(await takeMessages(page), []);
+                        },
+                    );
                 });
             }
 

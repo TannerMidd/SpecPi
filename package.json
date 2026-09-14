@@ -1,6 +1,6 @@
 {
   "name": "specpi",
-  "version": "0.21.1",
+  "version": "0.22.0",
   "description": "Scope control and a human-selected harness improvement loop for Pi",
   "author": "Tanner Middleton",
   "repository": {

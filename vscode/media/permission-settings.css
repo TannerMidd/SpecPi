@@ -1,0 +1,85 @@
+.permission-settings {
+    box-sizing: border-box;
+    width: min(720px, calc(100vw - 16px));
+    max-height: calc(100vh - 24px);
+    padding: 16px;
+    color: var(--text);
+    background: var(--vscode-editor-background, #1f1f1f);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: auto;
+    font-size: var(--chat-font-size);
+}
+.permission-settings::backdrop {
+    background: #0009;
+}
+.permission-settings h2 {
+    margin: 0 0 12px;
+    font-size: 18px;
+}
+.permission-settings p {
+    color: var(--muted);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.permission-settings fieldset {
+    border: 1px solid var(--border);
+    margin: 12px 0;
+    padding: 12px;
+    min-width: 0;
+}
+.permission-field {
+    margin-bottom: 14px;
+}
+.permission-field label,
+.permission-settings details label {
+    display: block;
+    margin-bottom: 6px;
+}
+.permission-field p {
+    margin: 4px 0;
+    font-size: var(--chat-small-font-size);
+}
+.permission-settings input,
+.permission-settings select,
+.permission-settings textarea {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 7px;
+    color: var(--vscode-input-foreground, var(--text));
+    background: var(--vscode-input-background, #242424);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font: inherit;
+}
+.permission-settings textarea {
+    resize: vertical;
+    min-height: 72px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: var(--chat-reading-font-size);
+}
+.permission-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.permission-actions select {
+    width: auto;
+    max-width: 100%;
+}
+.permission-actions button {
+    padding: 7px 10px;
+    height: auto;
+    white-space: normal;
+}
+.permission-settings summary {
+    cursor: pointer;
+}
+#permission-feedback {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+}
+#permission-feedback[data-error="true"] {
+    color: var(--error);
+}

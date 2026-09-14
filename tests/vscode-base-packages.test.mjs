@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { RpcClient } from "../vscode/src/rpc-client.js";
+import { loadPermissionSettings, savePermissionSettings } from "../vscode/src/permission-settings.js";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 test(
@@ -20,7 +21,7 @@ test(
             path.basename(os.tmpdir()).startsWith("specpi-base-check-") && relative === "agent",
             "Real package smoke requires the base check's isolated TEMP and agent directory",
         );
-        const client = new RpcClient({
+        const launch = {
             command: process.execPath,
             args: [
                 path.join(repository, "node_modules/@earendil-works/pi-coding-agent/dist/cli.js"),
@@ -36,7 +37,8 @@ test(
             ],
             cwd: path.dirname(agentDir),
             env: process.env,
-        });
+        };
+        const client = new RpcClient(launch);
         const events = [];
         let answer;
         client.on("event", (event) => {
@@ -90,6 +92,73 @@ test(
                 events.some((event) => event.type === "agent_start" || event.type === "extension_error"),
                 false,
             );
+
+            // Exercise Chat's writer against real upstream loading, only in the
+            // isolated base-check profile. No provider or model prompt is used.
+            await client.stop();
+            const before = loadPermissionSettings(launch.cwd, "global");
+            const saved = savePermissionSettings(
+                before,
+                JSON.stringify(
+                    {
+                        yoloMode: true,
+                        debugLog: false,
+                        permissionReviewLog: false,
+                        doublePressToConfirm: false,
+                        forwardingTimeoutMs: 5000,
+                        promptMaxRows: 30,
+                        promptFieldMaxWidth: 500,
+                        reviewLogFieldMaxWidth: 1200,
+                        permission: {
+                            "*": "ask",
+                            bash: { "*": "deny", "git status": "allow" },
+                            path_write: { "*.env": "deny" },
+                        },
+                        shellTools: { bg_run: { commandArgument: "command" } },
+                        piInfrastructureReadPaths: [],
+                        authorizerChain: [],
+                    },
+                    null,
+                    4,
+                ),
+            );
+            if (before.exists && before.text !== saved.text) {
+                assert.equal(fs.readFileSync(saved.backup, "utf8"), before.text);
+            } else {
+                assert.equal(saved.backup, undefined);
+            }
+
+            const restarted = new RpcClient(launch);
+            const restartedEvents = [];
+            restarted.on("event", (event) => restartedEvents.push(event));
+            restarted.on("error", (error) => failures.push(error.message));
+            try {
+                await restarted.start();
+                await restarted.waitUntilReady();
+                await restarted.request("prompt", { message: "/permission-system show" });
+                const summary =
+                    restartedEvents.findLast(
+                        (event) => event.method === "notify" && event.message.includes("yoloMode="),
+                    )?.message || "";
+                assert.match(summary, /yoloMode=on/u, "The actual upstream runtime must load the saved YOLO setting");
+                assert.ok(summary.includes("bash=deny"), "The saved default shell rule must load");
+                assert.ok(summary.includes('bash["git status"]=allow'), "The ordered shell exception must load");
+                assert.ok(
+                    restartedEvents.some(
+                        (event) =>
+                            event.method === "setStatus" &&
+                            event.statusKey === "pi-permission-system" &&
+                            event.statusText === "yolo",
+                    ),
+                );
+                assert.equal(
+                    restartedEvents.some((event) => event.type === "agent_start" || event.type === "extension_error"),
+                    false,
+                );
+                assert.deepEqual(failures, []);
+            } finally {
+                await restarted.stop();
+            }
         } catch (error) {
             t.diagnostic(diagnostics);
             throw error;

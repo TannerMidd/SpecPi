@@ -11,8 +11,8 @@ function permissionState(state) {
         yolo,
         label: yolo ? "YOLO" : "Permissions",
         detail: yolo
-            ? "Permission System reports YOLO mode. View its active settings."
-            : "View Permission System settings. The upstream package controls approval rules.",
+            ? "Permission System reports YOLO mode. Edit settings and permission rules."
+            : "Edit Permission System settings and rules. The upstream package enforces them.",
     };
 }
 

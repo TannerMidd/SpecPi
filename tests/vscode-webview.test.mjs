@@ -93,6 +93,8 @@ test("chat webview denies content by default and authorizes only its nonce-beari
     assert.deepEqual(
         scripts.map((script) => decodeAttribute(attributeValue(script, "src"))),
         [
+            "https://specpi-test.vscode-cdn.net/media/permission-config.js",
+            "https://specpi-test.vscode-cdn.net/media/permission-settings.js",
             "https://specpi-test.vscode-cdn.net/media/chat-extras.js",
             "https://specpi-test.vscode-cdn.net/media/chat-picker.js",
             webviewOptions.scriptUri,
@@ -109,6 +111,7 @@ test("chat webview denies content by default and authorizes only its nonce-beari
             webviewOptions.styleUri,
             "https://specpi-test.vscode-cdn.net/media/chat-extras.css",
             "https://specpi-test.vscode-cdn.net/media/chat-picker.css",
+            "https://specpi-test.vscode-cdn.net/media/permission-settings.css",
         ],
     );
     assert.doesNotMatch(html, /\son(?:click|load|error|submit|input)\s*=/iu);
@@ -125,14 +128,17 @@ test("webview resource attributes cannot inject executable markup", () => {
         extrasStyleUri: "https://specpi-test.vscode-cdn.net/media/chat-extras.css" + payload,
         historyScriptUri: "https://specpi-test.vscode-cdn.net/media/chat-picker.js" + payload,
         historyStyleUri: "https://specpi-test.vscode-cdn.net/media/chat-picker.css" + payload,
+        permissionStyleUri: "https://specpi-test.vscode-cdn.net/media/permission-settings.css" + payload,
         nonce: webviewOptions.nonce + payload,
     });
-    assert.equal(Array.from(html.matchAll(/<script\b/gu)).length, 3);
+    assert.equal(Array.from(html.matchAll(/<script\b/gu)).length, 5);
     assert.doesNotMatch(html, /<img src=x|<script>alert\(2\)/u);
     const scripts = Array.from(html.matchAll(/<script\b[^>]*>/gu), (match) => match[0]);
     assert.deepEqual(
         scripts.map((script) => decodeAttribute(attributeValue(script, "src"))),
         [
+            webviewOptions.scriptUri + payload,
+            webviewOptions.scriptUri + payload,
             "https://specpi-test.vscode-cdn.net/media/chat-extras.js" + payload,
             "https://specpi-test.vscode-cdn.net/media/chat-picker.js" + payload,
             webviewOptions.scriptUri + payload,
@@ -149,6 +155,7 @@ test("webview resource attributes cannot inject executable markup", () => {
             webviewOptions.styleUri + payload,
             "https://specpi-test.vscode-cdn.net/media/chat-extras.css" + payload,
             "https://specpi-test.vscode-cdn.net/media/chat-picker.css" + payload,
+            "https://specpi-test.vscode-cdn.net/media/permission-settings.css" + payload,
         ],
     );
 });

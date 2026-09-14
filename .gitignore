@@ -3,6 +3,10 @@ node_modules/
 .pi/npm/
 .pi/git/
 
+# Local agent test and review artifacts
+.pi/tasks/
+.pi/delegate/
+
 # Generated desktop builds
 /desktop/out/
 /desktop/dist/
