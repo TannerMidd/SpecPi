@@ -2,7 +2,8 @@
 
 ## 0.7.1
 
-- Bump the VSIX version and update install examples for the SpecPi 0.21.0 base. Runtime behavior is unchanged from 0.7.0.
+- Bump the VSIX version and update install examples for the SpecPi 0.21.0 base.
+- Resolve custom Pi state directories with the same native path resolver used for attachments and navigation, preserving privacy checks through Windows drive aliases. Make temporary-path fixtures portable across Windows and macOS runners.
 
 ## 0.7.0
 

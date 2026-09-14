@@ -974,7 +974,7 @@ test("wishlist issue drafts stay local and archives recover after a prepared ope
 });
 
 test("wishlist extension runs the one-command improvement loop and preserves consent, drafts, reset, and checksums", (context) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-extension-"));
+    const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-wishlist-extension-")));
     try {
         const result = runWishlistExtensionHarness(path.join(root, "agent"));
         if (!result) {
