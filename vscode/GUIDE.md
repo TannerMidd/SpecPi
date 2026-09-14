@@ -6,12 +6,7 @@ For a quick start, see the [overview](README.md). This guide covers the controls
 
 1. Install Node.js **22.19 or newer** and Pi **0.84.4** for the reviewed default base on the machine running your VS Code workspace. SpecPi 0.21.0 provides `/scope`, the harness improvement loop, and the eight default packages. Follow the [SpecPi setup guide](https://github.com/TannerMidd/SpecPi#readme). Configure your provider through Pi in a terminal, and confirm Pi works in the intended folder.
 2. Use VS Code **1.96 or newer**. Open and trust a filesystem workspace.
-3. Install **SpecPi Chat** by **tannermidd** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=tannermidd.specpi-chat), or run:
-
-   ```sh
-   code --install-extension tannermidd.specpi-chat
-   ```
-
+3. Download [SpecPi Chat 0.7.1](https://github.com/TannerMidd/SpecPi/releases/download/v0.21.0/specpi-chat-0.7.1.vsix). In VS Code, run **Extensions: Install from VSIX…** and select the downloaded file.
 4. Open **SpecPi** in the Activity Bar, or press **Ctrl+Alt+S** (**Cmd+Alt+S** on macOS). Choose **Connect Pi**.
 
 To install a package built from this repository instead, run:
