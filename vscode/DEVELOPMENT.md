@@ -43,6 +43,8 @@ Use the normal connection controls to start Pi. Run full repository validation w
 
 ## Publishing
 
+Include the packaged VSIX as a GitHub Release asset alongside the matching SpecPi release. Confirm the filename matches the download links in README and the website, then download it again and compare its checksum with the reviewed local build.
+
 After validation, run `npm --prefix vscode run package` and upload the resulting VSIX through the [Marketplace publisher dashboard](https://marketplace.visualstudio.com/manage/publishers/) for `tannermidd`. For the first publication, choose **New extension → Visual Studio Code**; for later versions, update the existing extension. Check the dashboard's validation result and the public listing before announcing availability. Packaging alone does not publish anything.
 
 The manifest's `private: true` prevents accidental npm publication; the VS Code Marketplace uses the VSIX and its publisher identity. Publisher sign-in is separate from Pi authentication. Do not put publishing credentials in the repository.

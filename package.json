@@ -10,7 +10,7 @@
   "bugs": {
     "url": "https://github.com/TannerMidd/SpecPi/issues"
   },
-  "homepage": "https://github.com/TannerMidd/SpecPi#readme",
+  "homepage": "https://tannermidd.github.io/SpecPi/",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -82,6 +82,7 @@
     "check:package": "node scripts/check-package.mjs",
     "check:pi-package": "node scripts/check-pi-package.mjs",
     "check:base": "node scripts/check-base-packages.mjs",
+    "check:site": "node scripts/check-site.mjs",
     "check:vscode": "npm --prefix vscode run check",
     "prepublishOnly": "npm run check",
     "check": "npm run format:check && npm run check:syntax && npm test && npm run check:package && npm run check:vscode"

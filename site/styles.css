@@ -1,0 +1,260 @@
+:root {
+    color-scheme: light dark;
+    --paper: #f6f7f3;
+    --ink: #202a2f;
+    --muted: #52615b;
+    --line: #cbd3ca;
+    --accent: #285945;
+    --code: #e9eee5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    line-height: 1.65;
+}
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+}
+.wrap {
+    width: min(1120px, calc(100% - 64px));
+    margin-inline: auto;
+}
+a {
+    color: var(--accent);
+    text-underline-offset: 0.22em;
+}
+a:hover {
+    text-decoration-thickness: 2px;
+}
+a:focus-visible,
+.table-scroll:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 5px;
+}
+header,
+footer,
+nav,
+.brand,
+.actions {
+    display: flex;
+    align-items: center;
+}
+header,
+footer {
+    justify-content: space-between;
+    gap: 24px;
+    padding-block: 26px;
+}
+header {
+    border-bottom: 1px solid var(--line);
+}
+nav {
+    gap: 24px;
+    flex-wrap: wrap;
+}
+.brand {
+    gap: 12px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    text-decoration: none;
+}
+.skip-link {
+    position: absolute;
+    left: 20px;
+    top: -100px;
+    padding: 12px;
+    background: var(--paper);
+}
+.skip-link:focus {
+    top: 12px;
+    z-index: 1;
+}
+section {
+    padding-block: 60px;
+    border-bottom: 1px solid var(--line);
+    scroll-margin-top: 24px;
+}
+.intro {
+    padding-block: 80px;
+}
+.intro > p:not(.eyebrow) {
+    max-width: 630px;
+}
+.eyebrow {
+    margin: 0 0 16px;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+h1,
+h2,
+h3 {
+    line-height: 1.15;
+    font-weight: 600;
+    text-wrap: balance;
+}
+h1 {
+    margin: 0 0 24px;
+    font-size: clamp(58px, 7.5vw, 100px);
+    letter-spacing: -0.055em;
+}
+h2 {
+    margin: 0 0 24px;
+    font-size: clamp(30px, 3.7vw, 42px);
+    letter-spacing: -0.035em;
+}
+h3 {
+    margin: 0 0 16px;
+    font-size: 22px;
+}
+p {
+    margin: 0 0 18px;
+}
+.lead {
+    font-size: clamp(23px, 3vw, 30px);
+    line-height: 1.4;
+    letter-spacing: -0.02em;
+}
+.actions {
+    margin-top: 32px;
+    gap: 28px;
+    flex-wrap: wrap;
+}
+.button {
+    display: inline-block;
+    padding: 12px 22px;
+    color: var(--paper);
+    background: var(--accent);
+    border-radius: 4px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.split,
+.columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+}
+.columns {
+    margin-top: 36px;
+}
+code {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.9em;
+    overflow-wrap: anywhere;
+}
+pre {
+    margin: 8px 0 20px;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--code);
+    line-height: 2;
+    white-space: pre-wrap;
+}
+.note {
+    color: var(--muted);
+    font-size: 14px;
+}
+.table-scroll {
+    overflow-x: auto;
+    margin: 30px 0 24px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+th,
+td {
+    padding: 15px 18px 15px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+}
+thead {
+    color: var(--muted);
+    font-size: 13px;
+}
+tbody th {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+td:nth-child(2) {
+    white-space: nowrap;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 14px;
+}
+.chat-install {
+    padding-top: 36px;
+}
+ol {
+    padding-left: 23px;
+}
+li {
+    padding-left: 4px;
+    margin-bottom: 12px;
+}
+footer {
+    color: var(--muted);
+    font-size: 14px;
+}
+footer p {
+    margin: 0;
+}
+@media (max-width: 760px) {
+    .wrap {
+        width: calc(100% - 40px);
+    }
+    header {
+        align-items: flex-start;
+    }
+    header nav {
+        justify-content: flex-end;
+        gap: 8px 16px;
+        font-size: 14px;
+        max-width: 220px;
+    }
+    .intro {
+        padding-block: 56px;
+    }
+    section {
+        padding-block: 40px;
+    }
+    .split,
+    .columns {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+    .chat-install {
+        padding-top: 0;
+    }
+    .wide-only {
+        display: none;
+    }
+    table {
+        font-size: 14px;
+    }
+    th,
+    td {
+        padding-right: 12px;
+    }
+    footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --paper: #17211e;
+        --ink: #edf0e9;
+        --muted: #b6c2b9;
+        --line: #3d4c43;
+        --accent: #a4c3b7;
+        --code: #202e27;
+    }
+}

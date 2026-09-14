@@ -206,7 +206,7 @@ function assertPackageMetadata(packageJson) {
     assert.equal(packageJson.author, "Tanner Middleton");
     assert.equal(packageJson.repository?.url, "git+https://github.com/TannerMidd/SpecPi.git");
     assert.equal(packageJson.bugs?.url, "https://github.com/TannerMidd/SpecPi/issues");
-    assert.equal(packageJson.homepage, "https://github.com/TannerMidd/SpecPi#readme");
+    assert.equal(packageJson.homepage, "https://tannermidd.github.io/SpecPi/");
     assert.equal(packageJson.engines?.node, ">=22.19.0");
     assert.equal(packageJson.bin?.specpi, "./scripts/specpi.mjs");
     assert.ok(packageJson.keywords?.includes("pi-package"));

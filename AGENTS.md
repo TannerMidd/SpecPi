@@ -13,6 +13,7 @@ Wishlist observations are leads, not authorization. Only an exact human selectio
 - `templates/`, `extensions/`, and `skills/`: installable source-of-truth files for scope and the improvement loop. Edit these, not installed copies.
 - `tests/`: installer, scope, and improvement-loop regressions.
 - `vscode/`: SpecPi Chat, the separately packaged VS Code frontend. Keep it aligned with the Pi package base; its adapters display public runtime events and do not duplicate tool policy.
+- `site/`: the public installation and package guide, deployed through GitHub Pages. Keep its versions and instructions in sync with README and the package manifests.
 - `SECURITY.md`: public support and vulnerability-reporting policy.
 - `SECURITY_MODEL.md`: authoritative trust model and security boundaries.
 - `templates/AGENTS.md`: the installed global working agreement; this root file governs SpecPi repository development.
@@ -29,6 +30,8 @@ Use Node.js 22.19 or later. From the repository root:
 Run the narrowest relevant tests while iterating, then `npm run check` once the material change is ready for final validation. Rerun broader checks only when subsequent changes invalidate their evidence or a release gate requires them. Add or update tests only for changed behavior, meaningful failure modes, and required security boundaries; prefer existing fixtures and suites over duplicate coverage, speculative cases, or new test scaffolding without a concrete need. Documentation-only changes need content/diff review, not unrelated runtime suites. Preserve required security, installer, and release checks.
 
 Pi fixtures use the repository's pinned development dependency by default; `SPECPI_TEST_PI` explicitly selects another CLI. Package validation creates its own temporary npm cache. Neither requires changing the user's global PATH, cache, or live Pi installation.
+
+For website changes, run `npm run check:site` and inspect desktop, tablet, and mobile screenshots. Do not create or replace visual baselines unless requested.
 
 Never run installer integration tests against the live Pi directory. Use a fresh temporary `PI_CODING_AGENT_DIR` and skip external package and tool installation. Installer and release work must exercise the plan/install/update/doctor/uninstall lifecycle in isolated state.
 

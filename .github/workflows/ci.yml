@@ -22,6 +22,7 @@ jobs:
       - run: npm run check:base
       - name: Install browser for Chat rendering checks
         run: npx --no-install playwright install --with-deps chromium
+      - run: npm run check:site
       - run: npm --prefix vscode run test:render
       - run: git diff --check
 

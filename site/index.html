@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#f6f7f3" />
+        <meta
+            name="description"
+            content="SpecPi adds scope control, a harness improvement loop, and eight useful packages to Pi. Use it in your terminal or with SpecPi Chat for VS Code."
+        />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/" />
+        <link rel="icon" href="logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="styles.css" />
+        <title>SpecPi — A small base for Pi</title>
+    </head>
+    <body>
+        <a class="skip-link" href="#main">Skip to content</a>
+        <header class="wrap">
+            <a class="brand" href="./"><img src="logo.svg" width="32" height="32" alt="" />SpecPi</a>
+            <nav aria-label="Main navigation">
+                <a href="#install">Install</a>
+                <a href="#packages">Packages</a>
+                <a href="#chat">VS Code</a>
+                <a href="https://github.com/TannerMidd/SpecPi#readme">Docs</a>
+            </nav>
+        </header>
+        <main id="main" class="wrap">
+            <section class="intro" aria-labelledby="title">
+                <p class="eyebrow">SpecPi 0.21.0</p>
+                <h1 id="title">A small base<br />for Pi.</h1>
+                <p class="lead">
+                    Set the scope. Notice what gets in the way.<br class="wide-only" />
+                    Choose what to improve.
+                </p>
+                <p>
+                    SpecPi adds two things of its own to the <a href="https://pi.dev/">Pi coding agent</a>: scope
+                    control and a harness improvement loop. Eight upstream packages handle the supporting tools.
+                </p>
+                <div class="actions">
+                    <a class="button" href="#install">Install SpecPi</a
+                    ><a href="#chat">Use Pi in VS Code <span aria-hidden="true">→</span></a>
+                </div>
+            </section>
+
+            <section id="install" class="split" aria-labelledby="install-title">
+                <div>
+                    <p class="eyebrow">Get started</p>
+                    <h2 id="install-title">Keep your Pi setup.</h2>
+                    <p>
+                        Install Pi and connect a provider first. SpecPi uses your existing provider and model settings.
+                    </p>
+                    <p>
+                        Requires Node.js 22.19+, Git, npm, and Pi on PATH. The full base is tested with Pi 0.84.4. Pi
+                        Goal X supports Pi versions from 0.83.0 up to, but excluding, 0.85.0.
+                    </p>
+                </div>
+                <div>
+                    <pre aria-label="Installation commands"><code>npm install --global specpi@latest
+specpi plan
+specpi install
+specpi doctor</code></pre>
+                    <p class="note">
+                        Review the plan, confirm the install, then restart Pi. Use
+                        <code>specpi install --skip-package-install</code> if you only want scope and the improvement
+                        loop.
+                    </p>
+                </div>
+            </section>
+
+            <section id="core" aria-labelledby="core-title">
+                <p class="eyebrow">The core</p>
+                <h2 id="core-title">Scope and a way to improve.</h2>
+                <div class="columns">
+                    <article>
+                        <h3>Declare the work with <code>/scope</code></h3>
+                        <p>
+                            Use <code>/scope set</code> to name the files and directories a task should touch. Review
+                            changes with <code>/scope status</code> and add paths when the work needs them.
+                        </p>
+                        <p>
+                            Interactive edits outside scope ask first. Shell commands and other tools are checked
+                            afterward, so scope monitors drift; it does not sandbox tools.
+                        </p>
+                    </article>
+                    <article>
+                        <h3>Improve from observed problems</h3>
+                        <p>
+                            Turn on local observations with <code>/wishlist on</code>. Review them with
+                            <code>/wishlist</code>, then choose a specific improvement through
+                            <code>/harness-improvement</code> in a SpecPi source checkout.
+                        </p>
+                        <p>
+                            The loop records the agreed change and checks the result. Collection starts off, records
+                            stay local, and an observation never authorizes a change.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="packages" aria-labelledby="packages-title">
+                <p class="eyebrow">Included by default</p>
+                <h2 id="packages-title">Eight packages. Their own tools.</h2>
+                <p>
+                    SpecPi installs these versions through <code>pi install</code>. Each package keeps its own commands,
+                    configuration, and permission rules.
+                </p>
+                <div class="table-scroll" tabindex="0" role="region" aria-label="Default packages">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Package</th>
+                                <th scope="col">Version</th>
+                                <th scope="col">What it adds</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th scope="row">
+                                    <a href="https://github.com/nicobailon/pi-web-access">pi-web-access</a>
+                                </th>
+                                <td>0.29.0</td>
+                                <td>Web search and page retrieval</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <a href="https://github.com/BetterWright/betterwright">betterwright</a>
+                                </th>
+                                <td>2.8.1</td>
+                                <td>Browser automation</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <a href="https://github.com/nicobailon/pi-subagents">pi-subagents</a>
+                                </th>
+                                <td>0.67.0</td>
+                                <td>Subagents and delegation</td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><a href="https://github.com/apmantza/pi-lens">pi-lens</a></th>
+                                <td>4.1.6</td>
+                                <td>Language diagnostics and code navigation</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <a href="https://github.com/ismailsaleekh/pi-background-tasks"
+                                        >pi-background-tasks</a
+                                    >
+                                </th>
+                                <td>2.5.0</td>
+                                <td>Background tasks</td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><a href="https://github.com/tmonk/pi-goal-x">pi-goal-x</a></th>
+                                <td>0.31.2</td>
+                                <td>Persistent goals and progress</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <a href="https://github.com/Sreetej510/pi-extensions/tree/main/extensions/pi-usage"
+                                        >@sreetej510/pi-usage</a
+                                    >
+                                </th>
+                                <td>0.10.0</td>
+                                <td>Provider usage reports</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <a
+                                        href="https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system"
+                                        >@gotgenes/pi-permission-system</a
+                                    >
+                                </th>
+                                <td>32.0.2</td>
+                                <td>Tool permission policies</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="note">
+                    BetterWright needs Bun 1.4+ and a separate browser setup:
+                    <code>bunx betterwright@2.8.1 setup</code>. See its
+                    <a href="https://github.com/BetterWright/betterwright/blob/main/SETUP.md">setup guide</a>. Other
+                    services, language servers, and permission rules follow each package's documentation.
+                </p>
+            </section>
+
+            <section id="chat" class="split" aria-labelledby="chat-title">
+                <div>
+                    <p class="eyebrow">SpecPi Chat 0.7.1</p>
+                    <h2 id="chat-title">Pi, beside your code.</h2>
+                    <p>
+                        Chat in VS Code with file and image attachments, conversation history, model controls, streamed
+                        tool output, and Git diffs.
+                    </p>
+                    <p>
+                        The new base brings subagent activity and result cards, goal and background-task messages, usage
+                        reports, and permission dialogs into Chat.
+                    </p>
+                </div>
+                <div class="chat-install">
+                    <h3>Install the VS Code extension</h3>
+                    <ol>
+                        <li>
+                            <a
+                                href="https://github.com/TannerMidd/SpecPi/releases/download/v0.21.0/specpi-chat-0.7.1.vsix"
+                                >Download SpecPi Chat 0.7.1</a
+                            >.
+                        </li>
+                        <li>In VS Code, run <strong>Extensions: Install from VSIX…</strong> and select the file.</li>
+                        <li>
+                            Open a trusted project, select SpecPi in the Activity Bar, and choose
+                            <strong>Connect Pi</strong>.
+                        </li>
+                    </ol>
+                    <p class="note">
+                        Requires VS Code 1.96+ and Pi on the workspace host. Install SpecPi separately. Provider sign-in
+                        and some package settings remain in terminal Pi.
+                    </p>
+                    <a href="https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md"
+                        >Read the Chat guide <span aria-hidden="true">→</span></a
+                    >
+                </div>
+            </section>
+
+            <section id="updating" class="split" aria-labelledby="update-title">
+                <div>
+                    <p class="eyebrow">Moving to 0.21.0</p>
+                    <h2 id="update-title">Start with the new base.</h2>
+                    <p>
+                        This release removes SpecPi's former custom tools, extra workflow commands, themes, and shell
+                        profiles. The eight packages replace the supporting tools; Chat remains available.
+                    </p>
+                    <p>
+                        Updates back up managed resources, preserve unrelated settings, and keep modified retired files
+                        in local backups. Restart Pi, including Chat connections, to unload the old extensions.
+                    </p>
+                </div>
+                <div>
+                    <pre aria-label="Update commands"><code>npm install --global specpi@latest
+specpi plan
+specpi update
+specpi doctor</code></pre>
+                    <p>
+                        <a href="https://github.com/TannerMidd/SpecPi#update-and-remove"
+                            >Migration and removal details</a
+                        >
+                        · <a href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.21.0">Release notes</a>
+                    </p>
+                </div>
+            </section>
+        </main>
+        <footer class="wrap">
+            <p>SpecPi · MIT licensed</p>
+            <nav aria-label="Project links">
+                <a href="https://github.com/TannerMidd/SpecPi">GitHub</a
+                ><a href="https://www.npmjs.com/package/specpi">npm</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md">Security</a
+                ><a href="https://github.com/TannerMidd/SpecPi/issues">Issues</a>
+            </nav>
+        </footer>
+    </body>
+</html>

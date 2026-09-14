@@ -5,7 +5,8 @@
 This release resets SpecPi's base and removes previously shipped harness features. Both retained Pi extensions ship as part of SpecPi 0.21.0. SpecPi Chat 0.7.1 remains the separately packaged VS Code frontend and is aligned with the new base.
 
 - Reduce SpecPi to `/scope` and the human-selected harness improvement loop, including its local evidence, contracts, verification, retirement, and reopen behavior.
-- Remove SpecPi's custom delegation, Command Guard, background tasks, browser and structural tools, extra workflow commands, file review UI, themes, shell profiles, and showcase website.
+- Remove SpecPi's custom delegation, Command Guard, background tasks, browser and structural tools, extra workflow commands, file review UI, themes, and shell profiles.
+- Replace the old showcase site with a short installation and package guide. Keep existing documentation URLs working and provide a direct download for Chat 0.7.1.
 - Update the VS Code frontend for the upstream package base: pi-subagents activity and result cards, visible package messages, Permission System settings and approval dialogs, and existing usage/status reporting. Preserve the chat UI, attachments, history, and separate VSIX packaging.
 - Establish the new default base through eight pinned upstream Pi packages: pi-web-access 0.29.0, betterwright 2.8.1, pi-subagents 0.67.0, pi-lens 4.1.6, pi-background-tasks 2.5.0, pi-goal-x 0.31.2, @sreetej510/pi-usage 0.10.0, and @gotgenes/pi-permission-system 32.0.2. Keep the first-party surface limited to scope and the improvement loop.
 - Install and update the base with Pi's package installer, preserve unrelated settings and resource filters, and restore unchanged owned package entries on uninstall. Document upstream script/download rollback limits, BetterWright's separate browser setup, and Pi 0.84.4 compatibility. Keep an explicit core-only skip option and isolated real-package validation.

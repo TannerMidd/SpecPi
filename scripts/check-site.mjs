@@ -1,0 +1,116 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const site = path.join(root, "site");
+const readJson = async (file) => JSON.parse(await fs.readFile(path.join(root, file), "utf8"));
+const manifest = await readJson("package.json");
+const chat = await readJson("vscode/package.json");
+const settings = await readJson("templates/settings.json");
+const routes = new Map([
+    ["/SpecPi/", ["index.html", "text/html"]],
+    ["/SpecPi/styles.css", ["styles.css", "text/css"]],
+    ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
+    ...["wiki", "why-pi", "single-agent"].map((name) => [`/SpecPi/${name}/`, [`${name}/index.html`, "text/html"]]),
+]);
+const server = http.createServer(async (request, response) => {
+    const route = routes.get(new URL(request.url, "http://localhost").pathname);
+    if (!route) {
+        response.writeHead(404).end();
+
+        return;
+    }
+
+    try {
+        response.writeHead(200, { "Content-Type": `${route[1]}; charset=utf-8` });
+        response.end(await fs.readFile(path.join(site, route[0])));
+    } catch {
+        response.destroy();
+    }
+});
+await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+});
+const origin = `http://127.0.0.1:${server.address().port}`;
+const screenshots = path.join(root, ".specpi-test", "site");
+await fs.mkdir(screenshots, { recursive: true });
+let browser;
+try {
+    browser = await chromium.launch();
+    const page = await browser.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+        if (message.type() === "error") {
+            errors.push(message.text());
+        }
+    });
+    page.on("response", (response) => {
+        if (response.status() >= 400) {
+            errors.push(`${response.status()} ${response.url()}`);
+        }
+    });
+    for (const [name, width, height, colorScheme] of [
+        ["desktop", 1440, 1000, "light"],
+        ["tablet", 820, 1180, "light"],
+        ["mobile", 390, 844, "light"],
+        ["mobile-dark", 390, 844, "dark"],
+    ]) {
+        await page.setViewportSize({ width, height });
+        await page.emulateMedia({ colorScheme });
+        await page.goto(`${origin}/SpecPi/`);
+        assert.equal(await page.locator("h1").innerText(), "A small base\nfor Pi.");
+        assert.ok((await page.locator(".intro .eyebrow").innerText()).includes(manifest.version));
+        const rows = await page.locator("tbody tr").allTextContents();
+        assert.equal(rows.length, settings.packages.length);
+        for (const source of settings.packages) {
+            const at = source.lastIndexOf("@");
+            const name = source.slice(4, at);
+            const version = source.slice(at + 1);
+            assert.ok(
+                rows.some((row) => row.includes(name) && row.includes(version)),
+                `${name} pin is out of date`,
+            );
+        }
+
+        const download = `https://github.com/TannerMidd/SpecPi/releases/download/v${manifest.version}/${chat.name}-${chat.version}.vsix`;
+        assert.equal(
+            await page.getByRole("link", { name: `Download SpecPi Chat ${chat.version}` }).getAttribute("href"),
+            download,
+        );
+        const layout = await page.evaluate(() => ({
+            width: document.documentElement.clientWidth,
+            contentWidth: document.documentElement.scrollWidth,
+            missingAnchors: [...document.querySelectorAll('a[href^="#"]')]
+                .map((link) => link.getAttribute("href").slice(1))
+                .filter((id) => !document.getElementById(id)),
+        }));
+        assert.ok(layout.contentWidth <= layout.width, `${name} has horizontal page overflow`);
+        assert.deepEqual(layout.missingAnchors, []);
+        await page.getByRole("link", { name: "Install SpecPi", exact: true }).click();
+        assert.equal(new URL(page.url()).hash, "#install");
+        await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true });
+        process.stdout.write(`Site ${name}: PASS\n`);
+    }
+
+    for (const [route, anchor] of [
+        ["wiki", "install"],
+        ["why-pi", "core"],
+        ["single-agent", "packages"],
+    ]) {
+        await page.goto(`${origin}/SpecPi/${route}/`);
+        await page.waitForURL(`${origin}/SpecPi/#${anchor}`);
+    }
+
+    assert.deepEqual(errors, []);
+    process.stdout.write("Site versions, package pins, navigation, redirects, and console: PASS\n");
+} finally {
+    await browser?.close();
+    await new Promise((resolve) => server.close(resolve));
+}

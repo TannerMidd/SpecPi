@@ -1,8 +1,10 @@
 # SpecPi
 
-A small base for the [Pi coding agent](https://pi.dev/): `/scope`, a human-selected harness improvement loop, and eight upstream packages. SpecPi's own features stay limited to scope and the improvement loop. Keep changes small, reversible, and supported by observed behavior.
+A small base for the [Pi coding agent](https://pi.dev/). Set the scope of a task, notice recurring problems, and choose what to improve. Eight upstream packages provide the supporting tools.
 
-**0.21.0 resets the base.** The two retained Pi extensions share the SpecPi package version. Custom tools, extra workflow commands, themes, shell profiles, and the website have been retired. **SpecPi Chat 0.7.1** remains the VS Code frontend and supports this new base. Review [the release notes](CHANGELOG.md) and the migration instructions below before updating.
+**0.21.0 resets the base.** SpecPi's own Pi extensions now provide only `/scope` and the harness improvement loop. Custom tools, extra workflow commands, themes, and shell profiles have been removed. **SpecPi Chat 0.7.1** remains the VS Code frontend. Read [the release notes](CHANGELOG.md) and the migration instructions below before updating.
+
+[Website](https://tannermidd.github.io/SpecPi/) · [Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.21.0/specpi-chat-0.7.1.vsix) · [Releases](https://github.com/TannerMidd/SpecPi/releases)
 
 ## Install
 
@@ -44,7 +46,7 @@ BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and r
 
 [SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.7.1** adds the new package base's visible messages, a Permission System settings button, and pi-subagents activity and result cards. The VSIX remains separate from the npm harness package.
 
-Build it with `npm --prefix vscode run package`, then install `.specpi-test/vscode/specpi-chat-0.7.1.vsix` in VS Code. See the [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) for package support and terminal-only controls. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+Download the [0.7.1 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.21.0/specpi-chat-0.7.1.vsix), then run **Extensions: Install from VSIX…** in VS Code. To build from source, run `npm --prefix vscode run package`; the file is written to `.specpi-test/vscode/specpi-chat-0.7.1.vsix`. See the [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) for package support and terminal-only controls. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
 
 ## Scope
 
@@ -71,6 +73,7 @@ Observations are leads, not permission. Records stay local, use sanitized summar
 ## Update and remove
 
 ```sh
+npm install --global specpi@latest
 specpi plan
 specpi update
 specpi doctor
@@ -79,7 +82,7 @@ specpi uninstall
 
 Install, update, and uninstall require confirmation; `--yes` supplies it for automation. Modified retained resources require `update --force`. Managed configuration and resources are backed up and checksum-tracked. `update --skip-package-install` preserves an existing base without invoking Pi's package installer. Normal updates reapply the reviewed pins.
 
-Updating from the larger harness retires its recorded extra resources, restores legacy settings that still match ownership records, removes its shell marker block, and installs the new package base. Modified retired files and old runtime directories are preserved under `<agent-dir>/specpi/backups/`. Restart Pi to unload the old extensions. Unrelated configuration and local improvement evidence remain intact. The showcase website is removed; the VS Code frontend is maintained separately under `vscode/`.
+Updating from the larger harness retires its recorded extra resources, restores legacy settings that still match ownership records, removes its shell marker block, and installs the new package base. Modified retired files and old runtime directories are preserved under `<agent-dir>/specpi/backups/`. Restart Pi to unload the old extensions. Unrelated configuration and local improvement evidence remain intact.
 
 Uninstall restores package entries that still match SpecPi's recorded changes and preserves subsequent user edits. Downloaded packages, npm caches, upstream configuration, and private evidence remain on disk. A failed install rolls back SpecPi-managed files and configuration; package downloads and upstream install-script effects cannot be rolled back. `doctor` checks the core, package settings, and installed top-level package versions without activating upstream tools.
 
@@ -94,5 +97,7 @@ npm run check:base
 ```
 
 Installer tests use disposable Pi directories. `check:base` requires network access, installs the real eight packages in isolated state, loads them together through Pi 0.84.4, verifies Chat RPC startup and explicit permission replies, and checks removal. It does not send model requests or run browser tasks. Never test against a live Pi installation. Publication remains explicit and uses the [release procedure](NPM_RELEASE.md).
+
+The website is static HTML and CSS in `site/`. After installing the pinned Playwright browser with `npx --no-install playwright install chromium`, run `npm run check:site` to check versions, links, and desktop, tablet, and mobile layouts. GitHub Pages deploys it from `main` after those checks pass.
 
 [Security model](SECURITY_MODEL.md) · [Third-party components](THIRD_PARTY.md) · [Release notes](CHANGELOG.md) · [MIT License](LICENSE)
