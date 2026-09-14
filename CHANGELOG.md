@@ -2,7 +2,7 @@
 
 ## 0.21.0 - 2026-09-14
 
-This release resets SpecPi's base and removes previously shipped harness features. Both retained Pi extensions ship as part of SpecPi 0.21.0. SpecPi Chat 0.7.0 remains the separately packaged VS Code frontend and is aligned with the new base.
+This release resets SpecPi's base and removes previously shipped harness features. Both retained Pi extensions ship as part of SpecPi 0.21.0. SpecPi Chat 0.7.1 remains the separately packaged VS Code frontend and is aligned with the new base.
 
 - Reduce SpecPi to `/scope` and the human-selected harness improvement loop, including its local evidence, contracts, verification, retirement, and reopen behavior.
 - Remove SpecPi's custom delegation, Command Guard, background tasks, browser and structural tools, extra workflow commands, file review UI, themes, shell profiles, and showcase website.

@@ -2,7 +2,7 @@
 
 A small base for the [Pi coding agent](https://pi.dev/): `/scope`, a human-selected harness improvement loop, and eight upstream packages. SpecPi's own features stay limited to scope and the improvement loop. Keep changes small, reversible, and supported by observed behavior.
 
-**0.21.0 resets the base.** The two retained Pi extensions share the SpecPi package version. Custom tools, extra workflow commands, themes, shell profiles, and the website have been retired. **SpecPi Chat 0.7.0** remains the VS Code frontend and supports this new base. Review [the release notes](CHANGELOG.md) and the migration instructions below before updating.
+**0.21.0 resets the base.** The two retained Pi extensions share the SpecPi package version. Custom tools, extra workflow commands, themes, shell profiles, and the website have been retired. **SpecPi Chat 0.7.1** remains the VS Code frontend and supports this new base. Review [the release notes](CHANGELOG.md) and the migration instructions below before updating.
 
 ## Install
 
@@ -40,9 +40,9 @@ BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and r
 
 ## VS Code
 
-[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.7.0** adds the new package base's visible messages, a Permission System settings button, and pi-subagents activity and result cards. The VSIX remains separate from the npm harness package.
+[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.7.1** adds the new package base's visible messages, a Permission System settings button, and pi-subagents activity and result cards. The VSIX remains separate from the npm harness package.
 
-Build it with `npm --prefix vscode run package`, then install `.specpi-test/vscode/specpi-chat-0.7.0.vsix` in VS Code. See the [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) for package support and terminal-only controls. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+Build it with `npm --prefix vscode run package`, then install `.specpi-test/vscode/specpi-chat-0.7.1.vsix` in VS Code. See the [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) for package support and terminal-only controls. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
 
 ## Scope
 

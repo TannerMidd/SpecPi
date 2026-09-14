@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.7.1
+
+- Bump the VSIX version and update install examples for the SpecPi 0.21.0 base. Runtime behavior is unchanged from 0.7.0.
+
 ## 0.7.0
 
 - Keep SpecPi Chat as the VS Code frontend for SpecPi 0.21.0 and its eight upstream packages. Preserve chat, attachments, history, model controls, and separate VSIX packaging.

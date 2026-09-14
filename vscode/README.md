@@ -2,7 +2,7 @@
 
 Use [Pi](https://github.com/earendil-works/pi) from a chat beside your code in VS Code. Ask a question, attach a file or screenshot, and follow along as Pi reads, edits, and runs commands in your project.
 
-Chat uses the models, provider accounts, and extensions you've already set up in Pi. It works with Pi alone. [SpecPi](https://github.com/TannerMidd/SpecPi) 0.21.0 adds `/scope`, the harness improvement loop, and eight upstream packages. SpecPi Chat **0.7.0** supports that base.
+Chat uses the models, provider accounts, and extensions you've already set up in Pi. It works with Pi alone. [SpecPi](https://github.com/TannerMidd/SpecPi) 0.21.0 adds `/scope`, the harness improvement loop, and eight upstream packages. SpecPi Chat **0.7.1** supports that base.
 
 ## Get started
 
