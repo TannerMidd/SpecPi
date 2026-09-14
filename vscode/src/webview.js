@@ -1,5 +1,3 @@
-"use strict";
-
 function attribute(value) {
     return String(value ?? "")
         .replaceAll("&", "&amp;")
