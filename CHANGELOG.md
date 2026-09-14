@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.1 - 2026-09-14
+
+- Restore the website's original typography, colors, Chat preview, theme switcher, and improvement diagram while keeping the new package base.
+- Bring back the README's logo, product preview, badges, and navigation, and make detailed command instructions collapsible.
+- Give npm's registry processing up to five minutes to finish before the publication readback check fails. Version 0.21.0 published correctly but became available after the previous one-minute check expired.
+
 ## 0.21.0 - 2026-09-14
 
 This release resets SpecPi's base and removes previously shipped harness features. Both retained Pi extensions ship as part of SpecPi 0.21.0. SpecPi Chat 0.7.1 remains the separately packaged VS Code frontend and is aligned with the new base.

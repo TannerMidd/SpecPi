@@ -15,9 +15,23 @@ const settings = await readJson("templates/settings.json");
 const routes = new Map([
     ["/SpecPi/", ["index.html", "text/html"]],
     ["/SpecPi/styles.css", ["styles.css", "text/css"]],
+    ["/SpecPi/wiki.css", ["wiki.css", "text/css"]],
+    ["/SpecPi/theme.js", ["theme.js", "text/javascript"]],
+    ["/SpecPi/page.js", ["page.js", "text/javascript"]],
     ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
     ...["wiki", "why-pi", "single-agent"].map((name) => [`/SpecPi/${name}/`, [`${name}/index.html`, "text/html"]]),
 ]);
+for (const directory of ["fonts", "media"]) {
+    for (const file of await fs.readdir(path.join(site, directory))) {
+        const contentType = { ".woff2": "font/woff2", ".svg": "image/svg+xml", ".png": "image/png" }[
+            path.extname(file)
+        ];
+        if (contentType) {
+            routes.set(`/SpecPi/${directory}/${file}`, [`${directory}/${file}`, contentType]);
+        }
+    }
+}
+
 const server = http.createServer(async (request, response) => {
     const route = routes.get(new URL(request.url, "http://localhost").pathname);
     if (!route) {
@@ -65,9 +79,16 @@ try {
         await page.setViewportSize({ width, height });
         await page.emulateMedia({ colorScheme });
         await page.goto(`${origin}/SpecPi/`);
-        assert.equal(await page.locator("h1").innerText(), "A small base\nfor Pi.");
-        assert.ok((await page.locator(".intro .eyebrow").innerText()).includes(manifest.version));
-        const rows = await page.locator("tbody tr").allTextContents();
+        await page.evaluate(() => document.fonts.ready);
+        assert.equal(await page.locator("h1").innerText(), "Pi, beside\nyour code.");
+        assert.ok((await page.locator(".edition").innerText()).includes(manifest.version));
+        if ((await page.locator("html").getAttribute("data-theme")) !== colorScheme) {
+            await page.getByRole("button", { name: "Dark mode", exact: true }).click();
+        }
+
+        assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
+        assert.equal(await page.evaluate(() => document.fonts.check('400 16px "Plex Sans"')), true);
+        const rows = await page.locator(".package-grid li").allTextContents();
         assert.equal(rows.length, settings.packages.length);
         for (const source of settings.packages) {
             const at = source.lastIndexOf("@");
@@ -95,12 +116,29 @@ try {
         assert.deepEqual(layout.missingAnchors, []);
         await page.getByRole("link", { name: "Install SpecPi", exact: true }).click();
         assert.equal(new URL(page.url()).hash, "#install");
+        await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin });
+        await page.getByRole("button", { name: "Copy commands", exact: true }).click();
+        assert.equal(
+            (await page.evaluate(() => navigator.clipboard.readText())).replaceAll("\r\n", "\n"),
+            await page.locator("#install-command").innerText(),
+        );
         await page.screenshot({ path: path.join(screenshots, `${name}.png`), fullPage: true });
+        await page.getByRole("link", { name: "Docs", exact: true }).click();
+        await page.waitForURL(`${origin}/SpecPi/wiki/`);
+        assert.ok((await page.locator(".index-meta").innerText()).includes(manifest.version));
+        assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
+        assert.equal(
+            await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+            true,
+            `${name} docs overflow`,
+        );
+        await page.locator('.wiki-sidebar a[href="#scope"]').click();
+        assert.equal(new URL(page.url()).hash, "#scope");
+        await page.screenshot({ path: path.join(screenshots, `docs-${name}.png`), fullPage: true });
         process.stdout.write(`Site ${name}: PASS\n`);
     }
 
     for (const [route, anchor] of [
-        ["wiki", "install"],
         ["why-pi", "core"],
         ["single-agent", "packages"],
     ]) {
@@ -109,7 +147,9 @@ try {
     }
 
     assert.deepEqual(errors, []);
-    process.stdout.write("Site versions, package pins, navigation, redirects, and console: PASS\n");
+    process.stdout.write(
+        "Site versions, package pins, fonts, themes, clipboard, documentation, redirects, and console: PASS\n",
+    );
 } finally {
     await browser?.close();
     await new Promise((resolve) => server.close(resolve));

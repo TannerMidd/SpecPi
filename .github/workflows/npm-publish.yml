@@ -195,7 +195,7 @@ jobs:
               run: |
                   set -euo pipefail
                   EXPECTED_INTEGRITY="sha512-$(openssl dgst -sha512 -binary "dist/specpi-${VERSION}.tgz" | openssl base64 -A)"
-                  for attempt in 1 2 3 4 5 6; do
+                  for attempt in {1..30}; do
                     ACTUAL_VERSION="$(npm view "specpi@${VERSION}" version 2>/dev/null || true)"
                     ACTUAL_INTEGRITY="$(npm view "specpi@${VERSION}" dist.integrity 2>/dev/null || true)"
                     ACTUAL_TAG="$(npm view "specpi" "dist-tags.${DIST_TAG}" 2>/dev/null || true)"

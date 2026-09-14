@@ -1,0 +1,209 @@
+.wiki-layout {
+    display: grid;
+    grid-template-columns: 14rem minmax(0, 1fr);
+    gap: 4rem;
+    padding-top: 3rem;
+    padding-bottom: 4rem;
+}
+.wiki-sidebar {
+    position: sticky;
+    top: 2rem;
+    align-self: start;
+    font-size: 0.85rem;
+}
+.wiki-sidebar > p {
+    font: 0.75rem var(--mono);
+    color: var(--muted);
+    margin-bottom: 1.25rem;
+}
+.wiki-sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.wiki-sidebar a {
+    padding: 0.45rem 0;
+    text-decoration: none;
+    display: flex;
+    gap: 1rem;
+}
+.wiki-sidebar a:hover {
+    text-decoration: underline;
+}
+.wiki-sidebar a span {
+    font: 0.7rem/1.9 var(--mono);
+    color: var(--muted);
+    min-width: 1.2rem;
+}
+.index-meta {
+    border-top: 1px solid var(--line);
+    padding-top: 1rem;
+    margin-top: 1.5rem;
+    font: 0.7rem/1.6 var(--mono);
+    color: var(--muted);
+}
+.wiki-content {
+    max-width: 56rem;
+    min-width: 0;
+}
+.wiki-intro {
+    padding-bottom: 2.5rem;
+}
+.wiki-intro h1 {
+    font-size: clamp(2.5rem, 4vw, 3.5rem);
+    margin: 1rem 0;
+}
+.wiki-summary {
+    font-size: 1.2rem;
+    color: var(--muted);
+    max-width: 42rem;
+}
+.wiki-release-note {
+    padding: 1rem 1.25rem;
+    border-left: 3px solid var(--accent);
+    background: var(--surface-raised);
+    font-size: 0.875rem;
+    margin-top: 1.5rem;
+}
+.doc-section {
+    border-top: 1px solid var(--line);
+    padding: 2.5rem 0;
+    scroll-margin-top: 1rem;
+}
+.doc-section pre {
+    padding: 1.25rem 1.5rem;
+    margin: 1.25rem 0;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: var(--surface);
+    line-height: 1.9;
+}
+.doc-section table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.25rem 0;
+    text-align: left;
+    font-size: 0.875rem;
+}
+.doc-section th,
+.doc-section td {
+    border-bottom: 1px solid var(--line);
+    padding: 0.85rem 0.7rem 0.85rem 0;
+    vertical-align: top;
+}
+.doc-section td code {
+    overflow-wrap: anywhere;
+}
+.doc-section li + li {
+    margin-top: 0.7rem;
+}
+.doc-section > header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.doc-section > header > span {
+    font: 0.75rem var(--mono);
+    color: var(--muted);
+}
+.doc-section h2 {
+    font-size: 2rem;
+}
+.doc-section h3 {
+    font-size: 1.35rem;
+    margin: 2rem 0 1rem;
+}
+.doc-section > p {
+    margin: 1rem 0;
+}
+.doc-section .text-link {
+    display: inline;
+    font: inherit;
+    text-decoration: underline;
+}
+.doc-section code {
+    overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+    .wiki-layout {
+        gap: 2.5rem;
+        grid-template-columns: 12rem minmax(0, 1fr);
+    }
+}
+@media (max-width: 800px) {
+    .wiki-layout {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        padding-top: 2rem;
+    }
+    .wiki-sidebar {
+        position: static;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 1.5rem;
+    }
+    .wiki-sidebar nav {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.4rem 1rem;
+    }
+    .wiki-sidebar nav a {
+        font-size: 0.8rem;
+    }
+    .index-meta {
+        display: none;
+    }
+    .wiki-intro h1 {
+        font-size: 3.5rem;
+    }
+}
+@media (max-width: 600px) {
+    .wiki-sidebar nav {
+        grid-template-columns: 1fr 1fr;
+    }
+    .wiki-sidebar nav a {
+        gap: 0.6rem;
+    }
+    .wiki-intro h1 {
+        font-size: 3rem;
+    }
+    .wiki-summary {
+        font-size: 1.1rem;
+    }
+    .doc-section {
+        padding: 2rem 0;
+    }
+    .doc-section h2 {
+        font-size: 1.75rem;
+    }
+    .doc-section > header {
+        gap: 0.7rem;
+    }
+    .wiki-intro {
+        padding-bottom: 2rem;
+    }
+}
+@media print {
+    .wiki-sidebar {
+        display: none;
+    }
+    .wiki-layout {
+        display: block;
+        padding: 0;
+    }
+    .wiki-content {
+        max-width: none;
+    }
+}
+.doc-section > p,
+.wiki-summary {
+    max-width: 65ch;
+}
+.wiki-sidebar a:hover,
+.doc-section a {
+    color: var(--accent);
+}
+.wiki-release-note {
+    border-left-width: 2px;
+    background: var(--surface);
+}
