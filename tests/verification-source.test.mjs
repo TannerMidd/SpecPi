@@ -37,6 +37,22 @@ function descriptor(size = 0) {
     return { type: "file", mode: 0o644, size, sha256: "0".repeat(64) };
 }
 
+test("source evidence tracks changes in the retained VS Code frontend", () => {
+    const root = createSourceRoot("vscode");
+    try {
+        fs.mkdirSync(path.join(root, "vscode", "src"), { recursive: true });
+        const file = path.join(root, "vscode", "src", "extension.js");
+        fs.writeFileSync(file, "module.exports = {};\n");
+        const before = captureSourceSnapshot(root);
+        fs.writeFileSync(file, "module.exports = {updated: true};\n");
+        assert.deepEqual(compareSourceSnapshots(before, captureSourceSnapshot(root)).changed, [
+            "vscode/src/extension.js",
+        ]);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 function syntheticSnapshot(root, entries) {
     return {
         schema: VERIFICATION_SCHEMA,

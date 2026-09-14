@@ -82,14 +82,16 @@
     "check:package": "node scripts/check-package.mjs",
     "check:pi-package": "node scripts/check-pi-package.mjs",
     "check:base": "node scripts/check-base-packages.mjs",
+    "check:vscode": "npm --prefix vscode run check",
     "prepublishOnly": "npm run check",
-    "check": "npm run format:check && npm run check:syntax && npm test && npm run check:package"
+    "check": "npm run format:check && npm run check:syntax && npm test && npm run check:package && npm run check:vscode"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "0.84.4",
     "@earendil-works/pi-ai": "0.84.4",
     "@earendil-works/pi-tui": "0.84.4",
     "typebox": "1.3.7",
+    "playwright": "1.62.1",
     "@stylistic/eslint-plugin": "5.10.0",
     "@typescript-eslint/parser": "8.68.0",
     "eslint": "10.9.1",

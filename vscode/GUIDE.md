@@ -1,0 +1,128 @@
+# SpecPi Chat guide
+
+For a quick start, see the [overview](README.md). This guide covers the controls, limits, and troubleshooting in more detail. Build, test, and publishing instructions are in the [development guide](DEVELOPMENT.md).
+
+## Set up
+
+1. Install Node.js **22.19 or newer** and Pi **0.84.4** for the reviewed default base on the machine running your VS Code workspace. SpecPi 0.21.0 provides `/scope`, the harness improvement loop, and the eight default packages. Follow the [SpecPi setup guide](https://github.com/TannerMidd/SpecPi#readme). Configure your provider through Pi in a terminal, and confirm Pi works in the intended folder.
+2. Use VS Code **1.96 or newer**. Open and trust a filesystem workspace.
+3. Install **SpecPi Chat** by **tannermidd** from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=tannermidd.specpi-chat), or run:
+
+   ```sh
+   code --install-extension tannermidd.specpi-chat
+   ```
+
+4. Open **SpecPi** in the Activity Bar, or press **Ctrl+Alt+S** (**Cmd+Alt+S** on macOS). Choose **Connect Pi**.
+
+To install a package built from this repository instead, run:
+
+```sh
+npm --prefix vscode run package
+code --install-extension .specpi-test/vscode/specpi-chat-0.7.0.vsix
+```
+
+You can also run **Extensions: Install from VSIX…** in VS Code and select that file.
+
+If Pi cannot be found, open **SpecPi: Chat Settings** and set `specpi.chat.piPath` to its absolute executable or JavaScript CLI path. For JavaScript entry points, `specpi.chat.nodePath` can select your external Node.js executable. Empty settings discover Pi and Node on PATH. These are application settings; repository settings cannot choose an executable. Supply a path, with no additional command arguments.
+
+On Windows, ordinary npm Pi launchers are resolved to their adjacent JavaScript entry point. Custom PowerShell launchers and arbitrary shell commands are unsupported. If automatic resolution fails, choose the installed Pi package's CLI JavaScript file explicitly.
+
+For SSH, WSL, or containers, install the extension in the remote workspace and configure Pi and Node on that host. Browser-only VS Code and virtual filesystems are unsupported.
+
+## Work in the sidebar
+
+Use SpecPi 0.21.0 with SpecPi Chat 0.7.0. Run the confirmed SpecPi install/update separately and restart Pi in Chat. Installing a VSIX does not install or update the harness packages. Legacy startup dialogs are cancelled without approval; update older harness resources if a connection waits for a startup dialog to expire.
+
+- **Send a message:** use Enter to send and Shift+Enter for a new line. Pick an available model and thinking level before sending.
+- **Add context:** the active editor selection appears above the composer as a chip and attaches with your next message (click the chip to hide it), or select code and use **SpecPi: Attach Selection to Chat**, press **Alt+K** to insert an `@file#Lx-Ly` mention, choose a file through the attachment controls, type `@` to find a workspace file or folder, or drop a workspace file reference into the composer. A file suggestion lists files and matching folders; selecting one attaches its validated contents or a bounded folder listing. Review or remove attachments before sending.
+- **Follow the work:** replies stream into the transcript. Thinking and tool blocks start expanded, including tool results and images. Manual collapse/expand choices are preserved during streaming and completion. Stop interrupts the current response. During a response, choose whether your next message should steer the current work or follow afterward.
+- **Add images:** choose PNG, JPEG, GIF, or WebP files with the image picker, paste a screenshot, or drop image files into the composer. The image picker can read explicitly selected images outside the workspace. Choose a model with image support, then send a normal message with or without text. Images stay attached when model validation fails. Pi slash commands reject image attachments because those commands do not consume them.
+- **Attach folders:** selecting a folder in `@` suggestions, an `@folder/` mention, or **Attach File** on an Explorer folder attaches a bounded directory-listing snapshot (at most 200 entries / 16 KiB, with an explicit truncation notice) instead of reading every file. Sensitive directories and credentials are never listed. Pi can still read files inside the folder with its own tools. Suggestions and folder listings respect `files.exclude`, `search.exclude`, and the workspace-root `.gitignore` (following `search.useIgnoreFiles`); explicitly attaching an ignored file or folder remains available.
+- **View permissions:** click Permissions or run **SpecPi: Show Permission Settings** to send `/permission-system show`. The button appears when Pi advertises the package command. YOLO is displayed only when upstream reports it. Rule changes remain upstream; the settings modal requires Pi in a terminal.
+- **Use Pi commands:** commands exposed by your installed Pi extensions appear in the command picker. `/help` shows local help without connecting, `/new` creates a conversation, and `/compact` asks Pi to compact the current context.
+- **Follow pi-subagents:** Chat 0.7.0 supports the [pi-subagents package](https://pi.dev/packages/pi-subagents) included in SpecPi's base. The agent panel shows active foreground and background children, model, thinking level, elapsed time, and reported tokens, including a count when more agents are active than fit in the list. Individual cards in `subagent` tool results show progress and outcomes, including parallel and chain children; saved results restore those cards. Live activity uses the public `fleetStatus` v1 API, reviewed against pi-subagents 0.67.0. If the package lacks that capability, ordinary tool-result cards and text still work. The live list is observational: disappearance is not proof of success, and it provides no per-agent Stop or steering buttons. Use the package's commands or ask Pi to control a run. Chat loads a small read-only adapter into its own Pi processes; it does not install pi-subagents or change global settings. Restart Chat's Pi connection after updating the extension.
+- **Manage conversations:** open Chat History to search conversations in the selected workspace, see which are running or waiting for input, and rename or archive a row directly. The Archived tab lets you restore conversations. Switching chats preserves their Pi processes, drafts, attachments, and scroll position; responses continue in the background. New Chat opens a blank draft and starts Pi when you connect or send.
+- **Branch or edit a prompt:** **Branch Conversation** clones the current conversation. **Edit an Earlier Prompt** creates a branch before the selected user message and restores its exact text and images to the composer for review. Neither action sends the draft automatically or rolls back code files.
+- **Find, copy, or export:** use **Ctrl+F** (**Cmd+F** on macOS) to search the displayed conversation. Copy Conversation copies its visible Markdown; Export Conversation opens an unsaved Markdown document in VS Code. Images appear as placeholders, and truncated earlier content is not reconstructed.
+- **Inspect usage:** The footer shows Pi's reported conversation cost in USD beside context/token usage. It updates after completed turns and when switching conversations; hover for the detailed amount or click for Session Usage, including input/output and cache tokens. Missing costs remain hidden rather than displaying zero. Context usage remains unavailable when Pi has no fresh measurement after compaction.
+- **Provider limits:** a compact **Limits** row shows reports from the base's `@sreetej510/pi-usage` package, including Anthropic, with keyboard-expandable details and source labels. These are package-reported subscription/rate-limit budgets, separate from conversation cost. Used percentages, loading, errors, unavailable values, cached ages, and resets remain as reported upstream. Send `/usage` or `/usage --refresh` in the composer for its reports. The sidebar does not query providers, read authentication or usage-cache files, automatically consume banked resets, or reproduce terminal-only custom footers. Updates belong to their live conversation and are cleared on disconnect/reconnect. The VSIX does not install packages.
+- **Review edits:** Review Changes lists working-tree, staged, untracked, and conflicted files through VS Code's Git integration and opens the selected change in the native editor or diff view. It does not stage, commit, or restore files.
+- **Open code references:** click a file reference such as `src/app.ts:12:3` or `src/app.ts#L12-L18` to reveal that location in the editor. Markdown links and inline code references work; plain file-and-line references are also detected. Targets must be regular, non-sensitive files inside the selected workspace. References inside fenced code examples remain copyable source text.
+- **Switch folders:** use **SpecPi: Choose Chat Workspace** in a multi-folder workspace. Each folder has its own history; changing folders preserves the conversations already running elsewhere.
+- **Disconnect:** use **SpecPi: Disconnect Pi** to stop the selected conversation's process. Other conversations keep running. Reconnect to continue; closing the VS Code extension host stops all its Pi processes.
+- **Restart:** click **Restart Pi** in the Chat title bar or run **SpecPi: Restart Pi** from the Command Palette to stop and reconnect the selected chat's Pi process, reloading its extensions and resuming its saved conversation. This interrupts any active response and clears queued sends and pending approval dialogs. Unsent composer text and attachments stay in the chat; other conversations keep running.
+
+Pi extensions can request confirmation, selection, or text input through the sidebar. Responses go back to the requesting conversation's Pi process. A background conversation appears as needing input in history; open it to respond. Switching away does not approve or cancel the request. A cancelled or timed-out dialog does not silently grant approval.
+
+Stop clears queued work before aborting the active response. Pi returns only the text of cleared queue entries. Chat retains image snapshots for accepted queued prompts, with at most eight images / 20 MiB across pending and recovered drafts, and offers an explicit restore action when a returned entry matches exactly. It does not guess when text was transformed or a match is ambiguous; the sidebar explains when an image draft cannot be recovered. Restoring does not send it, and a later unrelated message does not inherit those images.
+
+## Default package support
+
+Chat uses the packages installed in Pi; it never installs copies or changes their policies. Restart Pi after installing/updating the base. Type / to discover commands advertised by the connected runtime. Tools retain their upstream execution behavior.
+
+| Package | Chat support |
+| --- | --- |
+| pi-web-access | Search/fetch tool text and links; upstream configuration stays in Pi. |
+| betterwright | Browser tool progress, results, and returned image blocks. Install Bun and run the separate browser setup before browser work. |
+| pi-subagents | Public live fleet activity, model/effort/token metadata, parallel/chain result cards, and visible completion notices. The live fleet panel provides no per-agent stop controls. |
+| pi-lens | Tool results, diagnostics/status widgets, and advertised commands. Language-server setup and TUI-only custom views remain upstream. |
+| pi-background-tasks | Background tool output and visible completion messages; task processes retain the package's lifecycle rules. Chat's Stop interrupts Pi's response and does not claim to terminate every detached task. |
+| pi-goal-x | Goal commands, visible progress/completion messages, status widgets, and RPC questionnaire dialogs. Terminal-only custom settings views are not rendered. |
+| @sreetej510/pi-usage | Published provider-usage status in Limits and /usage reports. Chat does not read credentials or perform its own provider refreshes. |
+| @gotgenes/pi-permission-system | Exact select/input approval replies, including denial reasons and session-scope choices, plus /permission-system show, help, and path. The no-argument settings modal requires terminal Pi. |
+
+Visible package messages and generic widgets render as bounded text. Messages explicitly marked hidden stay hidden. Package-specific terminal renderers and custom footers are not reproduced in the sidebar. The full base is checked with Pi 0.84.4; Pi Goal X currently declares >=0.83.0 <0.85.0 support.
+
+## Supported content and controls
+
+| Capability | Support in this preview |
+| --- | --- |
+| Text, Markdown, code blocks, tables, HTTP(S) links | Yes; model output is rendered without executing HTML. |
+| Text/code attachments and editor selections | UTF-8 text, 64 KiB per attachment, inside the selected workspace; up to eight attachments total, including images. The active editor selection is also offered above the composer and attaches on send unless hidden by clicking the chip. It counts toward the eight; a message already holding eight attachments asks you to hide the chip or remove one. |
+| Folder references and listings | Selecting a folder in `@` suggestions, an `@folder/` mention, or an Explorer **Attach File** attaches one bounded directory listing (200 entries / 16 KiB) as a single attachment; contents are never read automatically. Sensitive paths are skipped. |
+| File and folder suggestion filtering | Suggestions respect `files.exclude`, `search.exclude`, and the workspace-root `.gitignore` (`search.useIgnoreFiles`); explicit attachment of ignored paths stays available. |
+| File, line, column, and line-range references | Yes; click to open the validated workspace file in VS Code. |
+| Image attachments, pasted screenshots, and image drag-and-drop | PNG, JPEG, GIF, and WebP; image-only or mixed messages; an image-capable Pi model is required. |
+| Inline images and Markdown image previews | Validated Pi image blocks render inline. Click a local image reference, ordinary Markdown link, or inline PNG/JPEG/GIF/WebP filename to preview a validated workspace image rather than open it as text. External image URLs open through the browser link action; Chat does not fetch them. |
+| Models and thinking levels | Pi's available options, including `max` when supported by the selected model. |
+| Streaming, tools, approvals, Stop, steering, and follow-ups | Yes, through the local Pi runtime. |
+| Chat history, branching, and earlier-prompt editing | Searchable extension-owned conversations, rename, archive/restore, and independent live processes. Editing restores a draft on a new conversation branch and leaves code files as they are. |
+| Search, copy, export, and usage | Search the visible transcript, copy/export visible Markdown, and see Pi's reported conversation cost beside context/token usage in the footer. Hover or click it for details; image bytes are omitted from exports. |
+| Native diff review | Working-tree and staged Git changes, with explicit selection before opening a diff or file. |
+| Inline completions and file checkpoints | Not implemented; there is no automatic file undo or checkpoint restore. |
+
+Each image is limited to **5 MiB**, **16,384 pixels per side**, and **40 million pixels**. A message accepts at most **eight mixed attachments** and **20 MiB of image bytes**. The visible transcript retains at most **32 images / 20 MiB**; omitted images receive a display notice. These limits apply before base64 expansion. Pi and individual providers can impose narrower format or image-count limits.
+
+The RPC connection accepts JSON records up to **64 MiB** and buffers at most **64 MiB** of pending writes. A very large image-bearing Pi history can exceed the response limit even when each original prompt was within the attachment limit. Recognized oversized history responses are drained without disconnecting Pi; the sidebar explains that older messages could not be loaded, and you can continue, compact, or start a new chat. Editing a prompt from an oversized history reports the limit without changing the conversation.
+
+## Privacy and boundaries
+
+The sidebar starts Pi as a child process over its local JSON-lines RPC interface. Pi owns provider authentication, provider requests, tools, and SpecPi enforcement. Chat messages and attached content are sent to Pi and may be sent by Pi to your configured provider. The extension does not store or inspect provider credentials.
+
+Opening the view does not start Pi. Connecting or sending a message does. Trusted-workspace access is required because Pi can read and change files and execute tools in the selected workspace. The extension does not replace Pi's tool policies or Permission System.
+
+Only conversations created through this extension appear in Chat History. Pi writes those transcripts under VS Code's workspace storage, separate from its ordinary session directory. The extension keeps a bounded index of its own session references and retrieves conversation messages through Pi RPC. It does not enumerate or import your existing Pi terminal history. **Archive** hides a conversation from the main list without deleting its file or stopping its process; restore it from the Archived tab. VS Code can retain extension storage after uninstall.
+
+Text/code attachments and file references are restricted to the selected workspace. Explicit image selection, pasted screenshots, and dropped image files may come from outside it; image file paths still undergo regular-file and sensitive-path checks. Image bytes are checked against supported formats, dimensions, and size limits. Attachments are snapshots for the user to review, not a content-based secret detector. Pi itself may read other files while completing your request.
+
+Draft images and display media caches remain in memory. Sent images become part of Pi's extension-owned conversation files and may be sent to the configured provider. The webview receives media by identifier, renders validated data images under `img-src data:`, and does not fetch remote images, scripts, or styles. Model output never executes as HTML. There is no extension telemetry or transcript logging to an output channel. Copy and Export are explicit ways to move the visible conversation into the clipboard or a document.
+
+## Current limits
+
+- Pi must already be installed and configured. SpecPi is optional. The sidebar does not install packages, sign in to providers, or change Pi settings.
+- Pi's RPC dialog methods are supported; custom terminal UIs, overlays, and TUI-only commands do not run inside VS Code.
+- Ignore filtering reads the workspace-root `.gitignore` only; nested `.gitignore` files and `core.excludesFile` are not followed yet. The ignore file must be a regular, unlinked UTF-8 workspace file of at most 64 KiB. Unsafe or unavailable ignore files stop filtering with an error rather than exposing ignored entries; fix the file or explicitly disable `search.useIgnoreFiles`. Malformed character-class rules are skipped individually. Boolean `files.exclude` and `search.exclude` entries are supported; sibling-dependent `{ "when": ... }` entries are not yet supported. `false` disables only the matching settings key. Filtering permits at most 1,000 compiled rules, 4,096 characters per pattern/path, and a bounded matching-work budget; exceeding a limit reports an error.
+- Folder listings are capped at 200 entries and 16 KiB per attachment, and scan at most 1,000 entries across the snapshot, including hidden entries. Only that bounded sample is sorted; large folders may be incomplete even when most entries are hidden. The listing includes a truncation notice when a limit is reached.
+- This preview does not provide inline ghost text, an apply-patch approval editor, file checkpoints or undo, or import of existing terminal conversations. Conversation branching changes chat history; it does not restore the worktree. Pi tools still perform workspace edits through the existing harness.
+- Each connected conversation keeps its own Pi process until explicitly disconnected or the extension host closes. Conversations can run concurrently in the same workspace; their tools operate on that shared workspace. Unsent drafts remain in memory for the current extension-host lifetime.
+- Model and reasoning choices depend on the connected Pi installation and provider. A successful local test does not establish that a provider is configured or reachable.
+- Image format, animation, and vision behavior vary by provider. Passing local validation establishes the sidebar's transport boundary, not provider support for every accepted image.
+- Remote workspace execution follows VS Code's extension-host model; the host and Pi must have access to the intended workspace filesystem.
+
+## Connection troubleshooting
+
+If Pi works in the terminal but Chat 0.1.0 reports **Pi did not respond to get_state in time**, install the latest VSIX from the setup steps above and reload VS Code when prompted. Older SpecPi Guard versions wait 30 seconds for a startup selection before Pi begins reading RPC requests, which conflicts with 0.1.0's 30-second request timeout. Chat now gives startup up to 90 seconds while keeping normal request timeouts at 30 seconds.
+
+The sidebar explains the startup delay and allows cancellation. If startup still times out, update the harness from this checkout and check whether another installed Pi extension waits for a startup dialog. Pi 0.84.4 cannot read dialog responses until its startup handlers return; an extension that waits indefinitely must implement an RPC-compatible startup path. The sidebar does not bypass extension policies or grant startup approvals.
+
+If a message was accepted but the subsequent status refresh failed, use **Refresh status**. This only retrieves the current conversation and does not send the message again. A dropped connection before Pi acknowledges a prompt leaves its outcome uncertain; inspect the resumed conversation before deciding whether to send it again.

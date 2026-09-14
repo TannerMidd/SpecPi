@@ -1,0 +1,9 @@
+# The dependency-free package script uses its own exact file allowlist.
+# This file documents the same exclusions for VS Code packaging tools.
+scripts/**
+tests/**
+node_modules/**
+**/*.vsix
+**/*.log
+**/*.map
+**/.*

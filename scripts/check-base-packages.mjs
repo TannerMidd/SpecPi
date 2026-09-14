@@ -75,6 +75,10 @@ process.exit(0);
         resources.tools.length,
         "Default packages registered conflicting tool names",
     );
+    console.log("Checking the complete base over Chat RPC, including upstream permission replies.");
+    env.SPECPI_CHAT_BASE_SMOKE = "1";
+    const chatReport = run(process.execPath, ["--test", path.join(repoRoot, "tests/vscode-base-packages.test.mjs")]);
+    assert.doesNotMatch(chatReport, /# skipped [1-9]|ℹ skipped [1-9]/u);
     run(cli, ["update", "--yes", "--skip-package-install"]);
     run(cli, ["doctor"]);
     run(cli, ["uninstall", "--yes"]);

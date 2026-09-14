@@ -20,6 +20,9 @@ jobs:
       - run: npm run check
       - run: npm run check:pi-package
       - run: npm run check:base
+      - name: Install browser for Chat rendering checks
+        run: npx --no-install playwright install --with-deps chromium
+      - run: npm --prefix vscode run test:render
       - run: git diff --check
 
   package-smoke:
@@ -40,4 +43,5 @@ jobs:
       - run: npm run check:package
       - run: npm run check:pi-package
       - run: npm run check:base
+      - run: npm run check:vscode
       - run: git diff --check
