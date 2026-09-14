@@ -14,19 +14,7 @@ export const MAX_RECEIPT_GATES = 8;
 // These are the source and verification inputs that can affect a SpecPi
 // checkout.  Keep the inventory explicit so a user's neighbouring files are
 // never pulled into a proof merely because they happen to live in the root.
-export const SOURCE_DIRECTORIES = Object.freeze([
-    ".github",
-    "browser-runtime",
-    "extensions",
-    "scripts",
-    "shell",
-    "site",
-    "skills",
-    "templates",
-    "tests",
-    "themes",
-    "vscode",
-]);
+export const SOURCE_DIRECTORIES = Object.freeze([".github", "extensions", "scripts", "skills", "templates", "tests"]);
 
 export const SOURCE_ROOT_FILES = Object.freeze([
     "AGENTS.md",
@@ -45,7 +33,6 @@ export const SOURCE_ROOT_FILES = Object.freeze([
     "eslint.config.js",
     "package.json",
     "prettier.config.mjs",
-    "tsconfig.browser.json",
     "specpi",
     "specpi.cmd",
 ]);

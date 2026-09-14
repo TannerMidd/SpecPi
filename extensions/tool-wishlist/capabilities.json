@@ -2,22 +2,6 @@
   "schema": 1,
   "capabilities": [
     {
-      "id": "local-browser-automation",
-      "title": "Local browser automation and visual regression",
-      "aliases": [
-        "browser-automation",
-        "browser-automation-visual-regression",
-        "browser-visual-regression-testing",
-        "local-browser-visual-regression",
-        "local-browser-visual-regression-testing"
-      ],
-      "shippedVersion": "0.1.0",
-      "shippedAt": "2026-08-28T00:00:00.000Z",
-      "validations": [
-        "browser-runtime-smoke"
-      ]
-    },
-    {
       "id": "durable-retirement-proof",
       "title": "Durable re-runnable retirement proofs",
       "aliases": [],
@@ -58,20 +42,6 @@
       ]
     },
     {
-      "id": "command-guard",
-      "title": "Cross-platform session command guard",
-      "aliases": [
-        "command-protection",
-        "dangerou-command-protection",
-        "session-command-safety"
-      ],
-      "shippedVersion": "0.8.0",
-      "shippedAt": "2026-08-31T00:00:00.000Z",
-      "validations": [
-        "command-guard-smoke"
-      ]
-    },
-    {
       "id": "scope-drift-monitor",
       "title": "Session scope drift monitor",
       "aliases": [
@@ -82,32 +52,6 @@
       "shippedAt": "2026-09-01T00:00:00.000Z",
       "validations": [
         "scope-drift-monitor-smoke"
-      ]
-    },
-    {
-      "id": "guided-experiment-worktree",
-      "title": "Guided detached experiment worktrees",
-      "aliases": [
-        "experiment-worktree",
-        "isolated-experiment-worktree"
-      ],
-      "shippedVersion": "0.8.4",
-      "shippedAt": "2026-09-01T00:00:00.000Z",
-      "validations": [
-        "guided-experiment-worktrees-smoke"
-      ]
-    },
-    {
-      "id": "completion-challenge",
-      "title": "Structured completion challenge",
-      "aliases": [
-        "completion-review",
-        "completion-readiness-challenge"
-      ],
-      "shippedVersion": "0.8.4",
-      "shippedAt": "2026-09-01T00:00:00.000Z",
-      "validations": [
-        "completion-challenge-smoke"
       ]
     }
   ]

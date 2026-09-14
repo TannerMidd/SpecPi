@@ -22,13 +22,8 @@ export function syntaxFiles(root) {
         }
     };
 
-    for (const directory of ["scripts", "extensions", "browser-runtime", "site"]) {
+    for (const directory of ["scripts", "extensions"]) {
         visit(path.join(root, directory));
-    }
-
-    // The separately distributed editor extension is absent from the npm artifact.
-    if (fs.existsSync(path.join(root, "vscode"))) {
-        visit(path.join(root, "vscode"));
     }
 
     return files.sort();

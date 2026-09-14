@@ -389,16 +389,7 @@ function assertFinishSelectionStillActive(
 }
 
 function validatorArgs(validator: string, cwd: string) {
-    return [
-        sourceCheckout(cwd).validatorsFile,
-        validator,
-        "--state-dir",
-        stateDir,
-        "--cwd",
-        cwd,
-        "--browser-runtime",
-        path.join(stateDir, "browser-runtime"),
-    ];
+    return [sourceCheckout(cwd).validatorsFile, validator, "--state-dir", stateDir, "--cwd", cwd];
 }
 
 async function gitChangedFiles(pi: any, cwd: string, signal: any) {
@@ -832,7 +823,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
                         existing.gapId !== expectedSelection.gapId ||
                         existing.selectionId !== expectedSelection.selectionId)
                 ) {
-                    throw new Error("A different task contract is active; revise it through /task or reselect the gap");
+                    throw new Error("A different improvement contract is active; reselect the gap");
                 }
 
                 const contract = createTaskContract(
@@ -849,7 +840,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
                 );
                 if (existing) {
                     if (existing.digest !== contract.digest) {
-                        throw new Error("The improvement task contract is immutable; revise it through /task");
+                        throw new Error("The improvement contract is immutable; reselect the gap to revise it");
                     }
 
                     return {

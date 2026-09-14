@@ -172,7 +172,7 @@ export default async function wishlistExtensionHarness() {
     await wishlist.handler("draft local-audio-transcription", ctx);
 
     const browserGap = {
-        capability: "Local browser automation",
+        capability: "Scope drift monitor",
         scenario: "Interact with a locally rendered application",
         limitation: "Browser interaction needed explicit revalidation",
         impact: "degraded",
@@ -186,7 +186,7 @@ export default async function wishlistExtensionHarness() {
     await reportTool.execute("call-2", browserGap, undefined, undefined, ctx);
     const stateDir = path.join(agentDir, "specpi");
     const completion = {
-        gapId: "local-browser-automation",
+        gapId: "scope-drift-monitor",
         acceptanceEvidence: ["Browser interaction and visual comparison smoke passed"],
         validationNote: "Browser workflow revalidated",
     };
@@ -252,7 +252,7 @@ export default async function wishlistExtensionHarness() {
     await reportTool.execute("call-3", browserGap, undefined, undefined, ctx);
     await harnessImprovement.handler("", ctx);
     const reopenPrompt = sentUserMessages[1] ?? "";
-    await wishlist.handler("history local-browser-automation", ctx);
+    await wishlist.handler("history scope-drift-monitor", ctx);
     await wishlist.handler("status", ctx);
 
     const reportBeforeReset = fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8");
@@ -317,7 +317,7 @@ export default async function wishlistExtensionHarness() {
             journalPersisted: Boolean(
                 journalRecord?.journal?.evidence?.includes("Browser interaction and visual comparison smoke passed") &&
                 journalRecord.journal.gates?.includes("npm run check") &&
-                journalRecord.journal.gates?.includes("browser-runtime-smoke") &&
+                journalRecord.journal.gates?.includes("scope-drift-monitor-smoke") &&
                 typeof journalRecord.journal.version === "string",
             ),
             contractRecorded: Boolean(
@@ -325,12 +325,12 @@ export default async function wishlistExtensionHarness() {
                     (entry: any) =>
                         entry.customType === "specpi-task-contract" &&
                         entry.data?.kind === "set" &&
-                        entry.data.contract?.gapId === "local-browser-automation" &&
+                        entry.data.contract?.gapId === "scope-drift-monitor" &&
                         entry.data.contract?.selectionId === activeSelection?.selectionId,
                 ),
             ),
             receiptPersisted: Boolean(
-                journalRecord?.journal?.receipt?.gapId === "local-browser-automation" &&
+                journalRecord?.journal?.receipt?.gapId === "scope-drift-monitor" &&
                 journalRecord.journal.receipt?.selectionId === activeSelection?.selectionId &&
                 journalRecord.journal.receipt?.runtime?.node === process.version,
             ),

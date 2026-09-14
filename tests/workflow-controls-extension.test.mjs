@@ -5,7 +5,7 @@ import { runPiFixture } from "../scripts/pi-test-harness.mjs";
 
 const fixture = path.resolve("tests/fixtures/workflow-controls-harness.ts");
 
-test("workflow-controls extension composes scope and completion challenge lifecycle", (context) => {
+test("workflow-controls extension composes scope and improvement contract lifecycle", (context) => {
     const result = runPiFixture(fixture);
     if (result.unavailable) {
         context.skip(result.error?.message ?? "Pi is not available for the extension harness");
@@ -18,67 +18,11 @@ test("workflow-controls extension composes scope and completion challenge lifecy
     const match = output.match(/WORKFLOW_CONTROLS_HARNESS=(.+)/u);
     assert.ok(match, output);
     const report = JSON.parse(match[1]);
-    assert.deepEqual(report.commands, ["challenge", "experiment", "guard", "scope", "task"]);
-    assert.equal(report.toolRegistered, true);
-    assert.equal(report.nestedCwdOutOfScopeDenied, true);
-    assert.equal(report.nestedCwdInScopeAllowed, true);
-    assert.equal(report.denied, true);
-    assert.equal(report.allowed, true);
-    assert.equal(report.pendingRecorded, true);
-    assert.equal(report.headlessAllowed, true);
-    assert.equal(report.headlessPending, true);
-    assert.equal(report.challengeTriggered, true);
-    assert.equal(report.challengeTerminated, true);
-    assert.equal(report.challengeVerdict, "incomplete");
-    assert.equal(report.staleChallengeRejected, true);
-    for (const observation of [
-        "genericChallengeTriggered",
-        "legacyReviewInvalidated",
-        "genericActiveReviewInvalidated",
-        "taskImportPreservedPending",
-        "taskImportBoundDigest",
-        "taskChallengeExactIds",
-        "taskChallengeRequiresDigest",
-        "handoffRendered",
-        "handoffDidNotTriggerTurn",
-        "taskRevisionKeepsId",
-        "taskRevisionChangedDigest",
-        "taskRevisionInvalidatedReview",
-        "taskScopeReportedStale",
-        "taskReimportUpdatedDigest",
-        "taskRevisionEmittedStaleImmediately",
-        "taskClearEmittedStaleImmediately",
-        "malformedTaskChallengeBlocked",
-        "malformedTaskRendererSafe",
-        "stickyChallengeIndeterminate",
-        "stickyReadyRejected",
-        "scopeRecheckClearedUncertainty",
-        "handoffStickyUncertainty",
-        "treeClearedChallengeBeforeRoot",
-        "treeOldStateCleared",
-        "treeOlderRestoreIgnored",
-        "treeArmedGenericChallengeCleared",
-        "treeDelayedChallengeRootIgnored",
-        "treeDelayedChallengeSnapshotIgnored",
-        "treeDelayedTaskEditorIgnored",
-        "treeDelayedHandoffIgnored",
-        "treeDelayedRecheckIgnored",
-        "shutdownDelayedChallengeIgnored",
-    ]) {
-        assert.equal(report[observation], true, observation);
+    assert.deepEqual(report.commands, ["scope"]);
+    assert.equal(report.toolRegistered, false);
+    for (const [name, value] of Object.entries(report)) {
+        if (!["commands", "toolRegistered"].includes(name)) {
+            assert.equal(value, true, name);
+        }
     }
-
-    assert.equal(report.acceptClearedPending, true);
-    assert.equal(report.acceptKeptScope, true);
-    assert.equal(report.addWidenedScope, true);
-    assert.equal(report.percentPathStayedCanonical, true);
-    assert.equal(report.readSkippedSnapshots, true);
-    assert.equal(report.abandonedChallengeExpired, true);
-    assert.equal(report.resumedActive, true);
-    assert.equal(report.resumedChallengeArmed, false);
-    assert.equal(report.completedResultSurvivedRestart, true);
-    assert.equal(report.restoredRecordUnchanged, true);
-    assert.equal(report.addAfterResumeWidened, true);
-    assert.equal(report.guardStillUsable, true);
-    assert.equal(report.emittedScopeStatus, true);
 });

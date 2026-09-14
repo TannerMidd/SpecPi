@@ -1,47 +1,12 @@
-<p align="center">
-  <img src="site/logo.svg" width="104" alt="SpecPi logo">
-</p>
+# SpecPi
 
-<h1 align="center">SpecPi</h1>
+A small base for the [Pi coding agent](https://pi.dev/): `/scope`, a human-selected harness improvement loop, and eight upstream packages. SpecPi's own features stay limited to scope and the improvement loop. Keep changes small, reversible, and supported by observed behavior.
 
-<p align="center">
-  A small toolkit for the <a href="https://pi.dev/">Pi coding agent</a>.
-</p>
-
-<p align="center">
-  <a href="#install">Install</a>
-  · <a href="https://tannermidd.github.io/SpecPi/">Website</a>
-  · <a href="https://tannermidd.github.io/SpecPi/why-pi/">Why Pi?</a>
-  · <a href="https://tannermidd.github.io/SpecPi/wiki/">Documentation</a>
-</p>
-
-SpecPi extends Pi with chat, review tools, and focused delegation. Its principles are simple: you choose the improvements, changes stay small and reversible, improvement records stay local, and checks matter more than an agent's claims.
-
-<details>
-<summary>Watch the showcase · 51 seconds</summary>
-
-<p>
-  <a href="https://tannermidd.github.io/SpecPi/#showcase">
-    <img src="https://tannermidd.github.io/SpecPi/media/showcase-poster.jpg" width="560" alt="Play the SpecPi showcase">
-  </a>
-</p>
-
-</details>
-
-## What it adds
-
-- **Focused delegation.** One agent makes changes. Up to two read-only subagents help investigate and review. [Research and design](https://tannermidd.github.io/SpecPi/single-agent/)
-- **Background tasks.** Start an approved dev server, test suite, or watch build, inspect bounded output, and stop it without blocking other work.
-- **Review as you work.** Track changed files, inspect diffs, check pages in a browser, and review risky commands.
-- **Structural search.** Bounded ast-grep patterns over selected code are enabled by default. Disable with `specpi update --structural-search=off`; on unsupported native hosts, pass `--structural-search=off` during installation too. [Usage and limits](docs/structural-search.md)
-- **Accessibility checks.** Scan the current browser state for automated WCAG and optional best-practice findings. [Browser verification](docs/browser-testing.md)
-- **Improvements you choose.** Record recurring problems, select one with `/harness-improvement`, and test the change before calling it done.
-
-Problem collection is off by default. Its records stay on your machine. Pi connects to your chosen model provider.
+**0.21.0 resets the base.** The two retained Pi extensions share the SpecPi package version. Custom tools, extra workflow commands, themes, shell profiles, the website, and VS Code Chat have been retired. Review [the release notes](CHANGELOG.md) and the migration instructions below before updating.
 
 ## Install
 
-Requires **Node.js 22.19+**, **npm**, and **Git**. SpecPi needs **Pi 0.84.4+**; the installer can add it if missing.
+Requires Node.js 22.19+, Git, npm, and an existing Pi installation on PATH. The complete base is tested with Pi **0.84.4**; `pi-goal-x` currently declares Pi `>=0.83.0 <0.85.0` compatibility.
 
 ```sh
 npm install --global specpi@latest
@@ -50,26 +15,76 @@ specpi install
 specpi doctor
 ```
 
-Preview the changes, confirm the install, then check the setup. Restart Pi when finished.
+Inspect the plan, confirm the install, then restart Pi. SpecPi installs two first-party extensions, the improvement skill, a marked working agreement, and the packages below using `pi install`. Provider and model settings are preserved. There are no additional SpecPi extensions, themes, shell profiles, tool wrappers, or browser bootstrap scripts.
 
-To pin this release, use `npm install --global specpi@0.20.1`.
+For this checkout, run `node scripts/specpi.mjs` in place of `specpi`. `PI_CODING_AGENT_DIR` selects an alternate destination; `SPECPI_PI` selects a Pi CLI path. `specpi install --skip-package-install` installs only the first-party core for offline use and testing. A plain `pi install npm:specpi` loads only the packaged first-party resources; use the SpecPi installer above for the complete base, and avoid installing the same first-party resources both ways.
 
-Delegation is enabled at startup. Use `/delegate off` to turn it off.
+## Default packages
 
-[Setup, updates & removal](https://tannermidd.github.io/SpecPi/wiki/#getting-started) · [Delegation settings](docs/delegation/README.md)
+These are installed on every normal install and update. Exact versions live in [`templates/settings.json`](templates/settings.json); SpecPi merges only the package entries, preserving unrelated configuration and existing resource filters.
 
-## SpecPi Chat for VS Code
+| Package | Pinned version | Purpose |
+| --- | --- | --- |
+| [pi-web-access](https://github.com/nicobailon/pi-web-access) | 0.29.0 | Web search and page retrieval |
+| [betterwright](https://github.com/BetterWright/betterwright) | 2.8.1 | Browser automation |
+| [pi-subagents](https://github.com/nicobailon/pi-subagents) | 0.67.0 | Subagents and delegation |
+| [pi-lens](https://github.com/apmantza/pi-lens) | 4.1.6 | Language diagnostics, navigation, and structural tools |
+| [pi-background-tasks](https://github.com/ismailsaleekh/pi-background-tasks) | 2.5.0 | Durable background tasks |
+| [pi-goal-x](https://github.com/tmonk/pi-goal-x) | 0.31.2 | Persistent goals and progress |
+| [@sreetej510/pi-usage](https://github.com/Sreetej510/pi-extensions/tree/main/extensions/pi-usage) | 0.10.0 | Provider usage reporting |
+| [@gotgenes/pi-permission-system](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) | 32.0.2 | Tool permission policies |
 
-Chat beside your code, attach files, and switch conversations.
+The effective commands are `pi install npm:<package>@<version>` for each row, including the scoped names. These packages supply their own extensions, tools, skills, and prompts according to their upstream defaults. SpecPi does not add a second implementation or configure their policies.
 
-[**Install from Marketplace**](https://marketplace.visualstudio.com/items?itemName=tannermidd.specpi-chat) · Requires VS Code 1.96+, Node.js 22.19+, and Pi 0.84.4+. SpecPi is optional.
+BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and run `bunx betterwright@2.8.1 setup` before using browser tools. See [BetterWright setup](https://github.com/BetterWright/betterwright/blob/main/SETUP.md). The default package installation does not install Bun or download its browser. Provider credentials, web-service configuration, language servers, and permission rules remain governed by each package's documentation. Package installation and extension loading do not prove that every external service or tool is ready.
 
-In VS Code, find **SpecPi Chat** by **tannermidd** in Extensions and install it. Open **SpecPi** in the Activity Bar, then **Connect Pi**.
+## Scope
 
-Chat 0.4.4 shows a compact delegation strip only while workers run or settle, and opens workspace image links in the image viewer. SpecPi 0.19.1 fixes delegation when switching GitHub Copilot models in the same chat, including Luna → Opus → Luna. Update the harness and use **Restart Pi** to load the fix; this patch does not require a Chat update. Later model switches do not require a restart. New Chat sessions start with Guard off; pick a mode from the shield beside the composer, or use `/guard guard` and `/guard strict`.
+- `/scope set`: declare project-relative files or directories, one per line.
+- `/scope status`: review declared paths, pending drift, and snapshot uncertainty.
+- `/scope add <path>` or `/scope remove <path>`: change the declared scope.
+- `/scope accept <path>`: acknowledge a finding without adding that path to scope.
+- `/scope recheck`: deliberately refresh the baseline after an uncertain snapshot.
+- `/scope clear`: turn monitoring off.
+- `/scope task`: import the active improvement contract's paths explicitly.
 
-## Go further
+Interactive writes and edits outside scope ask before proceeding. In headless mode they are recorded as pending. Other tools are checked afterward against bounded Git snapshots. Scope is a drift monitor, not a sandbox: shell commands and custom tools can already have changed files when drift is reported. State follows the current Pi session branch.
 
-[Commands](https://tannermidd.github.io/SpecPi/wiki/#reference) · [Chat help](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) · [Development](https://tannermidd.github.io/SpecPi/wiki/#development) · [Security](SECURITY_MODEL.md) · [Release notes](CHANGELOG.md)
+## Harness improvement loop
 
-[MIT License](LICENSE)
+1. Enable local observations with `/wishlist on`; collection is off by default. `/wishlist off` stops it.
+2. Review recurring gaps with `/wishlist` and select one through `/harness-improvement` in a complete SpecPi source checkout.
+3. Follow the `specpi-improve` skill: record a bounded contract, implement the smallest sufficient change, and gather direct acceptance evidence.
+4. `finish_harness_improvement` verifies the selected contract, source changes, repository checks, and registered capability validators before retirement.
+5. Review the journal with `/wishlist history <gap-id>`. A regression returns the item for human selection; it never authorizes an automatic fix.
+
+Observations are leads, not permission. Records stay local, use sanitized summaries and salted identifiers, and are never uploaded automatically. Pi still sends model requests to your selected provider. `/wishlist outcome <gap-id>` records the human's assessment of a local retirement.
+
+## Update and remove
+
+```sh
+specpi plan
+specpi update
+specpi doctor
+specpi uninstall
+```
+
+Install, update, and uninstall require confirmation; `--yes` supplies it for automation. Modified retained resources require `update --force`. Managed configuration and resources are backed up and checksum-tracked. `update --skip-package-install` preserves an existing base without invoking Pi's package installer. Normal updates reapply the reviewed pins.
+
+Updating from the larger harness retires its recorded extra resources, restores legacy settings that still match ownership records, removes its shell marker block, and installs the new package base. Modified retired files and old runtime directories are preserved under `<agent-dir>/specpi/backups/`. Restart Pi to unload the old extensions. Unrelated configuration and local improvement evidence remain intact. VS Code Chat and the showcase website have been removed from this repository; an existing editor installation is separate.
+
+Uninstall restores package entries that still match SpecPi's recorded changes and preserves subsequent user edits. Downloaded packages, npm caches, upstream configuration, and private evidence remain on disk. A failed install rolls back SpecPi-managed files and configuration; package downloads and upstream install-script effects cannot be rolled back. `doctor` checks the core, package settings, and installed top-level package versions without activating upstream tools.
+
+## Development
+
+```sh
+npm install --ignore-scripts --omit=peer --no-package-lock
+node --test tests/workflow-controls.test.mjs tests/workflow-controls-extension.test.mjs
+npm run check
+npm run check:pi-package
+npm run check:base
+```
+
+Installer tests use disposable Pi directories. `check:base` requires network access, installs the real eight packages in isolated state, loads them together through Pi 0.84.4, and checks removal. It does not send model requests or run browser tasks. Never test against a live Pi installation. Publication remains explicit and uses the [release procedure](NPM_RELEASE.md).
+
+[Security model](SECURITY_MODEL.md) · [Third-party components](THIRD_PARTY.md) · [Release notes](CHANGELOG.md) · [MIT License](LICENSE)

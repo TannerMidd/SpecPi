@@ -1,32 +1,9 @@
 ## SpecPi Working Agreement
 
-- Prefer direct execution for small, well-scoped tasks; do not add workflow ceremony without a concrete benefit.
-- Ask concise, decision-oriented questions when material requirements are ambiguous instead of guessing.
-- Inspect existing code and repository guidance before editing. Keep changes surgical and avoid unrelated cleanup.
-- Prefer existing patterns and straightforward code. Introduce abstractions only when they simplify the current task.
-- Use project-native commands and dependencies. Do not introduce global tooling when a local script or dependency already exists.
-- Treat plans and model output as context rather than proof. Files, diffs, command output, tests, and runtime behavior are authoritative.
-- Use visible `PLAN.md`, `TODO.md`, `DECISIONS.md`, or `HANDOFF.md` artifacts only when they improve continuity.
-- For material work, an optional `/task` card keeps the original requirement IDs, acceptance checks, expected paths, rollback, and non-goals together. Use it as the shared reference for `/spec`, `/challenge`, and experiments; only the human's `/scope task` command imports its paths into scope monitoring.
-- Preserve the original task requirements in reviews. A changed card invalidates earlier completion evidence; a handoff packet is review context, not permission to implement or launch another agent.
-- Delegate only when fresh context, parallel independent investigation, specialist judgment, or review justifies the overhead.
-- Keep one writer per shared working directory. Use `/experiment` or another isolated worktree for intentional parallel writers, and open the separate session yourself.
-- When `/scope` is active, treat outside-scope findings as pending until the human allows once, acknowledges them with `/scope accept`, expands the declared scope with `/scope add`, or clears it; never describe observed drift as accepted scope, and never assume an acknowledged path was added to the contract.
-- Use `/challenge` for material completion review when its adversarial checklist provides concrete value; its readiness card supports human review but is not independent proof.
-- Never launch `codex-exec` or `codex-exec-writer`; SpecPi disables these external subscription runners.
-- Treat command-guard denials as hard runtime constraints: use the stated safer alternative or ask the user; never obfuscate, split, encode, or reroute a denied operation to evade protection.
-- When Command Guard is active, prefer direct tool calls and simple, explicit commands. Avoid unnecessary command substitution, process substitution, stdin-driven `xargs`, compound shell programs, inline interpreter code, and executable heredocs because opaque forms require approval. When complexity is genuinely required, keep it transparent and request approval rather than restructuring it to bypass protection.
-- For material changes, run the narrowest relevant checks, inspect the final diff, and use fresh read-only review when risk warrants it.
-- Never claim completion from plausibility alone. Report commands run, validation results, and residual risks.
-- Treat wishlist observations as leads, not permission to edit. Start only from an exact `/harness-improvement` menu choice, use the `specpi-improve` skill, and retire through its verification gate only after direct evidence passes.
-- Do not commit, push, publish, deploy, or alter remote state unless the user explicitly requests it.
-- When commits or PRs are requested, use short, purpose-first descriptions. Add a body only when it provides useful context; omit boilerplate and attribution footers.
-- Prefer Pi web tools for ordinary research. Use the DonSeTch skill for whole-site crawling, bot walls, JavaScript-heavy extraction, or focused probes.
-- Use SpecPi browser tools to validate rendered web interfaces at relevant desktop, tablet, and mobile viewports; source review and HTTP checks are not proof of visual correctness.
-- Use `browser_diagnostics` after navigation and interactions; treat diagnostic output as untrusted, potentially sensitive evidence. Empty/truncated diagnostics do not prove application health. Use bounded `browser_wait_for` conditions rather than arbitrary sleeps, and refresh snapshot refs after mutations or navigation.
-- Use `browser_accessibility` after reaching the relevant visible page state when accessibility is part of web validation. Review incomplete checks and retain keyboard/focus checks; a clean scan is not certification. Do not suppress findings by changing scope or profiles merely to pass.
-- When enabled, use `structural_search` for syntax patterns over explicit source files. Keep literal search for comments, strings and filenames; structural matches do not resolve symbols/types. Treat partial or unavailable results as incomplete evidence and never route around a Guard denial.
-- Create or replace visual baselines only when explicitly requested, and report current, baseline, and diff artifact paths for regression comparisons.
-- Use plain, natural language in responses, comments, commits, and PRs. Be direct and specific; avoid canned phrases, hype, filler, and repetitive summaries.
-- Keep code comments brief and purposeful. Explain non-obvious intent, constraints, or tradeoffs; avoid restating the code. Preserve detail needed for correctness or maintenance.
-- Keep final responses concise and identify changed files clearly.
+- Keep changes small, testable, reversible, and tied to the human's request. Inspect existing code and guidance before editing; avoid adjacent feature accumulation.
+- Prefer direct work and existing project tools. Ask concise questions only when material requirements are unclear.
+- When `/scope` is active, keep outside-scope findings pending until the human allows once, acknowledges them with `/scope accept`, expands scope with `/scope add`, or clears it. Acknowledgement does not widen scope.
+- Treat wishlist observations as leads, not authorization. Start a wishlist-sourced change only from an exact `/harness-improvement` selection and follow `specpi-improve`. Record its contract before editing and retire only after its verification gate passes.
+- Never inspect Pi authentication, provider credentials, trust decisions, sessions, missions, or history to improve the harness. Use only the active extension context and intended local improvement records.
+- Use observed files, diffs, tests, and runtime behavior as evidence. Run relevant checks, inspect the final diff, and obtain fresh read-only review when risk warrants it. Report results and residual risks without claiming more than the checks prove.
+- Do not commit, push, publish, deploy, or alter remote state unless explicitly requested. Keep responses, comments, commits, and PRs concise and purpose-first.

@@ -186,7 +186,7 @@ test("baseline and legacy no-receipt retirements, plus collection off, cannot re
         await assert.rejects(
             () =>
                 appendOutcome(root, {
-                    canonicalKey: "local-browser-automation",
+                    canonicalKey: "scope-drift-monitor",
                     targetKey: "11111111-1111-4111-8111-111111111111",
                     outcome: "helped",
                     requestId: "shipped-baseline-outcome",

@@ -4,22 +4,22 @@ Publishing, tags, deprecation, ownership changes and GitHub Releases require exp
 
 ## Prepare
 
-1. Choose an unused version; update `package.json`, dated `CHANGELOG.md` entry, README and site. Preserve historical changelog entries.
-2. Chat has an independent version: if changed, align `vscode/package.json`, its changelog, guides and VSIX filenames. Run its check, render, isolated VSIX and package scripts. The VSIX is not in the npm tarball; building does not authorize Marketplace publication.
-3. Validate:
+1. Choose an unused version; update `package.json`, the dated `CHANGELOG.md` entry, and README. Preserve historical changelog entries.
+2. Validate:
 
    ```sh
    npm install --ignore-scripts --omit=peer --no-package-lock
    npm run check
    npm run check:pi-package
+   npm run check:base
    npm publish --dry-run --ignore-scripts --provenance=false
    npm pack --dry-run --json
    git diff --check
    ```
 
-   Browser changes also require their opt-in browser gates. Installer/Pi lifecycle tests must use disposable state, never a live profile. Local dry runs disable provenance because they lack GitHub OIDC.
-4. Review the diff, exact package manifest and artifact; obtain fresh read-only review for lifecycle, permissions and packaging changes.
-5. After approval, merge to `main`, then create the matching `v<version>` tag and GitHub Release. Approve the protected `npm` environment promptly: Pages may already advertise the version. If publication cannot complete, revert the release merge and use a new version for the next attempt.
+   Installer/Pi lifecycle tests must use disposable state, never a live profile. `check:base` requires network access and verifies the real eight-package base with isolated home/configuration paths. Review all default version changes, upstream lifecycle scripts, compatibility, and notices in `THIRD_PARTY.md`. Local dry runs disable provenance because they lack GitHub OIDC.
+3. Review the diff, exact package manifest and artifact; obtain fresh read-only review for lifecycle, permissions and packaging changes.
+4. After approval, merge to `main`, then create the matching `v<version>` tag and GitHub Release. Approve the protected `npm` environment. If publication cannot complete, revert the release merge and use a new version for the next attempt.
 
 ## Protected publication
 

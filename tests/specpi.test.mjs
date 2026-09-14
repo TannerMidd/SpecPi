@@ -1,11 +1,19 @@
 import assert from "node:assert/strict";
+
 import fs from "node:fs";
+
 import os from "node:os";
+
 import path from "node:path";
+
 import { spawnSync } from "node:child_process";
+
 import test from "node:test";
+
 import { fileURLToPath, pathToFileURL } from "node:url";
+
 import { runPiFixture } from "../scripts/pi-test-harness.mjs";
+
 import {
     aggregateEvents,
     appendWishlistDecision,
@@ -18,29 +26,11 @@ import {
     refreshWishlist,
     setCollectionMode,
 } from "../extensions/tool-wishlist/core.mjs";
+
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
-import { COMMAND_GUARD_MANAGED_FILES } from "../extensions/command-guard/managed-files.mjs";
-import { DELEGATION_MANAGED_FILES } from "../extensions/delegation/managed-files.mjs";
+
 import { acquireSpecPiLock } from "../scripts/lock.mjs";
-import { describeSpecPhase, transformSpecMarkdown } from "../extensions/spec/core.mjs";
-import {
-    assertDistinctPaths,
-    comparePngBuffers,
-    normalizeBrowserUrl,
-    publishBuffer,
-    resolveUserPath,
-    resolveViewport,
-} from "../extensions/browser/core.mjs";
-import {
-    buildFileTree,
-    discoverProject,
-    flattenFileTree,
-    formatReviewMessage,
-    readGitDiff,
-    readTextFile,
-    resolveBrowserRoot,
-    sanitizeTerminalText,
-} from "../extensions/files/core.mjs";
+
 import {
     AGENTS_END,
     AGENTS_START,
@@ -55,10 +45,175 @@ import {
 } from "../scripts/lib.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 const cli = path.join(repoRoot, "scripts", "specpi.mjs");
 
+function installerFixture(t) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-minimal-install-"));
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const agentDir = path.join(root, "agent");
+    const stateDir = path.join(agentDir, "specpi");
+    const manifestPath = path.join(stateDir, "manifest.json");
+
+    return { root, agentDir, stateDir, manifestPath };
+}
+
+test("minimal installer plan and unconfirmed installation do not mutate the destination", (t) => {
+    const { agentDir } = installerFixture(t);
+    runCli(agentDir, "plan");
+    assert.equal(fs.existsSync(agentDir), false);
+    const rejected = invokeCli(agentDir, ["install"]);
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /Confirmation requires a TTY/);
+    assert.equal(fs.existsSync(agentDir), false);
+});
+
+test("minimal installer completes the lifecycle without changing settings or private state", (t) => {
+    const { agentDir, manifestPath } = installerFixture(t);
+    fs.mkdirSync(agentDir);
+    const canaries = new Map([
+        ["settings.json", '{"theme":"user-theme","packages":["npm:user-package@1.0.0"],"defaultProvider":"test"}\n'],
+        ["auth.json", "synthetic credential canary\n"],
+        ["trust.json", "synthetic trust canary\n"],
+        ["sessions/canary", "synthetic session canary\n"],
+        ["specpi/wishlist/events.jsonl", "synthetic local evidence\n"],
+        ["specpi/browser-runtime/user.txt", "unowned runtime path\n"],
+        ["specpi/bin/user-tool", "unowned tool path\n"],
+    ]);
+    for (const [relative, content] of canaries) {
+        const file = path.join(agentDir, relative);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, content);
+    }
+
+    fs.writeFileSync(path.join(agentDir, "AGENTS.md"), "Human guidance\n");
+    runCli(agentDir, "install", "--yes");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath));
+    assert.equal(Object.keys(manifest.files).length, 11);
+    assert.ok(Object.keys(manifest.files).every((file) => /workflow-controls|tool-wishlist|specpi-improve/.test(file)));
+    runCli(agentDir, "doctor");
+    const retained = path.join(agentDir, "extensions/workflow-controls/index.ts");
+    fs.appendFileSync(retained, "\n// local change\n");
+    assert.notEqual(invokeCli(agentDir, ["update", "--yes"]).status, 0);
+    assert.notEqual(invokeCli(agentDir, ["doctor"]).status, 0);
+    runCli(agentDir, "update", "--yes", "--force");
+    runCli(agentDir, "doctor");
+    runCli(agentDir, "uninstall", "--yes");
+    assert.equal(fs.existsSync(manifestPath), false);
+    assert.equal(fs.existsSync(retained), false);
+    assert.equal(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), "Human guidance\n");
+    for (const [relative, content] of canaries) {
+        assert.equal(fs.readFileSync(path.join(agentDir, relative), "utf8"), content);
+    }
+});
+
+test("legacy migration retires modified extras and runtimes with backup, preserves user settings, and rolls back", (t) => {
+    const { root, agentDir, stateDir, manifestPath } = installerFixture(t);
+    runCli(agentDir, "install", "--yes");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath));
+    const extra = path.join(agentDir, "extensions/delegation/index.ts");
+    fs.mkdirSync(path.dirname(extra), { recursive: true });
+    fs.writeFileSync(extra, "// local modification of a retired extension\n");
+    manifest.files[extra] = { existed: false, installedHash: sha256("// old shipped extension\n") };
+    manifest.settingsChanges = [
+        {
+            path: ["theme"],
+            beforeExists: true,
+            before: "old-user-theme",
+            installedExists: true,
+            installed: "specpi-spec",
+        },
+    ];
+    manifest.packageChanges = [
+        { identity: "npm:pi-web-access", beforeExists: false, installed: "npm:pi-web-access@0.25.0" },
+        { identity: "npm:user-modified", beforeExists: false, installed: "npm:user-modified@1.0.0" },
+    ];
+    manifest.packagesKeyBeforeExists = false;
+    manifest.structuralRuntime = { installed: true };
+    const settingsPath = path.join(agentDir, "settings.json");
+    fs.writeFileSync(
+        settingsPath,
+        JSON.stringify({
+            theme: "specpi-spec",
+            packages: ["npm:pi-web-access@0.25.0", "npm:user-modified@2.0.0", "npm:unrelated"],
+            unrelated: true,
+        }),
+    );
+    const shellPath = path.join(root, "shellrc");
+    fs.writeFileSync(shellPath, "before\n\n# >>> SpecPi >>>\nold integration\n# <<< SpecPi <<<\n\nafter\n");
+    manifest.shellRc = shellPath;
+    manifest.blockFiles.shell = { existed: true };
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const runtime = path.join(stateDir, "structural-runtime");
+    fs.mkdirSync(runtime);
+    fs.writeFileSync(path.join(runtime, "modified-runtime.txt"), "local runtime bytes");
+    const observed = [manifestPath, settingsPath, shellPath, extra, ...Object.keys(manifest.files)];
+    const original = new Map(observed.map((file) => [file, fs.readFileSync(file)]));
+    for (const point of ["after-settings", "after-first-managed-file", "after-retirement", "after-manifest"]) {
+        const failed = invokeCli(agentDir, ["update", "--yes"], { SPECPI_TESTING: "1", SPECPI_TEST_FAIL_POINT: point });
+        assert.notEqual(failed.status, 0, point);
+        assert.match(failed.stderr, /rolled back/);
+        for (const [file, content] of original) {
+            assert.deepEqual(fs.readFileSync(file), content, `${point}: ${file}`);
+        }
+
+        assert.equal(fs.readFileSync(path.join(runtime, "modified-runtime.txt"), "utf8"), "local runtime bytes");
+    }
+
+    runCli(agentDir, "update", "--yes");
+    assert.equal(fs.existsSync(extra), false);
+    assert.equal(fs.existsSync(runtime), false);
+    assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath)), {
+        theme: "old-user-theme",
+        packages: ["npm:user-modified@2.0.0", "npm:unrelated"],
+        unrelated: true,
+    });
+    assert.equal(fs.readFileSync(shellPath, "utf8").trimEnd(), "before\n\nafter");
+    const updated = JSON.parse(fs.readFileSync(manifestPath));
+    const backup = path.join(stateDir, updated.backups.at(-1));
+    assert.equal(
+        fs.readFileSync(path.join(backup, "structural-runtime/modified-runtime.txt"), "utf8"),
+        "local runtime bytes",
+    );
+    const inventory = JSON.parse(fs.readFileSync(path.join(backup, "inventory.json")));
+    const record = inventory.find((entry) => entry.target === extra);
+    assert.deepEqual(fs.readFileSync(path.join(backup, record.file)), original.get(extra));
+    runCli(agentDir, "doctor");
+    runCli(agentDir, "uninstall", "--yes");
+});
+
+test("installer rejects manifest paths outside the managed resource inventory before mutation", (t) => {
+    const { root, agentDir, manifestPath } = installerFixture(t);
+    runCli(agentDir, "install", "--yes");
+    const protectedFile = path.join(root, "outside.txt");
+    fs.writeFileSync(protectedFile, "keep");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath));
+    manifest.files[protectedFile] = { existed: false, installedHash: sha256("keep") };
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const rejected = invokeCli(agentDir, ["update", "--yes"]);
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /outside its expected directory/);
+    assert.equal(fs.readFileSync(protectedFile, "utf8"), "keep");
+});
+
+test("migration preserves a removed or non-array package setting", (t) => {
+    const { agentDir, manifestPath } = installerFixture(t);
+    runCli(agentDir, "install", "--yes");
+    for (const settings of [{ unrelated: true }, { packages: { userValue: true }, unrelated: true }]) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath));
+        manifest.packageChanges = [
+            { identity: "npm:pi-web-access", beforeExists: false, installed: "npm:pi-web-access@0.25.0" },
+        ];
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+        const settingsPath = path.join(agentDir, "settings.json");
+        fs.writeFileSync(settingsPath, JSON.stringify(settings));
+        runCli(agentDir, "update", "--yes");
+        assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath)), settings);
+    }
+});
+
 function invokeCli(agentDir, args, extraEnv = {}) {
-    return spawnSync(process.execPath, [cli, ...args], {
+    return spawnSync(process.execPath, [cli, ...args, "--skip-package-install"], {
         cwd: repoRoot,
         env: { ...process.env, ...extraEnv, PI_CODING_AGENT_DIR: agentDir },
         encoding: "utf8",
@@ -80,45 +235,6 @@ async function recordTestGap(options) {
     }
 
     return recordCapabilityGap(options);
-}
-
-function writeExecutable(file, content) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, content, { mode: 0o755 });
-}
-
-function prependPath(directory) {
-    return [directory, process.env.PATH].filter(Boolean).join(path.delimiter);
-}
-
-function writeNodeCommand(directory, name, source) {
-    fs.mkdirSync(directory, { recursive: true });
-    if (process.platform === "win32") {
-        const script = path.join(directory, `${name}.mjs`);
-        fs.writeFileSync(script, `${source}\n`);
-        fs.writeFileSync(
-            path.join(directory, `${name}.cmd`),
-            `@echo off\r\n"${process.execPath}" "%~dp0${name}.mjs" %*\r\n`,
-        );
-
-        return;
-    }
-
-    writeExecutable(path.join(directory, name), `#!/usr/bin/env node\n${source}\n`);
-}
-
-function installFakePi(fakeBin) {
-    writeNodeCommand(
-        fakeBin,
-        "pi",
-        [
-            'import fs from "node:fs";',
-            "const args = process.argv.slice(2);",
-            'if (args[0] === "--version") { console.log(process.env.SPECPI_FAKE_PI_VERSION || "0.84.4"); process.exit(0); }',
-            'if (process.env.SPECPI_FAKE_LOG) { fs.appendFileSync(process.env.SPECPI_FAKE_LOG, `${args.join(" ")}\\n`); }',
-            'if (process.env.SPECPI_FAKE_PI_FAIL_PATTERN && args.join(" ").includes(process.env.SPECPI_FAKE_PI_FAIL_PATTERN)) { process.exit(9); }',
-        ].join("\n"),
-    );
 }
 
 function runWishlistExtensionHarness(agentDir) {
@@ -145,149 +261,6 @@ function runWishlistExtensionHarness(agentDir) {
 
     return JSON.parse(marker.slice("SPECPI_WISHLIST_HARNESS=".length));
 }
-
-function runUiRefreshHarness() {
-    const runner = path.join(repoRoot, "tests", "fixtures", "ui-refresh-harness.ts");
-    const result = spawnSync(process.execPath, ["--no-warnings", "--experimental-strip-types", runner], {
-        cwd: repoRoot,
-        env: { ...process.env, PI_OFFLINE: "1" },
-        encoding: "utf8",
-    });
-    if (result.status !== 0) {
-        throw new Error(`UI refresh harness failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
-    }
-
-    const marker = result.stdout.split("\n").find((line) => line.startsWith("SPECPI_UI_REFRESH_HARNESS="));
-    if (!marker) {
-        throw new Error(`UI refresh harness result missing\n${result.stdout}`);
-    }
-
-    return JSON.parse(marker.slice("SPECPI_UI_REFRESH_HARNESS=".length));
-}
-
-function installFakeBrowserNpm(fakeBin) {
-    const source = fs.readFileSync(path.join(repoRoot, "tests", "fixtures", "fake-browser-npm.mjs"), "utf8");
-    writeNodeCommand(fakeBin, "npm", source.replace(/^#!.*\n/u, ""));
-}
-
-test("Spec mode holds live prose behind a stable specification state", () => {
-    assert.deepEqual(describeSpecPhase("ready"), { index: "00", label: "READY", detail: "" });
-    assert.deepEqual(describeSpecPhase("using browser_open"), {
-        index: "03",
-        label: "TOOL",
-        detail: "BROWSER_OPEN",
-    });
-    assert.deepEqual(describeSpecPhase("bash failed"), { index: "!!", label: "FAULT", detail: "BASH" });
-    assert.deepEqual(describeSpecPhase("using unsafe\u001b[31mtool"), {
-        index: "03",
-        label: "TOOL",
-        detail: "UNSAFE-31MTOOL",
-    });
-
-    const live = transformSpecMarkdown(
-        "partial answer that keeps growing",
-        {
-            messageType: "assistant",
-            isStreaming: true,
-        },
-        true,
-    );
-    assert.equal(live, "> **04 / SYNTHESIS** · response held until complete");
-    assert.doesNotMatch(live, /partial answer/);
-    assert.equal(
-        transformSpecMarkdown("private reasoning", { messageType: "assistant-thinking", isStreaming: false }, true),
-        "> **01 / REASONING** · working trace sealed in Spec mode",
-    );
-    assert.equal(
-        transformSpecMarkdown("final answer", { messageType: "assistant", isStreaming: false }, true),
-        "final answer",
-    );
-    assert.equal(
-        transformSpecMarkdown("normal mode", { messageType: "assistant", isStreaming: true }, false),
-        "normal mode",
-    );
-});
-
-test("specpi-spec defines the complete Pi theme surface from the site palette", () => {
-    const theme = JSON.parse(fs.readFileSync(path.join(repoRoot, "themes", "specpi-spec.json"), "utf8"));
-    const expectedTokens = [
-        "accent",
-        "bashMode",
-        "border",
-        "borderAccent",
-        "borderMuted",
-        "customMessageBg",
-        "customMessageLabel",
-        "customMessageText",
-        "dim",
-        "error",
-        "mdCode",
-        "mdCodeBlock",
-        "mdCodeBlockBorder",
-        "mdHeading",
-        "mdHr",
-        "mdLink",
-        "mdLinkUrl",
-        "mdListBullet",
-        "mdQuote",
-        "mdQuoteBorder",
-        "muted",
-        "scrollbarThumb",
-        "searchMatchBg",
-        "searchMatchText",
-        "selectedBg",
-        "success",
-        "syntaxComment",
-        "syntaxFunction",
-        "syntaxKeyword",
-        "syntaxNumber",
-        "syntaxOperator",
-        "syntaxPunctuation",
-        "syntaxString",
-        "syntaxType",
-        "syntaxVariable",
-        "text",
-        "thinkingHigh",
-        "thinkingLow",
-        "thinkingMax",
-        "thinkingMedium",
-        "thinkingMinimal",
-        "thinkingOff",
-        "thinkingText",
-        "thinkingXhigh",
-        "toolDiffAdded",
-        "toolDiffContext",
-        "toolDiffRemoved",
-        "toolErrorBg",
-        "toolOutput",
-        "toolPendingBg",
-        "toolSuccessBg",
-        "toolTitle",
-        "userMessageBg",
-        "userMessageText",
-        "warning",
-    ];
-
-    assert.equal(theme.name, "specpi-spec");
-    assert.deepEqual(Object.keys(theme.colors).sort(), expectedTokens.sort());
-    assert.equal(theme.vars.blueprint, "#8FB6D9");
-    assert.equal(theme.vars.toolSuccessBg, "#192027");
-    assert.equal(theme.colors.toolTitle, "paperBright");
-    assert.equal(theme.export.pageBg, "#121519");
-
-    for (const [name, value] of Object.entries(theme.vars)) {
-        assert.match(value, /^#[0-9A-F]{6}$/i, `invalid theme variable ${name}`);
-    }
-
-    for (const [token, value] of Object.entries(theme.colors)) {
-        assert.ok(value in theme.vars || /^#[0-9A-F]{6}$/i.test(value), `unresolved theme token ${token}`);
-    }
-
-    assert.equal(
-        JSON.parse(fs.readFileSync(path.join(repoRoot, "templates", "settings.json"), "utf8")).theme,
-        "specpi-spec",
-    );
-});
 
 test("npm package identities ignore pinned versions", () => {
     assert.equal(packageIdentity("npm:pi-web-access@0.25.0"), "npm:pi-web-access");
@@ -340,27 +313,6 @@ test("shared SpecPi lock fails closed and release preserves a substituted lock",
     }
 });
 
-test("UI prompt refresh flushes one immediate TUI frame and cleans up its invisible widget", () => {
-    const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-    assert.deepEqual(manifest.peerDependencies, {
-        "@earendil-works/pi-ai": "*",
-        "@earendil-works/pi-coding-agent": "*",
-        "@earendil-works/pi-tui": "*",
-        typebox: "*",
-    });
-    for (const peer of Object.keys(manifest.peerDependencies)) {
-        assert.equal(manifest.peerDependenciesMeta[peer].optional, true);
-    }
-
-    const result = runUiRefreshHarness();
-    assert.deepEqual(result.eventNames, ["session_start", "ui_prompt_start", "session_shutdown"]);
-    assert.deepEqual(result.widgetCalls, [
-        { key: "specpi-ui-prompt-refresh", cleared: false },
-        { key: "specpi-ui-prompt-refresh", cleared: true },
-    ]);
-    assert.equal(result.renderCount, 1);
-});
-
 test("platform launchers invoke Node directly", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
     const windowsLauncher = fs.readFileSync(path.join(repoRoot, "specpi.cmd"), "utf8");
@@ -411,9 +363,6 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
     const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
     const changelog = fs.readFileSync(path.join(repoRoot, "CHANGELOG.md"), "utf8");
-    const site = fs.readFileSync(path.join(repoRoot, "site", "index.html"), "utf8");
-    const wiki = fs.readFileSync(path.join(repoRoot, "site", "wiki", "index.html"), "utf8");
-    const architecture = fs.readFileSync(path.join(repoRoot, "site", "single-agent", "index.html"), "utf8");
     const publish = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "npm-publish.yml"), "utf8");
     const releaseRunbook = fs.readFileSync(path.join(repoRoot, "NPM_RELEASE.md"), "utf8");
     const ci = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "ci.yml"), "utf8");
@@ -424,14 +373,8 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.equal(manifest.scripts.install, undefined);
     assert.equal(manifest.scripts.postinstall, undefined);
     assert.match(readme, /npm install --global specpi@latest/);
-    assert.match(readme, /wiki\/#getting-started/);
     assert.match(readme, /\[Release notes\]\(CHANGELOG\.md\)/);
     assert.match(changelog, new RegExp(`^## ${manifest.version.replaceAll(".", "\\.")} - \\d{4}-\\d{2}-\\d{2}$`, "m"));
-    assert.match(site, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
-    assert.match(site, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
-    assert.match(wiki, new RegExp(`v${manifest.version.replaceAll(".", "\\.")}`));
-    assert.match(wiki, new RegExp(`npm install --global specpi@${manifest.version.replaceAll(".", "\\.")}`));
-    assert.match(architecture, new RegExp(`SpecPi v${manifest.version.replaceAll(".", "\\.")}`));
     assert.match(publish, /release:\s*\n\s*types: \[published\]/);
     assert.match(publish, /environment: npm/);
     assert.match(publish, /concurrency:\s*\n\s*group: npm-publish\s*\n\s*cancel-in-progress: false/);
@@ -458,126 +401,13 @@ test("npm release metadata, docs, and protected workflow stay aligned", () => {
     assert.match(ci, /os: \[windows-latest, macos-latest\]/);
     assert.equal(ci.match(/npm run check:package/g)?.length, 1);
     assert.equal(ci.match(/npm run check:pi-package/g)?.length, 2);
-    for (const workflow of [publish, ci]) {
-        assert.ok(
-            workflow.includes(
-                "node --test tests/delegation-settings.test.mjs tests/delegation-settings-review.test.mjs",
-            ),
-        );
-    }
-});
-
-test("showcase site is self-contained and Pages-ready", () => {
-    const siteDir = path.join(repoRoot, "site");
-    const html = fs.readFileSync(path.join(siteDir, "index.html"), "utf8");
-    const css = fs.readFileSync(path.join(siteDir, "styles.css"), "utf8");
-    const wikiHtml = fs.readFileSync(path.join(siteDir, "wiki", "index.html"), "utf8");
-    const wikiCss = fs.readFileSync(path.join(siteDir, "wiki.css"), "utf8");
-    const cycle = fs.readFileSync(path.join(siteDir, "cycle.js"), "utf8");
-    const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
-    const thirdParty = fs.readFileSync(path.join(repoRoot, "THIRD_PARTY.md"), "utf8");
-    const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "pages.yml"), "utf8");
-
-    assert.match(html, /<html lang="en">/);
-    assert.match(html, /name="viewport"/);
-    assert.match(html, /href="styles\.css"/);
-    assert.match(html, /href="logo\.svg"/);
-    assert.match(html, /aria-label="Primary navigation"/);
-    assert.match(html, /href="single-agent\/"/);
-    assert.match(html, /id="overview"/);
-    assert.match(html, /id="loop"/);
-    assert.match(html, /id="session"/);
-    assert.match(html, /id="guard"/);
-    assert.match(html, /id="writer"/);
-    assert.match(html, /id="install"/);
-    assert.match(html, /type="module" src="cycle\.js"/);
-    assert.match(html, /role="tablist"\s+aria-label="Command guard modes"/);
-    assert.equal(html.match(/data-guard-mode=/g)?.length, 3);
-    assert.equal(html.match(/data-guard-verdict/g)?.length, 5);
-    assert.match(html, /npm install --global specpi@latest/);
-    assert.match(html, /specpi install/);
-    assert.match(html, /Collection is disabled by default/);
-    assert.match(html, /One writer per working directory/);
-    assert.match(css, /\.guard-controls button\[aria-selected="true"\]/);
-    assert.match(css, /prefers-reduced-motion: reduce/);
-    assert.doesNotMatch(css, /url\(["']https?:/i);
-
-    for (const font of [
-        "ibm-plex-mono-regular.woff2",
-        "ibm-plex-mono-medium.woff2",
-        "ibm-plex-mono-semibold.woff2",
-        "ibm-plex-sans.woff2",
-        "LICENSE.txt",
-    ]) {
-        assert.ok(fs.existsSync(path.join(siteDir, "fonts", font)));
-    }
-
-    assert.match(css, /fonts\/ibm-plex-mono-regular\.woff2/);
-    assert.match(css, /fonts\/ibm-plex-sans\.woff2/);
-    assert.match(thirdParty, /IBM Plex Sans and IBM Plex Mono/);
-    assert.match(thirdParty, /SIL Open Font License 1\.1/);
-
-    assert.match(readme, /tannermidd\.github\.io\/SpecPi\/wiki\//);
-    assert.match(wikiHtml, /registry-linked validators/);
-    assert.match(wikiHtml, /<html lang="en">/);
-    assert.match(wikiHtml, /name="viewport"/);
-    assert.match(wikiHtml, /href="\.\.\/styles\.css"/);
-    assert.match(wikiHtml, /href="\.\.\/wiki\.css"/);
-    assert.match(wikiHtml, /href="\.\.\/logo\.svg"/);
-    assert.match(wikiHtml, /aria-label="Wiki navigation"/);
-    for (const id of [
-        "overview",
-        "getting-started",
-        "first-session",
-        "workflows",
-        "work-ownership",
-        "command-guard",
-        "file-review",
-        "browser-qa",
-        "reference",
-        "configuration",
-        "security",
-        "development",
-    ]) {
-        assert.match(wikiHtml, new RegExp(`id="${id}"`));
-    }
-
-    assert.match(wikiHtml, /\/harness-improvement/);
-    assert.match(wikiHtml, /\/wishlist status/);
-    assert.match(wikiHtml, /\/wishlist history \[gap-id\]/);
-    assert.match(wikiHtml, /npm install --global specpi@latest/);
-    assert.match(wikiHtml, /specpi doctor/);
-    assert.match(wikiHtml, /pi install npm:specpi/);
-    assert.match(wikiHtml, /\.\/specpi doctor/);
-    assert.match(wikiHtml, /\.\\specpi\.cmd doctor/);
-    const releaseVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
-    assert.equal(wikiHtml.split(`git clone --branch v${releaseVersion}`).length - 1, 2);
-    assert.match(wikiHtml, /npm run check/);
-    assert.match(wikiHtml, /fresh isolated Chromium context/);
-    assert.match(wikiCss, /\.definition-list/);
-    assert.match(wikiCss, /\.doc-section/);
-    assert.match(wikiCss, /@media \(max-width: \d+px\)/);
-
-    assert.match(cycle, /ArrowRight|ArrowDown/);
-    assert.doesNotMatch(cycle, /CYCLE_STAGES|cycleControls/);
-    assert.doesNotMatch(html, /data-cycle-step|cycle-panel/);
-    assert.match(html, /media\/improvement-workflow\.svg/);
-    assert.ok(fs.statSync(path.join(siteDir, "media", "improvement-workflow.svg")).size > 0);
-    assert.match(workflow, /actions\/configure-pages@v5/);
-    assert.match(workflow, /actions\/upload-pages-artifact@v4/);
-    assert.match(workflow, /actions\/deploy-pages@v4/);
-    for (const content of [workflow.replaceAll("\r\n", "\n"), workflow.replace(/\r?\n/gu, "\r\n")]) {
-        assert.match(content, /permissions:\r?\n\s+contents: read\r?\n\s+pages: write\r?\n\s+id-token: write/);
-    }
-
-    assert.match(workflow, /path: site/);
 });
 
 test("capability keys and registry validation are exact", () => {
     assert.equal(normalizeCapability("Missing Browser Automation Tools"), "browser-automation");
     assert.equal(normalizeCapability("browser automations"), "browser-automation");
-    assert.equal(isImplementedCapability("Local browser visual regression testing"), true);
-    assert.equal(isImplementedCapability("Local browser automation"), true);
+    assert.equal(isImplementedCapability("Scope drift monitoring"), true);
+    assert.equal(isImplementedCapability("Local browser automation"), false);
     assert.equal(isImplementedCapability("Browser automation with persisted authentication"), false);
     assert.throws(
         () =>
@@ -590,7 +420,7 @@ test("capability keys and registry validation are exact", () => {
                         aliases: ["shared-alias"],
                         shippedVersion: "1.0.0",
                         shippedAt: "2026-01-01T00:00:00.000Z",
-                        validations: ["browser-runtime-smoke"],
+                        validations: ["scope-drift-monitor-smoke"],
                     },
                     {
                         id: "visual-regression",
@@ -598,7 +428,7 @@ test("capability keys and registry validation are exact", () => {
                         aliases: ["shared-alias"],
                         shippedVersion: "1.0.0",
                         shippedAt: "2026-01-01T00:00:00.000Z",
-                        validations: ["browser-runtime-smoke"],
+                        validations: ["scope-drift-monitor-smoke"],
                     },
                 ],
             }),
@@ -621,192 +451,6 @@ test("capability keys and registry validation are exact", () => {
             }),
         /invalid capability entry/,
     );
-});
-
-test("files core resolves paths, builds filtered trees, and formats bounded reviews", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-files-test-"));
-    try {
-        fs.mkdirSync(path.join(root, "src"));
-        fs.writeFileSync(path.join(root, "src", "a.ts"), "const a = 1;\n");
-        assert.equal(resolveBrowserRoot("src", root), path.join(root, "src"));
-        assert.throws(() => resolveBrowserRoot("missing", root), /not accessible/);
-        assert.equal(readTextFile(path.join(root, "src", "a.ts")), "const a = 1;\n");
-        assert.equal(sanitizeTerminalText("bad\u001b]0;title\u0007\tname"), "bad�]0;title�  name");
-        if (process.platform !== "win32") {
-            const outside = path.join(root, "outside.txt");
-            const linked = path.join(root, "src", "linked.txt");
-            fs.writeFileSync(outside, "private\n");
-            fs.symlinkSync(outside, linked);
-            assert.throws(() => readTextFile(linked), /Symbolic links/);
-            assert.equal(discoverProject(path.join(root, "src")).files.includes("linked.txt"), false);
-            const outsideDir = path.join(root, "outside-dir");
-            const linkedDir = path.join(root, "src", "linked-dir");
-            fs.mkdirSync(outsideDir);
-            fs.writeFileSync(path.join(outsideDir, "secret.txt"), "secret\n");
-            fs.symlinkSync(outsideDir, linkedDir, "dir");
-            assert.throws(
-                () => readTextFile(path.join(linkedDir, "secret.txt"), undefined, path.join(root, "src")),
-                /Symbolic links/,
-            );
-        }
-
-        const snapshot = {
-            root,
-            files: ["README.md", "src/a.ts", "src/b.ts"],
-            statuses: new Map([["src/b.ts", " M"]]),
-        };
-        const tree = buildFileTree(snapshot);
-        const collapsed = flattenFileTree(tree, new Set());
-        assert.deepEqual(
-            collapsed.map((row) => row.node.name),
-            ["src", "README.md"],
-        );
-        const changed = flattenFileTree(tree, new Set(["src"]), "", true);
-        assert.deepEqual(
-            changed.map((row) => row.node.relativePath),
-            ["src", "src/b.ts"],
-        );
-        assert.equal(
-            formatReviewMessage("src/a.ts", 2, 3, "one\ntwo", "Use clearer names."),
-            'Review comment for "src/a.ts" (lines 2-3):\n\n```ts\none\ntwo\n```\n\nUse clearer names.',
-        );
-        assert.match(formatReviewMessage("notes.md", 1, 1, "```nested```", "Fix."), /````md/);
-        assert.doesNotMatch(formatReviewMessage("bad.\u001b[31m", 1, 1, "safe", "Fix."), /\u001b/);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("files keeps deleted Git files available as diff-only entries", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-files-deleted-"));
-    try {
-        const deleted = path.join(root, "deleted.txt");
-        const secondDeleted = path.join(root, "second-deleted.txt");
-        assert.equal(spawnSync("git", ["init", "-q", root]).status, 0);
-        fs.writeFileSync(deleted, "removed line\n");
-        fs.writeFileSync(secondDeleted, "also removed\n");
-        assert.equal(spawnSync("git", ["-C", root, "add", "deleted.txt", "second-deleted.txt"]).status, 0);
-        assert.equal(
-            spawnSync("git", [
-                "-C",
-                root,
-                "-c",
-                "user.name=SpecPi Test",
-                "-c",
-                "user.email=test@example.invalid",
-                "commit",
-                "-qm",
-                "fixture",
-            ]).status,
-            0,
-        );
-        fs.rmSync(deleted);
-        fs.rmSync(secondDeleted);
-        const snapshot = discoverProject(root);
-        assert.equal(snapshot.files.includes("deleted.txt"), true);
-        assert.equal(snapshot.files.includes("second-deleted.txt"), true);
-        assert.match(snapshot.statuses.get("deleted.txt"), /D/);
-        assert.match(readGitDiff(deleted, snapshot.repoRoot).join("\n"), /-removed line/);
-        const bounded = discoverProject(root, { maxFiles: 1 });
-        assert.equal(bounded.files.length, 1);
-        assert.equal(bounded.truncated, true);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("browser inputs normalize local URLs, viewports, and project paths", () => {
-    assert.equal(normalizeBrowserUrl("localhost:4173/demo"), "http://localhost:4173/demo");
-    assert.equal(normalizeBrowserUrl("https://example.com/path"), "https://example.com/path");
-    assert.throws(() => normalizeBrowserUrl("file:///tmp/private.html"), /http: or https:/);
-    assert.deepEqual(resolveViewport({ preset: "mobile" }), { width: 390, height: 844 });
-    assert.deepEqual(resolveViewport({ width: 1024, height: 768 }), { width: 1024, height: 768 });
-    assert.throws(() => resolveViewport({ width: 100, height: 768 }), /200 to 4096/);
-    assert.throws(() => resolveViewport({ width: 4096, height: 4096 }), /pixel limit/);
-    const projectRoot = path.resolve("/tmp/project");
-    assert.equal(
-        resolveUserPath(projectRoot, "@screenshots/base.png"),
-        path.join(projectRoot, "screenshots", "base.png"),
-    );
-});
-
-test("browser PNG comparison reports exact pass and dimension mismatch", () => {
-    function fakePng(width, height, value = 0) {
-        const buffer = Buffer.alloc(25);
-        Buffer.from("89504e470d0a1a0a", "hex").copy(buffer);
-        buffer.write("IHDR", 12, "ascii");
-        buffer.writeUInt32BE(width, 16);
-        buffer.writeUInt32BE(height, 20);
-        buffer[24] = value;
-
-        return buffer;
-    }
-
-    class FakePng {
-        constructor({ width, height }) {
-            this.width = width;
-            this.height = height;
-            this.data = Buffer.alloc(width * height * 4);
-        }
-    }
-    FakePng.sync = {
-        read(buffer) {
-            const width = buffer.readUInt32BE(16);
-            const height = buffer.readUInt32BE(20);
-
-            return { width, height, data: Buffer.alloc(width * height * 4, buffer[24]) };
-        },
-        write(image) {
-            return fakePng(image.width, image.height);
-        },
-    };
-    const runtime = {
-        PNG: FakePng,
-        pixelmatch(left, right) {
-            return left.equals(right) ? 0 : left.length / 4;
-        },
-    };
-    const same = comparePngBuffers(fakePng(2, 2, 1), fakePng(2, 2, 1), runtime);
-    assert.equal(same.pass, true);
-    assert.equal(same.diffPixels, 0);
-    const changed = comparePngBuffers(fakePng(2, 2, 1), fakePng(2, 2, 2), runtime);
-    assert.equal(changed.pass, false);
-    assert.equal(changed.diffPixelRatio, 1);
-    const resized = comparePngBuffers(fakePng(2, 2, 1), fakePng(3, 2, 1), runtime);
-    assert.equal(resized.pass, false);
-    assert.equal(resized.dimensionsMatch, false);
-});
-
-test("browser output helpers reject aliases and preserve existing files by default", async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-browser-output-"));
-    const output = path.join(root, "capture.png");
-    try {
-        assert.throws(
-            () =>
-                assertDistinctPaths([
-                    ["baselinePath", output],
-                    ["currentPath", path.join(root, ".", "capture.png")],
-                ]),
-            /must not alias/,
-        );
-        await publishBuffer(output, Buffer.from("first"));
-        const hardlink = path.join(root, "hardlink.png");
-        fs.linkSync(output, hardlink);
-        assert.throws(
-            () =>
-                assertDistinctPaths([
-                    ["baselinePath", output],
-                    ["diffPath", hardlink],
-                ]),
-            /must not alias/,
-        );
-        await assert.rejects(() => publishBuffer(output, Buffer.from("second")), /Output already exists/);
-        assert.equal(fs.readFileSync(output, "utf8"), "first");
-        await publishBuffer(output, Buffer.from("second"), { overwrite: true });
-        assert.equal(fs.readFileSync(output, "utf8"), "second");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
 });
 
 test("tool wishlist deduplicates a gap per task and stores privacy-minimized metrics", async () => {
@@ -897,15 +541,15 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
     };
     const implementedEvent = {
         ...event,
-        canonicalKey: "local-browser-visual-regression-testing",
+        canonicalKey: "scope-drift-monitoring",
         runHash: "implemented-run-hash",
-        capability: "Local browser visual regression testing",
+        capability: "Scope drift monitoring",
     };
     const localAutomationEvent = {
         ...implementedEvent,
-        canonicalKey: "local-browser-automation",
+        canonicalKey: "scope-drift-monitor",
         runHash: "local-automation-run-hash",
-        capability: "Local browser automation",
+        capability: "Scope drift monitor",
     };
     const eventsPath = path.join(stateDir, "tool-wishlist-events.jsonl");
     fs.writeFileSync(
@@ -923,8 +567,8 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
         assert.equal(refreshed.uniqueGaps, 1);
         assert.equal(refreshed.invalidLines, 1);
         assert.match(refreshed.report, /1 malformed observation line\(s\) were ignored/);
-        assert.doesNotMatch(refreshed.report, /## Local browser visual regression testing/);
-        assert.doesNotMatch(refreshed.report, /## Local browser automation/);
+        assert.doesNotMatch(refreshed.report, /## Scope drift monitoring/);
+        assert.doesNotMatch(refreshed.report, /## Scope drift monitor/);
         assert.match(refreshed.report, /# Retired/);
         assert.equal(refreshed.report, fs.readFileSync(path.join(stateDir, "TOOL_WISHLIST.md"), "utf8"));
 
@@ -935,7 +579,7 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
             runId: "run-two",
             cwd: root,
             gap: {
-                capability: "Local browser visual regression testing",
+                capability: "Scope drift monitoring",
                 scenario: "Compare a local rendered page against an explicit baseline",
                 limitation: "No browser-backed pixel comparison was available",
                 impact: "degraded",
@@ -956,7 +600,7 @@ test("wishlist aggregation ignores duplicate run records and malformed lines", a
             runId: "run-three",
             cwd: root,
             gap: {
-                capability: "Local browser automation",
+                capability: "Scope drift monitor",
                 scenario: "Interact with a locally rendered application",
                 limitation: "No browser interaction capability was available",
                 impact: "degraded",
@@ -1282,7 +926,7 @@ test("merging an observed gap into a retired registry capability surfaces review
             stateDir: root,
             action: "merge",
             canonicalKey: "rendered-page-interaction",
-            targetKey: "local-browser-automation",
+            targetKey: "scope-drift-monitor",
         });
         const refreshed = await refreshWishlist({ stateDir: root });
         assert.equal(refreshed.uniqueGaps, 0);
@@ -1351,23 +995,21 @@ test("wishlist extension runs the one-command improvement loop and preserves con
         assert.equal(result.resetConfirmed, true);
         assert.equal(result.reportStableAfterRetirement, true);
         assert.match(result.improvementMenu.title, /Choose one harness improvement/);
-        assert.match(result.improvementMenu.options[0], /REVIEW · Local browser automation · local-browser-automation/);
-        assert.match(result.reopenMenu.options[0], /REVIEW · Local browser automation · local-browser-automation/);
+        assert.match(result.improvementMenu.options[0], /REVIEW · Scope drift monitor · scope-drift-monitor/);
+        assert.match(result.reopenMenu.options[0], /REVIEW · Scope drift monitor · scope-drift-monitor/);
         assert.match(result.unauthorizedCompletion, /not authorized by \/harness-improvement in the current session/);
         assert.match(
             result.implementationStarted,
-            /Begin the selected SpecPi harness improvement: local-browser-automation/,
+            /Begin the selected SpecPi harness improvement: scope-drift-monitor/,
         );
         const commands = result.verificationCommands.map((item) => item.args);
         const validatorInvocation = [
             path.join(root, "agent", "project", "extensions", "tool-wishlist", "validators.mjs"),
-            "browser-runtime-smoke",
+            "scope-drift-monitor-smoke",
             "--state-dir",
             path.join(root, "agent", "specpi"),
             "--cwd",
             path.join(root, "agent", "project"),
-            "--browser-runtime",
-            path.join(root, "agent", "specpi", "browser-runtime"),
         ];
         const checks = commands.filter((args) => args[0] === "run");
         assert.ok(checks.length >= 3, "the failure, retry, and successful completion must execute repository checks");
@@ -1402,10 +1044,10 @@ test("wishlist extension runs the one-command improvement loop and preserves con
         assert.equal(result.selectedAfterFailedGate, true);
         assert.match(
             result.failedValidatorGate,
-            /Capability validator browser-runtime-smoke failed[\s\S]*validator exploded/,
+            /Capability validator scope-drift-monitor-smoke failed[\s\S]*validator exploded/,
         );
         assert.equal(result.selectedAfterFailedValidator, true);
-        assert.match(result.reopenPrompt, /Begin the selected SpecPi harness improvement: local-browser-automation/);
+        assert.match(result.reopenPrompt, /Begin the selected SpecPi harness improvement: scope-drift-monitor/);
         assert.match(
             result.reopenPrompt,
             /Original proof from the improvement journal:\n- Browser interaction and visual comparison smoke passed/,
@@ -1522,1282 +1164,6 @@ test("wishlist release never removes a substituted lock", async () => {
             gap,
         });
         assert.equal(fs.readFileSync(replacementMarker, "utf8"), "owned\n");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("installer plan is non-mutating even when browser installation is planned", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-plan-test-"));
-    const agentDir = path.join(root, "agent");
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "settings.json"), '{"kept":true}\n');
-    const before = fs.readFileSync(path.join(agentDir, "settings.json"), "utf8");
-    try {
-        const result = invokeCli(agentDir, ["plan", "--skip-shell"]);
-        assert.equal(result.status, 0, result.stderr);
-        assert.match(result.stdout, /Playwright 1\.62\.1 \+ matching managed Chromium/);
-        assert.match(result.stdout, /salted task\/session\/project hashes/);
-        assert.equal(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"), before);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("installer PATH discovery skips permission-denied candidates but preserves unexpected errors", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-path-permissions-"));
-    const agentDir = path.join(root, "agent");
-    const blockedBin = path.join(root, "blocked-bin");
-    const fakeBin = path.join(root, "bin");
-    const hook = path.join(root, "deny-path-stat.mjs");
-    fs.mkdirSync(agentDir);
-    installFakePi(fakeBin);
-    fs.writeFileSync(
-        hook,
-        [
-            'import fs from "node:fs";',
-            'import path from "node:path";',
-            "const original = fs.statSync;",
-            "fs.statSync = function (file, ...args) {",
-            `    if (path.dirname(String(file)) === ${JSON.stringify(blockedBin)} ||`,
-            '        (process.env.SPECPI_DENY_EXPLICIT_NODE === "1" && String(file) === process.execPath)) {',
-            '        throw Object.assign(new Error("Injected PATH lookup failure"), { code: process.env.SPECPI_PATH_FAULT });',
-            "    }",
-            "    return original.call(this, file, ...args);",
-            "};",
-        ].join("\n"),
-    );
-    try {
-        for (const code of ["EACCES", "EPERM", "EIO"]) {
-            const result = invokeCli(agentDir, ["plan", "--skip-shell"], {
-                PATH: [blockedBin, fakeBin].join(path.delimiter),
-                NODE_OPTIONS: `--import=${pathToFileURL(hook).href}`,
-                SPECPI_PATH_FAULT: code,
-            });
-            if (code === "EIO") {
-                assert.notEqual(result.status, 0);
-                assert.match(result.stderr, /Injected PATH lookup failure/u);
-            } else {
-                assert.equal(result.status, 0, result.stderr);
-                assert.match(result.stdout, /Pi runtime:/u);
-            }
-
-            assert.deepEqual(fs.readdirSync(agentDir), [], "Discovery and plan must not mutate agent state");
-        }
-
-        installFakeBrowserNpm(fakeBin);
-        const explicit = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], {
-            PATH: prependPath(fakeBin),
-            NODE_OPTIONS: `--import=${pathToFileURL(hook).href}`,
-            SPECPI_PATH_FAULT: "EACCES",
-            SPECPI_DENY_EXPLICIT_NODE: "1",
-        });
-        assert.notEqual(explicit.status, 0, "An explicitly selected Node executable must not bypass a denial");
-        assert.match(explicit.stderr, /Injected PATH lookup failure/u);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("--yes installs each missing optional external tool", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-optional-tools-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const log = path.join(root, "tools.log");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(
-        path.join(fakeBin, "npm"),
-        '#!/bin/sh\nprintf \'npm %s\\n\' "$*" >> "$SPECPI_FAKE_LOG"\nprintf \'#!/bin/sh\\nexit 0\\n\' > "$SPECPI_FAKE_BIN/donsetch"\n/bin/chmod 755 "$SPECPI_FAKE_BIN/donsetch"\n',
-    );
-    const env = {
-        PATH: fakeBin,
-        SPECPI_FAKE_BIN: fakeBin,
-        SPECPI_FAKE_LOG: log,
-    };
-
-    try {
-        const result = invokeCli(agentDir, ["install", "--yes", "--skip-package-install", "--skip-shell"], env);
-        assert.equal(result.status, 0, result.stderr);
-        assert.equal(fs.readFileSync(log, "utf8").trim(), "npm install --global donsetch@3.4.0 --no-audit --no-fund");
-        runCli(agentDir, "uninstall", "--yes");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("optional tool failures warn without blocking the core install", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-optional-failure-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nexit 8\n");
-
-    try {
-        const result = invokeCli(agentDir, ["install", "--yes", "--skip-package-install", "--skip-shell"], {
-            PATH: fakeBin,
-        });
-        assert.equal(result.status, 0, result.stderr);
-        assert.match(result.stderr, /Optional tool DonSeTch failed to install/);
-        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")));
-        runCli(agentDir, "uninstall", "--yes");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("later core failure reports external optional tools that remain installed", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-optional-core-failure-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(
-        path.join(fakeBin, "npm"),
-        '#!/bin/sh\nprintf \'#!/bin/sh\\nexit 0\\n\' > "$SPECPI_FAKE_BIN/donsetch"\n/bin/chmod 755 "$SPECPI_FAKE_BIN/donsetch"\n',
-    );
-    writeExecutable(
-        path.join(fakeBin, "pi"),
-        '#!/bin/sh\nif [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\nexit 9\n',
-    );
-
-    try {
-        const result = invokeCli(agentDir, ["install", "--yes", "--skip-browser-install", "--skip-shell"], {
-            PATH: fakeBin,
-            SPECPI_FAKE_BIN: fakeBin,
-        });
-        assert.notEqual(result.status, 0);
-        assert.match(result.stderr, /External optional tool changes were not rolled back: DonSeTch/);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("uninstall moves modified managed tools outside the trusted bin", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-modified-tool-test-"));
-    const agentDir = path.join(root, "agent");
-    try {
-        runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
-        const target = path.join(agentDir, "specpi", "bin", "bat");
-        const marker = path.join(agentDir, "specpi", "optional-tools", "bat.json");
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.mkdirSync(path.dirname(marker), { recursive: true });
-        fs.writeFileSync(target, "modified\n", { mode: 0o755 });
-        fs.writeFileSync(marker, "{}\n");
-        const manifestPath = path.join(agentDir, "specpi", "manifest.json");
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-        manifest.managedOptionalTools = [
-            {
-                schema: 1,
-                tool: "bat",
-                version: "0.26.1",
-                installedHash: sha256(Buffer.from("original\n")),
-                target,
-                marker,
-            },
-        ];
-        fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-
-        const result = runCli(agentDir, "uninstall", "--yes");
-        assert.match(result.stderr, /Moved modified managed optional tool outside trusted PATH/);
-        assert.equal(fs.existsSync(target), false);
-        const preservedDir = path.join(agentDir, "specpi", "preserved-modified-tools");
-        const preserved = fs.readdirSync(preservedDir);
-        assert.equal(preserved.length, 1);
-        assert.equal(fs.readFileSync(path.join(preservedDir, preserved[0]), "utf8"), "modified\n");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("plan previews missing Pi bootstrap without invoking npm", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-plan-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const log = path.join(root, "npm.log");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$SPECPI_FAKE_LOG\"\n");
-    try {
-        const result = invokeCli(agentDir, ["plan", "--skip-browser-install", "--skip-tool-install", "--skip-shell"], {
-            PATH: fakeBin,
-            SPECPI_FAKE_LOG: log,
-        });
-        assert.equal(result.status, 0, result.stderr);
-        assert.match(
-            result.stdout,
-            /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.4 after confirmation/,
-        );
-        assert.equal(fs.existsSync(log), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("unconfirmed install never bootstraps missing Pi", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-decline-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const log = path.join(root, "npm.log");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(path.join(fakeBin, "npm"), "#!/bin/sh\nprintf 'invoked\\n' >> \"$SPECPI_FAKE_LOG\"\n");
-    try {
-        const result = spawnSync(
-            process.execPath,
-            [cli, "install", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            {
-                cwd: repoRoot,
-                env: { ...process.env, PATH: fakeBin, SPECPI_FAKE_LOG: log, PI_CODING_AGENT_DIR: agentDir },
-                input: "n\n",
-                encoding: "utf8",
-            },
-        );
-        assert.notEqual(result.status, 0);
-        assert.match(result.stderr, /Confirmation requires a TTY/);
-        assert.equal(fs.existsSync(log), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("installer bootstraps a missing pinned Pi after confirmation", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const log = path.join(root, "bootstrap.log");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(
-        path.join(fakeBin, "npm"),
-        '#!/bin/sh\nprintf \'npm %s\\n\' "$*" >> "$SPECPI_FAKE_LOG"\nprintf \'%s\\n\' \'#!/bin/sh\' \'if [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\' \'printf \'"\'"\'pi %s\\n\'"\'"\' "$*" >> "$SPECPI_FAKE_LOG"\' \'exit 0\' > "$SPECPI_FAKE_BIN/pi"\n/bin/chmod 755 "$SPECPI_FAKE_BIN/pi"\n',
-    );
-    const env = { PATH: fakeBin, SPECPI_FAKE_BIN: fakeBin, SPECPI_FAKE_LOG: log };
-
-    try {
-        const result = invokeCli(
-            agentDir,
-            ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            env,
-        );
-        assert.equal(result.status, 0, result.stderr);
-        assert.match(
-            result.stdout,
-            /missing; npm will globally install @earendil-works\/pi-coding-agent@0\.84\.4 after confirmation/,
-        );
-        const calls = fs.readFileSync(log, "utf8").trim().split("\n");
-        assert.equal(
-            calls[0],
-            "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 --no-audit --no-fund",
-        );
-        assert.equal(calls.filter((line) => line.startsWith("pi install ")).length, 5);
-        const manifest = JSON.parse(fs.readFileSync(path.join(agentDir, "specpi", "manifest.json"), "utf8"));
-        assert.deepEqual(
-            { ...manifest.piBootstrap, installedAt: "ignored" },
-            { package: "@earendil-works/pi-coding-agent", version: "0.84.4", installedAt: "ignored", external: true },
-        );
-
-        fs.rmSync(path.join(fakeBin, "pi"));
-        fs.writeFileSync(log, "");
-        const update = invokeCli(
-            agentDir,
-            ["update", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            env,
-        );
-        assert.equal(update.status, 0, update.stderr);
-        const updateCalls = fs.readFileSync(log, "utf8").trim().split("\n");
-        assert.equal(
-            updateCalls[0],
-            "npm install --global --ignore-scripts @earendil-works/pi-coding-agent@0.84.4 --no-audit --no-fund",
-        );
-        assert.equal(updateCalls.filter((line) => line.startsWith("pi install ")).length, 5);
-
-        const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
-        assert.equal(uninstall.status, 0, uninstall.stderr);
-        assert.match(uninstall.stdout, /Externally installed Pi.*were preserved/);
-        assert.equal(fs.existsSync(path.join(fakeBin, "pi")), true);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("bootstrap fails actionably when npm global bin is not persistently on PATH", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-prefix-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const globalPrefix = path.join(root, "npm-prefix");
-    const globalBin = path.join(globalPrefix, "bin");
-    const log = path.join(root, "bootstrap.log");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(
-        path.join(fakeBin, "npm"),
-        '#!/bin/sh\nif [ "$1" = "prefix" ]; then echo "$SPECPI_FAKE_PREFIX"; exit 0; fi\nprintf \'npm %s\\n\' "$*" >> "$SPECPI_FAKE_LOG"\n/bin/mkdir -p "$SPECPI_FAKE_PREFIX/bin"\nprintf \'%s\\n\' \'#!/bin/sh\' \'if [ "$1" = "--version" ]; then echo 0.84.4; exit 0; fi\' \'exit 0\' > "$SPECPI_FAKE_PREFIX/bin/pi"\n/bin/chmod 755 "$SPECPI_FAKE_PREFIX/bin/pi"\n',
-    );
-    const baseEnv = { PATH: fakeBin, SPECPI_FAKE_PREFIX: globalPrefix, SPECPI_FAKE_LOG: log };
-
-    try {
-        const first = invokeCli(
-            agentDir,
-            ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            baseEnv,
-        );
-        assert.notEqual(first.status, 0);
-        assert.ok(
-            first.stderr.includes(`Pi was installed by npm, but ${globalBin} is not available on PATH`),
-            first.stderr,
-        );
-        assert.match(
-            first.stderr,
-            /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.4 was attempted and is not rolled back automatically/,
-        );
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
-
-        const persistentEnv = {
-            ...baseEnv,
-            PATH: [globalBin, fakeBin, process.env.PATH].filter(Boolean).join(path.delimiter),
-        };
-        const second = invokeCli(
-            agentDir,
-            ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            persistentEnv,
-        );
-        assert.equal(second.status, 0, second.stderr);
-        assert.equal(
-            fs
-                .readFileSync(log, "utf8")
-                .trim()
-                .split("\n")
-                .filter((line) => line.startsWith("npm install ")).length,
-            1,
-        );
-        const doctor = invokeCli(agentDir, ["doctor"], persistentEnv);
-        assert.equal(doctor.status, 0, doctor.stderr);
-        const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], persistentEnv);
-        assert.equal(uninstall.status, 0, uninstall.stderr);
-        assert.equal(fs.existsSync(path.join(globalBin, "pi")), true);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("later bootstrap failure discloses retained external Pi", () => {
-    if (process.platform === "win32") {
-        return;
-    }
-
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-rollback-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    fs.mkdirSync(fakeBin, { recursive: true });
-    writeExecutable(
-        path.join(fakeBin, "npm"),
-        "#!/bin/sh\nprintf '%s\\n' '#!/bin/sh' 'if [ \"$1\" = \"--version\" ]; then echo 0.84.4; exit 0; fi' 'exit 9' > \"$SPECPI_FAKE_BIN/pi\"\n/bin/chmod 755 \"$SPECPI_FAKE_BIN/pi\"\n",
-    );
-    try {
-        const result = invokeCli(
-            agentDir,
-            ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            { PATH: fakeBin, SPECPI_FAKE_BIN: fakeBin },
-        );
-        assert.notEqual(result.status, 0);
-        assert.match(
-            result.stderr,
-            /Pi bootstrap @earendil-works\/pi-coding-agent@0\.84\.4 was attempted and is not rolled back automatically/,
-        );
-        assert.equal(fs.existsSync(path.join(fakeBin, "pi")), true);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("missing Pi fails before mutation when npm is unavailable", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-bootstrap-no-npm-test-"));
-    const agentDir = path.join(root, "agent");
-    const emptyBin = path.join(root, "empty-bin");
-    fs.mkdirSync(emptyBin, { recursive: true });
-    try {
-        const result = invokeCli(
-            agentDir,
-            ["install", "--yes", "--skip-browser-install", "--skip-tool-install", "--skip-shell"],
-            { PATH: emptyBin },
-        );
-        assert.notEqual(result.status, 0);
-        assert.match(result.stderr, /npm is required to install missing Pi @earendil-works\/pi-coding-agent@0\.84\.4/);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("installer rejects an incompatible Pi even when package installation is skipped", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-pi-version-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(path.join(agentDir, "settings.json"), '{"kept":true}\n');
-    installFakePi(fakeBin);
-
-    try {
-        const result = invokeCli(
-            agentDir,
-            [
-                "install",
-                "--yes",
-                "--skip-package-install",
-                "--skip-browser-install",
-                "--skip-tool-install",
-                "--skip-shell",
-            ],
-            { PATH: prependPath(fakeBin), SPECPI_FAKE_PI_VERSION: "0.84.3" },
-        );
-        assert.notEqual(result.status, 0);
-        assert.match(result.stderr, /Pi 0\.84\.4 or newer is required; found 0\.84\.3/);
-        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8")), { kept: true });
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("command guard install and update failures roll back settings, files, and manifest", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-command-guard-rollback-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    fs.mkdirSync(agentDir, { recursive: true });
-    installFakePi(fakeBin);
-    const env = { PATH: prependPath(fakeBin), SPECPI_TESTING: "1" };
-    const settingsPath = path.join(agentDir, "settings.json");
-    const originalSettings = Buffer.from('{"kept":true}\n');
-    fs.writeFileSync(settingsPath, originalSettings);
-    try {
-        const failedInstall = invokeCli(
-            agentDir,
-            [
-                "install",
-                "--yes",
-                "--skip-package-install",
-                "--skip-browser-install",
-                "--skip-tool-install",
-                "--skip-shell",
-            ],
-            { ...env, SPECPI_TEST_FAIL_POINT: "after-settings" },
-        );
-        assert.notEqual(failedInstall.status, 0);
-        assert.match(failedInstall.stderr, /SpecPi-managed changes rolled back/);
-        assert.deepEqual(fs.readFileSync(settingsPath), originalSettings);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")), false);
-
-        const install = invokeCli(
-            agentDir,
-            [
-                "install",
-                "--yes",
-                "--skip-package-install",
-                "--skip-browser-install",
-                "--skip-tool-install",
-                "--skip-shell",
-            ],
-            env,
-        );
-        assert.equal(install.status, 0, install.stderr);
-        const guardDir = path.join(agentDir, "extensions", "command-guard");
-        const manifestPath = path.join(agentDir, "specpi", "manifest.json");
-        const customized = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-        customized.kept = "customized";
-        fs.writeFileSync(settingsPath, `${JSON.stringify(customized, null, 2)}\n`);
-        fs.appendFileSync(path.join(guardDir, "core.mjs"), "\n// preserved local drift\n");
-        const beforeSettings = fs.readFileSync(settingsPath);
-        const beforeManifest = fs.readFileSync(manifestPath);
-        const beforeFiles = new Map(
-            fs.readdirSync(guardDir).map((name) => [name, fs.readFileSync(path.join(guardDir, name))]),
-        );
-
-        const failedUpdate = invokeCli(
-            agentDir,
-            [
-                "update",
-                "--yes",
-                "--force",
-                "--skip-package-install",
-                "--skip-browser-install",
-                "--skip-tool-install",
-                "--skip-shell",
-            ],
-            { ...env, SPECPI_TEST_FAIL_POINT: "after-first-command-guard-file" },
-        );
-        assert.notEqual(failedUpdate.status, 0);
-        assert.match(failedUpdate.stderr, /SpecPi-managed changes rolled back/);
-        assert.deepEqual(fs.readFileSync(settingsPath), beforeSettings);
-        assert.deepEqual(fs.readFileSync(manifestPath), beforeManifest);
-        assert.deepEqual(fs.readdirSync(guardDir).sort(), [...beforeFiles.keys()].sort());
-        for (const [name, bytes] of beforeFiles) {
-            assert.deepEqual(fs.readFileSync(path.join(guardDir, name)), bytes, name);
-        }
-
-        const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
-        assert.equal(uninstall.status, 0, uninstall.stderr);
-        assert.match(uninstall.stderr, /Preserved modified file during uninstall: .*command-guard.*core\.mjs/);
-        assert.equal(fs.existsSync(path.join(guardDir, "core.mjs")), true);
-        assert.equal(fs.existsSync(path.join(guardDir, "index.ts")), false);
-        assert.equal(JSON.parse(fs.readFileSync(settingsPath, "utf8")).kept, "customized");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("install, update, doctor, and uninstall round trip in an isolated agent dir", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-test-"));
-    const agentDir = path.join(root, "agent");
-    fs.mkdirSync(path.join(agentDir, "extensions"), { recursive: true });
-
-    const originalSettings = {
-        defaultProvider: "openrouter",
-        defaultModel: "example/model",
-        packages: ["npm:other@1.0.0", "npm:pi-web-access@0.1.0"],
-        customSetting: true,
-    };
-    fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(originalSettings, null, 2)}\n`);
-    fs.writeFileSync(path.join(agentDir, "AGENTS.md"), "# Personal instructions\n");
-    fs.writeFileSync(path.join(agentDir, "extensions", "spec.ts"), "// personal prior spec\n");
-
-    try {
-        runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
-        const installed = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
-        assert.equal(installed.defaultProvider, "openrouter");
-        assert.equal(installed.defaultModel, "example/model");
-        assert.equal(
-            installed.packages.some((entry) => packageIdentity(entry) === "npm:pi-subagents"),
-            false,
-        );
-        assert.equal(installed.customSetting, true);
-        assert.equal(installed.theme, "specpi-spec");
-        assert.ok(fs.existsSync(path.join(agentDir, "themes", "specpi-spec.json")));
-        assert.ok(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")));
-        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "spec", "core.mjs")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "specpi-ui-refresh", "index.ts")));
-        for (const file of [
-            "index.ts",
-            "scope.mjs",
-            "task-contract.mjs",
-            "experiments.mjs",
-            "challenge.mjs",
-            "smoke.mjs",
-        ]) {
-            assert.ok(
-                fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", file)),
-                `missing installed workflow-controls file ${file}`,
-            );
-        }
-
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")));
-        assert.deepEqual(
-            fs.readdirSync(path.resolve("extensions/delegation")).sort(),
-            [...DELEGATION_MANAGED_FILES].sort(),
-            "Every delegation source must be in the managed inventory",
-        );
-        for (const file of DELEGATION_MANAGED_FILES) {
-            assert.ok(
-                fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
-                `Missing installed delegation source: ${file}`,
-            );
-        }
-
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "verification.mjs")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "validators.mjs")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")));
-        const installedRegistryImport = spawnSync(
-            process.execPath,
-            [
-                "--input-type=module",
-                "-e",
-                "import(process.argv[1])",
-                pathToFileURL(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")).href,
-            ],
-            { encoding: "utf8" },
-        );
-        assert.equal(installedRegistryImport.status, 0, installedRegistryImport.stderr);
-        for (const file of COMMAND_GUARD_MANAGED_FILES) {
-            assert.ok(
-                fs.existsSync(path.join(agentDir, "extensions", "command-guard", file)),
-                `missing installed command guard file ${file}`,
-            );
-        }
-
-        const installedManifest = JSON.parse(fs.readFileSync(path.join(agentDir, "specpi", "manifest.json"), "utf8"));
-        const installedGuardDirectory = path.join(agentDir, "extensions", "command-guard");
-        const manifestGuardFiles = Object.keys(installedManifest.files || {})
-            .filter((target) => path.dirname(target) === installedGuardDirectory)
-            .map((target) => path.basename(target))
-            .sort();
-        assert.deepEqual(manifestGuardFiles, [...COMMAND_GUARD_MANAGED_FILES].sort());
-        const installedDelegationDirectory = path.join(agentDir, "extensions", "delegation");
-        const manifestDelegationFiles = Object.keys(installedManifest.files || {})
-            .filter((target) => path.dirname(target) === installedDelegationDirectory)
-            .map((target) => path.basename(target))
-            .sort();
-        assert.deepEqual(manifestDelegationFiles, [...DELEGATION_MANAGED_FILES].sort());
-        const installedDelegationImport = spawnSync(
-            process.execPath,
-            [
-                "--input-type=module",
-                "-e",
-                "import(process.argv[1])",
-                pathToFileURL(path.join(installedDelegationDirectory, "native.mjs")).href,
-            ],
-            { cwd: root, encoding: "utf8" },
-        );
-        assert.equal(installedDelegationImport.status, 0, installedDelegationImport.stderr);
-
-        assert.ok(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")));
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")));
-        for (const file of ["diagnostics.ts", "interactions.ts", "lifecycle.ts"]) {
-            assert.deepEqual(
-                fs.readFileSync(path.join(agentDir, "extensions", "browser", file)),
-                fs.readFileSync(path.join(repoRoot, "extensions", "browser", file)),
-                `installed browser helper differs: ${file}`,
-            );
-        }
-
-        for (const file of ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"]) {
-            assert.deepEqual(
-                fs.readFileSync(path.join(agentDir, "extensions", "background-tasks", file)),
-                fs.readFileSync(path.join(repoRoot, "extensions", "background-tasks", file)),
-            );
-        }
-
-        assert.ok(fs.existsSync(path.join(agentDir, "extensions", "browser", "smoke.mjs")));
-        assert.match(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), /# Personal instructions/);
-
-        const fakeBin = path.join(root, "bin");
-        installFakePi(fakeBin);
-        const doctor = invokeCli(agentDir, ["doctor"], {
-            PATH: prependPath(fakeBin),
-        });
-        assert.equal(doctor.status, 0, doctor.stderr);
-        assert.match(doctor.stdout, /BACKGROUND_TASKS_SMOKE=passed/);
-        assert.match(doctor.stdout, /CAPABILITY command-guard verified by command-guard-smoke/);
-        assert.match(doctor.stderr, /Managed browser runtime unavailable: .*installation was skipped/);
-
-        const installedGuardCore = path.join(agentDir, "extensions", "command-guard", "core.mjs");
-        const installedGuardCoreBytes = fs.readFileSync(installedGuardCore);
-        fs.appendFileSync(installedGuardCore, "\n// injected doctor drift\n");
-        const driftDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
-        assert.notEqual(driftDoctor.status, 0);
-        assert.match(driftDoctor.stderr, /Modified command-guard file/);
-        assert.doesNotMatch(driftDoctor.stdout, /CAPABILITY command-guard verified/);
-        fs.writeFileSync(installedGuardCore, installedGuardCoreBytes);
-
-        const backgroundCore = path.join(agentDir, "extensions", "background-tasks", "core.mjs");
-        const backgroundBytes = fs.readFileSync(backgroundCore);
-        fs.appendFileSync(backgroundCore, "\n// fixture drift\n");
-        const backgroundDrift = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
-        assert.notEqual(backgroundDrift.status, 0);
-        assert.match(backgroundDrift.stderr, /Background task smoke skipped/);
-        assert.doesNotMatch(backgroundDrift.stdout, /BACKGROUND_TASKS_SMOKE=passed/);
-        fs.writeFileSync(backgroundCore, backgroundBytes);
-
-        const installedRegistryPath = path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json");
-        const installedRegistry = fs.readFileSync(installedRegistryPath);
-        fs.writeFileSync(
-            installedRegistryPath,
-            '{"schema":1,"capabilities":[{"id":"Invalid ID","title":"Broken","aliases":[],"shippedVersion":"1","validations":["browser-runtime-smoke"]}]}\n',
-        );
-        const invalidRegistryDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
-        assert.notEqual(invalidRegistryDoctor.status, 0);
-        assert.match(invalidRegistryDoctor.stderr, /Capability registry invalid/);
-        fs.writeFileSync(installedRegistryPath, installedRegistry);
-
-        const customizedSettings = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
-        customizedSettings.unrelatedUserSetting = "preserved";
-        fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(customizedSettings, null, 2)}\n`);
-
-        // Simulate ownership retired by a future SpecPi version.
-        const retiredFile = path.join(agentDir, "extensions", "retired.ts");
-        fs.writeFileSync(retiredFile, "// retired\n");
-        const beforeUpdateSettings = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
-        beforeUpdateSettings.retiredFlag = true;
-        beforeUpdateSettings.packages.push("npm:retired-specpi-package@1.0.0");
-        beforeUpdateSettings.packages.push("npm:@tmustier/pi-files-widget@0.2.0");
-        beforeUpdateSettings.packages.push("npm:pi-subagents@0.58.0");
-        fs.writeFileSync(path.join(agentDir, "settings.json"), `${JSON.stringify(beforeUpdateSettings, null, 2)}\n`);
-        const manifestPath = path.join(agentDir, "specpi", "manifest.json");
-        const beforeUpdateManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-        beforeUpdateManifest.settingsChanges.push({
-            path: ["retiredFlag"],
-            beforeExists: false,
-            installedExists: true,
-            installed: true,
-        });
-        beforeUpdateManifest.packageChanges.push({
-            identity: "npm:retired-specpi-package",
-            beforeExists: false,
-            installed: "npm:retired-specpi-package@1.0.0",
-        });
-        beforeUpdateManifest.packageChanges.push({
-            identity: "npm:@tmustier/pi-files-widget",
-            beforeExists: false,
-            installed: "npm:@tmustier/pi-files-widget@0.2.0",
-        });
-        beforeUpdateManifest.packageChanges.push({
-            identity: "npm:pi-subagents",
-            beforeExists: false,
-            installed: "npm:pi-subagents@0.58.0",
-        });
-        const legacyTool = path.join(agentDir, "specpi", "bin", "bat");
-        const legacyMarker = path.join(agentDir, "specpi", "optional-tools", "bat.json");
-        fs.mkdirSync(path.dirname(legacyTool), { recursive: true });
-        fs.mkdirSync(path.dirname(legacyMarker), { recursive: true });
-        fs.writeFileSync(legacyTool, "legacy tool\n", { mode: 0o755 });
-        fs.writeFileSync(legacyMarker, "{}\n");
-        beforeUpdateManifest.managedOptionalTools = [
-            {
-                tool: "bat",
-                target: legacyTool,
-                marker: legacyMarker,
-                installedHash: sha256(fs.readFileSync(legacyTool)),
-            },
-        ];
-        beforeUpdateManifest.files[retiredFile] = {
-            existed: false,
-            installedHash: sha256(fs.readFileSync(retiredFile)),
-        };
-        fs.writeFileSync(manifestPath, `${JSON.stringify(beforeUpdateManifest, null, 2)}\n`);
-
-        const update = invokeCli(agentDir, [
-            "update",
-            "--yes",
-            "--skip-package-install",
-            "--skip-tool-install",
-            "--skip-shell",
-        ]);
-        assert.equal(update.status, 0, update.stderr);
-        assert.match(update.stdout, /restart active Pi sessions/);
-        const afterUpdate = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
-        assert.equal(afterUpdate.retiredFlag, undefined);
-        assert.equal(afterUpdate.unrelatedUserSetting, "preserved");
-        assert.equal(
-            afterUpdate.packages.some((entry) => packageIdentity(entry) === "npm:pi-subagents"),
-            false,
-        );
-        assert.equal(
-            afterUpdate.packages.some((entry) => String(entry).includes("retired-specpi-package")),
-            false,
-        );
-        assert.equal(
-            afterUpdate.packages.some((entry) => String(entry).includes("pi-files-widget")),
-            false,
-        );
-        assert.equal(fs.existsSync(legacyTool), false);
-        assert.equal(fs.existsSync(legacyMarker), false);
-        assert.equal(fs.existsSync(retiredFile), false);
-
-        const validCustomizedDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
-        assert.equal(validCustomizedDoctor.status, 0, validCustomizedDoctor.stderr);
-
-        const retainedWishlist = path.join(agentDir, "specpi", "tool-wishlist-events.jsonl");
-        const retainedExperiment = path.join(agentDir, "specpi", "experiments", "registry.json");
-        fs.mkdirSync(path.dirname(retainedExperiment), { recursive: true });
-        fs.writeFileSync(retainedWishlist, '{"local":"evidence"}\n', { mode: 0o600 });
-        fs.writeFileSync(retainedExperiment, '{"schema":1,"experiments":[]}\n', { mode: 0o600 });
-        const uninstall = runCli(agentDir, "uninstall", "--yes");
-        assert.match(uninstall.stdout, /local wishlist state\/archives were preserved/);
-        assert.match(uninstall.stdout, /Experiment metadata and exported patches were also preserved/);
-        assert.equal(fs.readFileSync(retainedWishlist, "utf8"), '{"local":"evidence"}\n');
-        assert.equal(fs.readFileSync(retainedExperiment, "utf8"), '{"schema":1,"experiments":[]}\n');
-
-        const restored = JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"), "utf8"));
-        assert.equal(restored.defaultProvider, originalSettings.defaultProvider);
-        assert.equal(restored.defaultModel, originalSettings.defaultModel);
-        assert.deepEqual(restored.packages, originalSettings.packages);
-        assert.equal(restored.customSetting, true);
-        assert.equal(restored.unrelatedUserSetting, "preserved");
-        assert.equal(fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8"), "# Personal instructions\n");
-        assert.equal(fs.readFileSync(path.join(agentDir, "extensions", "spec.ts"), "utf8"), "// personal prior spec\n");
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "spec", "core.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "specpi-ui-refresh", "index.ts")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "index.ts")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "scope.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "task-contract.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "experiments.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "challenge.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "workflow-controls", "smoke.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "index.ts")), false);
-        for (const file of [
-            "index.ts",
-            "native.mjs",
-            "extension.mjs",
-            "core.mjs",
-            "protocol.mjs",
-            "provider.mjs",
-            "snapshot.mjs",
-            "worker.mjs",
-        ]) {
-            assert.equal(
-                fs.existsSync(path.join(agentDir, "extensions", "delegation", file)),
-                false,
-                `Delegation source survived uninstall: ${file}`,
-            );
-        }
-
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "files", "core.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "index.ts")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "core.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "verification.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "registry.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "validators.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "tool-wishlist", "capabilities.json")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "index.ts")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "powershell-parser.ps1")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "command-guard", "smoke.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "skills", "specpi-improve", "SKILL.md")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "index.ts")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "core.mjs")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "diagnostics.ts")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "interactions.ts")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "extensions", "browser", "lifecycle.ts")), false);
-        for (const file of ["index.ts", "core.mjs", "supervisor.mjs", "smoke.mjs"]) {
-            assert.equal(fs.existsSync(path.join(agentDir, "extensions", "background-tasks", file)), false);
-        }
-
-        assert.equal(fs.existsSync(path.join(agentDir, "themes", "specpi-spec.json")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "themes", "tea-house.json")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
-
-        runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
-        const reinstallDoctor = invokeCli(agentDir, ["doctor"], { PATH: prependPath(fakeBin) });
-        assert.equal(reinstallDoctor.status, 0, reinstallDoctor.stderr);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test(
-    "real structural installer lifecycle uses a separately provisioned runtime without external acquisition",
-    { skip: process.env.SPECPI_STRUCTURAL_TESTS !== "1" },
-    () => {
-        const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-real-structural-"));
-        const agentDir = path.join(root, "agent");
-        const fakeBin = path.join(root, "bin");
-        const stateDir = path.join(agentDir, "specpi");
-        fs.mkdirSync(stateDir, { recursive: true });
-        installFakePi(fakeBin);
-        installFakeBrowserNpm(fakeBin);
-        writeNodeCommand(fakeBin, "donsetch", 'console.log("3.4.0");');
-        const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
-        const flags = ["--skip-browser-install", "--skip-shell"];
-        const config = path.join(stateDir, "tool-integrations.json");
-        const runtime = path.join(stateDir, "structural-runtime");
-        try {
-            assert.ok(process.env.SPECPI_STRUCTURAL_RUNTIME);
-            const plan = invokeCli(agentDir, ["plan", ...flags], env);
-            assert.equal(plan.status, 0, plan.stderr);
-            assert.match(plan.stdout, /Structural search: enabled/u);
-            assert.equal(fs.existsSync(config), false);
-            assert.equal(fs.existsSync(runtime), false);
-            const failed = invokeCli(agentDir, ["install", "--yes", ...flags], {
-                ...env,
-                SPECPI_TESTING: "1",
-                SPECPI_TEST_FAIL_POINT: "after-structural-runtime",
-            });
-            assert.notEqual(failed.status, 0);
-            assert.match(failed.stderr, /Injected test failure/u);
-            assert.equal(fs.existsSync(config), false);
-            assert.equal(fs.existsSync(runtime), false);
-            for (const command of ["install", "update"]) {
-                const result = invokeCli(agentDir, [command, "--yes", ...flags], env);
-                assert.equal(result.status, 0, result.stderr);
-                assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
-                assert.equal(fs.existsSync(path.join(runtime, "specpi-runtime.json")), true);
-            }
-
-            const doctor = invokeCli(agentDir, ["doctor"], env);
-            assert.equal(doctor.status, 0, doctor.stderr);
-            assert.match(doctor.stdout, /STRUCTURAL_SEARCH_SMOKE=passed/u);
-            const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
-            assert.equal(uninstall.status, 0, uninstall.stderr);
-            assert.equal(fs.existsSync(path.join(stateDir, "structural-runtime")), false);
-            assert.equal(
-                JSON.parse(fs.readFileSync(path.join(stateDir, "tool-integrations.json"))).structuralSearch.enabled,
-                true,
-            );
-        } finally {
-            fs.rmSync(root, { recursive: true, force: true });
-        }
-    },
-);
-
-test("default structural enablement is non-mutating in plan, survives update, rolls back and preserves opt-out", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-structural-lifecycle-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    installFakePi(fakeBin);
-    const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
-    const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
-    try {
-        const plan = invokeCli(agentDir, ["plan", ...skip], env);
-        assert.equal(plan.status, 0, plan.stderr);
-        assert.match(plan.stdout, /Structural search: enabled/u);
-        assert.equal(fs.existsSync(agentDir), false);
-        const failed = invokeCli(agentDir, ["install", "--yes", ...skip], {
-            ...env,
-            SPECPI_TESTING: "1",
-            SPECPI_TEST_FAIL_POINT: "after-structural-runtime",
-        });
-        assert.notEqual(failed.status, 0);
-        const config = path.join(agentDir, "specpi", "tool-integrations.json");
-        assert.equal(fs.existsSync(config), false);
-        const install = invokeCli(agentDir, ["install", "--yes", ...skip], env);
-        assert.equal(install.status, 0, install.stderr);
-        assert.match(install.stderr, /runtime acquisition was skipped/u);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "structural-runtime")), false);
-        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
-        // Older installs without an explicit choice gain the default on update.
-        fs.rmSync(config);
-        const upgrade = invokeCli(agentDir, ["update", "--yes", ...skip], env);
-        assert.equal(upgrade.status, 0, upgrade.stderr);
-        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
-        fs.writeFileSync(config, '{"schema":1,"structuralSearch":{"enabled":true},"unrelated":{"keep":7}}');
-        const update = invokeCli(agentDir, ["update", "--yes", ...skip], env);
-        assert.equal(update.status, 0, update.stderr);
-        assert.equal(JSON.parse(fs.readFileSync(config)).unrelated.keep, 7);
-        const doctor = invokeCli(agentDir, ["doctor"], env);
-        assert.equal(doctor.status, 0, doctor.stderr);
-        assert.match(doctor.stderr, /Structural search unavailable/u);
-        const before = fs.readFileSync(config, "utf8");
-        const failedDisable = invokeCli(agentDir, ["update", "--yes", "--structural-search=off", ...skip], {
-            ...env,
-            SPECPI_TESTING: "1",
-            SPECPI_TEST_FAIL_POINT: "after-structural-runtime",
-        });
-        assert.notEqual(failedDisable.status, 0);
-        assert.equal(fs.readFileSync(config, "utf8"), before);
-        const disable = invokeCli(agentDir, ["update", "--yes", "--structural-search=off", ...skip], env);
-        assert.equal(disable.status, 0, disable.stderr);
-        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, false);
-        const disabledPlan = invokeCli(agentDir, ["plan", ...skip], env);
-        assert.equal(disabledPlan.status, 0, disabledPlan.stderr);
-        assert.match(disabledPlan.stdout, /Structural search: disabled/u);
-        const disabledUpdate = invokeCli(agentDir, ["update", "--yes", ...skip], env);
-        assert.equal(disabledUpdate.status, 0, disabledUpdate.stderr);
-        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, false);
-        assert.equal(invokeCli(agentDir, ["uninstall", "--yes"], env).status, 0);
-        assert.equal(JSON.parse(fs.readFileSync(config)).unrelated.keep, 7);
-        const reinstall = invokeCli(agentDir, ["install", "--yes", ...skip], env);
-        assert.equal(reinstall.status, 0, reinstall.stderr);
-        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, false);
-        const reenable = invokeCli(agentDir, ["update", "--yes", "--structural-search=on", ...skip], env);
-        assert.equal(reenable.status, 0, reenable.stderr);
-        assert.equal(JSON.parse(fs.readFileSync(config)).structuralSearch.enabled, true);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("structural configuration serialization stays readable and rejects output overflow before mutation", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-structural-bounds-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const config = path.join(agentDir, "specpi", "tool-integrations.json");
-    installFakePi(fakeBin);
-    const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
-    const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
-    try {
-        fs.mkdirSync(path.dirname(config), { recursive: true });
-        const value = { schema: 1, structuralSearch: { enabled: true }, unrelated: Array(3000).fill(0) };
-        fs.writeFileSync(config, JSON.stringify(value));
-        assert.ok(Buffer.byteLength(JSON.stringify(value, null, 2)) > 16384);
-        const installed = invokeCli(agentDir, ["install", "--yes", ...skip], env);
-        assert.equal(installed.status, 0, installed.stderr);
-        assert.ok(fs.statSync(config).size <= 16384);
-        assert.deepEqual(JSON.parse(fs.readFileSync(config)), value);
-        assert.equal(invokeCli(agentDir, ["plan", ...skip], env).status, 0);
-        assert.equal(invokeCli(agentDir, ["doctor"], env).status, 0);
-        const disabled = invokeCli(agentDir, ["update", "--yes", "--structural-search=off", ...skip], env);
-        assert.equal(disabled.status, 0, disabled.stderr);
-        assert.ok(fs.statSync(config).size <= 16384);
-        assert.deepEqual(JSON.parse(fs.readFileSync(config)).unrelated, value.unrelated);
-
-        // true -> false adds a byte to an already full compact configuration. No output fits.
-        const full = { schema: 1, structuralSearch: { enabled: true }, unrelated: "" };
-        full.unrelated = "x".repeat(16384 - Buffer.byteLength(JSON.stringify(full)));
-        const before = JSON.stringify(full);
-        fs.writeFileSync(config, before);
-        const manifest = path.join(agentDir, "specpi", "manifest.json");
-        const beforeManifest = fs.readFileSync(manifest, "utf8");
-        const blocked = invokeCli(agentDir, ["update", "--yes", "--structural-search=off", ...skip], env);
-        assert.notEqual(blocked.status, 0);
-        assert.match(blocked.stderr, /configuration exceeds/u);
-        assert.ok(blocked.stderr.includes(config));
-        assert.equal(fs.readFileSync(config, "utf8"), before);
-        assert.equal(fs.readFileSync(manifest, "utf8"), beforeManifest);
-        assert.equal(invokeCli(agentDir, ["plan", ...skip], env).status, 0);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("an unparseable owned configuration keeps plan working and is repaired only by an explicit selection", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-structural-corrupt-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const config = path.join(agentDir, "specpi", "tool-integrations.json");
-    installFakePi(fakeBin);
-    const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
-    const skip = ["--skip-package-install", "--skip-tool-install", "--skip-shell"];
-    try {
-        fs.mkdirSync(path.dirname(config), { recursive: true });
-        fs.writeFileSync(config, "{ broken");
-        // plan is non-mutating and must still report rather than abort.
-        const plan = invokeCli(agentDir, ["plan", ...skip], env);
-        assert.equal(plan.status, 0, plan.stderr);
-        assert.match(plan.stdout, /Structural search: disabled/u);
-        assert.ok(plan.stdout.includes(config), plan.stdout);
-        assert.match(plan.stdout, /--structural-search=on/u);
-        assert.equal(fs.readFileSync(config, "utf8"), "{ broken");
-
-        // Omission fails closed, names the file, and leaves it untouched.
-        const blocked = invokeCli(agentDir, ["install", "--yes", ...skip], env);
-        assert.notEqual(blocked.status, 0);
-        assert.ok(blocked.stderr.includes(config), blocked.stderr);
-        assert.match(blocked.stderr, /Repair or remove it/u);
-        assert.equal(fs.readFileSync(config, "utf8"), "{ broken");
-
-        // An explicit selection rewrites it; the prior bytes stay in the operation backup.
-        const repaired = invokeCli(agentDir, ["install", "--yes", "--structural-search=off", ...skip], env);
-        assert.equal(repaired.status, 0, repaired.stderr);
-        assert.deepEqual(JSON.parse(fs.readFileSync(config, "utf8")), {
-            schema: 1,
-            structuralSearch: { enabled: false },
-        });
-        const backups = path.join(agentDir, "specpi", "backups");
-        const saved = fs
-            .readdirSync(backups)
-            .map((entry) => path.join(backups, entry, "tool-integrations.json"))
-            .filter((entry) => fs.existsSync(entry));
-        assert.equal(saved.length, 1);
-        assert.equal(fs.readFileSync(saved[0], "utf8"), "{ broken");
-
-        // A link or wrong file shape stays a hard failure that no selection can rewrite.
-        fs.rmSync(config);
-        fs.symlinkSync(path.join(root, "elsewhere.json"), config);
-        const linked = invokeCli(agentDir, ["update", "--yes", "--structural-search=on", ...skip], env);
-        assert.notEqual(linked.status, 0);
-        assert.match(linked.stderr, /must not be a link/u);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("managed browser runtime completes install, reuse update, doctor, and uninstall with fake browser", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-browser-lifecycle-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    installFakePi(fakeBin);
-    installFakeBrowserNpm(fakeBin);
-    const env = { PATH: prependPath(fakeBin), SHELL: "/bin/bash" };
-    try {
-        const install = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
-        assert.equal(install.status, 0, install.stderr);
-        const runtime = path.join(agentDir, "specpi", "browser-runtime");
-        assert.ok(fs.existsSync(path.join(runtime, "specpi-runtime.json")));
-
-        const doctor = invokeCli(agentDir, ["doctor"], env);
-        assert.equal(doctor.status, 0, doctor.stderr);
-        assert.match(doctor.stdout, /BROWSER Browser smoke passed/);
-        assert.match(doctor.stdout, /CAPABILITY local-browser-automation verified by browser-runtime-smoke/);
-
-        const update = invokeCli(agentDir, ["update", "--yes", "--skip-tool-install", "--skip-shell"], env);
-        assert.equal(update.status, 0, update.stderr);
-        assert.match(update.stdout, /passed its launch smoke; reusing/);
-
-        fs.writeFileSync(
-            path.join(runtime, "node_modules", "playwright", "index.js"),
-            "throw new Error('broken runtime');\n",
-        );
-        const repaired = invokeCli(agentDir, ["update", "--yes", "--skip-tool-install", "--skip-shell"], env);
-        assert.equal(repaired.status, 0, repaired.stderr);
-        assert.match(repaired.stderr, /failed validation and will be replaced/);
-        const repairedDoctor = invokeCli(agentDir, ["doctor"], env);
-        assert.equal(repairedDoctor.status, 0, repairedDoctor.stderr);
-
-        const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
-        assert.equal(uninstall.status, 0, uninstall.stderr);
-        assert.equal(fs.existsSync(runtime), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("default package and shell paths work with an isolated fake pi", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-shell-test-"));
-    const agentDir = path.join(root, "agent");
-    const shellRc = path.join(root, ".bashrc");
-    const fakeBin = path.join(root, "bin");
-    const log = path.join(root, "pi.log");
-    installFakePi(fakeBin);
-    fs.writeFileSync(shellRc, "# personal shell\n");
-    const env = {
-        PATH: prependPath(fakeBin),
-        SHELL: "/bin/bash",
-        SPECPI_SHELL_RC: shellRc,
-        SPECPI_FAKE_LOG: log,
-    };
-
-    try {
-        const install = invokeCli(agentDir, ["install", "--yes", "--skip-browser-install", "--skip-tool-install"], env);
-        assert.equal(install.status, 0, install.stderr);
-        const shell = fs.readFileSync(shellRc, "utf8");
-        assert.match(shell, /# >>> SpecPi >>>/);
-        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "pi-profiles.sh")));
-        const calls = fs.readFileSync(log, "utf8").trim().split("\n");
-        assert.equal(calls.filter((line) => line.startsWith("install ")).length, 5);
-        assert.ok(calls.some((line) => line.startsWith("--offline --list-models")));
-
-        const update = invokeCli(
-            agentDir,
-            ["update", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell"],
-            env,
-        );
-        assert.equal(update.status, 0, update.stderr);
-        assert.ok(fs.existsSync(path.join(agentDir, "specpi", "pi-profiles.sh")));
-        assert.match(fs.readFileSync(shellRc, "utf8"), /# >>> SpecPi >>>/);
-
-        const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
-        assert.equal(uninstall.status, 0, uninstall.stderr);
-        assert.equal(fs.readFileSync(shellRc, "utf8"), "# personal shell\n");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("failed package installation rolls configuration back and releases the lock", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-failure-test-"));
-    const agentDir = path.join(root, "agent");
-    const fakeBin = path.join(root, "bin");
-    const settingsPath = path.join(agentDir, "settings.json");
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(settingsPath, '{"untouched":true}\n');
-    installFakePi(fakeBin);
-    installFakeBrowserNpm(fakeBin);
-    const env = {
-        PATH: prependPath(fakeBin),
-        SHELL: "/bin/bash",
-        SPECPI_FAKE_PI_FAIL_PATTERN: "pi-web-access",
-    };
-
-    try {
-        const result = invokeCli(agentDir, ["install", "--yes", "--skip-tool-install", "--skip-shell"], env);
-        assert.notEqual(result.status, 0);
-        assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath, "utf8")), { untouched: true });
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "manifest.json")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "browser-runtime")), false);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "install.lock")), false);
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("settings symlinks remain symlinks through install and uninstall", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-symlink-test-"));
-    const agentDir = path.join(root, "agent");
-    const target = path.join(root, "settings-target.json");
-    const link = path.join(agentDir, "settings.json");
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(target, '{"kept":true}\n');
-    fs.symlinkSync(target, link);
-
-    try {
-        runCli(agentDir, "install", "--yes", "--skip-package-install", "--skip-tool-install", "--skip-shell");
-        assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
-        runCli(agentDir, "uninstall", "--yes");
-        assert.equal(fs.lstatSync(link).isSymbolicLink(), true);
-        assert.deepEqual(JSON.parse(fs.readFileSync(target, "utf8")), { kept: true });
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("empty AGENTS and shell symlink targets remain linked after uninstall", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-block-symlink-test-"));
-    const agentDir = path.join(root, "agent");
-    const agentsTarget = path.join(root, "AGENTS-target.md");
-    const shellTarget = path.join(root, "shell-target.rc");
-    const agentsLink = path.join(agentDir, "AGENTS.md");
-    const shellLink = path.join(root, ".bashrc");
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.writeFileSync(agentsTarget, "");
-    fs.writeFileSync(shellTarget, "");
-    fs.symlinkSync(agentsTarget, agentsLink);
-    fs.symlinkSync(shellTarget, shellLink);
-    const env = { SHELL: "/bin/bash", SPECPI_SHELL_RC: shellLink };
-
-    try {
-        const install = invokeCli(agentDir, ["install", "--yes", "--skip-package-install", "--skip-tool-install"], env);
-        assert.equal(install.status, 0, install.stderr);
-        const uninstall = invokeCli(agentDir, ["uninstall", "--yes"], env);
-        assert.equal(uninstall.status, 0, uninstall.stderr);
-        assert.equal(fs.lstatSync(agentsLink).isSymbolicLink(), true);
-        assert.equal(fs.lstatSync(shellLink).isSymbolicLink(), true);
-        assert.equal(fs.readFileSync(agentsTarget, "utf8"), "");
-        assert.equal(fs.readFileSync(shellTarget, "utf8"), "");
-    } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-    }
-});
-
-test("broken managed-path symlinks fail without leaving a lock", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-broken-link-test-"));
-    const agentDir = path.join(root, "agent");
-    fs.mkdirSync(agentDir, { recursive: true });
-    fs.symlinkSync(path.join(root, "missing-settings.json"), path.join(agentDir, "settings.json"));
-
-    try {
-        const result = invokeCli(agentDir, [
-            "install",
-            "--yes",
-            "--skip-package-install",
-            "--skip-tool-install",
-            "--skip-shell",
-        ]);
-        assert.notEqual(result.status, 0);
-        assert.match(result.stderr, /Broken symlink is unsupported/);
-        assert.equal(fs.existsSync(path.join(agentDir, "specpi", "install.lock")), false);
-        assert.equal(fs.lstatSync(path.join(agentDir, "settings.json")).isSymbolicLink(), true);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }

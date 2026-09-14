@@ -6,17 +6,15 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { checkSyntax, syntaxFiles } from "../scripts/check-syntax.mjs";
 
-test("syntax checks discover every delegation source including its TypeScript entry", () => {
+test("syntax checks discover every workflow-controls source including its TypeScript entry", () => {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
     const found = new Set(syntaxFiles(root));
-    const directory = path.join(root, "extensions", "delegation");
+    const directory = path.join(root, "extensions", "workflow-controls");
     for (const file of fs.readdirSync(directory)) {
-        assert.ok(found.has(path.join(directory, file)), `Unchecked delegation source: ${file}`);
+        assert.ok(found.has(path.join(directory, file)), `Unchecked workflow-controls source: ${file}`);
     }
 
     assert.ok(found.has(path.join(directory, "index.ts")));
-    assert.ok(found.has(path.join(root, "vscode", "src", "extension.js")));
-    assert.ok(found.has(path.join(root, "vscode", "media", "chat.js")));
 });
 
 test("nested new modules are checked without a hand-maintained manifest", (t) => {

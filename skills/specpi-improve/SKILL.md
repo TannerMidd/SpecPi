@@ -28,7 +28,7 @@ Before editing, present one compact card:
 
 The `/harness-improvement` selection authorizes this exact smallest-sufficient card. Do not add another approval step unless the proposed work exceeds it.
 
-Record the card with `record_harness_contract` before editing. Include stable requirement IDs and direct acceptance checks, and declare the expected source paths. The tool binds the card to the selected gap, selection generation, session, and source checkout. An identical retry is allowed; a changed card requires the human to revise it with `/task set` or select the improvement again. Never use a new card to manufacture authorization for another gap. `/scope task` is the human command for importing its paths into scope monitoring.
+Record the card with `record_harness_contract` before editing. Include stable requirement IDs and direct acceptance checks, and declare the expected source paths. The tool binds the card to the selected gap, selection generation, session, and source checkout. An identical retry is allowed; a changed card requires the human to select the improvement again. Never use a new card to manufacture authorization for another gap. `/scope task` is the human command for importing its paths into scope monitoring.
 
 The selection preserves verification policy, including task/scope and wishlist lifecycle rules, the package check, and formatter configuration. If the work changes those rules, obtain human review of that concrete policy change and a fresh `/harness-improvement` selection before using it to retire the item. Do not weaken or bypass preserved gates to make a change pass.
 
@@ -57,4 +57,4 @@ The selection preserves verification policy, including task/scope and wishlist l
 
 Report the gap ID, changed files, acceptance evidence, commands and exit codes, lifecycle action, rollback path, and residual risks. Never claim that silence or the absence of later reports proves success.
 
-When a separate human-directed review is useful, `/task handoff` assembles a bounded review packet in the current conversation. The human can later use `/wishlist outcome <gap-id>` to assess the latest local retirement. Do not submit outcome feedback on the human's behalf or treat a negative assessment as permission to start work.
+The human can later use `/wishlist outcome <gap-id>` to assess the latest local retirement. Do not submit outcome feedback on the human's behalf or treat a negative assessment as permission to start work.
