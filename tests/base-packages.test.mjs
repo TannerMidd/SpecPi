@@ -25,6 +25,9 @@ function fixture(t) {
 import fs from 'node:fs';
 import path from 'node:path';
 const args = process.argv.slice(2);
+if (process.env.npm_config_save_exact !== 'true' || process.env.NPM_CONFIG_SAVE_EXACT !== 'true') {
+    throw new Error('Pi must save exact npm versions for every package install');
+}
 fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify(args) + '\\n');
 const source = args[1];
 const at = source.lastIndexOf('@');
@@ -40,14 +43,23 @@ settings.packages = entries;
 fs.writeFileSync(file, JSON.stringify(settings));
 const dir = path.join(process.env.PI_CODING_AGENT_DIR, 'npm/node_modules', name);
 fs.mkdirSync(dir, {recursive:true});
-fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({name, version:source.slice(at + 1)}));
+const version = source === process.env.FAKE_DRIFT ? '0.0.0' : source.slice(at + 1);
+fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({name, version}));
 if (source === process.env.FAKE_FAIL) { process.exit(1); }
 `,
     );
     const invoke = (args, extraEnv = {}) =>
         spawnSync(process.execPath, [cli, ...args], {
             cwd: root,
-            env: { ...process.env, PI_CODING_AGENT_DIR: agent, SPECPI_PI: fake, FAKE_LOG: log, ...extraEnv },
+            env: {
+                ...process.env,
+                PI_CODING_AGENT_DIR: agent,
+                SPECPI_PI: fake,
+                FAKE_LOG: log,
+                npm_config_save_exact: "false",
+                NPM_CONFIG_SAVE_EXACT: "false",
+                ...extraEnv,
+            },
             encoding: "utf8",
             windowsHide: true,
         });
@@ -121,6 +133,21 @@ test("failed package acquisition restores configuration and managed files with e
     assert.equal(fs.readFileSync(f.settings, "utf8"), before);
     assert.equal(fs.readFileSync(manifest, "utf8"), oldManifest);
     assert.equal(fs.readFileSync(f.log, "utf8").trim().split("\n").length, 3);
+});
+
+test("package version drift fails installation and restores the previous managed configuration", (t) => {
+    const f = fixture(t);
+    const before = '{"theme":"user"}\n';
+    fs.writeFileSync(f.settings, before);
+    f.run("install", "--yes", "--skip-package-install");
+    const manifest = path.join(f.agent, "specpi/manifest.json");
+    const oldManifest = fs.readFileSync(manifest, "utf8");
+    const failed = f.invoke(["update", "--yes"], { FAKE_DRIFT: basePackages[5] });
+    assert.notEqual(failed.status, 0);
+    assert.match(failed.stderr, /Base package version mismatch: npm:pi-goal-x/);
+    assert.match(failed.stderr, /rolled back/);
+    assert.equal(fs.readFileSync(f.settings, "utf8"), before);
+    assert.equal(fs.readFileSync(manifest, "utf8"), oldManifest);
 });
 
 test("doctor detects missing package bytes and removal preserves user-modified package settings", (t) => {

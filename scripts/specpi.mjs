@@ -314,6 +314,11 @@ async function mutate(options, operation) {
             acquisitionStarted = true;
             installBasePackages(agentDir);
             const after = readJson(settingsPath, {});
+            const packageErrors = checkBasePackages(agentDir, after);
+            if (packageErrors.length) {
+                throw new Error(packageErrors.join("\n"));
+            }
+
             packageState = {
                 basePackages,
                 packagesKeyBeforeExists: Object.hasOwn(before, "packages"),

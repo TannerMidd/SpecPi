@@ -9,6 +9,7 @@ This release resets SpecPi's base and removes previously shipped harness feature
 - Update the VS Code frontend for the upstream package base: pi-subagents activity and result cards, visible package messages, Permission System settings and approval dialogs, and existing usage/status reporting. Preserve the chat UI, attachments, history, and separate VSIX packaging.
 - Establish the new default base through eight pinned upstream Pi packages: pi-web-access 0.29.0, betterwright 2.8.1, pi-subagents 0.67.0, pi-lens 4.1.6, pi-background-tasks 2.5.0, pi-goal-x 0.31.2, @sreetej510/pi-usage 0.10.0, and @gotgenes/pi-permission-system 32.0.2. Keep the first-party surface limited to scope and the improvement loop.
 - Install and update the base with Pi's package installer, preserve unrelated settings and resource filters, and restore unchanged owned package entries on uninstall. Document upstream script/download rollback limits, BetterWright's separate browser setup, and Pi 0.84.4 compatibility. Keep an explicit core-only skip option and isolated real-package validation.
+- Save exact npm dependency versions during package acquisition and verify installed versions before completing the transaction, preventing later package installs from advancing an earlier pin.
 - Keep explicit, backed-up installation and removal. Updates retire old managed resources, restore owned settings, remove shell marker blocks, and preserve retired runtime bytes and modified resources in local backups. Restart Pi after updating to unload retired extensions.
 
 ## 0.20.1 - 2026-09-10

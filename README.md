@@ -36,6 +36,8 @@ These are installed on every normal install and update. Exact versions live in [
 
 The effective commands are `pi install npm:<package>@<version>` for each row, including the scoped names. These packages supply their own extensions, tools, skills, and prompts according to their upstream defaults. SpecPi does not add a second implementation or configure their policies.
 
+SpecPi requests exact npm dependency saves for these installs and verifies installed versions before completing the transaction. This keeps later package installs from advancing an earlier pin through npm's default version ranges.
+
 BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and run `bunx betterwright@2.8.1 setup` before using browser tools. See [BetterWright setup](https://github.com/BetterWright/betterwright/blob/main/SETUP.md). The default package installation does not install Bun or download its browser. Provider credentials, web-service configuration, language servers, and permission rules remain governed by each package's documentation. Package installation and extension loading do not prove that every external service or tool is ready.
 
 ## VS Code

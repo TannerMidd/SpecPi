@@ -48,7 +48,13 @@ export function installBasePackages(agentDir) {
         const args = ["install", source];
         const options = {
             cwd: agentDir,
-            env: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
+            // Later installs must not re-resolve earlier pins through npm's default caret ranges.
+            env: {
+                ...process.env,
+                PI_CODING_AGENT_DIR: agentDir,
+                npm_config_save_exact: "true",
+                NPM_CONFIG_SAVE_EXACT: "true",
+            },
             stdio: "inherit",
             windowsHide: true,
         };

@@ -94,7 +94,7 @@ test("Pi harness preserves an explicit agent directory two levels below temporar
         assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
         assert.equal(result.agentDir, agentDir);
         const probe = readMarker(result.stdout);
-        const environmentRoot = fs.realpathSync(runDirectory);
+        const environmentRoot = fs.realpathSync.native(runDirectory);
         assert.equal(probe.agentDir, agentDir);
         assert.deepEqual(probe.environment, {
             HOME: environmentRoot,
@@ -107,6 +107,29 @@ test("Pi harness preserves an explicit agent directory two levels below temporar
             XDG_DATA_HOME: path.join(environmentRoot, ".local", "share"),
         });
         assert.equal(fs.readFileSync(path.join(agentDir, "seen.txt"), "utf8"), "ok\n");
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test("Pi harness compares native paths when TEMP uses a Windows short-name alias", (context) => {
+    const root = makeTemporaryRoot("pi-short-temp");
+    try {
+        const temporaryDirectory = path.join(root, "temporary-directory");
+        const agentDir = path.join(temporaryDirectory, "run", "agent");
+        fs.mkdirSync(agentDir, { recursive: true });
+        const alias = path.join(root, "TEMPOR~1");
+        context.mock.method(os, "tmpdir", () => alias);
+        // Emulate OS expansion of an 8.3 alias that the legacy JS resolver preserves.
+        const nativeRealpath = fs.realpathSync.native;
+        context.mock.method(fs, "realpathSync", (value) => (value === alias ? alias : nativeRealpath(value)));
+        context.mock.method(fs.realpathSync, "native", (value) =>
+            nativeRealpath(value === alias ? temporaryDirectory : value),
+        );
+        const cli = writeNodeFixture(root, "fake-pi.mjs", "process.exit(0);");
+        const result = runPiFixture(fixture, { agentDir, piCommand: cli });
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(fs.existsSync(agentDir), true);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }

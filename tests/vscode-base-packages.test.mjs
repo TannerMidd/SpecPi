@@ -14,8 +14,8 @@ test(
         timeout: 120_000,
     },
     async (t) => {
-        const agentDir = fs.realpathSync(process.env.PI_CODING_AGENT_DIR);
-        const relative = path.relative(fs.realpathSync(os.tmpdir()), agentDir);
+        const agentDir = fs.realpathSync.native(process.env.PI_CODING_AGENT_DIR);
+        const relative = path.relative(fs.realpathSync.native(os.tmpdir()), agentDir);
         assert.ok(
             path.basename(os.tmpdir()).startsWith("specpi-base-check-") && relative === "agent",
             "Real package smoke requires the base check's isolated TEMP and agent directory",

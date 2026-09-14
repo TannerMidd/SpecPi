@@ -39,6 +39,12 @@ try {
     fs.writeFileSync(authPath, "{}\n");
     run(cli, ["plan"]);
     run(cli, ["install", "--yes"]);
+    const npmDependencies = JSON.parse(fs.readFileSync(path.join(agentDir, "npm/package.json"))).dependencies;
+    for (const source of basePackages) {
+        const split = source.lastIndexOf("@");
+        assert.equal(npmDependencies[source.slice(4, split)], source.slice(split + 1), `Unpinned npm entry: ${source}`);
+    }
+
     run(cli, ["doctor"]);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).packages, basePackages);
     const probe = path.join(root, "resource-probe.mjs");

@@ -13,6 +13,8 @@ Development formatting uses Prettier **3.9.6** (MIT), ESLint **10.9.1** (MIT), `
 
 Reviewed on 2026-09-14 against published npm metadata and integrity-verified source archives. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
 
+SpecPi requests exact npm dependency saves for these pins and checks installed top-level versions before completing installation. The override applies to package acquisition without changing the user's global npm configuration.
+
 | Package | Version | Upstream |
 | --- | --- | --- |
 | pi-web-access | 0.29.0 | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access) |
@@ -28,4 +30,4 @@ Transitive dependencies and their notices remain in Pi's npm installation tree. 
 
 The combined base is tested with Pi 0.84.4. Pi Goal X declares Pi `>=0.83.0 <0.85.0`; compatibility with newer hosts is not assumed. SpecPi's former custom browser, structural-search, delegation, background-task, and command-guard implementations, DonSeTch, themes, fonts, and website have been removed. Removal restores owned package settings but does not delete downloaded upstream packages or tools. Retired private runtimes remain in local backups with their notices.
 
-SpecPi Chat 0.7.0 is a separately packaged VS Code extension with no bundled runtime dependencies. It uses VS Code's host APIs and Pi's RPC protocol. Its read-only pi-subagents adapter consumes the upstream `fleetStatus` v1 contract reviewed at 0.67.0. Generic tool output, visible custom messages, widgets, and dialogs stay owned by their upstream packages. Playwright **1.62.1** (Apache-2.0, [Microsoft Playwright](https://github.com/microsoft/playwright)) is a pinned development dependency for Chat's rendering tests; its browser is installed only for those checks and is not shipped in either artifact.
+SpecPi Chat 0.7.1 is a separately packaged VS Code extension with no bundled runtime dependencies. It uses VS Code's host APIs and Pi's RPC protocol. Its read-only pi-subagents adapter consumes the upstream `fleetStatus` v1 contract reviewed at 0.67.0. Generic tool output, visible custom messages, widgets, and dialogs stay owned by their upstream packages. Playwright **1.62.1** (Apache-2.0, [Microsoft Playwright](https://github.com/microsoft/playwright)) is a pinned development dependency for Chat's rendering tests; its browser is installed only for those checks and is not shipped in either artifact.
