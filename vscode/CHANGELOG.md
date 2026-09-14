@@ -1,5 +1,10 @@
 # SpecPi Chat changelog
 
+## 0.8.0
+
+- Edit global or project permission settings from Chat, including YOLO, logging, rules, and advanced options. Saves require confirmation and keep a backup. Restart Pi to apply the changes to the current chat.
+- Update the setup guide for SpecPi 0.22.0 and its seven default packages. Chat does not install or remove packages.
+
 ## 0.7.1
 
 - Bump the VSIX version and update install examples for the SpecPi 0.21.0 base.

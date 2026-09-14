@@ -22,11 +22,16 @@ function getWebviewHtml({
     extrasStyleUri,
     historyScriptUri,
     historyStyleUri,
+    permissionStyleUri,
 }) {
     const extrasScript = extrasScriptUri || String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "chat-extras.js");
     const extrasStyle = extrasStyleUri || String(styleUri).replace(/chat\.css(?=[?#]|$)/u, "chat-extras.css");
     const historyScript = historyScriptUri || String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "chat-picker.js");
     const historyStyle = historyStyleUri || String(styleUri).replace(/chat\.css(?=[?#]|$)/u, "chat-picker.css");
+    const permissionStyle =
+        permissionStyleUri || String(styleUri).replace(/chat\.css(?=[?#]|$)/u, "permission-settings.css");
+    const permissionConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-config.js");
+    const permissionSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-settings.js");
     const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cspSource}; img-src data:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';`;
 
     return `<!DOCTYPE html>
@@ -38,6 +43,7 @@ function getWebviewHtml({
     <link rel="stylesheet" href="${attribute(styleUri)}">
     <link rel="stylesheet" href="${attribute(extrasStyle)}">
     <link rel="stylesheet" href="${attribute(historyStyle)}">
+    <link rel="stylesheet" href="${attribute(permissionStyle)}">
     <title>SpecPi Chat</title>
 </head>
 <body>
@@ -167,6 +173,32 @@ function getWebviewHtml({
         <div id="image-preview-content" class="image-preview-content"></div>
         <p id="image-preview-meta" class="image-preview-meta"></p>
     </dialog>
+    <dialog id="permission-settings" class="permission-settings" aria-labelledby="permission-title">
+        <h2 id="permission-title">Permission settings</h2>
+        <p>Edit the package configuration, not a separate Chat policy. Global → project → per-agent overrides; project settings apply only when Pi trusts the project. Blank fields inherit/default. Rule maps keep their order.</p>
+        <div class="permission-actions">
+            <label for="permission-scope">Scope</label>
+            <select id="permission-scope"><option value="global">Global · all projects</option><option value="project">Project · this workspace</option></select>
+            <button id="permission-reload" type="button">Load scope / discard draft</button>
+        </div>
+        <p id="permission-path" class="permission-path"></p>
+        <fieldset id="permission-fields"><legend>Settings and rules</legend></fieldset>
+        <details id="permission-advanced">
+            <summary>Full configuration JSON</summary>
+            <p>Includes every supported field, including schema and legacy keys. Form edits reformat JSON and remove comments; editing here preserves them. Trailing commas are not supported.</p>
+            <label for="permission-source">Complete configuration</label>
+            <textarea id="permission-source" rows="18" maxlength="65536" spellcheck="false"></textarea>
+        </details>
+        <p id="permission-feedback" role="status" aria-live="polite"></p>
+        <div class="permission-actions">
+            <button id="permission-save" type="button" class="primary-button">Save settings…</button>
+            <button id="permission-restart" type="button" disabled>Restart Pi</button>
+            <button id="permission-effective" type="button">Show effective policy / discard draft</button>
+            <button id="permission-close" type="button">Close / discard draft</button>
+        </div>
+    </dialog>
+    <script nonce="${attribute(nonce)}" src="${attribute(permissionConfigScript)}"></script>
+    <script nonce="${attribute(nonce)}" src="${attribute(permissionSettingsScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(extrasScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(historyScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(scriptUri)}"></script>

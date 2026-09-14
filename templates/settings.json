@@ -1,12 +1,11 @@
 {
-  "packages": [
-    "npm:pi-web-access@0.29.0",
-    "npm:betterwright@2.8.1",
-    "npm:pi-subagents@0.67.0",
-    "npm:pi-lens@4.1.6",
-    "npm:pi-background-tasks@2.5.0",
-    "npm:pi-goal-x@0.31.2",
-    "npm:@sreetej510/pi-usage@0.10.0",
-    "npm:@gotgenes/pi-permission-system@32.0.2"
-  ]
+    "packages": [
+        "npm:pi-web-access@0.29.0",
+        "npm:betterwright@2.8.1",
+        "npm:pi-subagents@0.67.0",
+        "npm:pi-lens@4.1.6",
+        "npm:pi-goal-x@0.31.2",
+        "npm:@sreetej510/pi-usage@0.10.0",
+        "npm:@gotgenes/pi-permission-system@32.0.2"
+    ]
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.0 - 2026-09-14
+
+- Remove `pi-background-tasks` from the default setup to avoid its Anthropic message-history errors. Updates remove unchanged entries added by SpecPi and preserve user-managed installations. The other seven package versions stay the same.
+- Pair this release with SpecPi Chat 0.8.0, which adds editable permission settings.
+- Ask agents to keep replies, commits, and pull requests brief and written in plain language.
+
 ## 0.21.1 - 2026-09-14
 
 - Restore the website's original typography, colors, Chat preview, theme switcher, and improvement diagram while keeping the new package base.

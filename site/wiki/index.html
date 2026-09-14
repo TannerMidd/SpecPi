@@ -40,14 +40,14 @@
                     ><a href="#migration"><span>06</span>Update &amp; remove</a
                     ><a href="#development"><span>07</span>Development</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.21.1<br />Chat 0.7.1</div>
+                <div class="index-meta">SpecPi 0.22.0<br />Chat 0.8.0</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
                     <p class="eyebrow">Documentation</p>
                     <h1>Your Pi setup.<br />A smaller base.</h1>
                     <p class="wiki-summary">
-                        Scope control, an improvement loop, eight upstream packages, and a chat beside your code.
+                        Scope control, an improvement loop, seven upstream packages, and a chat beside your code.
                     </p>
                     <p class="wiki-release-note">
                         The 0.21 base removes the old custom tools, extra commands, themes, and shell profiles. Read
@@ -83,7 +83,7 @@ specpi doctor</code></pre>
                 <section class="doc-section" id="packages">
                     <h2>Default packages</h2>
                     <p>
-                        Normal installs and updates install <a href="../#packages">the eight pinned packages</a> through
+                        Normal installs and updates install <a href="../#packages">the seven pinned packages</a> through
                         Pi. SpecPi saves exact npm versions and checks the installed versions before completing the
                         update. Each package keeps its own commands and configuration; existing resource filters are
                         preserved.
@@ -192,8 +192,8 @@ specpi doctor</code></pre>
                 <section class="doc-section" id="vscode">
                     <h2>SpecPi Chat for VS Code</h2>
                     <p>
-                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.21.1/specpi-chat-0.7.1.vsix"
-                            >Download Chat 0.7.1</a
+                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.22.0/specpi-chat-0.8.0.vsix"
+                            >Download Chat 0.8.0</a
                         >, then run <strong>Extensions: Install from VSIX…</strong> in VS Code. Open a trusted project,
                         select SpecPi in the Activity Bar, and choose <strong>Connect Pi</strong>.
                     </p>
@@ -202,13 +202,14 @@ specpi doctor</code></pre>
                         containers, Pi and the extension must be installed on that host.
                     </p>
                     <p>
-                        Chat supports the new base's commands, tool output, subagent activity and result cards,
-                        goal/background messages, usage reports, and approval dialogs. Provider sign-in,
-                        package-specific terminal settings, and custom footers remain in terminal Pi.
+                        Chat supports the new base's commands, tool output, subagent activity and result cards, goal
+                        messages, usage reports, and approval dialogs. Provider sign-in, package-specific terminal
+                        settings, and custom footers remain in terminal Pi.
                     </p>
                     <p>
-                        The Permissions button opens the upstream settings report; it does not change rules. Approval
-                        dialogs send your explicit choice back to Pi. Cancellation never grants approval.
+                        The Permissions button opens editable global or project settings. Saves require confirmation
+                        and keep a backup; restart Pi to apply them to this chat. Approval dialogs send your explicit
+                        choice back to Pi. Cancellation never grants approval.
                     </p>
                     <p>
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md">Full Chat guide</a> ·
@@ -254,7 +255,7 @@ npm run check:base
 npm run check:site</code></pre>
                     <p>
                         Use disposable Pi state for installer tests. <code>check:base</code> installs the real
-                        eight-package base in isolation and checks loading, Chat RPC, explicit permission replies,
+                        seven-package base in isolation and checks loading, Chat RPC, explicit permission replies,
                         updates, and removal. It does not send model requests or run browser tasks.
                     </p>
                     <p>
@@ -272,7 +273,7 @@ npm run check:site</code></pre>
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.21.1">v0.21.1</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.22.0">v0.22.0</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>

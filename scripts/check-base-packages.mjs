@@ -34,7 +34,7 @@ const run = (command, args) => {
 
 let passed = false;
 try {
-    console.log("Installing the eight default packages in isolated state (network required).");
+    console.log(`Installing the ${basePackages.length} default packages in isolated state (network required).`);
     const authPath = path.join(agentDir, "auth.json");
     fs.writeFileSync(authPath, "{}\n");
     run(cli, ["plan"]);
@@ -70,8 +70,14 @@ process.exit(0);
     assert.ok(line, output);
     const resources = JSON.parse(line.slice("SPECPI_BASE=".length));
     assert.deepEqual(resources.errors, [], JSON.stringify(resources.errors));
-    // Background Tasks supplies two extensions; each other upstream package supplies one.
-    assert.equal(resources.paths.length, 11, JSON.stringify(resources.paths));
+    // Each upstream package supplies one extension, alongside the two first-party extensions.
+    assert.equal(resources.paths.length, basePackages.length + 2, JSON.stringify(resources.paths));
+    assert.equal(
+        resources.paths.some((file) => file.includes("pi-background-tasks")),
+        false,
+    );
+    assert.equal(resources.commands.includes("claude-cache"), false);
+    assert.equal(resources.tools.includes("bg_run"), false);
     for (const command of ["scope", "wishlist", "harness-improvement"]) {
         assert.ok(resources.commands.includes(command), `Missing /${command}`);
     }
@@ -91,7 +97,7 @@ process.exit(0);
     assert.equal(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).packages, undefined);
     assert.equal(fs.readFileSync(authPath, "utf8"), "{}\n");
     console.log(
-        `OK: eight package pins acquired, ${resources.paths.length} extensions loaded without errors or tool collisions, lifecycle and synthetic auth canary verified.`,
+        `OK: ${basePackages.length} package pins acquired, ${resources.paths.length} extensions loaded without errors or tool collisions, lifecycle and synthetic auth canary verified.`,
     );
     passed = true;
 } finally {

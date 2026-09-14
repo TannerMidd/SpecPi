@@ -240,7 +240,8 @@ function fixture(t, options = {}) {
         },
         window: {
             createStatusBarItem: () => ({ show() {}, dispose() {} }),
-            showWarningMessage: async () => options.warningAnswer,
+            showWarningMessage: async (...args) =>
+                typeof options.warningAnswer === "function" ? options.warningAnswer(...args) : options.warningAnswer,
             showInformationMessage: async () => undefined,
             showQuickPick: async (items) => {
                 quickPicks.push(items);
@@ -287,6 +288,22 @@ function fixture(t, options = {}) {
             },
         },
         "./session-catalog.js": { SessionCatalog: FakeCatalog },
+        "./permission-settings.js": {
+            loadPermissionSettings: (workspace, scope) =>
+                options.loadPermissions
+                    ? options.loadPermissions(workspace, scope)
+                    : {
+                          scope,
+                          path: path.join(workspace, "synthetic-permissions.json"),
+                          text: "{}\n",
+                          revision: "missing",
+                          exists: false,
+                      },
+            savePermissionSettings: (snapshot, text) =>
+                options.savePermissions
+                    ? options.savePermissions(snapshot, text)
+                    : { ...snapshot, text, exists: true, revision: "saved" },
+        },
         "./code-references.js": {
             resolveCodeReference: (input) =>
                 options.resolveCode
@@ -1077,31 +1094,8 @@ test("malformed runtime status and widget payloads cannot break event handling o
     assert.equal(controller.client, client);
 });
 
-async function guarded(t, choose) {
-    const value = await connected(t, {
-        request: (type) =>
-            type === "get_commands"
-                ? { commands: [{ name: "guard", description: "Show or change the session command guard" }] }
-                : undefined,
-        quickPick: (items) => items.find((item) => item.action === choose()),
-    });
-
-    return {
-        ...value,
-        publishGuard: (statusText) =>
-            value.client.emit("event", {
-                type: "extension_ui_request",
-                method: "setStatus",
-                statusKey: "specpi-command-guard",
-                statusText,
-            }),
-        prompts: () =>
-            value.client.requests.filter((request) => request.type === "prompt").map((request) => request.args.message),
-    };
-}
-
-test("Permissions opens only the upstream read-only settings command and reflects reported YOLO mode", async (t) => {
-    const { controller, client } = await connected(t, {
+test("Permissions opens the editable settings UI and reflects only upstream YOLO status", async (t) => {
+    const { controller, client, posted } = await connected(t, {
         request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
     });
     assert.equal(controller.state.permissions.label, "Permissions");
@@ -1113,6 +1107,13 @@ test("Permissions opens only the upstream read-only settings command and reflect
     });
     assert.equal(controller.state.permissions.yolo, true);
     await controller.handleMessage({ type: "showPermissions" });
+    assert.equal(posted.at(-1).type, "permissionSettings");
+    assert.equal(posted.at(-1).settings.scope, "global");
+    assert.equal(
+        client.requests.some((request) => request.type === "prompt"),
+        false,
+    );
+    await controller.handleMessage({ type: "showEffectivePermissions" });
     assert.ok(
         client.requests.some(
             (request) => request.type === "prompt" && request.args.message === "/permission-system show",
@@ -1122,6 +1123,98 @@ test("Permissions opens only the upstream read-only settings command and reflect
     await assert.rejects(controller.handleMessage({ type: "showPermissions" }), /idle/);
     const { controller: plain } = await connected(t);
     await assert.rejects(plain.handleMessage({ type: "showPermissions" }), /Permission System/);
+});
+
+test("permission saves require native confirmation, bind their path to the opened scope, and never prompt the model", async (t) => {
+    const writes = [];
+    const { controller, client, posted } = await connected(t, {
+        request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
+        warningAnswer: "Save permissions",
+        savePermissions: (snapshot, text) => {
+            writes.push({ snapshot, text });
+
+            return { ...snapshot, text, exists: true, revision: "saved" };
+        },
+    });
+    controller.showPermissions("project");
+    const snapshot = controller.permissionSettings;
+    await controller.handleMessage({
+        type: "savePermissions",
+        id: snapshot.id,
+        contextToken: controller.contextToken(),
+        text: '{"yoloMode":true}',
+        path: "/forged/path",
+        scope: "global",
+    });
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].snapshot.path, snapshot.path);
+    assert.equal(writes[0].snapshot.scope, "project");
+    assert.equal(controller.state.permissions.yolo, false, "Saving is not evidence of the runtime mode");
+    assert.equal(
+        posted.findLast((message) => message.type === "permissionSaveResult").settings.text,
+        '{"yoloMode":true}',
+    );
+    assert.equal(
+        client.requests.some((request) => request.type === "prompt"),
+        false,
+    );
+    await controller.handleMessage({ type: "savePermissions", id: snapshot.id, contextToken: "stale", text: "{}" });
+    assert.equal(writes.length, 1);
+    assert.match(posted.findLast((message) => message.type === "permissionSaveResult").error, /stale/u);
+});
+
+test("permission cancellation, invalid drafts, disk failures and changed conversations do not grant writes", async (t) => {
+    for (const scenario of ["cancel", "invalid", "switch", "disconnect", "trust", "busy", "disk"]) {
+        const confirmation = deferred();
+        let writes = 0;
+        const value = await connected(t, {
+            request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
+            warningAnswer: () => confirmation.promise,
+            savePermissions: () => {
+                writes += 1;
+                throw new Error("Synthetic disk failure");
+            },
+        });
+        const { controller, coordinator, vscode, posted } = value;
+        controller.showPermissions();
+        const operation = controller.handleMessage({
+            type: "savePermissions",
+            id: controller.permissionSettings.id,
+            contextToken: controller.contextToken(),
+            text: scenario === "invalid" ? '{"yoloMode":"yes"}' : "{}",
+        });
+        if (scenario === "switch") {
+            coordinator.selectRecord(coordinator.createRecord(controller.workspace));
+        } else if (scenario === "disconnect") {
+            await controller.disconnect();
+        } else if (scenario === "trust") {
+            vscode.workspace.isTrusted = false;
+        } else if (scenario === "busy") {
+            controller.state.status = "busy";
+        }
+
+        confirmation.resolve(scenario === "cancel" ? undefined : "Save permissions");
+        await operation;
+        assert.equal(writes, scenario === "disk" ? 1 : 0, scenario);
+        assert.equal(controller.sending, false);
+        if (scenario !== "switch") {
+            const result = posted.findLast((message) => message.type === "permissionSaveResult");
+            assert.ok(result.cancelled || result.error, scenario);
+        }
+    }
+});
+
+test("permission restart uses the selected connection and rejects a stale editor", async (t) => {
+    const { controller, client, clients } = await connected(t, {
+        request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
+    });
+    controller.showPermissions();
+    const id = controller.permissionSettings.id;
+    await controller.handleMessage({ type: "restartPermissions", id, contextToken: "stale" });
+    assert.equal(client.stops, 0);
+    await controller.handleMessage({ type: "restartPermissions", id, contextToken: controller.contextToken() });
+    assert.equal(client.stops, 1);
+    assert.equal(clients.length, 2);
 });
 
 test("package approval prompts preserve multiline tool context and require an exact human response", async (t) => {

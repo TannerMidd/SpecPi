@@ -9,7 +9,7 @@ Wishlist observations are leads, not authorization. Only an exact human selectio
 ## Repository map
 
 - `scripts/specpi.mjs` and `scripts/lib.mjs`: installer lifecycle, managed-state transactions, and CLI behavior.
-- `scripts/packages.mjs` and `templates/settings.json`: the eight pinned upstream packages installed by default. First-party features remain limited to `/scope` and the harness improvement loop.
+- `scripts/packages.mjs` and `templates/settings.json`: the seven pinned upstream packages installed by default. First-party features remain limited to `/scope` and the harness improvement loop.
 - `templates/`, `extensions/`, and `skills/`: installable source-of-truth files for scope and the improvement loop. Edit these, not installed copies.
 - `tests/`: installer, scope, and improvement-loop regressions.
 - `vscode/`: SpecPi Chat, the separately packaged VS Code frontend. Keep it aligned with the Pi package base; its adapters display public runtime events and do not duplicate tool policy.
