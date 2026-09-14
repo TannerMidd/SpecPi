@@ -13,8 +13,10 @@ function configPath(workspace, scope, { env = process.env, home = os.homedir() }
     }
 
     let agent = env.PI_CODING_AGENT_DIR || path.join(home, ".pi", "agent");
-    if (agent === "~" || agent.startsWith("~/") || agent.startsWith("~\\")) {
-        agent = path.join(home, agent.slice(1));
+    if (agent === "~") {
+        agent = home;
+    } else if (agent.startsWith("~/") || (process.platform === "win32" && agent.startsWith("~\\"))) {
+        agent = path.join(home, agent.slice(2));
     }
 
     const base = scope === "global" ? path.resolve(workspace, agent) : path.join(workspace, ".pi");

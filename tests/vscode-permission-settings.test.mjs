@@ -87,8 +87,14 @@ test("paths honor the host Pi directory and bind project scope to the selected w
         configPath(f.workspace, "global", f.options),
         path.join(f.home, ".pi", "agent", "extensions", "pi-permission-system", "config.json"),
     );
-    for (const agent of ["~/custom", "~\\custom", "custom", path.join(f.directory, "custom")]) {
-        const expected = agent.startsWith("~") ? path.join(f.home, "custom") : path.resolve(f.workspace, agent);
+    for (const [agent, expected] of [
+        ["~", f.home],
+        ["~/custom", path.join(f.home, "custom")],
+        ["~\\custom", process.platform === "win32" ? path.join(f.home, "custom") : path.join(f.workspace, "~\\custom")],
+        ["~other", path.join(f.workspace, "~other")],
+        ["custom", path.join(f.workspace, "custom")],
+        [path.join(f.directory, "custom"), path.join(f.directory, "custom")],
+    ]) {
         assert.equal(
             configPath(f.workspace, "global", { home: f.home, env: { PI_CODING_AGENT_DIR: agent } }),
             path.join(expected, "extensions", "pi-permission-system", "config.json"),
