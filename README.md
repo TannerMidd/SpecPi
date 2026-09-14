@@ -1,10 +1,38 @@
-# SpecPi
+<p align="center">
+  <img src="https://tannermidd.github.io/SpecPi/logo.svg" width="88" alt="SpecPi logo">
+</p>
 
-A small base for the [Pi coding agent](https://pi.dev/). Set the scope of a task, notice recurring problems, and choose what to improve. Eight upstream packages provide the supporting tools.
+<h1 align="center">SpecPi</h1>
 
-**0.21.0 resets the base.** SpecPi's own Pi extensions now provide only `/scope` and the harness improvement loop. Custom tools, extra workflow commands, themes, and shell profiles have been removed. **SpecPi Chat 0.7.1** remains the VS Code frontend. Read [the release notes](CHANGELOG.md) and the migration instructions below before updating.
+<p align="center">Pi, beside your code.<br>Scope your work. Choose what improves. Keep your own Pi setup.</p>
 
-[Website](https://tannermidd.github.io/SpecPi/) · [Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.21.0/specpi-chat-0.7.1.vsix) · [Releases](https://github.com/TannerMidd/SpecPi/releases)
+<p align="center">
+  <a href="https://www.npmjs.com/package/specpi"><img src="https://img.shields.io/npm/v/specpi?style=flat-square&amp;color=084bdb" alt="npm version"></a>
+  <a href="https://github.com/TannerMidd/SpecPi/actions/workflows/ci.yml"><img src="https://github.com/TannerMidd/SpecPi/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-084bdb?style=flat-square" alt="MIT license"></a>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> · <a href="https://tannermidd.github.io/SpecPi/">Website</a> · <a href="https://tannermidd.github.io/SpecPi/wiki/">Documentation</a> · <a href="#vs-code">VS Code</a> · <a href="https://github.com/TannerMidd/SpecPi/releases">Releases</a>
+</p>
+
+<p align="center">
+  <a href="https://tannermidd.github.io/SpecPi/#vscode-chat">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/specpi-chat.png">
+      <img src="https://tannermidd.github.io/SpecPi/media/specpi-chat-light.png" width="1100" alt="SpecPi Chat beside a file in VS Code, discussing a focused code change with a file attached.">
+    </picture>
+  </a>
+</p>
+<p align="center"><sub>SpecPi Chat · Example workspace</sub></p>
+
+SpecPi is a small base for the [Pi coding agent](https://pi.dev/). Its own extensions provide **scope control** and a **harness improvement loop**. Eight upstream packages handle the supporting tools, and **SpecPi Chat 0.7.1** brings them into VS Code.
+
+| Keep the work focused | Improve what gets in the way | Work beside your code |
+| --- | --- | --- |
+| Declare files and directories with `/scope`. Review drift as the task progresses. | Record recurring problems locally. Choose a change through `/harness-improvement` and verify it. | Chat, attach files, follow subagents, review approvals, and inspect changes in VS Code. |
+
+> **Moving from 0.20 or earlier?** The 0.21 base removes the old custom tools, extra commands, themes, and shell profiles. Read [updating and removal](#update-and-remove) before switching.
 
 ## Install
 
@@ -19,7 +47,12 @@ specpi doctor
 
 Inspect the plan, confirm the install, then restart Pi. SpecPi installs two first-party extensions, the improvement skill, a marked working agreement, and the packages below using `pi install`. Provider and model settings are preserved. There are no additional SpecPi extensions, themes, shell profiles, tool wrappers, or browser bootstrap scripts.
 
+<details>
+<summary>Source checkouts, alternate Pi paths, and core-only installs</summary>
+
 For this checkout, run `node scripts/specpi.mjs` in place of `specpi`. `PI_CODING_AGENT_DIR` selects an alternate destination; `SPECPI_PI` selects a Pi CLI path. `specpi install --skip-package-install` installs only the first-party core for offline use and testing. A plain `pi install npm:specpi` loads only the packaged first-party resources; use the SpecPi installer above for the complete base, and avoid installing the same first-party resources both ways.
+
+</details>
 
 ## Default packages
 
@@ -46,9 +79,16 @@ BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and r
 
 [SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.7.1** adds the new package base's visible messages, a Permission System settings button, and pi-subagents activity and result cards. The VSIX remains separate from the npm harness package.
 
-Download the [0.7.1 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.21.0/specpi-chat-0.7.1.vsix), then run **Extensions: Install from VSIX…** in VS Code. To build from source, run `npm --prefix vscode run package`; the file is written to `.specpi-test/vscode/specpi-chat-0.7.1.vsix`. See the [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) for package support and terminal-only controls. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+Download the [0.7.1 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.21.1/specpi-chat-0.7.1.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+
+[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.21.1/specpi-chat-0.7.1.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
 
 ## Scope
+
+Declare the files and directories a task should touch with `/scope set`, then use `/scope status` to review drift.
+
+<details>
+<summary>Scope commands</summary>
 
 - `/scope set`: declare project-relative files or directories, one per line.
 - `/scope status`: review declared paths, pending drift, and snapshot uncertainty.
@@ -58,9 +98,16 @@ Download the [0.7.1 VSIX](https://github.com/TannerMidd/SpecPi/releases/download
 - `/scope clear`: turn monitoring off.
 - `/scope task`: import the active improvement contract's paths explicitly.
 
+</details>
+
 Interactive writes and edits outside scope ask before proceeding. In headless mode they are recorded as pending. Other tools are checked afterward against bounded Git snapshots. Scope is a drift monitor, not a sandbox: shell commands and custom tools can already have changed files when drift is reported. State follows the current Pi session branch.
 
 ## Harness improvement loop
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/improvement-workflow-dark.svg">
+  <img src="https://tannermidd.github.io/SpecPi/media/improvement-workflow.svg" width="1200" alt="Observe a recurring gap, select one change, modify the harness, test it, retire with evidence, and review later outcomes.">
+</picture>
 
 1. Enable local observations with `/wishlist on`; collection is off by default. `/wishlist off` stops it.
 2. Review recurring gaps with `/wishlist` and select one through `/harness-improvement` in a complete SpecPi source checkout.

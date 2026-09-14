@@ -2,12 +2,281 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
+        <script src="../theme.js"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta http-equiv="refresh" content="0; url=../#install" />
-        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/#install" />
-        <title>SpecPi documentation</title>
+        <meta name="theme-color" content="#fafbfc" />
+        <meta
+            name="description"
+            content="Install SpecPi, set task scope, use the improvement loop, and connect Chat to the new package base."
+        />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/wiki/" />
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+        <title>Documentation · SpecPi</title>
     </head>
     <body>
-        <p>The documentation has moved. <a href="../#install">Read the current SpecPi guide.</a></p>
+        <a class="skip-link" href="#content">Skip to content</a>
+        <header class="site-header wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="../#core">Scope</a><a href="../#packages">Packages</a><a href="../#install">Install</a
+                ><a href="../#vscode-chat">VS Code</a><a href="./" aria-current="page">Docs</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
+            </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
+        </header>
+        <main class="wiki-layout wrap" id="content">
+            <aside class="wiki-sidebar" aria-label="Documentation contents">
+                <p>SPECPI / GUIDE</p>
+                <nav>
+                    <a href="#getting-started"><span>01</span>Getting started</a
+                    ><a href="#packages"><span>02</span>Default packages</a><a href="#scope"><span>03</span>Scope</a
+                    ><a href="#workflows"><span>04</span>Improvement loop</a><a href="#vscode"><span>05</span>VS Code</a
+                    ><a href="#migration"><span>06</span>Update &amp; remove</a
+                    ><a href="#development"><span>07</span>Development</a>
+                </nav>
+                <div class="index-meta">SpecPi 0.21.1<br />Chat 0.7.1</div>
+            </aside>
+            <div class="wiki-content">
+                <div class="wiki-intro">
+                    <p class="eyebrow">Documentation</p>
+                    <h1>Your Pi setup.<br />A smaller base.</h1>
+                    <p class="wiki-summary">
+                        Scope control, an improvement loop, eight upstream packages, and a chat beside your code.
+                    </p>
+                    <p class="wiki-release-note">
+                        The 0.21 base removes the old custom tools, extra commands, themes, and shell profiles. Read
+                        <a href="#migration">the migration notes</a> before updating.
+                    </p>
+                </div>
+                <section class="doc-section" id="getting-started">
+                    <h2>Getting started</h2>
+                    <p>
+                        Install Node.js 22.19+, Git, npm, and Pi on PATH. Connect a provider in terminal Pi and confirm
+                        it works before installing SpecPi. The complete base is tested with Pi 0.84.4.
+                    </p>
+                    <pre><code>npm install --global specpi@latest
+specpi plan
+specpi install
+specpi doctor</code></pre>
+                    <p>
+                        Review the plan, confirm, then restart Pi. Your provider, model, and unrelated settings are
+                        preserved. Install, update, and uninstall require confirmation; <code>--yes</code> supplies it
+                        for automation.
+                    </p>
+                    <p>
+                        For a source checkout, use <code>node scripts/specpi.mjs</code> in place of <code>specpi</code>.
+                        <code>PI_CODING_AGENT_DIR</code> selects an alternate destination and
+                        <code>SPECPI_PI</code> selects a Pi CLI path.
+                    </p>
+                    <p>
+                        <code>specpi install --skip-package-install</code> installs only scope and the improvement loop
+                        on a fresh profile. A plain <code>pi install npm:specpi</code> loads those packaged resources
+                        but does not set up the full base. Avoid installing the same resources both ways.
+                    </p>
+                </section>
+                <section class="doc-section" id="packages">
+                    <h2>Default packages</h2>
+                    <p>
+                        Normal installs and updates install <a href="../#packages">the eight pinned packages</a> through
+                        Pi. SpecPi saves exact npm versions and checks the installed versions before completing the
+                        update. Each package keeps its own commands and configuration; existing resource filters are
+                        preserved.
+                    </p>
+                    <p>
+                        BetterWright needs Bun 1.4+ and <code>bunx betterwright@2.8.1 setup</code> for its browser. See
+                        the <a href="https://github.com/BetterWright/betterwright/blob/main/SETUP.md">setup guide</a>.
+                        Pi Goal X declares compatibility with Pi ≥0.83.0 and &lt;0.85.0.
+                    </p>
+                    <p>
+                        Provider credentials, service configuration, language servers, and permission policies follow
+                        the upstream documentation. Installing a package does not complete its external service setup.
+                    </p>
+                </section>
+                <section class="doc-section" id="scope">
+                    <h2>Scope</h2>
+                    <p>
+                        Use <code>/scope set</code> to declare project-relative files and directories, one per line.
+                        Review drift with <code>/scope status</code>.
+                    </p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/scope set</code></td>
+                                <td>Declare the paths a task should touch.</td>
+                            </tr>
+                            <tr>
+                                <td><code>/scope status</code></td>
+                                <td>Review paths, drift, and snapshot uncertainty.</td>
+                            </tr>
+                            <tr>
+                                <td><code>/scope add &lt;path&gt;</code></td>
+                                <td>Add a path.</td>
+                            </tr>
+                            <tr>
+                                <td><code>/scope remove &lt;path&gt;</code></td>
+                                <td>Remove a path.</td>
+                            </tr>
+                            <tr>
+                                <td><code>/scope accept &lt;path&gt;</code></td>
+                                <td>Acknowledge a finding without expanding scope.</td>
+                            </tr>
+                            <tr>
+                                <td><code>/scope recheck</code></td>
+                                <td>Refresh an uncertain baseline.</td>
+                            </tr>
+                            <tr>
+                                <td><code>/scope task</code></td>
+                                <td>Import the active improvement contract's paths.</td>
+                            </tr>
+                            <tr>
+                                <td><code>/scope clear</code></td>
+                                <td>Turn monitoring off.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p>
+                        Interactive writes and edits outside scope ask first. In headless mode they are recorded as
+                        pending. Shell commands and other tools are checked afterward against bounded Git snapshots.
+                    </p>
+                    <p>
+                        Scope monitors drift; it does not sandbox tools. A tool may already have changed files before
+                        drift is reported. State follows the current Pi session branch.
+                    </p>
+                </section>
+                <section class="doc-section" id="workflows">
+                    <h2>The harness improvement loop</h2>
+                    <p>
+                        Start with an observed problem. You choose the change, define what success means, and verify it
+                        before closing the item.
+                    </p>
+                    <ol>
+                        <li>
+                            Enable local observations with <code>/wishlist on</code>. Collection starts off;
+                            <code>/wishlist off</code> stops it.
+                        </li>
+                        <li>
+                            Review recurring gaps with <code>/wishlist</code> and select one through
+                            <code>/harness-improvement</code> in a complete SpecPi source checkout.
+                        </li>
+                        <li>
+                            Follow the <code>specpi-improve</code> skill: record a bounded contract, make the smallest
+                            sufficient change, and gather direct acceptance evidence.
+                        </li>
+                        <li>
+                            <code>finish_harness_improvement</code> checks the contract, source changes, repository
+                            checks, and registered validators before retirement.
+                        </li>
+                        <li>
+                            Review the record with <code>/wishlist history &lt;gap-id&gt;</code>. Use
+                            <code>/wishlist outcome &lt;gap-id&gt;</code> to record your assessment.
+                        </li>
+                    </ol>
+                    <p>
+                        An observation never authorizes a change. A regression returns the item for human selection.
+                        Records stay local, use sanitized summaries and salted identifiers, and are never uploaded
+                        automatically. Pi still sends model requests to your selected provider.
+                    </p>
+                </section>
+                <section class="doc-section" id="vscode">
+                    <h2>SpecPi Chat for VS Code</h2>
+                    <p>
+                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.21.1/specpi-chat-0.7.1.vsix"
+                            >Download Chat 0.7.1</a
+                        >, then run <strong>Extensions: Install from VSIX…</strong> in VS Code. Open a trusted project,
+                        select SpecPi in the Activity Bar, and choose <strong>Connect Pi</strong>.
+                    </p>
+                    <p>
+                        Requires VS Code 1.96+ and Pi on the workspace host. Install SpecPi separately. On SSH, WSL, or
+                        containers, Pi and the extension must be installed on that host.
+                    </p>
+                    <p>
+                        Chat supports the new base's commands, tool output, subagent activity and result cards,
+                        goal/background messages, usage reports, and approval dialogs. Provider sign-in,
+                        package-specific terminal settings, and custom footers remain in terminal Pi.
+                    </p>
+                    <p>
+                        The Permissions button opens the upstream settings report; it does not change rules. Approval
+                        dialogs send your explicit choice back to Pi. Cancellation never grants approval.
+                    </p>
+                    <p>
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md">Full Chat guide</a> ·
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md"
+                            >Build and test Chat</a
+                        >
+                    </p>
+                </section>
+                <section class="doc-section" id="migration">
+                    <h2>Update and remove</h2>
+                    <pre><code>npm install --global specpi@latest
+specpi plan
+specpi update
+specpi doctor</code></pre>
+                    <p>
+                        Updates retire recorded old resources, restore legacy settings that still match ownership
+                        records, remove the shell marker block, and install the new package base. Modified retired files
+                        and old runtime directories are preserved under <code>&lt;agent-dir&gt;/specpi/backups/</code>.
+                    </p>
+                    <p>
+                        Restart Pi and Chat connections to unload old extensions. Unrelated settings and local
+                        improvement evidence remain intact. Modified retained resources require
+                        <code>update --force</code>; review the plan before using it.
+                        <code>update --skip-package-install</code> preserves the existing base without invoking its
+                        installer.
+                    </p>
+                    <p>
+                        Run <code>specpi uninstall</code> to remove managed resources and restore package entries that
+                        still match SpecPi's recorded changes. Subsequent user edits, downloaded packages, caches, and
+                        private evidence remain on disk.
+                    </p>
+                    <p>
+                        A failed install restores SpecPi-managed files and configuration. Upstream downloads and
+                        install-script effects cannot be rolled back.
+                    </p>
+                </section>
+                <section class="doc-section" id="development">
+                    <h2>Development</h2>
+                    <pre><code>npm install --ignore-scripts --omit=peer --no-package-lock
+npm run check
+npm run check:pi-package
+npm run check:base
+npm run check:site</code></pre>
+                    <p>
+                        Use disposable Pi state for installer tests. <code>check:base</code> installs the real
+                        eight-package base in isolation and checks loading, Chat RPC, explicit permission replies,
+                        updates, and removal. It does not send model requests or run browser tasks.
+                    </p>
+                    <p>
+                        Website checks use the pinned Playwright browser; install it with
+                        <code>npx --no-install playwright install chromium</code>. Read
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/AGENTS.md">the repository guide</a>,
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY_MODEL.md">security model</a>,
+                        and
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/NPM_RELEASE.md">release procedure</a>
+                        before contributing.
+                    </p>
+                </section>
+            </div>
+        </main>
+        <footer class="site-footer wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.21.1">v0.21.1</a>
+            <nav aria-label="Footer navigation">
+                <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
+            </nav>
+        </footer>
     </body>
 </html>

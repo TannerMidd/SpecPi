@@ -26,6 +26,8 @@ Publishing, tags, deprecation, ownership changes and GitHub Releases require exp
 
 `.github/workflows/npm-publish.yml` builds one immutable, checksummed candidate; validates that same tarball on Ubuntu, Windows and macOS; then publishes through approved GitHub OIDC with provenance. Stable releases use `latest`, prereleases `next`. Runs are serialized, existing versions are rejected and the candidate must advance its dist-tag. Registry readback must match version, integrity, dist-tag and attestation.
 
+Registry processing can take several minutes after npm accepts a publication. The workflow polls for up to five minutes. If that readback times out, inspect the registry and verify the published artifact before taking further action; do not rerun publication for a version that already exists.
+
 After publication, install the registry artifact into disposable state and exercise plan/install/doctor/uninstall. Check package-page links/images, license, provenance and dist-tag before announcing.
 
 ## First publication only
