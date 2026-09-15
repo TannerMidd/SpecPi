@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <script src="../theme.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#fafbfc" />
+        <meta
+            name="description"
+            content="What the published evidence does and does not establish about the Pi harness and about delegating work to subagents, read against the current SpecPi base."
+        />
+        <meta property="og:title" content="Research · SpecPi" />
+        <meta
+            property="og:description"
+            content="Harness choice and subagent delegation: measured results, the accounting behind them, and what stays unproven."
+        />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/research/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/research/" />
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+        <link rel="stylesheet" href="../research.css" />
+        <title>Research · SpecPi</title>
+    </head>
+    <body>
+        <a class="skip-link" href="#content">Skip to content</a>
+        <header class="site-header wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="../#core">Scope</a><a href="../#packages">Packages</a><a href="../#install">Install</a
+                ><a href="../#vscode-chat">VS Code</a><a href="../wiki/">Docs</a
+                ><a href="./" aria-current="page">Research</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
+            </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
+        </header>
+        <main class="wiki-layout wrap" id="content">
+            <aside class="wiki-sidebar" aria-label="Research contents">
+                <p>SPECPI / RESEARCH</p>
+                <nav>
+                    <a href="#summary"><span>01</span>Summary</a><a href="#accounting"><span>02</span>Reading a cost</a
+                    ><a href="#harness"><span>03</span>Harness choice</a><a href="#subagents"><span>04</span>Subagents</a
+                    ><a href="#specpi"><span>05</span>For this base</a
+                    ><a href="#unproven"><span>06</span>Not established</a><a href="#sources"><span>07</span>Sources</a>
+                </nav>
+                <div class="index-meta">SpecPi 0.23.0<br />Chat 0.10.0<br />Evidence to 15 Sep 2026</div>
+            </aside>
+            <div class="wiki-content">
+                <div class="wiki-intro">
+                    <p class="eyebrow">Research</p>
+                    <h1>What the evidence<br />actually shows.</h1>
+                    <p class="wiki-summary">
+                        Two questions decide how a harness is set up: is Pi worth running, and is it worth handing work
+                        to subagents. Neither has a universal answer. Here is what the published measurements support,
+                        and what they do not.
+                    </p>
+                    <p class="wiki-release-note">
+                        This page summarises two internal reviews of public evidence. SpecPi itself has not been
+                        measured against an alternative. Nothing below is a benchmark of this base.
+                    </p>
+                </div>
+
+                <section class="doc-section" id="summary">
+                    <header><h2>Summary</h2><span>01</span></header>
+                    <p>
+                        The short version: Pi is a credible efficiency baseline, and delegation is worth it selectively.
+                        Both claims are conditional on the workload, and the strength of the evidence differs a lot
+                        between them.
+                    </p>
+                    <dl class="verdict">
+                        <div>
+                            <dt>Supported</dt>
+                            <dd>
+                                <strong>Pi often costs less.</strong>
+                                Lower spending shows up across several independent comparisons, sometimes by a wide
+                                margin.
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Not supported</dt>
+                            <dd>
+                                <strong>A fixed savings multiplier.</strong>
+                                Reported ratios run from about 1.2x to 7x. None of them transfers to another workload.
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Not supported</dt>
+                            <dd>
+                                <strong>A success-rate winner.</strong>
+                                Pi leads on some benchmarks and trails on others. No study establishes parity either.
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Supported</dt>
+                            <dd>
+                                <strong>Delegation is task-shaped.</strong>
+                                Extra agents help bounded research and fresh-context review, and hurt coupled code
+                                changes.
+                            </dd>
+                        </div>
+                    </dl>
+                    <p>
+                        The practical consequence is that harness and delegation choices are budget decisions, not
+                        correctness decisions. A cheaper agent that solves two fewer tasks is the better buy only if
+                        those tasks are worth less than the money saved — which is a number you have to supply.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="accounting">
+                    <header><h2>Reading a cost number</h2><span>02</span></header>
+                    <p>
+                        Most disagreement about harness cost is really disagreement about arithmetic. Four different
+                        quantities all get published as "cost", and they answer different questions.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr><th>Quantity</th><th>How it is computed</th><th>What it tells you</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Mean cost per attempt</td>
+                                    <td>total &divide; attempts</td>
+                                    <td>Spending across successes and failures alike.</td>
+                                </tr>
+                                <tr>
+                                    <td>Cost per success</td>
+                                    <td>total &divide; successes</td>
+                                    <td>What each result actually costs, failures included.</td>
+                                </tr>
+                                <tr>
+                                    <td>Success-conditioned cost</td>
+                                    <td>cost of wins &divide; successes</td>
+                                    <td>Flattering. Hides everything spent on failures.</td>
+                                </tr>
+                                <tr>
+                                    <td>Median attempt cost</td>
+                                    <td>middle attempt</td>
+                                    <td>A typical run. Says nothing about the total.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="callout">
+                        <p>
+                            <strong>Why this matters here.</strong> In the FrontierHarness data, failed tasks consume
+                            85.3% of Pi's total spending and 48.7% of Codex's. A success-conditioned metric would
+                            discard most of the Pi bill and report a much larger advantage than the one that survives
+                            honest accounting.
+                        </p>
+                        <p>
+                            Pi's headline advantage also coexists with a slightly <em>higher</em> median attempt cost —
+                            $0.2347 against Codex's $0.2305. Both facts are true because the rest of the two
+                            distributions differ.
+                        </p>
+                    </div>
+                    <p>
+                        When costs are missing for some tasks, the honest figure is a lower bound, not a measurement.
+                        Missing costs must never quietly become zeroes.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="harness">
+                    <header><h2>Harness choice</h2><span>03</span></header>
+                    <p>
+                        The most auditable public comparison is FrontierHarness: 30 tasks, every harness on the same
+                        Kimi K3 model through the same provider, task-level results released. Pi ran at version 0.84.2.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>Harness</th><th>Solved</th><th>Cost / attempt</th><th>Cost / success</th>
+                                    <th>Cost coverage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Codex</td><td>20 / 30</td><td>$2.31</td><td>$3.47</td><td>30 / 30</td></tr>
+                                <tr>
+                                    <td>Claude Code</td><td>19 / 30</td><td>&ge; $11.61</td><td>&ge; $18.34</td>
+                                    <td>29 / 30</td>
+                                </tr>
+                                <tr class="row-pi">
+                                    <td>Pi</td><td>18 / 30</td><td>$1.46</td><td>$2.43</td><td>30 / 30</td>
+                                </tr>
+                                <tr><td>Oh My Pi</td><td>17 / 30</td><td>$2.69</td><td>$4.75</td><td>30 / 30</td></tr>
+                                <tr><td>Exo</td><td>16 / 30</td><td>$0.56</td><td>$1.05</td><td>30 / 30</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="figure-note">
+                        Selected rows from twelve configurations, at the benchmark's frozen historical prices. Values
+                        marked &ge; are lower bounds because some tasks were never priced. Pi is tied for fourth on
+                        accuracy and second-cheapest per success.
+                    </p>
+                    <div class="metric-row">
+                        <div>
+                            <span class="metric-value">29.9%</span>
+                            <span class="metric-label">Lower cost per success than Codex, on two fewer solves.</span>
+                        </div>
+                        <div>
+                            <span class="metric-value">p = 0.69</span>
+                            <span class="metric-label">
+                                Exact McNemar on the paired outcomes. The accuracy gap is not resolved either way.
+                            </span>
+                        </div>
+                        <div>
+                            <span class="metric-value">$12.79</span>
+                            <span class="metric-label">
+                                Value per extra solved task above which Codex becomes the better buy.
+                            </span>
+                        </div>
+                    </div>
+                    <p>
+                        That $12.79 is the whole argument in one number. Below it, Pi's savings outweigh the two missed
+                        tasks; above it, they do not. Real tasks are not worth the same amount, and human review time
+                        often dwarfs API cost, so treat it as a way of framing the decision rather than a threshold to
+                        apply.
+                    </p>
+                    <h3>The task mixture drives the ranking</h3>
+                    <p>
+                        Pi solves 16 of 21 terminal tasks and 2 of 9 repository-repair tasks; Codex solves 15 and 5. Pi
+                        leads on terminal work and trails badly on repository repair. The aggregate ordering is partly
+                        an artifact of the benchmark's 70:30 weighting, and neither subgroup is large enough to settle a
+                        domain ranking.
+                    </p>
+                    <h3>Other comparisons point in different directions</h3>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr><th>Evaluation</th><th>Accuracy</th><th>Cost</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Databricks &middot; internal codebase, 6 matched model settings</td>
+                                    <td>&minus;7 to +3 pp for Pi</td>
+                                    <td>16.7&ndash;51.9% cheaper, every time</td>
+                                </tr>
+                                <tr>
+                                    <td>Augment &middot; Auggie v2 (a Pi fork), 731 SWE-bench Pro</td>
+                                    <td>61.0% vs 61.4%</td>
+                                    <td>52.9% below Claude Code</td>
+                                </tr>
+                                <tr>
+                                    <td>Warden &middot; 86 known vulnerabilities, Sonnet 4.6</td>
+                                    <td>25 found vs 24</td>
+                                    <td>$19.84 vs $103.59</td>
+                                </tr>
+                                <tr>
+                                    <td>XBOW &middot; 104 security challenges, GPT-5</td>
+                                    <td>50.0% vs Codex 67.3%</td>
+                                    <td>$0.231 vs $0.396 per success</td>
+                                </tr>
+                                <tr>
+                                    <td>Composio &middot; 25 SaaS workflows, Kimi K3</td>
+                                    <td>72% vs Oh My Pi 88%</td>
+                                    <td>$0.57 vs $0.52 per success</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="callout callout-warn">
+                        <p>
+                            <strong>The counterexamples are the point.</strong> On security challenges Pi trails Codex
+                            by 17 points, and loses to OpenCode on accuracy <em>and</em> cost per success. On SaaS
+                            workflows Oh My Pi — a heavier Pi configuration — beats plain Pi by 16 points. A harness
+                            that wins on one workload can lose on the next.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="doc-section" id="subagents">
+                    <header><h2>Subagents</h2><span>04</span></header>
+                    <p>
+                        Whether a second agent helps depends almost entirely on whether the work decomposes. Kim et al.
+                        ran matched token ceilings across six benchmarks and picked the best multi-agent architecture
+                        separately for each. The direction of the result flips.
+                    </p>
+                    <div class="compare">
+                        <div class="compare-key">
+                            <span><i class="swatch-single"></i>Single agent</span>
+                            <span><i class="swatch-multi"></i>Best multi-agent configuration</span>
+                        </div>
+                        <div class="compare-row">
+                            <p>Finance Agent <span>centralized &middot; 50 instances</span></p>
+                            <div class="compare-bar is-single"><i style="width: 49.9%"></i><b>0.349</b></div>
+                            <div class="compare-bar is-multi"><i style="width: 90.1%"></i><b>0.631</b></div>
+                        </div>
+                        <div class="compare-row">
+                            <p>WorkBench <span>decentralized &middot; 100 instances</span></p>
+                            <div class="compare-bar is-single"><i style="width: 89.9%"></i><b>0.629</b></div>
+                            <div class="compare-bar is-multi"><i style="width: 94.9%"></i><b>0.664</b></div>
+                        </div>
+                        <div class="compare-row">
+                            <p>BrowseComp-Plus <span>decentralized &middot; 100 instances</span></p>
+                            <div class="compare-bar is-single"><i style="width: 45.4%"></i><b>0.318</b></div>
+                            <div class="compare-bar is-multi"><i style="width: 49.6%"></i><b>0.347</b></div>
+                        </div>
+                        <div class="compare-row">
+                            <p>PlanCraft <span>hybrid &middot; 100 instances</span></p>
+                            <div class="compare-bar is-single"><i style="width: 81.1%"></i><b>0.568</b></div>
+                            <div class="compare-bar is-multi"><i style="width: 49.4%"></i><b>0.346</b></div>
+                        </div>
+                        <div class="compare-row">
+                            <p>SWE-bench Verified <span>hybrid &middot; 20 instances</span></p>
+                            <div class="compare-bar is-single"><i style="width: 69.7%"></i><b>0.488</b></div>
+                            <div class="compare-bar is-multi"><i style="width: 68.7%"></i><b>0.481</b></div>
+                        </div>
+                        <div class="compare-row">
+                            <p>Terminal-Bench <span>independent &middot; 20 instances</span></p>
+                            <div class="compare-bar is-single"><i style="width: 44.6%"></i><b>0.312</b></div>
+                            <div class="compare-bar is-multi"><i style="width: 47.3%"></i><b>0.331</b></div>
+                        </div>
+                    </div>
+                    <p class="figure-note">
+                        Higher is better on every row; bars share a common 0&ndash;0.7 scale. Scores keep their source
+                        metric, so read each row on its own and do not average across them. The two software rows have
+                        only 20 instances each. Matched token ceilings are not matched spending.
+                    </p>
+                    <h3>Coupled code changes get worse</h3>
+                    <p>
+                        CooperBench is the sharpest result for anyone writing software. Across 652 deliberately
+                        overlapping feature tasks, GPT-5 solved 315 working alone and 183 cooperating. Letting the
+                        agents talk to each other reduced merge conflicts without improving success for any model
+                        tested.
+                    </p>
+                    <div class="compare">
+                        <div class="compare-row">
+                            <p>Solo <span>tasks solved out of 652</span></p>
+                            <div class="compare-bar is-single"><i style="width: 48.3%"></i><b>315</b></div>
+                        </div>
+                        <div class="compare-row">
+                            <p>Cooperative <span>two agents, 100 actions each</span></p>
+                            <div class="compare-bar is-multi"><i style="width: 28.1%"></i><b>183</b></div>
+                        </div>
+                    </div>
+                    <p class="figure-note">
+                        The action ceiling is per agent, so the cooperative arm was not cost-matched. This is evidence
+                        about agents writing interdependent code, not about read-only research workers.
+                    </p>
+                    <h3>Where delegation does earn its place</h3>
+                    <p>
+                        The pattern that survives scrutiny is narrow: independent, breadth-first evidence gathering, and
+                        review from a context that never saw the implementation — with one agent still owning every
+                        edit. Anthropic reports a 90.2% relative improvement on an internal research evaluation using
+                        that shape, though it also reports multi-agent systems consuming roughly 15x the tokens of
+                        chat.
+                    </p>
+                    <p>
+                        Pi's own author reaches a similar place from practice rather than measurement. Mario Zechner
+                        names code review as the useful subagent case and objects to opaque context transfer and
+                        parallel feature-writing teams — his normal habit is a separate review session that he then
+                        reads himself.
+                    </p>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr><th>Task shape</th><th>Start with</th><th>Only add a worker if</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Small edit or short lookup</td><td>Parent only</td>
+                                    <td>Never. Batch the tool calls instead.</td>
+                                </tr>
+                                <tr>
+                                    <td>Coupled change, unsettled interfaces</td><td>One implementation owner</td>
+                                    <td>Shared decisions are already resolved.</td>
+                                </tr>
+                                <tr>
+                                    <td>Two substantial evidence questions</td><td>One or two scouts</td>
+                                    <td>The questions and sources genuinely do not overlap.</td>
+                                </tr>
+                                <tr>
+                                    <td>Frozen change with review risk</td><td>One fresh reviewer</td>
+                                    <td>It gets requirements and the diff, not the author's verdict.</td>
+                                </tr>
+                                <tr>
+                                    <td>The same prompt already failed</td><td>Diagnose first</td>
+                                    <td>Something changed: new evidence or repaired state.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="callout">
+                        <p>
+                            <strong>Parallel is slower than it sounds.</strong> Two independent six-minute
+                            investigations take twelve minutes in sequence. Run them concurrently with a minute of
+                            preparation and two of synthesis and you get nine — a 25% saving, not a doubling. The dollar
+                            cost usually goes up.
+                        </p>
+                        <p>
+                            The full bill is <code>parent + workers + tools + retries + integration</code>. Delegation
+                            moves work into that last term rather than removing it.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="doc-section" id="specpi">
+                    <header><h2>For this base</h2><span>05</span></header>
+                    <p>
+                        SpecPi 0.23.0 pins six packages and keeps its own extensions to scope control and the
+                        improvement loop. Read against the evidence above, that shape is defensible for specific
+                        reasons, and it leaves specific things unmeasured.
+                    </p>
+                    <h3>What the base already does right</h3>
+                    <ul>
+                        <li>
+                            <strong>Delegation is a pinned package, not a core feature.</strong>
+                            <code>pi-subagents@0.67.0</code> is one of the six pins, so it can be configured, held at a
+                            version, or removed without touching the harness. Given how task-dependent the delegation
+                            evidence is, that separation is worth keeping.
+                        </li>
+                        <li>
+                            <strong>Scope control targets the failure the research keeps naming.</strong>
+                            Context omission, duplicated investigation and stale review are the recurring multi-agent
+                            failure modes. A task with an explicit scope is the cheapest defence against all three.
+                        </li>
+                        <li>
+                            <strong>The improvement loop needs a human selection.</strong>
+                            The literature is blunt that agreement between agents is not verification. Requiring a
+                            person to authorize a change matches that.
+                        </li>
+                    </ul>
+                    <h3>Settings worth choosing deliberately</h3>
+                    <p>
+                        SpecPi Chat 0.10.0 can edit the subagents configuration directly, which makes the knobs below
+                        worth a decision rather than a default. Open
+                        <em>Package settings</em> from the composer, or run <code>SpecPi: Edit Package Settings</code>.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="settings-table">
+                            <thead>
+                                <tr><th>Setting</th><th>Why the evidence bears on it</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>globalConcurrencyLimit</code></td>
+                                    <td>
+                                        Parallelism pays only when concurrent work exceeds coordination overhead. Start
+                                        low and raise it for a task class you have actually measured.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>maxSubagentSpawnsPerRun</code></td>
+                                    <td>
+                                        Retries and fan-out are where cost escapes. A cap turns an unbounded bill into a
+                                        bounded one.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>maxSubagentDepth</code></td>
+                                    <td>
+                                        Recursive delegation multiplies every coordination failure. Shallow is the
+                                        conservative default.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>defaultSubagentContext</code></td>
+                                    <td>
+                                        A reviewer that inherits the implementer's context is not a fresh reviewer.
+                                        Fresh context is the mechanism the review evidence actually supports.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>subagents.modelScope</code></td>
+                                    <td>
+                                        Model choice moves both cost and accuracy. Pinning the scope keeps a per-run
+                                        override from quietly escaping your budget.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        A sensible starting configuration is a low concurrency ceiling, no recursive delegation, and
+                        subagents used for review and bounded research while the parent session keeps writing the code.
+                        That is the conservative reading of the evidence, not a tuned optimum.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="unproven">
+                    <header><h2>Not established</h2><span>06</span></header>
+                    <p>
+                        The honest list. None of these follow from the evidence above, and the page would be misleading
+                        without them.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>SpecPi has never been measured against an alternative.</strong> Every number here
+                            describes stock Pi or another product. Version proximity is a hypothesis about transfer, not
+                            a result.
+                        </li>
+                        <li>
+                            <strong>No savings multiplier transfers.</strong> Published ratios span roughly 1.2x to 7x
+                            and each belongs to its own model, route, task set and pricing basis.
+                        </li>
+                        <li>
+                            <strong>A large p-value is not equivalence.</strong> The FrontierHarness comparison is
+                            underpowered at 30 tasks. It fails to show a difference; it does not show parity.
+                        </li>
+                        <li>
+                            <strong>Auggie v2 is not evidence about stock Pi.</strong> It changes retrieval, compaction
+                            and more at once, so nothing in that result attributes to any single mechanism.
+                        </li>
+                        <li>
+                            <strong>Benchmark scores do not pool.</strong> Repository repair, SaaS workflows, security
+                            challenges and biology workflows have different success events. An average across them
+                            would mean nothing.
+                        </li>
+                        <li>
+                            <strong>Token counts are not dollars.</strong> Cache categories, pricing and counting
+                            conventions differ between harnesses; one study found Pi using about 2.4x Codex's runtime
+                            tokens.
+                        </li>
+                    </ul>
+                    <p>
+                        The way to resolve any of this for your own work is a matched comparison on your own
+                        repositories: the same model and provider, a task set chosen before you see results, held-out
+                        verification, and complete cost accounting that includes failed attempts and human review time.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="sources">
+                    <header><h2>Sources</h2><span>07</span></header>
+                    <p>
+                        Primary evidence behind this page. Study prices are historical and imply no current pricing.
+                        Live pages were checked in September 2026.
+                    </p>
+                    <ul class="source-list">
+                        <li>
+                            <b>FrontierHarness Eval v1</b> — frozen 30-task benchmark and task-level results, generated
+                            22 August 2026.
+                            <span
+                                ><a class="text-link" href="https://github.com/frontier-harness-eval/eval"
+                                    >github.com/frontier-harness-eval/eval</a
+                                ></span
+                            >
+                        </li>
+                        <li>
+                            <b>Databricks</b> — Benchmarking coding agents on a multi-million line codebase, 8 July
+                            2026. Six matched model and effort settings.
+                        </li>
+                        <li>
+                            <b>Augment Code</b> — Rebuilding the Auggie CLI harness, August 2026. 731 SWE-bench Pro
+                            instances on Opus 4.7.
+                        </li>
+                        <li>
+                            <b>Dhakal, Neupane &amp; Chaudhary</b> — Baselines Before Architecture, arXiv:2607.13085.
+                            104 XBOW penetration-testing challenges.
+                        </li>
+                        <li>
+                            <b>Composio</b> — Best AI agent harnesses, 4 August 2026. 25 SaaS workflows on shared Kimi
+                            K3.
+                        </li>
+                        <li>
+                            <b>Sentry / Warden</b> — Known-vulnerability recall across 86 vulnerabilities.
+                        </li>
+                        <li>
+                            <b>Kim et al.</b> — Capable language models can outgrow the benefits of collaboration.
+                            Nature Machine Intelligence, 24 July 2026.
+                            <span
+                                ><a class="text-link" href="https://www.nature.com/articles/s42256-026-01268-y"
+                                    >nature.com/articles/s42256-026-01268-y</a
+                                ></span
+                            >
+                        </li>
+                        <li>
+                            <b>CooperBench</b> — Why coding agents cannot be your teammates yet, arXiv:2601.13295. 652
+                            paired-feature tasks across 12 repositories.
+                        </li>
+                        <li>
+                            <b>SwarmBench</b> — Can large language models act as agent swarm orchestrators?
+                            arXiv:2608.30661. Cost-matched single-agent comparison.
+                        </li>
+                        <li>
+                            <b>Anthropic</b> — How we built our multi-agent research system, 13 June 2025.
+                            <span
+                                ><a
+                                    class="text-link"
+                                    href="https://www.anthropic.com/engineering/multi-agent-research-system"
+                                    >anthropic.com/engineering/multi-agent-research-system</a
+                                ></span
+                            >
+                        </li>
+                        <li>
+                            <b>Walden Yan / Cognition</b> — Multi-agents: what's actually working, 22 April 2026.
+                            <span
+                                ><a class="text-link" href="https://cognition.com/blog/multi-agents-working"
+                                    >cognition.com/blog/multi-agents-working</a
+                                ></span
+                            >
+                        </li>
+                        <li>
+                            <b>Mario Zechner</b> — What I learned building an opinionated and minimal coding agent, 30
+                            November 2025.
+                            <span
+                                ><a class="text-link" href="https://mariozechner.at/posts/2025-11-30-pi-coding-agent/"
+                                    >mariozechner.at/posts/2025-11-30-pi-coding-agent</a
+                                ></span
+                            >
+                        </li>
+                        <li>
+                            <b>Zhang et al.</b> — Stop comparing LLM agents without disclosing the harness,
+                            arXiv:2605.23950. Three-model, three-configuration factorial design.
+                        </li>
+                    </ul>
+                </section>
+            </div>
+        </main>
+        <footer class="site-footer wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.23.0">v0.23.0</a>
+            <nav aria-label="Footer navigation">
+                <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
+                ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
+            </nav>
+        </footer>
+    </body>
+</html>
