@@ -26,6 +26,10 @@ Managed configuration and files are locked and backed up before mutation; first-
 
 Legacy migration restores only recorded settings ownership, preserves differing user values, and removes only the SpecPi shell marker block before applying the new base. The installer does not enumerate or modify authentication, provider credential stores, trust, sessions, missions, history, or unrelated private evidence. Normal updates deliberately reapply the default package pins, retaining the original entry for removal. Uninstall restores only package entries that still match the last installed value; user edits are preserved. Downloaded packages and tools are not deleted. Resources that SpecPi never owned require separate human management.
 
+## Standalone browser QA package
+
+`packages/browser-qa` is an independently released Node-native Pi package extracted from the retired browser tools. It is not installed by SpecPi or included in SpecPi's npm artifact. Its explicit setup downloads Playwright Chromium, and its doctor performs offline rendering, image-comparison and accessibility smoke checks. It uses package-local dependency resolution and the standard Playwright browser cache rather than SpecPi's retired managed runtime. No Pi settings, credentials or personal profiles are migrated. The ephemeral context is not OS/network isolation; pages can reach localhost and private networks. See the package's [security documentation](packages/browser-qa/SECURITY.md) for artifact retention, best-effort redaction, permission and cleanup limits. SpecPi's default BetterWright package is unchanged.
+
 ## VS Code frontend
 
 SpecPi Chat is a separate VSIX, retained alongside the npm harness. It launches Pi only in a trusted filesystem workspace and communicates over local RPC. Provider credentials stay with Pi. The frontend manages only its own workspace-storage conversation catalog and sessions for user-directed history, branching, and export; it does not import unrelated Pi histories. Attachments, images, webview messages, and file navigation are validated and bounded. Rendered model and tool output is untrusted text, never executable HTML.

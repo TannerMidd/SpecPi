@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Extract the former browser QA tools into the independent `specpi-browser-qa` source package under `packages/browser-qa`, with Node-based Chromium setup, real doctor checks, and the existing interaction, accessibility, diagnostic, and visual-regression tools. No Bun dependency, publishing, or changes to SpecPi's default package list.
+
 ## 0.22.1 - 2026-09-14
 
 - Remove `pi-lens` from the default base. The other six package pins are unchanged. Normal managed updates remove unchanged Lens entries added by SpecPi; pre-existing or user-modified entries and downloaded files remain. `--skip-package-install` preserves the old base. Restart Pi and Chat connections to unload Lens.

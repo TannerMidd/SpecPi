@@ -1,5 +1,7 @@
 # npm release
 
+This guide covers the root `specpi` package. Browser QA has an independent [release process](packages/browser-qa/NPM_RELEASE.md), `browser-qa-v*` tags and `browser-qa-publish.yml` workflow. Package-only releases do not invoke the root publisher.
+
 Publishing, tags, deprecation, ownership changes and GitHub Releases require explicit human approval. Publication is a post-merge operation: never publish from an unmerged commit. npm versions are immutable.
 
 ## Prepare

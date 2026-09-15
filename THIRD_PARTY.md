@@ -30,6 +30,10 @@ Pi Lens is no longer a default package. Normal updates retire only unchanged ent
 
 The combined base is tested with Pi 0.84.4. Pi Goal X declares Pi `>=0.83.0 <0.85.0`; compatibility with newer hosts is not assumed. SpecPi's former custom browser, structural-search, delegation, background-task, and command-guard implementations, DonSeTch, and Pi themes have been removed. Removal restores owned package settings but does not delete downloaded upstream packages or tools. Retired private runtimes remain in local backups with their notices.
 
+## Standalone browser QA
+
+The separately released `packages/browser-qa` source reuses the retired QA implementation with Playwright 1.62.1, axe-core and its Playwright adapter 4.13.0, pixelmatch 7.2.0, and pngjs 7.0.0. These are that package's runtime dependencies, not additions to SpecPi's default installation or npm artifact. See its [dependency notices](packages/browser-qa/THIRD_PARTY.md) and [security boundary](packages/browser-qa/SECURITY.md). Setup uses Node and explicitly downloads Chromium; no Bun or install hook is used.
+
 ## Website and README
 
 The website uses the bundled IBM Plex Sans and Plex Mono fonts under the SIL Open Font License 1.1; see [`site/fonts/LICENSE.txt`](https://github.com/TannerMidd/SpecPi/blob/main/site/fonts/LICENSE.txt). The website's scripts and diagrams are first-party code and assets. The README loads public package/license badges from Shields.io and build status from GitHub. Website fonts and media are not included in the npm package.
