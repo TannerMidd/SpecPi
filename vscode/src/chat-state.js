@@ -69,7 +69,7 @@ function createState(overrides = {}) {
     };
     state.model = safeModel(state.model);
     state.models = Array.isArray(state.models) ? state.models.map(safeModel).filter(Boolean).slice(0, 1_000) : [];
-    internal.set(state, { nextId: 0, activeId: null, runActive: false, blocks: new Map() });
+    internal.set(state, { nextId: 0, activeId: null, runActive: false, blocks: new Map(), usage: {} });
     replaceMessages(state, state.messages);
 
     return state;
@@ -77,7 +77,7 @@ function createState(overrides = {}) {
 
 function metadata(state) {
     if (!internal.has(state)) {
-        internal.set(state, { nextId: 0, activeId: null, runActive: false, blocks: new Map() });
+        internal.set(state, { nextId: 0, activeId: null, runActive: false, blocks: new Map(), usage: {} });
     }
 
     return internal.get(state);
@@ -374,6 +374,7 @@ function replaceMessages(state, messages) {
     const value = metadata(state);
     value.activeId = null;
     value.messageCost = 0;
+    value.usage = {};
     value.blocks.clear();
     state.messages = [];
     if (Array.isArray(messages)) {
@@ -435,17 +436,29 @@ function setUsage(state, usage, trackCost = false) {
         return;
     }
 
+    // Streaming updates report partial usage; providers commonly tick only the
+    // output count between full reports. Retain the last reported value for
+    // any key the update omits so derived displays such as the cache hit rate
+    // and usage details do not flash back to placeholders mid-stream.
+    //
+    // Carry forward only what this turn has reported. state.tokens is not that
+    // record: it also holds whole-session totals written by a refresh, and it
+    // survives the end of a turn, so reading it back would show one turn the
+    // cache counts of the turn before it, or of the session.
+    const value = metadata(state);
+    const previous = value.usage;
     const result = {};
     for (const key of ["input", "output", "cacheRead", "cacheWrite", "totalTokens", "reasoning"]) {
         if (Number.isFinite(usage[key]) && usage[key] >= 0) {
             result[key] = usage[key];
+        } else if (Number.isFinite(previous[key]) && previous[key] >= 0) {
+            result[key] = previous[key];
         }
     }
 
     if (Number.isFinite(usage.cost?.total) && usage.cost.total >= 0) {
         result.cost = usage.cost.total;
         if (trackCost) {
-            const value = metadata(state);
             state.cost = Math.max(0, (state.cost || 0) - (value.messageCost || 0) + result.cost);
             value.messageCost = result.cost;
         }
@@ -453,8 +466,11 @@ function setUsage(state, usage, trackCost = false) {
 
     if (result.totalTokens !== undefined) {
         result.total = result.totalTokens;
+    } else if (Number.isFinite(previous.total) && previous.total >= 0) {
+        result.total = previous.total;
     }
 
+    value.usage = result;
     state.tokens = result;
 }
 
@@ -564,6 +580,7 @@ function resetRunState(state) {
     const value = metadata(state);
     value.runActive = false;
     value.activeId = null;
+    value.usage = {};
     value.blocks.clear();
     state.queueCount = 0;
     for (const message of state.messages) {
@@ -603,6 +620,7 @@ function applyEvent(state, event) {
         if (message?.role === "assistant" && event.type === "message_start") {
             value.activeId = nextId(state);
             value.messageCost = 0;
+            value.usage = {};
             value.blocks.clear();
             if (Array.isArray(message.content)) {
                 let remaining = MAX_MESSAGE_CHARS;
@@ -636,7 +654,10 @@ function applyEvent(state, event) {
             upsert(state, projected);
         }
 
-        setUsage(state, message?.usage, message?.role === "assistant");
+        if (message?.role === "assistant") {
+            setUsage(state, message.usage, true);
+        }
+
         if (event.type === "message_end" && message?.role === "assistant") {
             value.activeId = null;
             value.blocks.clear();

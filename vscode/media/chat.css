@@ -256,7 +256,7 @@ textarea.request-input { min-height: 90px; resize: vertical; font-family: var(--
     .thinking-select { flex-basis: 63px; width: 63px; }
     .permissions-chip span { display: none; }
     .context-actions { gap: 0; }
-    .context-actions .icon-button { width: 25px; }
+    .context-actions .icon-button, .composer-options > .icon-button { width: 25px; }
     .welcome { margin-top: 8px; }
     .welcome-mark { margin-bottom: 19px; }
 }

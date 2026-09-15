@@ -90,6 +90,15 @@ test("provider usage projects only known plugin status strings without inventing
     assert.equal(runtimeText("\u009b31mred\u009b0m\nnext"), "red\nnext");
 });
 
+test("the composer exposes a hidden startup-default pin next to the model picker", () => {
+    const html = getWebviewHtml(webviewOptions);
+    const button = html.match(/<button id="defaults-button"[^>]*>/u)?.[0];
+    assert.ok(button, "the pin button must exist in the composer");
+    assert.match(button, /\bhidden\b/u, "the pin stays hidden until a model is connected");
+    assert.match(button, /aria-label="Save Pi startup defaults"/u);
+    assert.match(html, /<symbol id="icon-pin"/u);
+});
+
 test("chat webview denies content by default and authorizes only its nonce-bearing local scripts", () => {
     const html = getWebviewHtml(webviewOptions);
     const meta = html.match(/<meta\b[^>]*http-equiv="Content-Security-Policy"[^>]*>/u)?.[0];

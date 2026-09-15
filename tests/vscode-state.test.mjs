@@ -346,6 +346,102 @@ test("VS Code state serializes only public model fields, text, and numeric usage
     assert.doesNotMatch(JSON.stringify(state), /secret|private|opaque|Signature/u);
 });
 
+test("partial streaming usage keeps the last reported cache fields instead of flashing placeholders", () => {
+    const state = createState();
+    applyEvent(state, {
+        type: "message_start",
+        message: {
+            role: "assistant",
+            content: [],
+            usage: { input: 1000, cacheRead: 5000, cacheWrite: 500, output: 1 },
+        },
+    });
+    assert.deepEqual(state.tokens, { input: 1000, cacheRead: 5000, cacheWrite: 500, output: 1 });
+
+    // Anthropic-style deltas tick only the output count between full reports.
+    applyEvent(state, {
+        type: "message_update",
+        assistantMessageEvent: { type: "partial", partial: { usage: { output: 42 } } },
+    });
+    assert.deepEqual(state.tokens, { input: 1000, cacheRead: 5000, cacheWrite: 500, output: 42 });
+
+    applyEvent(state, {
+        type: "message_end",
+        message: {
+            role: "assistant",
+            content: [],
+            usage: { input: 1000, cacheRead: 5000, cacheWrite: 500, output: 300, totalTokens: 6800 },
+        },
+    });
+    assert.deepEqual(state.tokens, {
+        input: 1000,
+        cacheRead: 5000,
+        cacheWrite: 500,
+        output: 300,
+        totalTokens: 6800,
+        total: 6800,
+    });
+
+    // A later update without a total keeps the last reported one.
+    applyEvent(state, {
+        type: "message_update",
+        usage: { output: 320 },
+    });
+    assert.equal(state.tokens.total, 6800);
+    assert.equal(state.tokens.output, 320);
+});
+
+test("a new turn does not inherit the previous turn's usage or the session totals", () => {
+    const state = createState();
+    applyEvent(state, {
+        type: "message_start",
+        message: { role: "assistant", content: [], usage: { input: 1000, cacheRead: 50000, cacheWrite: 500 } },
+    });
+    applyEvent(state, {
+        type: "message_end",
+        message: {
+            role: "assistant",
+            content: [],
+            usage: { input: 1000, cacheRead: 50000, cacheWrite: 500, output: 300, totalTokens: 51800 },
+        },
+    });
+    assert.equal(state.tokens.cacheRead, 50000);
+
+    // A provider that reports no cache fields at all must not show the cache
+    // hit rate of the turn before it, nor that turn's output count.
+    applyEvent(state, {
+        type: "message_start",
+        message: { role: "assistant", content: [], usage: { input: 900 } },
+    });
+    assert.deepEqual(state.tokens, { input: 900 });
+
+    // Session totals published by a refresh are not a floor for the next turn.
+    state.tokens = { input: 90000, output: 4000, cacheRead: 80000, cacheWrite: 900, total: 174900 };
+    applyEvent(state, {
+        type: "message_start",
+        message: { role: "assistant", content: [], usage: { input: 120 } },
+    });
+    assert.deepEqual(state.tokens, { input: 120 });
+});
+
+test("tool result usage does not clobber the assistant request usage display", () => {
+    const state = createState();
+    applyEvent(state, {
+        type: "message_end",
+        message: {
+            role: "assistant",
+            content: [],
+            usage: { input: 1000, cacheRead: 5000, cacheWrite: 500, output: 300 },
+        },
+    });
+    applyEvent(state, {
+        type: "message_end",
+        message: { role: "toolResult", toolCallId: "tool", content: [], usage: { input: 500, output: 10 } },
+    });
+
+    assert.deepEqual(state.tokens, { input: 1000, cacheRead: 5000, cacheWrite: 500, output: 300 });
+});
+
 test("VS Code transcript and streamed partials remain bounded", () => {
     const state = createState();
     replaceMessages(
