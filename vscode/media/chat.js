@@ -378,6 +378,17 @@
         });
     }
 
+    function cacheHitRate(tokens) {
+        const counts = [tokens?.input, tokens?.cacheRead, tokens?.cacheWrite];
+        if (!counts.every((value) => Number.isFinite(value) && value >= 0)) {
+            return undefined;
+        }
+
+        const total = counts.reduce((sum, value) => sum + value, 0);
+
+        return total > 0 && Number.isFinite(total) ? (tokens.cacheRead / total) * 100 : undefined;
+    }
+
     if (typeof module !== "undefined" && module.exports) {
         module.exports = {
             safeHref,
@@ -387,6 +398,7 @@
             imageSource,
             runtimeText,
             providerUsageEntries,
+            cacheHitRate,
         };
     }
 
@@ -2017,6 +2029,14 @@
             typeof state.tokens === "number" ? state.tokens : (state.tokens?.total ?? state.tokens?.totalTokens);
         const percent = state.contextUsage?.percent;
         const cost = formatCost(state.cost);
+        const hitRate = cacheHitRate(state.tokens);
+        const cacheLabel = hitRate === undefined ? "—" : `${Math.round(hitRate)}%`;
+        const cacheDetails = `Cache hit rate: ${cacheLabel}. ${
+            hitRate === undefined ? "No reported input token usage yet. " : ""
+        }Reported cache read tokens / (input + cache read + cache write tokens).`;
+        byId("cache-status").textContent = `Cache ${cacheLabel}`;
+        byId("cache-status").title = cacheDetails;
+        byId("cache-status").setAttribute("aria-label", cacheDetails);
         const contextLabel =
             typeof percent === "number" && Number.isFinite(percent)
                 ? `${Math.round(percent)}%${cost ? "" : " context"}`

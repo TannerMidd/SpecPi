@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.8.2
+
+- Always show the reported cache hit rate in the chat footer, with `—` before input usage is available and a tooltip explaining the calculation.
+
 ## 0.8.1
 
 - Align setup and package documentation with SpecPi 0.22.1 and its six default packages, without `pi-lens`. Chat does not install or remove packages; update SpecPi separately and restart each Pi connection to unload Lens. Independent or modified Lens entries survive managed updates.

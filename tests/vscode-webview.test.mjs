@@ -14,6 +14,7 @@ const {
     inlineTokens,
     runtimeText,
     providerUsageEntries,
+    cacheHitRate,
 } = require("../vscode/media/chat.js");
 
 const webviewOptions = {
@@ -39,6 +40,25 @@ function decodeAttribute(value) {
         .replaceAll("&gt;", ">")
         .replaceAll("&amp;", "&");
 }
+
+test("cache hit rate counts cached reads against all prompt tokens, not output tokens", () => {
+    assert.equal(cacheHitRate({ input: 10, cacheRead: 80, cacheWrite: 10, output: 900 }), 80);
+    assert.equal(cacheHitRate({ input: 10, cacheRead: 0, cacheWrite: 10 }), 0);
+    assert.equal(cacheHitRate({ input: 0, cacheRead: 100, cacheWrite: 0 }), 100);
+    for (const tokens of [undefined, null, 100, {}, { total: 100 }, { input: 10, cacheRead: 90 }]) {
+        assert.equal(cacheHitRate(tokens), undefined);
+    }
+
+    assert.equal(cacheHitRate({ input: 0, cacheRead: 0, cacheWrite: 0 }), undefined);
+    for (const key of ["input", "cacheRead", "cacheWrite"]) {
+        for (const value of [-1, NaN, Infinity, "10"]) {
+            assert.equal(cacheHitRate({ input: 10, cacheRead: 80, cacheWrite: 10, [key]: value }), undefined);
+        }
+    }
+
+    const html = getWebviewHtml(webviewOptions);
+    assert.match(html, /<span id="cache-status"[^>]*>Cache —<\/span>/u);
+});
 
 test("provider usage projects only known plugin status strings without inventing quota semantics", () => {
     const status = {
