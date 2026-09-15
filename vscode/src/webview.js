@@ -160,6 +160,7 @@ function getWebviewHtml({
                     <label id="send-mode-label" class="sr-only" for="send-mode">Message timing</label>
                     <select id="send-mode" class="compact-select send-mode" title="When to send your next message" hidden><option value="steer">Steer now</option><option value="followUp">Follow up</option></select>
                 </div>
+                <span id="cache-status" title="Cache hit rate: no reported input token usage yet." aria-label="Cache hit rate: unavailable">Cache —</span>
                 <span id="token-status" title="Session usage"></span>
                 <button id="stop-button" class="stop-button" type="button" title="Stop response" aria-label="Stop response" hidden>${icon("stop")}<span>Stop</span></button>
             </div>

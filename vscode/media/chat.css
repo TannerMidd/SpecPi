@@ -159,7 +159,8 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .session-footer { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 4px 2px 0; font-size: 9px; color: var(--muted); height: 32px; }
 .footer-status { flex: 1 1 auto; display: flex; align-items: center; min-width: 0; }
 #runtime-status { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#token-status { flex: 0 0 auto; font-family: var(--mono); font-size: 9px; }
+#token-status, #cache-status { flex: 0 0 auto; font-family: var(--mono); font-size: 9px; }
+#cache-status { white-space: nowrap; }
 .attachments { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px 9px 0; }
 .selection-chip { display: flex; align-items: center; gap: 4px; padding: 9px 9px 0; }
 .selection-chip[hidden] { display: none; }

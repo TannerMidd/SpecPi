@@ -904,6 +904,45 @@ test(
                 },
             );
 
+            await t.test(
+                "cache hit rate stays visible by default across chat states and conversation switches",
+                async () => {
+                    await withPage(browser, fixtures, { name: "cache-hit-rate", width: 280 }, async (page) => {
+                        const cache = page.locator("#cache-status");
+                        for (const status of ["disconnected", "connecting", "ready", "busy", "compacting", "error"]) {
+                            await setState(page, { status, tokens: undefined });
+                            assert.equal(await cache.isVisible(), true);
+                            assert.equal(await cache.textContent(), "Cache —");
+                            assert.match(await cache.getAttribute("aria-label"), /Cache hit rate: —/u);
+                            await setState(page, {
+                                status,
+                                tokens: { input: 10, cacheRead: 80, cacheWrite: 10, output: 900, total: 1000 },
+                            });
+                            assert.equal(await cache.textContent(), "Cache 80%");
+                            assert.match(await cache.getAttribute("title"), /input \+ cache read \+ cache write/u);
+                            assert.equal(
+                                await cache.evaluate((element) => {
+                                    const bounds = element.getBoundingClientRect();
+
+                                    return (
+                                        bounds.left >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight
+                                    );
+                                }),
+                                true,
+                            );
+                        }
+
+                        await setState(page, { tokens: { input: 10, cacheRead: 0, cacheWrite: 0 } });
+                        assert.equal(await cache.textContent(), "Cache 0%");
+                        await setState(page, { tokens: { input: 0, cacheRead: 10, cacheWrite: 0 } });
+                        assert.equal(await cache.textContent(), "Cache 100%");
+                        await page.screenshot({ path: path.join(screenshots, "cache-hit-rate-280.png") });
+                        await setState(page, { contextToken: "new-conversation", tokens: undefined });
+                        assert.equal(await cache.textContent(), "Cache —");
+                    });
+                },
+            );
+
             await t.test("conversation cost reflects Pi's aggregate and keeps usage details accessible", async () => {
                 await withPage(browser, fixtures, { name: "conversation-cost", width: 280 }, async (page) => {
                     const usage = page.locator("#token-status");
