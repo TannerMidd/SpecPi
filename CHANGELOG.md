@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.23.0 - 2026-09-14
 
-- Extract the former browser QA tools into the independent `specpi-browser-qa` source package under `packages/browser-qa`, with Node-based Chromium setup, real doctor checks, and the existing interaction, accessibility, diagnostic, and visual-regression tools. No Bun dependency, publishing, or changes to SpecPi's default package list.
+- Replace the BetterWright default with independently published `specpi-browser-qa@0.1.0`: 14 QA-focused interaction, accessibility, diagnostic, and visual-regression tools, not general-browser feature parity. The other five package pins and Chat 0.8.1 are unchanged.
+- Confirmed install/update runs the installed package's Node bin for Chromium setup and offline readiness checks. `--skip-browser-install` now skips that setup; `--skip-package-install` still skips all acquisition and preserves an existing base. Doctor checks real rendering, pixel comparison, and accessibility without downloads. OS libraries require manual installation; Bun is neither required nor removed.
+- Migrate BetterWright entries using existing package ownership restoration: remove only unchanged SpecPi additions, restore pre-existing entries, and preserve user edits and downloaded tools. No personal browser/profile/cookie or private Pi data migration. Managed configuration rolls back on failure; package and browser-cache bytes may survive failure and uninstall.
+- The Browser QA source was extracted and released independently as 0.1.0 before this integration; its published package is unchanged.
 
 ## 0.22.1 - 2026-09-14
 

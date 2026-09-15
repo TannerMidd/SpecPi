@@ -8,6 +8,46 @@ export const basePackages = JSON.parse(
     fs.readFileSync(new URL("../templates/settings.json", import.meta.url), "utf8"),
 ).packages;
 
+// Invoke only the installed, pinned package's Node bin; never npx, Bun, or OS dependency setup.
+export function runBrowserQA(agentDir, command) {
+    if (!["setup", "doctor"].includes(command)) {
+        throw new Error(`Unsupported Browser QA command: ${command}`);
+    }
+
+    const root = path.join(agentDir, "npm", "node_modules", "specpi-browser-qa");
+    try {
+        const installed = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+        if (
+            installed.name !== "specpi-browser-qa" ||
+            installed.version !== "0.1.0" ||
+            installed.bin?.["specpi-browser-qa"] !== "./bin/browser-qa.mjs"
+        ) {
+            throw new Error("Missing or changed pinned Browser QA bin metadata");
+        }
+
+        const bin = path.join(root, "bin", "browser-qa.mjs");
+        const relative = path.relative(fs.realpathSync(root), fs.realpathSync(bin));
+        if (path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`)) {
+            throw new Error("Browser QA bin escapes its package directory");
+        }
+
+        const result = spawnSync(process.execPath, [bin, command], {
+            cwd: agentDir,
+            env: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
+            stdio: "inherit",
+            windowsHide: true,
+            timeout: command === "setup" ? 690_000 : 75_000,
+        });
+        if (result.error || result.status !== 0) {
+            throw new Error(result.error?.message || `exit ${result.signal ?? result.status}`);
+        }
+    } catch (error) {
+        throw new Error(
+            `Browser QA ${command} failed: ${error.message}. Retry specpi install (or specpi update if already installed) for Chromium setup; install missing OS libraries manually. Doctor never downloads browsers.`,
+        );
+    }
+}
+
 export function packageChanges(before, after) {
     return basePackages.map((source) => {
         const identity = packageIdentity(source);

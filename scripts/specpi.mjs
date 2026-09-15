@@ -22,7 +22,7 @@ import {
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
-import { basePackages, checkBasePackages, installBasePackages, packageChanges } from "./packages.mjs";
+import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VERSION = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
@@ -56,9 +56,10 @@ Usage:
   specpi doctor
   specpi uninstall [--yes]
 
-Installs /scope, the harness improvement loop, and six pinned upstream packages.
+Installs /scope, the harness improvement loop, and six pinned packages.
 The base is tested with Pi 0.84.4. Run specpi plan to see package versions.
 --skip-package-install installs only the core, or preserves an existing base on update.
+--skip-browser-install skips Chromium setup, not package acquisition or doctor checks.
 --force replaces modified retained resources after backing them up.
 SPECPI_PI selects a Pi CLI path instead of pi on PATH.
 PI_CODING_AGENT_DIR overrides the default ~/.pi/agent destination.`);
@@ -66,7 +67,7 @@ PI_CODING_AGENT_DIR overrides the default ~/.pi/agent destination.`);
 
 function parseArgs(argv) {
     const command = argv[0] || "help";
-    // Obsolete browser/tool/shell flags remain accepted for older automation.
+    // Obsolete tool/shell flags remain accepted for older automation.
     const known = new Set([
         "--yes",
         "--force",
@@ -86,6 +87,7 @@ function parseArgs(argv) {
         yes: argv.includes("--yes"),
         force: argv.includes("--force"),
         skipPackages: argv.includes("--skip-package-install"),
+        skipBrowser: argv.includes("--skip-browser-install"),
     };
 }
 
@@ -195,7 +197,12 @@ function printPlan(options = {}) {
     }
 
     console.log(
-        "Only package settings are merged. No SpecPi theme, shell integration, or separate browser/tool bootstrap. Wishlist collection starts off. Backups precede mutation; downloaded packages and upstream script effects cannot be rolled back.",
+        options.skipPackages || options.skipBrowser
+            ? "Chromium setup skipped; doctor still checks Browser QA when included in the managed base."
+            : "After package acquisition, run the installed Browser QA Node bin to download Chromium and verify offline rendering, pixel comparison, and accessibility. No Bun or OS library installation.",
+    );
+    console.log(
+        "Only package settings are merged. No theme or shell integration. Wishlist collection starts off. Backups precede mutation; downloaded packages, browser-cache bytes and upstream script effects cannot be rolled back or removed by uninstall.",
     );
 }
 
@@ -319,6 +326,10 @@ async function mutate(options, operation) {
                 throw new Error(packageErrors.join("\n"));
             }
 
+            if (!options.skipBrowser) {
+                runBrowserQA(agentDir, "setup");
+            }
+
             packageState = {
                 basePackages,
                 packagesKeyBeforeExists: Object.hasOwn(before, "packages"),
@@ -416,7 +427,7 @@ async function mutate(options, operation) {
         }
 
         console.log(
-            "Local wishlist and other private evidence were preserved. Restart Pi to unload retired resources.",
+            "Local wishlist and other private evidence were preserved. Downloaded packages and browser-cache bytes remain after uninstall. Restart Pi to unload retired resources.",
         );
     } catch (error) {
         const failures = [];
@@ -437,7 +448,7 @@ async function mutate(options, operation) {
         }
 
         throw new Error(
-            `${transaction ? "SpecPi-managed changes rolled back: " : ""}${error.message}${acquisitionStarted ? "; downloaded packages and upstream install-script effects may remain" : ""}${failures.length ? `; rollback errors: ${failures.join("; ")}` : ""}`,
+            `${transaction ? "SpecPi-managed changes rolled back: " : ""}${error.message}${acquisitionStarted ? "; downloaded packages, browser-cache bytes and upstream install-script effects may remain" : ""}${failures.length ? `; rollback errors: ${failures.join("; ")}` : ""}`,
         );
     } finally {
         releaseLock();
@@ -458,6 +469,13 @@ async function doctor() {
     const errors = [];
     if (manifest.basePackages?.length) {
         errors.push(...checkBasePackages(agentDir, readJson(settingsPath, {})));
+        if (manifest.basePackages.includes("npm:specpi-browser-qa@0.1.0")) {
+            try {
+                runBrowserQA(agentDir, "doctor");
+            } catch (error) {
+                errors.push(error.message);
+            }
+        }
     } else {
         console.log("Core-only installation: default package installation was skipped.");
     }
