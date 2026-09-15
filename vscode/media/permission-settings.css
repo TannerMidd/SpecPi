@@ -42,7 +42,7 @@
     font-size: var(--chat-small-font-size);
 }
 .permission-profile pre {
-    max-height: 180px;
+    max-height: 240px;
     overflow: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;

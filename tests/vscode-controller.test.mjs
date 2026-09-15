@@ -299,12 +299,10 @@ function fixture(t, options = {}) {
                           revision: "missing",
                           exists: false,
                       },
-            savePermissionSettings: (snapshot, text, profile) =>
+            savePermissionSettings: (snapshot, text) =>
                 options.savePermissions
-                    ? options.savePermissions(snapshot, text, profile)
+                    ? options.savePermissions(snapshot, text)
                     : { ...snapshot, text, exists: true, revision: "saved" },
-            prepareDestructiveGuard: (...args) => options.prepareProfile(...args),
-            verifyDestructiveGuard: (...args) => options.verifyProfile(...args),
         },
         "./code-references.js": {
             resolveCodeReference: (input) =>
@@ -1165,111 +1163,46 @@ test("permission saves require native confirmation, bind their path to the opene
     assert.match(posted.findLast((message) => message.type === "permissionSaveResult").error, /stale/u);
 });
 
-test("guard is a context-bound draft operation; undo and save retain host-owned safety proof", async (t) => {
-    const preparations = [];
+test("global preset replacement uses the existing native confirmation and bound global destination", async (t) => {
     const writes = [];
-    const verifications = [];
     let confirmations = 0;
-    const text = '{"permission":{"bash*":{"rm *":"deny"}},"yoloMode":false}';
-    const { controller, client, posted } = await connected(t, {
+    const { controller, client } = await connected(t, {
         request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
-        prepareProfile: (snapshot, draft, workspace) => {
-            preparations.push({ snapshot, draft, workspace });
-
-            return { text, profile: { surface: "bash*", baselineText: snapshot.text, evidence: "host-only" } };
-        },
-        verifyProfile: (profile, draft) => {
-            verifications.push({ profile, draft });
-        },
-        warningAnswer: () => {
+        warningAnswer: (_message, options) => {
+            assert.match(options.detail, /replaces the complete global configuration file/u);
+            assert.match(options.detail, /does not merge/u);
             confirmations += 1;
 
             return confirmations === 1 ? undefined : "Save permissions";
         },
-        savePermissions: (snapshot, draft, profile) => {
-            writes.push({ snapshot, draft, profile });
+        savePermissions: (snapshot, text) => {
+            writes.push({ snapshot, text });
 
-            return { ...snapshot, text: draft, exists: true, revision: "saved" };
+            return { ...snapshot, text, exists: true, revision: "saved" };
         },
     });
-    controller.showPermissions("project");
+    controller.showPermissions("global");
     const snapshot = controller.permissionSettings;
+    const text = extensionRequire("../media/permission-config.js").destructiveGuardText("global");
     const request = {
-        type: "usePermissionProfile",
+        type: "savePermissions",
         id: snapshot.id,
         contextToken: controller.contextToken(),
-        text: snapshot.text,
+        text,
+        scope: "project",
+        path: "/forged",
     };
-    await controller.handleMessage({ ...request, contextToken: "stale" });
-    assert.equal(preparations.length, 0);
-    await controller.handleMessage({ ...request, path: "/forged", scope: "global" });
-    assert.equal(preparations[0].snapshot, snapshot);
-    assert.equal(preparations[0].workspace, controller.workspace.uri.fsPath);
-    assert.equal(posted.at(-1).text, text);
-    assert.equal(
-        Object.hasOwn(posted.at(-1), "profile"),
-        false,
-        "Do not send host evidence or global policy to the webview",
-    );
-    assert.equal(writes.length, 0);
-    assert.equal(confirmations, 0);
-    await controller.handleMessage({ ...request, undo: true });
-    assert.equal(posted.at(-1).text, snapshot.text);
-    assert.equal(controller.permissionProfile, undefined);
     await controller.handleMessage(request);
-    const proof = controller.permissionProfile;
-    const save = { ...request, type: "savePermissions", text, profile: { evidence: "forged" } };
-    await controller.handleMessage(save);
-    assert.equal(writes.length, 0, "Cancellation does not write");
-    assert.equal(controller.permissionProfile, proof);
-    await controller.handleMessage(save);
+    assert.equal(writes.length, 0);
+    await controller.handleMessage(request);
     assert.equal(writes.length, 1);
-    assert.equal(writes[0].profile, proof);
-    assert.equal(verifications.length, 2);
-    assert.equal(controller.permissionProfile, undefined);
+    assert.equal(writes[0].snapshot.scope, "global");
+    assert.equal(writes[0].snapshot.path, snapshot.path);
+    assert.equal(writes[0].text, text);
     assert.equal(
         client.requests.some((entry) => entry.type === "prompt"),
         false,
     );
-});
-
-test("guard validation failures and conversation changes cannot save a profile", async (t) => {
-    const confirmation = deferred();
-    let writes = 0;
-    let valid = false;
-    const { controller, coordinator, posted } = await connected(t, {
-        request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
-        prepareProfile: (snapshot) => ({ text: "{}", profile: { baselineText: snapshot.text } }),
-        verifyProfile: () => {
-            if (!valid) {
-                throw new Error("Inherited global settings changed");
-            }
-        },
-        warningAnswer: () => confirmation.promise,
-        savePermissions: () => {
-            writes += 1;
-        },
-    });
-    controller.showPermissions("project");
-    const request = {
-        type: "usePermissionProfile",
-        id: controller.permissionSettings.id,
-        contextToken: controller.contextToken(),
-        text: "{}",
-    };
-    await controller.handleMessage(request);
-    await controller.handleMessage({ ...request, type: "savePermissions" });
-    assert.match(
-        posted.findLast((message) => message.type === "permissionSaveResult").error,
-        /Inherited global settings changed/u,
-    );
-    assert.equal(writes, 0);
-    valid = true;
-    const saving = controller.handleMessage({ ...request, type: "savePermissions" });
-    coordinator.selectRecord(coordinator.createRecord(controller.workspace));
-    confirmation.resolve("Save permissions");
-    await saving;
-    assert.equal(writes, 0);
 });
 
 test("permission cancellation, invalid drafts, disk failures and changed conversations do not grant writes", async (t) => {

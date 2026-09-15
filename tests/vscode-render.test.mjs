@@ -1488,12 +1488,6 @@ test(
                                 "6px",
                                 "Permission settings stylesheet must load",
                             );
-                            assert.equal(
-                                await page
-                                    .getByRole("button", { name: "Use Destructive guard", exact: true })
-                                    .isDisabled(),
-                                true,
-                            );
                             await page.locator("#permission-yoloMode").selectOption("true");
                             const rules = '{"*":"ask","bash":{"*":"deny","git status":"allow"},"read":"allow"}';
                             await page.locator("#permission-permission").fill(rules);
@@ -1502,6 +1496,54 @@ test(
                             assert.equal(JSON.parse(draft).yoloMode, true);
                             assert.deepEqual(Object.keys(JSON.parse(draft).permission.bash), ["*", "git status"]);
                             assert.deepEqual(await takeMessages(page), []);
+                            const apply = page.getByRole("button", { name: "Use Destructive guard", exact: true });
+                            const undo = page.getByRole("button", { name: "Undo preset", exact: true });
+                            assert.equal(await apply.isEnabled(), true);
+                            const template = await page.locator("#permission-profile-preview").textContent();
+                            await apply.click();
+                            const replacement = await page.locator("#permission-source").inputValue();
+                            assert.equal(replacement, template, "Preset replaces the full draft; it is not merged");
+                            assert.equal(Object.hasOwn(JSON.parse(replacement), "forwardingTimeoutMs"), false);
+                            assert.equal(Object.hasOwn(JSON.parse(replacement).permission, "read"), false);
+                            assert.equal(JSON.parse(replacement).yoloMode, false);
+                            assert.equal(await undo.isEnabled(), true);
+                            assert.deepEqual(
+                                await takeMessages(page),
+                                [],
+                                "Applying a preset is local draft editing only",
+                            );
+                            await editor.evaluate((node) => {
+                                node.scrollTop = 0;
+                            });
+                            await page.screenshot({
+                                path: path.join(screenshots, `global-destructive-guard-${width}.png`),
+                            });
+                            await page.locator("#permission-save").click();
+                            assert.deepEqual(await takeMessages(page), [
+                                {
+                                    type: "savePermissions",
+                                    id: settings.id,
+                                    contextToken: settings.contextToken,
+                                    text: replacement,
+                                },
+                            ]);
+                            await sendHost(page, { type: "permissionSaveResult", id: settings.id, cancelled: true });
+                            assert.equal(await page.locator("#permission-source").inputValue(), replacement);
+                            await page.locator("#permission-debugLog").selectOption("true");
+                            assert.equal(
+                                JSON.parse(await page.locator("#permission-source").inputValue()).debugLog,
+                                true,
+                                "Replacement remains editable",
+                            );
+                            await undo.click();
+                            assert.equal(await page.locator("#permission-source").inputValue(), draft);
+                            assert.equal(await undo.isVisible(), false);
+                            assert.deepEqual(
+                                await takeMessages(page),
+                                [],
+                                "Undo does not write or inspect other policy files",
+                            );
+                            await page.locator("#permission-advanced summary").click();
                             await setState(page, { permissions, cost: 5 });
                             assert.equal(await page.locator("#permission-source").inputValue(), draft);
                             await page.locator("#permission-save").click();
@@ -1563,6 +1605,16 @@ test(
                             await page.locator("#permission-source").fill('{"yoloMode":');
                             assert.equal(await page.locator("#permission-save").isDisabled(), true);
                             assert.equal(await page.locator("#permission-yoloMode").isDisabled(), true);
+                            await apply.click();
+                            assert.equal(
+                                await page.locator("#permission-save").isEnabled(),
+                                true,
+                                "A complete replacement does not need the old draft to parse",
+                            );
+                            await undo.click();
+                            assert.equal(await page.locator("#permission-source").inputValue(), '{"yoloMode":');
+                            assert.equal(await page.locator("#permission-save").isDisabled(), true);
+                            assert.match(await page.locator("#permission-feedback").textContent(), /Invalid JSON/u);
                             await page.locator("#permission-source").fill("{}");
                             assert.equal(await page.locator("#permission-yoloMode").isEnabled(), true);
                             await page.locator("#permission-scope").selectOption("project");
@@ -1573,83 +1625,13 @@ test(
                                 type: "permissionSettings",
                                 settings: { ...settings, id: "project-settings", scope: "project" },
                             });
-                            const apply = page.getByRole("button", { name: "Use Destructive guard", exact: true });
-                            const undo = page.getByRole("button", { name: "Undo profile", exact: true });
-                            assert.equal(await apply.isEnabled(), true);
-                            await apply.click();
-                            assert.deepEqual(await takeMessages(page), [
-                                {
-                                    type: "usePermissionProfile",
-                                    id: "project-settings",
-                                    contextToken: settings.contextToken,
-                                    text: settings.text,
-                                    undo: false,
-                                },
-                            ]);
-                            assert.equal(await page.locator("#permission-save").isDisabled(), true);
-                            await sendHost(page, {
-                                type: "permissionProfileResult",
-                                id: "project-settings",
-                                error: "Custom agent definitions are present. Existing settings are unchanged.",
-                            });
-                            assert.equal(await page.locator("#permission-source").inputValue(), settings.text);
-                            assert.match(await page.locator("#permission-feedback").textContent(), /Custom agent/u);
-                            await apply.click();
-                            await takeMessages(page);
-                            const guard = await page.evaluate(() =>
-                                window.SpecPiPermissionConfig.appendDestructiveGuard("{}", "{}"),
+                            assert.equal(
+                                await page
+                                    .getByRole("button", { name: "Use Destructive guard", exact: true })
+                                    .isDisabled(),
+                                true,
+                                "The preset is global, not project-scoped",
                             );
-                            await sendHost(page, {
-                                type: "permissionProfileResult",
-                                id: "project-settings",
-                                text: guard.text,
-                                surface: guard.surface,
-                                active: true,
-                            });
-                            assert.equal(await page.locator("#permission-source").inputValue(), guard.text);
-                            assert.equal(await page.locator("#permission-yoloMode").inputValue(), "false");
-                            assert.equal(await apply.isDisabled(), true);
-                            assert.equal(await undo.isEnabled(), true);
-                            assert.equal(await page.locator("#permission-restart").isDisabled(), true);
-                            assert.deepEqual(await takeMessages(page), [], "Filling a profile never saves or restarts");
-                            await editor.evaluate((node) => {
-                                node.scrollTop = 0;
-                            });
-                            await page.screenshot({ path: path.join(screenshots, `destructive-profile-${width}.png`) });
-                            await page.locator("#permission-save").click();
-                            assert.deepEqual(await takeMessages(page), [
-                                {
-                                    type: "savePermissions",
-                                    id: "project-settings",
-                                    contextToken: settings.contextToken,
-                                    text: guard.text,
-                                },
-                            ]);
-                            await sendHost(page, {
-                                type: "permissionSaveResult",
-                                id: "project-settings",
-                                cancelled: true,
-                            });
-                            assert.equal(await page.locator("#permission-source").inputValue(), guard.text);
-                            await undo.click();
-                            assert.deepEqual(await takeMessages(page), [
-                                {
-                                    type: "usePermissionProfile",
-                                    id: "project-settings",
-                                    contextToken: settings.contextToken,
-                                    text: guard.text,
-                                    undo: true,
-                                },
-                            ]);
-                            await sendHost(page, {
-                                type: "permissionProfileResult",
-                                id: "project-settings",
-                                text: settings.text,
-                                active: false,
-                            });
-                            assert.equal(await page.locator("#permission-source").inputValue(), settings.text);
-                            assert.equal(await undo.isVisible(), false);
-                            assert.equal(await apply.isEnabled(), true);
                             await page.keyboard.press("Escape");
                             assert.equal(await editor.isVisible(), false);
                             await page.waitForFunction(() => document.activeElement?.id === "permissions-button");

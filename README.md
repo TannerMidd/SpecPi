@@ -81,7 +81,7 @@ BetterWright remains an optional manual install, with its own [Bun-based setup](
 
 ## VS Code
 
-[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.8.3** adds searchable model choices, descriptive thinking levels, clearer cache hit and context usage, and an optional project Destructive guard preset with policy safety checks. The VSIX remains separate from the npm harness package.
+[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.8.3** adds searchable model choices, descriptive thinking levels, clearer cache hit and context usage, and a global Destructive guard configuration preset. The VSIX remains separate from the npm harness package.
 
 Download the [0.8.3 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.8.3.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
 

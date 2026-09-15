@@ -11,15 +11,9 @@ const {
     parse,
     validate,
     destructiveGuard,
-    appendDestructiveGuard,
+    destructiveGuardText,
 } = require("../vscode/media/permission-config.js");
-const {
-    configPath,
-    loadPermissionSettings,
-    savePermissionSettings,
-    prepareDestructiveGuard,
-    verifyDestructiveGuard,
-} = require("../vscode/src/permission-settings.js");
+const { configPath, loadPermissionSettings, savePermissionSettings } = require("../vscode/src/permission-settings.js");
 
 function fixture(t) {
     const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-permissions-")));
@@ -65,176 +59,49 @@ test("permission configuration exposes all current knobs, preserves order and su
     assert.deepEqual(validate("{}"), {});
 });
 
-test("guard appends native deny-only surfaces without changing any old map, scalar or ordering", () => {
-    for (const bash of [
-        undefined,
-        "allow",
-        "ask",
-        "deny",
-        { "*": "allow", "rm *": "deny" },
-        { "rm *": "allow", "*": "ask" },
-    ]) {
-        const project = {
-            permission: { read: "deny", ...(bash === undefined ? {} : { bash }), "bash*": { "git status": "allow" } },
-            debugLog: false,
-        };
-        const global = { permission: { bash: { "*": "ask", "git *": "allow" }, "bash**": "deny" } };
-        const result = appendDestructiveGuard(JSON.stringify(project), JSON.stringify(global));
-        const config = validate(result.text);
-        assert.equal(result.surface, "bash***");
-        assert.deepEqual(Object.entries(config.permission).slice(0, -1), Object.entries(project.permission));
-        assert.deepEqual(config.permission[result.surface], destructiveGuard);
-        assert.ok(Object.values(config.permission[result.surface]).every((rule) => rule.action === "deny"));
-        assert.equal(config.yoloMode, false);
-        assert.equal(config.debugLog, false);
-        assert.ok(
-            Object.hasOwn(config.permission[result.surface], "rm *"),
-            "Do not change optional-argument command spelling",
-        );
-    }
-
-    const occupied = Object.fromEntries(
-        Array.from({ length: 16 }, (_, index) => [`bash${"*".repeat(index + 1)}`, "ask"]),
+test("Destructive guard is a complete global replacement with an ask fallback and ordered denies", () => {
+    const text = destructiveGuardText("global");
+    const config = validate(text);
+    assert.deepEqual(config, destructiveGuard);
+    assert.equal(config.yoloMode, false);
+    assert.equal(config.permissionReviewLog, false);
+    assert.equal(config.debugLog, false);
+    assert.deepEqual(config.authorizerChain, []);
+    assert.equal(config.permission["*"], "ask");
+    assert.deepEqual(Object.entries(config.permission.bash)[0], ["*", "ask"]);
+    assert.ok(
+        Object.values(config.permission.bash)
+            .slice(1)
+            .every((rule) => rule.action === "deny"),
     );
-    assert.throws(
-        () => appendDestructiveGuard("{}", JSON.stringify({ permission: occupied })),
-        /No unused guard surface/u,
-    );
-    assert.throws(() => appendDestructiveGuard("{}", "{"), /Invalid JSON/u);
+    assert.ok(Object.hasOwn(config.permission.bash, "rm *"));
+    assert.throws(() => destructiveGuardText("project"), /global scope/u);
+    assert.throws(() => destructiveGuardText("unknown"), /global scope/u);
 });
 
-test("project guard preparation is read-only, supports empty directories, and saves with a backup", (t) => {
+test("saving the global preset replaces old rules and options, backs up the file, and leaves project and agents alone", (t) => {
     const f = fixture(t);
-    const snapshot = savePermissionSettings(f.load("project"), '// original comment\n{"permission":{"bash":"deny"}}\n');
-    const result = prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options);
-    assert.equal(fs.readFileSync(snapshot.path, "utf8"), snapshot.text);
-    assert.equal(f.load().exists, false);
-    assert.equal(fs.existsSync(path.join(f.home, ".pi")), false);
-    for (const directory of result.profile.agentDirectories) {
-        fs.mkdirSync(directory, { recursive: true });
-    }
-
-    verifyDestructiveGuard(result.profile, result.text);
-    const saved = savePermissionSettings(snapshot, result.text, result.profile);
-    assert.equal(fs.readFileSync(saved.backup, "utf8"), snapshot.text);
-    assert.equal(validate(saved.text).permission.bash, "deny");
-    assert.equal(validate(saved.text).yoloMode, false);
-    assert.equal(f.load().exists, false);
-});
-
-test("guard refuses unsupported scopes, other draft edits, malformed scopes and stale project snapshots", (t) => {
-    const f = fixture(t);
-    assert.throws(() => prepareDestructiveGuard(f.load(), "{}", f.workspace, f.options), /Load project scope/u);
-    const snapshot = f.load("project");
-    assert.throws(
-        () => prepareDestructiveGuard(snapshot, '{"permission":{"bash":"allow"}}', f.workspace, f.options),
-        /other draft edits/u,
-    );
-    const global = f.load();
-    fs.mkdirSync(path.dirname(global.path), { recursive: true });
-    fs.writeFileSync(global.path, "{");
-    assert.throws(() => prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options), /Invalid JSON/u);
-    fs.writeFileSync(global.path, "{}");
-    const current = savePermissionSettings(snapshot, "{}");
-    assert.throws(() => prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options), /changed/u);
-    fs.writeFileSync(current.path, "{");
-    const invalid = f.load("project");
-    assert.throws(() => prepareDestructiveGuard(invalid, invalid.text, f.workspace, f.options), /Invalid JSON/u);
-});
-
-test("guard refuses occupied or unreadable agent directories without reading frontmatter", (t) => {
-    const f = fixture(t);
-    const snapshot = f.load("project");
-    const result = prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options);
+    const oldText =
+        '// prior global settings\n{"yoloMode":true,"debugLog":true,"promptMaxRows":99,"permission":{"old_tool":"allow","read":"deny"}}\n';
+    const global = savePermissionSettings(f.load(), oldText);
+    const project = savePermissionSettings(f.load("project"), '{"permission":{"bash":"deny"}}');
+    const agent = path.join(f.home, ".pi", "agent", "agents", "custom.md");
+    fs.mkdirSync(path.dirname(agent), { recursive: true });
+    fs.writeFileSync(agent, "Synthetic custom agent; do not inspect");
     const open = fs.openSync;
     t.mock.method(fs, "openSync", (filename, ...args) => {
-        assert.ok(!String(filename).endsWith(".md"), "Agent contents must not be opened");
+        assert.ok(!String(filename).endsWith(".md"), "Global preset must not read agent definitions");
 
         return open(filename, ...args);
     });
-    for (const directory of result.profile.agentDirectories) {
-        fs.mkdirSync(directory, { recursive: true });
-        const definition = path.join(directory, "synthetic.md");
-        // Use the original descriptor opener so the read guard also covers writeFileSync internals.
-        const fd = open(definition, "w");
-        fs.writeFileSync(fd, "Never read this agent prompt");
-        fs.closeSync(fd);
-        assert.throws(
-            () => prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options),
-            /Custom agent definitions/u,
-        );
-        assert.throws(() => savePermissionSettings(snapshot, result.text, result.profile), /Custom agent definitions/u);
-        fs.unlinkSync(definition);
-    }
-
-    t.mock.method(fs, "opendirSync", () => {
-        throw Object.assign(new Error("Synthetic access denial"), { code: "EACCES" });
-    });
-    assert.throws(() => prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options), /Cannot verify/u);
-    assert.equal(fs.existsSync(snapshot.path), false);
-});
-
-test("guard refuses linked agent directories and changed inherited policy", (t) => {
-    const f = fixture(t);
-    const snapshot = f.load("project");
-    const result = prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options);
-    const directory = result.profile.agentDirectories[1];
-    fs.mkdirSync(path.dirname(directory), { recursive: true });
-    fs.symlinkSync(f.home, directory, process.platform === "win32" ? "junction" : "dir");
-    assert.throws(() => prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options), /links/u);
-    fs.unlinkSync(directory);
-    savePermissionSettings(f.load(), '{"permission":{"bash":"allow"}}');
-    assert.throws(
-        () => savePermissionSettings(snapshot, result.text, result.profile),
-        /Inherited global settings changed/u,
-    );
-    assert.equal(fs.existsSync(snapshot.path), false);
-});
-
-test("guard permits edits only to its new deny group and rechecks metadata immediately before replacement", (t) => {
-    const f = fixture(t);
-    const snapshot = savePermissionSettings(f.load("project"), '{"permission":{"bash":"deny"}}');
-    const result = prepareDestructiveGuard(snapshot, snapshot.text, f.workspace, f.options);
-    for (const change of [
-        (config) => {
-            config.yoloMode = true;
-        },
-        (config) => {
-            config.permission.bash = "allow";
-        },
-        (config) => {
-            config.permission[result.profile.surface] = {};
-        },
-        (config) => {
-            config.permission[result.profile.surface]["rm *"] = "allow";
-        },
-        (config) => {
-            config.permission = Object.fromEntries(Object.entries(config.permission).reverse());
-        },
-    ]) {
-        const config = validate(result.text);
-        change(config);
-        assert.throws(
-            () => savePermissionSettings(snapshot, JSON.stringify(config), result.profile),
-            /guard|Guard|existing/u,
-        );
-        assert.equal(fs.readFileSync(snapshot.path, "utf8"), snapshot.text);
-    }
-
-    const config = validate(result.text);
-    config.permission[result.profile.surface]["custom delete *"] = "deny";
-    verifyDestructiveGuard(result.profile, JSON.stringify(config));
-    const write = fs.writeFileSync;
-    t.mock.method(fs, "writeFileSync", (filename, ...args) => {
-        write(filename, ...args);
-        if (String(filename).endsWith(".tmp")) {
-            const directory = result.profile.agentDirectories[1];
-            fs.mkdirSync(directory, { recursive: true });
-            write(path.join(directory, "late-agent.md"), "Synthetic new agent");
-        }
-    });
-    assert.throws(() => savePermissionSettings(snapshot, result.text, result.profile), /Custom agent definitions/u);
-    assert.equal(fs.readFileSync(snapshot.path, "utf8"), snapshot.text);
+    const saved = savePermissionSettings(global, destructiveGuardText("global"));
+    assert.deepEqual(validate(saved.text), destructiveGuard);
+    assert.equal(Object.hasOwn(validate(saved.text), "promptMaxRows"), false);
+    assert.equal(Object.hasOwn(validate(saved.text).permission, "old_tool"), false);
+    assert.equal(fs.readFileSync(saved.backup, "utf8"), oldText);
+    assert.equal(fs.readFileSync(project.path, "utf8"), project.text);
+    t.mock.restoreAll();
+    assert.equal(fs.readFileSync(agent, "utf8"), "Synthetic custom agent; do not inspect");
 });
 
 test("invalid or unsupported settings cannot be silently dropped on save", () => {
