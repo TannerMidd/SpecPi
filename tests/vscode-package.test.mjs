@@ -320,3 +320,48 @@ test("ZIP writer rejects duplicate and unsafe paths and implements standard CRC3
         /safe relative paths/,
     );
 });
+
+// The allowlist above is the only thing that decides what ships. Restating it
+// in a test proves nothing, so derive what the extension actually loads: every
+// local module the host requires, and every media file the webview asks the
+// browser to fetch. A file the code needs but the allowlist omits produces an
+// extension that cannot activate, which no other packaging test detects.
+function extensionDependencies() {
+    const required = new Set();
+    for (const name of packageFiles.filter((entry) => entry.startsWith("src/"))) {
+        const source = fs.readFileSync(path.join(extensionRoot, name), "utf8");
+        for (const [, target] of source.matchAll(/require\(\s*"(\.[^"]+)"\s*\)/gu)) {
+            const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(name), target));
+            // Node resolves an extensionless require against .js, so the file
+            // that must ship is not always spelled the way it is required.
+            const candidates = path.posix.extname(resolved) ? [resolved] : [`${resolved}.js`, `${resolved}.mjs`];
+            required.add(candidates.find((file) => fs.existsSync(path.join(extensionRoot, file))) || resolved);
+        }
+    }
+
+    // Media assets are never required; the coordinator turns them into webview
+    // URLs and webview.js derives the rest by rewriting the chat asset name. In
+    // both cases the filename survives only as a bare string literal.
+    for (const name of packageFiles.filter((entry) => entry.startsWith("src/"))) {
+        const source = fs.readFileSync(path.join(extensionRoot, name), "utf8");
+        for (const [, asset] of source.matchAll(/"([\w.-]+\.(?:js|css))"/gu)) {
+            if (fs.existsSync(path.join(extensionRoot, "media", asset))) {
+                required.add(`media/${asset}`);
+            }
+        }
+    }
+
+    return [...required].sort();
+}
+
+test("every module the extension loads at runtime is inside the packaged allowlist", () => {
+    const required = extensionDependencies();
+    assert.ok(required.length > 20, "dependency scan found suspiciously little");
+    const missing = required.filter((name) => !packageFiles.includes(name));
+    assert.deepEqual(missing, [], "these files are loaded at runtime but would not ship in the VSIX");
+
+    // Spot-check the scan itself, so a broken regex cannot pass by finding nothing.
+    for (const name of ["src/webview.js", "src/settings-file.js", "media/chat.js", "media/chat-picker.css"]) {
+        assert.ok(required.includes(name), `dependency scan missed ${name}`);
+    }
+});
