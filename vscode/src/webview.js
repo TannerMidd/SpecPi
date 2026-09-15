@@ -181,6 +181,21 @@ function getWebviewHtml({
             <button id="permission-reload" type="button">Load scope / discard draft</button>
         </div>
         <p id="permission-path" class="permission-path"></p>
+        <section class="permission-profile" aria-labelledby="permission-profile-title">
+            <h3 id="permission-profile-title">Destructive guard · project profile</h3>
+            <p>Adds a separate deny-only group and turns YOLO off. Existing rule maps stay unchanged. Nothing saves or activates automatically.</p>
+            <p>Using this profile reads inherited global permission JSON and checks whether the two normal agent folders are empty. No agent contents are read. Custom agent policy or routing is unsupported.</p>
+            <p id="permission-profile-scope-note">Load project scope to use this profile; global changes could affect unverified projects.</p>
+            <details><summary>Preview rules and limitations</summary>
+                <p>Blocks common deletion, disk, Git and infrastructure commands, including benign uses. Case-sensitive patterns are not a sandbox: scripts, alternate spellings and unconfigured shell tools may bypass them. The group also matches custom surfaces beginning with bash. Later policy changes and session approvals remain upstream-controlled.</p>
+                <pre id="permission-profile-preview" aria-label="Destructive guard template"></pre>
+                <p>The host chooses an unused bash* surface spelling. You may edit the new deny group; undo the profile before making other changes.</p>
+            </details>
+            <div class="permission-actions">
+                <button id="permission-profile-apply" type="button">Use Destructive guard</button>
+                <button id="permission-profile-undo" type="button" hidden>Undo profile</button>
+            </div>
+        </section>
         <fieldset id="permission-fields"><legend>Settings and rules</legend></fieldset>
         <details id="permission-advanced">
             <summary>Full configuration JSON</summary>

@@ -1488,6 +1488,12 @@ test(
                                 "6px",
                                 "Permission settings stylesheet must load",
                             );
+                            assert.equal(
+                                await page
+                                    .getByRole("button", { name: "Use Destructive guard", exact: true })
+                                    .isDisabled(),
+                                true,
+                            );
                             await page.locator("#permission-yoloMode").selectOption("true");
                             const rules = '{"*":"ask","bash":{"*":"deny","git status":"allow"},"read":"allow"}';
                             await page.locator("#permission-permission").fill(rules);
@@ -1567,6 +1573,83 @@ test(
                                 type: "permissionSettings",
                                 settings: { ...settings, id: "project-settings", scope: "project" },
                             });
+                            const apply = page.getByRole("button", { name: "Use Destructive guard", exact: true });
+                            const undo = page.getByRole("button", { name: "Undo profile", exact: true });
+                            assert.equal(await apply.isEnabled(), true);
+                            await apply.click();
+                            assert.deepEqual(await takeMessages(page), [
+                                {
+                                    type: "usePermissionProfile",
+                                    id: "project-settings",
+                                    contextToken: settings.contextToken,
+                                    text: settings.text,
+                                    undo: false,
+                                },
+                            ]);
+                            assert.equal(await page.locator("#permission-save").isDisabled(), true);
+                            await sendHost(page, {
+                                type: "permissionProfileResult",
+                                id: "project-settings",
+                                error: "Custom agent definitions are present. Existing settings are unchanged.",
+                            });
+                            assert.equal(await page.locator("#permission-source").inputValue(), settings.text);
+                            assert.match(await page.locator("#permission-feedback").textContent(), /Custom agent/u);
+                            await apply.click();
+                            await takeMessages(page);
+                            const guard = await page.evaluate(() =>
+                                window.SpecPiPermissionConfig.appendDestructiveGuard("{}", "{}"),
+                            );
+                            await sendHost(page, {
+                                type: "permissionProfileResult",
+                                id: "project-settings",
+                                text: guard.text,
+                                surface: guard.surface,
+                                active: true,
+                            });
+                            assert.equal(await page.locator("#permission-source").inputValue(), guard.text);
+                            assert.equal(await page.locator("#permission-yoloMode").inputValue(), "false");
+                            assert.equal(await apply.isDisabled(), true);
+                            assert.equal(await undo.isEnabled(), true);
+                            assert.equal(await page.locator("#permission-restart").isDisabled(), true);
+                            assert.deepEqual(await takeMessages(page), [], "Filling a profile never saves or restarts");
+                            await editor.evaluate((node) => {
+                                node.scrollTop = 0;
+                            });
+                            await page.screenshot({ path: path.join(screenshots, `destructive-profile-${width}.png`) });
+                            await page.locator("#permission-save").click();
+                            assert.deepEqual(await takeMessages(page), [
+                                {
+                                    type: "savePermissions",
+                                    id: "project-settings",
+                                    contextToken: settings.contextToken,
+                                    text: guard.text,
+                                },
+                            ]);
+                            await sendHost(page, {
+                                type: "permissionSaveResult",
+                                id: "project-settings",
+                                cancelled: true,
+                            });
+                            assert.equal(await page.locator("#permission-source").inputValue(), guard.text);
+                            await undo.click();
+                            assert.deepEqual(await takeMessages(page), [
+                                {
+                                    type: "usePermissionProfile",
+                                    id: "project-settings",
+                                    contextToken: settings.contextToken,
+                                    text: guard.text,
+                                    undo: true,
+                                },
+                            ]);
+                            await sendHost(page, {
+                                type: "permissionProfileResult",
+                                id: "project-settings",
+                                text: settings.text,
+                                active: false,
+                            });
+                            assert.equal(await page.locator("#permission-source").inputValue(), settings.text);
+                            assert.equal(await undo.isVisible(), false);
+                            assert.equal(await apply.isEnabled(), true);
                             await page.keyboard.press("Escape");
                             assert.equal(await editor.isVisible(), false);
                             await page.waitForFunction(() => document.activeElement?.id === "permissions-button");

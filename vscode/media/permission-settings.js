@@ -12,6 +12,12 @@
             let valid = false;
             let formValid = false;
             let saved = false;
+            let profileActive = false;
+            byId("permission-profile-preview").textContent = JSON.stringify(
+                { yoloMode: false, permission: { "bash*": schema.destructiveGuard } },
+                null,
+                4,
+            );
 
             function report(message, error = false) {
                 const status = byId("permission-feedback");
@@ -38,6 +44,11 @@
                 byId("permission-effective").disabled = !enabled;
                 byId("permission-restart").disabled = !enabled || !saved;
                 byId("permission-close").disabled = pending;
+                byId("permission-profile-apply").disabled =
+                    !enabled || !valid || snapshot?.scope !== "project" || profileActive;
+                byId("permission-profile-scope-note").hidden = snapshot?.scope === "project";
+                byId("permission-profile-undo").hidden = !profileActive;
+                byId("permission-profile-undo").disabled = !enabled;
                 form.disabled = pending || !formValid;
                 source.disabled = pending;
             }
@@ -46,7 +57,11 @@
                 try {
                     schema.validate(source.value);
                     valid = true;
-                    report("Unsaved draft. No settings change until you save and confirm.");
+                    report(
+                        profileActive
+                            ? "Unsaved guard draft. Edit only the new deny group, or undo the profile for other changes. Save checks policy conditions again."
+                            : "Unsaved draft. No settings change until you save and confirm.",
+                    );
                 } catch (error) {
                     valid = false;
                     report(error.message, true);
@@ -166,6 +181,30 @@
                     send({ type: "showPermissions", scope: byId("permission-scope").value });
                 }
             });
+            function useProfile(undo) {
+                if (
+                    !snapshot ||
+                    !available() ||
+                    pending ||
+                    (!undo && (!valid || snapshot.scope !== "project" || profileActive))
+                ) {
+                    return;
+                }
+
+                pending = true;
+                report(undo ? "Restoring the original draft…" : "Checking inherited policy and agent-folder metadata…");
+                updateButtons();
+                send({
+                    type: "usePermissionProfile",
+                    id: snapshot.id,
+                    contextToken: snapshot.contextToken,
+                    text: source.value,
+                    undo,
+                });
+            }
+
+            byId("permission-profile-apply").addEventListener("click", () => useProfile(false));
+            byId("permission-profile-undo").addEventListener("click", () => useProfile(true));
             byId("permission-save").addEventListener("click", () => {
                 if (!snapshot || !available() || pending || !valid) {
                     return;
@@ -195,6 +234,7 @@
                 render() {
                     if (snapshot && (snapshot.contextToken !== getState().contextToken || !getState().permissions)) {
                         snapshot = undefined;
+                        profileActive = false;
                         source.value = "";
                         dialog.close();
                     }
@@ -207,6 +247,7 @@
                         message.settings?.contextToken === getState().contextToken
                     ) {
                         snapshot = message.settings;
+                        profileActive = false;
                         pending = false;
                         source.value = snapshot.text;
                         byId("permission-scope").value = snapshot.scope;
@@ -228,9 +269,27 @@
                         byId("permission-scope").focus();
                     } else if (message.type === "permissionSettingsError") {
                         report(message.error, true);
+                    } else if (message.type === "permissionProfileResult" && snapshot?.id === message.id) {
+                        pending = false;
+                        if (typeof message.text === "string") {
+                            profileActive = message.active === true;
+                            source.value = message.text;
+                            populate();
+                            byId("permission-advanced").open = true;
+                            report(
+                                profileActive
+                                    ? `Added ${message.surface} deny group to the draft. Review before saving; restart after saving to activate it.`
+                                    : "Profile undone. Nothing was saved.",
+                            );
+                        } else {
+                            report(message.error || "Profile could not be applied. Existing draft is unchanged.", true);
+                        }
+
+                        updateButtons();
                     } else if (message.type === "permissionSaveResult" && snapshot?.id === message.id) {
                         pending = false;
                         if (message.settings) {
+                            profileActive = false;
                             snapshot = message.settings;
                             byId("permission-path").textContent =
                                 `${snapshot.scope === "global" ? "Global" : "Project"}: ${snapshot.path}`;

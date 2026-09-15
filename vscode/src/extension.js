@@ -28,7 +28,12 @@ const { ImageQueue } = require("./image-queue.js");
 const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./delegates.js");
 const { SUBAGENT_WIDGET, decodeFleet } = require("./subagents.js");
 const { permissionState } = require("./permissions.js");
-const { loadPermissionSettings, savePermissionSettings } = require("./permission-settings.js");
+const {
+    loadPermissionSettings,
+    savePermissionSettings,
+    prepareDestructiveGuard,
+    verifyDestructiveGuard,
+} = require("./permission-settings.js");
 const { validate: validatePermissionConfig } = require("../media/permission-config.js");
 const { stripVTControlCharacters } = require("node:util");
 const { ConversationCoordinator } = require("./conversation-coordinator.js");
@@ -1581,11 +1586,47 @@ class ChatController {
                 id: randomUUID(),
                 contextToken: this.contextToken(),
             };
+            this.permissionProfile = undefined;
             this.post({ type: "permissionSettings", settings: this.permissionSettings });
         } catch (error) {
             this.post({ type: "permissionSettingsError", error: String(error.message).slice(0, 2000) });
             throw error;
         }
+    }
+
+    usePermissionProfile(message) {
+        this.requirePermissionSettings();
+        const snapshot = this.permissionSettings;
+        if (
+            !snapshot ||
+            snapshot.id !== message.id ||
+            snapshot.contextToken !== this.contextToken() ||
+            message.contextToken !== this.contextToken()
+        ) {
+            throw new Error("Permission settings are stale. Reopen settings before using the profile.");
+        }
+
+        if (message.undo === true) {
+            if (this.permissionProfile?.id !== snapshot.id) {
+                throw new Error("There is no unsaved profile to undo.");
+            }
+
+            const text = this.permissionProfile.baselineText;
+            this.permissionProfile = undefined;
+            this.post({ type: "permissionProfileResult", id: snapshot.id, text, active: false });
+
+            return;
+        }
+
+        const result = prepareDestructiveGuard(snapshot, message.text, this.requireWorkspace());
+        this.permissionProfile = { ...result.profile, id: snapshot.id };
+        this.post({
+            type: "permissionProfileResult",
+            id: snapshot.id,
+            text: result.text,
+            active: true,
+            surface: result.profile.surface,
+        });
     }
 
     async savePermissions(message) {
@@ -1601,6 +1642,11 @@ class ChatController {
         }
 
         validatePermissionConfig(message.text);
+        const profile = this.permissionProfile?.id === snapshot.id ? this.permissionProfile : undefined;
+        if (profile) {
+            verifyDestructiveGuard(profile, message.text);
+        }
+
         const client = this.client;
         this.sending = true;
         this.publish();
@@ -1609,7 +1655,7 @@ class ChatController {
                 `Save ${snapshot.scope} permission settings? This can change tool access and YOLO behavior for ${snapshot.scope === "global" ? "all projects" : "this project"}, including other Pi chats as they reload policy.`,
                 {
                     modal: true,
-                    detail: `Destination: ${snapshot.path}\nAn existing file is backed up. Restart this chat after saving to reload its settings and clear session approvals.`,
+                    detail: `Destination: ${snapshot.path}\nAn existing file is backed up. Restart this chat after saving to reload its settings and clear session approvals.${profile ? "\nDestructive guard checks inherited global configuration and empty normal agent directories again before writing. It supports ordinary main/default-agent use, not custom agent routing or a sandbox." : ""}`,
                 },
                 "Save permissions",
             );
@@ -1635,7 +1681,12 @@ class ChatController {
                 throw new Error("Pi is no longer idle. No permission settings were saved.");
             }
 
-            const saved = savePermissionSettings(snapshot, message.text);
+            if (profile && profile !== this.permissionProfile) {
+                throw new Error("The guard draft changed during confirmation. Nothing was saved.");
+            }
+
+            const saved = savePermissionSettings(snapshot, message.text, profile);
+            this.permissionProfile = undefined;
             this.permissionSettings = { ...saved, id: snapshot.id, contextToken: snapshot.contextToken };
             this.post({ type: "permissionSaveResult", id: snapshot.id, settings: this.permissionSettings });
         } catch (error) {
@@ -1942,6 +1993,18 @@ class ChatController {
                 break;
             case "showPermissions":
                 this.showPermissions(message.scope);
+                break;
+            case "usePermissionProfile":
+                try {
+                    this.usePermissionProfile(message);
+                } catch (error) {
+                    this.post({
+                        type: "permissionProfileResult",
+                        id: message.id,
+                        error: String(error.message).slice(0, 2000),
+                    });
+                }
+
                 break;
             case "savePermissions":
                 try {

@@ -28,6 +28,29 @@
     padding: 12px;
     min-width: 0;
 }
+.permission-profile {
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+.permission-profile h3 {
+    margin: 0;
+    font-size: var(--chat-font-size);
+}
+.permission-profile p, .permission-profile summary {
+    font-size: var(--chat-small-font-size);
+}
+.permission-profile pre {
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: var(--chat-small-font-size);
+}
+.permission-profile .permission-actions {
+    margin-top: 10px;
+}
 .permission-field {
     margin-bottom: 14px;
 }

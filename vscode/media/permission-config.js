@@ -152,7 +152,75 @@
         return config;
     }
 
-    const api = { fields, parse, validate };
+    // Native Permission System rules, not a command evaluator. Keep trailing
+    // " *" intact: upstream also matches the bare command for these patterns.
+    const destructiveGuard = Object.fromEntries([
+        ...["rm *", "rmdir *", "unlink *", "shred *", "del *", "erase *", "rd *", "Remove-Item *", "remove-item *"].map(
+            (pattern) => [
+                pattern,
+                { action: "deny", reason: "Destructive guard: deletion utility (including benign deletions)." },
+            ],
+        ),
+        ...[
+            "dd *",
+            "mkfs*",
+            "wipefs *",
+            "fdisk *",
+            "sfdisk *",
+            "parted *",
+            "diskpart *",
+            "format *",
+            "Clear-Disk *",
+            "clear-disk *",
+            "Format-Volume *",
+            "format-volume *",
+        ].map((pattern) => [
+            pattern,
+            { action: "deny", reason: "Destructive guard: raw disk, partition or formatting operation." },
+        ]),
+        ...["git reset *--hard*", "git clean *", "git push *--force*", "git push *-f*", "git push *+*"].map(
+            (pattern) => [
+                pattern,
+                { action: "deny", reason: "Destructive guard: discard work or overwrite remote history." },
+            ],
+        ),
+        ...[
+            "terraform destroy *",
+            "terraform apply *-destroy*",
+            "tofu destroy *",
+            "tofu apply *-destroy*",
+            "kubectl delete *",
+            "dropdb *",
+        ].map((pattern) => [
+            pattern,
+            { action: "deny", reason: "Destructive guard: infrastructure or database removal." },
+        ]),
+    ]);
+
+    function appendDestructiveGuard(text, globalText) {
+        const config = validate(text);
+        const global = validate(globalText);
+        const permission = config.permission || {};
+        for (let count = 1; count <= 16; count += 1) {
+            const surface = `bash${"*".repeat(count)}`;
+            if (Object.hasOwn(permission, surface) || Object.hasOwn(global.permission || {}, surface)) {
+                continue;
+            }
+
+            // A fresh surface appends only denies to the normalized rules.
+            // Never merge into bash: 32.0.2 can reorder collided pattern keys.
+            config.permission = { ...permission, [surface]: destructiveGuard };
+            config.yoloMode = false;
+            const result = `${JSON.stringify(config, null, 4)}\n`;
+            validate(result);
+
+            return { text: result, surface };
+        }
+
+        throw new Error("No unused guard surface is available. Existing rules were not changed.");
+    }
+
+    const api = { fields, parse, validate, destructiveGuard, appendDestructiveGuard };
     if (typeof module !== "undefined" && module.exports) {
         module.exports = api;
     } else {

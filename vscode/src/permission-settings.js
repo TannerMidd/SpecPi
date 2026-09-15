@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
-const { validate } = require("../media/permission-config.js");
+const { validate, appendDestructiveGuard } = require("../media/permission-config.js");
 
 const MAX_BYTES = 64 * 1024;
 const digest = (text) => createHash("sha256").update(text).digest("hex");
@@ -104,16 +104,114 @@ function loadPermissionSettings(workspace, scope, options) {
     return { ...readConfig(configPath(workspace, scope, options)), scope };
 }
 
+// Metadata only: never open agent definitions or inspect prompts/frontmatter.
+// A nonempty directory means the additional policy scopes cannot be certified.
+function requireNoAgentPolicies(directory) {
+    checkDirectories(directory);
+    let handle;
+    try {
+        handle = fs.opendirSync(directory, { bufferSize: 1 });
+    } catch (error) {
+        if (error.code === "ENOENT") {
+            return;
+        }
+
+        throw new Error("Cannot verify agent-policy directories. Destructive guard was not applied.");
+    }
+
+    try {
+        if (handle.readSync()) {
+            throw new Error(
+                "Custom agent definitions are present. This project preset cannot verify their policy; existing settings are unchanged.",
+            );
+        }
+    } finally {
+        handle.closeSync();
+    }
+}
+
+function prepareDestructiveGuard(snapshot, text, workspace, options) {
+    if (snapshot.scope !== "project" || snapshot.path !== configPath(workspace, "project", options)) {
+        throw new Error(
+            "Load project scope to use Destructive guard. Global changes could affect unverified projects.",
+        );
+    }
+
+    const baseline = validate(snapshot.text);
+    if (JSON.stringify(validate(text)) !== JSON.stringify(baseline)) {
+        throw new Error("Save or discard other draft edits before applying Destructive guard.");
+    }
+
+    if (readConfig(snapshot.path).revision !== snapshot.revision) {
+        throw new Error("Project permission settings changed. Reload before applying Destructive guard.");
+    }
+
+    const global = loadPermissionSettings(workspace, "global", options);
+    const agentDirectories = [
+        path.join(path.dirname(path.dirname(path.dirname(global.path))), "agents"),
+        path.join(workspace, ".pi", "agents"),
+    ];
+    for (const directory of agentDirectories) {
+        requireNoAgentPolicies(directory);
+    }
+
+    const result = appendDestructiveGuard(text, global.text);
+
+    return {
+        text: result.text,
+        profile: {
+            surface: result.surface,
+            baselineText: snapshot.text,
+            global: { path: global.path, revision: global.revision },
+            agentDirectories,
+        },
+    };
+}
+
+function verifyDestructiveGuard(profile, text) {
+    const config = validate(text);
+    const rules = config.permission?.[profile.surface];
+    if (
+        !rules ||
+        typeof rules !== "object" ||
+        !Object.keys(rules).length ||
+        Object.values(rules).some((rule) => rule !== "deny" && rule?.action !== "deny")
+    ) {
+        throw new Error("The guard group must contain only deny rules. Undo the profile for other policy changes.");
+    }
+
+    const expected = validate(profile.baselineText);
+    expected.permission = { ...expected.permission, [profile.surface]: rules };
+    expected.yoloMode = false;
+    if (JSON.stringify(config) !== JSON.stringify(expected)) {
+        throw new Error(
+            "Keep existing settings unchanged and the guard group last. Undo the profile for other changes.",
+        );
+    }
+
+    if (readConfig(profile.global.path).revision !== profile.global.revision) {
+        throw new Error("Inherited global settings changed. Reload and reapply Destructive guard before saving.");
+    }
+
+    for (const directory of profile.agentDirectories) {
+        requireNoAgentPolicies(directory);
+    }
+}
+
 // Synchronous, bounded transaction: the controller rechecks human/context
 // authority immediately before this call. No asynchronous yield separates that
 // check from the write. The lock coordinates Chat writers; the revision also
 // detects ordinary edits by terminals and other windows.
-function savePermissionSettings(snapshot, text) {
+function savePermissionSettings(snapshot, text, profile) {
     if (typeof text !== "string" || Buffer.byteLength(text) > MAX_BYTES) {
         throw new Error("Permission configuration exceeds 64 KiB.");
     }
 
     validate(text);
+    if (profile) {
+        verifyDestructiveGuard(profile, text);
+    }
+
     const filename = snapshot.path;
     checkDirectories(path.dirname(filename), true);
     const lock = `${filename}.specpi-lock`;
@@ -159,6 +257,10 @@ function savePermissionSettings(snapshot, text) {
             throw new Error("Permission settings changed during save. Reload settings before trying again.");
         }
 
+        if (profile) {
+            verifyDestructiveGuard(profile, text);
+        }
+
         fs.renameSync(temporary, filename);
         replaced = true;
         const saved = readConfig(filename);
@@ -189,4 +291,10 @@ function savePermissionSettings(snapshot, text) {
     }
 }
 
-module.exports = { configPath, loadPermissionSettings, savePermissionSettings };
+module.exports = {
+    configPath,
+    loadPermissionSettings,
+    savePermissionSettings,
+    prepareDestructiveGuard,
+    verifyDestructiveGuard,
+};

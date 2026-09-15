@@ -2,6 +2,7 @@
 
 ## 0.8.3
 
+- Add a project Destructive guard preset using the existing Permission System package, with rule preview, undo, confirmed Save, and inherited-policy safety checks. It adds a separate deny-only group without rewriting existing rules; custom agent-policy setups are refused without changing settings. Restart after saving; the recipe is not a sandbox.
 - Make cache hit and context usage easier to read in the footer.
 - Add searchable model choices and descriptive thinking-level choices, with keyboard navigation and responsive layouts.
 
