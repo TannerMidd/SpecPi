@@ -4,16 +4,16 @@ For a quick start, see the [overview](README.md). This guide covers the controls
 
 ## Set up
 
-1. Install Node.js **22.19 or newer** and Pi **0.84.4** for the reviewed default base on the machine running your VS Code workspace. SpecPi provides `/scope`, the harness improvement loop, and the seven default packages. Follow the [SpecPi setup guide](https://github.com/TannerMidd/SpecPi#readme). Configure your provider through Pi in a terminal, and confirm Pi works in the intended folder.
+1. Install Node.js **22.19 or newer** and Pi **0.84.4** for the reviewed default base on the machine running your VS Code workspace. SpecPi provides `/scope`, the harness improvement loop, and the six default packages. Follow the [SpecPi setup guide](https://github.com/TannerMidd/SpecPi#readme). Configure your provider through Pi in a terminal, and confirm Pi works in the intended folder.
 2. Use VS Code **1.96 or newer**. Open and trust a filesystem workspace.
-3. Download [SpecPi Chat 0.8.0](https://github.com/TannerMidd/SpecPi/releases/download/v0.22.0/specpi-chat-0.8.0.vsix). In VS Code, run **Extensions: Install from VSIX…** and select the downloaded file.
+3. Download [SpecPi Chat 0.8.1](https://github.com/TannerMidd/SpecPi/releases/download/v0.22.1/specpi-chat-0.8.1.vsix). In VS Code, run **Extensions: Install from VSIX…** and select the downloaded file.
 4. Open **SpecPi** in the Activity Bar, or press **Ctrl+Alt+S** (**Cmd+Alt+S** on macOS). Choose **Connect Pi**.
 
 To install a package built from this repository instead, run:
 
 ```sh
 npm --prefix vscode run package
-code --install-extension .specpi-test/vscode/specpi-chat-0.8.0.vsix
+code --install-extension .specpi-test/vscode/specpi-chat-0.8.1.vsix
 ```
 
 You can also run **Extensions: Install from VSIX…** in VS Code and select that file.
@@ -26,7 +26,7 @@ For SSH, WSL, or containers, install the extension in the remote workspace and c
 
 ## Work in the sidebar
 
-Use SpecPi 0.22.0 with SpecPi Chat 0.8.0. Run the confirmed SpecPi install/update separately and restart Pi in Chat. Installing a VSIX does not install or update the harness packages. Legacy startup dialogs are cancelled without approval; update older harness resources if a connection waits for a startup dialog to expire.
+Use SpecPi 0.22.1 with SpecPi Chat 0.8.1. Run the confirmed SpecPi install/update separately and restart Pi in each Chat connection. Normal managed updates remove unchanged `pi-lens` entries originally added by SpecPi; pre-existing or modified entries and downloaded files remain. `--skip-package-install` preserves the old base. Independently retained Lens installs require separate user management. Installing a VSIX does not install or update the harness packages. Legacy startup dialogs are cancelled without approval; update older harness resources if a connection waits for a startup dialog to expire.
 
 - **Send a message:** use Enter to send and Shift+Enter for a new line. Pick an available model and thinking level before sending.
 - **Add context:** the active editor selection appears above the composer as a chip and attaches with your next message (click the chip to hide it), or select code and use **SpecPi: Attach Selection to Chat**, press **Alt+K** to insert an `@file#Lx-Ly` mention, choose a file through the attachment controls, type `@` to find a workspace file or folder, or drop a workspace file reference into the composer. A file suggestion lists files and matching folders; selecting one attaches its validated contents or a bounded folder listing. Review or remove attachments before sending.
@@ -60,7 +60,6 @@ Chat uses the packages installed in Pi; it never installs copies. Permission set
 | pi-web-access                  | Search/fetch tool text and links; upstream configuration stays in Pi.                                                                                                                                                                                                                                                            |
 | betterwright                   | Browser tool progress, results, and returned image blocks. Install Bun and run the separate browser setup before browser work.                                                                                                                                                                                                   |
 | pi-subagents                   | Public live fleet activity, model/effort/token metadata, parallel/chain result cards, and visible completion notices. The live fleet panel provides no per-agent stop controls.                                                                                                                                                  |
-| pi-lens                        | Tool results, diagnostics/status widgets, and advertised commands. Language-server setup and TUI-only custom views remain upstream.                                                                                                                                                                                              |
 | pi-goal-x                      | Goal commands, visible progress/completion messages, status widgets, and RPC questionnaire dialogs. Terminal-only custom settings views are not rendered.                                                                                                                                                                        |
 | @sreetej510/pi-usage           | Published provider-usage status in Limits and /usage reports. Chat does not read credentials or perform its own provider refreshes.                                                                                                                                                                                              |
 | @gotgenes/pi-permission-system | Exact approval replies and an editable global/project configuration UI, reviewed against 32.0.2. Rules use ordered JSON maps; unknown or invalid fields block saving rather than being discarded. Show effective policy uses the upstream command. Per-agent frontmatter remains upstream and can override saved scope settings. |

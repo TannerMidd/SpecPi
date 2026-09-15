@@ -40,14 +40,14 @@
                     ><a href="#migration"><span>06</span>Update &amp; remove</a
                     ><a href="#development"><span>07</span>Development</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.22.0<br />Chat 0.8.0</div>
+                <div class="index-meta">SpecPi 0.22.1<br />Chat 0.8.1</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
                     <p class="eyebrow">Documentation</p>
                     <h1>Your Pi setup.<br />A smaller base.</h1>
                     <p class="wiki-summary">
-                        Scope control, an improvement loop, seven upstream packages, and a chat beside your code.
+                        Scope control, an improvement loop, six upstream packages, and a chat beside your code.
                     </p>
                     <p class="wiki-release-note">
                         The 0.21 base removes the old custom tools, extra commands, themes, and shell profiles. Read
@@ -83,7 +83,7 @@ specpi doctor</code></pre>
                 <section class="doc-section" id="packages">
                     <h2>Default packages</h2>
                     <p>
-                        Normal installs and updates install <a href="../#packages">the seven pinned packages</a> through
+                        Normal installs and updates install <a href="../#packages">the six pinned packages</a> through
                         Pi. SpecPi saves exact npm versions and checks the installed versions before completing the
                         update. Each package keeps its own commands and configuration; existing resource filters are
                         preserved.
@@ -94,8 +94,8 @@ specpi doctor</code></pre>
                         Pi Goal X declares compatibility with Pi ≥0.83.0 and &lt;0.85.0.
                     </p>
                     <p>
-                        Provider credentials, service configuration, language servers, and permission policies follow
-                        the upstream documentation. Installing a package does not complete its external service setup.
+                        Provider credentials, service configuration, and permission policies follow the upstream
+                        documentation. Installing a package does not complete its external service setup.
                     </p>
                 </section>
                 <section class="doc-section" id="scope">
@@ -192,8 +192,8 @@ specpi doctor</code></pre>
                 <section class="doc-section" id="vscode">
                     <h2>SpecPi Chat for VS Code</h2>
                     <p>
-                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.22.0/specpi-chat-0.8.0.vsix"
-                            >Download Chat 0.8.0</a
+                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.22.1/specpi-chat-0.8.1.vsix"
+                            >Download Chat 0.8.1</a
                         >, then run <strong>Extensions: Install from VSIX…</strong> in VS Code. Open a trusted project,
                         select SpecPi in the Activity Bar, and choose <strong>Connect Pi</strong>.
                     </p>
@@ -230,11 +230,12 @@ specpi doctor</code></pre>
                         and old runtime directories are preserved under <code>&lt;agent-dir&gt;/specpi/backups/</code>.
                     </p>
                     <p>
-                        Restart Pi and Chat connections to unload old extensions. Unrelated settings and local
-                        improvement evidence remain intact. Modified retained resources require
-                        <code>update --force</code>; review the plan before using it.
-                        <code>update --skip-package-install</code> preserves the existing base without invoking its
-                        installer.
+                        Normal updates remove unchanged <code>pi-lens</code> entries originally added by SpecPi;
+                        pre-existing or user-modified entries and downloaded files remain. Restart Pi and Chat
+                        connections to unload old extensions. Unrelated settings and local improvement evidence remain
+                        intact. Modified retained resources require <code>update --force</code>; review the plan before
+                        using it. <code>update --skip-package-install</code> preserves the existing base without
+                        invoking its installer.
                     </p>
                     <p>
                         Run <code>specpi uninstall</code> to remove managed resources and restore package entries that
@@ -255,7 +256,7 @@ npm run check:base
 npm run check:site</code></pre>
                     <p>
                         Use disposable Pi state for installer tests. <code>check:base</code> installs the real
-                        seven-package base in isolation and checks loading, Chat RPC, explicit permission replies,
+                        six-package base in isolation and checks loading, Chat RPC, explicit permission replies,
                         updates, and removal. It does not send model requests or run browser tasks.
                     </p>
                     <p>
@@ -273,7 +274,7 @@ npm run check:site</code></pre>
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.22.0">v0.22.0</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.22.1">v0.22.1</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.22.1 - 2026-09-14
+
+- Remove `pi-lens` from the default base. The other six package pins are unchanged. Normal managed updates remove unchanged Lens entries added by SpecPi; pre-existing or user-modified entries and downloaded files remain. `--skip-package-install` preserves the old base. Restart Pi and Chat connections to unload Lens.
+- Align package documentation and release links with SpecPi Chat 0.8.1; no Chat UI or host behavior changes.
+
 ## 0.22.0 - 2026-09-14
 
 - Remove `pi-background-tasks` from the default setup to avoid its Anthropic message-history errors. Updates remove unchanged entries added by SpecPi and preserve user-managed installations. The other seven package versions stay the same.

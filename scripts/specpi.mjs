@@ -56,7 +56,7 @@ Usage:
   specpi doctor
   specpi uninstall [--yes]
 
-Installs /scope, the harness improvement loop, and seven pinned upstream packages.
+Installs /scope, the harness improvement loop, and six pinned upstream packages.
 The base is tested with Pi 0.84.4. Run specpi plan to see package versions.
 --skip-package-install installs only the core, or preserves an existing base on update.
 --force replaces modified retained resources after backing them up.
