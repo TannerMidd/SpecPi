@@ -29,6 +29,8 @@ const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./
 const { SUBAGENT_WIDGET, decodeFleet } = require("./subagents.js");
 const { permissionState } = require("./permissions.js");
 const { loadPermissionSettings, savePermissionSettings } = require("./permission-settings.js");
+const { packageSettingsState } = require("./package-state.js");
+const { loadPackageSettings, savePackageSettings } = require("./package-settings.js");
 const { modelThinkingOverride, readDefaults, saveDefaults } = require("./pi-defaults.js");
 const { validate: validatePermissionConfig } = require("../media/permission-config.js");
 const { stripVTControlCharacters } = require("node:util");
@@ -82,6 +84,7 @@ class ChatController {
 
         this.state.sending = this.sending || this.transitioning;
         this.state.permissions = permissionState(this.state);
+        this.state.packageSettings = packageSettingsState(this.state);
         this.state.contextToken = this.contextToken();
         this.state.selectionContext = this.coordinator?.selectionContext || null;
         this.state.recoveredDrafts = this.imageQueue.recovered.map((item) => ({
@@ -1806,6 +1809,115 @@ Removes the modelThinkingLevels entry, so selecting this model falls back to the
         }
     }
 
+    requirePackageSettings() {
+        this.requireWorkspace();
+        if (
+            !this.client ||
+            !this.isForeground() ||
+            !packageSettingsState(this.state) ||
+            this.state.status !== "ready" ||
+            this.transitioning ||
+            this.sending ||
+            this.state.uiRequest ||
+            this.state.queueCount
+        ) {
+            throw new Error("Connect Pi with a configurable package installed and wait for the chat to be idle.");
+        }
+    }
+
+    // The webview names a target, never a path. Only targets belonging to an
+    // installed package are honoured, so the dialog cannot reach the config
+    // file of a package this session is not running.
+    showPackageSettings(target) {
+        this.requirePackageSettings();
+        const allowed = packageSettingsState(this.state).targets;
+        // The command palette opens the dialog without naming a target, so an
+        // omitted one falls back to the first package this session reports
+        // rather than to a fixed guess that may not be installed.
+        const chosen = target === undefined ? allowed[0] : target;
+        if (!allowed.includes(chosen)) {
+            const error = "That package is not installed in this session.";
+            this.post({ type: "packageSettingsError", error });
+            throw new Error(error);
+        }
+
+        try {
+            this.packageSettings = {
+                ...loadPackageSettings(chosen, { workspace: this.requireWorkspace() }),
+                id: randomUUID(),
+                contextToken: this.contextToken(),
+            };
+            this.post({ type: "packageSettings", settings: this.packageSettings });
+        } catch (error) {
+            this.post({ type: "packageSettingsError", error: String(error.message).slice(0, 2000) });
+            throw error;
+        }
+    }
+
+    async savePackageConfiguration(message) {
+        this.requirePackageSettings();
+        const snapshot = this.packageSettings;
+        if (
+            !snapshot ||
+            snapshot.id !== message.id ||
+            snapshot.contextToken !== this.contextToken() ||
+            message.contextToken !== this.contextToken()
+        ) {
+            throw new Error("Package settings are stale. Reopen settings before saving.");
+        }
+
+        const web = snapshot.target === "webAccess";
+        const settingsFile = snapshot.target !== "subagents:extension" && !web;
+        const client = this.client;
+        this.sending = true;
+        this.publish();
+        try {
+            const detail = web
+                ? `Destination: ${snapshot.path}
+This rewrites the web access configuration file. Stored provider credentials you did not replace are written back unchanged; keys you removed are deleted. Comments and key order are not preserved. An existing file is backed up.`
+                : settingsFile
+                  ? `Destination: ${snapshot.path}
+This replaces only the "subagents" block of that Pi settings file; every other setting in it is preserved. An existing file is backed up.`
+                  : `Destination: ${snapshot.path}
+This replaces the complete configuration file with the reviewed draft; it does not merge with the old file. An existing file is backed up.`;
+            const answer = await vscode.window.showWarningMessage(
+                `Save this ${web ? "web access" : "subagents"} configuration? It changes how the package behaves for every Pi session that reads this file.`,
+                { modal: true, detail },
+                "Save configuration",
+            );
+            if (answer !== "Save configuration") {
+                this.post({ type: "packageSaveResult", id: snapshot.id, cancelled: true });
+
+                return;
+            }
+
+            if (
+                client !== this.client ||
+                this.disposed ||
+                !this.isForeground() ||
+                snapshot !== this.packageSettings ||
+                snapshot.contextToken !== this.contextToken()
+            ) {
+                throw new Error("The conversation changed. No package settings were saved.");
+            }
+
+            // Recheck trust and runtime activity after the native confirmation.
+            this.requireWorkspace();
+            if (this.state.status !== "ready" || this.transitioning || this.state.uiRequest || this.state.queueCount) {
+                throw new Error("Pi is no longer idle. No package settings were saved.");
+            }
+
+            const saved = savePackageSettings(snapshot, message.text);
+            this.packageSettings = { ...saved, id: snapshot.id, contextToken: snapshot.contextToken };
+            this.post({ type: "packageSaveResult", id: snapshot.id, settings: this.packageSettings });
+        } catch (error) {
+            this.post({ type: "packageSaveResult", id: snapshot.id, error: String(error.message).slice(0, 2000) });
+        } finally {
+            this.sending = false;
+            this.publish();
+        }
+    }
+
     async showEffectivePermissions() {
         this.requirePermissionSettings();
         const client = this.client;
@@ -2103,6 +2215,28 @@ Removes the modelThinkingLevels entry, so selecting this model falls back to the
             case "showPermissions":
                 this.showPermissions(message.scope);
                 break;
+            case "showPackageSettings":
+                this.showPackageSettings(message.target);
+                break;
+            case "savePackageSettings":
+                try {
+                    await this.savePackageConfiguration(message);
+                } catch (error) {
+                    this.post({
+                        type: "packageSaveResult",
+                        id: message.id,
+                        error: String(error.message).slice(0, 2000),
+                    });
+                }
+
+                break;
+            case "restartPackageSettings":
+                this.requirePackageSettings();
+                if (message.contextToken === this.contextToken() && message.id === this.packageSettings?.id) {
+                    await this.restart();
+                }
+
+                break;
             case "savePermissions":
                 try {
                     await this.savePermissions(message);
@@ -2189,6 +2323,7 @@ function activate(context) {
         showUsage: () => controller.handleMessage({ type: "showUsage" }),
         chooseWorkspace: () => controller.chooseWorkspace(),
         permissions: () => controller.handleMessage({ type: "showPermissions" }),
+        packageSettings: () => controller.handleMessage({ type: "showPackageSettings" }),
         settings: () => controller.handleMessage({ type: "settings" }),
     };
     for (const [name, callback] of Object.entries(commands)) {

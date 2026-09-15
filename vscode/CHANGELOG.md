@@ -1,5 +1,12 @@
 # SpecPi Chat changelog
 
+## 0.10.0
+
+- Configure installed Pi packages from Chat. A new package settings dialog edits `pi-subagents` and `pi-web-access` configuration with generated fields for the documented keys plus a full JSON editor for everything else. Targets appear only for packages the connected session reports. Each save confirms first, goes through the existing guarded transaction (lock, revision check, backup, atomic replace, verification, rollback), and refuses a draft whose file changed on disk meanwhile. Restart Pi afterwards so the package reloads.
+- Subagents configuration covers both files the package reads: its own `extensions/subagent/config.json`, and the `subagents` block of the global or project Pi settings file. A settings write replaces only that block and preserves every unrelated Pi setting and its order; emptying the block removes the key. Keys this release does not recognise are kept as written rather than refused, so a configuration the package accepts can still be saved.
+- Web access credentials are never shown, copied, or logged. The webview receives a placeholder and a description of how each key is supplied — stored in the file, read from an environment variable, or resolved by a local command — never a value. A credential you do not retype is written back from disk unchanged, a key you delete is removed, and a placeholder with nothing stored behind it is refused instead of being written as literal placeholder text. Saving rewrites that file, so its comments and key order are not preserved.
+- Size the composer's model and thinking pickers to their labels instead of stretching the model box to a fixed width, and match their height to the icon buttons beside them. Long model names still shrink and ellipsize.
+
 ## 0.9.0
 
 - Stop the cache hit rate and usage details from flashing back to `—` while a response streams. Partial streaming usage (providers often report only the output count between full reports) now keeps the last reported input and cache token values instead of replacing them, and tool result usage no longer overwrites the assistant request usage display.

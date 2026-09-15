@@ -67,13 +67,13 @@
 }
 
 /* Composer pickers share the editor theme, not the platform select popup. */
-.choice-trigger { display: inline-flex; align-items: center; gap: 6px; min-width: 0; height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text); font-size: var(--chat-small-font-size); }
+.choice-trigger { display: inline-flex; align-items: center; gap: 5px; min-width: 0; height: 28px; padding: 4px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text); font-size: var(--chat-small-font-size); }
 .choice-trigger:hover:not(:disabled), .choice-trigger[aria-expanded="true"] { border-color: var(--focus); background: var(--hover); }
-.choice-model { flex: 1 1 100px; max-width: 280px; margin-left: auto; }
+.choice-model { flex: 0 1 auto; max-width: 240px; margin-left: auto; }
 .choice-thinking { flex: 0 1 auto; max-width: 125px; }
-.choice-symbol { flex: 0 0 auto; color: var(--accent); font-size: 16px; line-height: 1; }
+.choice-symbol { flex: 0 0 auto; color: var(--accent); font-size: 12px; line-height: 1; }
 .choice-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.choice-chevron { margin-left: auto; color: var(--muted); }
+.choice-chevron { flex: 0 0 auto; margin-left: 1px; color: var(--muted); font-size: 11px; line-height: 1; }
 .choice-panel { position: fixed; z-index: 75; display: flex; flex-direction: column; padding: 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; color: var(--vscode-quickInput-foreground, var(--text)); background: var(--vscode-quickInput-background, var(--surface-raised)); box-shadow: 0 12px 36px var(--vscode-widget-shadow, #0006); }
 .choice-heading { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px 8px; font-size: var(--chat-font-size); font-weight: 600; }
 .choice-close { width: 26px; height: 26px; border-radius: 5px; background: transparent; color: var(--muted); font-size: 20px; line-height: 1; }
@@ -103,10 +103,10 @@
 .choice-hint { flex: 0 0 auto; padding: 8px 5px 2px; margin-top: 6px; border-top: 1px solid var(--border); color: var(--muted); font-size: var(--chat-small-font-size); }
 @media (max-width: 480px) {
     .composer-options { flex-wrap: wrap; gap: 4px; }
-    .choice-model { order: 5; flex: 1 1 110px; max-width: none; margin-left: 0; }
+    .choice-model { order: 5; flex: 0 1 auto; max-width: none; margin-left: 0; }
     .choice-thinking { order: 6; max-width: 120px; }
     .send-actions { margin-left: auto; }
     .composer-options::after { content: ""; flex-basis: 100%; order: 4; }
-    .choice-trigger { height: 30px; }
+    .choice-trigger { height: 28px; }
     .session-footer .footer-status { flex-basis: 100%; }
 }

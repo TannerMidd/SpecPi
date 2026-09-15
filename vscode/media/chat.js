@@ -1540,6 +1540,19 @@
         button.disabled = state.status !== "ready" || Boolean(state.sending);
     }
 
+    function renderPackageSettings() {
+        const button = byId("package-settings-button");
+        const connected = ["ready", "busy", "retrying", "compacting"].includes(state.status);
+        const packages = connected ? state.packageSettings : null;
+        button.hidden = !packages;
+        if (!packages) {
+            return;
+        }
+
+        button.title = String(packages.detail || "Configure installed Pi packages").slice(0, 400);
+        button.disabled = state.status !== "ready" || Boolean(state.sending);
+    }
+
     function renderSelectionChip() {
         const chip = byId("selection-chip");
         const toggle = byId("selection-chip-toggle");
@@ -2099,7 +2112,9 @@
         renderMessages();
         renderModels();
         renderPermissions();
+        renderPackageSettings();
         permissionSettings?.render();
+        packageSettings?.render();
         renderAttachments();
         renderSelectionChip();
         renderRuntimeStatus();
@@ -2292,6 +2307,9 @@
     byId("permissions-button").addEventListener("click", () => {
         send({ type: "showPermissions" });
     });
+    byId("package-settings-button").addEventListener("click", () => {
+        send({ type: "showPackageSettings", target: state.packageSettings?.targets?.[0] });
+    });
     for (const suggestion of document.querySelectorAll("[data-suggestion]")) {
         suggestion.addEventListener("click", () => {
             input.value = suggestion.dataset.suggestion;
@@ -2346,7 +2364,7 @@
         }
     });
     document.addEventListener("keydown", (event) => {
-        if (byId("permission-settings").open) {
+        if (byId("permission-settings").open || byId("package-settings").open) {
             return;
         }
 
@@ -2388,6 +2406,7 @@
         }
 
         permissionSettings?.handleMessage(message);
+        packageSettings?.handleMessage(message);
         if (message.type === "state" && message.state && typeof message.state === "object") {
             renderState(hydrateMedia(message));
         } else if (message.type === "focus") {
@@ -2447,6 +2466,7 @@
     const modelPicker = window.SpecPiChoice?.install(byId("model-select"), { label: "Model", searchable: true });
     const thinkingPicker = window.SpecPiChoice?.install(byId("thinking-select"), { label: "Thinking level" });
     const permissionSettings = window.SpecPiPermissionSettings?.install({ send, getState: () => state });
+    const packageSettings = window.SpecPiPackageSettings?.install({ send, getState: () => state });
     extras = window.SpecPiExtras?.install({ send, getState: () => state, announce });
     history = window.SpecPiHistory?.install({ send, getState: () => state, announce });
     input.addEventListener("input", saveDraft);
