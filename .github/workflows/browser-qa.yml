@@ -1,0 +1,34 @@
+name: browser-qa
+
+on:
+  push:
+    paths: ["packages/browser-qa/**", ".github/workflows/browser-qa*.yml"]
+  pull_request:
+    paths: ["packages/browser-qa/**", ".github/workflows/browser-qa*.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/browser-qa
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+      - run: npm ci --ignore-scripts --omit=peer
+      - run: npm run setup -- --with-deps
+        if: runner.os == 'Linux'
+      - run: npm run setup
+        if: runner.os != 'Linux'
+      - run: npm run check
+      - run: git diff --check

@@ -73,6 +73,10 @@ SpecPi requests exact npm dependency saves for these installs and verifies insta
 
 BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and run `bunx betterwright@2.8.1 setup` before using browser tools. See [BetterWright setup](https://github.com/BetterWright/betterwright/blob/main/SETUP.md). The default package installation does not install Bun or download its browser. Provider credentials, web-service configuration, and permission rules remain governed by each package's documentation. Package installation and extension loading do not prove that every external service or tool is ready.
 
+## Standalone browser QA package
+
+[`packages/browser-qa`](packages/browser-qa/README.md) extracts the former in-house browser tools into an independent, Node-native Pi package: interactions, responsive screenshots, visual comparison, diagnostics, and accessibility checks. It has explicit Chromium setup and doctor commands, with no Bun requirement. It is released separately and is not installed by SpecPi; the default packages above are unchanged.
+
 ## VS Code
 
 [SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.8.1** lets you edit global or project permission settings, confirm changes, and keep a backup. The VSIX remains separate from the npm harness package.
