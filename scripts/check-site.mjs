@@ -16,10 +16,14 @@ const routes = new Map([
     ["/SpecPi/", ["index.html", "text/html"]],
     ["/SpecPi/styles.css", ["styles.css", "text/css"]],
     ["/SpecPi/wiki.css", ["wiki.css", "text/css"]],
+    ["/SpecPi/research.css", ["research.css", "text/css"]],
     ["/SpecPi/theme.js", ["theme.js", "text/javascript"]],
     ["/SpecPi/page.js", ["page.js", "text/javascript"]],
     ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
-    ...["wiki", "why-pi", "single-agent"].map((name) => [`/SpecPi/${name}/`, [`${name}/index.html`, "text/html"]]),
+    ...["wiki", "research", "why-pi", "single-agent"].map((name) => [
+        `/SpecPi/${name}/`,
+        [`${name}/index.html`, "text/html"],
+    ]),
 ]);
 for (const directory of ["fonts", "media"]) {
     for (const file of await fs.readdir(path.join(site, directory))) {
@@ -135,6 +139,23 @@ try {
         await page.locator('.wiki-sidebar a[href="#scope"]').click();
         assert.equal(new URL(page.url()).hash, "#scope");
         await page.screenshot({ path: path.join(screenshots, `docs-${name}.png`), fullPage: true });
+        await page.getByRole("link", { name: "Research", exact: true }).click();
+        await page.waitForURL(`${origin}/SpecPi/research/`);
+        assert.ok((await page.locator(".index-meta").innerText()).includes(chat.version));
+        assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
+        const research = await page.evaluate(() => ({
+            overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            missingAnchors: [...document.querySelectorAll('a[href^="#"]')]
+                .map((link) => link.getAttribute("href").slice(1))
+                .filter((id) => !document.getElementById(id)),
+            sections: document.querySelectorAll(".doc-section").length,
+            navLinks: document.querySelectorAll(".wiki-sidebar nav a").length,
+        }));
+        assert.equal(research.overflow, false, `${name} research overflows`);
+        assert.deepEqual(research.missingAnchors, []);
+        // Every sidebar entry must reach a section, or the contents read as broken.
+        assert.equal(research.sections, research.navLinks);
+        await page.screenshot({ path: path.join(screenshots, `research-${name}.png`), fullPage: true });
         process.stdout.write(`Site ${name}: PASS\n`);
     }
 

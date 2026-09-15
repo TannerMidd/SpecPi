@@ -30,6 +30,9 @@ function getWebviewHtml({
         permissionStyleUri || String(styleUri).replace(/chat\.css(?=[?#]|$)/u, "permission-settings.css");
     const permissionConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-config.js");
     const permissionSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-settings.js");
+    const subagentsConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "subagents-config.js");
+    const webAccessConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "web-access-config.js");
+    const packageSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "package-settings.js");
     const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cspSource}; img-src data:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';`;
 
     return `<!DOCTYPE html>
@@ -65,6 +68,7 @@ function getWebviewHtml({
             <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
             <symbol id="icon-pin" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6.5L7 13v2h10v-2l-3-3.5V3M12 15v6"/></symbol>
             <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+            <symbol id="icon-sliders" viewBox="0 0 24 24"><path d="M4 6h10m4 0h2M4 12h4m4 0h8M4 18h12m4 0h0M14 4v4M8 10v4M16 16v4"/></symbol>
         </defs>
     </svg>
     <div class="app">
@@ -143,6 +147,7 @@ function getWebviewHtml({
                         <button id="attach-selection" class="icon-button" type="button" title="Attach editor selection" aria-label="Attach editor selection">${icon("selection")}</button>
                     </div>
                     <button id="permissions-button" class="permissions-chip" type="button" title="Permission System settings" hidden>${icon("shield")}<span id="permissions-label">Permissions</span></button>
+                    <button id="package-settings-button" class="icon-button" type="button" title="Configure installed Pi packages" aria-label="Package settings" hidden>${icon("sliders")}</button>
                     <button id="defaults-button" class="icon-button" type="button" title="Save the current model and thinking level as Pi's startup default" aria-label="Save Pi startup defaults" hidden>${icon("pin")}</button>
                     <label class="sr-only" for="model-select">Model</label>
                     <select id="model-select" class="compact-select model-select" title="Model"><option value="">Default model</option></select>
@@ -212,8 +217,46 @@ function getWebviewHtml({
             <button id="permission-close" type="button">Close / discard draft</button>
         </div>
     </dialog>
+    <dialog id="package-settings" class="permission-settings package-settings" aria-labelledby="package-title">
+        <h2 id="package-title">Package settings</h2>
+        <p>Edit an installed package's own configuration file. Chat writes the file; the package keeps enforcing what is in it. Blank fields inherit the package default. Restart Pi after saving so the package reloads.</p>
+        <div class="permission-actions">
+            <label for="package-target">Configuration</label>
+            <select id="package-target">
+                <option value="subagents:extension">Subagents &middot; extension config</option>
+                <option value="subagents:global">Subagents &middot; Pi settings (global)</option>
+                <option value="subagents:project">Subagents &middot; Pi settings (project)</option>
+                <option value="webAccess">Web access &middot; providers and keys</option>
+            </select>
+            <button id="package-reload" type="button">Load / discard draft</button>
+        </div>
+        <p id="package-path" class="permission-path"></p>
+        <p id="package-scope-note" class="package-note" hidden></p>
+        <section id="package-credentials" class="package-credentials" aria-labelledby="package-credential-title" hidden>
+            <h3 id="package-credential-title">Provider credentials</h3>
+            <p id="package-credential-summary"></p>
+            <ul id="package-credential-list"></ul>
+            <p>Stored keys are never displayed, copied, or logged by Chat. Each one shows as a row of dots below and is written back unchanged unless you replace it. Delete a key to remove it. Saving rewrites this file, so comments and key order are not preserved.</p>
+        </section>
+        <fieldset id="package-fields"><legend>Settings</legend></fieldset>
+        <details id="package-advanced">
+            <summary>Full configuration JSON</summary>
+            <p>Every key in the file, including ones without a field above. Form edits reformat JSON and remove comments; editing here preserves them. Trailing commas are not supported.</p>
+            <label for="package-source">Complete configuration</label>
+            <textarea id="package-source" rows="18" maxlength="262144" spellcheck="false"></textarea>
+        </details>
+        <p id="package-feedback" role="status" aria-live="polite"></p>
+        <div class="permission-actions">
+            <button id="package-save" type="button" class="primary-button">Save settings&hellip;</button>
+            <button id="package-restart" type="button" disabled>Restart Pi</button>
+            <button id="package-close" type="button">Close / discard draft</button>
+        </div>
+    </dialog>
     <script nonce="${attribute(nonce)}" src="${attribute(permissionConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(permissionSettingsScript)}"></script>
+    <script nonce="${attribute(nonce)}" src="${attribute(subagentsConfigScript)}"></script>
+    <script nonce="${attribute(nonce)}" src="${attribute(webAccessConfigScript)}"></script>
+    <script nonce="${attribute(nonce)}" src="${attribute(packageSettingsScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(extrasScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(historyScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(scriptUri)}"></script>

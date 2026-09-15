@@ -1,0 +1,227 @@
+/* Research page components. Everything else comes from styles.css and
+   wiki.css so the page keeps the rest of the site's type, color and layout. */
+
+.verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1px;
+    margin: 1.5rem 0;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.verdict > div {
+    background: var(--surface);
+    padding: 1.1rem 1.2rem;
+}
+.verdict dt {
+    font: 0.7rem var(--mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+}
+.verdict dd {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+.verdict strong {
+    display: block;
+    font-size: 1.05rem;
+    margin-bottom: 0.3rem;
+}
+
+.metric-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1.25rem;
+    margin: 1.5rem 0;
+}
+.metric-row > div {
+    border-top: 2px solid var(--accent);
+    padding-top: 0.75rem;
+}
+.metric-value {
+    display: block;
+    font: 600 1.9rem/1.1 var(--sans);
+    font-variant-numeric: tabular-nums;
+}
+.metric-label {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+/* Paired bars. Each row is one benchmark; the two bars share that row's
+   scale, and the scale is stated in the caption because the metrics differ. */
+.compare {
+    margin: 1.5rem 0;
+    max-width: 40rem;
+}
+.compare-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 1.25rem;
+}
+.compare-key span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+.compare-key i {
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 2px;
+}
+.swatch-single {
+    background: var(--muted);
+}
+.swatch-multi {
+    background: var(--accent);
+}
+.compare-row {
+    margin-bottom: 1.1rem;
+}
+.compare-row > p {
+    margin: 0 0 0.4rem;
+    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: baseline;
+}
+.compare-row > p span {
+    font: 0.72rem var(--mono);
+    color: var(--muted);
+}
+/* A grid, not a flex row: the bar's percentage resolves against the track
+   column only, so a long bar plus its value can never overflow the page. */
+.compare-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+.compare-bar > i {
+    height: 0.95rem;
+    border-radius: 2px;
+    min-width: 2px;
+}
+.compare-bar > b {
+    font: 500 0.8rem var(--mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.compare-bar.is-single > i {
+    background: var(--muted);
+}
+.compare-bar.is-multi > i {
+    background: var(--accent);
+}
+.compare-bar.is-single > b {
+    color: var(--muted);
+}
+
+.callout {
+    margin: 1.5rem 0;
+    padding: 1.1rem 1.25rem;
+    border-left: 2px solid var(--accent);
+    background: var(--surface);
+    font-size: 0.9rem;
+    line-height: 1.65;
+}
+.callout p {
+    margin: 0;
+    max-width: none;
+}
+.callout p + p {
+    margin-top: 0.7rem;
+}
+.callout strong {
+    color: var(--text);
+}
+.callout-warn {
+    border-left-color: var(--ask);
+}
+
+.figure-note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0.75rem 0 0;
+    max-width: 65ch;
+}
+
+.source-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.25rem 0 0;
+    font-size: 0.85rem;
+}
+.source-list li {
+    border-top: 1px solid var(--line);
+    padding: 0.85rem 0;
+    line-height: 1.6;
+}
+.source-list li + li {
+    margin-top: 0;
+}
+.source-list b {
+    font-weight: 600;
+}
+.source-list span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 0.2rem;
+}
+
+.doc-section table.numeric td:not(:first-child),
+.doc-section table.numeric th:not(:first-child) {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.doc-section table .row-pi {
+    font-weight: 600;
+}
+.doc-section table .row-pi td {
+    border-bottom-color: var(--accent);
+}
+
+/* Identifiers must not break mid-word; the scroll container handles narrow
+   viewports instead. */
+.doc-section .settings-table td:first-child,
+.doc-section .settings-table th:first-child {
+    width: 1%;
+    white-space: nowrap;
+    padding-right: 1.75rem;
+}
+.doc-section .settings-table td:first-child code {
+    overflow-wrap: normal;
+}
+
+.doc-section .table-scroll {
+    overflow-x: auto;
+    margin: 1.25rem 0;
+}
+.doc-section .table-scroll table {
+    margin: 0;
+    min-width: 34rem;
+}
+
+@media (max-width: 600px) {
+    .metric-value {
+        font-size: 1.6rem;
+    }
+    .verdict > div {
+        padding: 1rem;
+    }
+}

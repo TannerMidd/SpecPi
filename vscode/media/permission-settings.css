@@ -106,3 +106,77 @@
 #permission-feedback[data-error="true"] {
     color: var(--error);
 }
+
+/* Package settings reuse the permission dialog's chrome and add a credential
+   roster and the two-column field grid the wider key lists need. */
+.package-settings .package-field {
+    margin-bottom: 14px;
+    min-width: 0;
+}
+.package-settings .package-field label {
+    display: block;
+    margin-bottom: 6px;
+}
+.package-settings .package-field p {
+    margin: 4px 0;
+    font-size: var(--chat-small-font-size);
+}
+.package-settings fieldset {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0 16px;
+}
+.package-settings legend {
+    padding: 0 4px;
+}
+.package-note {
+    margin: 4px 0 12px;
+    font-size: var(--chat-small-font-size);
+}
+.package-credentials {
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+.package-credentials h3 {
+    margin: 0 0 6px;
+    font-size: var(--chat-font-size);
+}
+.package-credentials p {
+    font-size: var(--chat-small-font-size);
+}
+.package-credentials ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 2px 16px;
+    margin: 8px 0;
+    padding: 0;
+    list-style: none;
+    max-height: 200px;
+    overflow: auto;
+}
+.package-credentials li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 3px 0;
+    font-size: var(--chat-small-font-size);
+}
+.package-credentials li code {
+    color: var(--text);
+    font-family: var(--vscode-editor-font-family, monospace);
+    overflow-wrap: anywhere;
+}
+.package-credentials li span {
+    flex: 0 0 auto;
+    color: var(--muted);
+}
+#package-feedback {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+}
+#package-feedback[data-error="true"] {
+    color: var(--error);
+}
