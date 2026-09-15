@@ -38,14 +38,14 @@ try {
     const authPath = path.join(agentDir, "auth.json");
     fs.writeFileSync(authPath, "{}\n");
     run(cli, ["plan"]);
-    run(cli, ["install", "--yes"]);
+    assert.match(run(cli, ["install", "--yes"]), /Browser QA is ready\./u);
     const npmDependencies = JSON.parse(fs.readFileSync(path.join(agentDir, "npm/package.json"))).dependencies;
     for (const source of basePackages) {
         const split = source.lastIndexOf("@");
         assert.equal(npmDependencies[source.slice(4, split)], source.slice(split + 1), `Unpinned npm entry: ${source}`);
     }
 
-    run(cli, ["doctor"]);
+    assert.match(run(cli, ["doctor"]), /Browser QA is ready\./u);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).packages, basePackages);
     const probe = path.join(root, "resource-probe.mjs");
     fs.writeFileSync(
@@ -70,7 +70,7 @@ process.exit(0);
     assert.ok(line, output);
     const resources = JSON.parse(line.slice("SPECPI_BASE=".length));
     assert.deepEqual(resources.errors, [], JSON.stringify(resources.errors));
-    // Each upstream package supplies one extension, alongside the two first-party extensions.
+    // Each separately installed package supplies one extension, alongside the two harness extensions.
     assert.equal(resources.paths.length, basePackages.length + 2, JSON.stringify(resources.paths));
     assert.equal(
         resources.paths.some((file) => file.includes("pi-background-tasks")),
@@ -80,6 +80,29 @@ process.exit(0);
         resources.paths.some((file) => file.includes("pi-lens")),
         false,
     );
+    assert.equal(
+        resources.paths.some((file) => file.includes("betterwright")),
+        false,
+    );
+    for (const tool of [
+        "browser_accessibility",
+        "browser_open",
+        "browser_set_viewport",
+        "browser_snapshot",
+        "browser_click",
+        "browser_fill",
+        "browser_diagnostics",
+        "browser_press",
+        "browser_select_option",
+        "browser_wait_for",
+        "browser_screenshot",
+        "browser_save_baseline",
+        "browser_compare_screenshot",
+        "browser_close",
+    ]) {
+        assert.ok(resources.tools.includes(tool), `Missing Browser QA tool: ${tool}`);
+    }
+
     assert.equal(resources.tools.includes("lens_diagnostics"), false);
     assert.equal(resources.commands.includes("claude-cache"), false);
     assert.equal(resources.tools.includes("bg_run"), false);
@@ -102,7 +125,7 @@ process.exit(0);
     assert.equal(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).packages, undefined);
     assert.equal(fs.readFileSync(authPath, "utf8"), "{}\n");
     console.log(
-        `OK: ${basePackages.length} package pins acquired, ${resources.paths.length} extensions loaded without errors or tool collisions, lifecycle and synthetic auth canary verified.`,
+        `OK: ${basePackages.length} package pins acquired, ${resources.paths.length} extensions loaded without errors or tool collisions, all 14 Browser QA registrations and Chromium readiness, lifecycle and synthetic auth canary verified.`,
     );
     passed = true;
 } finally {

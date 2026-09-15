@@ -19,6 +19,7 @@ function fixture(t) {
     const settings = path.join(agent, "settings.json");
     const log = path.join(root, "calls.jsonl");
     const fake = path.join(root, "fake pi.mjs");
+    const browserLog = path.join(root, "browser-calls.jsonl");
     fs.writeFileSync(
         fake,
         `
@@ -44,7 +45,24 @@ fs.writeFileSync(file, JSON.stringify(settings));
 const dir = path.join(process.env.PI_CODING_AGENT_DIR, 'npm/node_modules', name);
 fs.mkdirSync(dir, {recursive:true});
 const version = source === process.env.FAKE_DRIFT ? '0.0.0' : source.slice(at + 1);
-fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({name, version}));
+const browser = name === 'specpi-browser-qa';
+fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({name, version, ...(browser ? {bin: {'specpi-browser-qa': './bin/browser-qa.mjs'}} : {})}));
+if (browser) {
+    fs.mkdirSync(path.join(dir, 'bin'), {recursive: true});
+    fs.writeFileSync(path.join(dir, 'bin/browser-qa.mjs'), \`
+import fs from 'node:fs';
+import path from 'node:path';
+const command = process.argv[2];
+fs.appendFileSync(process.env.FAKE_BROWSER_LOG, JSON.stringify({command, node: process.execPath, args: process.argv.slice(2)}) + '\\\\n');
+const ready = path.join(process.env.PI_CODING_AGENT_DIR, 'fake-chromium-ready');
+if (command === 'setup') {
+    fs.writeFileSync(ready, 'downloaded browser bytes');
+    if (process.env.FAKE_BROWSER_FAIL === 'setup') { process.exit(1); }
+}
+if (!fs.existsSync(ready) || process.env.FAKE_BROWSER_FAIL === 'doctor') { process.exit(1); }
+console.log('Browser QA is ready.');
+\`);
+}
 if (source === process.env.FAKE_FAIL) { process.exit(1); }
 `,
     );
@@ -56,6 +74,7 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
                 PI_CODING_AGENT_DIR: agent,
                 SPECPI_PI: fake,
                 FAKE_LOG: log,
+                FAKE_BROWSER_LOG: browserLog,
                 npm_config_save_exact: "false",
                 NPM_CONFIG_SAVE_EXACT: "false",
                 ...extraEnv,
@@ -70,13 +89,13 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
         return result;
     };
 
-    return { root, agent, settings, log, fake, invoke, run };
+    return { root, agent, settings, log, browserLog, fake, invoke, run };
 }
 
 test("the default base is exactly the six human-selected pinned packages", () => {
     assert.deepEqual(basePackages, [
         "npm:pi-web-access@0.29.0",
-        "npm:betterwright@2.8.1",
+        "npm:specpi-browser-qa@0.1.0",
         "npm:pi-subagents@0.67.0",
         "npm:pi-goal-x@0.31.2",
         "npm:@sreetej510/pi-usage@0.10.0",
@@ -120,13 +139,20 @@ test("default lifecycle installs each pin through Pi, preserves filters, and res
     f.run("uninstall", "--yes");
     assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)), before);
     assert.equal(fs.readFileSync(path.join(f.agent, "auth.json"), "utf8"), "synthetic private canary");
-    assert.ok(fs.existsSync(path.join(f.agent, "npm/node_modules/betterwright/package.json")));
+    assert.ok(fs.existsSync(path.join(f.agent, "npm/node_modules/specpi-browser-qa/package.json")));
+    const calls = fs.readFileSync(f.browserLog, "utf8").trim().split("\n").map(JSON.parse);
+    assert.deepEqual(
+        calls.map((call) => call.command),
+        ["setup", "doctor", "setup"],
+    );
+    assert.ok(calls.every((call) => call.node === process.execPath && call.args.length === 1));
 });
 
-test("updates retire only unchanged SpecPi-added background-task and lens entries", async (t) => {
+test("updates retire only unchanged SpecPi-added retired package entries", async (t) => {
     for (const [name, version] of [
         ["pi-background-tasks", "2.5.0"],
         ["pi-lens", "4.1.6"],
+        ["betterwright", "2.8.1"],
     ]) {
         for (const modified of [false, true]) {
             await t.test(`${name}: ${modified ? "user edit survives" : "owned entry retires"}`, (t) => {
@@ -213,6 +239,93 @@ test("doctor detects missing package bytes and removal preserves user-modified p
     fs.writeFileSync(f.settings, JSON.stringify(settings));
     f.run("uninstall", "--yes");
     assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, ["npm:pi-web-access@user-choice"]);
+});
+
+test("browser skip acquires packages but doctor requires real readiness without setup", (t) => {
+    const f = fixture(t);
+    const plan = f.run("plan", "--skip-browser-install");
+    assert.match(plan.stdout, /Chromium setup skipped/);
+    assert.equal(fs.existsSync(f.browserLog), false);
+    f.run("install", "--yes", "--skip-browser-install");
+    assert.equal(fs.existsSync(f.browserLog), false);
+    assert.equal(fs.readFileSync(f.log, "utf8").trim().split("\n").length, basePackages.length);
+    assert.match(f.invoke(["doctor"]).stderr, /Browser QA doctor failed/);
+    assert.equal(fs.existsSync(path.join(f.agent, "fake-chromium-ready")), false);
+    f.run("update", "--yes", "--skip-browser-install");
+    assert.deepEqual(
+        fs
+            .readFileSync(f.browserLog, "utf8")
+            .trim()
+            .split("\n")
+            .map(JSON.parse)
+            .map((call) => call.command),
+        ["doctor"],
+    );
+    f.run("update", "--yes");
+    f.run("doctor");
+    assert.notEqual(f.invoke(["doctor"], { FAKE_BROWSER_FAIL: "doctor" }).status, 0);
+    fs.unlinkSync(path.join(f.agent, "npm/node_modules/specpi-browser-qa/bin/browser-qa.mjs"));
+    assert.match(f.invoke(["doctor"]).stderr, /Browser QA doctor failed/);
+});
+
+test("doctor refuses changed Browser QA bin metadata without executing it", (t) => {
+    const f = fixture(t);
+    f.run("install", "--yes", "--skip-browser-install");
+    const file = path.join(f.agent, "npm/node_modules/specpi-browser-qa/package.json");
+    const installed = JSON.parse(fs.readFileSync(file));
+    installed.bin["specpi-browser-qa"] = "../../outside.mjs";
+    fs.writeFileSync(file, JSON.stringify(installed));
+    assert.match(f.invoke(["doctor"]).stderr, /changed pinned Browser QA bin metadata/);
+    assert.equal(fs.existsSync(f.browserLog), false);
+});
+
+test("core-only lifecycle never acquires or checks a browser", (t) => {
+    const f = fixture(t);
+    f.run("plan", "--skip-package-install");
+    f.run("install", "--yes", "--skip-package-install");
+    f.run("update", "--yes", "--skip-package-install");
+    f.run("doctor");
+    f.run("uninstall", "--yes");
+    assert.equal(fs.existsSync(f.log), false);
+    assert.equal(fs.existsSync(f.browserLog), false);
+});
+
+test("failed Chromium setup rolls back managed configuration while browser bytes may remain", (t) => {
+    const f = fixture(t);
+    f.run("install", "--yes", "--skip-package-install");
+    const files = ["specpi/manifest.json", "AGENTS.md", "extensions/workflow-controls/index.ts"];
+    const before = files.map((file) => fs.readFileSync(path.join(f.agent, file), "utf8"));
+    const failed = f.invoke(["update", "--yes"], { FAKE_BROWSER_FAIL: "setup" });
+    assert.notEqual(failed.status, 0);
+    assert.match(failed.stderr, /rolled back.*Browser QA setup failed/s);
+    assert.match(failed.stderr, /browser-cache bytes.*may remain/);
+    assert.deepEqual(
+        files.map((file) => fs.readFileSync(path.join(f.agent, file), "utf8")),
+        before,
+    );
+    assert.equal(fs.existsSync(f.settings), false);
+    assert.equal(fs.existsSync(path.join(f.agent, "fake-chromium-ready")), true);
+    f.run("doctor");
+});
+
+test("pre-existing BetterWright ownership is restored through migration and uninstall", (t) => {
+    const f = fixture(t);
+    const original = { source: "npm:betterwright@2.7.0", extensions: [] };
+    fs.writeFileSync(f.settings, JSON.stringify({ packages: [original] }));
+    f.run("install", "--yes");
+    const manifestPath = path.join(f.agent, "specpi/manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(manifestPath));
+    const installed = { ...original, source: "npm:betterwright@2.8.1" };
+    manifest.basePackages.push(installed.source);
+    manifest.packageChanges.push({ identity: "npm:betterwright", beforeExists: true, before: original, installed });
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+    const settings = JSON.parse(fs.readFileSync(f.settings));
+    settings.packages[0] = installed;
+    fs.writeFileSync(f.settings, JSON.stringify(settings));
+    f.run("update", "--yes");
+    assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, [original, ...basePackages]);
+    f.run("uninstall", "--yes");
+    assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, [original]);
 });
 
 test("malformed package configuration fails before acquisition and is preserved", (t) => {
