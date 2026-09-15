@@ -29,6 +29,7 @@ const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./
 const { SUBAGENT_WIDGET, decodeFleet } = require("./subagents.js");
 const { permissionState } = require("./permissions.js");
 const { loadPermissionSettings, savePermissionSettings } = require("./permission-settings.js");
+const { modelThinkingOverride, readDefaults, saveDefaults } = require("./pi-defaults.js");
 const { validate: validatePermissionConfig } = require("../media/permission-config.js");
 const { stripVTControlCharacters } = require("node:util");
 const { ConversationCoordinator } = require("./conversation-coordinator.js");
@@ -710,7 +711,7 @@ class ChatController {
             if (/^\/help\s*$/.test(text)) {
                 appendNotice(
                     this.state,
-                    "Use /new for a fresh chat, /compact to compact context, and the command menu for installed Pi skills and SpecPi commands. Choose models and thinking below the composer. Attach files or selected text explicitly. Enter sends; Shift+Enter inserts a newline; Stop clears queued messages before aborting. Provider login is managed in the Pi terminal.",
+                    "Use /new for a fresh chat, /compact to compact context, and the command menu for installed Pi skills and SpecPi commands. Choose models and thinking below the composer, and pin them as Pi's startup defaults with the pin button. Attach files or selected text explicitly. Enter sends; Shift+Enter inserts a newline; Stop clears queued messages before aborting. Provider login is managed in the Pi terminal.",
                 );
 
                 return;
@@ -719,7 +720,7 @@ class ChatController {
             if (/^\/(?:settings|login|logout)\s*$/.test(text)) {
                 appendNotice(
                     this.state,
-                    "Manage provider sign-in and Pi settings in a terminal using Pi. SpecPi Chat reuses Pi's configuration; reconnect after making changes.",
+                    "Manage provider sign-in in a terminal using Pi. Save the current model and thinking level as Pi's startup defaults with the pin button next to the model picker; reconnect after changing settings.",
                 );
 
                 return;
@@ -1557,6 +1558,165 @@ class ChatController {
         await this.refresh(client);
     }
 
+    requireStartupDefaults() {
+        const workspace = this.requireWorkspace();
+        if (
+            !this.client ||
+            !this.isForeground() ||
+            this.state.status !== "ready" ||
+            this.transitioning ||
+            this.sending ||
+            this.state.uiRequest ||
+            this.state.queueCount
+        ) {
+            throw new Error("Connect Pi and wait for the chat to be idle.");
+        }
+
+        // A thinking level is only needed by the thinking pins, which are
+        // offered below solely when Pi has reported one.
+        if (!this.state.model?.id || !this.state.model.provider) {
+            throw new Error("Choose a model before saving Pi startup defaults.");
+        }
+
+        return workspace;
+    }
+
+    // Saves what the pickers currently show as Pi's startup defaults in the
+    // global settings file. Pi's RPC cannot persist defaults, so Chat edits
+    // the documented keys itself; the transaction in pi-defaults.js keeps the
+    // rest of the file untouched and backs it up first.
+    async saveStartupDefaults() {
+        const workspace = this.requireStartupDefaults();
+        const snapshot = readDefaults({ workspace });
+        const client = this.client;
+        const model = this.state.model;
+        const level = this.state.thinkingLevel;
+        const levels = this.state.thinkingLevels;
+        const key = `${model.provider}/${model.id}`;
+        const override = modelThinkingOverride(snapshot.settings, model.provider, model.id);
+        const choices = [
+            {
+                kind: "model",
+                label: `Startup model: ${model.name || model.id}`,
+                description: `${key} starts new chats`,
+            },
+        ];
+        // Pi does not report a thinking level for every model; pinning one is
+        // only offered when it has, so the model pin stays usable either way.
+        if (level && levels?.length) {
+            choices.push(
+                {
+                    kind: "thinkingGlobal",
+                    label: `Startup thinking (all models): ${level}`,
+                    description: "Per-model overrides still take precedence",
+                },
+                {
+                    kind: "thinkingModel",
+                    label: `Thinking for ${key}: ${level}`,
+                    description: "Applies in every chat that selects this model",
+                },
+            );
+        }
+
+        if (override !== undefined) {
+            choices.push({
+                kind: "thinkingRemove",
+                label: `Remove thinking override for ${key}`,
+                description: `Currently "${override}"; falls back to the global startup level`,
+            });
+        }
+
+        // Hold the send lock across both dialogs so a message cannot start
+        // between the confirmation and the write.
+        this.sending = true;
+        this.publish();
+        try {
+            const selected = await vscode.window.showQuickPick(choices, {
+                title: "SpecPi Chat · Save Pi startup defaults",
+            });
+            if (!selected || this.client !== client || !this.isForeground()) {
+                return;
+            }
+
+            const confirmations = {
+                model: {
+                    message: `Save ${model.name || model.id} as Pi's startup model?`,
+                    detail: `Destination: ${snapshot.path}
+Writes defaultProvider and defaultModel. Existing settings are backed up first. New chats use the default after reconnecting Pi.`,
+                    button: "Save startup model",
+                },
+                thinkingGlobal: {
+                    message: `Save "${level}" as Pi's startup thinking level?`,
+                    detail: `Destination: ${snapshot.path}
+Writes defaultThinkingLevel. Existing settings are backed up first. New chats use it after reconnecting Pi; per-model overrides take precedence.`,
+                    button: "Save startup thinking",
+                },
+                thinkingModel: {
+                    message: `Always use thinking "${level}" for ${key}?`,
+                    detail: `Destination: ${snapshot.path}
+Writes a modelThinkingLevels entry for ${key}. Pi then starts this model at "${level}" whenever it is selected — in every chat, not only when it is the startup model. Existing settings are backed up first; reconnect Pi to pick the entry up.`,
+                    button: "Save model default",
+                },
+                thinkingRemove: {
+                    message: `Remove the thinking override for ${key}?`,
+                    detail: `Destination: ${snapshot.path}
+Removes the modelThinkingLevels entry, so selecting this model falls back to the global startup level. Existing settings are backed up first.`,
+                    button: "Remove override",
+                },
+            };
+            const confirmation = confirmations[selected.kind];
+            const answer = await vscode.window.showWarningMessage(
+                confirmation.message,
+                { modal: true, detail: confirmation.detail },
+                confirmation.button,
+            );
+            if (answer !== confirmation.button) {
+                return;
+            }
+
+            // Recheck trust, connection, runtime activity, and the pinned
+            // values after the native confirmation.
+            this.requireWorkspace();
+            if (
+                client !== this.client ||
+                this.disposed ||
+                !this.isForeground() ||
+                this.state.status !== "ready" ||
+                this.transitioning ||
+                this.state.uiRequest ||
+                this.state.queueCount ||
+                this.state.model?.id !== model.id ||
+                this.state.model?.provider !== model.provider ||
+                this.state.thinkingLevel !== level
+            ) {
+                throw new Error("The chat changed. No startup defaults were saved.");
+            }
+
+            const patches = {
+                model: { defaultProvider: model.provider, defaultModel: model.id },
+                thinkingGlobal: { defaultThinkingLevel: level },
+                thinkingModel: { modelThinkingLevel: { provider: model.provider, modelId: model.id, level } },
+                thinkingRemove: { modelThinkingLevel: { provider: model.provider, modelId: model.id, level: null } },
+            };
+            const saved = saveDefaults(snapshot, patches[selected.kind], levels);
+            const notices = {
+                model: `Saved ${model.name || model.id} (${key}) as Pi's startup model in ${saved.path}.`,
+                thinkingGlobal: `Saved "${level}" as Pi's startup thinking level in ${saved.path}.`,
+                thinkingModel: `Saved "${level}" as the thinking level for ${key} in ${saved.path}.`,
+                thinkingRemove: `Removed the thinking override for ${key} in ${saved.path}.`,
+            };
+            appendNotice(
+                this.state,
+                saved.changed
+                    ? `${notices[selected.kind]} New chats use it after reconnecting Pi.`
+                    : `Pi's startup defaults in ${saved.path} already match this choice. Nothing was changed.`,
+            );
+        } finally {
+            this.sending = false;
+            this.publish();
+        }
+    }
+
     requirePermissionSettings() {
         this.requireWorkspace();
         if (
@@ -1967,6 +2127,9 @@ class ChatController {
                 break;
             case "setModel":
                 await this.setModel(message.modelId, message.provider);
+                break;
+            case "saveDefaults":
+                await this.saveStartupDefaults();
                 break;
             case "setThinking":
                 this.requireWorkspace();

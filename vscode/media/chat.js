@@ -1508,6 +1508,18 @@
         thinking.value = state.thinkingLevel || "off";
         thinking.disabled = state.status !== "ready" || validLevels.length < 2;
         thinking.title = `Thinking level: ${state.thinkingLevel || "off"}`;
+        const defaultsButton = byId("defaults-button");
+        // Mirror requireStartupDefaults: the model pin needs a model, and the
+        // thinking pins are only offered when Pi has reported a level.
+        defaultsButton.hidden = state.status !== "ready" || !state.model?.id || !state.model.provider;
+        if (!defaultsButton.hidden) {
+            const name = state.model.name || state.model.id;
+            defaultsButton.title =
+                state.thinkingLevel && validLevels.length
+                    ? `Save ${name} and ${state.thinkingLevel} thinking as Pi's startup default`
+                    : `Save ${name} as Pi's startup model`;
+        }
+
         modelPicker?.update();
         thinkingPicker?.update();
     }
@@ -2272,6 +2284,9 @@
     byId("thinking-select").addEventListener("change", (event) => {
         send({ type: "setThinking", level: event.target.value });
         renderModels();
+    });
+    byId("defaults-button").addEventListener("click", () => {
+        send({ type: "saveDefaults" });
     });
     // The mode itself is chosen in a VS Code picker; the webview only asks for it to open.
     byId("permissions-button").addEventListener("click", () => {

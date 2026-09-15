@@ -48,6 +48,10 @@ export const SOURCE_ROOT_FILES = Object.freeze([
 const EXCLUDED_DIRECTORY_NAMES = new Set([
     ".git",
     ".next",
+    // Test and packaging scratch output. It lands at the repository root, and
+    // also under vscode/ whenever a check runs with that as its cwd, so it does
+    // fall inside the scanned SOURCE_DIRECTORIES.
+    ".specpi-test",
     "build",
     "coverage",
     "desktop",

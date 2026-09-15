@@ -63,6 +63,7 @@ function getWebviewHtml({
             <symbol id="icon-spark" viewBox="0 0 24 24"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></symbol>
             <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3.4 5 6.1v5.2c0 4.4 2.8 7.6 7 9.3 4.2-1.7 7-4.9 7-9.3V6.1z"/></symbol>
             <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+            <symbol id="icon-pin" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6.5L7 13v2h10v-2l-3-3.5V3M12 15v6"/></symbol>
             <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
         </defs>
     </svg>
@@ -142,6 +143,7 @@ function getWebviewHtml({
                         <button id="attach-selection" class="icon-button" type="button" title="Attach editor selection" aria-label="Attach editor selection">${icon("selection")}</button>
                     </div>
                     <button id="permissions-button" class="permissions-chip" type="button" title="Permission System settings" hidden>${icon("shield")}<span id="permissions-label">Permissions</span></button>
+                    <button id="defaults-button" class="icon-button" type="button" title="Save the current model and thinking level as Pi's startup default" aria-label="Save Pi startup defaults" hidden>${icon("pin")}</button>
                     <label class="sr-only" for="model-select">Model</label>
                     <select id="model-select" class="compact-select model-select" title="Model"><option value="">Default model</option></select>
                     <label class="sr-only" for="thinking-select">Thinking level</label>

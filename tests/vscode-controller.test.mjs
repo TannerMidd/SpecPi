@@ -304,6 +304,24 @@ function fixture(t, options = {}) {
                     ? options.savePermissions(snapshot, text)
                     : { ...snapshot, text, exists: true, revision: "saved" },
         },
+        "./pi-defaults.js": {
+            readDefaults: () =>
+                options.readDefaults
+                    ? options.readDefaults()
+                    : {
+                          path: "synthetic-settings.json",
+                          exists: false,
+                          text: "{}",
+                          settings: {},
+                          revision: "missing",
+                      },
+            saveDefaults: (snapshot, patch) =>
+                options.saveDefaults
+                    ? options.saveDefaults(snapshot, patch)
+                    : { ...snapshot, exists: true, revision: "saved", changed: true },
+            modelThinkingOverride: (settings, provider, modelId) =>
+                extensionRequire("./pi-defaults.js").modelThinkingOverride(settings, provider, modelId),
+        },
         "./code-references.js": {
             resolveCodeReference: (input) =>
                 options.resolveCode
@@ -1161,6 +1179,186 @@ test("permission saves require native confirmation, bind their path to the opene
     await controller.handleMessage({ type: "savePermissions", id: snapshot.id, contextToken: "stale", text: "{}" });
     assert.equal(writes.length, 1);
     assert.match(posted.findLast((message) => message.type === "permissionSaveResult").error, /stale/u);
+});
+
+test("startup default pins offer quick pick, confirm, and save only the current selection", async (t) => {
+    const saves = [];
+    const model = { id: "model", name: "Model", provider: "provider" };
+    const { controller, client, quickPicks } = await connected(t, {
+        request: (type) => (type === "get_state" ? { model, thinkingLevel: "medium" } : undefined),
+        readDefaults: () => ({
+            path: "synthetic-settings.json",
+            exists: true,
+            text: "{}",
+            settings: { theme: "dark" },
+            revision: "one",
+        }),
+        saveDefaults: (snapshot, patch) => {
+            saves.push({ snapshot, patch });
+
+            return { ...snapshot, changed: true };
+        },
+        quickPick: (items) => items[0],
+        warningAnswer: (...args) => (args.includes("Save startup model") ? "Save startup model" : undefined),
+    });
+
+    await controller.handleMessage({ type: "saveDefaults" });
+    assert.equal(quickPicks.length, 1);
+    assert.equal(quickPicks[0].length, 3, "without a stored override only model and thinking choices exist");
+    assert.equal(saves.length, 1);
+    assert.deepEqual(saves[0].patch, { defaultProvider: "provider", defaultModel: "model" });
+    assert.equal(saves[0].snapshot.settings.theme, "dark", "the snapshot binds the save to the read settings");
+    assert.ok(
+        controller.state.messages.some((message) => message.role === "notice" && /startup model/.test(message.text)),
+    );
+    assert.equal(
+        client.requests.some((request) => request.type === "prompt"),
+        false,
+    );
+});
+
+test("thinking pins save a per-model override or remove it after confirmation", async (t) => {
+    const saves = [];
+    const model = { id: "model", name: "Model", provider: "provider" };
+    const { controller, quickPicks } = await connected(t, {
+        request: (type) => (type === "get_state" ? { model, thinkingLevel: "medium" } : undefined),
+        readDefaults: () => ({
+            path: "synthetic-settings.json",
+            exists: true,
+            text: "{}",
+            settings: { modelThinkingLevels: { "provider/model": "high" } },
+            revision: "one",
+        }),
+        saveDefaults: (snapshot, patch) => {
+            saves.push(patch);
+
+            return { ...snapshot, changed: true };
+        },
+        quickPick: (items, index) => items[index === 1 ? 2 : 3],
+        warningAnswer: (_message, _options, button) => button,
+    });
+
+    await controller.handleMessage({ type: "saveDefaults" });
+    assert.equal(quickPicks[0].length, 4, "a stored override offers a remove choice");
+    assert.match(quickPicks[0][3].label, /Remove thinking override/u);
+    assert.deepEqual(saves[0], {
+        modelThinkingLevel: { provider: "provider", modelId: "model", level: "medium" },
+    });
+
+    await controller.handleMessage({ type: "saveDefaults" });
+    assert.deepEqual(saves[1], {
+        modelThinkingLevel: { provider: "provider", modelId: "model", level: null },
+    });
+});
+
+test("startup default pins require an idle connected chat", async (t) => {
+    const { controller } = fixture(t);
+    await assert.rejects(controller.handleMessage({ type: "saveDefaults" }), /idle/u);
+});
+
+test("startup default pins refuse an in-flight send, a queued message, or a pending request", async (t) => {
+    const saves = [];
+    const model = { id: "model", name: "Model", provider: "provider" };
+    const { controller } = await connected(t, {
+        request: (type) => (type === "get_state" ? { model, thinkingLevel: "medium" } : undefined),
+        saveDefaults: (snapshot, patch) => {
+            saves.push(patch);
+
+            return { ...snapshot, changed: true };
+        },
+        quickPick: (items) => items[0],
+        warningAnswer: (_message, _options, button) => button,
+    });
+
+    // send() sets this.sending before Pi reports the run as busy.
+    controller.sending = true;
+    await assert.rejects(controller.handleMessage({ type: "saveDefaults" }), /idle/u);
+    controller.sending = false;
+
+    controller.transitioning = true;
+    await assert.rejects(controller.handleMessage({ type: "saveDefaults" }), /idle/u);
+    controller.transitioning = false;
+
+    controller.state.queueCount = 1;
+    await assert.rejects(controller.handleMessage({ type: "saveDefaults" }), /idle/u);
+    controller.state.queueCount = 0;
+
+    controller.state.uiRequest = { id: "one" };
+    await assert.rejects(controller.handleMessage({ type: "saveDefaults" }), /idle/u);
+    controller.state.uiRequest = undefined;
+
+    assert.deepEqual(saves, [], "no guard fell through to a write");
+
+    // The same chat saves once it is idle again.
+    await controller.handleMessage({ type: "saveDefaults" });
+    assert.equal(saves.length, 1);
+});
+
+test("a model with no reported thinking level can still pin the model", async (t) => {
+    const saves = [];
+    const model = { id: "model", name: "Model", provider: "provider" };
+    const { controller, quickPicks } = await connected(t, {
+        request: (type) =>
+            type === "get_state"
+                ? { model, thinkingLevel: undefined }
+                : type === "get_available_thinking_levels"
+                  ? { levels: [] }
+                  : undefined,
+        saveDefaults: (snapshot, patch) => {
+            saves.push(patch);
+
+            return { ...snapshot, changed: true };
+        },
+        quickPick: (items) => items[0],
+        warningAnswer: (_message, _options, button) => button,
+    });
+
+    await controller.handleMessage({ type: "saveDefaults" });
+    assert.equal(quickPicks[0].length, 1, "only the model pin is offered without a thinking level");
+    assert.deepEqual(saves, [{ defaultProvider: "provider", defaultModel: "model" }]);
+});
+
+test("declining the confirmation never writes startup defaults", async (t) => {
+    const saves = [];
+    const model = { id: "model", name: "Model", provider: "provider" };
+    const { controller } = await connected(t, {
+        request: (type) => (type === "get_state" ? { model, thinkingLevel: "medium" } : undefined),
+        saveDefaults: (snapshot, patch) => {
+            saves.push(patch);
+
+            return { ...snapshot, changed: true };
+        },
+        quickPick: (items) => items[0],
+        warningAnswer: () => undefined,
+    });
+
+    await controller.handleMessage({ type: "saveDefaults" });
+    assert.deepEqual(saves, []);
+    assert.ok(
+        !controller.state.messages.some((message) => message.role === "notice" && /startup model/.test(message.text)),
+    );
+});
+
+test("a chat that changed during confirmation cannot save startup defaults", async (t) => {
+    const saves = [];
+    const model = { id: "model", name: "Model", provider: "provider" };
+    const { controller } = await connected(t, {
+        request: (type) => (type === "get_state" ? { model, thinkingLevel: "medium" } : undefined),
+        saveDefaults: (snapshot, patch) => {
+            saves.push(patch);
+
+            return { ...snapshot, changed: true };
+        },
+        quickPick: (items) => items[1],
+        warningAnswer: () => {
+            controller.state.model = { ...model, id: "switched" };
+
+            return "Save startup thinking";
+        },
+    });
+
+    await assert.rejects(controller.handleMessage({ type: "saveDefaults" }), /chat changed/u);
+    assert.deepEqual(saves, []);
 });
 
 test("global preset replacement uses the existing native confirmation and bound global destination", async (t) => {

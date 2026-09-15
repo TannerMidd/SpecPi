@@ -1,5 +1,10 @@
 # SpecPi Chat changelog
 
+## 0.9.0
+
+- Stop the cache hit rate and usage details from flashing back to `—` while a response streams. Partial streaming usage (providers often report only the output count between full reports) now keeps the last reported input and cache token values instead of replacing them, and tool result usage no longer overwrites the assistant request usage display.
+- Save Pi's startup defaults from Chat: a pin button next to the model picker stores the current model as `defaultProvider`/`defaultModel`, the current thinking level as the global `defaultThinkingLevel`, or a per-model level (`modelThinkingLevels`) that Pi applies whenever that model is selected — and removes an existing per-model override. Each save confirms first, edits only those documented keys in Pi's global `settings.json` (honoring `PI_CODING_AGENT_DIR`, including a workspace-relative one), keeps unrelated settings and their order, and backs up the file. Pi picks the defaults up after reconnecting.
+
 ## 0.8.3
 
 - Add a global Destructive guard preset that replaces the complete global draft instead of merging with existing settings. Preview and edit the configuration, undo locally, then use the existing confirmed Save with backup. No project or agent-policy inspection and no upstream changes.
