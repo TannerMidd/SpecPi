@@ -1,5 +1,10 @@
 # SpecPi Chat changelog
 
+## 0.8.3
+
+- Make cache hit and context usage easier to read in the footer.
+- Add searchable model choices and descriptive thinking-level choices, with keyboard navigation and responsive layouts.
+
 ## 0.8.2
 
 - Always show the reported cache hit rate in the chat footer, with `—` before input usage is available and a tooltip explaining the calculation.

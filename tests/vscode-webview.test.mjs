@@ -57,7 +57,7 @@ test("cache hit rate counts cached reads against all prompt tokens, not output t
     }
 
     const html = getWebviewHtml(webviewOptions);
-    assert.match(html, /<span id="cache-status"[^>]*>Cache —<\/span>/u);
+    assert.match(html, /<span class="cache-label">Cache hit<\/span> <strong id="cache-value">—<\/strong>/u);
 });
 
 test("provider usage projects only known plugin status strings without inventing quota semantics", () => {

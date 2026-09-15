@@ -159,8 +159,10 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .session-footer { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 4px 2px 0; font-size: 9px; color: var(--muted); height: 32px; }
 .footer-status { flex: 1 1 auto; display: flex; align-items: center; min-width: 0; }
 #runtime-status { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#token-status, #cache-status { flex: 0 0 auto; font-family: var(--mono); font-size: 9px; }
-#cache-status { white-space: nowrap; }
+#token-status { flex: 0 1 auto; font-family: var(--mono); font-size: var(--chat-small-font-size); }
+#cache-status { display: inline-flex; align-items: baseline; gap: 8px; flex: 0 0 auto; padding: 4px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
+#cache-value { color: var(--text); font-size: var(--chat-font-size); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cache-label { color: var(--muted); }
 .attachments { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px 9px 0; }
 .selection-chip { display: flex; align-items: center; gap: 4px; padding: 9px 9px 0; }
 .selection-chip[hidden] { display: none; }
@@ -296,7 +298,7 @@ body.vscode-high-contrast .message-copy, body.vscode-high-contrast-light .messag
 .markdown h2 { font-size: 19px; }
 .markdown h3 { font-size: 17px; }
 .markdown h4, .markdown h5, .markdown h6 { font-size: 15px; }
-.session-footer { height: auto; min-height: 32px; flex-wrap: wrap; row-gap: 4px; }
+.session-footer { height: auto; min-height: 40px; flex-wrap: wrap; gap: 6px 14px; padding-top: 8px; }
 .footer-status { flex-basis: 92px; }
 .stop-button { height: 28px; margin-left: auto; }
 #token-status { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

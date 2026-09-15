@@ -65,3 +65,48 @@
     .history-row-actions { display: flex; }
     .history-time { display: none; }
 }
+
+/* Composer pickers share the editor theme, not the platform select popup. */
+.choice-trigger { display: inline-flex; align-items: center; gap: 6px; min-width: 0; height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); color: var(--text); font-size: var(--chat-small-font-size); }
+.choice-trigger:hover:not(:disabled), .choice-trigger[aria-expanded="true"] { border-color: var(--focus); background: var(--hover); }
+.choice-model { flex: 1 1 100px; max-width: 280px; margin-left: auto; }
+.choice-thinking { flex: 0 1 auto; max-width: 125px; }
+.choice-symbol { flex: 0 0 auto; color: var(--accent); font-size: 16px; line-height: 1; }
+.choice-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choice-chevron { margin-left: auto; color: var(--muted); }
+.choice-panel { position: fixed; z-index: 75; display: flex; flex-direction: column; padding: 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; color: var(--vscode-quickInput-foreground, var(--text)); background: var(--vscode-quickInput-background, var(--surface-raised)); box-shadow: 0 12px 36px var(--vscode-widget-shadow, #0006); }
+.choice-heading { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 8px 8px; font-size: var(--chat-font-size); font-weight: 600; }
+.choice-close { width: 26px; height: 26px; border-radius: 5px; background: transparent; color: var(--muted); font-size: 20px; line-height: 1; }
+.choice-search { flex: 0 0 auto; width: 100%; min-height: 36px; padding: 7px 10px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--input); color: var(--text); font-size: var(--chat-font-size); }
+.choice-search::placeholder { color: var(--muted); }
+.choice-search:focus { outline-offset: -1px; }
+.choice-list { min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 2px; }
+.choice-list:focus-visible { outline-offset: -1px; border-radius: 5px; }
+.choice-option { display: flex; align-items: center; gap: 8px; margin: 2px 0; padding: 9px 8px; border: 1px solid transparent; border-radius: 7px; cursor: pointer; }
+.choice-option:hover { background: var(--vscode-list-hoverBackground, var(--hover)); }
+.choice-option[aria-selected="true"] { background: var(--vscode-list-inactiveSelectionBackground, var(--hover)); border-color: var(--border); }
+.choice-option[data-active="true"] { background: var(--vscode-list-activeSelectionBackground, var(--button)); color: var(--vscode-list-activeSelectionForeground, var(--button-text)); border-color: var(--focus); }
+.choice-check { width: 16px; flex: 0 0 16px; color: var(--accent); font-weight: 600; }
+.choice-copy { flex: 1; min-width: 0; }
+.choice-name { display: block; font-size: var(--chat-font-size); font-weight: 500; overflow-wrap: anywhere; }
+.choice-detail { display: block; margin-top: 2px; font-size: var(--chat-small-font-size); color: var(--muted); overflow-wrap: anywhere; }
+.choice-option[data-active="true"] .choice-detail, .choice-option[data-active="true"] .choice-check { color: inherit; }
+.choice-effort { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 2px; height: 17px; }
+.choice-effort i { width: 3px; height: 5px; background: currentColor; opacity: .2; }
+.choice-effort i:nth-child(2) { height: 7px; }
+.choice-effort i:nth-child(3) { height: 9px; }
+.choice-effort i:nth-child(4) { height: 11px; }
+.choice-effort i:nth-child(5) { height: 14px; }
+.choice-effort i:nth-child(6) { height: 17px; }
+.choice-effort i.is-filled { opacity: 1; }
+.choice-empty { padding: 12px; margin: 0; color: var(--muted); font-size: var(--chat-font-size); }
+.choice-hint { flex: 0 0 auto; padding: 8px 5px 2px; margin-top: 6px; border-top: 1px solid var(--border); color: var(--muted); font-size: var(--chat-small-font-size); }
+@media (max-width: 480px) {
+    .composer-options { flex-wrap: wrap; gap: 4px; }
+    .choice-model { order: 5; flex: 1 1 110px; max-width: none; margin-left: 0; }
+    .choice-thinking { order: 6; max-width: 120px; }
+    .send-actions { margin-left: auto; }
+    .composer-options::after { content: ""; flex-basis: 100%; order: 4; }
+    .choice-trigger { height: 30px; }
+    .session-footer .footer-status { flex-basis: 100%; }
+}

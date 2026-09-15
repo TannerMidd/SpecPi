@@ -26,7 +26,7 @@
 </p>
 <p align="center"><sub>SpecPi Chat · Example workspace</sub></p>
 
-SpecPi is a small base for the [Pi coding agent](https://pi.dev/). Its own extensions provide **scope control** and a **harness improvement loop**. Six pinned packages handle the supporting tools, and **SpecPi Chat 0.8.2** brings them into VS Code.
+SpecPi is a small base for the [Pi coding agent](https://pi.dev/). Its own extensions provide **scope control** and a **harness improvement loop**. Six pinned packages handle the supporting tools, and **SpecPi Chat 0.8.3** brings them into VS Code.
 
 | Keep the work focused                                                             | Improve what gets in the way                                                                     | Work beside your code                                                                   |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
@@ -81,11 +81,11 @@ BetterWright remains an optional manual install, with its own [Bun-based setup](
 
 ## VS Code
 
-[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.8.2** adds an always-visible cache hit rate to the footer, alongside context and cost usage. The VSIX remains separate from the npm harness package.
+[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.8.3** adds searchable model choices, descriptive thinking levels, and clearer cache hit and context usage. The VSIX remains separate from the npm harness package.
 
-Download the [0.8.2 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.8.2.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+Download the [0.8.3 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.8.3.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
 
-[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.8.2.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
+[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.8.3.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
 
 ## Scope
 
