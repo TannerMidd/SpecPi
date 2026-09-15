@@ -160,7 +160,7 @@ function getWebviewHtml({
                     <label id="send-mode-label" class="sr-only" for="send-mode">Message timing</label>
                     <select id="send-mode" class="compact-select send-mode" title="When to send your next message" hidden><option value="steer">Steer now</option><option value="followUp">Follow up</option></select>
                 </div>
-                <span id="cache-status" title="Cache hit rate: no reported input token usage yet." aria-label="Cache hit rate: unavailable">Cache —</span>
+                <span id="cache-status" title="Cache hit rate: no reported input token usage yet." aria-label="Cache hit rate: unavailable"><span class="cache-label">Cache hit</span> <strong id="cache-value">—</strong></span>
                 <span id="token-status" title="Session usage"></span>
                 <button id="stop-button" class="stop-button" type="button" title="Stop response" aria-label="Stop response" hidden>${icon("stop")}<span>Stop</span></button>
             </div>
@@ -181,6 +181,20 @@ function getWebviewHtml({
             <button id="permission-reload" type="button">Load scope / discard draft</button>
         </div>
         <p id="permission-path" class="permission-path"></p>
+        <section class="permission-profile" aria-labelledby="permission-profile-title">
+            <h3 id="permission-profile-title">Destructive guard · global preset</h3>
+            <p>Replaces the entire global draft with the preset below, including existing rules and options. Nothing is merged, saved or activated automatically.</p>
+            <p id="permission-profile-scope-note">Load global scope to use this preset.</p>
+            <details><summary>Preview complete configuration</summary>
+                <p>Asks by default; denies common deletion, disk, destructive Git and infrastructure commands. YOLO and logging are off; the authorizer chain is empty. These case-sensitive patterns can block benign uses and do not cover every script or command spelling. Project and agent overrides still follow Permission System behavior.</p>
+                <pre id="permission-profile-preview" aria-label="Complete Destructive guard configuration"></pre>
+            </details>
+            <div class="permission-actions">
+                <button id="permission-profile-apply" type="button">Use Destructive guard</button>
+                <button id="permission-profile-undo" type="button" hidden>Undo preset</button>
+            </div>
+            <p>Review or edit the replacement, then Save settings… and confirm. Undo restores the previous draft. Restart Pi after saving.</p>
+        </section>
         <fieldset id="permission-fields"><legend>Settings and rules</legend></fieldset>
         <details id="permission-advanced">
             <summary>Full configuration JSON</summary>

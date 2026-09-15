@@ -12,6 +12,8 @@
             let valid = false;
             let formValid = false;
             let saved = false;
+            let beforeProfile;
+            byId("permission-profile-preview").textContent = schema.destructiveGuardText("global");
 
             function report(message, error = false) {
                 const status = byId("permission-feedback");
@@ -38,6 +40,11 @@
                 byId("permission-effective").disabled = !enabled;
                 byId("permission-restart").disabled = !enabled || !saved;
                 byId("permission-close").disabled = pending;
+                byId("permission-profile-apply").disabled =
+                    !enabled || snapshot?.scope !== "global" || beforeProfile !== undefined;
+                byId("permission-profile-scope-note").hidden = snapshot?.scope === "global";
+                byId("permission-profile-undo").hidden = beforeProfile === undefined;
+                byId("permission-profile-undo").disabled = !enabled;
                 form.disabled = pending || !formValid;
                 source.disabled = pending;
             }
@@ -166,6 +173,37 @@
                     send({ type: "showPermissions", scope: byId("permission-scope").value });
                 }
             });
+            byId("permission-profile-apply").addEventListener("click", () => {
+                if (
+                    !snapshot ||
+                    snapshot.scope !== "global" ||
+                    !available() ||
+                    pending ||
+                    beforeProfile !== undefined
+                ) {
+                    return;
+                }
+
+                beforeProfile = source.value;
+                source.value = schema.destructiveGuardText("global");
+                populate();
+                byId("permission-advanced").open = true;
+                report(
+                    "Global draft replaced with Destructive guard. Review or edit it, then save and confirm. Nothing has been written.",
+                );
+            });
+            byId("permission-profile-undo").addEventListener("click", () => {
+                if (beforeProfile === undefined || !available() || pending) {
+                    return;
+                }
+
+                source.value = beforeProfile;
+                beforeProfile = undefined;
+                populate();
+                if (valid) {
+                    report("Previous draft restored. Nothing was saved.");
+                }
+            });
             byId("permission-save").addEventListener("click", () => {
                 if (!snapshot || !available() || pending || !valid) {
                     return;
@@ -195,6 +233,7 @@
                 render() {
                     if (snapshot && (snapshot.contextToken !== getState().contextToken || !getState().permissions)) {
                         snapshot = undefined;
+                        beforeProfile = undefined;
                         source.value = "";
                         dialog.close();
                     }
@@ -207,6 +246,7 @@
                         message.settings?.contextToken === getState().contextToken
                     ) {
                         snapshot = message.settings;
+                        beforeProfile = undefined;
                         pending = false;
                         source.value = snapshot.text;
                         byId("permission-scope").value = snapshot.scope;
@@ -231,6 +271,7 @@
                     } else if (message.type === "permissionSaveResult" && snapshot?.id === message.id) {
                         pending = false;
                         if (message.settings) {
+                            beforeProfile = undefined;
                             snapshot = message.settings;
                             byId("permission-path").textContent =
                                 `${snapshot.scope === "global" ? "Global" : "Project"}: ${snapshot.path}`;

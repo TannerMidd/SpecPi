@@ -6,7 +6,13 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const { fields, parse, validate } = require("../vscode/media/permission-config.js");
+const {
+    fields,
+    parse,
+    validate,
+    destructiveGuard,
+    destructiveGuardText,
+} = require("../vscode/media/permission-config.js");
 const { configPath, loadPermissionSettings, savePermissionSettings } = require("../vscode/src/permission-settings.js");
 
 function fixture(t) {
@@ -51,6 +57,51 @@ test("permission configuration exposes all current knobs, preserves order and su
         "https://example.invalid/*not-comment*/",
     );
     assert.deepEqual(validate("{}"), {});
+});
+
+test("Destructive guard is a complete global replacement with an ask fallback and ordered denies", () => {
+    const text = destructiveGuardText("global");
+    const config = validate(text);
+    assert.deepEqual(config, destructiveGuard);
+    assert.equal(config.yoloMode, false);
+    assert.equal(config.permissionReviewLog, false);
+    assert.equal(config.debugLog, false);
+    assert.deepEqual(config.authorizerChain, []);
+    assert.equal(config.permission["*"], "ask");
+    assert.deepEqual(Object.entries(config.permission.bash)[0], ["*", "ask"]);
+    assert.ok(
+        Object.values(config.permission.bash)
+            .slice(1)
+            .every((rule) => rule.action === "deny"),
+    );
+    assert.ok(Object.hasOwn(config.permission.bash, "rm *"));
+    assert.throws(() => destructiveGuardText("project"), /global scope/u);
+    assert.throws(() => destructiveGuardText("unknown"), /global scope/u);
+});
+
+test("saving the global preset replaces old rules and options, backs up the file, and leaves project and agents alone", (t) => {
+    const f = fixture(t);
+    const oldText =
+        '// prior global settings\n{"yoloMode":true,"debugLog":true,"promptMaxRows":99,"permission":{"old_tool":"allow","read":"deny"}}\n';
+    const global = savePermissionSettings(f.load(), oldText);
+    const project = savePermissionSettings(f.load("project"), '{"permission":{"bash":"deny"}}');
+    const agent = path.join(f.home, ".pi", "agent", "agents", "custom.md");
+    fs.mkdirSync(path.dirname(agent), { recursive: true });
+    fs.writeFileSync(agent, "Synthetic custom agent; do not inspect");
+    const open = fs.openSync;
+    t.mock.method(fs, "openSync", (filename, ...args) => {
+        assert.ok(!String(filename).endsWith(".md"), "Global preset must not read agent definitions");
+
+        return open(filename, ...args);
+    });
+    const saved = savePermissionSettings(global, destructiveGuardText("global"));
+    assert.deepEqual(validate(saved.text), destructiveGuard);
+    assert.equal(Object.hasOwn(validate(saved.text), "promptMaxRows"), false);
+    assert.equal(Object.hasOwn(validate(saved.text).permission, "old_tool"), false);
+    assert.equal(fs.readFileSync(saved.backup, "utf8"), oldText);
+    assert.equal(fs.readFileSync(project.path, "utf8"), project.text);
+    t.mock.restoreAll();
+    assert.equal(fs.readFileSync(agent, "utf8"), "Synthetic custom agent; do not inspect");
 });
 
 test("invalid or unsupported settings cannot be silently dropped on save", () => {

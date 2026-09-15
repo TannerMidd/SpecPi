@@ -1163,6 +1163,48 @@ test("permission saves require native confirmation, bind their path to the opene
     assert.match(posted.findLast((message) => message.type === "permissionSaveResult").error, /stale/u);
 });
 
+test("global preset replacement uses the existing native confirmation and bound global destination", async (t) => {
+    const writes = [];
+    let confirmations = 0;
+    const { controller, client } = await connected(t, {
+        request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
+        warningAnswer: (_message, options) => {
+            assert.match(options.detail, /replaces the complete global configuration file/u);
+            assert.match(options.detail, /does not merge/u);
+            confirmations += 1;
+
+            return confirmations === 1 ? undefined : "Save permissions";
+        },
+        savePermissions: (snapshot, text) => {
+            writes.push({ snapshot, text });
+
+            return { ...snapshot, text, exists: true, revision: "saved" };
+        },
+    });
+    controller.showPermissions("global");
+    const snapshot = controller.permissionSettings;
+    const text = extensionRequire("../media/permission-config.js").destructiveGuardText("global");
+    const request = {
+        type: "savePermissions",
+        id: snapshot.id,
+        contextToken: controller.contextToken(),
+        text,
+        scope: "project",
+        path: "/forged",
+    };
+    await controller.handleMessage(request);
+    assert.equal(writes.length, 0);
+    await controller.handleMessage(request);
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].snapshot.scope, "global");
+    assert.equal(writes[0].snapshot.path, snapshot.path);
+    assert.equal(writes[0].text, text);
+    assert.equal(
+        client.requests.some((entry) => entry.type === "prompt"),
+        false,
+    );
+});
+
 test("permission cancellation, invalid drafts, disk failures and changed conversations do not grant writes", async (t) => {
     for (const scenario of ["cancel", "invalid", "switch", "disconnect", "trust", "busy", "disk"]) {
         const confirmation = deferred();

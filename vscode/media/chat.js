@@ -1468,6 +1468,8 @@
                 const option = element("option", "", modelLabel(model));
                 option.value = modelValue(model);
                 option.title = `${model.provider} / ${model.id}`;
+                option.dataset.name = model.name || model.id;
+                option.dataset.provider = model.provider;
                 select.append(option);
             }
         }
@@ -1506,6 +1508,8 @@
         thinking.value = state.thinkingLevel || "off";
         thinking.disabled = state.status !== "ready" || validLevels.length < 2;
         thinking.title = `Thinking level: ${state.thinkingLevel || "off"}`;
+        modelPicker?.update();
+        thinkingPicker?.update();
     }
 
     function renderPermissions() {
@@ -2034,14 +2038,14 @@
         const cacheDetails = `Cache hit rate: ${cacheLabel}. ${
             hitRate === undefined ? "No reported input token usage yet. " : ""
         }Reported cache read tokens / (input + cache read + cache write tokens).`;
-        byId("cache-status").textContent = `Cache ${cacheLabel}`;
+        byId("cache-value").textContent = cacheLabel;
         byId("cache-status").title = cacheDetails;
         byId("cache-status").setAttribute("aria-label", cacheDetails);
         const contextLabel =
             typeof percent === "number" && Number.isFinite(percent)
-                ? `${Math.round(percent)}%${cost ? "" : " context"}`
+                ? `Context ${Math.round(percent)}%`
                 : typeof tokens === "number"
-                  ? `${formatTokens(tokens)}${cost ? "" : " tokens"}`
+                  ? `${formatTokens(tokens)} tokens`
                   : "";
         byId("token-status").textContent = [contextLabel, cost].filter(Boolean).join(" · ");
         const usageDetails = [];
@@ -2425,6 +2429,8 @@
                 seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
         }
     }, 1000);
+    const modelPicker = window.SpecPiChoice?.install(byId("model-select"), { label: "Model", searchable: true });
+    const thinkingPicker = window.SpecPiChoice?.install(byId("thinking-select"), { label: "Thinking level" });
     const permissionSettings = window.SpecPiPermissionSettings?.install({ send, getState: () => state });
     extras = window.SpecPiExtras?.install({ send, getState: () => state, announce });
     history = window.SpecPiHistory?.install({ send, getState: () => state, announce });

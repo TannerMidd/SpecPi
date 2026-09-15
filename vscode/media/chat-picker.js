@@ -688,11 +688,284 @@
         return { update, handleMessage, toggle, close };
     }
 
+    // Keep the native selects as the host-state adapter, not the visible UI.
+    function installChoice(select, { label, searchable = false }) {
+        const make = (tag, className, text) => {
+            const node = document.createElement(tag);
+            node.className = className;
+            if (text !== undefined) {
+                node.textContent = text;
+            }
+
+            return node;
+        };
+
+        const trigger = make("button", `choice-trigger ${searchable ? "choice-model" : "choice-thinking"}`);
+        trigger.id = select.id.replace("-select", "-picker");
+        trigger.type = "button";
+        const symbol = make("span", "choice-symbol", searchable ? "◇" : "✦");
+        symbol.setAttribute("aria-hidden", "true");
+        const value = make("span", "choice-value");
+        const chevron = make("span", "choice-chevron", "⌄");
+        chevron.setAttribute("aria-hidden", "true");
+        trigger.append(symbol, value, chevron);
+        select.hidden = true;
+        select.after(trigger);
+        const panel = make("section", "choice-panel");
+        panel.id = `${trigger.id}-panel`;
+        panel.hidden = true;
+        panel.setAttribute("role", "dialog");
+        panel.setAttribute("aria-label", label);
+        trigger.setAttribute("aria-haspopup", "dialog");
+        trigger.setAttribute("aria-expanded", "false");
+        trigger.setAttribute("aria-controls", panel.id);
+        const heading = make("div", "choice-heading");
+        heading.append(make("span", "", searchable ? "Choose model" : "Thinking effort"));
+        const closeButton = make("button", "choice-close", "×");
+        closeButton.type = "button";
+        closeButton.setAttribute("aria-label", `Close ${label.toLowerCase()} picker`);
+        heading.append(closeButton);
+        const search = make("input", "choice-search");
+        search.type = "search";
+        search.placeholder = "Search models or providers…";
+        search.setAttribute("aria-label", "Search models");
+        search.autocomplete = "off";
+        search.maxLength = 200;
+        search.hidden = !searchable;
+        const list = make("div", "choice-list");
+        list.id = `${trigger.id}-list`;
+        list.setAttribute("role", "listbox");
+        list.setAttribute("aria-label", label);
+        list.tabIndex = searchable ? -1 : 0;
+        if (searchable) {
+            search.setAttribute("role", "combobox");
+            search.setAttribute("aria-controls", list.id);
+            search.setAttribute("aria-expanded", "true");
+            search.setAttribute("aria-autocomplete", "list");
+        }
+
+        const empty = make("p", "choice-empty", "No matching models. Try another name or provider.");
+        empty.setAttribute("role", "status");
+        const hint = make("div", "choice-hint", "↑↓ navigate · Enter select · Esc close");
+        hint.setAttribute("aria-hidden", "true");
+        panel.append(heading, search, list, empty, hint);
+        document.body.append(panel);
+        let rows = [];
+        let active = -1;
+        let signature;
+        const focusTarget = searchable ? search : list;
+        const descriptions = {
+            off: "No additional reasoning effort",
+            minimal: "Lightest reasoning effort",
+            low: "Light reasoning for simpler tasks",
+            medium: "Balanced reasoning effort",
+            high: "Deeper reasoning for complex tasks",
+            xhigh: "Extra reasoning effort",
+            max: "Highest available reasoning effort",
+        };
+
+        function position() {
+            if (panel.hidden) {
+                return;
+            }
+
+            const rect = trigger.getBoundingClientRect();
+            const width = Math.min(searchable ? 400 : 320, window.innerWidth - 16);
+            panel.style.width = `${width}px`;
+            panel.style.left = `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`;
+            const composer = trigger.closest(".composer")?.getBoundingClientRect() || rect;
+            const above = composer.top - 16;
+            const below = window.innerHeight - composer.bottom - 16;
+            const upward = above >= below;
+            panel.style.maxHeight = `${Math.max(0, Math.min(460, upward ? above : below))}px`;
+            panel.style.bottom = upward ? `${window.innerHeight - composer.top + 8}px` : "auto";
+            panel.style.top = upward ? "auto" : `${composer.bottom + 8}px`;
+        }
+
+        function close(restoreFocus = true) {
+            panel.hidden = true;
+            trigger.setAttribute("aria-expanded", "false");
+            if (restoreFocus && !trigger.disabled) {
+                trigger.focus();
+            }
+        }
+
+        function activate(index, scroll = true) {
+            active = index;
+            rows.forEach((row, i) => {
+                row.node.dataset.active = String(i === active);
+            });
+            const row = rows[active];
+            if (row) {
+                focusTarget.setAttribute("aria-activedescendant", row.node.id);
+                if (scroll) {
+                    row.node.scrollIntoView({ block: "nearest" });
+                }
+            } else {
+                focusTarget.removeAttribute("aria-activedescendant");
+            }
+        }
+
+        function choose(option) {
+            if (select.disabled || !Array.from(select.options).includes(option)) {
+                close();
+
+                return;
+            }
+
+            close();
+            if (option.value !== select.value) {
+                select.value = option.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+        }
+
+        function render() {
+            const query = search.value.trim().toLocaleLowerCase();
+            rows = [];
+            for (const [index, option] of Array.from(select.options).entries()) {
+                if (
+                    option.disabled ||
+                    (searchable && !`${option.textContent} ${option.title}`.toLocaleLowerCase().includes(query))
+                ) {
+                    continue;
+                }
+
+                const node = make("div", "choice-option");
+                node.id = `${list.id}-${index}`;
+                node.setAttribute("role", "option");
+                node.setAttribute("aria-selected", String(option.selected));
+                const marker = make("span", "choice-check", option.selected ? "✓" : "");
+                marker.setAttribute("aria-hidden", "true");
+                const copy = make("span", "choice-copy");
+                copy.append(make("span", "choice-name", option.dataset.name || option.textContent));
+                copy.append(
+                    make(
+                        "span",
+                        "choice-detail",
+                        searchable ? option.dataset.provider || "Pi default" : descriptions[option.value] || "",
+                    ),
+                );
+                node.append(marker, copy);
+                if (!searchable) {
+                    const meter = make("span", "choice-effort");
+                    meter.setAttribute("aria-hidden", "true");
+                    const level = Object.keys(descriptions).indexOf(option.value);
+                    for (let bar = 1; bar <= 6; bar += 1) {
+                        const tick = make("i", bar <= level ? "is-filled" : "");
+                        meter.append(tick);
+                    }
+
+                    node.append(meter);
+                }
+
+                node.title = option.title || option.textContent;
+                node.addEventListener("click", () => choose(option));
+                rows.push({ node, option });
+            }
+
+            list.replaceChildren(...rows.map((row) => row.node));
+            empty.hidden = rows.length > 0;
+            const selected = rows.findIndex((row) => row.option.selected);
+            activate(selected < 0 && rows.length ? 0 : selected, false);
+        }
+
+        function update() {
+            const selected = select.selectedOptions[0];
+            value.textContent = selected?.dataset.name || selected?.textContent || label;
+            trigger.title = select.title;
+            trigger.setAttribute("aria-label", `${label}: ${select.title || value.textContent}`);
+            trigger.disabled = select.disabled;
+            if (select.disabled && !panel.hidden) {
+                close(false);
+            }
+
+            const nextSignature = JSON.stringify(
+                Array.from(select.options, (option) => [
+                    option.value,
+                    option.textContent,
+                    option.selected,
+                    option.disabled,
+                    option.title,
+                    option.dataset.name,
+                    option.dataset.provider,
+                ]),
+            );
+            if (nextSignature !== signature) {
+                signature = nextSignature;
+                if (!panel.hidden) {
+                    render();
+                }
+            }
+
+            position();
+        }
+
+        function open() {
+            if (trigger.disabled) {
+                return;
+            }
+
+            search.value = "";
+            panel.hidden = false;
+            trigger.setAttribute("aria-expanded", "true");
+            render();
+            position();
+            focusTarget.focus();
+            activate(active);
+        }
+
+        trigger.addEventListener("click", () => (panel.hidden ? open() : close()));
+        trigger.addEventListener("keydown", (event) => {
+            if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+                event.preventDefault();
+                open();
+            }
+        });
+        closeButton.addEventListener("click", () => close());
+        search.addEventListener("input", render);
+        panel.addEventListener("keydown", (event) => {
+            if (event.key === "Tab") {
+                // Resume the composer's tab order rather than leaving the webview
+                // from this body-mounted popup.
+                close();
+            } else if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                close();
+            } else if (event.target === focusTarget) {
+                if (["ArrowDown", "ArrowUp"].includes(event.key) && rows.length) {
+                    event.preventDefault();
+                    activate(Math.max(0, Math.min(rows.length - 1, active + (event.key === "ArrowDown" ? 1 : -1))));
+                } else if (!searchable && ["Home", "End"].includes(event.key)) {
+                    event.preventDefault();
+                    activate(event.key === "Home" ? 0 : rows.length - 1);
+                } else if ((event.key === "Enter" || (!searchable && event.key === " ")) && rows[active]) {
+                    event.preventDefault();
+                    choose(rows[active].option);
+                }
+            }
+        });
+        for (const type of ["pointerdown", "focusin"]) {
+            document.addEventListener(type, (event) => {
+                if (!panel.hidden && !panel.contains(event.target) && !trigger.contains(event.target)) {
+                    close(false);
+                }
+            });
+        }
+
+        window.addEventListener("resize", position);
+        update();
+
+        return { update, close };
+    }
+
     if (typeof module !== "undefined" && module.exports) {
         module.exports = { conversationItems, dateGroup, relativeTime, conversationStatus };
     }
 
     if (typeof window !== "undefined") {
         window.SpecPiHistory = { install };
+        window.SpecPiChoice = { install: installChoice };
     }
 })();

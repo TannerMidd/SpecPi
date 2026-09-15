@@ -4,8 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { RpcClient } from "../vscode/src/rpc-client.js";
 import { loadPermissionSettings, savePermissionSettings } from "../vscode/src/permission-settings.js";
+import permissionConfig from "../vscode/media/permission-config.js";
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 test(
@@ -21,6 +23,64 @@ test(
             path.basename(os.tmpdir()).startsWith("specpi-base-check-") && relative === "agent",
             "Real package smoke requires the base check's isolated TEMP and agent directory",
         );
+        // Check the replacement preset with the unchanged published package.
+        // These command strings are policy test data; nothing is executed.
+        const requirePi = createRequire(
+            path.join(repository, "node_modules/@earendil-works/pi-coding-agent/dist/cli.js"),
+        );
+        const { createJiti } = requirePi("jiti");
+        const alias = Object.fromEntries(
+            ["@earendil-works/pi-coding-agent", "@earendil-works/pi-ai", "@earendil-works/pi-tui", "typebox"].map(
+                (name) => [name, fileURLToPath(import.meta.resolve(name))],
+            ),
+        );
+        const { PermissionManager } = await createJiti(import.meta.url, { alias }).import(
+            path.join(agentDir, "npm/node_modules/@gotgenes/pi-permission-system/src/policy/permission-manager.ts"),
+        );
+        for (const bash of [undefined, { "*": "allow", "rm *": "deny" }, "deny", "ask", "allow"]) {
+            const directory = fs.mkdtempSync(path.join(os.tmpdir(), "global-guard-"));
+            const workspace = path.join(directory, "project");
+            const globalAgent = path.join(directory, "agent");
+            fs.mkdirSync(workspace);
+            const options = { env: { PI_CODING_AGENT_DIR: globalAgent }, home: directory };
+            const original = savePermissionSettings(
+                loadPermissionSettings(workspace, "global", options),
+                JSON.stringify({
+                    yoloMode: true,
+                    permission: { old_tool: "allow", bash: { "*": "ask", "git *": "allow" } },
+                }),
+            );
+            const project = savePermissionSettings(
+                loadPermissionSettings(workspace, "project", options),
+                JSON.stringify(bash === undefined ? {} : { permission: { bash } }),
+            );
+            const saved = savePermissionSettings(original, permissionConfig.destructiveGuardText("global"));
+            assert.deepEqual(JSON.parse(saved.text), permissionConfig.destructiveGuard);
+            assert.equal(fs.readFileSync(saved.backup, "utf8"), original.text);
+            assert.equal(fs.readFileSync(project.path, "utf8"), project.text);
+            const manager = new PermissionManager({ agentDir: globalAgent });
+            manager.configureForCwd(workspace);
+            assert.deepEqual(manager.getConfigIssues(), []);
+            const check = (command) => manager.check({ kind: "tool", surface: "bash", input: { command } }).state;
+            for (const command of [
+                "rm",
+                "rm file",
+                "git reset --hard",
+                "git clean",
+                "terraform destroy",
+                "dd",
+                "dropdb",
+            ]) {
+                assert.equal(check(command), typeof bash === "string" ? bash : "deny", command);
+            }
+
+            const fallback = typeof bash === "string" ? bash : bash ? "allow" : "ask";
+            assert.equal(check("git status"), fallback);
+            assert.equal(check("echo safe"), fallback);
+            assert.equal(manager.getToolPermission("bash"), fallback);
+            assert.equal(manager.isToolFullyDenied("bash"), bash === "deny");
+        }
+
         const launch = {
             command: process.execPath,
             args: [

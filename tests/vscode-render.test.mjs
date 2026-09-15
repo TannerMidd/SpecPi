@@ -521,7 +521,7 @@ test(
                             });
                             assert.equal(await page.locator("#welcome").isVisible(), false);
                             assert.equal(await page.locator(".message").count(), 3);
-                            assert.equal(await page.locator("#token-status").textContent(), "1.2k · $0.0123");
+                            assert.equal(await page.locator("#token-status").textContent(), "1.2k tokens · $0.0123");
                             await page.locator("#composer-input").fill("Keep the change focused and testable.");
                             assert.equal(await page.locator("#send-button").isEnabled(), true);
                             await assertLayout(page, width);
@@ -904,6 +904,126 @@ test(
                 },
             );
 
+            for (const theme of ["dark", "light", "highcontrast"]) {
+                for (const width of [280, 768, 1440]) {
+                    await t.test(`styled composer pickers and distinct usage at ${width}px in ${theme}`, async () => {
+                        await withPage(
+                            browser,
+                            fixtures,
+                            { name: `composer-pickers-${theme}-${width}`, theme, width },
+                            async (page) => {
+                                const models = Array.from({ length: 80 }, (_, index) => ({
+                                    id: `model-${index}`,
+                                    name:
+                                        index === 0
+                                            ? "A model with a deliberately long display name"
+                                            : `Reasoning model ${index}`,
+                                    provider: index < 40 ? "provider-one" : "provider-two",
+                                }));
+                                const fixture = {
+                                    models,
+                                    model: models[55],
+                                    thinkingLevels: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+                                    thinkingLevel: "high",
+                                    tokens: { input: 10, cacheRead: 80, cacheWrite: 10, total: 100 },
+                                    contextUsage: { percent: 24 },
+                                };
+                                await setState(page, fixture);
+                                const trigger = page.locator("#model-picker");
+                                const panel = page.locator("#model-picker-panel");
+                                const search = page.getByRole("combobox", { name: "Search models" });
+                                await trigger.focus();
+                                await page.keyboard.press("ArrowDown");
+                                assert.equal(await panel.isVisible(), true);
+                                assert.equal(await search.evaluate((node) => node === document.activeElement), true);
+                                assert.equal(await panel.getByRole("option", { selected: true }).count(), 1);
+                                await search.fill("provider-two");
+                                assert.equal(await panel.getByRole("option").count(), 40);
+                                await search.fill("not a model");
+                                assert.equal(await panel.getByRole("option").count(), 0);
+                                assert.equal(await panel.locator(".choice-empty").isVisible(), true);
+                                await page.keyboard.press("Enter");
+                                assert.deepEqual(await takeMessages(page), []);
+                                await search.fill("Reasoning model 79");
+                                await page.keyboard.press("Enter");
+                                assert.deepEqual(await takeMessages(page), [
+                                    { type: "setModel", provider: "provider-two", modelId: "model-79" },
+                                ]);
+                                assert.match(await trigger.textContent(), /Reasoning model 55/u);
+                                assert.equal(await trigger.evaluate((node) => node === document.activeElement), true);
+                                await trigger.click();
+                                await search.fill("provider-one");
+                                // A streaming state refresh must not erase the query or keyboard position.
+                                await page.keyboard.press("ArrowDown");
+                                const active = await search.getAttribute("aria-activedescendant");
+                                await setState(page, fixture);
+                                assert.equal(await search.inputValue(), "provider-one");
+                                assert.equal(await search.getAttribute("aria-activedescendant"), active);
+                                const bounds = await panel.boundingBox();
+                                assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0);
+                                assert.ok(
+                                    await panel
+                                        .locator(".choice-list")
+                                        .evaluate((node) => node.scrollHeight > node.clientHeight),
+                                );
+                                await assertLayout(page, width);
+                                await page.screenshot({
+                                    path: path.join(screenshots, `model-picker-${theme}-${width}.png`),
+                                });
+                                await page.keyboard.press("Escape");
+                                assert.equal(await panel.isVisible(), false);
+                                assert.equal(await trigger.evaluate((node) => node === document.activeElement), true);
+                                await trigger.click();
+                                await page.keyboard.press("Tab");
+                                assert.equal(await panel.isVisible(), false);
+                                await trigger.click();
+                                await page.locator("#composer-input").click();
+                                assert.equal(await panel.isVisible(), false);
+                                const thinking = page.locator("#thinking-picker");
+                                await thinking.click();
+                                await page.keyboard.press("Home");
+                                await page.keyboard.press("ArrowDown");
+                                await page.keyboard.press("Enter");
+                                assert.deepEqual(await takeMessages(page), [{ type: "setThinking", level: "minimal" }]);
+                                assert.match(await thinking.textContent(), /High/u);
+                                await thinking.click();
+                                await page.keyboard.press("End");
+                                await page.screenshot({
+                                    path: path.join(screenshots, `thinking-picker-${theme}-${width}.png`),
+                                });
+                                await page.keyboard.press("Escape");
+                                await trigger.click();
+                                await setState(page, { ...fixture, status: "busy" });
+                                assert.equal(await panel.isVisible(), false);
+                                assert.equal(await trigger.isDisabled(), true);
+                                assert.equal(await thinking.isDisabled(), true);
+                                await setState(page, { ...fixture, thinkingLevels: ["off"], thinkingLevel: "off" });
+                                assert.equal(await thinking.isDisabled(), true);
+                                assert.equal(await trigger.isEnabled(), true);
+                                const metrics = await page.evaluate(() => {
+                                    const cache = document.getElementById("cache-status");
+                                    const usage = document.getElementById("token-status");
+                                    const left = cache.getBoundingClientRect();
+                                    const right = usage.getBoundingClientRect();
+
+                                    return {
+                                        labelSize: parseFloat(getComputedStyle(cache).fontSize),
+                                        valueSize: parseFloat(
+                                            getComputedStyle(document.getElementById("cache-value")).fontSize,
+                                        ),
+                                        separated: right.left - left.right >= 12 || right.top >= left.bottom,
+                                        text: usage.textContent,
+                                    };
+                                });
+                                assert.ok(metrics.labelSize >= 12 && metrics.valueSize >= 14);
+                                assert.equal(metrics.separated, true);
+                                assert.equal(metrics.text, "Context 24% · $0.0123");
+                            },
+                        );
+                    });
+                }
+            }
+
             await t.test(
                 "cache hit rate stays visible by default across chat states and conversation switches",
                 async () => {
@@ -912,13 +1032,13 @@ test(
                         for (const status of ["disconnected", "connecting", "ready", "busy", "compacting", "error"]) {
                             await setState(page, { status, tokens: undefined });
                             assert.equal(await cache.isVisible(), true);
-                            assert.equal(await cache.textContent(), "Cache —");
+                            assert.equal(await cache.textContent(), "Cache hit —");
                             assert.match(await cache.getAttribute("aria-label"), /Cache hit rate: —/u);
                             await setState(page, {
                                 status,
                                 tokens: { input: 10, cacheRead: 80, cacheWrite: 10, output: 900, total: 1000 },
                             });
-                            assert.equal(await cache.textContent(), "Cache 80%");
+                            assert.equal(await cache.textContent(), "Cache hit 80%");
                             assert.match(await cache.getAttribute("title"), /input \+ cache read \+ cache write/u);
                             assert.equal(
                                 await cache.evaluate((element) => {
@@ -933,12 +1053,12 @@ test(
                         }
 
                         await setState(page, { tokens: { input: 10, cacheRead: 0, cacheWrite: 0 } });
-                        assert.equal(await cache.textContent(), "Cache 0%");
+                        assert.equal(await cache.textContent(), "Cache hit 0%");
                         await setState(page, { tokens: { input: 0, cacheRead: 10, cacheWrite: 0 } });
-                        assert.equal(await cache.textContent(), "Cache 100%");
+                        assert.equal(await cache.textContent(), "Cache hit 100%");
                         await page.screenshot({ path: path.join(screenshots, "cache-hit-rate-280.png") });
                         await setState(page, { contextToken: "new-conversation", tokens: undefined });
-                        assert.equal(await cache.textContent(), "Cache —");
+                        assert.equal(await cache.textContent(), "Cache hit —");
                     });
                 },
             );
@@ -950,7 +1070,7 @@ test(
                         tokens: { total: 1240, cost: 99 },
                         contextUsage: { percent: 12, tokens: 1200, contextWindow: 10000 },
                     });
-                    assert.equal(await usage.textContent(), "12% · $0.0123");
+                    assert.equal(await usage.textContent(), "Context 12% · $0.0123");
                     assert.match(
                         await usage.getAttribute("title"),
                         /Pi-reported conversation cost \(USD\): \$0\.01234/u,
@@ -962,13 +1082,13 @@ test(
                     await page.keyboard.press("Enter");
                     assert.deepEqual(await takeMessages(page), [{ type: "showUsage" }]);
                     await setState(page, { cost: 0.02345 });
-                    assert.equal(await usage.textContent(), "1.2k · $0.0234");
+                    assert.equal(await usage.textContent(), "1.2k tokens · $0.0234");
                     await setState(page, { contextToken: "new-conversation", cost: undefined, tokens: undefined });
                     assert.equal(await usage.textContent(), "");
                     assert.doesNotMatch(await usage.getAttribute("title"), /cost/u);
                     assert.doesNotMatch(await usage.getAttribute("aria-label"), /cost/u);
                     await setState(page, { contextToken: "new-conversation", cost: 0, tokens: { total: 0 } });
-                    assert.equal(await usage.textContent(), "0 · $0.0000");
+                    assert.equal(await usage.textContent(), "0 tokens · $0.0000");
                     await setState(page, { cost: 0.01234, tokens: undefined });
                     assert.equal(await usage.textContent(), "$0.0123");
                 });
@@ -1008,12 +1128,12 @@ test(
                         async (page) => {
                             const usage = page.locator("#token-status");
                             for (const [cost, expected] of [
-                                [0, "1.2k · $0.0000"],
-                                [0.00000032, "1.2k · <$0.0001"],
-                                [0.01234, "1.2k · $0.0123"],
-                                [999.1234, "1.2k · $999.1234"],
-                                [1234.56, "1.2k · $1.235K"],
-                                [1e12, "1.2k · $1.00e+12"],
+                                [0, "1.2k tokens · $0.0000"],
+                                [0.00000032, "1.2k tokens · <$0.0001"],
+                                [0.01234, "1.2k tokens · $0.0123"],
+                                [999.1234, "1.2k tokens · $999.1234"],
+                                [1234.56, "1.2k tokens · $1.235K"],
+                                [1e12, "1.2k tokens · $1.00e+12"],
                                 [null, "1.2k tokens"],
                                 [undefined, "1.2k tokens"],
                                 [NaN, "1.2k tokens"],
@@ -1053,7 +1173,10 @@ test(
                                         },
                                     };
                                 });
-                                assert.ok(bounds.height >= 32 && bounds.height <= 72);
+                                assert.ok(
+                                    bounds.height >= 32 && bounds.height <= 112,
+                                    `Labeled usage may wrap, but must remain compact: ${JSON.stringify(bounds)}`,
+                                );
                                 for (const other of [bounds.mode, bounds.stop]) {
                                     const separate =
                                         bounds.cost.right <= other.left ||
@@ -1128,7 +1251,7 @@ test(
                                 const input = page.locator("#composer-input");
                                 const empty = await composerMetrics(page);
                                 assert.ok(
-                                    empty.composerHeight >= 60 && empty.composerHeight <= 96,
+                                    empty.composerHeight >= 60 && empty.composerHeight <= 132,
                                     `An idle composer should leave room for the conversation: ${JSON.stringify(empty)}`,
                                 );
                                 assert.ok(empty.inputHeight >= 28 && empty.inputHeight <= 48);
@@ -1143,8 +1266,8 @@ test(
                                 const keyboardControls = new Set([
                                     "attach-menu-button",
                                     "attach-selection",
-                                    "model-select",
-                                    "thinking-select",
+                                    "model-picker",
+                                    "thinking-picker",
                                     "send-button",
                                 ]);
                                 const reached = new Set();
@@ -1258,7 +1381,11 @@ test(
                         assert.equal(await thinking.inputValue(), "max");
                         assert.equal(await thinking.isEnabled(), true);
                         assert.ok((await thinking.locator('option[value="max"]').textContent()).trim().length > 0);
-                        await thinking.selectOption("high");
+                        await page.locator("#thinking-picker").click();
+                        await page
+                            .locator("#thinking-picker-list")
+                            .getByRole("option", { name: "High Deeper reasoning for complex tasks", exact: true })
+                            .click();
                         assert.deepEqual(await takeMessages(page), [{ type: "setThinking", level: "high" }]);
                         assert.equal(
                             await thinking.inputValue(),
@@ -1267,7 +1394,11 @@ test(
                         );
                         await setState(page, { thinkingLevels, thinkingLevel: "high" });
                         assert.equal(await thinking.inputValue(), "high");
-                        await thinking.selectOption("max");
+                        await page.locator("#thinking-picker").click();
+                        await page
+                            .locator("#thinking-picker-list")
+                            .getByRole("option", { name: "Max Highest available reasoning effort", exact: true })
+                            .click();
                         assert.deepEqual(await takeMessages(page), [{ type: "setThinking", level: "max" }]);
                         assert.equal(await thinking.inputValue(), "high");
                         await setState(page, { thinkingLevels, thinkingLevel: "max" });
@@ -1365,6 +1496,54 @@ test(
                             assert.equal(JSON.parse(draft).yoloMode, true);
                             assert.deepEqual(Object.keys(JSON.parse(draft).permission.bash), ["*", "git status"]);
                             assert.deepEqual(await takeMessages(page), []);
+                            const apply = page.getByRole("button", { name: "Use Destructive guard", exact: true });
+                            const undo = page.getByRole("button", { name: "Undo preset", exact: true });
+                            assert.equal(await apply.isEnabled(), true);
+                            const template = await page.locator("#permission-profile-preview").textContent();
+                            await apply.click();
+                            const replacement = await page.locator("#permission-source").inputValue();
+                            assert.equal(replacement, template, "Preset replaces the full draft; it is not merged");
+                            assert.equal(Object.hasOwn(JSON.parse(replacement), "forwardingTimeoutMs"), false);
+                            assert.equal(Object.hasOwn(JSON.parse(replacement).permission, "read"), false);
+                            assert.equal(JSON.parse(replacement).yoloMode, false);
+                            assert.equal(await undo.isEnabled(), true);
+                            assert.deepEqual(
+                                await takeMessages(page),
+                                [],
+                                "Applying a preset is local draft editing only",
+                            );
+                            await editor.evaluate((node) => {
+                                node.scrollTop = 0;
+                            });
+                            await page.screenshot({
+                                path: path.join(screenshots, `global-destructive-guard-${width}.png`),
+                            });
+                            await page.locator("#permission-save").click();
+                            assert.deepEqual(await takeMessages(page), [
+                                {
+                                    type: "savePermissions",
+                                    id: settings.id,
+                                    contextToken: settings.contextToken,
+                                    text: replacement,
+                                },
+                            ]);
+                            await sendHost(page, { type: "permissionSaveResult", id: settings.id, cancelled: true });
+                            assert.equal(await page.locator("#permission-source").inputValue(), replacement);
+                            await page.locator("#permission-debugLog").selectOption("true");
+                            assert.equal(
+                                JSON.parse(await page.locator("#permission-source").inputValue()).debugLog,
+                                true,
+                                "Replacement remains editable",
+                            );
+                            await undo.click();
+                            assert.equal(await page.locator("#permission-source").inputValue(), draft);
+                            assert.equal(await undo.isVisible(), false);
+                            assert.deepEqual(
+                                await takeMessages(page),
+                                [],
+                                "Undo does not write or inspect other policy files",
+                            );
+                            await page.locator("#permission-advanced summary").click();
                             await setState(page, { permissions, cost: 5 });
                             assert.equal(await page.locator("#permission-source").inputValue(), draft);
                             await page.locator("#permission-save").click();
@@ -1426,6 +1605,16 @@ test(
                             await page.locator("#permission-source").fill('{"yoloMode":');
                             assert.equal(await page.locator("#permission-save").isDisabled(), true);
                             assert.equal(await page.locator("#permission-yoloMode").isDisabled(), true);
+                            await apply.click();
+                            assert.equal(
+                                await page.locator("#permission-save").isEnabled(),
+                                true,
+                                "A complete replacement does not need the old draft to parse",
+                            );
+                            await undo.click();
+                            assert.equal(await page.locator("#permission-source").inputValue(), '{"yoloMode":');
+                            assert.equal(await page.locator("#permission-save").isDisabled(), true);
+                            assert.match(await page.locator("#permission-feedback").textContent(), /Invalid JSON/u);
                             await page.locator("#permission-source").fill("{}");
                             assert.equal(await page.locator("#permission-yoloMode").isEnabled(), true);
                             await page.locator("#permission-scope").selectOption("project");
@@ -1436,6 +1625,13 @@ test(
                                 type: "permissionSettings",
                                 settings: { ...settings, id: "project-settings", scope: "project" },
                             });
+                            assert.equal(
+                                await page
+                                    .getByRole("button", { name: "Use Destructive guard", exact: true })
+                                    .isDisabled(),
+                                true,
+                                "The preset is global, not project-scoped",
+                            );
                             await page.keyboard.press("Escape");
                             assert.equal(await editor.isVisible(), false);
                             await page.waitForFunction(() => document.activeElement?.id === "permissions-button");
@@ -1491,8 +1687,8 @@ test(
                                         const controls = [
                                             "attach-menu-button",
                                             "attach-selection",
-                                            "model-select",
-                                            "thinking-select",
+                                            "model-picker",
+                                            "thinking-picker",
                                             "send-mode",
                                             "stop-button",
                                             "send-button",
@@ -2051,8 +2247,12 @@ test(
                             "Fixture Reasoning · fixture",
                             "Fixture Fast · fixture",
                         ]);
-                        await page.locator("#model-select").selectOption(JSON.stringify(["fixture", "fast-model"]));
-                        await page.locator("#thinking-select").selectOption("high");
+                        await page.locator("#model-picker").click();
+                        await page.getByRole("option", { name: "Fixture Fast fixture", exact: true }).click();
+                        await page.locator("#thinking-picker").click();
+                        await page
+                            .getByRole("option", { name: "High Deeper reasoning for complex tasks", exact: true })
+                            .click();
                         assert.deepEqual(await takeMessages(page), [
                             { type: "setModel", provider: "fixture", modelId: "fast-model" },
                             { type: "setThinking", level: "high" },
@@ -3372,9 +3572,8 @@ test(
                             assert.equal(await page.locator("#send-button").isDisabled(), true);
                             await page.locator("#composer-input").press("Enter");
                             assert.deepEqual(await takeMessages(page), []);
-                            await page
-                                .locator("#model-select")
-                                .selectOption(JSON.stringify(["fixture", "vision-model"]));
+                            await page.locator("#model-picker").click();
+                            await page.getByRole("option", { name: "Fixture Vision fixture", exact: true }).click();
                             assert.deepEqual(await takeMessages(page), [
                                 { type: "setModel", provider: "fixture", modelId: "vision-model" },
                             ]);

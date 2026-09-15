@@ -1609,7 +1609,7 @@ class ChatController {
                 `Save ${snapshot.scope} permission settings? This can change tool access and YOLO behavior for ${snapshot.scope === "global" ? "all projects" : "this project"}, including other Pi chats as they reload policy.`,
                 {
                     modal: true,
-                    detail: `Destination: ${snapshot.path}\nAn existing file is backed up. Restart this chat after saving to reload its settings and clear session approvals.`,
+                    detail: `Destination: ${snapshot.path}\nThis replaces the complete ${snapshot.scope} configuration file with the reviewed draft; it does not merge with the old file. An existing file is backed up. Restart this chat after saving to reload its settings and clear session approvals.`,
                 },
                 "Save permissions",
             );

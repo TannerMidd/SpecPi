@@ -152,7 +152,80 @@
         return config;
     }
 
-    const api = { fields, parse, validate };
+    // A complete replacement configuration, not a merge with the old file.
+    // Native Permission System owns matching and enforcement.
+    const destructiveGuard = {
+        yoloMode: false,
+        permissionReviewLog: false,
+        debugLog: false,
+        authorizerChain: [],
+        permission: {
+            "*": "ask",
+            bash: {
+                "*": "ask",
+                ...Object.fromEntries([
+                    ...[
+                        "rm *",
+                        "rmdir *",
+                        "unlink *",
+                        "shred *",
+                        "del *",
+                        "erase *",
+                        "rd *",
+                        "Remove-Item *",
+                        "remove-item *",
+                    ].map((pattern) => [
+                        pattern,
+                        { action: "deny", reason: "Destructive guard: deletion utility (including benign deletions)." },
+                    ]),
+                    ...[
+                        "dd *",
+                        "mkfs*",
+                        "wipefs *",
+                        "fdisk *",
+                        "sfdisk *",
+                        "parted *",
+                        "diskpart *",
+                        "format *",
+                        "Clear-Disk *",
+                        "clear-disk *",
+                        "Format-Volume *",
+                        "format-volume *",
+                    ].map((pattern) => [
+                        pattern,
+                        { action: "deny", reason: "Destructive guard: raw disk, partition or formatting operation." },
+                    ]),
+                    ...["git reset *--hard*", "git clean *", "git push *--force*", "git push *-f*", "git push *+*"].map(
+                        (pattern) => [
+                            pattern,
+                            { action: "deny", reason: "Destructive guard: discard work or overwrite remote history." },
+                        ],
+                    ),
+                    ...[
+                        "terraform destroy *",
+                        "terraform apply *-destroy*",
+                        "tofu destroy *",
+                        "tofu apply *-destroy*",
+                        "kubectl delete *",
+                        "dropdb *",
+                    ].map((pattern) => [
+                        pattern,
+                        { action: "deny", reason: "Destructive guard: infrastructure or database removal." },
+                    ]),
+                ]),
+            },
+        },
+    };
+
+    function destructiveGuardText(scope) {
+        if (scope !== "global") {
+            throw new Error("Load global scope to use this preset.");
+        }
+
+        return `${JSON.stringify(destructiveGuard, null, 4)}\n`;
+    }
+
+    const api = { fields, parse, validate, destructiveGuard, destructiveGuardText };
     if (typeof module !== "undefined" && module.exports) {
         module.exports = api;
     } else {
