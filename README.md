@@ -26,7 +26,7 @@
 </p>
 <p align="center"><sub>SpecPi Chat · Example workspace</sub></p>
 
-SpecPi is a small base for the [Pi coding agent](https://pi.dev/). Its own extensions provide **scope control** and a **harness improvement loop**. Seven upstream packages handle the supporting tools, and **SpecPi Chat 0.8.0** brings them into VS Code.
+SpecPi is a small base for the [Pi coding agent](https://pi.dev/). Its own extensions provide **scope control** and a **harness improvement loop**. Six upstream packages handle the supporting tools, and **SpecPi Chat 0.8.1** brings them into VS Code.
 
 | Keep the work focused                                                             | Improve what gets in the way                                                                     | Work beside your code                                                                   |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
@@ -63,7 +63,6 @@ These are installed on every normal install and update. Exact versions live in [
 | [pi-web-access](https://github.com/nicobailon/pi-web-access)                                                      | 0.29.0         | Web search and page retrieval                          |
 | [betterwright](https://github.com/BetterWright/betterwright)                                                      | 2.8.1          | Browser automation                                     |
 | [pi-subagents](https://github.com/nicobailon/pi-subagents)                                                        | 0.67.0         | Subagents and delegation                               |
-| [pi-lens](https://github.com/apmantza/pi-lens)                                                                    | 4.1.6          | Language diagnostics, navigation, and structural tools |
 | [pi-goal-x](https://github.com/tmonk/pi-goal-x)                                                                   | 0.31.2         | Persistent goals and progress                          |
 | [@sreetej510/pi-usage](https://github.com/Sreetej510/pi-extensions/tree/main/extensions/pi-usage)                 | 0.10.0         | Provider usage reporting                               |
 | [@gotgenes/pi-permission-system](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) | 32.0.2         | Tool permission policies                               |
@@ -72,15 +71,15 @@ The effective commands are `pi install npm:<package>@<version>` for each row, in
 
 SpecPi requests exact npm dependency saves for these installs and verifies installed versions before completing the transaction. This keeps later package installs from advancing an earlier pin through npm's default version ranges.
 
-BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and run `bunx betterwright@2.8.1 setup` before using browser tools. See [BetterWright setup](https://github.com/BetterWright/betterwright/blob/main/SETUP.md). The default package installation does not install Bun or download its browser. Provider credentials, web-service configuration, language servers, and permission rules remain governed by each package's documentation. Package installation and extension loading do not prove that every external service or tool is ready.
+BetterWright's browser is a separate upstream setup step: install Bun 1.4+ and run `bunx betterwright@2.8.1 setup` before using browser tools. See [BetterWright setup](https://github.com/BetterWright/betterwright/blob/main/SETUP.md). The default package installation does not install Bun or download its browser. Provider credentials, web-service configuration, and permission rules remain governed by each package's documentation. Package installation and extension loading do not prove that every external service or tool is ready.
 
 ## VS Code
 
-[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.8.0** lets you edit global or project permission settings, confirm changes, and keep a backup. The VSIX remains separate from the npm harness package.
+[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.8.1** lets you edit global or project permission settings, confirm changes, and keep a backup. The VSIX remains separate from the npm harness package.
 
-Download the [0.8.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.22.0/specpi-chat-0.8.0.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+Download the [0.8.1 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.22.1/specpi-chat-0.8.1.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
 
-[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.22.0/specpi-chat-0.8.0.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
+[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.22.1/specpi-chat-0.8.1.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
 
 ## Scope
 
@@ -128,6 +127,8 @@ specpi uninstall
 
 Install, update, and uninstall require confirmation; `--yes` supplies it for automation. Modified retained resources require `update --force`. Managed configuration and resources are backed up and checksum-tracked. `update --skip-package-install` preserves an existing base without invoking Pi's package installer. Normal updates reapply the reviewed pins.
 
+`pi-lens` is no longer included by default. A normal managed update removes unchanged Lens entries originally added by SpecPi; pre-existing or user-modified entries and downloaded files remain. `--skip-package-install` preserves the old base. Restart Pi and each Chat connection to unload Lens. Independently retained installations require separate user management (`pi remove npm:pi-lens` in their installation scope).
+
 `pi-background-tasks` is no longer included by default because its Anthropic wrapper can reject changing message context. A normal update removes an unchanged package entry originally added by SpecPi; pre-existing or user-modified entries and downloaded files remain. `--skip-package-install` preserves the old base. To remove a separately retained installation, run `pi remove npm:pi-background-tasks` in its installation scope, then restart Pi.
 
 Updating from the larger harness retires its recorded extra resources, restores legacy settings that still match ownership records, removes its shell marker block, and installs the new package base. Modified retired files and old runtime directories are preserved under `<agent-dir>/specpi/backups/`. Restart Pi to unload the old extensions. Unrelated configuration and local improvement evidence remain intact.
@@ -144,7 +145,7 @@ npm run check:pi-package
 npm run check:base
 ```
 
-Installer tests use disposable Pi directories. `check:base` requires network access, installs the real seven packages in isolated state, loads them together through Pi 0.84.4, verifies Chat RPC startup and explicit permission replies, and checks removal. It does not send model requests or run browser tasks. Never test against a live Pi installation. Publication remains explicit and uses the [release procedure](NPM_RELEASE.md).
+Installer tests use disposable Pi directories. `check:base` requires network access, installs the real six packages in isolated state, loads them together through Pi 0.84.4, verifies Chat RPC startup and explicit permission replies, and checks removal. It does not send model requests or run browser tasks. Never test against a live Pi installation. Publication remains explicit and uses the [release procedure](NPM_RELEASE.md).
 
 The website is static HTML and CSS in `site/`. After installing the pinned Playwright browser with `npx --no-install playwright install chromium`, run `npm run check:site` to check versions, links, and desktop, tablet, and mobile layouts. GitHub Pages deploys it from `main` after those checks pass.
 

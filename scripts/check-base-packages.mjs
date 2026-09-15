@@ -76,6 +76,11 @@ process.exit(0);
         resources.paths.some((file) => file.includes("pi-background-tasks")),
         false,
     );
+    assert.equal(
+        resources.paths.some((file) => file.includes("pi-lens")),
+        false,
+    );
+    assert.equal(resources.tools.includes("lens_diagnostics"), false);
     assert.equal(resources.commands.includes("claude-cache"), false);
     assert.equal(resources.tools.includes("bg_run"), false);
     for (const command of ["scope", "wishlist", "harness-improvement"]) {

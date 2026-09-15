@@ -73,12 +73,11 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
     return { root, agent, settings, log, fake, invoke, run };
 }
 
-test("the default base is exactly the seven human-selected pinned packages", () => {
+test("the default base is exactly the six human-selected pinned packages", () => {
     assert.deepEqual(basePackages, [
         "npm:pi-web-access@0.29.0",
         "npm:betterwright@2.8.1",
         "npm:pi-subagents@0.67.0",
-        "npm:pi-lens@4.1.6",
         "npm:pi-goal-x@0.31.2",
         "npm:@sreetej510/pi-usage@0.10.0",
         "npm:@gotgenes/pi-permission-system@32.0.2",
@@ -93,6 +92,7 @@ test("default lifecycle installs each pin through Pi, preserves filters, and res
             "npm:user-tool@1.0.0",
             { source: "npm:pi-web-access@0.25.0", extensions: ["index.ts"], skills: [] },
             { source: "npm:pi-background-tasks@2.5.0", extensions: [] },
+            { source: "npm:pi-lens@4.1.6", extensions: [] },
         ],
     };
     fs.writeFileSync(f.settings, JSON.stringify(before));
@@ -109,8 +109,8 @@ test("default lifecycle installs each pin through Pi, preserves filters, and res
     const installed = JSON.parse(fs.readFileSync(f.settings));
     assert.deepEqual(installed.packages[1], { ...before.packages[1], source: basePackages[0] });
     assert.equal(installed.theme, before.theme);
-    assert.equal(installed.packages.length, basePackages.length + 2);
-    assert.deepEqual(installed.packages[2], before.packages[2]);
+    assert.equal(installed.packages.length, basePackages.length + 3);
+    assert.deepEqual(installed.packages.slice(2, 4), before.packages.slice(2, 4));
     f.run("doctor");
     f.run("update", "--yes", "--skip-package-install");
     assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)), installed);
@@ -123,47 +123,52 @@ test("default lifecycle installs each pin through Pi, preserves filters, and res
     assert.ok(fs.existsSync(path.join(f.agent, "npm/node_modules/betterwright/package.json")));
 });
 
-test("updates retire only unchanged SpecPi-added background-task entries", async (t) => {
-    for (const modified of [false, true]) {
-        await t.test(modified ? "user edit survives" : "owned entry retires", (t) => {
-            const f = fixture(t);
-            f.run("install", "--yes");
-            const removed = "npm:pi-background-tasks@2.5.0";
-            const current = modified ? { source: removed, extensions: [] } : removed;
-            const settings = JSON.parse(fs.readFileSync(f.settings));
-            settings.packages.push(current);
-            fs.writeFileSync(f.settings, JSON.stringify(settings));
-            const manifestPath = path.join(f.agent, "specpi/manifest.json");
-            const manifest = JSON.parse(fs.readFileSync(manifestPath));
-            manifest.basePackages.push(removed);
-            manifest.packageChanges.push({
-                identity: "npm:pi-background-tasks",
-                beforeExists: false,
-                installed: removed,
-            });
-            fs.writeFileSync(manifestPath, JSON.stringify(manifest));
-            const downloaded = path.join(f.agent, "npm/node_modules/pi-background-tasks/package.json");
-            fs.mkdirSync(path.dirname(downloaded), { recursive: true });
-            const bytes = JSON.stringify({ name: "pi-background-tasks", version: "2.5.0" });
-            fs.writeFileSync(downloaded, bytes);
+test("updates retire only unchanged SpecPi-added background-task and lens entries", async (t) => {
+    for (const [name, version] of [
+        ["pi-background-tasks", "2.5.0"],
+        ["pi-lens", "4.1.6"],
+    ]) {
+        for (const modified of [false, true]) {
+            await t.test(`${name}: ${modified ? "user edit survives" : "owned entry retires"}`, (t) => {
+                const f = fixture(t);
+                f.run("install", "--yes");
+                const removed = `npm:${name}@${version}`;
+                const current = modified ? { source: removed, extensions: [] } : removed;
+                const settings = JSON.parse(fs.readFileSync(f.settings));
+                settings.packages.push(current);
+                fs.writeFileSync(f.settings, JSON.stringify(settings));
+                const manifestPath = path.join(f.agent, "specpi/manifest.json");
+                const manifest = JSON.parse(fs.readFileSync(manifestPath));
+                manifest.basePackages.push(removed);
+                manifest.packageChanges.push({
+                    identity: `npm:${name}`,
+                    beforeExists: false,
+                    installed: removed,
+                });
+                fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+                const downloaded = path.join(f.agent, "npm/node_modules", name, "package.json");
+                fs.mkdirSync(path.dirname(downloaded), { recursive: true });
+                const bytes = JSON.stringify({ name, version });
+                fs.writeFileSync(downloaded, bytes);
 
-            f.run("plan");
-            assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)), settings);
-            f.run("update", "--yes", "--skip-package-install");
-            assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)), settings);
-            f.run("update", "--yes");
-            const after = JSON.parse(fs.readFileSync(f.settings));
-            assert.deepEqual(after.packages, modified ? [current, ...basePackages] : basePackages);
-            assert.deepEqual(JSON.parse(fs.readFileSync(manifestPath)).basePackages, basePackages);
-            assert.equal(fs.readFileSync(downloaded, "utf8"), bytes);
-            assert.deepEqual(
-                fs.readFileSync(f.log, "utf8").trim().split("\n").map(JSON.parse),
-                [...basePackages, ...basePackages].map((source) => ["install", source]),
-            );
-            f.run("doctor");
-            f.run("uninstall", "--yes");
-            assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, modified ? [current] : undefined);
-        });
+                f.run("plan");
+                assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)), settings);
+                f.run("update", "--yes", "--skip-package-install");
+                assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)), settings);
+                f.run("update", "--yes");
+                const after = JSON.parse(fs.readFileSync(f.settings));
+                assert.deepEqual(after.packages, modified ? [current, ...basePackages] : basePackages);
+                assert.deepEqual(JSON.parse(fs.readFileSync(manifestPath)).basePackages, basePackages);
+                assert.equal(fs.readFileSync(downloaded, "utf8"), bytes);
+                assert.deepEqual(
+                    fs.readFileSync(f.log, "utf8").trim().split("\n").map(JSON.parse),
+                    [...basePackages, ...basePackages].map((source) => ["install", source]),
+                );
+                f.run("doctor");
+                f.run("uninstall", "--yes");
+                assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, modified ? [current] : undefined);
+            });
+        }
     }
 });
 
@@ -190,7 +195,7 @@ test("package version drift fails installation and restores the previous managed
     f.run("install", "--yes", "--skip-package-install");
     const manifest = path.join(f.agent, "specpi/manifest.json");
     const oldManifest = fs.readFileSync(manifest, "utf8");
-    const failed = f.invoke(["update", "--yes"], { FAKE_DRIFT: basePackages[4] });
+    const failed = f.invoke(["update", "--yes"], { FAKE_DRIFT: basePackages[3] });
     assert.notEqual(failed.status, 0);
     assert.match(failed.stderr, /Base package version mismatch: npm:pi-goal-x/);
     assert.match(failed.stderr, /rolled back/);
@@ -201,8 +206,8 @@ test("package version drift fails installation and restores the previous managed
 test("doctor detects missing package bytes and removal preserves user-modified package settings", (t) => {
     const f = fixture(t);
     f.run("install", "--yes");
-    fs.unlinkSync(path.join(f.agent, "npm/node_modules/pi-lens/package.json"));
-    assert.match(f.invoke(["doctor"]).stderr, /Missing or unreadable base package: npm:pi-lens/);
+    fs.unlinkSync(path.join(f.agent, "npm/node_modules/pi-goal-x/package.json"));
+    assert.match(f.invoke(["doctor"]).stderr, /Missing or unreadable base package: npm:pi-goal-x/);
     const settings = JSON.parse(fs.readFileSync(f.settings));
     settings.packages[0] = "npm:pi-web-access@user-choice";
     fs.writeFileSync(f.settings, JSON.stringify(settings));

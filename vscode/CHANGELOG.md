@@ -1,5 +1,10 @@
 # SpecPi Chat changelog
 
+## 0.8.1
+
+- Align setup and package documentation with SpecPi 0.22.1 and its six default packages, without `pi-lens`. Chat does not install or remove packages; update SpecPi separately and restart each Pi connection to unload Lens. Independent or modified Lens entries survive managed updates.
+- No UI or host behavior changes.
+
 ## 0.8.0
 
 - Edit global or project permission settings from Chat, including YOLO, logging, rules, and advanced options. Saves require confirmation and keep a backup. Restart Pi to apply the changes to the current chat.

@@ -39,7 +39,7 @@ code --extensionDevelopmentPath="<absolute-path-to-SpecPi>/vscode" "<your-worksp
 
 Use the normal connection controls to start Pi. Run full repository validation with `npm run check` before considering the change complete. Packaging uses an exact source allowlist and deterministic ZIP metadata; generated VSIX files remain under the repository's ignored `.specpi-test/vscode` directory.
 
-`npm run check:base` additionally starts the actual seven-package base over Chat's RPC transport in isolated state. It verifies package commands and approval transport without sending model requests.
+`npm run check:base` additionally starts the actual six-package base over Chat's RPC transport in isolated state. It verifies package commands and approval transport without sending model requests.
 
 ## Publishing
 
