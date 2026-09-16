@@ -154,6 +154,7 @@ test("updates retire only unchanged SpecPi-added retired package entries", async
         ["pi-background-tasks", "2.5.0"],
         ["pi-lens", "4.1.6"],
         ["betterwright", "2.8.1"],
+        ["pi-subagents", "0.67.0"],
     ]) {
         for (const modified of [false, true]) {
             await t.test(`${name}: ${modified ? "user edit survives" : "owned entry retires"}`, (t) => {
