@@ -1,10 +1,16 @@
 // SpecPi Remote phone client.
 //
-// Every value that originates with the model, a tool, or an extension is placed
-// with textContent. Nothing on this page uses innerHTML, and the daemon's CSP
-// forbids inline script as the backstop.
+// Every value that originates with the model, a tool, an extension, or a stored
+// session is placed with textContent. Nothing on this page uses innerHTML, and
+// the daemon's CSP forbids inline script as the backstop.
 
 const MAX_TOOL_OUTPUT_CHARS = 16000;
+
+// Phone cameras produce images far larger than any model needs. Downscaling in
+// the browser keeps the request small and the upload quick.
+const MAX_IMAGE_EDGE = 1568;
+const IMAGE_QUALITY = 0.82;
+const MAX_IMAGES = 6;
 
 const state = {
     connectionId: null,
@@ -12,29 +18,49 @@ const state = {
     blocks: new Map(),
     tools: new Map(),
     approvals: new Map(),
-    lastEntryId: null,
     // Keyed by statusKey / widgetKey, exactly as the extension addressed them,
     // so a later update replaces the entry instead of stacking another copy.
     status: new Map(),
     widgets: new Map(),
+    sessions: [],
+    sessionPath: null,
+    images: [],
+    modelAcceptsImages: false,
 };
 
-const ui = {
-    transcript: document.getElementById("transcript"),
-    approvals: document.getElementById("approvals"),
-    queue: document.getElementById("queue"),
-    extensions: document.getElementById("extensions"),
-    input: document.getElementById("input"),
-    send: document.getElementById("send"),
-    stop: document.getElementById("stop"),
-    model: document.getElementById("model"),
-    thinking: document.getElementById("thinking"),
-    stateDot: document.getElementById("state-dot"),
-    stateLabel: document.getElementById("state-label"),
-    context: document.getElementById("stat-context"),
-    cost: document.getElementById("stat-cost"),
-    hint: document.getElementById("hint"),
-};
+const ui = {};
+for (const id of [
+    "transcript",
+    "approvals",
+    "queue",
+    "extensions",
+    "input",
+    "send",
+    "stop",
+    "model",
+    "thinking",
+    "state-dot",
+    "state-label",
+    "session-title",
+    "stat-context",
+    "hint",
+    "attach",
+    "attachments",
+    "file-input",
+    "open-sessions",
+    "close-sessions",
+    "new-session",
+    "sessions-panel",
+    "sessions-list",
+    "session-filter",
+    "open-usage",
+    "close-usage",
+    "usage-panel",
+    "usage-body",
+    "scrim",
+]) {
+    ui[id.replace(/-([a-z])/gu, (_, c) => c.toUpperCase())] = document.getElementById(id);
+}
 
 function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -196,6 +222,10 @@ function clamp(text, limit) {
 }
 
 function contentText(content) {
+    if (typeof content === "string") {
+        return content;
+    }
+
     if (!Array.isArray(content)) {
         return "";
     }
@@ -233,13 +263,11 @@ function onAgentEvent(event) {
             refreshStats();
             break;
         case "message_start":
+        case "message_end":
             state.blocks.clear();
             break;
         case "message_update":
             applyDelta(event);
-            break;
-        case "message_end":
-            state.blocks.clear();
             break;
         case "tool_execution_start": {
             const record = startTool(event.toolCallId, event.toolName, event.args);
@@ -319,8 +347,8 @@ function renderQueue(event) {
 // Only `notify` is a message for the user. `setStatus`, `setWidget`, and
 // `setTitle` are chrome that extensions update on almost every turn, so they
 // belong in their own strip rather than in the transcript. Each carries its own
-// field names; reading `message` off all of them is how this first shipped, and
-// it produced a stream of empty rows.
+// field names; reading `message` off all of them produced a stream of empty
+// rows the first time around.
 
 function applyExtensionUi(request) {
     if (!request || typeof request.method !== "string") {
@@ -334,14 +362,13 @@ function applyExtensionUi(request) {
                 return;
             }
 
-            const severity = request.notifyType === "error" || request.notifyType === "warning";
-            addEntry(request.notifyType || "info", severity ? "error" : "notice", text);
+            const severe = request.notifyType === "error" || request.notifyType === "warning";
+            addEntry(request.notifyType || "info", severe ? "error" : "notice", text);
 
             return;
         }
 
         case "setStatus":
-            // An omitted statusText clears that key.
             setKeyed(state.status, request.statusKey, request.statusText);
 
             return;
@@ -360,8 +387,6 @@ function applyExtensionUi(request) {
 
             return;
         case "set_editor_text":
-            // Documented purpose is prefilling the composer, so it replaces the
-            // field rather than appending to it.
             if (typeof request.text === "string") {
                 ui.input.value = request.text;
             }
@@ -423,8 +448,7 @@ function renderApproval(request, expiresAt) {
         actions.append(button("Yes", "approve", () => answer(request.id, { confirmed: true })));
         actions.append(button("No", "", () => answer(request.id, { confirmed: false })));
     } else if (request.method === "select") {
-        const options = Array.isArray(request.options) ? request.options : [];
-        for (const option of options) {
+        for (const option of Array.isArray(request.options) ? request.options : []) {
             actions.append(button(option, "", () => answer(request.id, { value: option })));
         }
     } else if (request.method === "input" || request.method === "editor") {
@@ -439,10 +463,8 @@ function renderApproval(request, expiresAt) {
 
     const expiry = element("div", "expiry", "");
     card.append(expiry);
-
     ui.approvals.append(card);
-    const record = { card, expiry, expiresAt };
-    state.approvals.set(request.id, record);
+    state.approvals.set(request.id, { card, expiry, expiresAt });
     tickExpiry();
 }
 
@@ -497,7 +519,262 @@ function removeApproval(id) {
     state.approvals.delete(id);
 }
 
-// --- Transcript backfill ----------------------------------------------------
+// --- Conversations ----------------------------------------------------------
+
+function openPanel(panel) {
+    panel.hidden = false;
+    ui.scrim.hidden = false;
+}
+
+function closePanels() {
+    ui.sessionsPanel.hidden = true;
+    ui.usagePanel.hidden = true;
+    ui.scrim.hidden = true;
+}
+
+async function loadSessions() {
+    const response = await fetch("/sessions");
+    if (!response.ok) {
+        ui.sessionsList.replaceChildren(element("div", "empty", "Could not read the sessions directory."));
+
+        return;
+    }
+
+    const payload = await response.json();
+    state.sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+    renderSessions();
+}
+
+function renderSessions() {
+    const filter = ui.sessionFilter.value.trim().toLowerCase();
+    const matching = state.sessions.filter((session) => {
+        if (!filter) {
+            return true;
+        }
+
+        return `${session.project} ${session.preview}`.toLowerCase().includes(filter);
+    });
+
+    ui.sessionsList.replaceChildren();
+    if (matching.length === 0) {
+        ui.sessionsList.append(element("div", "empty", "No conversations match."));
+
+        return;
+    }
+
+    let currentProject = null;
+    for (const session of matching) {
+        if (session.project !== currentProject) {
+            currentProject = session.project;
+            ui.sessionsList.append(element("div", "group", currentProject));
+        }
+
+        const row = element("button", "session");
+        row.type = "button";
+        if (session.path === state.sessionPath) {
+            row.classList.add("active");
+        }
+
+        row.append(element("div", "session-preview", session.preview || "(no messages yet)"));
+        const meta = `${formatWhen(session.modified)} · ${session.messages}${session.partial ? "+" : ""} messages`;
+        row.append(element("div", "session-meta", meta));
+        row.addEventListener("click", () => switchSession(session));
+        ui.sessionsList.append(row);
+    }
+}
+
+function formatWhen(iso) {
+    const when = new Date(iso);
+    if (Number.isNaN(when.getTime())) {
+        return "unknown";
+    }
+
+    const sameDay = when.toDateString() === new Date().toDateString();
+    if (sameDay) {
+        return when.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    return when.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+async function switchSession(session) {
+    const result = await command({ type: "switch_session", sessionPath: session.path });
+    if (!result) {
+        return;
+    }
+
+    if (result.cancelled) {
+        addEntry("notice", "notice", "An extension cancelled the session switch.");
+
+        return;
+    }
+
+    state.sessionPath = session.path;
+    ui.sessionTitle.textContent = session.preview ? session.preview.slice(0, 40) : "Conversation";
+    closePanels();
+    await afterSessionChange();
+}
+
+async function startNewSession() {
+    const result = await command({ type: "new_session" });
+    if (!result) {
+        return;
+    }
+
+    state.sessionPath = null;
+    ui.sessionTitle.textContent = "New conversation";
+    closePanels();
+    await afterSessionChange();
+    loadSessions();
+}
+
+async function afterSessionChange() {
+    state.blocks.clear();
+    state.tools.clear();
+    await loadTranscript();
+    await refreshStats();
+    await loadModels();
+}
+
+// --- Usage ------------------------------------------------------------------
+
+function renderUsage(data) {
+    ui.usageBody.replaceChildren();
+    if (!data) {
+        ui.usageBody.append(element("div", "empty", "No usage yet."));
+
+        return;
+    }
+
+    const tokens = data.tokens || {};
+    const context = data.contextUsage || {};
+    const rows = [
+        ["Cost", typeof data.cost === "number" ? `$${data.cost.toFixed(4)}` : "—"],
+        ["Context", context.percent === null || context.percent === undefined ? "—" : `${context.percent}%`],
+        [
+            "Context tokens",
+            context.tokens === null || context.tokens === undefined
+                ? "—"
+                : `${number(context.tokens)} / ${number(context.contextWindow)}`,
+        ],
+        ["Input tokens", number(tokens.input)],
+        ["Output tokens", number(tokens.output)],
+        ["Cache read", number(tokens.cacheRead)],
+        ["Cache write", number(tokens.cacheWrite)],
+        ["Total tokens", number(tokens.total)],
+        ["Messages", number(data.totalMessages)],
+        ["Tool calls", number(data.toolCalls)],
+    ];
+
+    for (const [label, value] of rows) {
+        const row = element("div", "usage-row");
+        row.append(element("span", "usage-label", label));
+        row.append(element("span", "usage-value", value));
+        ui.usageBody.append(row);
+    }
+
+    if (context.percent === null) {
+        ui.usageBody.append(
+            element("div", "usage-note", "Context is unknown right after compaction until the next response."),
+        );
+    }
+}
+
+function number(value) {
+    return typeof value === "number" ? value.toLocaleString() : "—";
+}
+
+// --- Images -----------------------------------------------------------------
+
+async function addImages(files) {
+    for (const file of files) {
+        if (state.images.length >= MAX_IMAGES) {
+            addEntry("notice", "notice", `Only ${MAX_IMAGES} images can be attached at once.`);
+            break;
+        }
+
+        try {
+            state.images.push(await downscale(file));
+        } catch {
+            addEntry("error", "error", `Could not read ${file.name}.`);
+        }
+    }
+
+    renderAttachments();
+}
+
+// Draws the photo into a bounded canvas and re-encodes it. A modern phone photo
+// is several megabytes; this brings it to a few hundred kilobytes without the
+// model losing anything it can use.
+function downscale(file) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+            URL.revokeObjectURL(url);
+            const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(image.width, image.height));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(image.width * scale));
+            canvas.height = Math.max(1, Math.round(image.height * scale));
+            canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
+            resolve({
+                type: "image",
+                mimeType: "image/jpeg",
+                data: dataUrl.slice(dataUrl.indexOf(",") + 1),
+                preview: dataUrl,
+                name: file.name,
+            });
+        };
+
+        image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("decode failed"));
+        };
+
+        image.src = url;
+    });
+}
+
+function renderAttachments() {
+    ui.attachments.replaceChildren();
+    if (state.images.length === 0) {
+        ui.attachments.hidden = true;
+
+        return;
+    }
+
+    ui.attachments.hidden = false;
+    state.images.forEach((image, index) => {
+        const chip = element("div", "chip");
+        const thumb = document.createElement("img");
+        thumb.src = image.preview;
+        thumb.alt = image.name || "attachment";
+        chip.append(thumb);
+        const remove = element("button", "chip-remove", "✕");
+        remove.type = "button";
+        remove.setAttribute("aria-label", `Remove ${image.name || "image"}`);
+        remove.addEventListener("click", () => {
+            state.images.splice(index, 1);
+            renderAttachments();
+        });
+        chip.append(remove);
+        ui.attachments.append(chip);
+    });
+}
+
+function updateImageSupport(model) {
+    // Pi reports accepted input modalities on the model itself.
+    state.modelAcceptsImages = Array.isArray(model?.input) && model.input.includes("image");
+    ui.attach.hidden = !state.modelAcceptsImages;
+    if (!state.modelAcceptsImages && state.images.length > 0) {
+        state.images = [];
+        renderAttachments();
+        addEntry("notice", "notice", "Attachments cleared: this model does not accept images.");
+    }
+}
+
+// --- Loading ----------------------------------------------------------------
 
 async function loadTranscript() {
     const data = await command({ type: "get_messages" });
@@ -507,7 +784,7 @@ async function loadTranscript() {
 
     ui.transcript.replaceChildren();
     for (const message of data.messages) {
-        const text = typeof message.content === "string" ? message.content : contentText(message.content);
+        const text = contentText(message.content);
         if (!text) {
             continue;
         }
@@ -523,17 +800,16 @@ async function refreshStats() {
     }
 
     const percent = data.contextUsage?.percent;
-    ui.context.textContent = typeof percent === "number" ? `ctx ${percent}%` : "ctx —";
-    ui.cost.textContent = typeof data.cost === "number" ? `$${data.cost.toFixed(2)}` : "—";
+    ui.statContext.textContent = typeof percent === "number" ? `${percent}%` : "—";
+    renderUsage(data);
+    if (typeof data.sessionFile === "string") {
+        state.sessionPath = data.sessionFile;
+    }
 }
 
 async function loadModels() {
     const data = await command({ type: "get_available_models" });
-    const models = data?.models;
-    if (!Array.isArray(models)) {
-        return;
-    }
-
+    const models = Array.isArray(data?.models) ? data.models : [];
     ui.model.replaceChildren();
     for (const model of models) {
         const option = element("option", null, model.name || model.id);
@@ -544,6 +820,7 @@ async function loadModels() {
     const current = await command({ type: "get_state" });
     if (current?.model?.id) {
         ui.model.value = current.model.id;
+        updateImageSupport(models.find((model) => model.id === current.model.id) || current.model);
     }
 
     if (current?.thinkingLevel) {
@@ -555,7 +832,6 @@ async function loadModels() {
 
 function connect() {
     const stream = new EventSource("/events");
-
     stream.addEventListener("message", (message) => {
         let payload;
         try {
@@ -566,7 +842,6 @@ function connect() {
 
         handle(payload);
     });
-
     stream.addEventListener("error", () => {
         ui.stateDot.dataset.state = "error";
         ui.stateLabel.textContent = "Reconnecting";
@@ -581,6 +856,7 @@ function handle(payload) {
             loadModels();
             loadTranscript();
             refreshStats();
+            loadSessions();
             break;
         case "agent":
             onAgentEvent(payload.event);
@@ -614,32 +890,77 @@ function handle(payload) {
     }
 }
 
-ui.send.addEventListener("click", async () => {
+async function send() {
     const text = ui.input.value.trim();
-    if (!text) {
+    const images = state.images;
+    if (!text && images.length === 0) {
         return;
     }
 
     ui.input.value = "";
-    addEntry("you", "user", text);
-    await command({ type: state.running ? "steer" : "prompt", message: text });
+    state.images = [];
+    renderAttachments();
+
+    const entry = addEntry("you", "user", text);
+    if (images.length > 0) {
+        const strip = element("div", "sent-images");
+        for (const image of images) {
+            const thumb = document.createElement("img");
+            thumb.src = image.preview;
+            thumb.alt = image.name || "attachment";
+            strip.append(thumb);
+        }
+
+        entry.parentElement.append(strip);
+    }
+
+    const payload = { type: state.running ? "steer" : "prompt", message: text };
+    if (images.length > 0) {
+        payload.images = images.map((image) => ({
+            type: "image",
+            data: image.data,
+            mimeType: image.mimeType,
+        }));
+    }
+
+    await command(payload);
     if (!state.running) {
         setRunning(true);
     }
-});
+}
 
+ui.send.addEventListener("click", send);
 ui.stop.addEventListener("click", async () => {
     await command({ type: "abort" });
     setRunning(false);
 });
-
 ui.model.addEventListener("change", async () => {
-    await command({ type: "set_model", modelId: ui.model.value });
+    const data = await command({ type: "set_model", modelId: ui.model.value });
+    if (data?.model) {
+        updateImageSupport(data.model);
+    }
+});
+ui.thinking.addEventListener("change", () => command({ type: "set_thinking_level", level: ui.thinking.value }));
+
+ui.attach.addEventListener("click", () => ui.fileInput.click());
+ui.fileInput.addEventListener("change", async () => {
+    await addImages([...ui.fileInput.files]);
+    ui.fileInput.value = "";
 });
 
-ui.thinking.addEventListener("change", async () => {
-    await command({ type: "set_thinking_level", level: ui.thinking.value });
+ui.openSessions.addEventListener("click", () => {
+    openPanel(ui.sessionsPanel);
+    loadSessions();
 });
+ui.closeSessions.addEventListener("click", closePanels);
+ui.newSession.addEventListener("click", startNewSession);
+ui.sessionFilter.addEventListener("input", renderSessions);
+ui.openUsage.addEventListener("click", () => {
+    openPanel(ui.usagePanel);
+    refreshStats();
+});
+ui.closeUsage.addEventListener("click", closePanels);
+ui.scrim.addEventListener("click", closePanels);
 
 setInterval(tickExpiry, 1000);
 connect();

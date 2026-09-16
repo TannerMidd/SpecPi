@@ -219,13 +219,40 @@ test("a command outside the allowlist is refused with 403", async (t) => {
     assert.match((await response.json()).error, /not permitted/u);
 });
 
+test("switch_session cannot point the agent outside its sessions tree", async (t) => {
+    const context = await startServer();
+    t.after(context.dispose);
+
+    // switch_session is the one allowlisted command that takes a filesystem
+    // path. Being authenticated is not a reason to let it name any file.
+    for (const sessionPath of ["../auth.json", "/etc/shadow", "C:\\Windows\\win.ini", "", undefined]) {
+        const response = await post(context.base, "/command", { type: "switch_session", sessionPath });
+        assert.equal(response.status, 403, `${sessionPath} should be refused`);
+        assert.match((await response.json()).error, /outside the agent's sessions directory/u);
+    }
+});
+
+test("GET /sessions lists conversations and needs auth", async (t) => {
+    const context = await startServer();
+    t.after(context.dispose);
+
+    assert.equal((await fetch(`${context.base}/sessions`)).status, 401);
+
+    const response = await fetch(`${context.base}/sessions`, { headers: authed() });
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    // The synthetic agent directory has no sessions on disk, so an empty list
+    // is the correct answer rather than an error.
+    assert.ok(Array.isArray(payload.sessions));
+});
+
 test("an oversized body is rejected", async (t) => {
     const context = await startServer();
     t.after(context.dispose);
     const response = await fetch(`${context.base}/command`, {
         method: "POST",
         headers: authed({ "content-type": "application/json" }),
-        body: JSON.stringify({ type: "prompt", message: "x".repeat(2 * 1024 * 1024) }),
+        body: JSON.stringify({ type: "prompt", message: "x".repeat(13 * 1024 * 1024) }),
     });
     assert.equal(response.status, 413);
     assert.match((await response.json()).error, /too large/u);

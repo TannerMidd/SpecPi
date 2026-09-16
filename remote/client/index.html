@@ -10,14 +10,17 @@
     </head>
     <body>
         <header class="bar">
-            <div class="status">
+            <button id="open-sessions" type="button" class="icon" aria-label="Conversations">☰</button>
+            <div class="title">
                 <span id="state-dot" class="dot" data-state="idle"></span>
-                <span id="state-label">Connecting</span>
+                <div class="title-text">
+                    <strong id="session-title">SpecPi Remote</strong>
+                    <span id="state-label">Connecting</span>
+                </div>
             </div>
-            <div class="stats">
+            <button id="open-usage" type="button" class="icon" aria-label="Usage and cost">
                 <span id="stat-context">—</span>
-                <span id="stat-cost">—</span>
-            </div>
+            </button>
         </header>
 
         <main id="transcript" class="transcript" aria-live="polite"></main>
@@ -29,6 +32,23 @@
         <section id="queue" class="queue" hidden></section>
 
         <footer class="composer">
+            <div id="attachments" class="attachments" hidden></div>
+            <div class="input-row">
+                <button id="attach" type="button" class="icon attach" aria-label="Attach images" hidden>
+                    +
+                </button>
+                <textarea
+                    id="input"
+                    rows="2"
+                    placeholder="Message Pi…"
+                    autocomplete="off"
+                    autocapitalize="sentences"
+                ></textarea>
+                <div class="buttons">
+                    <button id="send" type="button" class="primary">Send</button>
+                    <button id="stop" type="button" class="danger" disabled>Stop</button>
+                </div>
+            </div>
             <div class="controls">
                 <label class="field">
                     <span>Model</span>
@@ -44,21 +64,34 @@
                     </select>
                 </label>
             </div>
-            <div class="input-row">
-                <textarea
-                    id="input"
-                    rows="2"
-                    placeholder="Message Pi…"
-                    autocomplete="off"
-                    autocapitalize="sentences"
-                ></textarea>
-                <div class="buttons">
-                    <button id="send" type="button" class="primary">Send</button>
-                    <button id="stop" type="button" class="danger" disabled>Stop</button>
-                </div>
-            </div>
             <p id="hint" class="hint">While Pi is running, Send steers the current turn.</p>
         </footer>
+
+        <input id="file-input" type="file" accept="image/*" multiple hidden />
+
+        <!-- Conversation drawer -->
+        <div id="sessions-panel" class="panel" hidden>
+            <div class="panel-head">
+                <strong>Conversations</strong>
+                <div class="panel-actions">
+                    <button id="new-session" type="button">New</button>
+                    <button id="close-sessions" type="button" class="icon" aria-label="Close">✕</button>
+                </div>
+            </div>
+            <input id="session-filter" type="search" placeholder="Filter by project or text…" />
+            <div id="sessions-list" class="panel-body"></div>
+        </div>
+
+        <!-- Usage panel -->
+        <div id="usage-panel" class="panel" hidden>
+            <div class="panel-head">
+                <strong>Usage</strong>
+                <button id="close-usage" type="button" class="icon" aria-label="Close">✕</button>
+            </div>
+            <div id="usage-body" class="panel-body"></div>
+        </div>
+
+        <div id="scrim" class="scrim" hidden></div>
 
         <script src="/app.js" type="module"></script>
     </body>

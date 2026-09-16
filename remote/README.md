@@ -61,6 +61,9 @@ Never port-forward this to the internet. There is no relay mode and none is plan
 
 ## Using it
 
+- **Conversations** — the menu button opens every session in your Pi agent directory, grouped by project, with the first user message as a preview and a filter box. Tap one to switch, or New to start fresh. Building this list means reading stored conversations; see SECURITY.md.
+- **Usage** — the context percentage in the header opens a full breakdown: cost, tokens in/out, cache reads and writes, context window use, message and tool-call counts.
+- **Images** — the + button appears only when the selected model accepts image input. Photos are downscaled in the browser before upload, so a 12 MP phone photo becomes a few hundred kilobytes.
 - **Send / Steer** — the button becomes "Steer" while a turn is running, and the message is delivered as a steering message rather than a new prompt.
 - **Stop** — aborts the current turn.
 - **Approvals** — appear as cards above the composer. Every option is an explicit tap; there are no gesture shortcuts for granting permission.

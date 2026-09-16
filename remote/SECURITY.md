@@ -20,9 +20,17 @@ The cookie is not marked `Secure`, because a `Secure` cookie is never sent over 
 
 ## Credentials and session data
 
-Provider credentials stay with Pi. The daemon never reads, stores, or proxies authentication files, provider credentials, trust decisions, or sessions. It reads only what the UI functionally needs from the connected conversation: `get_state`, `get_messages`, `get_entries`, `get_session_stats`.
+Provider credentials stay with Pi. The daemon never reads, stores, or proxies authentication files, provider credentials, or trust decisions.
 
-Conversation content — prompts, model output, tool output, and approval context — does cross the tunnel to the phone and is rendered there. Treat the phone as inside your trust boundary.
+**It does read stored sessions.** Pi's RPC surface has no command to list conversations — `switch_session` takes a path you are expected to already have — so the conversation picker is built by reading the agent's sessions directory directly. For each session file the daemon reads the header (id, working directory, timestamp) and scans forward for the **first user message**, which it shows as the list preview, because session headers carry no title. That means conversation content from every session on disk, including projects unrelated to the one the daemon was launched against, is read and sent to the phone.
+
+This is a wider boundary than the rest of the daemon takes, and it is a deliberate choice rather than an oversight. SpecPi Chat draws the line differently: it keeps its own catalogue and does not import unrelated Pi histories. If that matters more than seeing existing conversations, do not run Remote.
+
+Reads are bounded. A preview stops at the first user message, the per-file scan gives up after 2 MB rather than pulling a large transcript into memory, and the listing is capped at the most recently modified sessions.
+
+`switch_session` is confined to the sessions tree. It is the only allowlisted command that takes a filesystem path, and without that check an authenticated client could point the agent at any file the daemon can read — the agent's own `auth.json` included. Paths outside the sessions directory, paths that traverse out of it, and anything not ending in `.jsonl` are refused.
+
+Conversation content — prompts, model output, tool output, approval context, and session previews — crosses the tunnel to the phone and is rendered there. Treat the phone as inside your trust boundary.
 
 ## Rendering
 

@@ -13,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApprovalRegistry } from "./approvals.js";
 import { ALLOWED_COMMANDS } from "./rpc-bridge.js";
+import { listSessions, isInsideSessions } from "./sessions.js";
 
 const clientRoot = fileURLToPath(new URL("../client/", import.meta.url));
 
@@ -28,7 +29,9 @@ const STATIC_FILES = new Map([
     ["/icon.svg", { file: "icon.svg", type: "image/svg+xml" }],
 ]);
 
-const MAX_BODY_BYTES = 1024 * 1024;
+// Generous enough for a prompt carrying a few downscaled phone photos as
+// base64, which the 1 MB text limit could never hold.
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
 const EVENT_HISTORY_LIMIT = 500;
 const SSE_KEEPALIVE_MS = 25000;
 
@@ -114,6 +117,12 @@ export class RemoteServer {
                 location: url.pathname,
             });
             response.end();
+
+            return;
+        }
+
+        if (request.method === "GET" && url.pathname === "/sessions") {
+            await this.handleSessions(response);
 
             return;
         }
@@ -260,6 +269,14 @@ export class RemoteServer {
         response.end();
     }
 
+    async handleSessions(response) {
+        try {
+            sendJson(response, 200, { sessions: await listSessions({ env: this.bridge.env }) });
+        } catch (error) {
+            sendJson(response, 500, { error: error.message });
+        }
+    }
+
     async handleCommand(request, response) {
         const body = await readJson(request);
         if (!body.ok) {
@@ -277,6 +294,15 @@ export class RemoteServer {
 
         if (!ALLOWED_COMMANDS.has(command.type)) {
             sendJson(response, 403, { error: `Command not permitted over Remote: ${command.type}` });
+
+            return;
+        }
+
+        // switch_session takes a filesystem path, so it is the one command that
+        // could point the agent at a file outside its own session tree. Being
+        // authenticated is not a reason to allow that.
+        if (command.type === "switch_session" && !isInsideSessions(command.sessionPath, this.bridge.env)) {
+            sendJson(response, 403, { error: "Session path is outside the agent's sessions directory" });
 
             return;
         }
