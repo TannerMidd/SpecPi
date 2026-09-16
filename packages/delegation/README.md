@@ -14,13 +14,13 @@ Pi supplies every runtime import. The package has no production dependencies.
 
 ## Use
 
-Delegation is off until you turn it on, and it needs an interactive session with a model selected:
+Delegation is **enabled at Pi startup** whenever a session has a model configured; there is no opt-in step. Turn it off for a session with:
 
 ```
-/delegate on
+/delegate off
 ```
 
-The agent then has a `delegate` tool with two job modes:
+While it is on, the agent has a `delegate` tool with two job modes:
 
 - **review** — check finished artifacts against assigned requirements in fresh context, with no memory of how the work was argued for.
 - **scout** — answer one distinct evidence question over selected sources.
@@ -31,7 +31,7 @@ The agent then has a `delegate` tool with two job modes:
 
 | Command                    | Effect                                                              |
 | -------------------------- | ------------------------------------------------------------------- |
-| `/delegate on` / `off`     | Turn delegation on or off for this session                          |
+| `/delegate off` / `on`     | Turn delegation off or back on for this session (on at startup)     |
 | `/delegate status`         | Current posture, model, guard state and session counters            |
 | `/delegate limits`         | The ceilings currently in force                                     |
 | `/delegate budget <1–64>`  | Save a session budget multiplier (default 8); `reset` restores it   |

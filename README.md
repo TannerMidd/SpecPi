@@ -76,7 +76,7 @@ Browser QA setup uses the installed package's pinned Playwright and the standard
 
 ## Delegation and experiments
 
-[`specpi-delegation@0.1.0`](https://www.npmjs.com/package/specpi-delegation/v/0.1.0) replaces the third-party subagent package in the default base. It hands a question to a real Pi child session that can read a frozen copy of selected sources and nothing else — three tools, no shell, no edits, no network — under fixed call, token and time ceilings. Turn it on per session with `/delegate on`; it needs an interactive session with a model selected. Results are advisory evidence, not verification.
+[`specpi-delegation@0.1.0`](https://www.npmjs.com/package/specpi-delegation/v/0.1.0) replaces the third-party subagent package in the default base. It hands a question to a real Pi child session that can read a frozen copy of selected sources and nothing else — three tools, no shell, no edits, no network — under fixed call, token and time ceilings. It is enabled at Pi startup whenever a model is configured; `/delegate off` turns it off for a session. Results are advisory evidence, not verification.
 
 [`specpi-experiments@0.1.0`](https://www.npmjs.com/package/specpi-experiments/v/0.1.0) adds `/experiment`: try an idea in a detached Git worktree created at `HEAD`, then export it as a patch or discard it. The base worktree, its index and its uncommitted changes are never touched. Do the work in a separate Pi session opened in the experiment directory.
 

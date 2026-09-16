@@ -12,9 +12,9 @@ Work is bounded by fixed ceilings that local settings may lower but never raise:
 
 Prompts, source excerpts and results cross Pi's conversation and model-provider boundary, and a child's output is model-generated text that the parent may act on. This package applies no prompt-injection defense. Treat a delegated result as untrusted input, not as a verified finding.
 
-Delegation is off until a human turns it on with `/delegate on`, and activation requires an interactive session with a selected model. Headless activation is refused. Changing model, provider, thinking level or working directory invalidates the active grant rather than silently carrying it forward.
+Delegation activates at Pi startup whenever the session has a model configured, in every mode including RPC and print. It is on unless a human runs `/delegate off`, so treat it as part of the installed surface rather than an opt-in feature. Startup preflights the host without launching workers or model inference, and a session whose model, provider, thinking level or working directory changes has its grant invalidated rather than silently carried forward. Re-enabling by command requires an interactive session; startup activation does not.
 
-This package cooperates with a command guard when one is present, through the `specpi:guard-state` and `specpi:guard-policy-changed` events, and reports its guard posture as `absent` when none answers. SpecPi no longer ships a command guard, so the default posture is `absent`: delegation admission is governed by the host's permission system and the human `on` toggle alone.
+This package cooperates with a command guard when one is present, through the `specpi:guard-state` and `specpi:guard-policy-changed` events, and reports its guard posture as `absent` when none answers. SpecPi no longer ships a command guard, so the default posture is `absent`: delegation admission is governed by the host's permission system and the human `/delegate off` toggle alone.
 
 Top-level dependencies are none; Pi supplies every runtime import as an optional peer. The bundled Pi manifest loads only `src/index.ts`, so no other file in the package is auto-discovered as an extension.
 

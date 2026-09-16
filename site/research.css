@@ -225,3 +225,91 @@
         padding: 1rem;
     }
 }
+
+/* Figures rendered from HarnessTax's published data (harnesstax.github.io) and from
+   scripts/measure-context.mjs. Categorical hues are fixed per entity and validated
+   against both surfaces; marker shape and row labels carry identity alongside colour. */
+:root {
+    --ct-pi: #1b5fd6;
+    --ct-specpi: #157f4c;
+    --ct-codex: #9a5b00;
+    --ct-claudecode: #a3197f;
+}
+:root[data-theme="dark"] {
+    --ct-pi: #5a8ae8;
+    --ct-specpi: #3f9e6b;
+    --ct-codex: #c08420;
+    --ct-claudecode: #c25299;
+}
+
+.chart {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin: 0.4rem 0 0.2rem;
+    overflow: visible;
+}
+.chart text {
+    font-family: var(--sans);
+    fill: var(--muted);
+}
+.chart .ct-ax {
+    font-size: 11px;
+}
+.chart .ct-lb {
+    font-size: 11.5px;
+    fill: var(--muted);
+}
+.chart .ct-pt {
+    font-size: 11.5px;
+    fill: var(--text);
+    font-weight: 500;
+}
+.chart .ct-row {
+    font-size: 13px;
+    fill: var(--text);
+    font-weight: 600;
+}
+.chart .ct-sub {
+    font-size: 11px;
+}
+.chart .ct-val {
+    font-size: 12px;
+    fill: var(--text);
+    font-weight: 600;
+}
+
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.1rem;
+    margin: 1.4rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+.chart-legend li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+}
+.chart-key {
+    width: 11px;
+    height: 11px;
+    background: var(--k);
+    flex: 0 0 auto;
+}
+.chart-key[data-shape="circle"] {
+    border-radius: 50%;
+}
+.chart-key[data-shape="triangle"] {
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.chart-key[data-shape="diamond"] {
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.chart-figure { margin: 1.6rem 0; }
+.chart-figure figcaption { margin-top: 0.5rem; }
