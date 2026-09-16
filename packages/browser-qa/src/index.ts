@@ -9,6 +9,7 @@ import {
 import type { Browser, BrowserContext, Page } from "playwright";
 import { Check } from "typebox/value";
 import { BrowserDiagnostics, DIAGNOSTIC_CATEGORIES } from "./diagnostics.ts";
+import { loadStartupActivation, saveStartupActivation, settingsPath, syncActiveTools } from "./activation.mjs";
 import { BrowserCleanupError, settleBrowserCleanup } from "./lifecycle.ts";
 import { AccessibilityError, AccessibilityParams, scanAccessibility } from "./accessibility.ts";
 import {
@@ -138,6 +139,11 @@ function imageContent(file: string, data: Buffer, note: string) {
 
 export default function browserExtension(pi: ExtensionAPI) {
     const state: BrowserState = { acceptedRefs: new Set(), assignedRefs: new Set() };
+    // Fourteen tool schemas are about 8.7 KB on every request of a session, so they are
+    // only offered once someone asks for them. The tools are always registered; what the
+    // gate controls is whether Pi sends them to the model.
+    const toolNames: string[] = [];
+    let browsingEnabled = false;
     let operationTail: Promise<unknown> = Promise.resolve();
     const diagnostics = new BrowserDiagnostics();
     let detachPageListeners: (() => void) | undefined;
@@ -414,6 +420,7 @@ export default function browserExtension(pi: ExtensionAPI) {
 
     const register = <T extends TSchema>(definition: ToolDefinition<T, unknown>) => {
         const execute = definition.execute;
+        toolNames.push(definition.name);
         pi.registerTool({
             ...definition,
             executionMode: "sequential",
@@ -1043,6 +1050,79 @@ export default function browserExtension(pi: ExtensionAPI) {
             await shutdownNow();
 
             return { content: [{ type: "text", text: "Closed the isolated Browser QA context." }], details: {} };
+        },
+    });
+
+    const applyActivation = () => syncActiveTools(pi, toolNames, browsingEnabled);
+
+    pi.on("session_start", () => {
+        browsingEnabled = loadStartupActivation();
+        applyActivation();
+    });
+
+    pi.registerCommand("browser", {
+        description: "Offer or withdraw Browser QA's tools, or choose whether they start offered",
+        getArgumentCompletions: (prefix: string) =>
+            ["on", "off", "status", "startup", "startup on", "startup off"]
+                .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
+                .map((value) => ({ value, label: value })),
+        handler: async (args: string, ctx: ExtensionContext) => {
+            const [action = "status", choice, ...rest] = args.trim().split(/\s+/u).filter(Boolean);
+            if (rest.length || (choice && action.toLowerCase() !== "startup")) {
+                throw new Error("Usage: /browser [on|off|status|startup [on|off]]");
+            }
+
+            const verb = action.toLowerCase();
+            if (verb === "on" || verb === "off") {
+                browsingEnabled = verb === "on";
+                applyActivation();
+                ctx.ui.notify(
+                    browsingEnabled
+                        ? `Browser QA offered ${toolNames.length} tools to this session. They add about 8.7 KB of tool schema to each request until /browser off.`
+                        : "Browser QA withdrew its tools from this session. No browser is launched and its schemas leave the request.",
+                    "info",
+                );
+
+                return;
+            }
+
+            if (verb === "startup") {
+                if (!choice) {
+                    ctx.ui.notify(
+                        `Browser QA starts ${loadStartupActivation() ? "offered" : "withdrawn"}. Preference: ${settingsPath()}`,
+                        "info",
+                    );
+
+                    return;
+                }
+
+                if (!ctx.hasUI) {
+                    throw new Error("Startup changes require a human interactive command");
+                }
+
+                if (!["on", "off"].includes(choice.toLowerCase())) {
+                    throw new Error("Usage: /browser startup [on|off]");
+                }
+
+                saveStartupActivation(choice.toLowerCase() === "on");
+                ctx.ui.notify(
+                    choice.toLowerCase() === "on"
+                        ? "Browser QA will offer its tools in new Pi sessions, adding their schemas to every request. This session is unchanged."
+                        : "Browser QA will start withdrawn in new Pi sessions and its schemas will not be sent. This session is unchanged.",
+                    "info",
+                );
+
+                return;
+            }
+
+            if (verb !== "status") {
+                throw new Error("Usage: /browser [on|off|status|startup [on|off]]");
+            }
+
+            ctx.ui.notify(
+                `Browser QA is ${browsingEnabled ? "offering" : "not offering"} its ${toolNames.length} tools to this session, and starts ${loadStartupActivation() ? "offered" : "withdrawn"}.`,
+                "info",
+            );
         },
     });
 

@@ -30,7 +30,7 @@
 
 SpecPi is a small base for the [Pi coding agent](https://pi.dev/), assembled from deliberate choices about how the agent should work — not a curated marketplace.
 
-Two first-party extensions set the terms: **scope control**, which holds each task to the files it declared, and an **improvement loop**, which turns recurring friction into tested, evidence-backed harness changes instead of accumulated prompts and workarounds. Around them sit six hand-picked packages, each pinned to an exact version and verified before any transaction completes, and **SpecPi Chat**, a VS Code frontend for working beside the agent.
+Two first-party extensions set the terms: **scope control**, which holds each task to the files it declared, and an **improvement loop**, which turns recurring friction into tested, evidence-backed harness changes instead of accumulated prompts and workarounds. Around them sit seven hand-picked packages, each pinned to an exact version and verified before any transaction completes, and **SpecPi Chat**, a VS Code frontend for working beside the agent.
 
 The setup optimizes for four things:
 
@@ -60,7 +60,7 @@ Full setup options, package details, and requirements: [website](https://tannerm
 
 | | |
 | --- | --- |
-| [Packages](https://tannermidd.github.io/SpecPi/#packages) | The six pinned packages and what each provides |
+| [Packages](https://tannermidd.github.io/SpecPi/#packages) | The seven pinned packages and what each provides |
 | [Scope control](https://tannermidd.github.io/SpecPi/wiki/#scope) | `/scope` commands and drift monitoring |
 | [Improvement loop](https://tannermidd.github.io/SpecPi/#loop) | Local wishlist, `/harness-improvement`, and retirement with evidence |
 | [SpecPi Chat](https://tannermidd.github.io/SpecPi/#vscode-chat) | VS Code frontend and VSIX install · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) |

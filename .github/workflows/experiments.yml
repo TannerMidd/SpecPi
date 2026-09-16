@@ -1,0 +1,35 @@
+name: experiments
+
+on:
+  push:
+    paths: ["packages/experiments/**", ".github/workflows/experiments*.yml"]
+  pull_request:
+    paths: ["packages/experiments/**", ".github/workflows/experiments*.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/experiments
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+      # The experiment suite drives real `git worktree` operations.
+      - name: Configure Git identity
+        run: |
+          git config --global user.email "experiments@example.invalid"
+          git config --global user.name "Experiments CI"
+      - run: npm ci --ignore-scripts --omit=peer
+      - run: npm run check
+      - run: git diff --check

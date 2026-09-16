@@ -6,12 +6,6 @@
 // package reads.
 const PACKAGES = [
     {
-        id: "subagents",
-        label: "Subagents",
-        commands: ["subagents-fleet", "subagents-guide"],
-        targets: ["subagents:extension", "subagents:global", "subagents:project"],
-    },
-    {
         id: "webAccess",
         label: "Web access",
         commands: ["websearch", "curator"],

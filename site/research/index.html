@@ -49,7 +49,7 @@
                     ><a href="#specpi"><span>05</span>For this base</a
                     ><a href="#unproven"><span>06</span>Not established</a><a href="#sources"><span>07</span>Sources</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.23.0<br />Chat 0.10.0<br />Evidence to 15 Sep 2026</div>
+                <div class="index-meta">SpecPi 0.24.0<br />Chat 0.11.0<br />Evidence to 16 Sep 2026</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -61,8 +61,10 @@
                         and what they do not.
                     </p>
                     <p class="wiki-release-note">
-                        This page summarises two internal reviews of public evidence. SpecPi itself has not been
-                        measured against an alternative. Nothing below is a benchmark of this base.
+                        This page summarises public evidence, including the
+                        <a class="text-link" href="https://harnesstax.github.io/">HarnessTax</a> study published on
+                        16 September 2026 by Pan, Yang, Arabzadeh, Chiang, Stoica and Zaharia. SpecPi itself has not
+                        been measured against an alternative. Nothing below is a benchmark of this base.
                     </p>
                 </div>
 
@@ -94,6 +96,14 @@
                             <dd>
                                 <strong>A success-rate winner.</strong>
                                 Pi leads on some benchmarks and trails on others. No study establishes parity either.
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Supported</dt>
+                            <dd>
+                                <strong>The harness moves cost more than correctness.</strong>
+                                Across 21 model–harness pairs, success rates stayed within a few points while the same
+                                model's bill varied by up to 5x.
                             </dd>
                         </div>
                         <div>
@@ -168,9 +178,109 @@
 
                 <section class="doc-section" id="harness">
                     <header><h2>Harness choice</h2><span>03</span></header>
+                    <h3 id="harnesstax">HarnessTax: seven models across three harnesses</h3>
                     <p>
-                        The most auditable public comparison is FrontierHarness: 30 tasks, every harness on the same
-                        Kimi K3 model through the same provider, task-level results released. Pi ran at version 0.84.2.
+                        The largest controlled comparison to date, published 16 September 2026, evaluates 21
+                        model–harness pairs — seven models across Claude Code, Codex CLI and Pi — on SWE-bench Lite and
+                        Terminal-Bench 2.0. It is the first study of this scale to measure Pi directly, and it is the
+                        strongest evidence on this page.
+                    </p>
+                    <div class="callout">
+                        <p>
+                            <strong>With thanks to the HarnessTax authors.</strong> This section summarises
+                            <em>HarnessTax: How Much Does the Harness Matter for Coding Agents?</em> by
+                            <strong>Melissa Z. Pan, Shuo Yang, Negar Arabzadeh, Wei-Lin Chiang, Ion Stoica and Matei
+                            Zaharia</strong> (UC Berkeley Sky Lab; Wei-Lin Chiang at Arena). The work is theirs, not
+                            SpecPi's, and the summary below is necessarily lossy.
+                        </p>
+                        <p>
+                            Read the full study, with its interactive figures and the complete 21-pair grid, at
+                            <a class="text-link" href="https://harnesstax.github.io/">harnesstax.github.io</a>. Please
+                            cite the authors rather than this page.
+                        </p>
+                    </div>
+                    <p>
+                        Their headline result is that <strong>the harness moves cost far more than it moves
+                        correctness</strong>. Averaged across shared models, the harness effect on success rate stays
+                        within about ±2% on SWE-bench Lite and ±5% on Terminal-Bench 2.0, while the same model's bill
+                        varies by as much as 5x. Pi reaches the Pareto frontier on both benchmarks with four tools —
+                        read, write, edit and bash.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg class="chart" id="chart-swe" viewBox="0 0 720 384" role="img" preserveAspectRatio="xMidYMid meet"><rect x="108" y="6" width="11" height="11" rx="2" fill="var(--ct-pi)" /><text x="125" y="16" class="ct-ax">Pi</text><rect x="161.2" y="6" width="11" height="11" rx="2" fill="var(--ct-codex)" /><text x="178.2" y="16" class="ct-ax">Codex CLI</text><rect x="257.1" y="6" width="11" height="11" rx="2" fill="var(--ct-claudecode)" /><text x="274.1" y="16" class="ct-ax">Claude Code</text><text x="246" y="36" text-anchor="middle" class="ct-lb">Tasks resolved</text><line x1="108" y1="44" x2="108" y2="341" stroke="var(--line)" opacity=".85" /><text x="108" y="359" text-anchor="middle" class="ct-ax">0%</text><line x1="177" y1="44" x2="177" y2="341" stroke="var(--line)" opacity=".45" /><text x="177" y="359" text-anchor="middle" class="ct-ax">25%</text><line x1="246" y1="44" x2="246" y2="341" stroke="var(--line)" opacity=".45" /><text x="246" y="359" text-anchor="middle" class="ct-ax">50%</text><line x1="315" y1="44" x2="315" y2="341" stroke="var(--line)" opacity=".45" /><text x="315" y="359" text-anchor="middle" class="ct-ax">75%</text><line x1="384" y1="44" x2="384" y2="341" stroke="var(--line)" opacity=".45" /><text x="384" y="359" text-anchor="middle" class="ct-ax">100%</text><text x="558" y="36" text-anchor="middle" class="ct-lb">Mean cost per attempt</text><line x1="420" y1="44" x2="420" y2="341" stroke="var(--line)" opacity=".85" /><text x="420" y="359" text-anchor="middle" class="ct-ax">$0</text><line x1="489" y1="44" x2="489" y2="341" stroke="var(--line)" opacity=".45" /><text x="489" y="359" text-anchor="middle" class="ct-ax">$.40</text><line x1="558" y1="44" x2="558" y2="341" stroke="var(--line)" opacity=".45" /><text x="558" y="359" text-anchor="middle" class="ct-ax">$.80</text><line x1="627" y1="44" x2="627" y2="341" stroke="var(--line)" opacity=".45" /><text x="627" y="359" text-anchor="middle" class="ct-ax">$1.20</text><line x1="696" y1="44" x2="696" y2="341" stroke="var(--line)" opacity=".45" /><text x="696" y="359" text-anchor="middle" class="ct-ax">$1.60</text><text x="100" y="72" text-anchor="end" class="ct-row">Fable 5</text><rect x="108" y="52" width="266.89" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Fable 5 · Pi: 96.7% of tasks</title></rect><rect x="420" y="52" width="114.89" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Fable 5 · Pi: $0.666 per attempt</title></rect><rect x="108" y="63" width="266.89" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Fable 5 · Codex: 96.7% of tasks</title></rect><rect x="420" y="63" width="153.53" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Fable 5 · Codex: $0.890 per attempt</title></rect><rect x="108" y="74" width="269.93" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Fable 5 · Claude Code: 97.8% of tasks</title></rect><rect x="420" y="74" width="229.25" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Fable 5 · Claude Code: $1.329 per attempt</title></rect><text x="100" y="115" text-anchor="end" class="ct-row">Opus 4.8</text><rect x="108" y="95" width="226.87" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Opus 4.8 · Pi: 82.2% of tasks</title></rect><rect x="420" y="95" width="81.59" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Opus 4.8 · Pi: $0.473 per attempt</title></rect><rect x="108" y="106" width="245.36" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Opus 4.8 · Codex: 88.9% of tasks</title></rect><rect x="420" y="106" width="119.71" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Opus 4.8 · Codex: $0.694 per attempt</title></rect><rect x="108" y="117" width="239.29" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Opus 4.8 · Claude Code: 86.7% of tasks</title></rect><rect x="420" y="117" width="168.36" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Opus 4.8 · Claude Code: $0.976 per attempt</title></rect><text x="100" y="158" text-anchor="end" class="ct-row">GPT-5.6 Sol</text><rect x="108" y="138" width="205.34" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Sol · Pi: 74.4% of tasks</title></rect><rect x="420" y="138" width="76.07" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Sol · Pi: $0.441 per attempt</title></rect><rect x="108" y="149" width="202.31" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Sol · Codex: 73.3% of tasks</title></rect><rect x="420" y="149" width="96.77" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Sol · Codex: $0.561 per attempt</title></rect><rect x="108" y="160" width="214.73" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Sol · Claude Code: 77.8% of tasks</title></rect><rect x="420" y="160" width="265.65" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Sol · Claude Code: $1.540 per attempt</title></rect><text x="100" y="201" text-anchor="end" class="ct-row">Kimi K3</text><rect x="108" y="181" width="199.27" height="9" rx="3" fill="var(--ct-pi)"><title>Kimi K3 · Pi: 72.2% of tasks</title></rect><rect x="420" y="181" width="78.49" height="9" rx="3" fill="var(--ct-pi)"><title>Kimi K3 · Pi: $0.455 per attempt</title></rect><rect x="108" y="192" width="205.34" height="9" rx="3" fill="var(--ct-codex)"><title>Kimi K3 · Codex: 74.4% of tasks</title></rect><rect x="420" y="192" width="145.76" height="9" rx="3" fill="var(--ct-codex)"><title>Kimi K3 · Codex: $0.845 per attempt</title></rect><rect x="108" y="203" width="211.69" height="9" rx="3" fill="var(--ct-claudecode)"><title>Kimi K3 · Claude Code: 76.7% of tasks</title></rect><rect x="420" y="203" width="135.24" height="9" rx="3" fill="var(--ct-claudecode)"><title>Kimi K3 · Claude Code: $0.784 per attempt</title></rect><text x="100" y="244" text-anchor="end" class="ct-row">Sonnet 4.6</text><rect x="108" y="224" width="177.74" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Sonnet 4.6 · Pi: 64.4% of tasks</title></rect><rect x="420" y="224" width="117.13" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Sonnet 4.6 · Pi: $0.679 per attempt</title></rect><rect x="108" y="235" width="190.16" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Sonnet 4.6 · Codex: 68.9% of tasks</title></rect><rect x="420" y="235" width="128.51" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Sonnet 4.6 · Codex: $0.745 per attempt</title></rect><rect x="108" y="246" width="184.09" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Sonnet 4.6 · Claude Code: 66.7% of tasks</title></rect><rect x="420" y="246" width="115.4" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Sonnet 4.6 · Claude Code: $0.669 per attempt</title></rect><text x="100" y="287" text-anchor="end" class="ct-row">Haiku 4.5</text><rect x="108" y="267" width="165.6" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Haiku 4.5 · Pi: 60% of tasks</title></rect><rect x="420" y="267" width="64.52" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Haiku 4.5 · Pi: $0.374 per attempt</title></rect><rect x="108" y="278" width="159.53" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Haiku 4.5 · Codex: 57.8% of tasks</title></rect><rect x="420" y="278" width="67.62" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Haiku 4.5 · Codex: $0.392 per attempt</title></rect><rect x="108" y="289" width="144.07" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Haiku 4.5 · Claude Code: 52.2% of tasks</title></rect><rect x="420" y="289" width="73.48" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Haiku 4.5 · Claude Code: $0.426 per attempt</title></rect><text x="100" y="330" text-anchor="end" class="ct-row">GPT-5.6 Luna</text><rect x="108" y="310" width="147.11" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Luna · Pi: 53.3% of tasks</title></rect><rect x="420" y="310" width="5.17" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Luna · Pi: $0.030 per attempt</title></rect><rect x="108" y="321" width="153.46" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Luna · Codex: 55.6% of tasks</title></rect><rect x="420" y="321" width="6.04" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Luna · Codex: $0.035 per attempt</title></rect><rect x="108" y="332" width="153.46" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Luna · Claude Code: 55.6% of tasks</title></rect><rect x="420" y="332" width="26.22" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Luna · Claude Code: $0.152 per attempt</title></rect></svg>
+                        <figcaption class="figure-note">
+                            <b>SWE-bench Lite.</b> All 21 model–harness pairs, grouped by model. The three bars in each
+                            left-hand group are nearly level while the right-hand ones are not, and that contrast is the
+                            study's headline result. Pi is the cheapest of the three on six of the seven models; Claude
+                            Sonnet 4.6 is the exception. Rows are ordered by mean success here and held in that order in the
+                            figure below, so the two can be read against each other. Hover any bar for the exact figure.
+                        </figcaption>
+                    </figure>
+                    <figure class="chart-figure">
+                        <svg class="chart" id="chart-tb" viewBox="0 0 720 384" role="img" preserveAspectRatio="xMidYMid meet"><rect x="108" y="6" width="11" height="11" rx="2" fill="var(--ct-pi)" /><text x="125" y="16" class="ct-ax">Pi</text><rect x="161.2" y="6" width="11" height="11" rx="2" fill="var(--ct-codex)" /><text x="178.2" y="16" class="ct-ax">Codex CLI</text><rect x="257.1" y="6" width="11" height="11" rx="2" fill="var(--ct-claudecode)" /><text x="274.1" y="16" class="ct-ax">Claude Code</text><text x="246" y="36" text-anchor="middle" class="ct-lb">Tasks resolved</text><line x1="108" y1="44" x2="108" y2="341" stroke="var(--line)" opacity=".85" /><text x="108" y="359" text-anchor="middle" class="ct-ax">0%</text><line x1="177" y1="44" x2="177" y2="341" stroke="var(--line)" opacity=".45" /><text x="177" y="359" text-anchor="middle" class="ct-ax">25%</text><line x1="246" y1="44" x2="246" y2="341" stroke="var(--line)" opacity=".45" /><text x="246" y="359" text-anchor="middle" class="ct-ax">50%</text><line x1="315" y1="44" x2="315" y2="341" stroke="var(--line)" opacity=".45" /><text x="315" y="359" text-anchor="middle" class="ct-ax">75%</text><line x1="384" y1="44" x2="384" y2="341" stroke="var(--line)" opacity=".45" /><text x="384" y="359" text-anchor="middle" class="ct-ax">100%</text><text x="558" y="36" text-anchor="middle" class="ct-lb">Mean cost per attempt</text><line x1="420" y1="44" x2="420" y2="341" stroke="var(--line)" opacity=".85" /><text x="420" y="359" text-anchor="middle" class="ct-ax">$0</text><line x1="489" y1="44" x2="489" y2="341" stroke="var(--line)" opacity=".45" /><text x="489" y="359" text-anchor="middle" class="ct-ax">$.40</text><line x1="558" y1="44" x2="558" y2="341" stroke="var(--line)" opacity=".45" /><text x="558" y="359" text-anchor="middle" class="ct-ax">$.80</text><line x1="627" y1="44" x2="627" y2="341" stroke="var(--line)" opacity=".45" /><text x="627" y="359" text-anchor="middle" class="ct-ax">$1.20</text><line x1="696" y1="44" x2="696" y2="341" stroke="var(--line)" opacity=".45" /><text x="696" y="359" text-anchor="middle" class="ct-ax">$1.60</text><text x="100" y="72" text-anchor="end" class="ct-row">Fable 5</text><rect x="108" y="52" width="196.24" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Fable 5 · Pi: 71.1% of tasks</title></rect><rect x="420" y="52" width="186.13" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Fable 5 · Pi: $1.079 per attempt</title></rect><rect x="108" y="63" width="199.27" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Fable 5 · Codex: 72.2% of tasks</title></rect><rect x="420" y="63" width="168.36" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Fable 5 · Codex: $0.976 per attempt</title></rect><rect x="108" y="74" width="208.66" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Fable 5 · Claude Code: 75.6% of tasks</title></rect><rect x="420" y="74" width="268.06" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Fable 5 · Claude Code: $1.554 per attempt</title></rect><text x="100" y="115" text-anchor="end" class="ct-row">Opus 4.8</text><rect x="108" y="95" width="199.27" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Opus 4.8 · Pi: 72.2% of tasks</title></rect><rect x="420" y="95" width="130.75" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Opus 4.8 · Pi: $0.758 per attempt</title></rect><rect x="108" y="106" width="199.27" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Opus 4.8 · Codex: 72.2% of tasks</title></rect><rect x="420" y="106" width="146.28" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Opus 4.8 · Codex: $0.848 per attempt</title></rect><rect x="108" y="117" width="190.16" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Opus 4.8 · Claude Code: 68.9% of tasks</title></rect><rect x="420" y="117" width="155.08" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Opus 4.8 · Claude Code: $0.899 per attempt</title></rect><text x="100" y="158" text-anchor="end" class="ct-row">GPT-5.6 Sol</text><rect x="108" y="138" width="229.91" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Sol · Pi: 83.3% of tasks</title></rect><rect x="420" y="138" width="72.62" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Sol · Pi: $0.421 per attempt</title></rect><rect x="108" y="149" width="217.76" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Sol · Codex: 78.9% of tasks</title></rect><rect x="420" y="149" width="131.27" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Sol · Codex: $0.761 per attempt</title></rect><rect x="108" y="160" width="196.24" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Sol · Claude Code: 71.1% of tasks</title></rect><rect x="420" y="160" width="233.74" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Sol · Claude Code: $1.355 per attempt</title></rect><text x="100" y="201" text-anchor="end" class="ct-row">Kimi K3</text><rect x="108" y="181" width="202.31" height="9" rx="3" fill="var(--ct-pi)"><title>Kimi K3 · Pi: 73.3% of tasks</title></rect><rect x="420" y="181" width="66.07" height="9" rx="3" fill="var(--ct-pi)"><title>Kimi K3 · Pi: $0.383 per attempt</title></rect><rect x="108" y="192" width="193.2" height="9" rx="3" fill="var(--ct-codex)"><title>Kimi K3 · Codex: 70% of tasks</title></rect><rect x="420" y="192" width="77.63" height="9" rx="3" fill="var(--ct-codex)"><title>Kimi K3 · Codex: $0.450 per attempt</title></rect><rect x="108" y="203" width="184.09" height="9" rx="3" fill="var(--ct-claudecode)"><title>Kimi K3 · Claude Code: 66.7% of tasks</title></rect><rect x="420" y="203" width="89.87" height="9" rx="3" fill="var(--ct-claudecode)"><title>Kimi K3 · Claude Code: $0.521 per attempt</title></rect><text x="100" y="244" text-anchor="end" class="ct-row">Sonnet 4.6</text><rect x="108" y="224" width="181.06" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Sonnet 4.6 · Pi: 65.6% of tasks</title></rect><rect x="420" y="224" width="105.91" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Sonnet 4.6 · Pi: $0.614 per attempt</title></rect><rect x="108" y="235" width="174.71" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Sonnet 4.6 · Codex: 63.3% of tasks</title></rect><rect x="420" y="235" width="95.22" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Sonnet 4.6 · Codex: $0.552 per attempt</title></rect><rect x="108" y="246" width="171.67" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Sonnet 4.6 · Claude Code: 62.2% of tasks</title></rect><rect x="420" y="246" width="115.4" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Sonnet 4.6 · Claude Code: $0.669 per attempt</title></rect><text x="100" y="287" text-anchor="end" class="ct-row">Haiku 4.5</text><rect x="108" y="267" width="131.93" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Haiku 4.5 · Pi: 47.8% of tasks</title></rect><rect x="420" y="267" width="43.13" height="9" rx="3" fill="var(--ct-pi)"><title>Claude Haiku 4.5 · Pi: $0.250 per attempt</title></rect><rect x="108" y="278" width="85.84" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Haiku 4.5 · Codex: 31.1% of tasks</title></rect><rect x="420" y="278" width="36.91" height="9" rx="3" fill="var(--ct-codex)"><title>Claude Haiku 4.5 · Codex: $0.214 per attempt</title></rect><rect x="108" y="289" width="113.44" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Haiku 4.5 · Claude Code: 41.1% of tasks</title></rect><rect x="420" y="289" width="45.37" height="9" rx="3" fill="var(--ct-claudecode)"><title>Claude Haiku 4.5 · Claude Code: $0.263 per attempt</title></rect><text x="100" y="330" text-anchor="end" class="ct-row">GPT-5.6 Luna</text><rect x="108" y="310" width="211.69" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Luna · Pi: 76.7% of tasks</title></rect><rect x="420" y="310" width="7.76" height="9" rx="3" fill="var(--ct-pi)"><title>GPT-5.6 Luna · Pi: $0.045 per attempt</title></rect><rect x="108" y="321" width="199.27" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Luna · Codex: 72.2% of tasks</title></rect><rect x="420" y="321" width="11.04" height="9" rx="3" fill="var(--ct-codex)"><title>GPT-5.6 Luna · Codex: $0.064 per attempt</title></rect><rect x="108" y="332" width="193.2" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Luna · Claude Code: 70% of tasks</title></rect><rect x="420" y="332" width="16.91" height="9" rx="3" fill="var(--ct-claudecode)"><title>GPT-5.6 Luna · Claude Code: $0.098 per attempt</title></rect></svg>
+                        <figcaption class="figure-note">
+                            <b>Terminal-Bench 2.0.</b> The same 21 pairs in the same row order, on the harder benchmark,
+                            where the ranking changes completely. GPT-5.6 Luna on Pi resolves 76.7% at $0.045 an attempt —
+                            more tasks than any Claude model in any harness, and the best of those, Claude Fable 5 on Claude
+                            Code, resolves 75.6% at $1.554. Fable 5, the SWE-bench Lite leader, is beaten on both measures at
+                            once by eight cheaper configurations, Pi's own among them.
+                        </figcaption>
+                    </figure>
+                    <p class="figure-note">
+                        Both figures are drawn by SpecPi from the data published with the study; the design is ours and any
+                        error in it is ours. Method: 30 randomly sampled tasks per benchmark, three attempts each, each
+                        harness in its native configuration at its high effort setting, capped at 100 agent turns, priced from
+                        a fixed direct-API list dated 1 September 2026. Confidence intervals in the study come from 10,000
+                        bootstrap resamples and are wide: most pairwise differences here are not separable.
+                    </p>
+                    <div class="metric-row">
+                        <div>
+                            <span class="metric-value">±2%</span>
+                            <span class="metric-label">
+                                Average harness effect on success rate, SWE-bench Lite. Cost moved far more.
+                            </span>
+                        </div>
+                        <div>
+                            <span class="metric-value">2.0x</span>
+                            <span class="metric-label">
+                                Claude Code's cost relative to Pi on SWE-bench Lite, geometric mean across shared
+                                models.
+                            </span>
+                        </div>
+                        <div>
+                            <span class="metric-value">10x</span>
+                            <span class="metric-label">
+                                Claude Code's mean first-call context relative to Pi's, across all seven models.
+                            </span>
+                        </div>
+                    </div>
+                    <p>
+                        Two details matter more than the headline. First, the spending gap is not explained by the agent
+                        working harder: on SWE-bench Lite, Fable 5 averages 15.4 turns in Pi and 15.3 in Claude Code,
+                        yet Claude Code costs about twice as much for a 1.1-point gain. Second, the tax starts on the
+                        very first model call — longer instructions and larger tool schemas make Claude Code's initial
+                        context more than ten times Pi's before any work begins.
+                    </p>
+                    <p>
+                        Their third finding cuts against provider loyalty: across the six Anthropic and OpenAI models
+                        and both benchmarks, <strong>an alternative harness achieved the highest observed success rate
+                        in nine of twelve comparisons</strong>. A model does not necessarily do its best work in its own
+                        vendor's harness.
+                    </p>
+                    <div class="callout callout-warn">
+                        <p>
+                            <strong>What it does not settle.</strong> Thirty sampled tasks per benchmark, on two
+                            open-source benchmarks the authors note the models may have seen during training. Turn
+                            counts are not comparable across harnesses because each defines a turn differently. The
+                            authors state plainly that results may differ on other benchmarks and workloads, and they
+                            make no claim about any configured Pi distribution — including this one.
+                        </p>
+                    </div>
+                    <h3>FrontierHarness: task-level results on a single model</h3>
+                    <p>
+                        The most auditable single-model comparison is FrontierHarness: 30 tasks, every harness on the
+                        same Kimi K3 model through the same provider, with task-level results released rather than
+                        promised. Pi ran at version 0.84.2.
                     </p>
                     <div class="table-scroll">
                         <table class="numeric">
@@ -269,7 +379,8 @@
                         <p>
                             <strong>The counterexamples are the point.</strong> On security challenges Pi trails Codex
                             by 17 points, and loses to OpenCode on accuracy <em>and</em> cost per success. On SaaS
-                            workflows Oh My Pi — a heavier Pi configuration — beats plain Pi by 16 points. A harness
+                            workflows Oh My Pi — a fork of Pi whose first call is twelve times Pi's, measured in
+                            <a class="text-link" href="#specpi">section 05</a> — beats plain Pi by 16 points. A harness
                             that wins on one workload can lose on the next.
                         </p>
                     </div>
@@ -404,7 +515,7 @@
                 <section class="doc-section" id="specpi">
                     <header><h2>For this base</h2><span>05</span></header>
                     <p>
-                        SpecPi 0.23.0 pins six packages and keeps its own extensions to scope control and the
+                        SpecPi 0.24.0 pins seven packages and keeps its own extensions to scope control and the
                         improvement loop. Read against the evidence above, that shape is defensible for specific
                         reasons, and it leaves specific things unmeasured.
                     </p>
@@ -412,9 +523,9 @@
                     <ul>
                         <li>
                             <strong>Delegation is a pinned package, not a core feature.</strong>
-                            <code>pi-subagents@0.67.0</code> is one of the six pins, so it can be configured, held at a
-                            version, or removed without touching the harness. Given how task-dependent the delegation
-                            evidence is, that separation is worth keeping.
+                            <code>specpi-delegation@0.2.0</code> is one of the seven pins, so it can be configured,
+                            held at a version, or removed without touching the harness. Given how task-dependent the
+                            delegation evidence is, that separation is worth keeping.
                         </li>
                         <li>
                             <strong>Scope control targets the failure the research keeps naming.</strong>
@@ -427,60 +538,124 @@
                             person to authorize a change matches that.
                         </li>
                     </ul>
+                    <div class="callout callout-warn">
+                        <p>
+                            <strong>The finding that cuts against this base.</strong> HarnessTax traces a large part of Claude
+                            Code's cost premium to its first model call, where longer instructions and larger tool schemas make
+                            its initial context more than ten times Pi's. Every package SpecPi pins adds to that same call, so
+                            we measured it rather than assuming Pi's economy survives configuration.
+                        </p>
+                    </div>
+                    <figure class="chart-figure">
+                        <svg class="chart" id="chart-context" viewBox="0 0 720 380" role="img" preserveAspectRatio="xMidYMid meet"><line x1="108" y1="22" x2="108" y2="326" stroke="var(--line)" opacity=".6" /><text x="108" y="346" text-anchor="middle" class="ct-ax">0k</text><line x1="263.20833333333337" y1="22" x2="263.20833333333337" y2="326" stroke="var(--line)" opacity=".6" /><text x="263.20833333333337" y="346" text-anchor="middle" class="ct-ax">25k</text><line x1="418.41666666666674" y1="22" x2="418.41666666666674" y2="326" stroke="var(--line)" opacity=".6" /><text x="418.41666666666674" y="346" text-anchor="middle" class="ct-ax">50k</text><line x1="573.6250000000001" y1="22" x2="573.6250000000001" y2="326" stroke="var(--line)" opacity=".6" /><text x="573.6250000000001" y="346" text-anchor="middle" class="ct-ax">75k</text><text x="406" y="370" text-anchor="middle" class="ct-lb">Characters on the first model call</text><text x="98" y="43" text-anchor="end" class="ct-row">Pi</text><text x="98" y="58" text-anchor="end" class="ct-sub">4 tools</text><rect x="108" y="30" width="15.836541666666673" height="22" rx="4" fill="var(--ct-pi)" opacity="1"><title>Pi tool schema: 2,873 chars</title></rect><rect x="125.83654166666668" y="30" width="15.812625000000004" height="22" rx="4" fill="var(--ct-pi)" opacity=".42"><title>Pi instructions: 2,547 chars</title></rect><text x="149.64916666666667" y="46" class="ct-val">5,420</text><text x="98" y="97" text-anchor="end" class="ct-row">SpecPi</text><text x="98" y="112" text-anchor="end" class="ct-sub">7 tools</text><rect x="108" y="84" width="42.19091666666668" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>SpecPi tool schema: 7,118 chars</title></rect><rect x="152.19091666666668" y="84" width="21.22008333333334" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi instructions: 3,418 chars</title></rect><text x="181.411" y="100" class="ct-val">10,536</text><text x="98" y="151" text-anchor="end" class="ct-row">SpecPi, all on</text><text x="98" y="166" text-anchor="end" class="ct-sub">22 tools</text><rect x="108" y="138" width="119.79508333333337" height="22" rx="4" fill="var(--ct-specpi)" opacity="0.55"><title>SpecPi, all on tool schema: 19,618 chars</title></rect><rect x="229.79508333333337" y="138" width="25.404500000000006" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi, all on instructions: 4,092 chars</title></rect><text x="263.1995833333334" y="154" class="ct-val">23,710</text><text x="98" y="205" text-anchor="end" class="ct-row">Codex CLI</text><text x="98" y="220" text-anchor="end" class="ct-sub">7.4 tools</text><rect x="108" y="192" width="110.45775000000003" height="22" rx="4" fill="var(--ct-codex)" opacity="1"><title>Codex CLI tool schema: 18,114 chars</title></rect><rect x="220.45775000000003" y="192" width="145.90825000000004" height="22" rx="4" fill="var(--ct-codex)" opacity=".42"><title>Codex CLI instructions: 23,502 chars</title></rect><text x="374.36600000000004" y="208" class="ct-val">41,616</text><text x="98" y="259" text-anchor="end" class="ct-row">Oh My Pi</text><text x="98" y="274" text-anchor="end" class="ct-sub">11 tools</text><rect x="108" y="246" width="293.3614583333334" height="22" rx="4" fill="var(--ct-omp)" opacity="1"><title>Oh My Pi tool schema: 47,575 chars</title></rect><rect x="403.3614583333334" y="246" width="113.41383333333336" height="22" rx="4" fill="var(--ct-omp)" opacity=".42"><title>Oh My Pi instructions: 18,268 chars</title></rect><text x="524.7752916666668" y="262" class="ct-val">65,843</text><text x="98" y="313" text-anchor="end" class="ct-row">Claude Code</text><text x="98" y="328" text-anchor="end" class="ct-sub">23 tools</text><rect x="108" y="300" width="476.0106250000001" height="22" rx="4" fill="var(--ct-claudecode)" opacity="1"><title>Claude Code tool schema: 76,995 chars</title></rect><rect x="586.0106250000001" y="300" width="83.59520833333335" height="22" rx="4" fill="var(--ct-claudecode)" opacity=".42"><title>Claude Code instructions: 13,465 chars</title></rect><text x="677.6058333333335" y="316" class="ct-val">90,460</text><rect x="108" y="6" width="11" height="11" rx="2" fill="var(--muted)" /><text x="125" y="16" class="ct-ax">tool schemas</text><rect x="216" y="6" width="11" height="11" rx="2" fill="var(--muted)" opacity=".42" /><text x="233" y="16" class="ct-ax">instructions</text></svg>
+                        <figcaption class="figure-note">
+                            Pi, Codex and Claude Code are HarnessTax's measurements. The SpecPi and Oh My Pi bars are ours,
+                            taken the same way — from the request the harness actually sends — by
+                            <code>node scripts/measure-context.mjs</code>, which you can run yourself. Oh My Pi needs
+                            <code>--omp=&lt;path to its cli.js&gt;</code> and a Bun runtime; without it that row is skipped.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        A default session sends <strong>10,536 characters</strong> on its first call. The same measurement
+                        records <strong>5,521</strong> for stock Pi, so the base as installed is about <strong>1.9x</strong> the
+                        harness it configures — the improvement loop's three tools, <code>/scope</code> and their skills.
+                    </p>
+                    <p>
+                        It was not always. An earlier reading of this page put the base at 4.3x, because Browser QA's fourteen
+                        tools and delegation's one were offered to every session whether or not anyone used them. Both now ship
+                        behind a saved preference that defaults to off, which is what the second bar costs if you turn
+                        everything on. That change came directly out of measuring this figure, which is the argument for
+                        measuring it.
+                    </p>
+                    <p>
+                        <strong>Oh My Pi</strong> is the fifth bar, and a different kind of thing from the two above it: a
+                        Bun-based fork of Pi rather than a package set on top of one. Its default session sends
+                        <strong>65,843 characters</strong> across 11 tools — about <strong>11.9x</strong> stock Pi, and
+                        six times a default SpecPi — which places a configured Pi fork between Codex and Claude Code.
+                        That figure is measured rather than reported: the same script, the same synthetic provider and the
+                        same empty workspace, on <code>omp</code> 18.2.2. Disabling its skills and rules discovery changed
+                        it by nothing at all, so what the chart shows is the fork's own prompt and tool surface, not
+                        anything this machine had configured.
+                    </p>
+                    <p>
+                        It is worth holding that next to the two places Oh My Pi already appears on this page. It costs 84%
+                        more per attempt than Pi on FrontierHarness and solves one task fewer; it beats Pi by 16 points on
+                        Composio's SaaS workflows. A first call twelve times the size is neither the reason it wins nor the
+                        reason it loses. The tax is real and measurable — and measuring it settles nothing about what it buys.
+                    </p>
+                    <p>
+                        Three caveats keep this honest. The figure omits the four third-party pins, so it is a floor rather
+                        than a ceiling. It was taken on Pi 0.84.4 against a synthetic provider, where the study used Pi
+                        0.85.1 against real ones — which is also why the chart's Pi bar reads 5,420 rather than our 5,521,
+                        a 2% gap that is the best evidence the two measurements are comparable at all. And characters are
+                        not tokens: they track each other closely for this kind of text, but a token count would be the
+                        better number if a synthetic provider could report one.
+                    </p>
+                    <p>
+                        The reading is now less uncomfortable but no less conditional. A configured SpecPi is light by the
+                        study's own yardstick — a quarter of Codex, a sixth of Oh My Pi and an eighth of Claude Code —
+                        and turning on every
+                        optional package still leaves it under Codex. What nobody has measured is whether any of that added
+                        context pays for itself in solved tasks. Enable what you use and watch <code>/usage</code>.
+                    </p>
+
                     <h3>Settings worth choosing deliberately</h3>
                     <p>
-                        SpecPi Chat 0.10.0 can edit the subagents configuration directly, which makes the knobs below
-                        worth a decision rather than a default. Open
-                        <em>Package settings</em> from the composer, or run <code>SpecPi: Edit Package Settings</code>.
+                        <code>specpi-delegation</code> fixes in code most of what the evidence says to be careful
+                        about, and leaves two knobs to you. Both are set from the session with
+                        <code>/delegate</code>, and are saved per agent directory.
                     </p>
                     <div class="table-scroll">
                         <table class="settings-table">
                             <thead>
-                                <tr><th>Setting</th><th>Why the evidence bears on it</th></tr>
+                                <tr><th>Control</th><th>Why the evidence bears on it</th></tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><code>globalConcurrencyLimit</code></td>
+                                    <td><code>/delegate budget &lt;1&ndash;64&gt;</code></td>
                                     <td>
-                                        Parallelism pays only when concurrent work exceeds coordination overhead. Start
-                                        low and raise it for a task class you have actually measured.
+                                        Retries and fan-out are where cost escapes. The session multiplier turns an
+                                        unbounded bill into a bounded one; 8 is the default.
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td><code>maxSubagentSpawnsPerRun</code></td>
+                                    <td><code>/delegate timeout &lt;1&ndash;60&gt;</code></td>
                                     <td>
-                                        Retries and fan-out are where cost escapes. A cap turns an unbounded bill into a
-                                        bounded one.
+                                        A stalled child spends without converging. Ten minutes is the default ceiling
+                                        per job, and lowering it costs less than a long failing run.
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td><code>maxSubagentDepth</code></td>
+                                    <td>Concurrency &mdash; fixed at 2</td>
                                     <td>
-                                        Recursive delegation multiplies every coordination failure. Shallow is the
-                                        conservative default.
+                                        Parallelism pays only when concurrent work exceeds coordination overhead. The
+                                        package does not expose a higher ceiling to raise by accident.
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td><code>defaultSubagentContext</code></td>
+                                    <td>Recursion &mdash; not available</td>
+                                    <td>
+                                        Recursive delegation multiplies every coordination failure. A child holds three
+                                        read-only tools and cannot delegate further.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Child context &mdash; always fresh</td>
                                     <td>
                                         A reviewer that inherits the implementer's context is not a fresh reviewer.
-                                        Fresh context is the mechanism the review evidence actually supports.
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td><code>subagents.modelScope</code></td>
-                                    <td>
-                                        Model choice moves both cost and accuracy. Pinning the scope keeps a per-run
-                                        override from quietly escaping your budget.
+                                        Children see a frozen source snapshot and the request, never the parent's
+                                        conversation.
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <p>
-                        A sensible starting configuration is a low concurrency ceiling, no recursive delegation, and
-                        subagents used for review and bounded research while the parent session keeps writing the code.
-                        That is the conservative reading of the evidence, not a tuned optimum.
+                        The conservative reading of the evidence is therefore close to the package's defaults: bounded
+                        spending, shallow delegation, fresh context, and children used for review and bounded research
+                        while the parent session keeps writing the code. Delegation is on from Pi startup whenever a model is
+                        configured, so its tool schema is part of every first call unless you run
+                        <code>/delegate off</code>.
                     </p>
                 </section>
 
@@ -533,6 +708,23 @@
                         Live pages were checked in September 2026.
                     </p>
                     <ul class="source-list">
+                        <li>
+                            <b>Melissa Z. Pan, Shuo Yang, Negar Arabzadeh, Wei-Lin Chiang, Ion Stoica and Matei
+                            Zaharia</b> — <em>HarnessTax: How Much Does the Harness Matter for Coding Agents?</em> UC
+                            Berkeley Sky Lab and Arena, 16 September 2026. 21 model–harness pairs across Claude Code,
+                            Codex CLI and Pi, on SWE-bench Lite and Terminal-Bench 2.0. The primary source for
+                            <a class="text-link" href="#harnesstax">section 03</a>, with our thanks to the authors.
+                            <span
+                                ><a class="text-link" href="https://harnesstax.github.io/">harnesstax.github.io</a></span
+                            >
+                            <br />
+                            <code>
+                                @misc{pan2026harnesstax, title={{HarnessTax: How Much Does Harness Matter for Coding
+                                Agents?}}, author={Pan, Melissa Z. and Yang, Shuo and Arabzadeh, Negar and Chiang,
+                                Wei-Lin and Stoica, Ion and Zaharia, Matei}, year={2026},
+                                url={https://harnesstax.github.io/}}
+                            </code>
+                        </li>
                         <li>
                             <b>FrontierHarness Eval v1</b> — frozen 30-task benchmark and task-level results, generated
                             22 August 2026.
@@ -606,6 +798,12 @@
                             >
                         </li>
                         <li>
+                            <b>Oh My Pi</b> — a Bun-based fork of Pi, by can1357 and contributors. Not a study: the npm
+                            package <code>@oh-my-pi/pi-coding-agent</code> 18.2.2, installed and measured on 16 September
+                            2026 for the first-call figure in <a class="text-link" href="#specpi">section 05</a>.
+                            <span><a class="text-link" href="https://omp.sh">omp.sh</a></span>
+                        </li>
+                        <li>
                             <b>Zhang et al.</b> — Stop comparing LLM agents without disclosing the harness,
                             arXiv:2605.23950. Three-model, three-configuration factorial design.
                         </li>
@@ -616,7 +814,7 @@
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.23.0">v0.23.0</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.24.0">v0.24.0</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>

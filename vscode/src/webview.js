@@ -30,7 +30,6 @@ function getWebviewHtml({
         permissionStyleUri || String(styleUri).replace(/chat\.css(?=[?#]|$)/u, "permission-settings.css");
     const permissionConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-config.js");
     const permissionSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-settings.js");
-    const subagentsConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "subagents-config.js");
     const webAccessConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "web-access-config.js");
     const packageSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "package-settings.js");
     const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cspSource}; img-src data:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';`;
@@ -111,6 +110,15 @@ function getWebviewHtml({
         <div class="jump-row"><button id="jump-to-latest" class="jump-button" type="button" hidden>${icon("down")} Jump to latest</button></div>
         <footer class="footer">
             <div class="footer-panels">
+            <section id="provider-signin" class="provider-signin" aria-labelledby="provider-signin-title" hidden>
+                <h2 id="provider-signin-title">Sign in to a provider</h2>
+                <p id="provider-signin-message" role="status" aria-live="polite"></p>
+                <div class="provider-signin-actions">
+                    <button id="provider-signin-start" class="primary-button" type="button">Sign in to a provider</button>
+                    <button id="provider-signin-reload" class="text-button" type="button" hidden>Reload Pi</button>
+                </div>
+                <p class="provider-signin-note">Pi runs the sign-in in its own terminal. Chat never reads, stores, or sends your provider credentials; it only reloads Pi afterwards so new models appear.</p>
+            </section>
             <div id="error-banner" class="error-banner" role="alert" hidden><p id="error-message"></p><div class="error-actions"><button id="error-retry" class="text-button" type="button">Try again</button><button id="error-dismiss" class="text-button" type="button">Dismiss</button></div></div>
             <div id="queue-notice" class="queue-notice" hidden></div>
             <details id="provider-usage" class="provider-usage" hidden>
@@ -223,9 +231,6 @@ function getWebviewHtml({
         <div class="permission-actions">
             <label for="package-target">Configuration</label>
             <select id="package-target">
-                <option value="subagents:extension">Subagents &middot; extension config</option>
-                <option value="subagents:global">Subagents &middot; Pi settings (global)</option>
-                <option value="subagents:project">Subagents &middot; Pi settings (project)</option>
                 <option value="webAccess">Web access &middot; providers and keys</option>
             </select>
             <button id="package-reload" type="button">Load / discard draft</button>
@@ -254,7 +259,6 @@ function getWebviewHtml({
     </dialog>
     <script nonce="${attribute(nonce)}" src="${attribute(permissionConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(permissionSettingsScript)}"></script>
-    <script nonce="${attribute(nonce)}" src="${attribute(subagentsConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(webAccessConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(packageSettingsScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(extrasScript)}"></script>

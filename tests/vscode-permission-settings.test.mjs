@@ -15,6 +15,51 @@ const {
 } = require("../vscode/media/permission-config.js");
 const { configPath, loadPermissionSettings, savePermissionSettings } = require("../vscode/src/permission-settings.js");
 
+const { hasDestructiveGuard, permissionState } = require("../vscode/src/permissions.js");
+
+test("saved guard recognition permits YOLO but rejects missing, reordered or changed rules", () => {
+    const config = structuredClone(destructiveGuard);
+    config.yoloMode = true;
+    config.debugLog = true;
+    assert.equal(hasDestructiveGuard(JSON.stringify(config)), true);
+    for (const mutate of [
+        (value) => {
+            delete value.permission.bash["rm *"];
+        },
+        (value) => {
+            value.permission.bash["rm *"] = "allow";
+        },
+        (value) => {
+            value.permission.bash = Object.fromEntries(Object.entries(value.permission.bash).reverse());
+        },
+        (value) => {
+            value.permission.read = "allow";
+        },
+        (value) => {
+            value.authorizerChain = ["custom"];
+        },
+    ]) {
+        const changed = structuredClone(config);
+        mutate(changed);
+        assert.equal(hasDestructiveGuard(JSON.stringify(changed)), false);
+    }
+
+    assert.equal(hasDestructiveGuard("{"), false);
+    assert.equal(hasDestructiveGuard("{}"), false);
+    const state = {
+        commands: [{ name: "permission-system" }],
+        destructiveGuardSaved: true,
+        runtimeStatus: { "pi-permission-system": "yolo" },
+    };
+    assert.equal(permissionState(state).label, "Guard saved · YOLO");
+    assert.equal(permissionState(state).mode, "guard-saved");
+    assert.match(permissionState(state).detail, /do not prove active enforcement/u);
+    delete state.runtimeStatus["pi-permission-system"];
+    assert.equal(permissionState(state).label, "Guard saved");
+    state.destructiveGuardSaved = false;
+    assert.equal(permissionState(state).label, "Permissions");
+});
+
 function fixture(t) {
     const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-permissions-")));
     const workspace = path.join(directory, "workspace");

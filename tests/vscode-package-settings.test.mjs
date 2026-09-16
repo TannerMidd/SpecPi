@@ -6,7 +6,6 @@ import { createRequire } from "node:module";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
-const subagents = require("../vscode/media/subagents-config.js");
 const webAccess = require("../vscode/media/web-access-config.js");
 const { packageSettingsState } = require("../vscode/src/package-state.js");
 const {
@@ -38,73 +37,9 @@ function fixture(t, env = {}) {
     };
 }
 
-test("subagent schema types every documented key and keeps unrecognised upstream keys", () => {
-    const { config, unknown } = subagents.validate(
-        `{
-            // Synthetic configuration; no live Pi state.
-            "asyncByDefault": false,
-            "fleetView": true,
-            "fleetViewPlacement": "aboveEditor",
-            "timeoutMs": 3600000,
-            "globalConcurrencyLimit": 20,
-            "waitTool": false,
-            "parallel": {"maxTasks": 12, "concurrency": 6},
-            "aKeyAddedUpstreamAfterThisRelease": {"nested": true}
-        }`,
-        subagents.EXTENSION,
-    );
-    assert.equal(config.fleetViewPlacement, "aboveEditor");
-    assert.equal(config.waitTool, false);
-    assert.deepEqual(unknown, ["aKeyAddedUpstreamAfterThisRelease"]);
-
-    // An unknown key must not become a refusal: the package accepts keys this
-    // schema has not learned yet, and blocking the save would be worse.
-    assert.deepEqual(subagents.validate("{}", subagents.EXTENSION).config, {});
-    assert.throws(
-        () => subagents.validate('{"fleetViewPlacement": "sideways"}', subagents.EXTENSION),
-        /expected one of: belowEditor, aboveEditor/u,
-    );
-    assert.throws(() => subagents.validate('{"timeoutMs": -1}', subagents.EXTENSION), /timeoutMs/u);
-    assert.throws(() => subagents.validate('{"__proto__": {}}', subagents.EXTENSION), /__proto__/u);
-    assert.throws(() => subagents.validate('{"waitTool": 5}', subagents.EXTENSION), /waitTool/u);
-    assert.throws(
-        () => subagents.validate('{"mainWindowRenderer": {"horizontalSpacing": 9}}', subagents.EXTENSION),
-        /horizontalSpacing/u,
-    );
-});
-
-test("subagent settings schema refuses a model scope the package would reject at load time", () => {
-    const { config } = subagents.validate(
-        '{"defaultModel": "openai/gpt-5", "defaultThinking": "high", "watchdog": {"enabled": true}}',
-        subagents.SETTINGS,
-    );
-    assert.equal(config.defaultThinking, "high");
-    assert.throws(() => subagents.validate('{"defaultThinking": "extreme"}', subagents.SETTINGS), /defaultThinking/u);
-
-    // enforce with no allow list is rejected upstream, which would leave Pi
-    // unable to launch any subagent at all.
-    assert.throws(() => subagents.validate('{"modelScope": {"enforce": true}}', subagents.SETTINGS), /modelScope/u);
-    assert.throws(
-        () => subagents.validate('{"modelScope": {"enforce": true, "allow": [], "agents": {}}}', subagents.SETTINGS),
-        /modelScope/u,
-    );
-    assert.doesNotThrow(() =>
-        subagents.validate(
-            '{"modelScope": {"enforce": true, "agents": {"worker": {"allow": ["inherit"]}}}}',
-            subagents.SETTINGS,
-        ),
-    );
-});
-
 test("package targets resolve to the files each package actually reads", (t) => {
-    const { workspace, home, options } = fixture(t);
-    assert.deepEqual(TARGETS, ["subagents:extension", "subagents:global", "subagents:project", "webAccess"]);
-    assert.equal(
-        targetPath("subagents:extension", options),
-        path.join(home, ".pi", "agent", "extensions", "subagent", "config.json"),
-    );
-    assert.equal(targetPath("subagents:global", options), path.join(home, ".pi", "agent", "settings.json"));
-    assert.equal(targetPath("subagents:project", options), path.join(workspace, ".pi", "settings.json"));
+    const { home, options } = fixture(t);
+    assert.deepEqual(TARGETS, ["webAccess"]);
     assert.equal(targetPath("webAccess", options), path.join(home, ".pi", "agent", "web-search.json"));
     assert.throws(() => targetPath("someOtherPackage", options), /Choose a package configuration/u);
     assert.throws(() => loadPackageSettings("someOtherPackage", options), /Choose a package configuration/u);
@@ -132,80 +67,6 @@ test("web access config path follows the package's own precedence", (t) => {
     fs.mkdirSync(path.join(xdg, "pi"), { recursive: true });
     fs.writeFileSync(xdgFile, "{}\n");
     assert.equal(webAccessPath({ workspace: directory, env: { XDG_CONFIG_HOME: xdg }, home }), xdgFile);
-});
-
-test("subagent extension config round-trips through the guarded write", (t) => {
-    const { load, read, options } = fixture(t);
-    const empty = load("subagents:extension");
-    assert.equal(empty.exists, false);
-    assert.equal(empty.text, "{}\n");
-
-    const saved = savePackageSettings(empty, '{"asyncByDefault": false, "timeoutMs": 60000}');
-    assert.equal(saved.changed, true);
-    assert.equal(saved.backup, undefined);
-    assert.deepEqual(JSON.parse(read("subagents:extension")), { asyncByDefault: false, timeoutMs: 60000 });
-
-    // Saving the same meaning again neither rewrites nor backs up the file.
-    const again = savePackageSettings(load("subagents:extension"), '{"asyncByDefault":false,"timeoutMs":60000}');
-    assert.equal(again.changed, false);
-    assert.equal(again.backup, undefined);
-
-    // A stale snapshot must not clobber an edit made in a terminal meanwhile.
-    const stale = load("subagents:extension");
-    fs.writeFileSync(targetPath("subagents:extension", options), '{"asyncByDefault": true}\n');
-    assert.throws(() => savePackageSettings(stale, '{"timeoutMs": 1}'), /changed on disk/u);
-    assert.deepEqual(JSON.parse(read("subagents:extension")), { asyncByDefault: true });
-});
-
-test("writing the subagents block preserves every unrelated Pi setting and its order", (t) => {
-    const { load, read, options } = fixture(t);
-    const file = targetPath("subagents:global", options);
-    fs.writeFileSync(
-        file,
-        JSON.stringify(
-            {
-                defaultModel: "keep/me",
-                packages: ["npm:pi-subagents@0.67.0"],
-                subagents: { defaultModel: "old" },
-                theme: "dark",
-            },
-            null,
-            2,
-        ),
-    );
-
-    const snapshot = load("subagents:global");
-    assert.deepEqual(JSON.parse(snapshot.text), { defaultModel: "old" });
-    assert.deepEqual(snapshot.keys, ["defaultModel", "packages", "theme"]);
-
-    savePackageSettings(snapshot, '{"defaultModel": "new/model", "disableThinking": true}');
-    const written = JSON.parse(read("subagents:global"));
-    assert.deepEqual(Object.keys(written), ["defaultModel", "packages", "subagents", "theme"]);
-    assert.equal(written.defaultModel, "keep/me", "the Pi-level default model is not the subagents one");
-    assert.deepEqual(written.packages, ["npm:pi-subagents@0.67.0"]);
-    assert.deepEqual(written.subagents, { defaultModel: "new/model", disableThinking: true });
-
-    // Clearing the block removes the key rather than leaving an empty object.
-    savePackageSettings(load("subagents:global"), "{}");
-    const cleared = JSON.parse(read("subagents:global"));
-    assert.equal(Object.hasOwn(cleared, "subagents"), false);
-    assert.deepEqual(Object.keys(cleared), ["defaultModel", "packages", "theme"]);
-
-    // A subagents key that is not an object is a file to fix by hand, not to
-    // silently overwrite.
-    fs.writeFileSync(file, '{"subagents": "everything"}\n');
-    assert.throws(() => load("subagents:global"), /must be an object/u);
-});
-
-test("project subagent settings need an open workspace and write beside it", (t) => {
-    const { workspace, load, read } = fixture(t);
-    savePackageSettings(load("subagents:project"), '{"disableBuiltins": true}');
-    assert.deepEqual(JSON.parse(read("subagents:project")), { subagents: { disableBuiltins: true } });
-    assert.ok(fs.existsSync(path.join(workspace, ".pi", "settings.json")));
-    assert.throws(
-        () => loadPackageSettings("subagents:project", { workspace: "", env: {}, home: workspace }),
-        /Open a workspace folder/u,
-    );
 });
 
 test("stored provider credentials never reach the webview and survive an unrelated edit", (t) => {
@@ -312,15 +173,9 @@ test("web access validation names the key and never echoes a value", () => {
 test("package targets are offered only for packages the session reports", () => {
     assert.equal(packageSettingsState({ commands: [] }), undefined);
     assert.equal(packageSettingsState({}), undefined);
-
-    const subagentsOnly = packageSettingsState({ commands: [{ name: "subagents-fleet" }] });
-    assert.deepEqual(subagentsOnly.targets, ["subagents:extension", "subagents:global", "subagents:project"]);
-    assert.equal(subagentsOnly.label, "Subagents");
-
-    const both = packageSettingsState({ commands: [{ name: "subagents-guide" }, { name: "curator" }] });
-    assert.deepEqual(both.targets, [...subagentsOnly.targets, "webAccess"]);
-    assert.equal(both.label, "Subagents · Web access");
+    assert.equal(packageSettingsState({ commands: [{ name: "subagents-fleet" }] }), undefined);
 
     const webOnly = packageSettingsState({ commands: [{ name: "websearch" }] });
     assert.deepEqual(webOnly.targets, ["webAccess"]);
+    assert.equal(webOnly.label, "Web access");
 });

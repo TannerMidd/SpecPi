@@ -70,6 +70,8 @@ function imageAttachment(id, overrides = {}) {
     };
 }
 
+const model = { id: "m", name: "M", provider: "anthropic" };
+
 function visionState(input = ["text", "image"]) {
     return {
         isStreaming: false,
@@ -110,6 +112,8 @@ function fixture(t, options = {}) {
     const editorShows = [];
     const reveals = [];
     const filePicks = [];
+    const terminals = [];
+    const terminalListeners = [];
     const workspacePath = path.resolve(".specpi-test", "controller-workspace");
     const folder = { name: "Controller workspace", uri: uri(workspacePath) };
     const defaultData = {
@@ -240,6 +244,29 @@ function fixture(t, options = {}) {
         },
         window: {
             createStatusBarItem: () => ({ show() {}, dispose() {} }),
+            createTerminal: (configuration) => {
+                const terminal = {
+                    configuration,
+                    shown: 0,
+                    show(preserveFocus) {
+                        this.shown += 1;
+                        this.preserveFocus = preserveFocus;
+                    },
+                };
+                terminals.push(terminal);
+
+                return terminal;
+            },
+            onDidCloseTerminal: (listener) => {
+                const entry = { listener, disposed: false };
+                terminalListeners.push(entry);
+
+                return {
+                    dispose() {
+                        entry.disposed = true;
+                    },
+                };
+            },
             showWarningMessage: async (...args) =>
                 typeof options.warningAnswer === "function" ? options.warningAnswer(...args) : options.warningAnswer,
             showInformationMessage: async () => undefined,
@@ -399,6 +426,8 @@ function fixture(t, options = {}) {
         editorShows,
         reveals,
         filePicks,
+        terminals,
+        terminalListeners,
     };
 }
 
@@ -1141,6 +1170,58 @@ test("Permissions opens the editable settings UI and reflects only upstream YOLO
     await assert.rejects(controller.handleMessage({ type: "showPermissions" }), /idle/);
     const { controller: plain } = await connected(t);
     await assert.rejects(plain.handleMessage({ type: "showPermissions" }), /Permission System/);
+});
+
+test("the saved guard badge loads on connect and follows confirmed saves without inventing runtime policy", async (t) => {
+    const preset = extensionRequire("../media/permission-config.js").destructiveGuardText("global");
+    let text = preset;
+    let unreadable = false;
+    const { controller, client } = await connected(t, {
+        request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
+        warningAnswer: "Save permissions",
+        loadPermissions: (_workspace, scope) => {
+            assert.equal(scope, "global");
+            if (unreadable) {
+                throw new Error("Unsafe configuration");
+            }
+
+            return { scope, path: "synthetic-config.json", text, revision: "synthetic" };
+        },
+        savePermissions: (snapshot, next) => {
+            text = next;
+
+            return { ...snapshot, text };
+        },
+    });
+    assert.equal(controller.state.permissions.label, "Guard saved");
+    client.emit("event", {
+        type: "extension_ui_request",
+        method: "setStatus",
+        statusKey: "pi-permission-system",
+        statusText: "yolo",
+    });
+    assert.equal(controller.state.permissions.label, "Guard saved · YOLO");
+    controller.showPermissions();
+    await controller.savePermissions({
+        id: controller.permissionSettings.id,
+        contextToken: controller.contextToken(),
+        text: "{}",
+    });
+    assert.equal(controller.state.permissions.label, "YOLO");
+    await controller.savePermissions({
+        id: controller.permissionSettings.id,
+        contextToken: controller.contextToken(),
+        text: preset,
+    });
+    assert.equal(controller.state.permissions.label, "Guard saved · YOLO");
+    unreadable = true;
+    await controller.refresh();
+    assert.equal(controller.state.permissions.label, "YOLO");
+    unreadable = false;
+    await controller.refresh();
+    assert.equal(controller.state.permissions.label, "Guard saved · YOLO");
+    await controller.disconnect();
+    assert.equal(controller.state.destructiveGuardSaved, false);
 });
 
 test("permission saves require native confirmation, bind their path to the opened scope, and never prompt the model", async (t) => {
@@ -2454,40 +2535,6 @@ test("oversized same-session history preserves visible messages during manual re
     assert.equal(controller.state.error, undefined);
 });
 
-test("pi-subagents fleet stays scoped to its connection and never enables delegate controls", async (t) => {
-    const { controller, client, clients } = await connected(t);
-    const view = {
-        version: 1,
-        totalActive: 1,
-        omitted: 0,
-        entries: [{ key: "opaque-key", agent: "worker", startedAt: 1000, tokens: { input: 1, output: 2, total: 3 } }],
-    };
-    const event = {
-        type: "extension_ui_request",
-        method: "setWidget",
-        widgetKey: "specpi-chat-subagents-v1",
-        widgetLines: [JSON.stringify(view)],
-    };
-    client.emit("event", event);
-    assert.equal(controller.state.subagents.entries[0].agent, "worker");
-    assert.equal(controller.state.runtimeStatus["specpi-chat-subagents-v1"], undefined);
-    assert.equal(controller.state.delegation, undefined);
-    assert.ok(client.launch.args.includes("--extension"));
-    assert.ok(client.launch.args.some((arg) => arg.endsWith("subagents-bridge.mjs")));
-    client.emit("event", { ...event, widgetLines: ["malformed"] });
-    assert.equal(controller.state.subagents, undefined);
-    client.emit("event", event);
-    await controller.disconnect();
-    assert.equal(controller.state.subagents, undefined);
-    await controller.connect();
-    client.emit("event", event);
-    assert.equal(controller.state.subagents, undefined);
-    clients.at(-1).emit("event", event);
-    assert.equal(controller.state.subagents.totalActive, 1);
-    clients.at(-1).emit("exit");
-    assert.equal(controller.state.subagents, undefined);
-});
-
 test("delegate progress stays live during parent streaming and Stop targets only the observed attempt", async (t) => {
     const gate = deferred();
     const { controller, client, posted } = await connected(t, {
@@ -3683,4 +3730,146 @@ test("folder mentions attach a bounded directory listing", async (t) => {
         client.requests.some((request) => request.type === "prompt"),
         false,
     );
+});
+
+test("a connected Pi with no provider credential asks for sign-in instead of an empty picker", async (t) => {
+    const { controller } = await connected(t);
+
+    // Pi answers with an empty catalogue and a synthetic "unknown" model when
+    // no credential resolves; the model picker alone gives the user nothing.
+    assert.deepEqual(controller.state.models, []);
+    assert.match(controller.state.providerSignIn.message, /no provider credential/u);
+    assert.equal(controller.state.providerSignIn.provider, "");
+    assert.equal(controller.state.error, undefined);
+});
+
+test("an available model clears the sign-in panel", async (t) => {
+    const { controller } = await connected(t, {
+        request: (type) => (type === "get_available_models" ? { models: [model] } : undefined),
+    });
+
+    assert.equal(controller.state.providerSignIn, undefined);
+});
+
+test("Pi's missing-credential error becomes an actionable sign-in prompt, not its /login text", async (t) => {
+    const { controller, coordinator } = await connected(t, {
+        request(type) {
+            if (type === "get_available_models") {
+                return { models: [model] };
+            }
+
+            if (type === "prompt") {
+                throw new Error(
+                    "No API key found for openai.\n\nUse /login to log into a provider via OAuth or API key. See:\n" +
+                        "  /home/user/pi/docs/providers.md",
+                );
+            }
+
+            return undefined;
+        },
+    });
+
+    // The coordinator is what turns a rejected send into displayed chat state.
+    await coordinator.handleMessage({ type: "send", text: "hello" });
+    assert.equal(controller.state.providerSignIn.provider, "openai");
+    assert.match(controller.state.providerSignIn.message, /no credential for openai/u);
+    // Pi's own guidance names a command Chat does not run and a local file path.
+    assert.equal(controller.state.error, undefined);
+    assert.equal(controller.state.providerSignIn.message.includes("/login"), false);
+    assert.equal(controller.state.providerSignIn.message.includes("providers.md"), false);
+});
+
+test("sign-in starts the configured Pi in a terminal and never handles the credential itself", async (t) => {
+    const { controller, terminals, launches } = await connected(t, {
+        launch: () => ({ command: "node", args: ["/pi/cli.js"] }),
+    });
+
+    await controller.handleMessage({ type: "signIn" });
+    assert.equal(terminals.length, 1);
+    const [terminal] = terminals;
+    assert.equal(terminal.configuration.shellPath, "node");
+    assert.deepEqual(terminal.configuration.shellArgs, ["/pi/cli.js"]);
+    assert.equal(terminal.configuration.cwd, controller.workspace.uri.fsPath);
+    assert.equal(terminal.shown, 1);
+    // The sign-in terminal runs plain Pi: no RPC flags and no session are passed.
+    assert.equal(terminal.configuration.shellArgs.includes("--mode"), false);
+    assert.equal(launches.length, 2, "the terminal reuses the configured Pi and Node.js paths");
+    const notice = controller.state.messages.at(-1);
+    assert.equal(notice.role, "notice");
+    assert.match(notice.text, /\/login/u);
+});
+
+test("closing the sign-in terminal reloads Pi so a new credential is picked up", async (t) => {
+    const { controller, terminals, terminalListeners, clients } = await connected(t);
+
+    await controller.handleMessage({ type: "signIn" });
+    assert.equal(clients.length, 1);
+    await terminalListeners.at(-1).listener(terminals[0]);
+    await controller.restartOperation;
+    // Pi resolves its catalogue once at startup, so only a restart can see the
+    // credential the terminal stored.
+    assert.equal(clients.length, 2);
+    assert.equal(terminalListeners.at(-1).disposed, true);
+});
+
+test("a close event from an unrelated terminal does not restart Pi", async (t) => {
+    const { controller, terminalListeners, clients } = await connected(t);
+
+    await controller.handleMessage({ type: "signIn" });
+    await terminalListeners.at(-1).listener({ name: "someone else's terminal" });
+    await controller.restartOperation;
+    assert.equal(clients.length, 1);
+});
+
+test("a busy conversation is not reloaded underneath a running response", async (t) => {
+    const { controller, terminals, terminalListeners, clients } = await connected(t);
+
+    await controller.handleMessage({ type: "signIn" });
+    controller.state.status = "busy";
+    await terminalListeners.at(-1).listener(terminals[0]);
+    await controller.restartOperation;
+    assert.equal(clients.length, 1);
+    assert.match(controller.state.messages.at(-1).text, /Pi is busy/u);
+});
+
+test("a send that has not reached Pi yet is not reloaded out from under itself", async (t) => {
+    const gate = deferred();
+    const naming = deferred();
+    const { controller, terminals, terminalListeners, clients } = await connected(t, {
+        request(type) {
+            if (type === "set_session_name") {
+                naming.resolve();
+
+                return gate.promise;
+            }
+
+            return undefined;
+        },
+    });
+
+    await controller.handleMessage({ type: "signIn" });
+    const sending = controller.send("name this chat");
+    await naming.promise;
+    // Pi has accepted nothing yet, so the status is still "ready" even though
+    // the send is mid-flight: only `sending` marks the message as in progress.
+    assert.equal(controller.state.status, "ready");
+    await terminalListeners.at(-1).listener(terminals[0]);
+    await controller.restartOperation;
+    assert.equal(clients.length, 1);
+    assert.match(controller.state.messages.at(-1).text, /Pi is busy/u);
+    gate.resolve({});
+    await sending;
+    assert.ok(
+        clients[0].requests.some((request) => request.type === "prompt"),
+        "the prepared message still reaches Pi",
+    );
+});
+
+test("the sign-in command reaches the active conversation's controller", async (t) => {
+    const { coordinator, controller, terminals } = await connected(t);
+
+    // The command palette calls the coordinator, not the controller it fronts.
+    await coordinator.signIn();
+    assert.equal(terminals.length, 1);
+    assert.equal(controller.signInTerminal, terminals[0]);
 });

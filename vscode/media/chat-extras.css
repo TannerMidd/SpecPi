@@ -56,12 +56,6 @@ body.vscode-high-contrast .delegate-worker, body.vscode-high-contrast-light .del
 .message-delegate-summary { margin: 10px 0; padding: 9px 11px; border: 1px solid var(--border); border-left: 2px solid var(--accent); border-radius: 5px; background: var(--surface-raised); font-size: 12px; }
 .delegate-output { font-family: var(--vscode-font-family, system-ui, sans-serif); font-size: 14px; }
 .delegate-input > summary { font-size: 12px; }
-.subagent-results { display: grid; gap: 8px; margin: 10px 0; }
-.subagent-result { min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); }
-.subagent-result .delegate-model { white-space: normal; overflow-wrap: anywhere; }
-.subagent-result .delegate-state[data-state="failed"], .subagent-result .delegate-state[data-state="timed_out"] { color: var(--error); }
-.subagent-result .delegate-state[data-state="completed"] { color: var(--vscode-testing-iconPassed, var(--accent)); }
-.subagent-result-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 @media (max-width: 340px) {
     .topbar .brand-chat { display: none; }
 }

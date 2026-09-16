@@ -604,198 +604,6 @@ test(
             }
 
             await t.test(
-                "pi-subagents live agents and result cards remain readable across viewports and themes",
-                async () => {
-                    for (const theme of Object.keys(themes)) {
-                        for (const width of [280, 768, 1200]) {
-                            await withPage(
-                                browser,
-                                fixtures,
-                                { name: `subagents-${theme}-${width}`, theme, width },
-                                async (page) => {
-                                    const messages = createState();
-                                    const receipt = {
-                                        mode: "parallel",
-                                        results: [
-                                            {
-                                                index: 2,
-                                                agent: "reviewer",
-                                                task: "Review error handling",
-                                                exitCode: -1,
-                                                progress: {
-                                                    status: "running",
-                                                    tokens: 1450,
-                                                    toolCount: 3,
-                                                    durationMs: 12000,
-                                                    currentTool: "read",
-                                                },
-                                            },
-                                            {
-                                                index: 0,
-                                                agent: "scout",
-                                                task: "Find the request handler",
-                                                exitCode: 0,
-                                                progress: {
-                                                    status: "completed",
-                                                    tokens: 830,
-                                                    toolCount: 2,
-                                                    durationMs: 5000,
-                                                },
-                                            },
-                                        ],
-                                    };
-                                    applyEvent(messages, {
-                                        type: "tool_execution_start",
-                                        toolCallId: "subagent-call",
-                                        toolName: "subagent",
-                                        args: { workflow: "review" },
-                                    });
-                                    applyEvent(messages, {
-                                        type: "tool_execution_update",
-                                        toolCallId: "subagent-call",
-                                        toolName: "subagent",
-                                        partialResult: {
-                                            details: receipt,
-                                            content: [{ type: "text", text: "Reviewing the request handler." }],
-                                        },
-                                    });
-                                    const fleet = {
-                                        version: 1,
-                                        totalActive: 2,
-                                        omitted: 1,
-                                        entries: [
-                                            {
-                                                key: "fleet-key",
-                                                agent: "reviewer",
-                                                model: "fixture-model",
-                                                effort: "high",
-                                                goal: '<img src=x onerror="window.agentAttack=true"> Review error handling',
-                                                startedAt: Date.now() - 12000,
-                                                tokens: { input: 1000, output: 450, total: 1450 },
-                                            },
-                                        ],
-                                    };
-                                    await setState(page, {
-                                        status: "busy",
-                                        messages: messages.messages,
-                                        subagents: fleet,
-                                    });
-                                    assert.equal(await page.locator(".subagent-result").count(), 2);
-                                    assert.equal(await page.locator(".delegate-input").getAttribute("open"), null);
-                                    assert.equal(
-                                        await page.locator(".delegates-count").textContent(),
-                                        "2 agents working",
-                                    );
-                                    await page.locator(".delegates-header").click();
-                                    assert.equal(
-                                        await page.locator("#delegates-panel .delegate-name").textContent(),
-                                        "reviewer",
-                                    );
-                                    assert.equal(
-                                        await page.locator("#delegates-panel .delegate-stop").isVisible(),
-                                        false,
-                                    );
-                                    assert.equal(
-                                        await page.locator("#delegates-panel img, #delegates-panel script").count(),
-                                        0,
-                                    );
-                                    assert.equal(await page.evaluate(() => window.agentAttack), undefined);
-                                    assert.match(
-                                        await page.locator(".delegates-note").textContent(),
-                                        /1 more active agent/u,
-                                    );
-                                    assert.equal(
-                                        await page
-                                            .locator(".subagent-result[data-agent-index='2'] .delegate-state")
-                                            .textContent(),
-                                        "Running",
-                                    );
-                                    receipt.results[0].progress.tokens = 2150;
-                                    applyEvent(messages, {
-                                        type: "tool_execution_update",
-                                        toolCallId: "subagent-call",
-                                        toolName: "subagent",
-                                        partialResult: {
-                                            details: receipt,
-                                            content: [{ type: "text", text: "Reviewing the request handler." }],
-                                        },
-                                    });
-                                    fleet.entries[0].goal = "Review error handling against the API contract";
-                                    fleet.entries[0].tokens = { input: 1700, output: 450, total: 2150 };
-                                    await setState(page, {
-                                        status: "busy",
-                                        messages: messages.messages,
-                                        subagents: fleet,
-                                    });
-                                    assert.match(
-                                        await page
-                                            .locator(".subagent-result[data-agent-index='2'] .delegate-metrics")
-                                            .textContent(),
-                                        /2,150 tokens/u,
-                                    );
-                                    await page.screenshot({
-                                        path: path.join(screenshots, `subagents-${theme}-${width}.png`),
-                                    });
-                                    for (const selector of ["#delegates-panel", ".subagent-result", "#composer"]) {
-                                        for (const box of await page.locator(selector).evaluateAll((nodes) =>
-                                            nodes.map((node) => {
-                                                const rect = node.getBoundingClientRect();
-
-                                                return { left: rect.left, right: rect.right };
-                                            }),
-                                        )) {
-                                            assert.ok(
-                                                box.left >= 0 && box.right <= width,
-                                                `${selector} overflows at ${width}px`,
-                                            );
-                                        }
-                                    }
-
-                                    receipt.results[0].exitCode = 1;
-                                    receipt.results[0].error = "Request failed";
-                                    applyEvent(messages, {
-                                        type: "tool_execution_end",
-                                        toolCallId: "subagent-call",
-                                        toolName: "subagent",
-                                        isError: true,
-                                        result: {
-                                            details: receipt,
-                                            content: [
-                                                { type: "text", text: "Reviewer failed. Scout found the handler." },
-                                            ],
-                                        },
-                                    });
-                                    await setState(page, {
-                                        messages: messages.messages,
-                                        subagents: { ...fleet, entries: [], totalActive: 0, omitted: 0 },
-                                    });
-                                    assert.equal(await page.locator("#delegates-panel").isVisible(), false);
-                                    assert.equal(
-                                        await page
-                                            .locator(".subagent-result[data-agent-index='2'] .delegate-state")
-                                            .textContent(),
-                                        "Failed",
-                                    );
-                                    assert.equal(
-                                        await page
-                                            .locator(".subagent-result[data-agent-index='0'] .delegate-state")
-                                            .textContent(),
-                                        "Completed",
-                                    );
-                                    await setState(page, {
-                                        contextToken: "next-conversation",
-                                        messages: [],
-                                        subagents: undefined,
-                                    });
-                                    assert.equal(await page.locator(".subagent-result, .delegate-worker").count(), 0);
-                                },
-                            );
-                        }
-                    }
-                },
-            );
-
-            await t.test(
                 "history searches, renames, archives, restores and switches with keyboard access",
                 async () => {
                     await withPage(browser, fixtures, { name: "history-interactions", width: 280 }, async (page) => {
@@ -1015,7 +823,10 @@ test(
                                         text: usage.textContent,
                                     };
                                 });
-                                assert.ok(metrics.labelSize >= 12 && metrics.valueSize >= 14);
+                                // The chip reads as a peer of the footer's other usage text, not
+                                // its loudest element: weight and the border carry the emphasis.
+                                assert.ok(metrics.labelSize >= 12);
+                                assert.equal(metrics.valueSize, metrics.labelSize);
                                 assert.equal(metrics.separated, true);
                                 assert.equal(metrics.text, "Context 24% · $0.0123");
                             },
@@ -1419,7 +1230,12 @@ test(
                     await withPage(browser, fixtures, { name: `permissions-mode-${width}`, width }, async (page) => {
                         const chip = page.locator("#permissions-button");
                         const permissions = (mode, label) => ({
-                            permissions: { yolo: mode === "yolo", label, detail: `Synthetic ${mode} description.` },
+                            permissions: {
+                                yolo: label.includes("YOLO"),
+                                mode,
+                                label,
+                                detail: `Synthetic ${mode} description.`,
+                            },
                         });
                         assert.equal(
                             await chip.isVisible(),
@@ -1429,6 +1245,8 @@ test(
                         for (const [mode, label] of [
                             ["configured", "Permissions"],
                             ["yolo", "YOLO"],
+                            ["guard-saved", "Guard saved"],
+                            ["guard-saved", "Guard saved · YOLO"],
                         ]) {
                             await setState(page, permissions(mode, label));
                             assert.equal(await chip.isVisible(), true);
@@ -1437,9 +1255,21 @@ test(
                             assert.equal(await page.locator("#permissions-label").isVisible(), width > 330);
                             assert.match(await chip.getAttribute("aria-label"), /Permission System/u);
                             assert.match(await chip.getAttribute("title"), /Synthetic/u);
+                            assert.equal(await chip.getAttribute("data-mode"), mode);
+                            assert.ok((await chip.getAttribute("aria-label")).includes(label));
+                            if (mode === "guard-saved") {
+                                assert.equal(
+                                    await chip.evaluate((element) => getComputedStyle(element).borderTopStyle),
+                                    "dashed",
+                                );
+                            }
+
                             await assertLayout(page, width);
                             await page.screenshot({
-                                path: path.join(screenshots, `guard-${mode}-${width}.png`),
+                                path: path.join(
+                                    screenshots,
+                                    `guard-${mode}-${label.includes("YOLO") ? "yolo-" : ""}${width}.png`,
+                                ),
                             });
                         }
 
@@ -4287,6 +4117,36 @@ test(
                         assert.equal(await page.locator("#jump-to-latest").isVisible(), false);
                     },
                 );
+            });
+
+            await t.test("the provider sign-in panel stays usable and actionable in a narrow sidebar", async () => {
+                await withPage(browser, fixtures, { name: "provider-signin", width: 280 }, async (page) => {
+                    await setState(page, {
+                        messages: sampleMessages(),
+                        providerSignIn: {
+                            provider: "",
+                            message:
+                                "Pi has no provider credential, so no models are available and messages cannot be sent. " +
+                                "Sign in to a provider in Pi, then reload so Chat picks it up.",
+                        },
+                    });
+                    assert.equal(await page.locator("#provider-signin").isVisible(), true);
+                    assert.equal(await page.locator("#provider-signin-reload").isVisible(), true);
+                    await assertLayout(page, 280);
+                    const panel = await page.locator("#provider-signin").boundingBox();
+                    assert.ok(panel.x >= 0 && panel.x + panel.width <= 280, `Sign-in panel overflows: ${panel.width}`);
+                    await page.screenshot({ path: path.join(screenshots, "provider-signin-280.png") });
+
+                    await page.locator("#provider-signin-start").click();
+                    assert.deepEqual(
+                        (await takeMessages(page)).map((message) => message.type),
+                        ["signIn"],
+                    );
+
+                    // A usable provider leaves no sign-in surface behind.
+                    await setState(page, { messages: sampleMessages() });
+                    assert.equal(await page.locator("#provider-signin").isVisible(), false);
+                });
             });
 
             await t.test("a short narrow sidebar keeps request decisions and composer controls in reach", async () => {
