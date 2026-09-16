@@ -1447,16 +1447,11 @@
             return;
         }
 
-        const guard = permissions.mode === "guard-saved";
-        const label = guard
-            ? permissions.yolo
-                ? "Guard saved · YOLO"
-                : "Guard saved"
-            : permissions.yolo
-              ? "YOLO"
-              : "Permissions";
+        // The host derives the label and mode together; recomputing either here would be a
+        // second copy of that rule for the render tests to agree with rather than check.
+        const label = String(permissions.label || "Permissions");
         byId("permissions-label").textContent = label;
-        button.dataset.mode = guard ? "guard-saved" : permissions.yolo ? "yolo" : "configured";
+        button.dataset.mode = permissions.mode || "configured";
         button.title = String(permissions.detail || "View Permission System settings").slice(0, 400);
         button.setAttribute("aria-label", `${label}. Edit Permission System settings`);
         button.disabled = state.status !== "ready" || Boolean(state.sending);
