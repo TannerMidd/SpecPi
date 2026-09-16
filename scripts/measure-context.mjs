@@ -32,6 +32,12 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const piCli = path.join(root, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
 const asJson = process.argv.includes("--json");
+// Oh My Pi is a separate harness, not a SpecPi dependency: a Bun-based fork of Pi with its
+// own tools and prompt. Point --omp at its installed cli.js to measure it on these same
+// terms. Without it that row is skipped, so this script keeps working with no Bun present.
+const ompFlag = process.argv.find((argument) => argument.startsWith("--omp="));
+const ompCli = ompFlag ? path.resolve(ompFlag.slice("--omp=".length)) : process.env.SPECPI_OMP_CLI;
+const ompRuntime = process.env.SPECPI_OMP_RUNTIME ?? "bun";
 
 assert.ok(fs.existsSync(piCli), "Install development dependencies before measuring.");
 
@@ -139,7 +145,7 @@ function instructionChars(body) {
         .reduce((total, message) => total + String(message.content ?? "").length, 0);
 }
 
-async function measure({ label, extensions = [], skills = false, agentDir, cwd }) {
+async function measure({ label, extensions = [], skills = false, agentDir, cwd, runtime, cli, isolation }) {
     const provider = await startProvider();
     const helper = path.join(agentDir, "measure-provider.ts");
     fs.writeFileSync(helper, providerExtension(provider.url));
@@ -150,20 +156,20 @@ async function measure({ label, extensions = [], skills = false, agentDir, cwd }
         `${JSON.stringify({ defaultModel: "measure/measure-model" }, null, 4)}\n`,
     );
     const args = [
-        piCli,
+        cli ?? piCli,
         "--mode",
         "rpc",
         "--no-session",
-        "--no-context-files",
-        "--no-prompt-templates",
-        "--no-themes",
+        // Neutralize whatever this machine has configured, so the row reflects the harness
+        // under test. Each harness spells its own discovery flags differently.
+        ...(isolation ?? ["--no-context-files", "--no-prompt-templates", "--no-themes"]),
         "--no-extensions",
         ...(skills ? [] : ["--no-skills"]),
         "-e",
         helper,
         ...extensions.flatMap((entry) => ["-e", entry]),
     ];
-    const child = spawn(process.execPath, args, {
+    const child = spawn(runtime ?? process.execPath, args, {
         cwd,
         env: {
             ...Object.fromEntries(
@@ -281,6 +287,19 @@ const configurations = [
     },
 ];
 
+// Oh My Pi ships its own tools, skills and prompt inside the binary, so its row is the
+// harness as installed: nothing added, only this machine's own configuration excluded.
+if (ompCli) {
+    assert.ok(fs.existsSync(ompCli), `No Oh My Pi CLI at ${ompCli}`);
+    configurations.push({
+        label: "Oh My Pi",
+        runtime: ompRuntime,
+        cli: ompCli,
+        isolation: ["--no-rules"],
+        skills: true,
+    });
+}
+
 const results = [];
 try {
     for (const configuration of configurations) {
@@ -289,7 +308,13 @@ try {
         results.push(await measure({ ...configuration, agentDir, cwd: workspace }));
     }
 } finally {
-    fs.rmSync(directory, { recursive: true, force: true });
+    // A harness that keeps a database or log handle open can outlive its own kill on
+    // Windows. Losing the scratch directory is not a reason to lose the measurement.
+    try {
+        fs.rmSync(directory, { recursive: true, force: true });
+    } catch {
+        console.error(`Left behind: ${directory}`);
+    }
 }
 
 if (asJson) {
@@ -310,10 +335,11 @@ if (asJson) {
     }
 
     console.log(`\nStock Pi tools: ${base.toolNames.join(", ")}`);
-    const added = results.at(-1).toolNames.filter((name) => !base.toolNames.includes(name));
+    // Named rather than positional: another harness may follow SpecPi's rows.
+    const last = results.find((result) => result.label === "+ specpi-browser-qa");
+    const added = last.toolNames.filter((name) => !base.toolNames.includes(name));
     console.log(`Added by SpecPi: ${added.length ? added.join(", ") : "none"}`);
 
-    const last = results.at(-1);
     const builtinGated = new Set(base.gated.map((tool) => tool.name));
     const gatedByPackages = last.gated.filter((tool) => !builtinGated.has(tool.name));
     if (gatedByPackages.length) {

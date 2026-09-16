@@ -233,12 +233,14 @@
     --ct-pi: #1b5fd6;
     --ct-specpi: #157f4c;
     --ct-codex: #9a5b00;
+    --ct-omp: #8c6ebd;
     --ct-claudecode: #a3197f;
 }
 :root[data-theme="dark"] {
     --ct-pi: #5a8ae8;
     --ct-specpi: #3f9e6b;
     --ct-codex: #c08420;
+    --ct-omp: #864ad2;
     --ct-claudecode: #c25299;
 }
 
