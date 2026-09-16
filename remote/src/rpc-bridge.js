@@ -10,6 +10,7 @@ import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { RecordDecoder, encodeRecord } from "./framing.js";
+import { spawnTarget } from "./spawn-target.js";
 
 // Dialog methods block the agent until the client answers. Fire-and-forget
 // methods must never be answered: replying to one desynchronises the
@@ -65,11 +66,16 @@ export class RpcBridge extends EventEmitter {
         }
 
         this.exitReason = null;
-        this.child = spawn(this.command, this.args, {
+        // On Windows an npm-installed `pi` is a .cmd shim that Node cannot
+        // spawn directly; spawnTarget resolves it and routes through cmd.exe
+        // without handing the command line to a shell.
+        const target = spawnTarget(this.command, this.args, { env: this.env });
+        this.child = spawn(target.file, target.args, {
             cwd: this.cwd,
             env: this.env,
             stdio: ["pipe", "pipe", "pipe"],
             windowsHide: true,
+            ...target.options,
         });
         this.child.stdout.setEncoding("utf8");
         this.child.stderr.setEncoding("utf8");

@@ -24,6 +24,8 @@ Pi agent + your installed packages, including Permission System
 - A working `pi` on your `PATH` (or pass `--pi`)
 - A tunnel to reach the machine from your phone: Tailscale, WireGuard, or an SSH port forward
 
+On Windows an npm-installed `pi` is really `pi.cmd`, which Node cannot spawn directly. The daemon resolves it through `PATHEXT` and invokes it via `cmd.exe` with quoted arguments rather than handing the command line to a shell. This is automatic; `--pi` also accepts an explicit path to a `.cmd` or `.exe`.
+
 ## Running it
 
 ```sh
