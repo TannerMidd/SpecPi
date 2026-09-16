@@ -15,6 +15,7 @@ node_modules/
 auth.json
 models.json
 models-store.json
+or-models.json
 trust.json
 run-history.jsonl
 sessions/

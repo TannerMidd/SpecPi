@@ -41,6 +41,20 @@ The setup optimizes for four things:
 
 Everything it manages is declared, versioned, and reversible.
 
+## Measured context
+
+SpecPi configures Pi rather than replacing it, so what that configuration costs was measured rather than assumed. A default session sends 10,536 characters on its first model call — about 1.9× stock Pi, and a quarter of Codex CLI.
+
+<p align="center">
+  <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/context-chart-dark.svg">
+      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi 5,420, SpecPi 10,536, SpecPi all on 23,710, Codex CLI 41,616, Oh My Pi 65,843, Claude Code 90,460.">
+    </picture>
+  </a>
+</p>
+<p align="center"><sub>Characters on the first model call, split into tool schemas and instructions · SpecPi and Oh My Pi measured with <code>scripts/measure-context.mjs</code>, the rest per <a href="https://harnesstax.github.io/">HarnessTax</a> · <a href="https://tannermidd.github.io/SpecPi/research/#specpi">Method and caveats</a></sub></p>
+
 ## Install
 
 Requires Node.js 22.19+, Git, npm, and an existing Pi installation on PATH.
