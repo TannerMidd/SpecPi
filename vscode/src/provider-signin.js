@@ -61,15 +61,18 @@ function providerSignInMessage(provider) {
 
 /**
  * The sign-in panel's state, or undefined when a provider is usable.
- * A connected Pi with an empty catalogue and no named provider has no
- * credential; a send that failed on a named provider reports that provider.
+ * A send that failed on a named provider reports that provider. An empty
+ * catalogue means "no credential" only once Pi has actually answered with its
+ * models: `catalogLoaded` is false while a connection is still starting, where
+ * the catalogue is empty because nothing has asked for it yet. Reading that
+ * window as a missing credential flashes the panel over every startup.
  */
-function providerSignInState({ connected = false, models, model, failure } = {}) {
+function providerSignInState({ catalogLoaded = false, models, model, failure } = {}) {
     if (failure) {
         return { provider: failure.provider, message: providerSignInMessage(failure.provider) };
     }
 
-    if (connected && Array.isArray(models) && models.length === 0 && !providerLabel(model?.provider)) {
+    if (catalogLoaded && Array.isArray(models) && models.length === 0 && !providerLabel(model?.provider)) {
         return { provider: "", message: providerSignInMessage("") };
     }
 

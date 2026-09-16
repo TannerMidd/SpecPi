@@ -3743,6 +3743,37 @@ test("a connected Pi with no provider credential asks for sign-in instead of an 
     assert.equal(controller.state.error, undefined);
 });
 
+test("connecting never flashes the sign-in panel before Pi reports its catalogue", async (t) => {
+    const { controller } = fixture(t, {
+        // Pi is spawned and emitting, but nothing has asked for its catalogue yet. This is the
+        // window the panel used to appear in, and Chat itself warns it can last 90 seconds.
+        async ready(client) {
+            client.emit("event", { type: "startup_notice" });
+            await new Promise((resolve) => setTimeout(resolve, 60));
+        },
+    });
+    const seen = [];
+    const publish = controller.publish.bind(controller);
+    controller.publish = () => {
+        publish();
+        seen.push({ status: controller.state.status, signIn: Boolean(controller.state.providerSignIn) });
+    };
+
+    await controller.connect();
+
+    // The panel is a verdict on a catalogue Pi has answered with, so it must not appear while
+    // the connection is still starting. It used to appear the moment the process spawned and
+    // stay up for the whole startup, which Chat itself warns can take 90 seconds.
+    assert.equal(
+        seen.some((entry) => entry.status === "connecting" && entry.signIn),
+        false,
+    );
+    assert.ok(seen.some((entry) => entry.status === "connecting"));
+
+    // Once Pi has answered, an empty catalogue is still a missing credential.
+    assert.ok(controller.state.providerSignIn);
+});
+
 test("an available model clears the sign-in panel", async (t) => {
     const { controller } = await connected(t, {
         request: (type) => (type === "get_available_models" ? { models: [model] } : undefined),

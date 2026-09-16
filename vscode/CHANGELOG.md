@@ -5,6 +5,7 @@
 - Follow the default base off `pi-subagents`. The live agent panel, result cards and configuration UI for that package are removed; Chat's existing delegation support now covers the base package, `specpi-delegation`. The panel shows each worker's mode, task, elapsed time, model calls and tool calls, and its Stop button sends the package's own `/delegate cancel-worker` command — a per-worker control the fleet panel never had.
 - Package settings cover web access alone. The Subagents extension-config and Pi-settings-block targets are gone, along with the "editing only the subagents block" scope note; the dialog opens only for packages the connected session actually reports.
 - `/experiment` from `specpi-experiments` works through ordinary command discovery, including its editor, confirmation and notification dialogs. Experiment worktrees are opened in a separate Pi session, not inside Chat.
+- Stop the provider sign-in panel from appearing while a chat is still connecting. An empty model catalogue was read as a missing credential from the moment Pi was spawned, so every startup showed "Pi has no provider credential" until the catalogue arrived and took it away again — for a connection Chat itself warns can take 90 seconds. The panel now waits for Pi to actually report its models, and a session that genuinely has no credential still raises it.
 
 ## 0.11.0
 

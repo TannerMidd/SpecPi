@@ -66,25 +66,33 @@ test("sign-in guidance replaces Pi's /login text and local documentation paths",
     assert.match(providerSignInMessage("unknown"), /no provider credential/u);
 });
 
-test("the panel appears only for a connected Pi that reports no usable provider", () => {
+test("the panel appears only once Pi has reported a catalogue with no usable provider", () => {
     const unknown = { id: "unknown", name: "unknown", provider: "unknown" };
     const usable = { id: "claude-opus-4-8", name: "Opus", provider: "anthropic" };
 
     // Pi answers an unauthenticated session with an empty catalogue and this model.
-    assert.match(providerSignInState({ connected: true, models: [], model: unknown }).message, /no provider/u);
-    assert.equal(providerSignInState({ connected: true, models: [], model: undefined }) === undefined, false);
+    assert.match(providerSignInState({ catalogLoaded: true, models: [], model: unknown }).message, /no provider/u);
+    assert.equal(providerSignInState({ catalogLoaded: true, models: [], model: undefined }) === undefined, false);
 
     // A disconnected chat has an empty catalogue for an unrelated reason.
-    assert.equal(providerSignInState({ connected: false, models: [], model: unknown }), undefined);
+    assert.equal(providerSignInState({ catalogLoaded: false, models: [], model: unknown }), undefined);
     assert.equal(providerSignInState(), undefined);
-    assert.equal(providerSignInState({ connected: true, models: [usable], model: usable }), undefined);
-    assert.equal(providerSignInState({ connected: true, models: [], model: usable }), undefined);
-    assert.equal(providerSignInState({ connected: true, models: undefined, model: unknown }), undefined);
+    assert.equal(providerSignInState({ catalogLoaded: true, models: [usable], model: usable }), undefined);
+    assert.equal(providerSignInState({ catalogLoaded: true, models: [], model: usable }), undefined);
+    assert.equal(providerSignInState({ catalogLoaded: true, models: undefined, model: unknown }), undefined);
 
     // A named send failure keeps the panel up even after the connection drops.
-    const failed = providerSignInState({ connected: false, models: [usable], failure: { provider: "openai" } });
+    const failed = providerSignInState({ catalogLoaded: false, models: [usable], failure: { provider: "openai" } });
     assert.equal(failed.provider, "openai");
     assert.match(failed.message, /openai/u);
+});
+
+test("a starting connection does not flash the sign-in panel before the catalogue lands", () => {
+    // Between spawning Pi and its first get_available_models answer the catalogue is empty
+    // because nothing has asked yet. Reading that as a missing credential put the panel on
+    // screen for the whole startup, then took it away again once the models arrived.
+    assert.equal(providerSignInState({ catalogLoaded: false, models: [], model: undefined }), undefined);
+    assert.equal(providerSignInState({ catalogLoaded: false, models: [], model: { provider: "unknown" } }), undefined);
 });
 
 test("sign-in instructions name the terminal and the command Pi expects", () => {
