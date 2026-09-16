@@ -1,0 +1,143 @@
+name: publish-delegation
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_NPM_VERSION: "11.19.1"
+  NPM_CONFIG_REGISTRY: "https://registry.npmjs.org"
+
+concurrency:
+  group: delegation-npm-publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: startsWith(github.event.release.tag_name, 'delegation-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.19.0"
+          package-manager-cache: false
+      - run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
+      - name: Verify release identity and build immutable candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node --print "require('./packages/delegation/package.json').version")"
+          node scripts/check-release-order.mjs tag "${VERSION}"
+          test "${GITHUB_REF_NAME}" = "delegation-v${VERSION}"
+          git merge-base --is-ancestor HEAD origin/main
+          set +e
+          LOOKUP="$(npm view "specpi-delegation@${VERSION}" version 2>&1)"
+          STATUS=$?
+          set -e
+          if [[ ${STATUS} -eq 0 || "${LOOKUP}" != *"E404"* ]]; then
+            printf 'Could not establish an unused version:\n%s\n' "${LOOKUP}" >&2
+            exit 1
+          fi
+          mkdir -p candidate
+          npm pack ./packages/delegation --ignore-scripts --json --pack-destination candidate > candidate/npm-pack.json
+          (cd candidate && sha512sum "specpi-delegation-${VERSION}.tgz" > "specpi-delegation-${VERSION}.tgz.sha512")
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: delegation-candidate
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 7
+
+  validate:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.19.0"
+          package-manager-cache: false
+      - run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
+        shell: bash
+      - run: npm --prefix packages/delegation ci --ignore-scripts --omit=peer
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: delegation-candidate
+          path: candidate
+      - name: Validate the exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node --print "require('./packages/delegation/package.json').version")"
+          TARBALL="${GITHUB_WORKSPACE}/candidate/specpi-delegation-${VERSION}.tgz"
+          node scripts/verify-artifact.mjs "${TARBALL}" "${TARBALL}.sha512"
+          npm --prefix packages/delegation run check:types
+          npm --prefix packages/delegation test
+          npm --prefix packages/delegation run check:package -- --artifact "${TARBALL}"
+          npm publish --dry-run --ignore-scripts --provenance=false "${TARBALL}"
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.19.0"
+          package-manager-cache: false
+      - run: npm install --global --ignore-scripts npm@${RELEASE_NPM_VERSION} --no-audit --no-fund
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: delegation-candidate
+          path: candidate
+      - name: Verify, publish and read back registry identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node --print "require('./packages/delegation/package.json').version")"
+          DIST_TAG="$(node scripts/check-release-order.mjs tag "${VERSION}")"
+          TARBALL="${GITHUB_WORKSPACE}/candidate/specpi-delegation-${VERSION}.tgz"
+          node scripts/verify-artifact.mjs "${TARBALL}" "${TARBALL}.sha512"
+          set +e
+          LOOKUP="$(npm view specpi-delegation "dist-tags.${DIST_TAG}" 2>&1)"
+          STATUS=$?
+          set -e
+          if [[ ${STATUS} -eq 0 && -n "${LOOKUP}" ]]; then
+            node scripts/check-release-order.mjs advance "${VERSION}" "${LOOKUP}"
+          elif [[ ${STATUS} -ne 0 && "${LOOKUP}" != *"E404"* ]]; then
+            printf 'Could not read registry tag:\n%s\n' "${LOOKUP}" >&2
+            exit 1
+          fi
+          npm publish --ignore-scripts --access public --provenance --tag "${DIST_TAG}" "${TARBALL}"
+          EXPECTED="sha512-$(openssl dgst -sha512 -binary "${TARBALL}" | openssl base64 -A)"
+          for attempt in {1..30}; do
+            ACTUAL="$(npm view "specpi-delegation@${VERSION}" dist.integrity 2>/dev/null || true)"
+            TAG="$(npm view specpi-delegation "dist-tags.${DIST_TAG}" 2>/dev/null || true)"
+            ATTESTATION="$(npm view "specpi-delegation@${VERSION}" dist.attestations.url 2>/dev/null || true)"
+            if [[ "${ACTUAL}" == "${EXPECTED}" && "${TAG}" == "${VERSION}" && -n "${ATTESTATION}" ]]; then
+              printf 'Verified specpi-delegation@%s with provenance\n' "${VERSION}"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Publication readback did not converge; inspect registry before retrying.' >&2
+          exit 1
