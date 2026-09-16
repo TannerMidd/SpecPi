@@ -74,6 +74,9 @@ class ChatController {
         this.transitioning = false;
         this.disposed = false;
         this.providerFailure = undefined;
+        // Whether Pi has reported its model catalogue for the current connection. An empty
+        // catalogue only means "no credential" after that has happened.
+        this.catalogLoaded = false;
         this.signInTerminal = undefined;
         this.signInListener = undefined;
         this.workspace = options.workspace || vscode.workspace.workspaceFolders?.[0];
@@ -90,7 +93,7 @@ class ChatController {
         this.state.permissions = permissionState(this.state);
         this.state.packageSettings = packageSettingsState(this.state);
         this.state.providerSignIn = providerSignInState({
-            connected: Boolean(this.client),
+            catalogLoaded: this.catalogLoaded,
             models: this.state.models,
             model: this.state.model,
             failure: this.providerFailure,
@@ -248,6 +251,9 @@ class ChatController {
         this.delegateSummaries.clear();
         const cwd = this.requireWorkspace();
         resetRunState(this.state);
+        // A reconnect re-asks Pi for its catalogue, so the previous answer says nothing about
+        // this attempt. Until it lands, an empty catalogue is "not yet known", not "no credential".
+        this.catalogLoaded = false;
         this.state.status = "connecting";
         this.state.runtimeStatus = {};
         this.state.delegation = undefined;
@@ -383,6 +389,7 @@ class ChatController {
         } catch (error) {
             if (this.client === client) {
                 this.client = null;
+                this.catalogLoaded = false;
             }
 
             if (generation === this.generation) {
@@ -495,6 +502,8 @@ class ChatController {
 
         if (full) {
             this.state.models = (data.get_available_models?.models || []).map(safeModel).filter(Boolean).slice(0, 1000);
+            // Pi has now answered with its catalogue, so an empty one is a real verdict.
+            this.catalogLoaded = true;
             applyEvent(this.state, {
                 type: "response",
                 command: "get_commands",
@@ -573,6 +582,7 @@ class ChatController {
         const client = this.client;
         this.cancelDialogs();
         this.client = null;
+        this.catalogLoaded = false;
         this.clientWorkspace = undefined;
         this.imageQueue.clear();
         resetRunState(this.state);

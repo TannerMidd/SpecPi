@@ -18,7 +18,12 @@
 // Provider-reported input tokens are deliberately not reported: a synthetic provider
 // cannot count them honestly, and characters are the comparable measure.
 //
-// Usage: node scripts/measure-context.mjs [--json]
+// Usage: node scripts/measure-context.mjs [--json] [--chart | --check-chart]
+//   --chart        rewrite the published chart from this run's numbers
+//   --check-chart  fail if a published copy has drifted from them, without writing
+//
+// The chart is published in three places plus the README's alt text. Rendering them from one
+// run is what keeps them from disagreeing; see scripts/context-chart.mjs.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -28,10 +33,13 @@ import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { staleChartFiles, writeChart } from "./context-chart.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const piCli = path.join(root, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
 const asJson = process.argv.includes("--json");
+const writesChart = process.argv.includes("--chart");
+const checksChart = process.argv.includes("--check-chart");
 // Oh My Pi is a separate harness, not a SpecPi dependency: a Bun-based fork of Pi with its
 // own tools and prompt. Point --omp at its installed cli.js to measure it on these same
 // terms. Without it that row is skipped, so this script keeps working with no Bun present.
@@ -357,5 +365,25 @@ if (asJson) {
         console.log(
             "a floor, because a gated tool's prompt snippet is not counted in the instructions until it is active.",
         );
+    }
+}
+
+// The chart mixes these rows with HarnessTax's published ones, so it is rendered from a run
+// rather than edited: every copy moves together or the run fails.
+if (writesChart || checksChart) {
+    if (checksChart) {
+        const stale = staleChartFiles(results);
+        if (stale.length) {
+            console.error(
+                `\nThe published chart no longer matches this measurement:\n  ${stale.join("\n  ")}\n` +
+                    "Run: node scripts/measure-context.mjs --chart --omp=<path to its cli.js>",
+            );
+            process.exitCode = 1;
+        } else {
+            console.error("\nThe published chart matches this measurement.");
+        }
+    } else {
+        const written = writeChart(results);
+        console.error(written.length ? `\nRewrote:\n  ${written.join("\n  ")}` : "\nThe published chart was current.");
     }
 }
