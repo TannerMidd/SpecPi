@@ -12,6 +12,38 @@ const readJson = async (file) => JSON.parse(await fs.readFile(path.join(root, fi
 const manifest = await readJson("package.json");
 const chat = await readJson("vscode/package.json");
 const settings = await readJson("templates/settings.json");
+
+// Versions are spelled out in prose and in download URLs across the docs as well as the site.
+// They drift: both extension docs sat on the v0.23.0 tag through a release, so their download
+// links would have 404'd against the next VSIX filename, and nothing here looked at them. The
+// site's own link was checked against the manifests; these spellings were not.
+const documents = [
+    "README.md",
+    "vscode/README.md",
+    "vscode/GUIDE.md",
+    "site/index.html",
+    "site/wiki/index.html",
+    "site/research/index.html",
+];
+for (const file of documents) {
+    const text = await fs.readFile(path.join(root, file), "utf8");
+    const spelled = (pattern, expected, label) => {
+        for (const [match, found] of text.matchAll(pattern)) {
+            assert.equal(found, expected, `${file} names ${label} ${found} rather than ${expected}: "${match}"`);
+        }
+    };
+
+    // The site's version badges name the extension without the product in front of it, so a
+    // bare "Chat 0.11.1" there has to be current. Prose may name an old one on purpose --
+    // GUIDE.md troubleshoots a get_state timeout against Chat 0.1.0 -- so the documents are
+    // held only to the "SpecPi Chat" form that states what this release ships.
+    const names = file.startsWith("site/") ? /Chat \*{0,2}(\d+\.\d+\.\d+)/gu : /SpecPi Chat \*{0,2}(\d+\.\d+\.\d+)/gu;
+    spelled(names, chat.version, "Chat");
+    spelled(/SpecPi (?!Chat)\*{0,2}(\d+\.\d+\.\d+)/gu, manifest.version, "SpecPi");
+    spelled(/specpi-chat-(\d+\.\d+\.\d+)\.vsix/gu, chat.version, "a VSIX built from Chat");
+    spelled(/releases\/download\/v(\d+\.\d+\.\d+)/gu, manifest.version, "the release tag");
+}
+
 const routes = new Map([
     ["/SpecPi/", ["index.html", "text/html"]],
     ["/SpecPi/styles.css", ["styles.css", "text/css"]],
