@@ -13,12 +13,17 @@ const state = {
     tools: new Map(),
     approvals: new Map(),
     lastEntryId: null,
+    // Keyed by statusKey / widgetKey, exactly as the extension addressed them,
+    // so a later update replaces the entry instead of stacking another copy.
+    status: new Map(),
+    widgets: new Map(),
 };
 
 const ui = {
     transcript: document.getElementById("transcript"),
     approvals: document.getElementById("approvals"),
     queue: document.getElementById("queue"),
+    extensions: document.getElementById("extensions"),
     input: document.getElementById("input"),
     send: document.getElementById("send"),
     stop: document.getElementById("stop"),
@@ -309,6 +314,93 @@ function renderQueue(event) {
     }
 }
 
+// --- Extension UI (fire-and-forget) -----------------------------------------
+//
+// Only `notify` is a message for the user. `setStatus`, `setWidget`, and
+// `setTitle` are chrome that extensions update on almost every turn, so they
+// belong in their own strip rather than in the transcript. Each carries its own
+// field names; reading `message` off all of them is how this first shipped, and
+// it produced a stream of empty rows.
+
+function applyExtensionUi(request) {
+    if (!request || typeof request.method !== "string") {
+        return;
+    }
+
+    switch (request.method) {
+        case "notify": {
+            const text = typeof request.message === "string" ? request.message.trim() : "";
+            if (!text) {
+                return;
+            }
+
+            const severity = request.notifyType === "error" || request.notifyType === "warning";
+            addEntry(request.notifyType || "info", severity ? "error" : "notice", text);
+
+            return;
+        }
+
+        case "setStatus":
+            // An omitted statusText clears that key.
+            setKeyed(state.status, request.statusKey, request.statusText);
+
+            return;
+        case "setWidget":
+            setKeyed(
+                state.widgets,
+                request.widgetKey,
+                Array.isArray(request.widgetLines) ? request.widgetLines.join("\n") : undefined,
+            );
+
+            return;
+        case "setTitle":
+            if (typeof request.title === "string" && request.title.length > 0) {
+                document.title = request.title;
+            }
+
+            return;
+        case "set_editor_text":
+            // Documented purpose is prefilling the composer, so it replaces the
+            // field rather than appending to it.
+            if (typeof request.text === "string") {
+                ui.input.value = request.text;
+            }
+
+            return;
+        default:
+            return;
+    }
+}
+
+function setKeyed(map, key, value) {
+    const name = typeof key === "string" && key.length > 0 ? key : "default";
+    if (typeof value !== "string" || value.trim().length === 0) {
+        map.delete(name);
+    } else {
+        map.set(name, value);
+    }
+
+    renderExtensions();
+}
+
+function renderExtensions() {
+    ui.extensions.replaceChildren();
+    if (state.status.size === 0 && state.widgets.size === 0) {
+        ui.extensions.hidden = true;
+
+        return;
+    }
+
+    ui.extensions.hidden = false;
+    for (const [, text] of state.status) {
+        ui.extensions.append(element("div", "status-entry", text));
+    }
+
+    for (const [, text] of state.widgets) {
+        ui.extensions.append(element("pre", "widget-entry", text));
+    }
+}
+
 // --- Approvals --------------------------------------------------------------
 
 function renderApproval(request, expiresAt) {
@@ -499,8 +591,8 @@ function handle(payload) {
         case "approvalResolved":
             removeApproval(payload.id);
             break;
-        case "notice":
-            addEntry("notice", "notice", payload.request?.message || payload.request?.title || "");
+        case "extensionUi":
+            applyExtensionUi(payload.request);
             break;
         case "protocolError":
             addEntry("error", "error", `Protocol error: ${payload.message}`);

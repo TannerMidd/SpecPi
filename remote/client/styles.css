@@ -203,6 +203,31 @@ body {
     border-top: 1px solid var(--line);
 }
 
+/* Extension chrome: status entries and widgets. Kept out of the transcript so
+   an extension updating its status every turn does not bury the conversation. */
+.extensions {
+    padding: 8px 16px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 22vh;
+    overflow-y: auto;
+}
+
+.status-entry {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.widget-entry {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .composer {
     position: sticky;
     bottom: 0;

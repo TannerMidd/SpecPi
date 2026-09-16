@@ -70,6 +70,20 @@ function emitDialog(message) {
         return id;
     }
 
+    if (message.includes("DIALOG:status")) {
+        // The chrome update extensions emit constantly. Its text is in
+        // statusText, not message.
+        output({
+            type: "extension_ui_request",
+            id,
+            method: "setStatus",
+            statusKey: "usage",
+            statusText: "Turn 3 running...",
+        });
+
+        return id;
+    }
+
     const timed = message.match(/DIALOG:timed:(\d+)/u);
     output({
         type: "extension_ui_request",

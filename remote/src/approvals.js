@@ -43,9 +43,13 @@ export class ApprovalRegistry {
     // Returns a small record describing what was done, for tests and logging.
     handleRequest(request, connectionId) {
         if (FIRE_AND_FORGET_METHODS.has(request.method)) {
-            this.broadcast({ type: "notice", request });
+            // Not all of these are messages for the user. `notify` is; the rest
+            // are status entries, widgets, and window titles that extensions
+            // fire constantly. The client routes them by method, so it has to
+            // see the method rather than a pre-flattened "notice".
+            this.broadcast({ type: "extensionUi", request });
 
-            return { outcome: "notice" };
+            return { outcome: "display" };
         }
 
         if (!DIALOG_METHODS.has(request.method)) {

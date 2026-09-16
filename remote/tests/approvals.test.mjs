@@ -48,10 +48,36 @@ test("an unknown dialog method is cancelled", () => {
 test("a fire-and-forget request is shown but never answered", () => {
     const { registry, written, broadcasts } = harness();
     const result = registry.handleRequest({ id: "n-1", method: "notify", message: "hi" }, "conn-1");
-    assert.equal(result.outcome, "notice");
+    assert.equal(result.outcome, "display");
     // Answering a fire-and-forget method desynchronises the sub-protocol.
     assert.equal(written.length, 0);
-    assert.equal(broadcasts[0].type, "notice");
+    assert.equal(broadcasts[0].type, "extensionUi");
+});
+
+test("every fire-and-forget method keeps its identity for the client to route", () => {
+    // The regression this guards: flattening these into one "notice" shape lost
+    // the method, so the client rendered status-bar and window-title updates as
+    // transcript entries — a constant stream of them, mostly empty, because the
+    // text lives in a different field for each method.
+    const requests = [
+        { id: "f-1", method: "notify", message: "Command blocked", notifyType: "warning" },
+        { id: "f-2", method: "setStatus", statusKey: "usage", statusText: "Turn 3 running..." },
+        { id: "f-3", method: "setWidget", widgetKey: "usage", widgetLines: ["a", "b"] },
+        { id: "f-4", method: "setTitle", title: "pi - my project" },
+        { id: "f-5", method: "set_editor_text", text: "prefilled" },
+    ];
+
+    for (const request of requests) {
+        const { registry, written, broadcasts } = harness();
+        const result = registry.handleRequest(request, "conn-1");
+        assert.equal(result.outcome, "display", `${request.method} should display`);
+        assert.equal(broadcasts.length, 1);
+        assert.equal(broadcasts[0].type, "extensionUi");
+        assert.equal(broadcasts[0].request.method, request.method);
+        // Still never answered: replying desynchronises the sub-protocol.
+        assert.equal(written.length, 0, `${request.method} must not be answered`);
+        assert.equal(registry.snapshot().length, 0, `${request.method} must not be pending`);
+    }
 });
 
 test("expiry cancels rather than granting, ahead of the agent's own timeout", async () => {

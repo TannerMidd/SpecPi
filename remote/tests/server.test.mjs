@@ -385,9 +385,31 @@ test("a fire-and-forget notify is shown but never answered", async (t) => {
         }
     });
     await post(context.base, "/command", { type: "prompt", message: "DIALOG:notify" });
-    const notice = await stream.waitFor((event) => event.type === "notice");
+    const notice = await stream.waitFor((event) => event.type === "extensionUi");
     assert.equal(notice.request.method, "notify");
     // Answering a fire-and-forget request desynchronises the sub-protocol.
+    assert.equal(answered, false);
+});
+
+test("a status update arrives as chrome, with its own field intact", async (t) => {
+    const context = await startServer();
+    t.after(context.dispose);
+    const stream = context.track(await openStream(context.base));
+    await stream.waitFor((event) => event.type === "connected");
+
+    let answered = false;
+    context.bridge.on("event", (event) => {
+        if (event.type === "dialog_answered") {
+            answered = true;
+        }
+    });
+    await post(context.base, "/command", { type: "prompt", message: "DIALOG:status" });
+    const update = await stream.waitFor((event) => event.type === "extensionUi");
+
+    assert.equal(update.request.method, "setStatus");
+    assert.equal(update.request.statusKey, "usage");
+    assert.equal(update.request.statusText, "Turn 3 running...");
+    // The client needs the method to keep this out of the transcript.
     assert.equal(answered, false);
 });
 
