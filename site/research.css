@@ -281,37 +281,5 @@
     font-weight: 600;
 }
 
-.chart-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem 1.1rem;
-    margin: 1.4rem 0 0;
-    padding: 0;
-    list-style: none;
-    font-size: 0.82rem;
-    color: var(--muted);
-}
-.chart-legend li {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin: 0;
-}
-.chart-key {
-    width: 11px;
-    height: 11px;
-    background: var(--k);
-    flex: 0 0 auto;
-}
-.chart-key[data-shape="circle"] {
-    border-radius: 50%;
-}
-.chart-key[data-shape="triangle"] {
-    clip-path: polygon(50% 0, 100% 100%, 0 100%);
-}
-.chart-key[data-shape="diamond"] {
-    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-}
-
 .chart-figure { margin: 1.6rem 0; }
 .chart-figure figcaption { margin-top: 0.5rem; }
