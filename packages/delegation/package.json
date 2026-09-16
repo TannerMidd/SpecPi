@@ -1,6 +1,6 @@
 {
   "name": "specpi-delegation",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bounded in-house subagents for Pi: child sessions read a frozen source snapshot and report back under fixed call, token and time ceilings",
   "author": "Tanner Middleton",
   "license": "MIT",

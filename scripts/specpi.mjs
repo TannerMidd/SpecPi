@@ -469,7 +469,7 @@ async function doctor() {
     const errors = [];
     if (manifest.basePackages?.length) {
         errors.push(...checkBasePackages(agentDir, readJson(settingsPath, {})));
-        if (manifest.basePackages.includes("npm:specpi-browser-qa@0.1.0")) {
+        if (manifest.basePackages.includes("npm:specpi-browser-qa@0.2.0")) {
             try {
                 runBrowserQA(agentDir, "doctor");
             } catch (error) {

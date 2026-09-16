@@ -7,17 +7,18 @@ This is the first-party replacement for third-party subagent packages in SpecPi'
 ## Install
 
 ```
-pi package add npm:specpi-delegation@0.1.0
+pi package add npm:specpi-delegation@0.2.0
 ```
 
 Pi supplies every runtime import. The package has no production dependencies.
 
 ## Use
 
-Delegation is **enabled at Pi startup** whenever a session has a model configured; there is no opt-in step. Turn it off for a session with:
+Delegation ships **off**. Its tool schema is about 4.4 KB, and Pi sends every active tool's schema on every request of a session, so it is not offered until you ask for it:
 
 ```
-/delegate off
+/delegate on            # this session
+/delegate startup on    # and every new session, saved
 ```
 
 While it is on, the agent has a `delegate` tool with two job modes:
@@ -31,7 +32,8 @@ While it is on, the agent has a `delegate` tool with two job modes:
 
 | Command                    | Effect                                                              |
 | -------------------------- | ------------------------------------------------------------------- |
-| `/delegate off` / `on`     | Turn delegation off or back on for this session (on at startup)     |
+| `/delegate on` / `off`     | Turn delegation on or off for this session                          |
+| `/delegate startup [on\|off]` | Whether new sessions start with it on; ships off, saved across restarts |
 | `/delegate status`         | Current posture, model, guard state and session counters            |
 | `/delegate limits`         | The ceilings currently in force                                     |
 | `/delegate budget <1–64>`  | Save a session budget multiplier (default 8); `reset` restores it   |

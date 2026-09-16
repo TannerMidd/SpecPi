@@ -94,7 +94,9 @@ export function createTimeoutStore(
         if (
             !settings ||
             settings.schema !== 1 ||
-            Object.keys(settings).some((key) => !["schema", "timeoutMinutes", "budgetMultiplier"].includes(key)) ||
+            Object.keys(settings).some(
+                (key) => !["schema", "timeoutMinutes", "budgetMultiplier", "startupActivation"].includes(key),
+            ) ||
             !Object.hasOwn(settings, "timeoutMinutes")
         ) {
             throw new Error("Invalid settings schema");
@@ -105,7 +107,16 @@ export function createTimeoutStore(
             budgetLimits(settings.budgetMultiplier);
         }
 
-        return { content, minutes: settings.timeoutMinutes, budgetMultiplier: settings.budgetMultiplier };
+        if (Object.hasOwn(settings, "startupActivation") && typeof settings.startupActivation !== "boolean") {
+            throw new Error("Invalid settings schema");
+        }
+
+        return {
+            content,
+            minutes: settings.timeoutMinutes,
+            budgetMultiplier: settings.budgetMultiplier,
+            startupActivation: settings.startupActivation,
+        };
     };
 
     const save = (patch) => {
@@ -124,6 +135,7 @@ export function createTimeoutStore(
             schema: 1,
             timeoutMinutes: previous?.minutes ?? DEFAULT_TIMEOUT_MINUTES,
             ...(previous?.budgetMultiplier === undefined ? {} : { budgetMultiplier: previous.budgetMultiplier }),
+            ...(previous?.startupActivation === undefined ? {} : { startupActivation: previous.startupActivation }),
             ...patch,
         };
         atomicWrite(file, `${JSON.stringify(settings)}\n`);
@@ -145,6 +157,26 @@ export function createTimeoutStore(
                 save({ budgetMultiplier: multiplier });
             } catch {
                 throw new DelegationError("Cannot save delegation budget settings; the active budget is unchanged.");
+            }
+        },
+        // Delegation's tool schema is ~4.4 KB on every request of a session, so it is not
+        // sent unless someone asked for it. Absent preference means off.
+        loadStartupActivation() {
+            try {
+                return read()?.startupActivation === true;
+            } catch {
+                return false;
+            }
+        },
+        saveStartupActivation(enabled) {
+            if (typeof enabled !== "boolean") {
+                throw new DelegationError("Startup activation must be on or off.");
+            }
+
+            try {
+                save({ startupActivation: enabled });
+            } catch {
+                throw new DelegationError("Cannot save delegation startup settings; the startup default is unchanged.");
             }
         },
         load() {

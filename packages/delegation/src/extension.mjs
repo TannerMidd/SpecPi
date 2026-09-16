@@ -11,7 +11,7 @@ import {
 } from "./presentation.mjs";
 
 const USAGE =
-    "Usage: /delegate [on|off|status|limits|budget [<multiplier>|reset]|timeout [<minutes>|reset]|cancel <batchId>]";
+    "Usage: /delegate [on|off|startup [on|off]|status|limits|budget [<multiplier>|reset]|timeout [<minutes>|reset]|cancel <batchId>]";
 
 const integer = { type: "integer", minimum: 0 };
 const string = { type: "string" };
@@ -106,7 +106,16 @@ export const DELEGATE_SCHEMA = {
 /** The native entry supplies a preflighted Pi child-session host for the active context. */
 export function createDelegationExtension(
     getHost,
-    { root = process.cwd(), controllerOptions = {}, prepareContext = () => {}, presentation, timeoutStore } = {},
+    {
+        root = process.cwd(),
+        controllerOptions = {},
+        prepareContext = () => {},
+        presentation,
+        timeoutStore,
+        // Tests that exercise startup behaviour set this directly. Production leaves it
+        // unset, so the saved preference decides and an absent preference means off.
+        startupActivation: startupActivationOverride,
+    } = {},
 ) {
     let currentPi;
     let currentContext;
@@ -115,7 +124,7 @@ export function createDelegationExtension(
     let detach = () => {};
 
     let requested = false;
-    let startupActivation = true;
+    let startupActivation = startupActivationOverride ?? timeoutStore?.loadStartupActivation?.() === true;
     let requestedGuard;
     let boundHost;
     let pending;
@@ -422,11 +431,14 @@ export function createDelegationExtension(
         });
         pi.registerCommand("delegate", {
             description:
-                "Control delegation, inspect limits, or save budget <multiplier> (1–64; default 8) and timeout <minutes> (1–60; default 10)",
+                "Control delegation, inspect limits, choose whether it starts enabled, or save budget <multiplier> (1–64; default 8) and timeout <minutes> (1–60; default 10)",
             getArgumentCompletions: (prefix) =>
                 [
                     "on",
                     "off",
+                    "startup",
+                    "startup on",
+                    "startup off",
                     "status",
                     "limits",
                     "budget",
@@ -495,12 +507,42 @@ export function createDelegationExtension(
                         extra ||
                         attemptId ||
                         rest.length ||
-                        (id && !["cancel", "timeout", "budget"].includes(action))
+                        (id && !["cancel", "timeout", "budget", "startup"].includes(action))
                     ) {
                         throw new DelegationError(USAGE);
                     }
 
-                    if (action === "on") {
+                    if (action === "startup") {
+                        if (!timeoutStore?.saveStartupActivation) {
+                            throw new DelegationError("This runtime cannot save a startup preference.");
+                        }
+
+                        if (!id) {
+                            ctx.ui.notify(
+                                `Delegation starts ${startupActivation ? "enabled" : "disabled"}. Its tool schema is about 4.4 KB on every request of a session, so it is only sent while delegation is on. Use /delegate startup on to change that.`,
+                                "info",
+                            );
+
+                            return;
+                        }
+
+                        if (!ctx.hasUI) {
+                            throw new DelegationError("Startup changes require a human interactive command");
+                        }
+
+                        if (!["on", "off"].includes(id)) {
+                            throw new DelegationError(USAGE);
+                        }
+
+                        timeoutStore.saveStartupActivation(id === "on");
+                        startupActivation = id === "on";
+                        ctx.ui.notify(
+                            id === "on"
+                                ? "Delegation will start enabled in new Pi sessions, which adds its tool schema to every request. This session is unchanged; use /delegate on to enable it now."
+                                : "Delegation will start disabled in new Pi sessions and its tool schema will not be sent. This session is unchanged; use /delegate off to disable it now.",
+                            "info",
+                        );
+                    } else if (action === "on") {
                         if (!ctx.hasUI) {
                             throw new DelegationError("Delegation activation requires a human interactive command");
                         }

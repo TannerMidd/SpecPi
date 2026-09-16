@@ -103,11 +103,9 @@ function providerExtension(url) {
     });
     pi.on("session_start", async (_event, ctx) => {
         await pi.setModel(ctx.modelRegistry.find("measure", "measure-model"));
-        // Tools a package registers but Pi has not activated never reach the request, so
-        // the captured body understates a gated surface. Report it separately rather than
-        // letting it look free: delegation gates its tool behind an activation this
-        // synthetic provider cannot satisfy, because it refuses to inherit a runtime
-        // provider override.
+        // Tools a package registers but Pi has not activated never reach the request. Report
+        // them separately so a gated surface is neither counted as sent nor lost: both
+        // delegation and Browser QA ship behind a saved preference that defaults to off.
         setTimeout(() => {
             const registered = (pi.getAllTools?.() ?? []).map((tool) => ({
                 name: tool.name,
@@ -326,12 +324,12 @@ if (asJson) {
             `\nRegistered by a package but gated on this run: ${gatedByPackages.map((tool) => tool.name).join(", ")} ` +
                 `(${chars.toLocaleString()} chars of schema).`,
         );
+        console.log("These ship gated behind a saved preference, so a default session does not send them. Turning");
         console.log(
-            "Delegation activates at Pi startup whenever a model is configured, and this synthetic provider is the",
+            `every gate on would send at least ${full.toLocaleString()} chars, about ${(full / baseTotal).toFixed(1)}x stock Pi;`,
         );
         console.log(
-            `only reason it did not. A normal session therefore sends ${full.toLocaleString()} chars, ` +
-                `${(full / baseTotal).toFixed(1)}x stock Pi.`,
+            "a floor, because a gated tool's prompt snippet is not counted in the instructions until it is active.",
         );
     }
 }

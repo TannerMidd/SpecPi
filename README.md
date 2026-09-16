@@ -76,7 +76,7 @@ Browser QA setup uses the installed package's pinned Playwright and the standard
 
 ## Delegation and experiments
 
-[`specpi-delegation@0.1.0`](https://www.npmjs.com/package/specpi-delegation/v/0.1.0) replaces the third-party subagent package in the default base. It hands a question to a real Pi child session that can read a frozen copy of selected sources and nothing else — three tools, no shell, no edits, no network — under fixed call, token and time ceilings. It is enabled at Pi startup whenever a model is configured; `/delegate off` turns it off for a session. Results are advisory evidence, not verification.
+[`specpi-delegation@0.2.0`](https://www.npmjs.com/package/specpi-delegation/v/0.2.0) replaces the third-party subagent package in the default base. It hands a question to a real Pi child session that can read a frozen copy of selected sources and nothing else — three tools, no shell, no edits, no network — under fixed call, token and time ceilings. It ships off, because its tool schema rides on every request of an enabled session: `/delegate on` enables it for a session and `/delegate startup on` saves that choice. Results are advisory evidence, not verification.
 
 [`specpi-experiments@0.1.0`](https://www.npmjs.com/package/specpi-experiments/v/0.1.0) adds `/experiment`: try an idea in a detached Git worktree created at `HEAD`, then export it as a patch or discard it. The base worktree, its index and its uncommitted changes are never touched. Do the work in a separate Pi session opened in the experiment directory.
 
@@ -84,7 +84,7 @@ Both are first-party, carry no production dependencies, and were extracted from 
 
 ## Browser QA
 
-[`specpi-browser-qa@0.1.0`](https://www.npmjs.com/package/specpi-browser-qa/v/0.1.0) is independently published and now included in the default base. Its 14 tools cover interactions, responsive screenshots, visual comparison, diagnostics, and accessibility checks in an ephemeral browser context. It is QA-focused, not general-browser feature parity with BetterWright. No personal browser, profile, cookie, or private Pi data is migrated.
+[`specpi-browser-qa@0.2.0`](https://www.npmjs.com/package/specpi-browser-qa/v/0.2.0) is independently published and now included in the default base. Its 14 tools cover interactions, responsive screenshots, visual comparison, diagnostics, and accessibility checks in an ephemeral browser context. They ship withdrawn — together they are about 8.7 KB of tool schema on every request — so `/browser on` offers them for a session and `/browser startup on` saves that choice. It is QA-focused, not general-browser feature parity with BetterWright. No personal browser, profile, cookie, or private Pi data is migrated.
 
 BetterWright remains an optional manual install, with its own [Bun-based setup](https://github.com/BetterWright/betterwright/blob/main/SETUP.md). SpecPi does not uninstall Bun or user-owned tools.
 
@@ -92,9 +92,9 @@ BetterWright remains an optional manual install, with its own [Bun-based setup](
 
 [SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.11.0** adds provider sign-in: Chat names a missing credential and opens Pi in a terminal for its own `/login`, then reloads Pi so the new models appear. Chat still never reads or stores those credentials. The VSIX remains separate from the npm harness package.
 
-Download the [0.11.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.11.0.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+Download the [0.11.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.24.0/specpi-chat-0.11.0.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
 
-[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.11.0.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
+[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.24.0/specpi-chat-0.11.0.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
 
 ## Scope
 

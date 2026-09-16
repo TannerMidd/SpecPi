@@ -672,7 +672,12 @@ export default async function nativeEntryFixture(pi: any) {
             assert.equal((await tools.status()).limits.jobMs, 1_800_000);
             assert.equal((await tools.status()).limits.batchMs, 3_600_000);
             const preferenceFile = path.join(process.env.PI_CODING_AGENT_DIR!, "specpi", "delegation", "settings.json");
-            assert.deepEqual(JSON.parse(fs.readFileSync(preferenceFile, "utf8")), { schema: 1, timeoutMinutes: 30 });
+            // A timeout write preserves the saved startup preference beside it.
+            assert.deepEqual(JSON.parse(fs.readFileSync(preferenceFile, "utf8")), {
+                schema: 1,
+                timeoutMinutes: 30,
+                startupActivation: true,
+            });
             await tools.command("timeout reset");
             assert.equal((await tools.status()).limits.jobMs, 600_000);
             await tools.command("budget 1");

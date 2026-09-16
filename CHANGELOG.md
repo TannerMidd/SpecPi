@@ -1,14 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.24.0 - 2026-09-16
 
-- Replace `pi-subagents@0.67.0` in the default base with first-party `specpi-delegation@0.1.0`, and add `specpi-experiments@0.1.0`. The base is now seven pinned packages; the other five are unchanged.
+- Replace `pi-subagents@0.67.0` in the default base with first-party `specpi-delegation@0.2.0`, and add `specpi-experiments@0.1.0`. The base is now seven pinned packages; the other five are unchanged.
 - Correct the delegation documentation: the package activates at Pi startup whenever a model is configured, and `/delegate off` turns it off. Earlier drafts of this entry and of the package's own README, security notes and guide described it as opt-in, which the extension, its tool description and its startup test all contradict.
 - Publish SpecPi's own bounded delegation as an independent Pi package. Child sessions get three read-only tools over a source snapshot frozen when the batch starts — no shell, edits, network or nested delegation — under fixed ceilings that local settings may lower and never raise. Delegation activates at Pi startup whenever a model is configured, and `/delegate off` turns it off for the session. The extraction drops the Command Guard admission path, which SpecPi no longer ships, so the reported guard posture is `absent`.
 - Publish the retired `/experiment` command as an independent Pi package. An experiment is a detached Git worktree created at `HEAD`, closed by exporting a patch or discarding it; the base worktree, its index and its uncommitted changes are never touched. `/experiment recover` reconciles records against what Git tracks and never deletes a directory Git still tracks.
 - Both packages carry no production dependencies and were extracted under MIT from SpecPi 0.20.1, immediately before commit `4f5461d`.
 - Add the HarnessTax study (Pan, Yang, Arabzadeh, Chiang, Stoica and Zaharia; UC Berkeley Sky Lab and Arena, 16 September 2026) to the research page, credited and linked, with all 21 model-harness pairs drawn as cost-success figures from the data published with the study.
 - Measure what SpecPi adds to Pi's first model call rather than assuming Pi's economy survives configuration. `scripts/measure-context.mjs` reads the request a real Pi process sends and counts tool definitions, tool-schema characters and instruction characters the way the study defines them. The base sends 23,710 characters against stock Pi's 5,521, about 4.3x, still under half of Codex and about a quarter of Claude Code. The figure omits the four third-party pins, so it is a floor.
+- Gate the two heaviest optional packages behind a saved preference that ships off. Pi sends every active tool's schema on every request of a session, so Browser QA's fourteen tools (about 8.7 KB) and delegation's one (about 4.4 KB) were charged to projects that never used them. `/browser on` and `/delegate on` enable them for a session; `/browser startup on` and `/delegate startup on` save that choice. A default session's first call falls from 23,710 characters to 10,536, from 4.3x stock Pi to 1.9x.
+- Bump `specpi-browser-qa` to 0.2.0 and `specpi-delegation` to 0.2.0 for that change, and move the base pins to match. `specpi-experiments` is unchanged at 0.1.0.
 - Remove Chat's `pi-subagents` frontend: the fleet adapter, its RPC bridge, its result cards and its configuration UI. Chat's existing delegation panel now covers the default base, including per-worker Stop. Package settings cover web access alone.
 
 ## 0.23.0 - 2026-09-14

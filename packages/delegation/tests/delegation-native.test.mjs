@@ -16,13 +16,17 @@ function runNativeFixture(context, mode = "main") {
     const provider = "specpi-native-entry-fixture";
     fs.mkdirSync(cwd);
     fs.mkdirSync(agentDir);
-    if (mode === "main") {
-        fs.mkdirSync(path.join(agentDir, "specpi", "delegation"), { recursive: true });
-        fs.writeFileSync(
-            path.join(agentDir, "specpi", "delegation", "settings.json"),
-            JSON.stringify({ schema: 1, timeoutMinutes: 15 }),
-        );
-    }
+    // Startup activation ships off, so these cases save it on: they are about what a real
+    // Pi process does once delegation starts enabled, not about the shipped default.
+    fs.mkdirSync(path.join(agentDir, "specpi", "delegation"), { recursive: true });
+    fs.writeFileSync(
+        path.join(agentDir, "specpi", "delegation", "settings.json"),
+        JSON.stringify({
+            schema: 1,
+            timeoutMinutes: mode === "main" ? 15 : 10,
+            startupActivation: true,
+        }),
+    );
 
     fs.writeFileSync(path.join(cwd, "fixture.md"), "Public native fixture evidence.\n");
     fs.writeFileSync(path.join(cwd, "AGENTS.md"), "NATIVE_AMBIENT_CONTEXT_CANARY\n");

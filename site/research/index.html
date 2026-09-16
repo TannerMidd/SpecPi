@@ -49,7 +49,7 @@
                     ><a href="#specpi"><span>05</span>For this base</a
                     ><a href="#unproven"><span>06</span>Not established</a><a href="#sources"><span>07</span>Sources</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.23.0<br />Chat 0.11.0<br />Evidence to 16 Sep 2026</div>
+                <div class="index-meta">SpecPi 0.24.0<br />Chat 0.11.0<br />Evidence to 16 Sep 2026</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -511,7 +511,7 @@
                 <section class="doc-section" id="specpi">
                     <header><h2>For this base</h2><span>05</span></header>
                     <p>
-                        SpecPi 0.23.0 pins seven packages and keeps its own extensions to scope control and the
+                        SpecPi 0.24.0 pins seven packages and keeps its own extensions to scope control and the
                         improvement loop. Read against the evidence above, that shape is defensible for specific
                         reasons, and it leaves specific things unmeasured.
                     </p>
@@ -519,7 +519,7 @@
                     <ul>
                         <li>
                             <strong>Delegation is a pinned package, not a core feature.</strong>
-                            <code>specpi-delegation@0.1.0</code> is one of the seven pins, so it can be configured,
+                            <code>specpi-delegation@0.2.0</code> is one of the seven pins, so it can be configured,
                             held at a version, or removed without touching the harness. Given how task-dependent the
                             delegation evidence is, that separation is worth keeping.
                         </li>
@@ -543,7 +543,7 @@
                         </p>
                     </div>
                     <figure class="chart-figure">
-                        <svg class="chart" id="chart-context" viewBox="0 0 720 286" role="img" preserveAspectRatio="xMidYMid meet"><line x1="108" y1="22" x2="108" y2="234" stroke="var(--line)" opacity=".6" /><text x="108" y="254" text-anchor="middle" class="ct-ax">0k</text><line x1="263.20833333333337" y1="22" x2="263.20833333333337" y2="234" stroke="var(--line)" opacity=".6" /><text x="263.20833333333337" y="254" text-anchor="middle" class="ct-ax">25k</text><line x1="418.4166666666667" y1="22" x2="418.4166666666667" y2="234" stroke="var(--line)" opacity=".6" /><text x="418.4166666666667" y="254" text-anchor="middle" class="ct-ax">50k</text><line x1="573.625" y1="22" x2="573.625" y2="234" stroke="var(--line)" opacity=".6" /><text x="573.625" y="254" text-anchor="middle" class="ct-ax">75k</text><text x="406" y="278" text-anchor="middle" class="ct-lb">Characters on the first model call</text><text x="98" y="43" text-anchor="end" class="ct-row">Pi</text><text x="98" y="58" text-anchor="end" class="ct-sub">4 tools</text><rect x="108" y="30" width="15.836541666666665" height="22" rx="4" fill="var(--ct-pi)"><title>Pi tool schema: 2,873 chars</title></rect><rect x="125.83654166666666" y="30" width="15.812624999999999" height="22" rx="4" fill="var(--ct-pi)" opacity=".42"><title>Pi instructions: 2,547 chars</title></rect><text x="149.64916666666667" y="46" class="ct-val">5,420</text><text x="98" y="97" text-anchor="end" class="ct-row">SpecPi</text><text x="98" y="112" text-anchor="end" class="ct-sub">22 tools</text><rect x="108" y="84" width="119.79508333333334" height="22" rx="4" fill="var(--ct-specpi)"><title>SpecPi tool schema: 19,618 chars</title></rect><rect x="229.79508333333334" y="84" width="25.404500000000002" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi instructions: 4,092 chars</title></rect><text x="263.1995833333333" y="100" class="ct-val">23,710</text><text x="98" y="151" text-anchor="end" class="ct-row">Codex CLI</text><text x="98" y="166" text-anchor="end" class="ct-sub">7.4 tools</text><rect x="108" y="138" width="110.45775" height="22" rx="4" fill="var(--ct-codex)"><title>Codex CLI tool schema: 18,114 chars</title></rect><rect x="220.45775" y="138" width="145.90824999999998" height="22" rx="4" fill="var(--ct-codex)" opacity=".42"><title>Codex CLI instructions: 23,502 chars</title></rect><text x="374.366" y="154" class="ct-val">41,616</text><text x="98" y="205" text-anchor="end" class="ct-row">Claude Code</text><text x="98" y="220" text-anchor="end" class="ct-sub">23 tools</text><rect x="108" y="192" width="476.010625" height="22" rx="4" fill="var(--ct-claudecode)"><title>Claude Code tool schema: 76,995 chars</title></rect><rect x="586.010625" y="192" width="83.59520833333333" height="22" rx="4" fill="var(--ct-claudecode)" opacity=".42"><title>Claude Code instructions: 13,465 chars</title></rect><text x="677.6058333333333" y="208" class="ct-val">90,460</text><rect x="108" y="6" width="11" height="11" rx="2" fill="var(--muted)" /><text x="125" y="16" class="ct-ax">tool schemas</text><rect x="216" y="6" width="11" height="11" rx="2" fill="var(--muted)" opacity=".42" /><text x="233" y="16" class="ct-ax">instructions</text></svg>
+                        <svg class="chart" id="chart-context" viewBox="0 0 720 340" role="img" preserveAspectRatio="xMidYMid meet"><line x1="108" y1="22" x2="108" y2="288" stroke="var(--line)" opacity=".6" /><text x="108" y="308" text-anchor="middle" class="ct-ax">0k</text><line x1="263.20833333333337" y1="22" x2="263.20833333333337" y2="288" stroke="var(--line)" opacity=".6" /><text x="263.20833333333337" y="308" text-anchor="middle" class="ct-ax">25k</text><line x1="418.4166666666667" y1="22" x2="418.4166666666667" y2="288" stroke="var(--line)" opacity=".6" /><text x="418.4166666666667" y="308" text-anchor="middle" class="ct-ax">50k</text><line x1="573.625" y1="22" x2="573.625" y2="288" stroke="var(--line)" opacity=".6" /><text x="573.625" y="308" text-anchor="middle" class="ct-ax">75k</text><text x="406" y="332" text-anchor="middle" class="ct-lb">Characters on the first model call</text><text x="98" y="43" text-anchor="end" class="ct-row">Pi</text><text x="98" y="58" text-anchor="end" class="ct-sub">4 tools</text><rect x="108" y="30" width="15.836541666666665" height="22" rx="4" fill="var(--ct-pi)" opacity="1"><title>Pi tool schema: 2,873 chars</title></rect><rect x="125.83654166666666" y="30" width="15.812624999999999" height="22" rx="4" fill="var(--ct-pi)" opacity=".42"><title>Pi instructions: 2,547 chars</title></rect><text x="149.64916666666667" y="46" class="ct-val">5,420</text><text x="98" y="97" text-anchor="end" class="ct-row">SpecPi</text><text x="98" y="112" text-anchor="end" class="ct-sub">7 tools</text><rect x="108" y="84" width="42.190916666666666" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>SpecPi tool schema: 7,118 chars</title></rect><rect x="152.19091666666668" y="84" width="21.22008333333333" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi instructions: 3,418 chars</title></rect><text x="181.411" y="100" class="ct-val">10,536</text><text x="98" y="151" text-anchor="end" class="ct-row">SpecPi, all on</text><text x="98" y="166" text-anchor="end" class="ct-sub">22 tools</text><rect x="108" y="138" width="119.79508333333334" height="22" rx="4" fill="var(--ct-specpi)" opacity="0.55"><title>SpecPi, all on tool schema: 19,618 chars</title></rect><rect x="229.79508333333334" y="138" width="25.404500000000002" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi, all on instructions: 4,092 chars</title></rect><text x="263.1995833333333" y="154" class="ct-val">23,710</text><text x="98" y="205" text-anchor="end" class="ct-row">Codex CLI</text><text x="98" y="220" text-anchor="end" class="ct-sub">7.4 tools</text><rect x="108" y="192" width="110.45775" height="22" rx="4" fill="var(--ct-codex)" opacity="1"><title>Codex CLI tool schema: 18,114 chars</title></rect><rect x="220.45775" y="192" width="145.90824999999998" height="22" rx="4" fill="var(--ct-codex)" opacity=".42"><title>Codex CLI instructions: 23,502 chars</title></rect><text x="374.366" y="208" class="ct-val">41,616</text><text x="98" y="259" text-anchor="end" class="ct-row">Claude Code</text><text x="98" y="274" text-anchor="end" class="ct-sub">23 tools</text><rect x="108" y="246" width="476.010625" height="22" rx="4" fill="var(--ct-claudecode)" opacity="1"><title>Claude Code tool schema: 76,995 chars</title></rect><rect x="586.010625" y="246" width="83.59520833333333" height="22" rx="4" fill="var(--ct-claudecode)" opacity=".42"><title>Claude Code instructions: 13,465 chars</title></rect><text x="677.6058333333333" y="262" class="ct-val">90,460</text><rect x="108" y="6" width="11" height="11" rx="2" fill="var(--muted)" /><text x="125" y="16" class="ct-ax">tool schemas</text><rect x="216" y="6" width="11" height="11" rx="2" fill="var(--muted)" opacity=".42" /><text x="233" y="16" class="ct-ax">instructions</text></svg>
                         <figcaption class="figure-note">
                             Pi, Codex and Claude Code are HarnessTax's measurements. The SpecPi bar is ours, taken the same way
                             — from the request a real Pi process actually sends — by
@@ -551,11 +551,16 @@
                         </figcaption>
                     </figure>
                     <p>
-                        SpecPi's base sends <strong>23,710 characters</strong> on its first call. The same measurement
-                        records <strong>5,521</strong> for stock Pi, so the base is about <strong>4.3x</strong> the harness
-                        it configures. Roughly two thirds of the addition is Browser QA's fourteen tools; the improvement
-                        loop and <code>/scope</code> account for most of the rest, and delegation contributes 4,440
-                        characters of tool schema because it is on from startup.
+                        A default session sends <strong>10,536 characters</strong> on its first call. The same measurement
+                        records <strong>5,521</strong> for stock Pi, so the base as installed is about <strong>1.9x</strong> the
+                        harness it configures — the improvement loop's three tools, <code>/scope</code> and their skills.
+                    </p>
+                    <p>
+                        It was not always. An earlier reading of this page put the base at 4.3x, because Browser QA's fourteen
+                        tools and delegation's one were offered to every session whether or not anyone used them. Both now ship
+                        behind a saved preference that defaults to off, which is what the second bar costs if you turn
+                        everything on. That change came directly out of measuring this figure, which is the argument for
+                        measuring it.
                     </p>
                     <p>
                         Three caveats keep this honest. The figure omits the four third-party pins, so it is a floor rather
@@ -566,11 +571,10 @@
                         better number if a synthetic provider could report one.
                     </p>
                     <p>
-                        The honest reading is mixed. SpecPi is four times heavier than the harness whose economy it inherits,
-                        which is a real cost on every call and not one this page can wave away. It is also still well under half
-                        of Codex and about a quarter of Claude Code, so a configured Pi remains a light harness by the study's own
-                        yardstick. What nobody has measured is whether that added context pays for itself in solved tasks. Anyone
-                        on a tight budget should install fewer packages and watch <code>/usage</code>.
+                        The reading is now less uncomfortable but no less conditional. A configured SpecPi is light by the
+                        study's own yardstick — a quarter of Codex and an eighth of Claude Code — and turning on every
+                        optional package still leaves it under Codex. What nobody has measured is whether any of that added
+                        context pays for itself in solved tasks. Enable what you use and watch <code>/usage</code>.
                     </p>
 
                     <h3>Settings worth choosing deliberately</h3>
@@ -782,7 +786,7 @@
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.23.0">v0.23.0</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.24.0">v0.24.0</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>

@@ -2,16 +2,28 @@
 
 A standalone, Node-native Pi package for testing web applications. No Bun, SpecPi installation, browser account, or model API key is required by the browser runtime. Pi supplies the agent and model connection.
 
-Extracted from SpecPi 0.20.1 (`4f5461d^`, before the 0.21.0 reset), preserving its 14 QA tools. This package is separate from SpecPi's default installation; BetterWright remains unchanged there. The initial standalone release is 0.1.0.
+Extracted from SpecPi 0.20.1 (`4f5461d^`, before the 0.21.0 reset), preserving its 14 QA tools. This package is separate from SpecPi's default installation; BetterWright remains unchanged there.
+
+## Offering the tools
+
+The fourteen tool schemas are about 8.7 KB, and Pi sends every active tool's schema on every request of a session, so a project that never opens a browser would pay for them on every call. They therefore ship **withdrawn**:
+
+```sh
+/browser on            # offer them to this session
+/browser startup on    # and to every new session, saved
+/browser status        # what this session offers, and what new sessions will
+```
+
+`/browser off` withdraws them again. Withdrawing does not close a running browser; use `browser_close` for that. The preference is this package's own file under the Pi agent directory, and an absent or unreadable one means withdrawn.
 
 ## Install the published package
 
 ```sh
-pi install npm:specpi-browser-qa@0.1.0
-npx --yes specpi-browser-qa@0.1.0 setup
+pi install npm:specpi-browser-qa@0.2.0
+npx --yes specpi-browser-qa@0.2.0 setup
 ```
 
-Restart Pi after installation. For readiness checks, run `npx --yes specpi-browser-qa@0.1.0 doctor`. Both commands use Node and the same standard Playwright browser cache.
+Restart Pi after installation. For readiness checks, run `npx --yes specpi-browser-qa@0.2.0 doctor`. Both commands use Node and the same standard Playwright browser cache.
 
 ## Install from this checkout
 

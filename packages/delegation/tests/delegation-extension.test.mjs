@@ -60,6 +60,7 @@ test("live panel samples counters, keeps cancelled slots visible and stops refre
     });
     const bridge = publicHostBridge();
     const factory = createDelegationExtension(() => bridge.host, {
+        startupActivation: true,
         root: project(t),
         presentation,
         controllerOptions: {
@@ -101,7 +102,11 @@ test("live panel samples counters, keeps cancelled slots visible and stops refre
 test("completed results stay visible without a timer until parent resolution", async (t) => {
     t.mock.timers.enable({ apis: ["setTimeout"] });
     const bridge = publicHostBridge();
-    const factory = createDelegationExtension(() => bridge.host, { root: project(t), presentation });
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        presentation,
+        startupActivation: true,
+    });
     const pi = mockPi();
     pi.context.mode = "tui";
     factory(pi);
@@ -139,6 +144,7 @@ test("panel shutdown detaches its timer and a reload cannot render into the old 
     });
     const bridge = publicHostBridge();
     const factory = createDelegationExtension(() => bridge.host, {
+        startupActivation: true,
         root: project(t),
         presentation,
         controllerOptions: {
@@ -177,7 +183,11 @@ test("panel shutdown detaches its timer and a reload cannot render into the old 
 test("RPC and print sessions never mount terminal widgets", async (t) => {
     const bridge = publicHostBridge();
     for (const mode of ["rpc", "print"]) {
-        const factory = createDelegationExtension(() => bridge.host, { root: project(t), presentation });
+        const factory = createDelegationExtension(() => bridge.host, {
+            root: project(t),
+            presentation,
+            startupActivation: true,
+        });
         const pi = mockPi();
         pi.context.mode = mode;
         factory(pi);
@@ -205,6 +215,7 @@ test("RPC delegate progress reports live counters, binds Stop to an attempt and 
     });
     const bridge = publicHostBridge();
     const factory = createDelegationExtension(() => bridge.host, {
+        startupActivation: true,
         root: project(t),
         controllerOptions: {
             async worker({ job, admitCall }) {
@@ -260,6 +271,7 @@ test("RPC retains a replaced stopping worker through settlement but hides invali
     });
     const bridge = publicHostBridge();
     const factory = createDelegationExtension(() => bridge.host, {
+        startupActivation: true,
         root: project(t),
         controllerOptions: {
             async worker({ admitCall }) {
@@ -546,7 +558,16 @@ function publicHostBridge() {
 
 async function fixture(t, controllerOptions = {}, options = {}) {
     const bridge = publicHostBridge();
-    const factory = createDelegationExtension(() => bridge.host, { root: project(t), controllerOptions, ...options });
+    // Startup activation ships off, because the tool's schema rides on every request.
+    // These cases are about what happens once it is on, so they opt in; the default is
+    // covered separately by "startup stays off until it is saved on".
+    const factory = createDelegationExtension(() => bridge.host, {
+        startupActivation: true,
+        root: project(t),
+        controllerOptions,
+        startupActivation: true,
+        ...options,
+    });
     const pi = mockPi();
     factory(pi);
     await pi.fire("session_start");
@@ -835,6 +856,7 @@ test("unexpected context setup failures are redacted for activation, status and 
     const bridge = publicHostBridge();
     let broken = false;
     const factory = createDelegationExtension(() => bridge.host, {
+        startupActivation: true,
         root: project(t),
         prepareContext() {
             if (broken) {
@@ -864,6 +886,7 @@ test("startup setup failures revoke old work, redact SDK errors and allow later 
     const bridge = publicHostBridge();
     let broken = false;
     const factory = createDelegationExtension(() => bridge.host, {
+        startupActivation: true,
         root: project(t),
         prepareContext(ctx) {
             if (ctx && broken) {
@@ -921,7 +944,7 @@ test("startup enables every Pi mode without a command or model invocation", asyn
     for (const mode of ["tui", "rpc", "print", "json"]) {
         for (const guard of ["absent", "off", "guard", "strict"]) {
             const bridge = publicHostBridge();
-            const factory = createDelegationExtension(() => bridge.host, { root: project(t) });
+            const factory = createDelegationExtension(() => bridge.host, { root: project(t), startupActivation: true });
             const pi = mockPi();
             pi.context.mode = mode;
             pi.context.hasUI = ["tui", "rpc"].includes(mode);
@@ -951,7 +974,7 @@ test("unsupported startup host pauses and a compatible selection resumes without
         },
     };
     const pi = mockPi();
-    createDelegationExtension(() => bridge.host, { root: project(t) })(pi);
+    createDelegationExtension(() => bridge.host, { root: project(t), startupActivation: true })(pi);
     await pi.fire("session_start");
     const paused = await state(pi);
     assert.equal(paused.enabled, false);
@@ -975,7 +998,7 @@ test("startup fails closed for locked, unready and ambiguous Guard policies", as
             pi.events.on("specpi:guard-state", (request) => request.reply({ mode: "guard" }));
         }
 
-        createDelegationExtension(() => bridge.host, { root: project(t) })(pi);
+        createDelegationExtension(() => bridge.host, { root: project(t), startupActivation: true })(pi);
         await pi.fire("session_start");
         assert.equal((await state(pi)).enabled, false);
         assert.deepEqual(pi.getActiveTools(), ["read"]);
@@ -1010,6 +1033,7 @@ test("revocation before or during synchronous startup preparation cancels the de
             };
 
             createDelegationExtension(() => bridge.host, {
+                startupActivation: true,
                 root: project(t),
                 timeoutStore: {
                     load() {
@@ -1052,7 +1076,7 @@ test("off during startup preflight cannot be undone by its late completion", asy
             finish = resolve;
         });
     const pi = mockPi();
-    createDelegationExtension(() => bridge.host, { root: project(t) })(pi);
+    createDelegationExtension(() => bridge.host, { root: project(t), startupActivation: true })(pi);
     const startup = pi.fire("session_start");
     await pi.command("off");
     finish();
@@ -1073,7 +1097,7 @@ test("activation cannot outlive the extension binding that started provider pref
     });
     const bridge = publicHostBridge();
     bridge.host.ready = () => ready;
-    const factory = createDelegationExtension(() => bridge.host, { root: project(t) });
+    const factory = createDelegationExtension(() => bridge.host, { root: project(t), startupActivation: true });
     const oldPi = mockPi();
     factory(oldPi);
     const pendingActivation = oldPi.fire("session_start");
@@ -1449,4 +1473,56 @@ test("factory rebinding preserves counters and non-cooperative settlement owners
             .state,
         "failed",
     );
+});
+
+test("startup stays off until it is saved on, and the tool is not offered meanwhile", async (t) => {
+    const bridge = publicHostBridge();
+    const saved = [];
+    const store = {
+        load: () => 10,
+        loadBudget: () => 8,
+        loadStartupActivation: () => false,
+        saveStartupActivation: (value) => saved.push(value),
+    };
+    const factory = createDelegationExtension(() => bridge.host, { root: project(t), timeoutStore: store });
+    const pi = mockPi();
+    factory(pi);
+    await pi.fire("session_start");
+    t.after(() => pi.fire("session_shutdown"));
+
+    // The shipped default: no inference, no active tool, nothing on the request.
+    assert.equal((await pi.tool({ operation: "status" })).details.enabled, false);
+    assert.equal(pi.getActiveTools().includes("delegate"), false);
+
+    await pi.command("startup");
+    assert.match(pi.notices.at(-1).text, /starts disabled/);
+
+    await pi.command("startup on");
+    assert.deepEqual(saved, [true]);
+    assert.match(pi.notices.at(-1).text, /start enabled in new Pi sessions/);
+    // Saving a preference must not enable the current session behind the human's back.
+    assert.equal((await pi.tool({ operation: "status" })).details.enabled, false);
+    assert.equal(pi.getActiveTools().includes("delegate"), false);
+    await pi.command("startup");
+    assert.match(pi.notices.at(-1).text, /starts enabled/);
+
+    await pi.command("startup off");
+    assert.deepEqual(saved, [true, false]);
+    await pi.command("on");
+    assert.equal((await pi.tool({ operation: "status" })).details.enabled, true);
+    assert.equal(pi.getActiveTools().includes("delegate"), true);
+});
+
+test("a saved startup preference activates the session without a command", async (t) => {
+    const bridge = publicHostBridge();
+    const factory = createDelegationExtension(() => bridge.host, {
+        root: project(t),
+        timeoutStore: { load: () => 10, loadBudget: () => 8, loadStartupActivation: () => true },
+    });
+    const pi = mockPi();
+    factory(pi);
+    await pi.fire("session_start");
+    t.after(() => pi.fire("session_shutdown"));
+    assert.equal((await pi.tool({ operation: "status" })).details.enabled, true);
+    assert.equal(pi.getActiveTools().includes("delegate"), true);
 });

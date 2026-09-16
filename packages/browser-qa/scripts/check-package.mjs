@@ -59,6 +59,8 @@ try {
     for (const expected of [
         "src/index.ts",
         "src/core.mjs",
+        "src/activation.mjs",
+        "src/activation.d.mts",
         "src/core.d.mts",
         "src/smoke.mjs",
         "bin/browser-qa.mjs",
@@ -91,8 +93,17 @@ try {
         `import register from ${JSON.stringify(path.join(installed, "src", "index.ts"))};
 export default function(pi) {
     let count = 0;
-    register({ registerTool(tool) { count++; pi.registerTool(tool); }, on(event, handler) { pi.on(event, handler); } });
-    pi.on("session_start", () => { console.log("PACKAGED_BROWSER_TOOLS=" + count); });
+    const commands = [];
+    register({ ...pi,
+        registerTool(tool) { count++; pi.registerTool(tool); },
+        registerCommand(name, command) { commands.push(name); pi.registerCommand(name, command); },
+        on(event, handler) { pi.on(event, handler); } });
+    pi.on("session_start", () => {
+        // The tools are registered but gated, so the packaged extension must offer none of
+        // them until /browser turns them on.
+        const active = pi.getActiveTools().filter((name) => name.startsWith("browser_"));
+        console.log("PACKAGED_BROWSER_TOOLS=" + JSON.stringify({ count, commands, active: active.length }));
+    });
 }`,
     );
     const piCli = path.join(
@@ -141,7 +152,14 @@ export default function(pi) {
     );
     assert.equal(result.status, 0, result.stdout + result.stderr);
     // Pi may route extension console output to stderr to keep RPC stdout protocol-only.
-    assert.match(result.stdout + result.stderr, /PACKAGED_BROWSER_TOOLS=14/u);
+    const marker = (result.stdout + result.stderr)
+        .split(/\r?\n/u)
+        .find((line) => line.includes("PACKAGED_BROWSER_TOOLS="));
+    assert.ok(marker, result.stdout + result.stderr);
+    assert.deepEqual(
+        JSON.parse(marker.slice(marker.indexOf("PACKAGED_BROWSER_TOOLS=") + "PACKAGED_BROWSER_TOOLS=".length)),
+        { count: 14, commands: ["browser"], active: 0 },
+    );
     console.log("Production tarball: dependency resolution, offline doctor, and Pi registration passed.");
 } finally {
     fs.rmSync(temporary, { recursive: true, force: true });

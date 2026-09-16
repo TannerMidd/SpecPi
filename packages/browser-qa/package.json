@@ -1,6 +1,6 @@
 {
   "name": "specpi-browser-qa",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Node-native browser QA tools for Pi: interactions, accessibility and visual regression",
   "author": "Tanner Middleton",
   "license": "MIT",

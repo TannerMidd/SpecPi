@@ -139,3 +139,37 @@ test("hardlinks and directory links cannot redirect preference IO", (t) => {
     assert.throws(() => store.save(30), /Cannot save/);
     assert.deepEqual(fs.readdirSync(elsewhere), []);
 });
+
+test("startup activation is off until it is saved on and survives other writes", (t) => {
+    const { file, store } = fixture(t);
+    // Delegation's tool schema is on every request of an enabled session, so an absent
+    // preference must mean off rather than on.
+    assert.equal(store.loadStartupActivation(), false);
+    store.saveStartupActivation(true);
+    assert.equal(store.loadStartupActivation(), true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), {
+        schema: 1,
+        timeoutMinutes: 10,
+        startupActivation: true,
+    });
+
+    // A timeout or budget write must not silently clear it.
+    store.save(30);
+    store.saveBudget(16);
+    assert.equal(store.loadStartupActivation(), true);
+    assert.equal(store.load(), 30);
+    assert.equal(store.loadBudget(), 16);
+
+    store.saveStartupActivation(false);
+    assert.equal(store.loadStartupActivation(), false);
+    assert.equal(store.load(), 30);
+    assert.throws(() => store.saveStartupActivation("yes"), /must be on or off/);
+});
+
+test("a non-boolean startup preference is rejected rather than treated as on", (t) => {
+    const { file, store } = fixture(t);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{"schema":1,"timeoutMinutes":10,"startupActivation":"yes"}');
+    assert.equal(store.loadStartupActivation(), false);
+    assert.throws(() => store.load(), /Cannot read/);
+});
