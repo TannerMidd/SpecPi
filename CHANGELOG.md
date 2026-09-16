@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add SpecPi Remote under `remote/`: a loopback daemon and phone web client for driving a local Pi agent over a tunnel. It is a separate artifact — not part of the npm package, never acquired by the installer, and with no runtime dependencies of its own.
+- Remote refuses `bash` and `abort_bash`, so there is no remote shell, and binds `127.0.0.1` only. Approvals are bound to a single connection; no connection, disconnect, supersession, shutdown, an oversized dialog, or an answer that does not fit its dialog all cancel rather than grant. Expiry is enforced by the daemon ahead of Pi's agent-side auto-resolve, a race it narrows but cannot close.
+- `SECURITY_MODEL.md` gains a Remote daemon section. `check:remote` is available at the root and deliberately stays outside the root `check` chain, matching `check:browser-qa`.
+
 ## 0.23.0 - 2026-09-14
 
 - Replace the BetterWright default with independently published `specpi-browser-qa@0.1.0`: 14 QA-focused interaction, accessibility, diagnostic, and visual-regression tools, not general-browser feature parity. The other five package pins and Chat 0.8.1 are unchanged.

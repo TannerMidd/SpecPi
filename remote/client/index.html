@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#111418" />
+        <title>SpecPi Remote</title>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="stylesheet" href="/styles.css" />
+    </head>
+    <body>
+        <header class="bar">
+            <div class="status">
+                <span id="state-dot" class="dot" data-state="idle"></span>
+                <span id="state-label">Connecting</span>
+            </div>
+            <div class="stats">
+                <span id="stat-context">—</span>
+                <span id="stat-cost">—</span>
+            </div>
+        </header>
+
+        <main id="transcript" class="transcript" aria-live="polite"></main>
+
+        <section id="approvals" class="approvals" aria-label="Approval requests"></section>
+
+        <section id="queue" class="queue" hidden></section>
+
+        <footer class="composer">
+            <div class="controls">
+                <label class="field">
+                    <span>Model</span>
+                    <select id="model"></select>
+                </label>
+                <label class="field">
+                    <span>Thinking</span>
+                    <select id="thinking">
+                        <option value="off">off</option>
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                    </select>
+                </label>
+            </div>
+            <div class="input-row">
+                <textarea
+                    id="input"
+                    rows="2"
+                    placeholder="Message Pi…"
+                    autocomplete="off"
+                    autocapitalize="sentences"
+                ></textarea>
+                <div class="buttons">
+                    <button id="send" type="button" class="primary">Send</button>
+                    <button id="stop" type="button" class="danger" disabled>Stop</button>
+                </div>
+            </div>
+            <p id="hint" class="hint">While Pi is running, Send steers the current turn.</p>
+        </footer>
+
+        <script src="/app.js" type="module"></script>
+    </body>
+</html>

@@ -1,0 +1,31 @@
+{
+    "name": "specpi-remote",
+    "version": "0.1.0",
+    "description": "Drive a local Pi coding agent from a phone over an authenticated loopback daemon",
+    "author": "Tanner Middleton",
+    "license": "MIT",
+    "type": "module",
+    "private": true,
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/TannerMidd/SpecPi.git",
+        "directory": "remote"
+    },
+    "bugs": {
+        "url": "https://github.com/TannerMidd/SpecPi/issues"
+    },
+    "keywords": ["specpi", "pi", "coding-agent", "remote", "mobile"],
+    "bin": {
+        "specpi-remote": "./bin/specpi-remote.mjs"
+    },
+    "files": ["bin", "src", "client", "README.md", "SECURITY.md", "THIRD_PARTY.md", "LICENSE"],
+    "engines": {
+        "node": ">=22.19.0"
+    },
+    "scripts": {
+        "start": "node bin/specpi-remote.mjs",
+        "test": "node --test tests/*.test.mjs",
+        "check:syntax": "node scripts/check-syntax.mjs",
+        "check": "npm run check:syntax && npm test"
+    }
+}
