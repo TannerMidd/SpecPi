@@ -1,5 +1,12 @@
 # SpecPi Chat changelog
 
+## 0.11.0
+
+- Make provider sign-in reachable from Chat. A connected Pi that reports no usable provider, and a message that fails because the selected provider has no credential, now raise a sign-in panel naming what is missing instead of an empty model picker or Pi's raw `/login` guidance with its absolute documentation paths. **Sign in to a provider** starts the configured Pi executable in a VS Code terminal, in the chat's workspace folder and without RPC flags or a session, so Pi runs its own `/login` and `/logout`. **SpecPi: Sign In to a Provider** does the same from the Command Palette.
+- Reload Pi after sign-in. Pi resolves its model catalogue once at startup and cannot see a credential stored afterwards, so closing the sign-in terminal restarts the connection and the new provider's models appear. **Reload Pi** does it on demand; a busy conversation is left running with a notice rather than restarted underneath a response.
+- Keep credentials outside Chat. The extension does not read `auth.json`, run Pi's auth commands, prompt for API keys, send input to the sign-in terminal, or receive a credential over RPC. Detection uses only what Pi already reports: its available-model list and its own missing-credential error text.
+- Scale the footer's cache hit readout to the type around it. The percentage was two steps larger than the token, cost, and status text beside it, which made it the loudest element in the footer; the chip keeps its border and bold value but now matches the footer's own size.
+
 ## 0.10.0
 
 - Configure installed Pi packages from Chat. A new package settings dialog edits `pi-subagents` and `pi-web-access` configuration with generated fields for the documented keys plus a full JSON editor for everything else. Targets appear only for packages the connected session reports. Each save confirms first, goes through the existing guarded transaction (lock, revision check, backup, atomic replace, verification, rollback), and refuses a draft whose file changed on disk meanwhile. Restart Pi afterwards so the package reloads.

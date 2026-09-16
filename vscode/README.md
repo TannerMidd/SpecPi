@@ -2,13 +2,13 @@
 
 Use [Pi](https://github.com/earendil-works/pi) from a chat beside your code in VS Code. Ask a question, attach a file or screenshot, and follow along as Pi reads, edits, and runs commands in your project.
 
-Chat uses the models, provider accounts, and extensions you've already set up in Pi. It works with Pi alone. [SpecPi](https://github.com/TannerMidd/SpecPi) adds `/scope`, the harness improvement loop, and six pinned packages. SpecPi Chat **0.10.0** supports that base.
+Chat uses the models, provider accounts, and extensions you've already set up in Pi. It works with Pi alone. [SpecPi](https://github.com/TannerMidd/SpecPi) adds `/scope`, the harness improvement loop, and six pinned packages. SpecPi Chat **0.11.0** supports that base.
 
 ## Get started
 
-1. **Set up Pi.** Install [Pi](https://github.com/earendil-works/pi), run it in a terminal, and use `/login` to connect your provider. Confirm you can send a message there first.
-2. **Open your project.** Download the [SpecPi Chat 0.10.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.10.0.vsix), run **Extensions: Install from VSIX…** in VS Code, then open and trust your project folder.
-3. **Start chatting.** Click **SpecPi** in the Activity Bar and choose **Connect Pi**. Pick a model and send your first message.
+1. **Set up Pi.** Install [Pi](https://github.com/earendil-works/pi) and confirm it runs in a terminal. You can sign in to a provider there with `/login`, or let Chat open that terminal for you in step 3.
+2. **Open your project.** Download the [SpecPi Chat 0.11.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.11.0.vsix), run **Extensions: Install from VSIX…** in VS Code, then open and trust your project folder.
+3. **Start chatting.** Click **SpecPi** in the Activity Bar and choose **Connect Pi**. If Pi has no provider yet, Chat says so and offers **Sign in to a provider**, which opens Pi in a terminal for `/login` and reloads Pi when you close it. Pick a model and send your first message.
 
 Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4** for the reviewed default base. For SSH, WSL, or containers, Pi and the extension need to be installed on the workspace host. Browser-only VS Code isn't supported.
 
@@ -22,6 +22,7 @@ Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4** for the review
 - **Keep your model across chats:** with a chat connected, use the pin button next to the model picker to save the current model as Pi's startup model, or the current thinking level as the global startup level. You can also pin the thinking level to this model alone, which Pi then applies whenever that model is selected, in every chat. Saving confirms first and edits only those keys in Pi's global settings, with a backup. Restart Pi (or reconnect) to pick the change up.
 - **Edit permissions:** the Permissions button opens global/project settings with YOLO, logging, runtime controls, and JSON editors for all permission rules and advanced fields. Save with explicit confirmation, then restart Pi to reload this chat. Existing files are backed up; upstream remains the policy enforcer. **Show effective policy** reports the runtime settings, and reported YOLO mode stays visible.
 - **Review changes:** open file references and Git diffs in your editor.
+- **Sign in to a provider:** when Pi reports no usable provider, or a message fails because a provider has no credential, Chat shows what is missing and offers **Sign in to a provider**. That opens your configured Pi in a VS Code terminal so you can run Pi's own `/login` (or `/logout`), and reloads Pi afterwards so its new models appear. **SpecPi: Sign In to a Provider** does the same from the Command Palette.
 - **Reload Pi:** use **Restart Pi** in the Chat title bar to reconnect the current conversation and reload its Pi extensions. Other chats keep running.
 
 Press **Enter** to send, **Shift+Enter** for a new line, or type `/` to see available commands.
@@ -30,7 +31,7 @@ See [package support](GUIDE.md#default-package-support) for the six packages, in
 
 ## A few things to know
 
-Provider sign-in happens in Pi's terminal. Chat doesn't install Pi or SpecPi, and its history only includes conversations started in Chat.
+Provider sign-in runs in Pi's own terminal; Chat starts that terminal and reloads Pi afterwards, but never reads, stores, or sends your credentials. Chat doesn't install Pi or SpecPi, and its history only includes conversations started in Chat.
 
 Pi can change files and run commands in your project. Chat has no automatic file undo; branching a conversation doesn't roll back code. Restart interrupts the current response and clears queued messages and pending approvals.
 

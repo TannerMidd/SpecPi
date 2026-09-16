@@ -30,6 +30,7 @@ const { SUBAGENT_WIDGET, decodeFleet } = require("./subagents.js");
 const { permissionState } = require("./permissions.js");
 const { loadPermissionSettings, savePermissionSettings } = require("./permission-settings.js");
 const { packageSettingsState } = require("./package-state.js");
+const { providerAuthFailure, providerSignInState, signInInstructions } = require("./provider-signin.js");
 const { loadPackageSettings, savePackageSettings } = require("./package-settings.js");
 const { modelThinkingOverride, readDefaults, saveDefaults } = require("./pi-defaults.js");
 const { validate: validatePermissionConfig } = require("../media/permission-config.js");
@@ -39,6 +40,7 @@ const { ConversationCoordinator } = require("./conversation-coordinator.js");
 const PREFIX = "specpi.chat";
 const MAX_INPUT = 64 * 1024;
 const DIALOG_METHODS = new Set(["select", "confirm", "input", "editor"]);
+const SIGN_IN_TERMINAL = "SpecPi Chat · Pi sign-in";
 
 function withinWorkspace(root, candidate) {
     const relative = path.relative(root, candidate);
@@ -72,6 +74,9 @@ class ChatController {
         this.sending = false;
         this.transitioning = false;
         this.disposed = false;
+        this.providerFailure = undefined;
+        this.signInTerminal = undefined;
+        this.signInListener = undefined;
         this.workspace = options.workspace || vscode.workspace.workspaceFolders?.[0];
         this.state.workspace = this.workspace?.name || "Open a folder to begin";
         this.publish();
@@ -85,6 +90,12 @@ class ChatController {
         this.state.sending = this.sending || this.transitioning;
         this.state.permissions = permissionState(this.state);
         this.state.packageSettings = packageSettingsState(this.state);
+        this.state.providerSignIn = providerSignInState({
+            connected: Boolean(this.client),
+            models: this.state.models,
+            model: this.state.model,
+            failure: this.providerFailure,
+        });
         this.state.contextToken = this.contextToken();
         this.state.selectionContext = this.coordinator?.selectionContext || null;
         this.state.recoveredDrafts = this.imageQueue.recovered.map((item) => ({
@@ -167,7 +178,13 @@ class ChatController {
 
     fail(error) {
         // Errors are shown only in this local view, never copied into logs or telemetry.
-        this.state.error = String(error?.message || "The operation could not finish.").slice(0, 2000);
+        const failure = providerAuthFailure(error);
+        this.providerFailure = failure ?? undefined;
+        // Pi's own guidance names /login and absolute documentation paths. The
+        // sign-in panel carries the actionable version instead.
+        this.state.error = failure
+            ? undefined
+            : String(error?.message || "The operation could not finish.").slice(0, 2000);
         if (!this.client) {
             this.state.status = "error";
         }
@@ -359,6 +376,7 @@ class ChatController {
             await this.refresh(client, true);
             if (this.client === client && generation === this.generation && !this.disposed) {
                 this.state.error = undefined;
+                this.providerFailure = undefined;
                 this.state.connectionMessage = undefined;
                 for (const notice of startupNotices) {
                     appendNotice(this.state, notice);
@@ -558,6 +576,83 @@ class ChatController {
         await client?.stop();
     }
 
+    /**
+     * Hand provider sign-in to Pi itself. Pi only offers /login from its own
+     * terminal UI, and Chat deliberately keeps no credential path of its own:
+     * it starts the configured Pi in a terminal and reloads once that ends.
+     */
+    async signIn() {
+        const cwd = this.requireWorkspace();
+        const configuration = vscode.workspace.getConfiguration(PREFIX);
+        const launch = await resolveLaunch({
+            piPath: configuration.get("piPath", ""),
+            nodePath: configuration.get("nodePath", ""),
+        });
+        if (this.disposed) {
+            return;
+        }
+
+        this.signInListener?.dispose();
+        this.signInListener = undefined;
+        const terminal = vscode.window.createTerminal({
+            name: SIGN_IN_TERMINAL,
+            cwd,
+            shellPath: launch.command,
+            shellArgs: [...launch.args],
+            isTransient: true,
+        });
+        this.signInTerminal = terminal;
+        this.signInListener = vscode.window.onDidCloseTerminal((closed) => {
+            if (closed !== terminal) {
+                return;
+            }
+
+            this.signInListener?.dispose();
+            this.signInListener = undefined;
+            if (this.signInTerminal === terminal) {
+                this.signInTerminal = undefined;
+            }
+
+            void this.reloadProviders({ afterSignIn: true }).catch((error) => this.fail(error));
+        });
+        terminal.show(true);
+        appendNotice(this.state, signInInstructions(SIGN_IN_TERMINAL));
+        this.publish();
+    }
+
+    /**
+     * Pi resolves its model catalogue once at startup, so a credential stored
+     * during sign-in only becomes usable after the Pi process restarts.
+     */
+    async reloadProviders({ afterSignIn = false } = {}) {
+        if (this.disposed || !this.workspace) {
+            return;
+        }
+
+        if (ACTIVE_STATUSES.has(this.state.status) || this.transitioning || this.sending) {
+            appendNotice(
+                this.state,
+                "Pi is busy, so Chat did not reload it. Use Restart Pi once the current chat action finishes.",
+            );
+            this.publish();
+
+            return;
+        }
+
+        if (!this.client) {
+            if (afterSignIn) {
+                appendNotice(this.state, "Sign-in finished. Connect to Pi to load the providers it can now reach.");
+                this.publish();
+            }
+
+            return;
+        }
+
+        appendNotice(this.state, "Reloading Pi so it picks up your provider sign-in.");
+        this.publish();
+        await this.restart();
+    }
+
     async restart() {
         if (this.restartOperation) {
             return this.restartOperation;
@@ -714,7 +809,7 @@ class ChatController {
             if (/^\/help\s*$/.test(text)) {
                 appendNotice(
                     this.state,
-                    "Use /new for a fresh chat, /compact to compact context, and the command menu for installed Pi skills and SpecPi commands. Choose models and thinking below the composer, and pin them as Pi's startup defaults with the pin button. Attach files or selected text explicitly. Enter sends; Shift+Enter inserts a newline; Stop clears queued messages before aborting. Provider login is managed in the Pi terminal.",
+                    "Use /new for a fresh chat, /compact to compact context, and the command menu for installed Pi skills and SpecPi commands. Choose models and thinking below the composer, and pin them as Pi's startup defaults with the pin button. Attach files or selected text explicitly. Enter sends; Shift+Enter inserts a newline; Stop clears queued messages before aborting. Use Sign in to a provider to run Pi's own /login in a terminal.",
                 );
 
                 return;
@@ -723,7 +818,8 @@ class ChatController {
             if (/^\/(?:settings|login|logout)\s*$/.test(text)) {
                 appendNotice(
                     this.state,
-                    "Manage provider sign-in in a terminal using Pi. Save the current model and thinking level as Pi's startup defaults with the pin button next to the model picker; reconnect after changing settings.",
+                    "Use Sign in to a provider below, or run SpecPi: Sign In to a Provider, to open Pi in a terminal for /login and /logout. " +
+                        "Chat reloads Pi when that terminal closes. Save the current model and thinking level as Pi's startup defaults with the pin button next to the model picker; reconnect after changing settings.",
                 );
 
                 return;
@@ -847,6 +943,7 @@ class ChatController {
                 (attachment) => !attached.some((item) => item.id === attachment.id),
             );
             this.state.error = undefined;
+            this.providerFailure = undefined;
             await this.refresh(client);
         } catch (error) {
             if (connectionGeneration !== undefined && this.generation !== connectionGeneration) {
@@ -2173,6 +2270,12 @@ This replaces the complete configuration file with the reviewed draft; it does n
                 }
 
                 break;
+            case "signIn":
+                await this.signIn();
+                break;
+            case "reloadProviders":
+                await this.reloadProviders();
+                break;
             case "clearError":
                 this.state.error = undefined;
                 this.publish();
@@ -2289,6 +2392,8 @@ This replaces the complete configuration file with the reviewed draft; it does n
 
         this.disposed = true;
         clearTimeout(this.publishTimer);
+        this.signInListener?.dispose();
+        this.signInListener = undefined;
         void this.disconnect();
     }
 }
@@ -2310,6 +2415,7 @@ function activate(context) {
         connect: () => controller.connect(),
         disconnect: () => controller.disconnect(),
         restart: () => controller.restart(),
+        signIn: () => controller.signIn(),
         new: () => controller.newChat(),
         history: () => controller.history(),
         stop: () => controller.stop(),

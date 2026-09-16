@@ -19,6 +19,7 @@ export const packageFiles = Object.freeze([
     "src/subagents.js",
     "src/subagents-bridge.mjs",
     "src/permissions.js",
+    "src/provider-signin.js",
     "src/permission-settings.js",
     "src/package-state.js",
     "src/package-settings.js",

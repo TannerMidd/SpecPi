@@ -1015,7 +1015,10 @@ test(
                                         text: usage.textContent,
                                     };
                                 });
-                                assert.ok(metrics.labelSize >= 12 && metrics.valueSize >= 14);
+                                // The chip reads as a peer of the footer's other usage text, not
+                                // its loudest element: weight and the border carry the emphasis.
+                                assert.ok(metrics.labelSize >= 12);
+                                assert.equal(metrics.valueSize, metrics.labelSize);
                                 assert.equal(metrics.separated, true);
                                 assert.equal(metrics.text, "Context 24% · $0.0123");
                             },
@@ -4287,6 +4290,36 @@ test(
                         assert.equal(await page.locator("#jump-to-latest").isVisible(), false);
                     },
                 );
+            });
+
+            await t.test("the provider sign-in panel stays usable and actionable in a narrow sidebar", async () => {
+                await withPage(browser, fixtures, { name: "provider-signin", width: 280 }, async (page) => {
+                    await setState(page, {
+                        messages: sampleMessages(),
+                        providerSignIn: {
+                            provider: "",
+                            message:
+                                "Pi has no provider credential, so no models are available and messages cannot be sent. " +
+                                "Sign in to a provider in Pi, then reload so Chat picks it up.",
+                        },
+                    });
+                    assert.equal(await page.locator("#provider-signin").isVisible(), true);
+                    assert.equal(await page.locator("#provider-signin-reload").isVisible(), true);
+                    await assertLayout(page, 280);
+                    const panel = await page.locator("#provider-signin").boundingBox();
+                    assert.ok(panel.x >= 0 && panel.x + panel.width <= 280, `Sign-in panel overflows: ${panel.width}`);
+                    await page.screenshot({ path: path.join(screenshots, "provider-signin-280.png") });
+
+                    await page.locator("#provider-signin-start").click();
+                    assert.deepEqual(
+                        (await takeMessages(page)).map((message) => message.type),
+                        ["signIn"],
+                    );
+
+                    // A usable provider leaves no sign-in surface behind.
+                    await setState(page, { messages: sampleMessages() });
+                    assert.equal(await page.locator("#provider-signin").isVisible(), false);
+                });
             });
 
             await t.test("a short narrow sidebar keeps request decisions and composer controls in reach", async () => {

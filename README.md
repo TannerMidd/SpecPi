@@ -26,7 +26,7 @@
 </p>
 <p align="center"><sub>SpecPi Chat · Example workspace</sub></p>
 
-SpecPi is a small base for the [Pi coding agent](https://pi.dev/). Its own extensions provide **scope control** and a **harness improvement loop**. Six pinned packages handle the supporting tools, and **SpecPi Chat 0.10.0** brings them into VS Code.
+SpecPi is a small base for the [Pi coding agent](https://pi.dev/). Its own extensions provide **scope control** and a **harness improvement loop**. Six pinned packages handle the supporting tools, and **SpecPi Chat 0.11.0** brings them into VS Code.
 
 | Keep the work focused                                                             | Improve what gets in the way                                                                     | Work beside your code                                                                   |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
@@ -81,11 +81,11 @@ BetterWright remains an optional manual install, with its own [Bun-based setup](
 
 ## VS Code
 
-[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.10.0** adds a package settings dialog that edits the configuration files `pi-subagents` and `pi-web-access` read, with stored provider credentials never displayed or copied. The VSIX remains separate from the npm harness package.
+[SpecPi Chat](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) provides the chat sidebar, file and image attachments, conversation history, tool output, package commands, and approval dialogs. Version **0.11.0** adds provider sign-in: Chat names a missing credential and opens Pi in a terminal for its own `/login`, then reloads Pi so the new models appear. Chat still never reads or stores those credentials. The VSIX remains separate from the npm harness package.
 
-Download the [0.10.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.10.0.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
+Download the [0.11.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.11.0.vsix), then run **Extensions: Install from VSIX…** in VS Code. Install/update SpecPi separately, then restart Pi in Chat to reload its extensions.
 
-[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.10.0.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
+[Download Chat](https://github.com/TannerMidd/SpecPi/releases/download/v0.23.0/specpi-chat-0.11.0.vsix) · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/GUIDE.md) · [Build from source](https://github.com/TannerMidd/SpecPi/blob/main/vscode/DEVELOPMENT.md)
 
 ## Scope
 

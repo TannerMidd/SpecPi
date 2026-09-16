@@ -2034,6 +2034,16 @@
         byId("queue-notice").hidden = !(Number(state.queueCount) > 0);
         byId("queue-notice").textContent =
             `${Number(state.queueCount) || 0} message${Number(state.queueCount) === 1 ? "" : "s"} queued`;
+        const signIn = state.providerSignIn;
+        byId("provider-signin").hidden = !signIn;
+        const signInMessage = typeof signIn?.message === "string" ? signIn.message : "";
+        if (byId("provider-signin-message").textContent !== signInMessage) {
+            byId("provider-signin-message").textContent = signInMessage;
+        }
+
+        byId("provider-signin-start").disabled = busy;
+        byId("provider-signin-reload").hidden = !signIn || !connected;
+        byId("provider-signin-reload").disabled = busy;
         const error = typeof state.error === "string" ? state.error : state.error?.message || "";
         byId("error-banner").hidden = !error;
         if (byId("error-message").textContent !== error) {
@@ -2162,6 +2172,8 @@
         "attach-file": "attachFile",
         "stop-button": "stop",
         "error-dismiss": "clearError",
+        "provider-signin-start": "signIn",
+        "provider-signin-reload": "reloadProviders",
     };
     for (const [id, type] of Object.entries(actions)) {
         byId(id).addEventListener("click", () => send({ type }));

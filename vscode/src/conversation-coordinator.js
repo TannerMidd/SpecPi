@@ -689,6 +689,10 @@ class ConversationCoordinator {
         return this.active.restart();
     }
 
+    signIn() {
+        return this.active.signIn();
+    }
+
     stop() {
         return this.active.stop();
     }

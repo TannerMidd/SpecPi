@@ -111,6 +111,15 @@ function getWebviewHtml({
         <div class="jump-row"><button id="jump-to-latest" class="jump-button" type="button" hidden>${icon("down")} Jump to latest</button></div>
         <footer class="footer">
             <div class="footer-panels">
+            <section id="provider-signin" class="provider-signin" aria-labelledby="provider-signin-title" hidden>
+                <h2 id="provider-signin-title">Sign in to a provider</h2>
+                <p id="provider-signin-message" role="status" aria-live="polite"></p>
+                <div class="provider-signin-actions">
+                    <button id="provider-signin-start" class="primary-button" type="button">Sign in to a provider</button>
+                    <button id="provider-signin-reload" class="text-button" type="button" hidden>Reload Pi</button>
+                </div>
+                <p class="provider-signin-note">Pi runs the sign-in in its own terminal. Chat never reads, stores, or sends your provider credentials; it only reloads Pi afterwards so new models appear.</p>
+            </section>
             <div id="error-banner" class="error-banner" role="alert" hidden><p id="error-message"></p><div class="error-actions"><button id="error-retry" class="text-button" type="button">Try again</button><button id="error-dismiss" class="text-button" type="button">Dismiss</button></div></div>
             <div id="queue-notice" class="queue-notice" hidden></div>
             <details id="provider-usage" class="provider-usage" hidden>

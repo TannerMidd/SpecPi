@@ -160,8 +160,8 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .footer-status { flex: 1 1 auto; display: flex; align-items: center; min-width: 0; }
 #runtime-status { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #token-status { flex: 0 1 auto; font-family: var(--mono); font-size: var(--chat-small-font-size); }
-#cache-status { display: inline-flex; align-items: baseline; gap: 8px; flex: 0 0 auto; padding: 4px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
-#cache-value { color: var(--text); font-size: var(--chat-font-size); font-weight: 600; font-variant-numeric: tabular-nums; }
+#cache-status { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 0 auto; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
+#cache-value { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .cache-label { color: var(--muted); }
 .attachments { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px 9px 0; }
 .selection-chip { display: flex; align-items: center; gap: 4px; padding: 9px 9px 0; }
@@ -202,6 +202,11 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .image-preview-content { display: flex; align-items: center; justify-content: center; min-height: 80px; overflow: auto; padding: 10px; }
 .image-preview-content img { display: block; max-width: 100%; max-height: calc(100vh - 150px); object-fit: contain; }
 .image-preview-meta { padding: 0 11px 10px; margin: 0; color: var(--muted); font-size: 10px; }
+.provider-signin { background: var(--surface-raised); border: 1px solid var(--border); border-left: 2px solid var(--accent); border-radius: 5px; padding: 10px; margin-bottom: 8px; }
+.provider-signin h2 { font-size: 12px; font-weight: 600; margin: 0 0 5px; }
+.provider-signin p { font-size: 11px; line-height: 1.6; margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.provider-signin-actions { display: flex; align-items: center; gap: 12px; margin-top: 9px; }
+.provider-signin .provider-signin-note { margin-top: 8px; font-size: 10px; }
 .error-banner { color: var(--error); background: var(--surface-raised); border: 1px solid var(--error); border-radius: 5px; padding: 9px 10px; margin-bottom: 8px; }
 .error-banner p { font-size: 11px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 150px; overflow: auto; }
 .error-actions { display: flex; gap: 10px; margin-top: 5px; }
@@ -291,6 +296,7 @@ body.vscode-high-contrast .message-copy, body.vscode-high-contrast-light .messag
 .jump-button, .compact-select, .permissions-chip, .composer-hint, .stop-button, .session-footer, #token-status,
 .attachment, .attachment-image .attachment-label, .image-unavailable, .attach-menu button,
 .attach-menu p, .image-feedback, .vision-warning, .image-preview-meta, .error-banner p,
+.provider-signin h2, .provider-signin p,
 .text-button, .queue-notice, .slash-name, .slash-description, .request-option,
 .request-actions .primary-button { font-size: var(--chat-small-font-size); }
 .provider-usage, .runtime-details, .runtime-details dt, .reasoning-content,
