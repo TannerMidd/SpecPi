@@ -32,9 +32,18 @@ const MIN_EXPIRY_MS = 250;
 const UNTIMED_CEILING_MS = 10 * 60 * 1000;
 
 export class ApprovalRegistry {
-    constructor({ bridge, broadcast, displayBudgetBytes = DEFAULT_DISPLAY_BUDGET_BYTES, now = () => Date.now() }) {
+    constructor({
+        bridge,
+        broadcast,
+        // Approvals go only to the stream that owns them. Broadcasting one to
+        // every open tab would render a card the other tabs cannot answer.
+        emit = broadcast,
+        displayBudgetBytes = DEFAULT_DISPLAY_BUDGET_BYTES,
+        now = () => Date.now(),
+    }) {
         this.bridge = bridge;
         this.broadcast = broadcast;
+        this.emit = emit;
         this.displayBudgetBytes = displayBudgetBytes;
         this.now = now;
         this.pending = new Map();
@@ -82,7 +91,7 @@ export class ApprovalRegistry {
         };
         entry.timer.unref?.();
         this.pending.set(request.id, entry);
-        this.broadcast({ type: "approval", request, expiresAt: entry.expiresAt });
+        this.emit(connectionId, { type: "approval", request, expiresAt: entry.expiresAt });
 
         return { outcome: "pending", expiresInMs };
     }

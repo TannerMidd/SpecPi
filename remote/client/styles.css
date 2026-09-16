@@ -21,6 +21,14 @@
     box-sizing: border-box;
 }
 
+/* Author styles beat the user-agent's [hidden] rule regardless of specificity,
+   so any rule that sets a display value silently defeats the hidden attribute.
+   Several elements here are flex containers toggled with .hidden, which is how
+   both slide-over panels once rendered permanently on top of the app. */
+[hidden] {
+    display: none !important;
+}
+
 body {
     margin: 0;
     background: var(--bg);
@@ -570,4 +578,40 @@ button.attach {
     object-fit: cover;
     border-radius: 8px;
     border: 1px solid var(--line);
+}
+
+/* Wide screens. The layout is phone-first, so without a bound the composer and
+   its selects stretch the full width of a desktop window and the app reads as a
+   stretched page rather than an app. The column keeps line lengths readable and
+   the controls a sane size; the slide-over drawer is unaffected. */
+@media (min-width: 900px) {
+    body {
+        align-items: center;
+    }
+
+    .bar,
+    .transcript,
+    .approvals,
+    .extensions,
+    .queue,
+    .composer {
+        width: 100%;
+        max-width: 880px;
+    }
+
+    .bar,
+    .composer {
+        border-left: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+    }
+
+    .transcript {
+        border-left: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+    }
+
+    /* A textarea that grows with the window is unpleasant to type in. */
+    textarea {
+        max-height: 40vh;
+    }
 }

@@ -58,6 +58,7 @@ export class RemoteServer {
         this.approvals = new ApprovalRegistry({
             bridge,
             broadcast: (payload) => this.broadcast(payload),
+            emit: (connectionId, payload) => this.sendTo(connectionId, payload),
         });
         this.server = createServer((request, response) => {
             this.route(request, response).catch((error) => {
@@ -174,10 +175,13 @@ export class RemoteServer {
         const previous = this.activeConnectionId();
         this.connections.set(id, response);
         if (previous) {
-            // Only one phone drives the agent. The older stream is closed and
-            // its pending approvals cancelled, never transferred.
-            this.approvals.cancelForConnection(previous, "superseded");
-            this.closeStream(previous);
+            // The newest stream owns approvals: anything the previous one was
+            // holding is cancelled, never transferred. The old stream is left
+            // open rather than closed, because EventSource reconnects
+            // automatically -- closing it made two open tabs evict each other
+            // in a loop, and neither could hold a connection long enough to
+            // answer anything.
+            this.approvals.cancelAll("superseded");
         }
 
         const keepalive = setInterval(() => {
@@ -205,9 +209,6 @@ export class RemoteServer {
 
         this.writeEvent(response, { type: "connected", connectionId: id }, this.nextEventId++);
         this.replay(request, response);
-        for (const item of this.approvals.snapshot()) {
-            this.writeEvent(response, { type: "approval", ...item }, this.nextEventId++);
-        }
     }
 
     // SSE resume. The client's Last-Event-ID tells us how far it got; anything
@@ -237,6 +238,16 @@ export class RemoteServer {
                 this.writeEvent(response, item.payload, item.id);
             }
         }
+    }
+
+    // Targeted delivery for anything bound to one connection.
+    sendTo(connectionId, payload) {
+        const response = this.connections.get(connectionId);
+        if (!response) {
+            return;
+        }
+
+        this.writeEvent(response, payload, this.nextEventId++);
     }
 
     broadcast(payload) {

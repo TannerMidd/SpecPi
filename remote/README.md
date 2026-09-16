@@ -73,7 +73,7 @@ Never port-forward this to the internet. There is no relay mode and none is plan
 ## What it deliberately does not do
 
 - No remote shell. Pi's `bash` and `abort_bash` RPC commands are refused by the daemon, not just hidden in the UI.
-- No internet relay hosting, and no multi-user access. One phone drives the agent; a second connection supersedes the first and cancels any approval the first was holding.
+- No internet relay hosting, and no multi-user access. The newest connection owns approvals: a pending dialog is cancelled rather than handed over, and an approval card is only ever delivered to the stream that can answer it. Other open tabs keep following the conversation.
 - No agent-side behaviour changes. Remote is a client of Pi's existing RPC surface.
 
 ## Development
@@ -81,7 +81,10 @@ Never port-forward this to the internet. There is no relay mode and none is plan
 ```sh
 npm test          # node --test tests/*.test.mjs
 npm run check     # syntax check plus the full suite
+npm run test:render  # real browser render checks (needs the root devDependencies)
 ```
+
+`test:render` drives the client in headless Chromium and asserts what is actually on screen: panels closed on load, no horizontal overflow, the reply rendered, the composer back to Send once a turn settles, and an approval card with the agent's own options as buttons. It is kept out of `npm test` because this package has no dependencies of its own and Playwright is a repository-root devDependency.
 
 Tests run against a synthetic RPC peer in `tests/fixtures/fake-pi.mjs`. They load no Pi, read no user configuration, and contact no provider: `PI_CODING_AGENT_DIR` points at a throwaway directory for every run. Real Pi is only ever exercised by manual device testing.
 

@@ -440,7 +440,7 @@ test("a status update arrives as chrome, with its own field intact", async (t) =
     assert.equal(answered, false);
 });
 
-test("a second stream supersedes the first and cancels its approvals", async (t) => {
+test("a second stream takes over approvals without evicting the first", async (t) => {
     const context = await startServer();
     t.after(context.dispose);
     const first = await openStream(context.base);
@@ -453,8 +453,11 @@ test("a second stream supersedes the first and cancels its approvals", async (t)
     const secondConnection = await second.waitFor((event) => event.type === "connected");
     assert.notEqual(secondConnection.connectionId, firstConnection.connectionId);
 
-    // The superseded stream's dialog is cancelled, never handed over.
+    // The superseded stream's dialog is cancelled, never handed over. The
+    // first stream stays open: closing it made two tabs evict each other in a
+    // reconnect loop, since EventSource reconnects on its own.
     assert.equal((await answered).cancelled, true);
+    assert.equal(first.response.body.locked, true, "the first stream should still be open");
     const response = await post(context.base, "/approval", {
         id: approval.request.id,
         connectionId: secondConnection.connectionId,

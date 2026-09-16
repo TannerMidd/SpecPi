@@ -263,9 +263,28 @@ function onAgentEvent(event) {
             refreshStats();
             break;
         case "message_start":
-        case "message_end":
             state.blocks.clear();
             break;
+        case "message_end": {
+            // docs/rpc.md calls message_end.message authoritative. When deltas
+            // streamed, the blocks already hold that text. When none did --
+            // a provider that does not stream, or a reply that arrives whole --
+            // nothing has been rendered yet, and clearing the blocks without
+            // drawing this would silently drop the entire assistant turn.
+            const streamed = state.blocks.size > 0;
+            state.blocks.clear();
+            if (streamed) {
+                break;
+            }
+
+            const text = contentText(event.message?.content);
+            if (text) {
+                addEntry(event.message?.role || "assistant", "assistant", text);
+            }
+
+            break;
+        }
+
         case "message_update":
             applyDelta(event);
             break;
@@ -914,7 +933,8 @@ async function send() {
         entry.parentElement.append(strip);
     }
 
-    const payload = { type: state.running ? "steer" : "prompt", message: text };
+    const steering = state.running;
+    const payload = { type: steering ? "steer" : "prompt", message: text };
     if (images.length > 0) {
         payload.images = images.map((image) => ({
             type: "image",
@@ -923,9 +943,17 @@ async function send() {
         }));
     }
 
-    await command(payload);
-    if (!state.running) {
+    // Optimistic, and deliberately before the await. Setting it afterwards can
+    // land after agent_settled has already arrived for this very turn, which
+    // leaves the UI stuck in Running: Stop stays enabled and the next message
+    // goes out as a steer into a turn that already finished.
+    if (!steering) {
         setRunning(true);
+    }
+
+    const result = await command(payload);
+    if (!result && !steering) {
+        setRunning(false);
     }
 }
 
