@@ -91,8 +91,6 @@ test(
                 "--no-session",
                 "--no-context-files",
                 "-e",
-                path.join(repository, "vscode/src/subagents-bridge.mjs"),
-                "-e",
                 path.join(repository, "tests/fixtures/vscode-base-packages.ts"),
             ],
             cwd: path.dirname(agentDir),

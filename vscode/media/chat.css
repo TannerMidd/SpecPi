@@ -148,6 +148,7 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .permissions-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .permissions-chip[data-mode="configured"] .icon { color: var(--accent); }
 .permissions-chip[data-mode="yolo"] { color: var(--error); }
+.permissions-chip[data-mode="guard-saved"] { color: var(--vscode-editorWarning-foreground, #d7a64b); border: 1px dashed currentColor; background: var(--surface-raised); border-radius: 5px; }
 .composer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 5px; padding: 3px 8px; border-top: 1px solid var(--border); }
 .composer-hint { font-size: 9px; color: var(--muted); line-height: 1.5; }
 .send-actions { margin-left: auto; flex: 0 0 auto; }

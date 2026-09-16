@@ -30,7 +30,6 @@ function getWebviewHtml({
         permissionStyleUri || String(styleUri).replace(/chat\.css(?=[?#]|$)/u, "permission-settings.css");
     const permissionConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-config.js");
     const permissionSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-settings.js");
-    const subagentsConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "subagents-config.js");
     const webAccessConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "web-access-config.js");
     const packageSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "package-settings.js");
     const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cspSource}; img-src data:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';`;
@@ -232,9 +231,6 @@ function getWebviewHtml({
         <div class="permission-actions">
             <label for="package-target">Configuration</label>
             <select id="package-target">
-                <option value="subagents:extension">Subagents &middot; extension config</option>
-                <option value="subagents:global">Subagents &middot; Pi settings (global)</option>
-                <option value="subagents:project">Subagents &middot; Pi settings (project)</option>
                 <option value="webAccess">Web access &middot; providers and keys</option>
             </select>
             <button id="package-reload" type="button">Load / discard draft</button>
@@ -263,7 +259,6 @@ function getWebviewHtml({
     </dialog>
     <script nonce="${attribute(nonce)}" src="${attribute(permissionConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(permissionSettingsScript)}"></script>
-    <script nonce="${attribute(nonce)}" src="${attribute(subagentsConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(webAccessConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(packageSettingsScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(extrasScript)}"></script>

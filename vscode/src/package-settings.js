@@ -1,34 +1,29 @@
 "use strict";
 
 // Read and write the configuration files of the pinned packages that expose
-// one: pi-subagents (its own extension config plus the "subagents" block of a
-// Pi settings file) and pi-web-access (a provider credential store).
+// one. Today that is pi-web-access alone: a provider credential store.
 //
 // Every write goes through the guarded transaction in settings-file.js, the
 // same one behind permission settings and Pi startup defaults: bounded read
 // with link and identity checks, lock, revision check, backup, atomic replace,
 // verification, and rollback on failure.
 //
-// Two rules shape this module. Settings files belong to Pi, so a write touches
-// only the one documented key the caller asked for and leaves every other key,
-// and its order, exactly as found. Web access configuration holds provider
-// credentials, so values never reach the webview, a log line, or an error
-// message; see media/web-access-config.js for the redaction contract.
+// Web access configuration holds provider credentials, so values never reach
+// the webview, a log line, or an error message; see media/web-access-config.js
+// for the redaction contract.
 
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { checkDirectories, readFile, parseJson, replaceFile } = require("./settings-file.js");
 const { agentDirectory } = require("./pi-defaults.js");
-const subagentsConfig = require("../media/subagents-config.js");
 const webAccessConfig = require("../media/web-access-config.js");
 
 const MAX_BYTES = 256 * 1024;
-const SETTINGS_KEY = "subagents";
 
 // Targets are opaque identifiers chosen by the webview; each resolves to one
 // file and one write shape. Nothing here accepts a caller-supplied path.
-const TARGETS = ["subagents:extension", "subagents:global", "subagents:project", "webAccess"];
+const TARGETS = ["webAccess"];
 
 function messagesFor(label) {
     return {
@@ -45,8 +40,6 @@ function messagesFor(label) {
     };
 }
 
-const SUBAGENT_MESSAGES = messagesFor("Subagents configuration");
-const SETTINGS_MESSAGES = messagesFor("Pi settings");
 const WEB_MESSAGES = messagesFor("Web access configuration");
 
 function expandHome(value, home) {
@@ -86,23 +79,6 @@ function webAccessPath({ workspace, env = process.env, home = os.homedir() } = {
 }
 
 function targetPath(target, options = {}) {
-    const { workspace } = options;
-    if (target === "subagents:extension") {
-        return path.join(agentDirectory(options), "extensions", "subagent", "config.json");
-    }
-
-    if (target === "subagents:global") {
-        return path.join(agentDirectory(options), "settings.json");
-    }
-
-    if (target === "subagents:project") {
-        if (!path.isAbsolute(workspace || "")) {
-            throw new Error("Open a workspace folder before editing project subagent settings.");
-        }
-
-        return path.join(workspace, ".pi", "settings.json");
-    }
-
     if (target === "webAccess") {
         return webAccessPath(options);
     }
@@ -112,14 +88,8 @@ function targetPath(target, options = {}) {
 
 // Paths under the agent directory are resolved before inspection: a relocated
 // home or a junctioned Windows profile puts a link above every file there.
-// Workspace paths are not, because an opened repository could ship a link of
-// its own to redirect the write.
-function inspect(target, filename, messages, create = false) {
-    checkDirectories(path.dirname(filename), {
-        create,
-        resolve: target !== "subagents:project",
-        link: messages.link,
-    });
+function inspect(filename, messages, create = false) {
+    checkDirectories(path.dirname(filename), { create, resolve: true, link: messages.link });
 }
 
 function readSnapshot(filename, messages) {
@@ -141,48 +111,17 @@ function parseObject(filename, text, label) {
     return value;
 }
 
-function isSettingsTarget(target) {
-    return target === "subagents:global" || target === "subagents:project";
-}
-
-// Pi settings hold the subagents block beside unrelated configuration. The
-// draft the webview edits is only that block, never the whole file.
-function loadSettingsBlock(target, options) {
-    const filename = targetPath(target, options);
-    inspect(target, filename, SETTINGS_MESSAGES);
-    const snapshot = readSnapshot(filename, SETTINGS_MESSAGES);
-    const settings = snapshot.exists ? parseObject(filename, snapshot.text, "Pi settings") : {};
-    const block = settings[SETTINGS_KEY];
-    if (block !== undefined && (block === null || typeof block !== "object" || Array.isArray(block))) {
-        throw new Error(`Pi settings field '${SETTINGS_KEY}' must be an object. Fix the file manually.`);
-    }
-
-    return {
-        target,
-        path: filename,
-        exists: snapshot.exists,
-        revision: snapshot.revision,
-        text: `${JSON.stringify(block === undefined ? {} : block, null, 4)}\n`,
-        keys: Object.keys(settings).filter((key) => key !== SETTINGS_KEY),
-    };
-}
-
-function loadWholeFile(target, messages, options) {
-    const filename = targetPath(target, options);
-    inspect(target, filename, messages);
-
-    return { target, path: filename, ...readSnapshot(filename, messages) };
-}
-
 // Web access configuration never leaves the host with its credentials intact.
 function loadWebAccess(options) {
-    const snapshot = loadWholeFile("webAccess", WEB_MESSAGES, options);
-    const stored = snapshot.exists ? parseObject(snapshot.path, snapshot.text, "Web access configuration") : {};
+    const filename = targetPath("webAccess", options);
+    inspect(filename, WEB_MESSAGES);
+    const snapshot = readSnapshot(filename, WEB_MESSAGES);
+    const stored = snapshot.exists ? parseObject(filename, snapshot.text, "Web access configuration") : {};
     const { config, credentials } = webAccessConfig.redact(stored);
 
     return {
         target: "webAccess",
-        path: snapshot.path,
+        path: filename,
         exists: snapshot.exists,
         revision: snapshot.revision,
         text: `${JSON.stringify(config, null, 4)}\n`,
@@ -195,15 +134,7 @@ function loadPackageSettings(target, options = {}) {
         throw new Error("Choose a package configuration to edit.");
     }
 
-    if (target === "webAccess") {
-        return loadWebAccess(options);
-    }
-
-    if (isSettingsTarget(target)) {
-        return loadSettingsBlock(target, options);
-    }
-
-    return loadWholeFile(target, SUBAGENT_MESSAGES, options);
+    return loadWebAccess(options);
 }
 
 function sameJson(text, next, filename, label) {
@@ -235,46 +166,12 @@ function commit({ filename, text, messages, revision, unchanged, snapshot, extra
     };
 }
 
-// Writes the subagents block into a Pi settings file. Unrelated keys and their
-// order survive; an empty block removes the key rather than leaving `{}`.
-function saveSettingsBlock(snapshot, draft) {
-    const filename = snapshot.path;
-    inspect(snapshot.target, filename, SETTINGS_MESSAGES, true);
-    const current = readSnapshot(filename, SETTINGS_MESSAGES);
-    if (current.revision !== snapshot.revision) {
-        throw new Error(SETTINGS_MESSAGES.changed);
-    }
-
-    const settings = current.exists ? parseObject(filename, current.text, "Pi settings") : {};
-    const next = { ...settings };
-    if (Object.keys(draft).length > 0) {
-        next[SETTINGS_KEY] = draft;
-    } else {
-        delete next[SETTINGS_KEY];
-    }
-
-    const text = `${JSON.stringify(next, null, 4)}\n`;
-
-    return commit({
-        filename,
-        text,
-        messages: SETTINGS_MESSAGES,
-        revision: snapshot.revision,
-        unchanged: (previous) => sameJson(previous.text, next, filename, "Pi settings"),
-        snapshot,
-        extra: {
-            text: `${JSON.stringify(draft, null, 4)}\n`,
-            keys: Object.keys(next).filter((key) => key !== SETTINGS_KEY),
-        },
-    });
-}
-
 // Restores redacted credentials from disk, then writes. The draft text is
 // never written verbatim: a value the person did not retype is taken from the
 // file that is already there.
 function saveWebAccess(snapshot, draft) {
     const filename = snapshot.path;
-    inspect("webAccess", filename, WEB_MESSAGES, true);
+    inspect(filename, WEB_MESSAGES, true);
     const current = readSnapshot(filename, WEB_MESSAGES);
     if (current.revision !== snapshot.revision) {
         throw new Error(WEB_MESSAGES.changed);
@@ -303,22 +200,6 @@ function saveWebAccess(snapshot, draft) {
     return { ...result, text: `${JSON.stringify(config, null, 4)}\n`, credentials };
 }
 
-function saveWholeFile(snapshot, draft) {
-    const filename = snapshot.path;
-    inspect(snapshot.target, filename, SUBAGENT_MESSAGES, true);
-    const text = `${JSON.stringify(draft, null, 4)}\n`;
-
-    return commit({
-        filename,
-        text,
-        messages: SUBAGENT_MESSAGES,
-        revision: snapshot.revision,
-        unchanged: (previous) => sameJson(previous.text, draft, filename, "Subagents configuration"),
-        snapshot,
-        extra: { text },
-    });
-}
-
 // The caller rechecks human and runtime authority immediately before this
 // call; the revision detects ordinary edits by terminals and other windows in
 // between. `text` is the draft the webview holds, already validated there and
@@ -336,14 +217,7 @@ function savePackageSettings(snapshot, text) {
         throw new Error("Configuration exceeds 256 KiB.");
     }
 
-    if (snapshot.target === "webAccess") {
-        return saveWebAccess(snapshot, webAccessConfig.validate(text).config);
-    }
-
-    const target = isSettingsTarget(snapshot.target) ? subagentsConfig.SETTINGS : subagentsConfig.EXTENSION;
-    const draft = subagentsConfig.validate(text, target).config;
-
-    return isSettingsTarget(snapshot.target) ? saveSettingsBlock(snapshot, draft) : saveWholeFile(snapshot, draft);
+    return saveWebAccess(snapshot, webAccessConfig.validate(text).config);
 }
 
 module.exports = { TARGETS, webAccessPath, targetPath, loadPackageSettings, savePackageSettings };

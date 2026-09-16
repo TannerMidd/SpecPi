@@ -84,6 +84,8 @@
     "check:base": "node scripts/check-base-packages.mjs",
     "check:site": "node scripts/check-site.mjs",
     "check:browser-qa": "npm --prefix packages/browser-qa run check",
+    "check:delegation": "npm --prefix packages/delegation run check",
+    "check:experiments": "npm --prefix packages/experiments run check",
     "check:vscode": "npm --prefix vscode run check",
     "prepublishOnly": "npm run check",
     "check": "npm run format:check && npm run check:syntax && npm test && npm run check:package && npm run check:vscode"

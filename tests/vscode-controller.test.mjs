@@ -1172,6 +1172,58 @@ test("Permissions opens the editable settings UI and reflects only upstream YOLO
     await assert.rejects(plain.handleMessage({ type: "showPermissions" }), /Permission System/);
 });
 
+test("the saved guard badge loads on connect and follows confirmed saves without inventing runtime policy", async (t) => {
+    const preset = extensionRequire("../media/permission-config.js").destructiveGuardText("global");
+    let text = preset;
+    let unreadable = false;
+    const { controller, client } = await connected(t, {
+        request: (type) => (type === "get_commands" ? { commands: [{ name: "permission-system" }] } : undefined),
+        warningAnswer: "Save permissions",
+        loadPermissions: (_workspace, scope) => {
+            assert.equal(scope, "global");
+            if (unreadable) {
+                throw new Error("Unsafe configuration");
+            }
+
+            return { scope, path: "synthetic-config.json", text, revision: "synthetic" };
+        },
+        savePermissions: (snapshot, next) => {
+            text = next;
+
+            return { ...snapshot, text };
+        },
+    });
+    assert.equal(controller.state.permissions.label, "Guard saved");
+    client.emit("event", {
+        type: "extension_ui_request",
+        method: "setStatus",
+        statusKey: "pi-permission-system",
+        statusText: "yolo",
+    });
+    assert.equal(controller.state.permissions.label, "Guard saved · YOLO");
+    controller.showPermissions();
+    await controller.savePermissions({
+        id: controller.permissionSettings.id,
+        contextToken: controller.contextToken(),
+        text: "{}",
+    });
+    assert.equal(controller.state.permissions.label, "YOLO");
+    await controller.savePermissions({
+        id: controller.permissionSettings.id,
+        contextToken: controller.contextToken(),
+        text: preset,
+    });
+    assert.equal(controller.state.permissions.label, "Guard saved · YOLO");
+    unreadable = true;
+    await controller.refresh();
+    assert.equal(controller.state.permissions.label, "YOLO");
+    unreadable = false;
+    await controller.refresh();
+    assert.equal(controller.state.permissions.label, "Guard saved · YOLO");
+    await controller.disconnect();
+    assert.equal(controller.state.destructiveGuardSaved, false);
+});
+
 test("permission saves require native confirmation, bind their path to the opened scope, and never prompt the model", async (t) => {
     const writes = [];
     const { controller, client, posted } = await connected(t, {
@@ -2481,40 +2533,6 @@ test("oversized same-session history preserves visible messages during manual re
     assert.equal(controller.state.historyTruncated, true);
     assert.equal(controller.state.status, "ready");
     assert.equal(controller.state.error, undefined);
-});
-
-test("pi-subagents fleet stays scoped to its connection and never enables delegate controls", async (t) => {
-    const { controller, client, clients } = await connected(t);
-    const view = {
-        version: 1,
-        totalActive: 1,
-        omitted: 0,
-        entries: [{ key: "opaque-key", agent: "worker", startedAt: 1000, tokens: { input: 1, output: 2, total: 3 } }],
-    };
-    const event = {
-        type: "extension_ui_request",
-        method: "setWidget",
-        widgetKey: "specpi-chat-subagents-v1",
-        widgetLines: [JSON.stringify(view)],
-    };
-    client.emit("event", event);
-    assert.equal(controller.state.subagents.entries[0].agent, "worker");
-    assert.equal(controller.state.runtimeStatus["specpi-chat-subagents-v1"], undefined);
-    assert.equal(controller.state.delegation, undefined);
-    assert.ok(client.launch.args.includes("--extension"));
-    assert.ok(client.launch.args.some((arg) => arg.endsWith("subagents-bridge.mjs")));
-    client.emit("event", { ...event, widgetLines: ["malformed"] });
-    assert.equal(controller.state.subagents, undefined);
-    client.emit("event", event);
-    await controller.disconnect();
-    assert.equal(controller.state.subagents, undefined);
-    await controller.connect();
-    client.emit("event", event);
-    assert.equal(controller.state.subagents, undefined);
-    clients.at(-1).emit("event", event);
-    assert.equal(controller.state.subagents.totalActive, 1);
-    clients.at(-1).emit("exit");
-    assert.equal(controller.state.subagents, undefined);
 });
 
 test("delegate progress stays live during parent streaming and Stop targets only the observed attempt", async (t) => {

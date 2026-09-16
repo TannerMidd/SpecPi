@@ -16,7 +16,7 @@ Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4** for the review
 
 - **Add context:** the active editor selection appears above the composer and attaches with your next message, or attach selected code or files, type `@` to find a workspace file or folder, press **Alt+K** to insert an `@file#Lx-Ly` mention, or paste a screenshot. Folder attachments send a bounded listing of their contents. Images need a model that supports them.
 - **Follow the work:** see replies and tool output as they arrive. Use **Stop** to interrupt a response.
-- **Follow agents:** with [pi-subagents](https://pi.dev/packages/pi-subagents) installed in Pi, expand the agent panel above the composer for live foreground and background activity. Tool results show each agent's progress, usage, and outcome.
+- **Follow agents:** with [specpi-delegation](https://www.npmjs.com/package/specpi-delegation) installed in Pi, expand the agent panel above the composer for live worker activity, and stop a worker from there. Tool results show each delegated report.
 - **Keep a few conversations going:** switch chats while Pi continues working in the background. Find older chats in **Chat History**.
 - **Try another direction:** branch a conversation or edit an earlier prompt to start a new branch.
 - **Keep your model across chats:** with a chat connected, use the pin button next to the model picker to save the current model as Pi's startup model, or the current thinking level as the global startup level. You can also pin the thinking level to this model alone, which Pi then applies whenever that model is selected, in every chat. Saving confirms first and edits only those keys in Pi's global settings, with a backup. Restart Pi (or reconnect) to pick the change up.
@@ -27,7 +27,7 @@ Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4** for the review
 
 Press **Enter** to send, **Shift+Enter** for a new line, or type `/` to see available commands.
 
-See [package support](GUIDE.md#default-package-support) for the six packages, including commands, subagent cards, usage, and terminal-only settings.
+See [package support](GUIDE.md#default-package-support) for the seven packages, including commands, delegated agent activity, usage, and terminal-only settings.
 
 ## A few things to know
 

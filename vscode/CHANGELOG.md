@@ -1,10 +1,17 @@
 # SpecPi Chat changelog
 
+## Unreleased
+
+- Follow the default base off `pi-subagents`. The live agent panel, result cards and configuration UI for that package are removed; Chat's existing delegation support now covers the base package, `specpi-delegation`. The panel shows each worker's mode, task, elapsed time, model calls and tool calls, and its Stop button sends the package's own `/delegate cancel-worker` command — a per-worker control the fleet panel never had.
+- Package settings cover web access alone. The Subagents extension-config and Pi-settings-block targets are gone, along with the "editing only the subagents block" scope note; the dialog opens only for packages the connected session actually reports.
+- `/experiment` from `specpi-experiments` works through ordinary command discovery, including its editor, confirmation and notification dialogs. Experiment worktrees are opened in a separate Pi session, not inside Chat.
+
 ## 0.11.0
 
 - Make provider sign-in reachable from Chat. A connected Pi that reports no usable provider, and a message that fails because the selected provider has no credential, now raise a sign-in panel naming what is missing instead of an empty model picker or Pi's raw `/login` guidance with its absolute documentation paths. **Sign in to a provider** starts the configured Pi executable in a VS Code terminal, in the chat's workspace folder and without RPC flags or a session, so Pi runs its own `/login` and `/logout`. **SpecPi: Sign In to a Provider** does the same from the Command Palette.
 - Reload Pi after sign-in. Pi resolves its model catalogue once at startup and cannot see a credential stored afterwards, so closing the sign-in terminal restarts the connection and the new provider's models appear. **Reload Pi** does it on demand; a busy conversation is left running with a notice rather than restarted underneath a response.
 - Keep credentials outside Chat. The extension does not read `auth.json`, run Pi's auth commands, prompt for API keys, send input to the sign-in terminal, or receive a credential over RPC. Detection uses only what Pi already reports: its available-model list and its own missing-credential error text.
+- Give the Destructive guard a visible state. When the saved global configuration matches the preset's deny rules, the composer's Permissions button shows **Guard saved** with a dashed outline — **Guard saved · YOLO** if Pi also reports YOLO — instead of the plain **YOLO** label. The badge reads only the documented global config file, updates on connect and on confirmed settings changes, and its detail states that saved rules are not proof of active enforcement. YOLO continues to reflect only Pi's reported runtime status.
 - Scale the footer's cache hit readout to the type around it. The percentage was two steps larger than the token, cost, and status text beside it, which made it the loudest element in the footer; the chip keeps its border and bold value but now matches the footer's own size.
 
 ## 0.10.0

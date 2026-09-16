@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Replace `pi-subagents@0.67.0` in the default base with first-party `specpi-delegation@0.1.0`, and add `specpi-experiments@0.1.0`. The base is now seven pinned packages; the other five are unchanged.
+- Publish SpecPi's own bounded delegation as an independent Pi package. Child sessions get three read-only tools over a source snapshot frozen when the batch starts — no shell, edits, network or nested delegation — under fixed ceilings that local settings may lower and never raise. Delegation stays off until `/delegate on` in an interactive session with a model selected. The extraction drops the Command Guard admission path, which SpecPi no longer ships, so the reported guard posture is `absent`.
+- Publish the retired `/experiment` command as an independent Pi package. An experiment is a detached Git worktree created at `HEAD`, closed by exporting a patch or discarding it; the base worktree, its index and its uncommitted changes are never touched. `/experiment recover` reconciles records against what Git tracks and never deletes a directory Git still tracks.
+- Both packages carry no production dependencies and were extracted under MIT from SpecPi 0.20.1, immediately before commit `4f5461d`.
+- Remove Chat's `pi-subagents` frontend: the fleet adapter, its RPC bridge, its result cards and its configuration UI. Chat's existing delegation panel now covers the default base, including per-worker Stop. Package settings cover web access alone.
+
 ## 0.23.0 - 2026-09-14
 
 - Replace the BetterWright default with independently published `specpi-browser-qa@0.1.0`: 14 QA-focused interaction, accessibility, diagnostic, and visual-regression tools, not general-browser feature parity. The other five package pins and Chat 0.8.1 are unchanged.

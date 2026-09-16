@@ -92,11 +92,12 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
     return { root, agent, settings, log, browserLog, fake, invoke, run };
 }
 
-test("the default base is exactly the six human-selected pinned packages", () => {
+test("the default base is exactly the seven human-selected pinned packages", () => {
     assert.deepEqual(basePackages, [
         "npm:pi-web-access@0.29.0",
         "npm:specpi-browser-qa@0.1.0",
-        "npm:pi-subagents@0.67.0",
+        "npm:specpi-delegation@0.1.0",
+        "npm:specpi-experiments@0.1.0",
         "npm:pi-goal-x@0.31.2",
         "npm:@sreetej510/pi-usage@0.10.0",
         "npm:@gotgenes/pi-permission-system@32.0.2",
@@ -221,7 +222,9 @@ test("package version drift fails installation and restores the previous managed
     f.run("install", "--yes", "--skip-package-install");
     const manifest = path.join(f.agent, "specpi/manifest.json");
     const oldManifest = fs.readFileSync(manifest, "utf8");
-    const failed = f.invoke(["update", "--yes"], { FAKE_DRIFT: basePackages[3] });
+    const drifted = basePackages.find((entry) => entry.startsWith("npm:pi-goal-x@"));
+    assert.ok(drifted, "pi-goal-x is no longer a base pin");
+    const failed = f.invoke(["update", "--yes"], { FAKE_DRIFT: drifted });
     assert.notEqual(failed.status, 0);
     assert.match(failed.stderr, /Base package version mismatch: npm:pi-goal-x/);
     assert.match(failed.stderr, /rolled back/);

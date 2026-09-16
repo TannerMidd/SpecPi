@@ -1,7 +1,6 @@
 (() => {
     window.SpecPiPackageSettings = {
         install({ send, getState }) {
-            const subagents = window.SpecPiSubagentsConfig;
             const webAccess = window.SpecPiWebAccessConfig;
             const byId = (id) => document.getElementById(id);
             const dialog = byId("package-settings");
@@ -17,26 +16,14 @@
             let saved = false;
 
             const isWeb = () => snapshot?.target === "webAccess";
-            const isSettings = () =>
-                snapshot?.target === "subagents:global" || snapshot?.target === "subagents:project";
 
             // Each target names one file and one validator. The host resolves
             // the path itself; the webview never sends or sees one it chose.
             function schema() {
-                if (isWeb()) {
-                    return {
-                        fields: webAccess.fields,
-                        validate: (text) => webAccess.validate(text),
-                        parse: webAccess.parse,
-                    };
-                }
-
-                const kind = isSettings() ? subagents.SETTINGS : subagents.EXTENSION;
-
                 return {
-                    fields: subagents.fieldsFor(kind),
-                    validate: (text) => subagents.validate(text, kind),
-                    parse: subagents.parse,
+                    fields: webAccess.fields,
+                    validate: (text) => webAccess.validate(text),
+                    parse: webAccess.parse,
                 };
             }
 
@@ -280,13 +267,7 @@
             function describe() {
                 const where = snapshot.exists ? "" : " (not created yet)";
                 byId("package-path").textContent = `${snapshot.path}${where}`;
-                byId("package-scope-note").hidden = !isSettings();
-                if (isSettings()) {
-                    const others = (snapshot.keys || []).length;
-                    byId("package-scope-note").textContent = others
-                        ? `Editing only the "subagents" block of this Pi settings file. ${others} unrelated setting${others === 1 ? "" : "s"} in it stay untouched.`
-                        : 'Editing only the "subagents" block of this Pi settings file.';
-                }
+                byId("package-scope-note").hidden = true;
             }
 
             return {

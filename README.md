@@ -62,7 +62,8 @@ These are installed on every normal install and update. Exact versions live in [
 | ----------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------ |
 | [pi-web-access](https://github.com/nicobailon/pi-web-access)                                                      | 0.29.0         | Web search and page retrieval                          |
 | [specpi-browser-qa](https://www.npmjs.com/package/specpi-browser-qa)                                               | 0.1.0          | Browser interaction, accessibility and visual QA                                     |
-| [pi-subagents](https://github.com/nicobailon/pi-subagents)                                                        | 0.67.0         | Subagents and delegation                               |
+| [specpi-delegation](https://www.npmjs.com/package/specpi-delegation)                                              | 0.1.0          | Bounded in-house subagents over a frozen snapshot      |
+| [specpi-experiments](https://www.npmjs.com/package/specpi-experiments)                                            | 0.1.0          | Detached Git worktree experiments                      |
 | [pi-goal-x](https://github.com/tmonk/pi-goal-x)                                                                   | 0.31.2         | Persistent goals and progress                          |
 | [@sreetej510/pi-usage](https://github.com/Sreetej510/pi-extensions/tree/main/extensions/pi-usage)                 | 0.10.0         | Provider usage reporting                               |
 | [@gotgenes/pi-permission-system](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) | 32.0.2         | Tool permission policies                               |
@@ -72,6 +73,14 @@ The effective commands are `pi install npm:<package>@<version>` for each row, in
 SpecPi requests exact npm dependency saves for these installs and verifies installed versions before completing the transaction. This keeps later package installs from advancing an earlier pin through npm's default version ranges.
 
 Browser QA setup uses the installed package's pinned Playwright and the standard browser cache (or `PLAYWRIGHT_BROWSERS_PATH`). If setup fails, managed configuration rolls back; install missing OS libraries manually and retry `specpi install` (or `specpi update` for an existing installation). `specpi doctor` runs offline rendering, pixel-comparison, and accessibility checks without downloading anything. Provider credentials, web-service configuration, and permission rules remain governed by each package's documentation. Package installation and extension loading do not prove that every external service or tool is ready.
+
+## Delegation and experiments
+
+[`specpi-delegation@0.1.0`](https://www.npmjs.com/package/specpi-delegation/v/0.1.0) replaces the third-party subagent package in the default base. It hands a question to a real Pi child session that can read a frozen copy of selected sources and nothing else — three tools, no shell, no edits, no network — under fixed call, token and time ceilings. Turn it on per session with `/delegate on`; it needs an interactive session with a model selected. Results are advisory evidence, not verification.
+
+[`specpi-experiments@0.1.0`](https://www.npmjs.com/package/specpi-experiments/v/0.1.0) adds `/experiment`: try an idea in a detached Git worktree created at `HEAD`, then export it as a patch or discard it. The base worktree, its index and its uncommitted changes are never touched. Do the work in a separate Pi session opened in the experiment directory.
+
+Both are first-party, carry no production dependencies, and were extracted from SpecPi's own retired harness code. See their boundaries in [delegation](packages/delegation/SECURITY.md) and [experiments](packages/experiments/SECURITY.md).
 
 ## Browser QA
 
