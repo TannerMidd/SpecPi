@@ -658,27 +658,16 @@ pre {
         width: 100%;
     }
 }
-.product-preview .preview-panels {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    aspect-ratio: 1.75;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    overflow: hidden;
+.product-preview .preview-showcase {
+    margin: 0;
 }
-.product-preview .preview-panels img {
+.product-preview .preview-showcase img {
     width: 100%;
-    height: 100%;
+    height: auto;
     min-height: 0;
     object-fit: cover;
     border: 0;
     border-radius: 0;
-}
-.preview-editor {
-    object-position: left top;
-}
-.preview-chat {
-    object-position: right top;
 }
 .hero-grid {
     padding-block: 3.25rem 2rem;
@@ -792,7 +781,7 @@ pre {
     display: none;
 }
 [data-theme="dark"] .product-preview [data-preview-theme="dark"] {
-    display: grid;
+    display: block;
 }
 .packages-section {
     padding-block: 2.75rem;
