@@ -63,7 +63,7 @@ Full setup options, package details, and requirements: [website](https://tannerm
 | [Packages](https://tannermidd.github.io/SpecPi/#packages) | The six pinned packages and what each provides |
 | [Scope control](https://tannermidd.github.io/SpecPi/wiki/#scope) | `/scope` commands and drift monitoring |
 | [Improvement loop](https://tannermidd.github.io/SpecPi/#loop) | Local wishlist, `/harness-improvement`, and retirement with evidence |
-| [SpecPi Chat](https://tannermidd.github.io/SpecPi/#vscode-chat) | VS Code frontend and VSIX install |
+| [SpecPi Chat](https://tannermidd.github.io/SpecPi/#vscode-chat) | VS Code frontend and VSIX install · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) |
 | [Updating](https://tannermidd.github.io/SpecPi/#updating) | Update, uninstall, and migration notes |
 
 ## Development
