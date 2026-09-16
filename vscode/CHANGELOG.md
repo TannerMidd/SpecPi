@@ -1,6 +1,6 @@
 # SpecPi Chat changelog
 
-## Unreleased
+## 0.11.1
 
 - Follow the default base off `pi-subagents`. The live agent panel, result cards and configuration UI for that package are removed; Chat's existing delegation support now covers the base package, `specpi-delegation`. The panel shows each worker's mode, task, elapsed time, model calls and tool calls, and its Stop button sends the package's own `/delegate cancel-worker` command — a per-worker control the fleet panel never had.
 - Package settings cover web access alone. The Subagents extension-config and Pi-settings-block targets are gone, along with the "editing only the subagents block" scope note; the dialog opens only for packages the connected session actually reports.
