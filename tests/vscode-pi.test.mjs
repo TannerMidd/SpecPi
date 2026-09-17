@@ -291,7 +291,8 @@ test(
                 await closed;
             } finally {
                 clearTimeout(terminate);
-                fs.rmSync(root, { recursive: true, force: true });
+                // Async removal retries initial Windows EBUSY errors that Node 22.19's rmSync does not.
+                await fs.promises.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
             }
         }
     },
@@ -369,7 +370,7 @@ test(
                 path.dirname(resolvedRoot) === path.resolve(os.tmpdir()) &&
                     path.basename(resolvedRoot).startsWith("specpi-vscode-legacy-startup-"),
             );
-            fs.rmSync(resolvedRoot, { recursive: true, force: true });
+            await fs.promises.rm(resolvedRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
         }
     },
 );

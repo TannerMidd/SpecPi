@@ -129,11 +129,10 @@ process.exit(0);
     );
     passed = true;
 } finally {
-    // Windows releases a spawned Pi's handle on its working directory after the process itself is gone, so a
-    // teardown that runs immediately can lose a passing check to EBUSY. Retry rather than report a failure that
-    // the check above already disproved.
+    // Node 22.19's rmSync can bypass retries on an initial EBUSY from rmdir on Windows.
+    // Await async removal so transient directory locks retry and persistent errors still fail the check.
     if (passed) {
-        fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+        await fs.promises.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } else {
         console.error(`Failed isolated base check retained for diagnosis: ${root}`);
     }
