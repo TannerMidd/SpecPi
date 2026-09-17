@@ -103,7 +103,7 @@ function connect(child) {
         }
     });
 
-    const wait = (predicate, since = 0, label = "response") => {
+    const wait = (predicate, since = 0) => {
         const existing = events.slice(since).find(predicate);
         if (existing) {
             return Promise.resolve(existing);
@@ -130,16 +130,9 @@ function connect(child) {
                     finish(reject, error);
                 },
             };
-            // Name the hung step: a bare timeout cannot tell a slow boot from a
-            // stuck dialog, and this test has both kinds of waits. Attach the tail
-            // of the event stream so a failure shows what Pi actually sent last.
             const timer = setTimeout(() => {
-                const tail = events
-                    .slice(-8)
-                    .map((event) => JSON.stringify(event).slice(0, 300))
-                    .join("\n");
-                finish(reject, new Error(`RPC ${label} timed out. Recent events:\n${tail}\n${stderr}`));
-            }, 90000);
+                finish(reject, new Error(`RPC response timed out. ${stderr}`));
+            }, 20000);
             waiting.add(waiter);
         });
     };
@@ -147,7 +140,7 @@ function connect(child) {
     const send = (value) => child.stdin.write(`${JSON.stringify(value)}\n`);
     const request = async (type, fields = {}) => {
         const id = `test-${++sequence}`;
-        const response = wait((event) => event.type === "response" && event.id === id, 0, type);
+        const response = wait((event) => event.type === "response" && event.id === id);
         send({ id, type, ...fields });
         const result = await response;
         assert.equal(result.success, true, result.error);
@@ -160,7 +153,7 @@ function connect(child) {
 
 test(
     "real isolated Pi RPC starts all SpecPi extensions and preserves scope, wishlist, and visible command workflows",
-    { timeout: 300000 },
+    { timeout: 60000 },
     async () => {
         assert.ok(
             fs.existsSync(piShim),
@@ -173,44 +166,36 @@ test(
         const env = isolatedEnvironment(root);
         const launch = await resolveLaunch({ piPath: piShim, nodePath: process.execPath, env });
         assert.match(launch.args[0], /dist[/\\]bundle[/\\]cli\.js$/u);
-        const spawnPi = () => {
-            const child = spawn(
-                launch.command,
-                [
-                    ...launch.args,
-                    "--mode",
-                    "rpc",
-                    "--offline",
-                    "--no-session",
-                    "--no-context-files",
-                    "--no-extensions",
-                    "--no-skills",
-                    "--no-prompt-templates",
-                    "--no-themes",
-                    "-e",
-                    path.join(repository, "tests/fixtures/vscode-pi-harness.ts"),
-                    ...extensionArguments,
-                    "--provider",
-                    "specpi-rpc-fixture",
-                    "--model",
-                    "offline-fixture",
-                ],
-                { cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
-            );
-
-            return { child, closed: once(child, "close"), rpc: connect(child) };
-        };
-
-        let { child, closed, rpc } = spawnPi();
+        const child = spawn(
+            launch.command,
+            [
+                ...launch.args,
+                "--mode",
+                "rpc",
+                "--offline",
+                "--no-session",
+                "--no-context-files",
+                "--no-extensions",
+                "--no-skills",
+                "--no-prompt-templates",
+                "--no-themes",
+                "-e",
+                path.join(repository, "tests/fixtures/vscode-pi-harness.ts"),
+                ...extensionArguments,
+                "--provider",
+                "specpi-rpc-fixture",
+                "--model",
+                "offline-fixture",
+            ],
+            { cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
+        );
+        const closed = once(child, "close");
+        const rpc = connect(child);
 
         async function notification(command, pattern) {
             const cursor = rpc.events.length;
             await rpc.request("prompt", { message: command });
-            const event = await rpc.wait(
-                (item) => item.method === "notify" && pattern.test(item.message),
-                cursor,
-                "notify",
-            );
+            const event = await rpc.wait((item) => item.method === "notify" && pattern.test(item.message), cursor);
 
             return event.message;
         }
@@ -218,7 +203,7 @@ test(
         async function editCommand(command, title, value) {
             const cursor = rpc.events.length;
             const pending = rpc.request("prompt", { message: command });
-            const editor = await rpc.wait((item) => item.method === "editor" && item.title === title, cursor, "editor");
+            const editor = await rpc.wait((item) => item.method === "editor" && item.title === title, cursor);
             rpc.send({
                 type: "extension_ui_response",
                 id: editor.id,
@@ -230,22 +215,7 @@ test(
         }
 
         try {
-            // A cold or crowded runner can leave the first Pi boot silent past the
-            // deadline, as observed on CI. Respawn once on a silent boot; any other
-            // failure still fails, as does a second silent boot.
-            let initial;
-            try {
-                initial = await rpc.request("get_state");
-            } catch (error) {
-                if (!(error instanceof Error) || !error.message.includes("timed out")) {
-                    throw error;
-                }
-
-                child.kill();
-                ({ child, closed, rpc } = spawnPi());
-                initial = await rpc.request("get_state");
-            }
-
+            const initial = await rpc.request("get_state");
             assert.equal(initial.model.provider, "specpi-rpc-fixture");
             assert.equal(initial.sessionFile, undefined);
             assert.equal(
@@ -280,7 +250,6 @@ test(
                 const dialog = await rpc.wait(
                     (event) => event.method === method && event.title.startsWith("RPC "),
                     cursor,
-                    `dialog ${method}`,
                 );
                 rpc.send({ type: "extension_ui_response", id: dialog.id, value });
             }
@@ -289,7 +258,6 @@ test(
             const result = await rpc.wait(
                 (event) => event.method === "notify" && event.message.includes('"selected":"Second"'),
                 cursor,
-                "dialog result",
             );
             assert.deepEqual(JSON.parse(result.message), {
                 selected: "Second",
