@@ -1,29 +1,11 @@
 #!/usr/bin/env node
-// Measure what SpecPi adds to Pi's first model call.
-//
-// HarnessTax (Pan, Yang, Arabzadeh, Chiang, Stoica and Zaharia, 16 September 2026,
-// https://harnesstax.github.io/) traces much of a harness's cost premium to the first
-// request: the instructions and tool schemas a harness sends before any work happens.
-// It reports stock Pi at 4 tools, 2,873 characters of tool schema and 2,547 characters
-// of instructions. SpecPi is a configured Pi, so that baseline is not its number.
-//
-// This script measures the same three quantities against a real Pi process, by pointing
-// it at a local provider and reading the request it actually sends. Characters are
-// counted the way the study defines them:
-//
-//   tool_count         tool definitions declared on the first main request
-//   tool_schema_chars  characters of the compact JSON of those definitions
-//   instruction_chars  characters of the system/developer instructions
-//
-// Provider-reported input tokens are deliberately not reported: a synthetic provider
-// cannot count them honestly, and characters are the comparable measure.
-//
-// Usage: node scripts/measure-context.mjs [--json] [--chart | --check-chart]
-//   --chart        rewrite the published chart from this run's numbers
-//   --check-chart  fail if a published copy has drifted from them, without writing
-//
-// The chart is published in three places plus the README's alt text. Rendering them from one
-// run is what keeps them from disagreeing; see scripts/context-chart.mjs.
+// Measure real first requests from stock Pi and the complete installed SpecPi base.
+// Network is used only to acquire the exact default packages in a disposable home.
+// No live Pi state or provider credentials are read. The model endpoint is localhost.
+// Usage: node scripts/measure-context.mjs [--chart] [--json] [--omp=<path to Oh My Pi's cli.js>]
+//          [--oc=<path to OpenCode's binary>]
+// --chart also saves the bounded measurement artifact used by the chart renderer, and
+// requires --omp and --oc because the chart carries measured Oh My Pi and OpenCode rows.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -32,77 +14,102 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { staleChartFiles, writeChart } from "./context-chart.mjs";
+import { createHash } from "node:crypto";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { runPiFixture } from "./pi-test-harness.mjs";
+import { basePackages, checkBasePackages } from "./packages.mjs";
+import { writeChart } from "./context-chart.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const piCli = path.join(root, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
-const asJson = process.argv.includes("--json");
-const writesChart = process.argv.includes("--chart");
-const checksChart = process.argv.includes("--check-chart");
-// Oh My Pi is a separate harness, not a SpecPi dependency: a Bun-based fork of Pi with its
-// own tools and prompt. Point --omp at its installed cli.js to measure it on these same
-// terms. Without it that row is skipped, so this script keeps working with no Bun present.
+const piRoot = path.join(root, "node_modules/@earendil-works/pi-coding-agent");
+const piCli = path.join(piRoot, "dist/cli.js");
+const version = JSON.parse(fs.readFileSync(path.join(root, "package.json"))).version;
+const directory = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-context-")));
+const workspace = path.join(directory, "workspace");
+const agentDir = path.join(directory, "agent");
+const stockDir = path.join(directory, "stock");
+for (const dir of [workspace, agentDir, stockDir]) {
+    fs.mkdirSync(dir);
+}
+
+// Oh My Pi is a separate harness with its own runtime, so it is opt-in rather than a
+// dependency: point --omp at an installed cli.js to measure it on these same terms.
 const ompFlag = process.argv.find((argument) => argument.startsWith("--omp="));
 const ompCli = ompFlag ? path.resolve(ompFlag.slice("--omp=".length)) : process.env.SPECPI_OMP_CLI;
 const ompRuntime = process.env.SPECPI_OMP_RUNTIME ?? "bun";
+const ompVersion = ompCli ? readPackageVersion(path.resolve(ompCli, "..", "..")) : undefined;
 
-assert.ok(fs.existsSync(piCli), "Install development dependencies before measuring.");
+// OpenCode is likewise a separate harness, published as a compiled Bun binary: opt-in via
+// --oc or SPECPI_OPENCODE_CLI so it is measured where it is installed, never assumed.
+const ocFlag = process.argv.find((argument) => argument.startsWith("--oc="));
+const ocCli = ocFlag ? path.resolve(ocFlag.slice("--oc=".length)) : process.env.SPECPI_OPENCODE_CLI;
+const ocVersion = ocCli ? readPackageVersion(path.resolve(ocCli, "..", "..")) : undefined;
 
-// A provider that records the first request and answers it with the shortest valid
-// stream, so Pi completes one turn and nothing else is measured.
-function startProvider() {
-    const requests = [];
-    const server = http.createServer(async (request, response) => {
-        const chunks = [];
-        for await (const chunk of request) {
-            chunks.push(chunk);
-        }
-
-        let body;
-        try {
-            body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-        } catch {
-            response.writeHead(400).end("{}");
-
-            return;
-        }
-
-        requests.push(body);
-        const event = (choices, usage) => ({
-            id: "chatcmpl-measure",
-            object: "chat.completion.chunk",
-            created: 1,
-            model: body.model,
-            choices,
-            ...(usage ? { usage } : {}),
-        });
-        response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
-        response.write(
-            `data: ${JSON.stringify(event([{ index: 0, delta: { role: "assistant", content: "ok" } }]))}\n\n`,
-        );
-        response.write(`data: ${JSON.stringify(event([{ index: 0, delta: {}, finish_reason: "stop" }]))}\n\n`);
-        response.write(
-            `data: ${JSON.stringify(event([], { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }))}\n\n`,
-        );
-        response.end("data: [DONE]\n\n");
-    });
-
-    return new Promise((resolve) => {
-        server.listen(0, "127.0.0.1", () => {
-            resolve({ server, requests, url: `http://127.0.0.1:${server.address().port}/v1` });
-        });
-    });
+const npmrc = path.join(directory, "npmrc");
+fs.writeFileSync(npmrc, "");
+const installEnv = {
+    SPECPI_PI: piCli,
+    NPM_CONFIG_USERCONFIG: npmrc,
+    npm_config_cache: path.join(directory, "npm-cache"),
+};
+for (const name of Object.keys(process.env)) {
+    if (name.toLowerCase() === "npm_config_cache") {
+        installEnv[name] = installEnv.npm_config_cache;
+    }
 }
 
-// Registered from inside Pi so the measured process selects the model itself, exactly as
-// a configured session would. It declares no tools and no commands of its own.
-function providerExtension(url) {
-    return `export default function (pi) {
-    pi.registerProvider("measure", {
-        baseUrl: ${JSON.stringify(url)},
+/** The installed version beside a harness CLI, so a row names what it measured. */
+function readPackageVersion(packageRoot) {
+    try {
+        return JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8")).version;
+    } catch {
+        return undefined;
+    }
+}
+
+function run(file, args) {
+    const result = runPiFixture(file, {
+        piCommand: file,
+        cwd: workspace,
+        agentDir,
+        args,
+        env: installEnv,
+        timeout: 900_000,
+    });
+    assert.equal(result.status, 0, `${result.error?.message || ""}\n${result.stdout}\n${result.stderr}`);
+
+    return result.stdout;
+}
+
+// An allowlisted environment prevents ambient provider settings and personal discovery.
+function environment(selectedAgentDir) {
+    const env = {};
+    for (const name of ["PATH", "Path", "SystemRoot", "WINDIR", "ComSpec", "COMSPEC", "PATHEXT"]) {
+        if (process.env[name]) {
+            env[name] = process.env[name];
+        }
+    }
+
+    for (const name of ["HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR"]) {
+        env[name] = directory;
+    }
+
+    for (const name of ["APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME"]) {
+        env[name] = path.join(directory, name);
+        fs.mkdirSync(env[name], { recursive: true });
+    }
+
+    env.PI_CODING_AGENT_DIR = selectedAgentDir;
+    env.PI_OFFLINE = "1";
+
+    return env;
+}
+
+function providerSpec(url) {
+    return {
+        baseUrl: url,
         api: "openai-completions",
-        apiKey: "synthetic-measurement-only",
+        apiKey: "synthetic-only",
         models: [
             {
                 id: "measure-model",
@@ -114,276 +121,463 @@ function providerExtension(url) {
                 cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
             },
         ],
-    });
+    };
+}
+
+function providerConfig(url) {
+    return JSON.stringify({ providers: { measure: providerSpec(url) } });
+}
+
+// Oh My Pi keeps Pi's extension API but not necessarily its settings schema, which this
+// repository does not own. Registering the provider from inside the harness asks only for
+// the documented extension surface, so the fork selects the model exactly as a configured
+// session would.
+function providerExtension(url) {
+    return `export default function (pi) {
+    pi.registerProvider("measure", ${JSON.stringify(providerSpec(url))});
     pi.on("session_start", async (_event, ctx) => {
         await pi.setModel(ctx.modelRegistry.find("measure", "measure-model"));
-        // Tools a package registers but Pi has not activated never reach the request. Report
-        // them separately so a gated surface is neither counted as sent nor lost: both
-        // delegation and Browser QA ship behind a saved preference that defaults to off.
-        setTimeout(() => {
-            const registered = (pi.getAllTools?.() ?? []).map((tool) => ({
-                name: tool.name,
-                description: tool.description ?? "",
-                parameters: tool.parameters ?? {},
-            }));
-            console.log(\`SPECPI_PROBE=\${JSON.stringify({ registered, active: pi.getActiveTools?.() ?? [] })}\`);
-        }, 1500);
     });
 }
 `;
 }
 
-// Pi sends OpenAI-shaped tool definitions, and the study counts the compact JSON of what
-// is on the request. Serialize a registered-but-gated tool the same way so the two
-// numbers are comparable.
-function serializeTools(tools) {
-    return JSON.stringify(
-        tools.map((tool) => ({
-            type: "function",
-            function: { name: tool.name, description: tool.description, parameters: tool.parameters },
-        })),
-    ).length;
+// Records the first request and answers it with the shortest valid stream, so the harness
+// completes one turn and nothing after it is measured.
+async function startProvider() {
+    const requests = [];
+    const server = http.createServer(async (request, response) => {
+        const chunks = [];
+        for await (const chunk of request) {
+            chunks.push(chunk);
+        }
+
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        requests.push(body);
+        response.writeHead(200, { "Content-Type": "text/event-stream" });
+        const event = (choices) => ({
+            id: "measure",
+            object: "chat.completion.chunk",
+            created: 1,
+            model: body.model,
+            choices,
+        });
+        response.write(
+            `data: ${JSON.stringify(event([{ index: 0, delta: { role: "assistant", content: "ok" } }]))}\n\n`,
+        );
+        response.write(`data: ${JSON.stringify(event([{ index: 0, delta: {}, finish_reason: "stop" }]))}\n\n`);
+        response.end("data: [DONE]\n\n");
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+    return {
+        requests,
+        url: `http://127.0.0.1:${server.address().port}/v1`,
+        close: () => new Promise((resolve) => server.close(resolve)),
+    };
 }
 
-// The study counts the system/developer instructions of the first main request. For the
-// OpenAI completions shape that is every leading system or developer message.
-function instructionChars(body) {
-    return (body.messages || [])
-        .filter((message) => message.role === "system" || message.role === "developer")
-        .reduce((total, message) => total + String(message.content ?? "").length, 0);
-}
-
-async function measure({ label, extensions = [], skills = false, agentDir, cwd, runtime, cli, isolation }) {
-    const provider = await startProvider();
-    const helper = path.join(agentDir, "measure-provider.ts");
-    fs.writeFileSync(helper, providerExtension(provider.url));
-    // Pi resolves this after extensions register their providers, so the model is already
-    // selected when startup-activating extensions look for one.
-    fs.writeFileSync(
-        path.join(agentDir, "settings.json"),
-        `${JSON.stringify({ defaultModel: "measure/measure-model" }, null, 4)}\n`,
+/** Tool schemas and instruction text from one recorded request body. */
+function summarize(body) {
+    const tools = body.tools ?? [];
+    const instructions = body.messages.filter((message) => ["system", "developer"].includes(message.role));
+    assert.ok(
+        instructions.every((message) => typeof message.content === "string"),
+        "Unexpected instruction encoding",
     );
-    const args = [
-        cli ?? piCli,
-        "--mode",
-        "rpc",
-        "--no-session",
-        // Neutralize whatever this machine has configured, so the row reflects the harness
-        // under test. Each harness spells its own discovery flags differently.
-        ...(isolation ?? ["--no-context-files", "--no-prompt-templates", "--no-themes"]),
-        "--no-extensions",
-        ...(skills ? [] : ["--no-skills"]),
-        "-e",
-        helper,
-        ...extensions.flatMap((entry) => ["-e", entry]),
-    ];
-    const child = spawn(runtime ?? process.execPath, args, {
-        cwd,
-        env: {
-            ...Object.fromEntries(
-                Object.entries(process.env).filter(
-                    ([name]) => !/^(PI_|SPECPI_)/u.test(name) && name !== "NODE_OPTIONS",
-                ),
-            ),
-            PI_CODING_AGENT_DIR: agentDir,
+    const instructionText = instructions.map((message) => message.content).join("");
+
+    return {
+        tools,
+        instructionText,
+        toolCount: tools.length,
+        toolNames: tools.map((tool) => tool.function.name).sort(),
+        toolChars: Object.fromEntries(tools.map((tool) => [tool.function.name, JSON.stringify(tool).length])),
+        toolSchemaChars: JSON.stringify(tools).length,
+        instructionChars: instructionText.length,
+        requestSha256: createHash("sha256").update(JSON.stringify(body)).digest("hex"),
+    };
+}
+
+async function measure(label, selectedAgentDir, enabled = false) {
+    const provider = await startProvider();
+    const { requests } = provider;
+    // Configured local model, not a parent-only runtime override: delegation must
+    // be able to resolve the same provider through its normal isolated SDK path.
+    fs.writeFileSync(path.join(selectedAgentDir, "models.json"), providerConfig(provider.url));
+    const settingsFile = path.join(selectedAgentDir, "settings.json");
+    const settings = fs.existsSync(settingsFile) ? JSON.parse(fs.readFileSync(settingsFile)) : {};
+    fs.writeFileSync(
+        settingsFile,
+        JSON.stringify({ ...settings, defaultProvider: "measure", defaultModel: "measure-model" }),
+    );
+    const child = spawn(
+        process.execPath,
+        [piCli, "--mode", "rpc", "--no-session", "--provider", "measure", "--model", "measure-model"],
+        {
+            cwd: workspace,
+            env: environment(selectedAgentDir),
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
         },
-        stdio: ["pipe", "pipe", "pipe"],
-        windowsHide: true,
-    });
-    let stderr = "";
+    );
     let output = "";
-    child.stderr.on("data", (chunk) => {
-        stderr += chunk;
-        output += chunk;
+    let errors = "";
+    const events = [];
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
     });
-    child.stdout.on("data", (chunk) => {
-        output += chunk;
+    child.stdout.on("data", (text) => {
+        output += text;
+        let newline;
+        while ((newline = output.indexOf("\n")) !== -1) {
+            const line = output.slice(0, newline).trim();
+            output = output.slice(newline + 1);
+            try {
+                events.push(JSON.parse(line));
+            } catch {
+                // Some packages print non-RPC startup diagnostics.
+            }
+        }
     });
+    const closed = new Promise((resolve) => child.once("close", resolve));
+    let launchError;
+    child.on("error", (error) => {
+        launchError = error;
+    });
+    async function until(predicate) {
+        const deadline = Date.now() + 90_000;
+        while (!predicate()) {
+            assert.ok(!launchError, String(launchError));
+            assert.equal(child.exitCode, null, `${label} exited: ${errors}`);
+            assert.ok(Date.now() < deadline, `${label} timed out: ${errors}`);
+            const failure = events.find(
+                (event) => event.type === "extension_error" || (event.type === "response" && event.success === false),
+            );
+            assert.ok(!failure, JSON.stringify(failure));
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+    }
+
+    async function command(id, type, extra = {}) {
+        child.stdin.write(`${JSON.stringify({ id, type, ...extra })}\n`);
+        await until(() => events.some((event) => event.type === "response" && event.id === id));
+        const result = events.find((event) => event.type === "response" && event.id === id);
+        assert.equal(result.success, true, JSON.stringify(result));
+
+        return result;
+    }
 
     try {
-        child.stdin.write(`${JSON.stringify({ id: "m1", type: "prompt", message: "Reply with ok." })}\n`);
-        const deadline = Date.now() + 60000;
-        while (provider.requests.length === 0) {
-            if (Date.now() > deadline) {
-                throw new Error(`${label}: Pi sent no provider request within 60s. ${stderr.slice(-2000)}`);
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, 100));
+        await command("ready", "get_state");
+        if (enabled) {
+            await command("browser", "prompt", { message: "/browser on" });
+            await command("delegate", "prompt", { message: "/delegate on" });
+            await command("webaccess", "prompt", { message: "/webaccess on" });
         }
 
-        const body = provider.requests[0];
-        const tools = body.tools || [];
-        const sent = new Set(tools.map((tool) => tool.function?.name ?? tool.name));
-
-        // Give the probe its window, then read the gated surface from the same process.
-        const probeDeadline = Date.now() + 5000;
-        let probe;
-        while (!probe && Date.now() < probeDeadline) {
-            const line = output.split(/\r?\n/u).find((entry) => entry.includes("SPECPI_PROBE="));
-            if (line) {
-                probe = JSON.parse(line.slice(line.indexOf("SPECPI_PROBE=") + "SPECPI_PROBE=".length));
-                break;
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, 100));
+        assert.equal(requests.length, 0, "Activation commands must not call a model");
+        await command("measure", "prompt", { message: "Reply with ok." });
+        await until(() => requests.length > 0);
+        await until(() => events.some((event) => event.type === "agent_end"));
+        assert.equal(requests.length, 1, "Exactly one model request expected");
+        assert.ok(!events.some((event) => event.type === "extension_error"), "Extension failed during measurement");
+        const { tools, instructionText, ...summary } = summarize(requests[0]);
+        if (process.env.SPECPI_DEBUG_INSTRUCTIONS) {
+            fs.writeFileSync(
+                path.join(root, ".specpi-test", `instructions-${label.replace(/\W+/gu, "-")}.txt`),
+                instructionText,
+            );
         }
 
-        // Pi registers built-ins it does not activate (find, grep, ls, powershell). Those
-        // belong to the baseline, so the caller subtracts them and keeps only what the
-        // loaded packages added.
-        const gated = (probe?.registered ?? []).filter((tool) => !sent.has(tool.name));
+        const { toolNames } = summary;
+        if (selectedAgentDir === agentDir) {
+            assert.ok(instructionText.includes("SpecPi Working Agreement"), "Installed AGENTS guidance missing");
+            assert.ok(instructionText.includes("specpi-improve"), "Installed skill discovery missing");
+            assert.equal(toolNames.includes("browser_open"), enabled);
+            assert.equal(
+                toolNames.includes("delegate"),
+                enabled,
+                JSON.stringify({ toolNames, events: events.filter((event) => event.type === "extension_ui_request") }),
+            );
+            // Wishlist tools are always active. Optional capabilities ship hidden: the
+            // enabled profile opted browser QA, delegation and web access in; the
+            // default profile must contain none of them.
+            for (const tool of ["report_capability_gap", "record_harness_contract", "finish_harness_improvement"]) {
+                assert.ok(toolNames.includes(tool), `Installed tool missing: ${tool}`);
+            }
+
+            for (const tool of ["web_search", "source_check", "fetch_content", "get_search_content"]) {
+                assert.equal(toolNames.includes(tool), enabled, `${tool} visibility mismatch`);
+            }
+        }
 
         return {
             label,
-            toolCount: tools.length,
-            toolSchemaChars: JSON.stringify(tools).length,
-            instructionChars: instructionChars(body),
-            toolNames: [...sent].sort(),
-            gated,
+            harness: "Pi",
+            ...summary,
+            installedGuidance: selectedAgentDir === agentDir,
+            browserAndDelegationEnabled: enabled,
         };
     } finally {
         child.stdin.end();
         child.kill();
-        provider.server.close();
+        await closed;
+        await provider.close();
     }
 }
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-measure-"));
-const workspace = path.join(directory, "workspace");
-fs.mkdirSync(workspace);
-fs.writeFileSync(path.join(workspace, "README.md"), "Measurement workspace.\n");
-
-const configurations = [
-    { label: "Pi (stock)", extensions: [], skills: false },
-    {
-        label: "SpecPi first-party",
-        extensions: [
-            path.join(root, "extensions", "workflow-controls", "index.ts"),
-            path.join(root, "extensions", "tool-wishlist", "index.ts"),
-        ],
-        skills: true,
-    },
-    {
-        label: "+ specpi-delegation",
-        extensions: [
-            path.join(root, "extensions", "workflow-controls", "index.ts"),
-            path.join(root, "extensions", "tool-wishlist", "index.ts"),
-            path.join(root, "packages", "delegation", "src", "index.ts"),
-        ],
-        skills: true,
-    },
-    {
-        label: "+ specpi-experiments",
-        extensions: [
-            path.join(root, "extensions", "workflow-controls", "index.ts"),
-            path.join(root, "extensions", "tool-wishlist", "index.ts"),
-            path.join(root, "packages", "delegation", "src", "index.ts"),
-            path.join(root, "packages", "experiments", "src", "index.ts"),
-        ],
-        skills: true,
-    },
-    {
-        label: "+ specpi-browser-qa",
-        extensions: [
-            path.join(root, "extensions", "workflow-controls", "index.ts"),
-            path.join(root, "extensions", "tool-wishlist", "index.ts"),
-            path.join(root, "packages", "delegation", "src", "index.ts"),
-            path.join(root, "packages", "experiments", "src", "index.ts"),
-            path.join(root, "packages", "browser-qa", "src", "index.ts"),
-        ],
-        skills: true,
-    },
-];
-
-// Oh My Pi ships its own tools, skills and prompt inside the binary, so its row is the
-// harness as installed: nothing added, only this machine's own configuration excluded.
-if (ompCli) {
-    assert.ok(fs.existsSync(ompCli), `No Oh My Pi CLI at ${ompCli}`);
-    configurations.push({
-        label: "Oh My Pi",
-        runtime: ompRuntime,
-        cli: ompCli,
-        isolation: ["--no-rules"],
-        skills: true,
+// Oh My Pi is a separate harness rather than a SpecPi dependency: a Bun-based fork of Pi
+// with its own tools, skills and prompt built in. It is measured as installed, on the same
+// terms as the rows above -- one synthetic provider, one empty workspace, this machine's own
+// configuration excluded -- so its bar is ours and is never filled in from a published
+// figure. Nothing is added to it; only local discovery is turned off.
+async function measureForeign({ label, harness, runtime, cli, isolation }) {
+    const provider = await startProvider();
+    const foreignDir = path.join(directory, `foreign-${label.replace(/\W+/gu, "-")}`);
+    fs.mkdirSync(foreignDir, { recursive: true });
+    const helper = path.join(foreignDir, "measure-provider.ts");
+    fs.writeFileSync(helper, providerExtension(provider.url));
+    const child = spawn(runtime, [cli, "--mode", "rpc", "--no-session", ...isolation, "-e", helper], {
+        cwd: workspace,
+        env: environment(foreignDir),
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
     });
+    let errors = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    child.stdout.resume();
+    const closed = new Promise((resolve) => child.once("close", resolve));
+    let launchError;
+    child.on("error", (error) => {
+        launchError = error;
+    });
+    try {
+        child.stdin.write(`${JSON.stringify({ id: "measure", type: "prompt", message: "Reply with ok." })}\n`);
+        const deadline = Date.now() + 180_000;
+        while (provider.requests.length === 0) {
+            assert.ok(!launchError, `${label} failed to launch: ${launchError}`);
+            assert.ok(Date.now() < deadline, `${label} sent no provider request: ${errors.slice(-2000)}`);
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        const summary = summarize(provider.requests[0]);
+        delete summary.tools;
+        delete summary.instructionText;
+
+        return { label, harness, ...summary };
+    } finally {
+        child.stdin.end();
+        child.kill();
+        await closed;
+        await provider.close();
+    }
 }
 
-const results = [];
+// OpenCode is a separate harness built as a compiled Bun binary with its own config schema,
+// which this repository does not own. It is measured as installed on the same terms as the
+// rows above -- one synthetic provider, one empty workspace, this machine's own config,
+// auth and data excluded through the XDG redirects -- so its bar is ours and is never
+// filled in from a published figure. Nothing is added to it; only the provider is
+// registered, through its documented config surface. `opencode run` normally fires a
+// parallel small-model call to write a session title; pinning --title suppresses it, so the
+// turn sends exactly one request and the recorded one is the conversation call.
+async function measureOpenCode({ label, harness, cli }) {
+    const provider = await startProvider();
+    const configDir = path.join(directory, "XDG_CONFIG_HOME", "opencode");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.mkdirSync(path.join(directory, "XDG_CACHE_HOME"), { recursive: true });
+    fs.mkdirSync(path.join(directory, "XDG_STATE_HOME"), { recursive: true });
+    fs.writeFileSync(
+        path.join(configDir, "opencode.json"),
+        JSON.stringify(
+            {
+                $schema: "https://opencode.ai/config.json",
+                provider: {
+                    measure: {
+                        npm: "@ai-sdk/openai-compatible",
+                        name: "Measure",
+                        options: { baseURL: provider.url, apiKey: "synthetic-only" },
+                        models: {
+                            "measure-model": {
+                                name: "Measurement model",
+                                contextWindow: 200000,
+                                maxTokens: 8192,
+                                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                            },
+                        },
+                    },
+                },
+            },
+            null,
+            4,
+        ),
+    );
+    const child = spawn(
+        cli,
+        ["run", "Reply with ok.", "--model", "measure/measure-model", "--title", "Measurement", "--port", "0"],
+        {
+            cwd: workspace,
+            // Oh My Pi resolves its dependencies through Bun's install cache, which is part
+            // of how it is installed, so only OpenCode gets the cache and state redirects.
+            env: {
+                ...environment(directory),
+                XDG_CACHE_HOME: path.join(directory, "XDG_CACHE_HOME"),
+                XDG_STATE_HOME: path.join(directory, "XDG_STATE_HOME"),
+            },
+            stdio: ["ignore", "ignore", "pipe"],
+            windowsHide: true,
+        },
+    );
+    let errors = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const closed = new Promise((resolve) => child.once("close", resolve));
+    let launchError;
+    child.on("error", (error) => {
+        launchError = error;
+    });
+    try {
+        const deadline = Date.now() + 180_000;
+        while (child.exitCode === null && child.signalCode === null && !launchError && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        assert.ok(!launchError, `${label} failed to launch: ${launchError}`);
+        assert.equal(child.exitCode, 0, `${label} exited: ${errors.slice(-2000)}`);
+        assert.ok(Date.now() < deadline, `${label} timed out: ${errors.slice(-2000)}`);
+        assert.equal(
+            provider.requests.length,
+            1,
+            `${label} sent ${provider.requests.length} model requests, expected exactly one`,
+        );
+        const summary = summarize(provider.requests[0]);
+        delete summary.tools;
+        delete summary.instructionText;
+
+        return { label, harness, ...summary };
+    } finally {
+        child.kill();
+        await closed;
+        await provider.close();
+    }
+}
+
 try {
-    for (const configuration of configurations) {
-        const agentDir = path.join(directory, `agent-${results.length}`);
-        fs.mkdirSync(agentDir, { recursive: true });
-        results.push(await measure({ ...configuration, agentDir, cwd: workspace }));
+    console.error(
+        `Acquiring all ${basePackages.length} pinned packages in a disposable home; Chromium download skipped.`,
+    );
+    run(path.join(root, "scripts/specpi.mjs"), ["plan"]);
+    run(path.join(root, "scripts/specpi.mjs"), ["install", "--yes", "--skip-browser-install"]);
+    assert.deepEqual(
+        checkBasePackages(agentDir, JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json")))),
+        [],
+    );
+    // Verify combined resource loading independently: a missing extension must not make a cheaper bar.
+    const probe = path.join(directory, "resources.mjs");
+    fs.writeFileSync(
+        probe,
+        `import { DefaultResourceLoader } from ${JSON.stringify(pathToFileURL(path.join(piRoot, "dist/index.js")).href)};
+const loader = new DefaultResourceLoader(${JSON.stringify({ cwd: workspace, agentDir })});
+await loader.reload();
+const result = loader.getExtensions();
+console.log("RESOURCES=" + JSON.stringify({ errors: result.errors, count: result.extensions.length }));
+process.exit(0);`,
+    );
+    const line = run(probe, [])
+        .split("\n")
+        .find((entry) => entry.startsWith("RESOURCES="));
+    assert.ok(line, "Missing resource report");
+    const resources = JSON.parse(line.slice("RESOURCES=".length));
+    assert.deepEqual(resources.errors, []);
+    assert.equal(resources.count, basePackages.length + 2);
+    const results = [];
+    for (const [label, selected, enabled] of [
+        ["Pi (stock)", stockDir, false],
+        ["SpecPi default", agentDir, false],
+        ["SpecPi enabled", agentDir, true],
+    ]) {
+        console.error(`Measuring ${label}...`);
+        results.push(await measure(label, selected, enabled));
+    }
+
+    if (ompCli) {
+        assert.ok(fs.existsSync(ompCli), `No Oh My Pi CLI at ${ompCli}`);
+        console.error("Measuring Oh My Pi...");
+        results.push(
+            await measureForeign({
+                label: "Oh My Pi",
+                harness: `Oh My Pi ${ompVersion ?? "(unknown version)"}`,
+                runtime: ompRuntime,
+                cli: ompCli,
+                isolation: ["--no-rules", "--no-extensions"],
+            }),
+        );
+    }
+
+    if (ocCli) {
+        assert.ok(fs.existsSync(ocCli), `No OpenCode binary at ${ocCli}`);
+        console.error("Measuring OpenCode...");
+        results.push(
+            await measureOpenCode({
+                label: "OpenCode",
+                harness: `OpenCode ${ocVersion ?? "(unknown version)"}`,
+                cli: ocCli,
+            }),
+        );
+    }
+
+    if (process.argv.includes("--chart")) {
+        const missing = [
+            !ompCli && "--omp=<path to Oh My Pi's cli.js>",
+            !ocCli && "--oc=<path to OpenCode's binary>",
+        ].filter(Boolean);
+        if (missing.length > 0) {
+            throw new Error(
+                `The chart carries measured Oh My Pi and OpenCode rows, so writing it needs ${missing.join(" and ")}. ` +
+                    "Measure them or remove the rows from scripts/context-chart.mjs; they must not be filled in from elsewhere.",
+            );
+        }
+    }
+
+    const report = {
+        schema: 1,
+        measuredAt: new Date().toISOString(),
+        specpiVersion: version,
+        piVersion: JSON.parse(fs.readFileSync(path.join(piRoot, "package.json"))).version,
+        nodeVersion: process.version,
+        platform: process.platform,
+        packages: basePackages,
+        loadedExtensionCount: resources.count,
+        ...(ompCli ? { ohMyPiVersion: ompVersion } : {}),
+        ...(ocCli ? { opencodeVersion: ocVersion } : {}),
+        method: "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
+        results,
+    };
+    console.log(
+        process.argv.includes("--json")
+            ? JSON.stringify(report, null, 4)
+            : results
+                  .map(
+                      (row) =>
+                          `${row.label}: ${row.toolCount} tools; ${row.toolSchemaChars} schema + ${row.instructionChars} instructions = ${row.toolSchemaChars + row.instructionChars} characters`,
+                  )
+                  .join("\n"),
+    );
+    if (process.argv.includes("--chart")) {
+        fs.writeFileSync(
+            path.join(root, "site/research/context-measurement.json"),
+            `${JSON.stringify(report, null, 4)}\n`,
+        );
+        console.error(`Updated charts: ${writeChart(report).join(", ")}`);
     }
 } finally {
-    // A harness that keeps a database or log handle open can outlive its own kill on
-    // Windows. Losing the scratch directory is not a reason to lose the measurement.
-    try {
-        fs.rmSync(directory, { recursive: true, force: true });
-    } catch {
-        console.error(`Left behind: ${directory}`);
-    }
-}
-
-if (asJson) {
-    console.log(JSON.stringify(results, null, 2));
-} else {
-    const base = results[0];
-    const pad = (value, width) => String(value).padStart(width);
-    console.log("First main request, measured against a real Pi process.\n");
-    console.log("configuration            tools  tool schema  instructions   total chars   vs stock");
-    for (const result of results) {
-        const total = result.toolSchemaChars + result.instructionChars;
-        const baseTotal = base.toolSchemaChars + base.instructionChars;
-        console.log(
-            `${result.label.padEnd(24)}${pad(result.toolCount, 5)}${pad(result.toolSchemaChars.toLocaleString(), 13)}` +
-                `${pad(result.instructionChars.toLocaleString(), 14)}${pad(total.toLocaleString(), 14)}` +
-                `${pad(result === base ? "—" : `${(total / baseTotal).toFixed(1)}x`, 11)}`,
-        );
-    }
-
-    console.log(`\nStock Pi tools: ${base.toolNames.join(", ")}`);
-    // Named rather than positional: another harness may follow SpecPi's rows.
-    const last = results.find((result) => result.label === "+ specpi-browser-qa");
-    const added = last.toolNames.filter((name) => !base.toolNames.includes(name));
-    console.log(`Added by SpecPi: ${added.length ? added.join(", ") : "none"}`);
-
-    const builtinGated = new Set(base.gated.map((tool) => tool.name));
-    const gatedByPackages = last.gated.filter((tool) => !builtinGated.has(tool.name));
-    if (gatedByPackages.length) {
-        const chars = serializeTools(gatedByPackages);
-        const full = last.toolSchemaChars + last.instructionChars + chars;
-        const baseTotal = base.toolSchemaChars + base.instructionChars;
-        console.log(
-            `\nRegistered by a package but gated on this run: ${gatedByPackages.map((tool) => tool.name).join(", ")} ` +
-                `(${chars.toLocaleString()} chars of schema).`,
-        );
-        console.log("These ship gated behind a saved preference, so a default session does not send them. Turning");
-        console.log(
-            `every gate on would send at least ${full.toLocaleString()} chars, about ${(full / baseTotal).toFixed(1)}x stock Pi;`,
-        );
-        console.log(
-            "a floor, because a gated tool's prompt snippet is not counted in the instructions until it is active.",
-        );
-    }
-}
-
-// The chart mixes these rows with HarnessTax's published ones, so it is rendered from a run
-// rather than edited: every copy moves together or the run fails.
-if (writesChart || checksChart) {
-    if (checksChart) {
-        const stale = staleChartFiles(results);
-        if (stale.length) {
-            console.error(
-                `\nThe published chart no longer matches this measurement:\n  ${stale.join("\n  ")}\n` +
-                    "Run: node scripts/measure-context.mjs --chart --omp=<path to its cli.js>",
-            );
-            process.exitCode = 1;
-        } else {
-            console.error("\nThe published chart matches this measurement.");
-        }
-    } else {
-        const written = writeChart(results);
-        console.error(written.length ? `\nRewrote:\n  ${written.join("\n  ")}` : "\nThe published chart was current.");
-    }
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }

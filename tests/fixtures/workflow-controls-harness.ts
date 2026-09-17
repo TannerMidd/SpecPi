@@ -56,6 +56,13 @@ const pi: any = {
         entries.push(entry);
         branch.push(entry);
     },
+    // Mirror Pi: the built-ins plus pi-web-access tools start active; setActiveTools replaces the set.
+    getActiveTools() {
+        return [...activeTools];
+    },
+    setActiveTools(names: string[]) {
+        activeTools = [...names];
+    },
     sendMessage(message: any, options: any) {
         messages.push({ message, options });
     },
@@ -81,6 +88,8 @@ registerWorkflowControls(pi);
 let branch: any[] = [];
 let currentCwd = nestedCwd;
 let branchReads = 0;
+const webAccessTools = ["web_search", "source_check", "fetch_content", "get_search_content"];
+let activeTools: string[] = ["read", "bash", "edit", "write", ...webAccessTools];
 const sessionManager = {
     getBranch: () => {
         branchReads += 1;
@@ -128,9 +137,22 @@ const ctx: any = {
     },
 };
 
+// Web access ships hidden: the first session_start must withdraw its four tools, /webaccess on
+// must offer them again, and a saved startup preference must re-offer them on later sessions.
+const activeAtLoad = [...activeTools];
 for (const handler of events.get("session_start") || []) {
     await handler({}, ctx);
 }
+
+const activeAfterFirstStart = [...activeTools];
+await commands.get("webaccess").handler("on", ctx);
+const activeAfterOn = [...activeTools];
+await commands.get("webaccess").handler("off", ctx);
+const activeAfterOff = [...activeTools];
+await commands.get("webaccess").handler("startup on", ctx);
+const startupPreferenceSaved =
+    JSON.parse(fs.readFileSync(path.join(agentDir, "specpi", "web-access", "settings.json"), "utf8"))
+        ?.startupActivation === true;
 
 await commands.get("scope").handler("set", ctx);
 
@@ -281,14 +303,23 @@ for (const handler of events.get("session_start") || []) {
     await handler({}, ctx);
 }
 
+const activeAfterResumeStart = [...activeTools];
+
 await commands.get("scope").handler("add docs/", ctx);
 const restoredRecordUnchanged = JSON.stringify(branch.slice(0, -1)) === beforeResume;
 const exec = pi.exec;
 let releaseRoot: () => void;
+let rootLookupReached: () => void;
+// The command reaches its root lookup asynchronously, so hand back the real exec only once the stub is holding it;
+// swapping on the next line instead would let the command sail past and leave `releaseRoot` unassigned.
+const rootLookupHeld = new Promise<void>((resolve) => {
+    rootLookupReached = resolve;
+});
 pi.exec = async (command: string, args: string[], options: any) => {
     if (args[0] === "rev-parse") {
         await new Promise<void>((resolve) => {
             releaseRoot = resolve;
+            rootLookupReached();
         });
     }
 
@@ -296,6 +327,7 @@ pi.exec = async (command: string, args: string[], options: any) => {
 };
 
 const pending = commands.get("scope").handler("status", ctx);
+await rootLookupHeld;
 branch = [];
 pi.exec = exec;
 for (const handler of events.get("session_tree") || []) {
@@ -306,9 +338,51 @@ releaseRoot!();
 await pending;
 await commands.get("scope").handler("status", ctx);
 const treeCleared = notifications.at(-1).message === "Scope monitoring is inactive.";
+
+// Restore retires scope immediately but only learns the repository root once `git rev-parse` returns. A human who
+// declares scope inside that window must not have it recorded against the session cwd the restore was still guessing
+// at, because the replay that follows rejects a foreign root and would silently retire the contract it just confirmed.
+ctx.cwd = nestedCwd;
+editorValue = "src/";
+branch = [];
+let releaseRestoreRoot: () => void;
+pi.exec = async (command: string, args: string[], options: any) => {
+    if (args[0] === "rev-parse") {
+        await new Promise<void>((resolve) => {
+            releaseRestoreRoot = resolve;
+        });
+    }
+
+    return exec(command, args, options);
+};
+
+for (const handler of events.get("session_start") || []) {
+    await handler({}, ctx);
+}
+
+const declaredDuringRestore = commands.get("scope").handler("set", ctx);
+pi.exec = exec;
+releaseRestoreRoot!();
+await declaredDuringRestore;
+const racedScopeState = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
+const restoreRaceKeptRepositoryRoot =
+    racedScopeState?.active === true &&
+    racedScopeState.root === fs.realpathSync.native(repository) &&
+    racedScopeState.entries.some((entry: any) => entry.path === "src" && entry.directory === true);
+await commands.get("scope").handler("status", ctx);
+const restoreRaceSurvived = notifications.at(-1).message.startsWith("Scope: src/;");
+
 const report = {
     commands: [...commands.keys()].sort(),
     toolRegistered: tools.size > 0,
+    webToolsOfferedAtLoad: webAccessTools.every((name) => activeAtLoad.includes(name)),
+    webToolsHiddenAtStart:
+        !webAccessTools.some((name) => activeAfterFirstStart.includes(name)) &&
+        ["read", "bash", "edit", "write"].every((name) => activeAfterFirstStart.includes(name)),
+    webToolsOfferedAfterOn: webAccessTools.every((name) => activeAfterOn.includes(name)),
+    webToolsWithdrawnAfterOff: !webAccessTools.some((name) => activeAfterOff.includes(name)),
+    startupPreferenceSaved,
+    startupPreferenceReofferedOnResume: webAccessTools.every((name) => activeAfterResumeStart.includes(name)),
     nestedCwdOutOfScopeDenied,
     nestedCwdInScopeAllowed,
     denied,
@@ -325,6 +399,8 @@ const report = {
     taskBound,
     restoredRecordUnchanged,
     treeCleared,
+    restoreRaceKeptRepositoryRoot,
+    restoreRaceSurvived,
     emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
 };
 console.log("WORKFLOW_CONTROLS_HARNESS=" + JSON.stringify(report));

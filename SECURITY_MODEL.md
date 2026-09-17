@@ -10,7 +10,7 @@ Scope records use Pi's current session branch. Restoring a branch does not creat
 
 ## Improvement authority and evidence
 
-Collection is off by default. Enabling it permits sanitized gap observations, not implementation. Only an exact human `/harness-improvement` selection authorizes a wishlist-sourced change. The selected contract is bound to the gap, source checkout, session, and selection generation.
+Collection is off by default. Enabling it permits sanitized gap observations, not implementation. Only an exact human `/harness-improvement` selection authorizes a wishlist-sourced change. The selected contract is bound to the gap, source checkout, session, and selection generation. Web access tools (`web_search`, `source_check`, `fetch_content`, `get_search_content`) are hidden until `/webaccess on`.
 
 Retirement requires source registry integration, unchanged verification policy, a matching contract, bounded source snapshots, `npm run check`, and closed registered validators. Receipts distinguish machine-observed gates from model-reported acceptance evidence. Stale selections, changed source, missing evidence, and failed checks reject retirement. A validator proves only the behavior it exercises; the human remains responsible for accepting the result. The loop never commits, publishes, or installs a resulting change automatically.
 

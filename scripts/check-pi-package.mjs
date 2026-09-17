@@ -221,7 +221,7 @@ try {
         "WORKFLOW_CONTROLS_HARNESS=",
         "workflow extension harness",
     );
-    assert.deepEqual(workflowReport.commands, ["scope"]);
+    assert.deepEqual(workflowReport.commands, ["scope", "webaccess"]);
     assert.equal(workflowReport.toolRegistered, false);
     assert.equal(workflowReport.emittedScopeStatus, true);
 
@@ -305,5 +305,7 @@ try {
     assert.equal(fs.readFileSync(authPath, "utf8"), authCanary, "Pi package smoke modified authentication state");
     console.log(`Pi package check passed: ${artifactLabel} loaded through Pi ${piVersion}`);
 } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    // Node 22.19's rmSync can bypass retries on an initial EBUSY from rmdir on Windows.
+    // Await async removal so transient directory locks retry and persistent errors still fail the check.
+    await fs.promises.rm(temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }

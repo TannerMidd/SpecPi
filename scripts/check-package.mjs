@@ -48,6 +48,7 @@ const requiredFiles = [
     "extensions/workflow-controls/scope.mjs",
     "extensions/workflow-controls/smoke.mjs",
     "extensions/workflow-controls/task-contract.mjs",
+    "extensions/workflow-controls/web-access.mjs",
     "package.json",
     "scripts/lib.mjs",
     "scripts/lock.mjs",
@@ -468,5 +469,7 @@ try {
         `Package check passed: ${packResult.filename} (${packResult.entryCount} files, ${packResult.size} bytes compressed)`,
     );
 } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    // Node 22.19's rmSync can bypass retries on an initial EBUSY from rmdir on Windows.
+    // Await async removal so transient directory locks retry and persistent errors still fail the check.
+    await fs.promises.rm(temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }

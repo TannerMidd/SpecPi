@@ -9,7 +9,7 @@ Wishlist observations are leads, not authorization. Only an exact human selectio
 ## Repository map
 
 - `scripts/specpi.mjs` and `scripts/lib.mjs`: installer lifecycle, managed-state transactions, and CLI behavior.
-- `scripts/packages.mjs` and `templates/settings.json`: the six pinned packages installed by default, including independently published `specpi-browser-qa`. The harness's own extensions remain limited to `/scope` and the improvement loop. Browser QA source lives in `packages/browser-qa` and has its own release process; change default integration in the installer, not in that immutable package release.
+- `scripts/packages.mjs` and `templates/settings.json`: the seven pinned packages installed by default, including independently published `specpi-browser-qa`. The harness's own extensions remain limited to `/scope` and the improvement loop. Browser QA source lives in `packages/browser-qa` and has its own release process; change default integration in the installer, not in that immutable package release.
 - `templates/`, `extensions/`, and `skills/`: installable source-of-truth files for scope and the improvement loop. Edit these, not installed copies.
 - `tests/`: installer, scope, and improvement-loop regressions.
 - `vscode/`: SpecPi Chat, the separately packaged VS Code frontend. Keep it aligned with the Pi package base; its adapters display public runtime events and do not duplicate tool policy.

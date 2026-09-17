@@ -18,7 +18,7 @@ test("workflow-controls extension composes scope and improvement contract lifecy
     const match = output.match(/WORKFLOW_CONTROLS_HARNESS=(.+)/u);
     assert.ok(match, output);
     const report = JSON.parse(match[1]);
-    assert.deepEqual(report.commands, ["scope"]);
+    assert.deepEqual(report.commands, ["scope", "webaccess"]);
     assert.equal(report.toolRegistered, false);
     for (const [name, value] of Object.entries(report)) {
         if (!["commands", "toolRegistered"].includes(name)) {

@@ -89,7 +89,7 @@ test("minimal installer completes the lifecycle without changing settings or pri
     fs.writeFileSync(path.join(agentDir, "AGENTS.md"), "Human guidance\n");
     runCli(agentDir, "install", "--yes");
     const manifest = JSON.parse(fs.readFileSync(manifestPath));
-    assert.equal(Object.keys(manifest.files).length, 11);
+    assert.equal(Object.keys(manifest.files).length, 12);
     assert.ok(Object.keys(manifest.files).every((file) => /workflow-controls|tool-wishlist|specpi-improve/.test(file)));
     runCli(agentDir, "doctor");
     const retained = path.join(agentDir, "extensions/workflow-controls/index.ts");

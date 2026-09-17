@@ -49,6 +49,7 @@ const routes = new Map([
     ["/SpecPi/styles.css", ["styles.css", "text/css"]],
     ["/SpecPi/wiki.css", ["wiki.css", "text/css"]],
     ["/SpecPi/research.css", ["research.css", "text/css"]],
+    ["/SpecPi/research/context-measurement.json", ["research/context-measurement.json", "application/json"]],
     ["/SpecPi/theme.js", ["theme.js", "text/javascript"]],
     ["/SpecPi/page.js", ["page.js", "text/javascript"]],
     ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
@@ -188,6 +189,10 @@ try {
         // Every sidebar entry must reach a section, or the contents read as broken.
         assert.equal(research.sections, research.navLinks);
         await page.screenshot({ path: path.join(screenshots, `research-${name}.png`), fullPage: true });
+        await page.locator("#chart-context").screenshot({ path: path.join(screenshots, `context-${name}.png`) });
+        await page.locator("#chart-capability").screenshot({ path: path.join(screenshots, `capability-${name}.png`) });
+        const measurement = await page.request.get(`${origin}/SpecPi/research/context-measurement.json`);
+        assert.equal(measurement.status(), 200);
         process.stdout.write(`Site ${name}: PASS\n`);
     }
 

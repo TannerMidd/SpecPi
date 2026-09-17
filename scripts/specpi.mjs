@@ -37,6 +37,7 @@ const resourcePaths = [
     "extensions/workflow-controls/scope.mjs",
     "extensions/workflow-controls/task-contract.mjs",
     "extensions/workflow-controls/smoke.mjs",
+    "extensions/workflow-controls/web-access.mjs",
     "extensions/tool-wishlist/index.ts",
     "extensions/tool-wishlist/core.mjs",
     "extensions/tool-wishlist/verification.mjs",
