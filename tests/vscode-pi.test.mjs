@@ -213,11 +213,7 @@ test(
         async function editCommand(command, title, value) {
             const cursor = rpc.events.length;
             const pending = rpc.request("prompt", { message: command });
-            const editor = await rpc.wait(
-                (item) => item.method === "editor" && item.title === title,
-                cursor,
-                "editor",
-            );
+            const editor = await rpc.wait((item) => item.method === "editor" && item.title === title, cursor, "editor");
             rpc.send({
                 type: "extension_ui_response",
                 id: editor.id,
