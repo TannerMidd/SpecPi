@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.26.0 - 2026-09-17
+
+- Let the agent ask for a withdrawn tool group instead of working around it. Hiding web access and Browser QA keeps 19,344 characters of tool schema out of every request, but it also hides them from the agent, so a session that turns out to need one had no way to say so. The new `request_capability` tool names the withdrawn groups and asks the human, who may decline; accepting offers that group's tools from the agent's next message, for the rest of the session. It grants nothing on its own: it refuses without an interactive human, and a decline leaves the session unchanged. `/webaccess on` and `/browser on` are unchanged. Delegation is not requestable, because its own package requires a human command to bind a model.
+- Stop asking about a capability you always allow. `/capability allow <name>` records a standing grant so `request_capability` offers that group without a prompt, `/capability ask <name>` restores the prompt, and `/capability` shows which groups are offered and which are granted. Recording a grant needs an interactive command, a grant that fires announces itself, and headless sessions are still refused: the grant removes the prompt, not the human.
+- Bump `specpi-browser-qa` to 0.3.0 and move the base pin to match. Its fourteen tools no longer carry `promptSnippet` or `promptGuidelines`; that guidance moved into the tool descriptions, which travel with the schema. Pi rebuilds the system prompt when an activated tool carries prompt metadata, and that rebuild invalidates the provider's cached prefix even where deferred tool schemas are supported — so the metadata made every mid-session activation more expensive than it needed to be. Behavior is unchanged. `pi-web-access` is a third-party package and still carries its own prompt metadata, so activating web access mid-session continues to rebuild the prompt.
+
 ## 0.25.0 - 2026-09-17
 
 - Hide the web access tools until needed. `web_search`, `source_check`, `fetch_content` and `get_search_content` are no longer offered to a session until `/webaccess on`; `/webaccess startup on` saves that choice. The working agreement, security model and wiki say so, and the agent asks the human to run it rather than attempting a hidden tool.

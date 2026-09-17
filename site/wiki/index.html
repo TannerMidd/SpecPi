@@ -40,7 +40,7 @@
                     ><a href="#migration"><span>06</span>Update &amp; remove</a
                     ><a href="#development"><span>07</span>Development</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.25.0<br />Chat 0.11.1</div>
+                <div class="index-meta">SpecPi 0.26.0<br />Chat 0.11.1</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -89,7 +89,7 @@ specpi doctor</code></pre>
                         preserved.
                     </p>
                     <p>
-                        <code>specpi-browser-qa@0.2.0</code> provides 14 interaction, accessibility, diagnostic, and
+                        <code>specpi-browser-qa@0.3.0</code> provides 14 interaction, accessibility, diagnostic, and
                         visual QA tools, not general-browser feature parity. Confirmed install/update invokes its
                         installed Node bin to download Chromium and verify readiness. No Bun or OS libraries are
                         installed. <code>--skip-browser-install</code> skips setup but still installs packages;
@@ -112,7 +112,14 @@ specpi doctor</code></pre>
                         <code>/webaccess on</code> offers the web search, check, fetch, and content tools for the
                         session, <code>/browser on</code> offers Browser QA's fourteen tools, and
                         <code>/delegate on</code> offers delegation. Each supports <code>startup on</code> to save
-                        the preference; <code>off</code> withdraws the group again. The improvement loop's tools
+                        the preference; <code>off</code> withdraws the group again. The agent can also ask for web
+                        access or Browser QA when a task needs one, which prompts you to allow it for the session;
+                        declining leaves the session unchanged, and it cannot offer itself a group without you.
+                        Delegation is not requestable that way. If a prompt becomes routine,
+                        <code>/capability allow browser</code> grants that group without asking again and
+                        <code>/capability ask browser</code> restores the prompt; <code>/capability</code> shows
+                        both states. A grant still announces itself when it fires and never applies to a headless
+                        session. The improvement loop's tools
                         are always offered; <code>/wishlist on</code> and <code>/wishlist off</code> govern local
                         collection, which gates recording rather than visibility.
                     </p>
@@ -216,7 +223,7 @@ specpi doctor</code></pre>
                 <section class="doc-section" id="vscode">
                     <h2>SpecPi Chat for VS Code</h2>
                     <p>
-                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.25.0/specpi-chat-0.11.1.vsix"
+                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.26.0/specpi-chat-0.11.1.vsix"
                             >Download Chat 0.11.1</a
                         >, then run <strong>Extensions: Install from VSIX…</strong> in VS Code. Open a trusted project,
                         select SpecPi in the Activity Bar, and choose <strong>Connect Pi</strong>.
@@ -298,7 +305,7 @@ npm run check:site</code></pre>
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.25.0">v0.25.0</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.26.0">v0.26.0</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>

@@ -38,7 +38,7 @@ It focuses on five things:
 - **Accuracy:** exact version pins, checksums on state, rollback on failure, and proof over promises
 - **Improvement:** local notes become small, checked changes through `/harness-improvement`
 - **Efficiency:** delegation, persistent goals, and browser QA handled by the right tool for the job
-- **Lean default:** web access, browser QA, and delegation stay off until you need them. Turn them on for a session with `/webaccess on`, `/browser on`, and `/delegate on`
+- **Lean default:** web access, browser QA, and delegation stay off until you need them. Turn them on for a session with `/webaccess on`, `/browser on`, and `/delegate on` — or let the agent ask when it hits the need, and answer the prompt
 
 Everything it touches is written down, versioned, and easy to undo.
 

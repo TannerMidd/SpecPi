@@ -18,7 +18,7 @@ SpecPi requests exact npm dependency saves for these pins and checks installed t
 | Package                        | Version | Upstream                                                                  |
 | ------------------------------ | ------- | ------------------------------------------------------------------------- |
 | pi-web-access                  | 0.29.0  | [nicobailon/pi-web-access](https://github.com/nicobailon/pi-web-access)   |
-| specpi-browser-qa              | 0.2.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/browser-qa-v0.1.0/packages/browser-qa) |
+| specpi-browser-qa              | 0.3.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/browser-qa-v0.3.0/packages/browser-qa) |
 | specpi-delegation              | 0.2.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/delegation) |
 | specpi-experiments             | 0.1.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/experiments) |
 | pi-goal-x                      | 0.31.2  | [tmonk/pi-goal-x](https://github.com/tmonk/pi-goal-x)                     |

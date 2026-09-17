@@ -95,7 +95,7 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
 test("the default base is exactly the seven human-selected pinned packages", () => {
     assert.deepEqual(basePackages, [
         "npm:pi-web-access@0.29.0",
-        "npm:specpi-browser-qa@0.2.0",
+        "npm:specpi-browser-qa@0.3.0",
         "npm:specpi-delegation@0.2.0",
         "npm:specpi-experiments@0.1.0",
         "npm:pi-goal-x@0.31.2",
