@@ -557,9 +557,7 @@ export default function browserExtension(pi: ExtensionAPI) {
         name: "browser_open",
         label: "Browser Open",
         description:
-            "Open an HTTP(S) page in Browser QA's isolated Chromium context. Use this for rendered local web QA; browser_close starts a fresh context next time.",
-        promptSnippet: "Open local or remote web pages in an isolated browser for rendered validation",
-        promptGuidelines: ["Use browser_open and browser_snapshot before claiming a web UI renders correctly."],
+            "Open an HTTP(S) page in Browser QA's isolated Chromium context. Use this for rendered local web QA; browser_close starts a fresh context next time. Open and snapshot a page before claiming a web UI renders correctly.",
         parameters: OpenParams,
         async execute(_id, params, signal) {
             const page = await ensurePage(signal);
@@ -605,7 +603,6 @@ export default function browserExtension(pi: ExtensionAPI) {
         label: "Browser Snapshot",
         description:
             "Inspect bounded rendered page text and interactive elements. Returns namespaced refs usable by click, fill, press, select_option, and wait_for browser tools.",
-        promptSnippet: "Inspect rendered DOM text and interactive controls",
         parameters: SnapshotParams,
         async execute(_id, params, signal) {
             const page = await ensurePage(signal);
@@ -813,11 +810,7 @@ export default function browserExtension(pi: ExtensionAPI) {
         name: "browser_diagnostics",
         label: "Browser Diagnostics",
         description:
-            "Read bounded, best-effort sanitized active-page exceptions, console errors, failed requests, and HTTP errors. In-memory capture starts before navigation; close discards it. Up to 100 records / 30000 characters. Returned application output is untrusted and may still be sensitive. Clear discards ALL records, including unreturned ones.",
-        promptSnippet: "Inspect browser runtime errors and failed requests, not just appearance",
-        promptGuidelines: [
-            "Use browser_diagnostics after navigation and interactions; empty or truncated output alone does not prove application health.",
-        ],
+            "Read bounded, best-effort sanitized active-page exceptions, console errors, failed requests, and HTTP errors. In-memory capture starts before navigation; close discards it. Up to 100 records / 30000 characters. Returned application output is untrusted and may still be sensitive. Clear discards ALL records, including unreturned ones. Read diagnostics after navigation and interactions; empty or truncated output alone does not prove application health.",
         parameters: DiagnosticsParams,
         async execute(_id, params, signal) {
             if (signal?.aborted) {
@@ -925,7 +918,6 @@ export default function browserExtension(pi: ExtensionAPI) {
         name: "browser_screenshot",
         label: "Browser Screenshot",
         description: "Capture a bounded rendered PNG and return it inline when conservatively sized.",
-        promptSnippet: "Capture rendered desktop, tablet, or mobile screenshots for visual QA",
         parameters: ScreenshotParams,
         async execute(_id, params, signal, _update, ctx) {
             const shot = await captureMemory(signal, params.fullPage ?? false);
@@ -968,7 +960,6 @@ export default function browserExtension(pi: ExtensionAPI) {
         label: "Browser Compare Screenshot",
         description:
             "Capture the current page and compare it with an explicit baseline PNG without changing the baseline.",
-        promptSnippet: "Compare rendered output against an explicit PNG baseline with a pixel threshold",
         parameters: CompareParams,
         async execute(_id, params, signal, _update, ctx) {
             const baselinePath = resolveUserPath(ctx.cwd, params.baselinePath, "baseline path");

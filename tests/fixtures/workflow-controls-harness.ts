@@ -38,6 +38,11 @@ const emitted: any[] = [];
 const selectAnswers: string[] = [];
 const renderers = new Map<string, any>();
 let editorValue = "src/";
+let confirmAnswer = true;
+let confirmPrompts = 0;
+// Browser QA is a separate package. Start with it absent so the loader has to report an
+// uninstalled capability, then install it to exercise a real activation.
+let browserRegistered = false;
 const pi: any = {
     on(name: string, handler: any) {
         events.set(name, [...(events.get(name) || []), handler]);
@@ -62,6 +67,15 @@ const pi: any = {
     },
     setActiveTools(names: string[]) {
         activeTools = [...names];
+    },
+    // Mirror Pi: every registered tool is listed whether or not it is active.
+    getAllTools() {
+        const registered = ["read", "bash", "edit", "write", ...webAccessTools, ...tools.keys()];
+        if (browserRegistered) {
+            registered.push(...browserTools);
+        }
+
+        return [...new Set(registered)].map((name) => ({ name }));
     },
     sendMessage(message: any, options: any) {
         messages.push({ message, options });
@@ -89,6 +103,7 @@ let branch: any[] = [];
 let currentCwd = nestedCwd;
 let branchReads = 0;
 const webAccessTools = ["web_search", "source_check", "fetch_content", "get_search_content"];
+const { BROWSER_TOOL_NAMES: browserTools } = await import("../../extensions/workflow-controls/capabilities.mjs");
 let activeTools: string[] = ["read", "bash", "edit", "write", ...webAccessTools];
 const sessionManager = {
     getBranch: () => {
@@ -132,7 +147,9 @@ const ctx: any = {
             return selectAnswers.shift() ?? options[0];
         },
         async confirm() {
-            return true;
+            confirmPrompts += 1;
+
+            return confirmAnswer;
         },
     },
 };
@@ -149,6 +166,121 @@ await commands.get("webaccess").handler("on", ctx);
 const activeAfterOn = [...activeTools];
 await commands.get("webaccess").handler("off", ctx);
 const activeAfterOff = [...activeTools];
+
+// request_capability lets the model ask for a withdrawn group. It must never grant one on its
+// own: an unknown name, a headless session, an uninstalled package, and a declined prompt all
+// have to leave the active set exactly as it was. Activation must also stay additive, because
+// removing a tool in the same call costs Pi's cached prompt prefix.
+const requestCapability = tools.get("request_capability");
+const requestCapabilityCall = async (capability: unknown, overrides: any = {}) =>
+    await requestCapability.execute(
+        "capability-call",
+        { capability, reason: "harness scenario" },
+        undefined,
+        undefined,
+        { ...ctx, ...overrides },
+    );
+
+const unknownCapability = await requestCapabilityCall("telepathy");
+const unknownCapabilityRejected = unknownCapability.isError === true && unknownCapability.details?.activated === false;
+const activeAfterUnknown = [...activeTools];
+
+const headlessCapability = await requestCapabilityCall("web", { hasUI: false });
+const headlessCapabilityRefused =
+    headlessCapability.details?.headless === true &&
+    headlessCapability.details?.activated === false &&
+    headlessCapability.isError !== true;
+const activeAfterHeadless = [...activeTools];
+
+const uninstalledCapability = await requestCapabilityCall("browser");
+const uninstalledCapabilityReported =
+    uninstalledCapability.details?.installed === false &&
+    uninstalledCapability.details?.activated === false &&
+    uninstalledCapability.isError !== true;
+
+confirmAnswer = false;
+const promptsBeforeDecline = confirmPrompts;
+const declinedCapability = await requestCapabilityCall("web");
+const declinedCapabilityPrompted = confirmPrompts === promptsBeforeDecline + 1;
+const declinedCapabilityWithheld =
+    declinedCapability.details?.declined === true &&
+    declinedCapability.details?.activated === false &&
+    declinedCapability.isError !== true;
+const activeAfterDecline = [...activeTools];
+
+confirmAnswer = true;
+const grantedCapability = await requestCapabilityCall("web");
+const activeAfterGrant = [...activeTools];
+const grantedCapabilityActivated = grantedCapability.details?.activated === true;
+
+// A granted group must leave SpecPi's own web-access state truthful, not just the tool set.
+notifications.length = 0;
+await commands.get("webaccess").handler("status", ctx);
+const grantedCapabilitySyncedState = notifications.at(-1)?.message?.includes("is offering") === true;
+
+// An already-available group answers without spending another human decision.
+const promptsBeforeRepeat = confirmPrompts;
+const repeatedCapability = await requestCapabilityCall("web");
+const repeatedCapabilitySkippedPrompt =
+    confirmPrompts === promptsBeforeRepeat &&
+    repeatedCapability.details?.alreadyActive === true &&
+    repeatedCapability.isError !== true;
+
+await commands.get("webaccess").handler("off", ctx);
+
+// A standing grant replaces the prompt with a decision the human already made. Recording one
+// still needs a human, the grant must be visible when it fires, and revoking it must restore
+// the prompt.
+let capabilityPolicyRefusedHeadless = false;
+try {
+    await commands.get("capability").handler("allow web", { ...ctx, hasUI: false });
+} catch {
+    capabilityPolicyRefusedHeadless = true;
+}
+
+const policyFile = path.join(agentDir, "specpi", "capabilities", "settings.json");
+const capabilityPolicyUnwrittenWhenHeadless = !fs.existsSync(policyFile);
+
+await commands.get("capability").handler("allow web", ctx);
+const capabilityPolicySaved = JSON.parse(fs.readFileSync(policyFile, "utf8"))?.autoAllow?.includes("web") === true;
+
+confirmAnswer = false;
+notifications.length = 0;
+const promptsBeforeStanding = confirmPrompts;
+const standingCapability = await requestCapabilityCall("web");
+const standingCapabilitySkippedPrompt = confirmPrompts === promptsBeforeStanding;
+const standingCapabilityActivated = standingCapability.details?.standing === true;
+const standingCapabilityOffered = webAccessTools.every((name) => activeTools.includes(name));
+const standingCapabilityAnnounced = notifications.some((item) => item.message.includes("standing grant"));
+
+await commands.get("webaccess").handler("off", ctx);
+await commands.get("capability").handler("ask web", ctx);
+const promptsBeforeRevoked = confirmPrompts;
+const revokedCapability = await requestCapabilityCall("web");
+const revokedCapabilityPromptedAgain =
+    confirmPrompts === promptsBeforeRevoked + 1 && revokedCapability.details?.declined === true;
+confirmAnswer = true;
+
+// An unknown name must never reach the policy file, which stores tool-group authority.
+let capabilityPolicyRejectedUnknown = false;
+try {
+    await commands.get("capability").handler("allow telepathy", ctx);
+} catch {
+    capabilityPolicyRejectedUnknown = true;
+}
+
+const capabilityPolicyStayedClean =
+    JSON.parse(fs.readFileSync(policyFile, "utf8"))?.autoAllow?.length === 0 &&
+    !webAccessTools.some((name) => activeTools.includes(name));
+
+// A second capability exercises the generic path: Browser QA's tools belong to another
+// package, so the loader can only add them by name and must leave web access alone.
+browserRegistered = true;
+const activeBeforeBrowser = [...activeTools];
+const grantedBrowser = await requestCapabilityCall("browser");
+const activeAfterBrowser = [...activeTools];
+const grantedBrowserActivated = grantedBrowser.details?.activated === true;
+
 await commands.get("webaccess").handler("startup on", ctx);
 const startupPreferenceSaved =
     JSON.parse(fs.readFileSync(path.join(agentDir, "specpi", "web-access", "settings.json"), "utf8"))
@@ -374,7 +506,7 @@ const restoreRaceSurvived = notifications.at(-1).message.startsWith("Scope: src/
 
 const report = {
     commands: [...commands.keys()].sort(),
-    toolRegistered: tools.size > 0,
+    toolNames: [...tools.keys()].sort(),
     webToolsOfferedAtLoad: webAccessTools.every((name) => activeAtLoad.includes(name)),
     webToolsHiddenAtStart:
         !webAccessTools.some((name) => activeAfterFirstStart.includes(name)) &&
@@ -383,6 +515,33 @@ const report = {
     webToolsWithdrawnAfterOff: !webAccessTools.some((name) => activeAfterOff.includes(name)),
     startupPreferenceSaved,
     startupPreferenceReofferedOnResume: webAccessTools.every((name) => activeAfterResumeStart.includes(name)),
+    unknownCapabilityRejected,
+    unknownCapabilityChangedNothing: JSON.stringify(activeAfterUnknown) === JSON.stringify(activeAfterOff),
+    headlessCapabilityRefused,
+    headlessCapabilityChangedNothing: JSON.stringify(activeAfterHeadless) === JSON.stringify(activeAfterOff),
+    uninstalledCapabilityReported,
+    declinedCapabilityPrompted,
+    declinedCapabilityWithheld,
+    declinedCapabilityChangedNothing: JSON.stringify(activeAfterDecline) === JSON.stringify(activeAfterOff),
+    grantedCapabilityActivated,
+    grantedCapabilityOffered: webAccessTools.every((name) => activeAfterGrant.includes(name)),
+    grantedCapabilityStayedAdditive: activeAfterOff.every((name) => activeAfterGrant.includes(name)),
+    grantedCapabilitySyncedState,
+    repeatedCapabilitySkippedPrompt,
+    grantedBrowserActivated,
+    grantedBrowserOffered: browserTools.every((name) => activeAfterBrowser.includes(name)),
+    grantedBrowserStayedAdditive: activeBeforeBrowser.every((name) => activeAfterBrowser.includes(name)),
+    grantedBrowserLeftWebWithdrawn: !webAccessTools.some((name) => activeAfterBrowser.includes(name)),
+    capabilityPolicyRefusedHeadless,
+    capabilityPolicyUnwrittenWhenHeadless,
+    capabilityPolicySaved,
+    standingCapabilitySkippedPrompt,
+    standingCapabilityActivated,
+    standingCapabilityOffered,
+    standingCapabilityAnnounced,
+    revokedCapabilityPromptedAgain,
+    capabilityPolicyRejectedUnknown,
+    capabilityPolicyStayedClean,
     nestedCwdOutOfScopeDenied,
     nestedCwdInScopeAllowed,
     denied,

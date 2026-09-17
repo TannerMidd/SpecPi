@@ -19,11 +19,11 @@ The fourteen tool schemas are about 8.7 KB, and Pi sends every active tool's sch
 ## Install the published package
 
 ```sh
-pi install npm:specpi-browser-qa@0.2.0
-npx --yes specpi-browser-qa@0.2.0 setup
+pi install npm:specpi-browser-qa@0.3.0
+npx --yes specpi-browser-qa@0.3.0 setup
 ```
 
-Restart Pi after installation. For readiness checks, run `npx --yes specpi-browser-qa@0.2.0 doctor`. Both commands use Node and the same standard Playwright browser cache.
+Restart Pi after installation. For readiness checks, run `npx --yes specpi-browser-qa@0.3.0 doctor`. Both commands use Node and the same standard Playwright browser cache.
 
 ## Install from this checkout
 

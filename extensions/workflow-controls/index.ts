@@ -1,6 +1,17 @@
 import path from "node:path";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { truncateToWidth } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
+import {
+    CAPABILITY_NAMES,
+    capabilityActive,
+    capabilityInstalled,
+    describeCapabilities,
+    findCapability,
+    missingTools,
+} from "./capabilities.mjs";
+import { allowCapability, askCapability, autoAllowed, loadAutoAllowed, policyPath } from "./capability-policy.mjs";
 import {
     canonicalRoot,
     compareWorktreeSnapshots,
@@ -17,7 +28,7 @@ import {
     loadStartupActivation,
     saveStartupActivation,
     settingsPath,
-    syncActiveTools as syncWebAccessTools,
+    syncActiveTools as syncToolGroup,
 } from "./web-access.mjs";
 const SCOPE_ENTRY = "specpi-scope-state";
 const SCOPE_STATUS = "specpi-scope";
@@ -358,7 +369,7 @@ export default function workflowControls(pi: ExtensionAPI) {
     // Web access ships hidden. A missing or unreadable preference means off, and the
     // gate only ever touches its own four tool names.
     let webAccessEnabled = loadStartupActivation();
-    const applyWebAccess = () => syncWebAccessTools(pi, WEB_TOOL_NAMES, webAccessEnabled);
+    const applyWebAccess = () => syncToolGroup(pi, WEB_TOOL_NAMES, webAccessEnabled);
 
     pi.on("session_start", (_event, ctx) => {
         webAccessEnabled = loadStartupActivation();
@@ -844,6 +855,207 @@ export default function workflowControls(pi: ExtensionAPI) {
                 `Web access is ${webAccessEnabled ? "offering" : "not offering"} its ${WEB_TOOL_NAMES.length} tools to this session, and starts ${loadStartupActivation() ? "offered" : "withdrawn"}.`,
                 "info",
             );
+        },
+    });
+
+    // Withdrawn tool groups are invisible to the model, so a session that turns out to need
+    // one has no way to say so. This tool names the withdrawn groups and asks the human to
+    // restore one. It grants nothing on its own: without an interactive human it refuses, and
+    // a declined prompt leaves the session exactly as it was.
+    //
+    // Pi records tools added during a tool call and offers them from the next assistant
+    // message, so activation must be additive; removing here would cost the cached prefix.
+    const activateCapability = (capabilityId: string) => {
+        const capability = findCapability(capabilityId);
+        if (!capability) {
+            return;
+        }
+
+        if (capability.id === "web") {
+            webAccessEnabled = true;
+            applyWebAccess();
+
+            return;
+        }
+
+        syncToolGroup(pi, capability.tools, true);
+    };
+
+    pi.registerTool({
+        name: "request_capability",
+        label: "Request Capability",
+        description: `Ask the user to restore a withdrawn SpecPi tool group for this session. Available groups — ${describeCapabilities()}. Their tools are hidden to keep each request small, so request a group only when the current task actually needs it, and continue without it if the user declines. The restored tools are usable from your next message and stay available until the session ends. Delegation is not requestable here; ask the user to run /delegate on.`,
+        parameters: Type.Object(
+            {
+                capability: StringEnum(CAPABILITY_NAMES, {
+                    description: "Withdrawn tool group to request",
+                }),
+                reason: Type.String({
+                    minLength: 5,
+                    maxLength: 200,
+                    description: "What in the current task needs this group; shown to the user in the prompt",
+                }),
+            },
+            { additionalProperties: false },
+        ),
+        async execute(_toolCallId, params: any, _signal, _onUpdate, ctx: ExtensionContext) {
+            const capability = findCapability(params.capability);
+            if (!capability) {
+                return {
+                    content: [
+                        {
+                            type: "text" as const,
+                            text: `Unknown capability. Available: ${CAPABILITY_NAMES.join(", ")}.`,
+                        },
+                    ],
+                    isError: true,
+                    details: { activated: false, capability: String(params.capability ?? "") },
+                };
+            }
+
+            const active = typeof pi.getActiveTools === "function" ? pi.getActiveTools() : [];
+            if (capabilityActive(active, capability)) {
+                return {
+                    content: [
+                        {
+                            type: "text" as const,
+                            text: `${capability.label} is already available. Use its tools directly.`,
+                        },
+                    ],
+                    details: { activated: false, capability: capability.id, alreadyActive: true },
+                };
+            }
+
+            const registered = typeof pi.getAllTools === "function" ? pi.getAllTools().map((tool) => tool.name) : [];
+            if (registered.length > 0 && !capabilityInstalled(registered, capability)) {
+                return {
+                    content: [
+                        {
+                            type: "text" as const,
+                            text: `${capability.label} is not installed in this session, so it cannot be restored. Continue without it.`,
+                        },
+                    ],
+                    details: { activated: false, capability: capability.id, installed: false },
+                };
+            }
+
+            if (!ctx.hasUI) {
+                return {
+                    content: [
+                        {
+                            type: "text" as const,
+                            text: `${capability.label} stays withdrawn: restoring it needs an interactive user. Continue without it.`,
+                        },
+                    ],
+                    details: { activated: false, capability: capability.id, headless: true },
+                };
+            }
+
+            // A standing grant replaces the prompt, not the human: it records a decision this
+            // human already made, and only an interactive command can record one.
+            const standing = autoAllowed(capability.id);
+            const pending = missingTools(active, capability);
+            const accepted =
+                standing ||
+                (await ctx.ui.confirm(
+                    `Allow ${capability.label} for this session?`,
+                    `The agent asked to ${capability.summary}. Reason given: ${safeMessage(params.reason)}\n\nThis offers ${pending.length} tool${pending.length === 1 ? "" : "s"} for the rest of this session and adds ${capability.schemaCost}. Withdraw them again with ${capability.command} off.`,
+                ));
+            if (!accepted) {
+                return {
+                    content: [
+                        {
+                            type: "text" as const,
+                            text: `The user declined ${capability.label}. Continue the task without it and do not ask again for this task.`,
+                        },
+                    ],
+                    details: { activated: false, capability: capability.id, declined: true },
+                };
+            }
+
+            activateCapability(capability.id);
+            // A standing grant skips the dialog, so say what happened; a capability must never
+            // turn itself on without the human seeing it.
+            if (standing) {
+                ctx.ui.notify(
+                    `${capability.label} offered to this session by a standing grant. Withdraw it with ${capability.command} off, or stop granting it with /capability ask ${capability.id}.`,
+                    "info",
+                );
+            }
+
+            return {
+                content: [
+                    {
+                        type: "text" as const,
+                        text: `${capability.label} is available from your next message: ${capability.tools.join(", ")}.`,
+                    },
+                ],
+                details: { activated: true, capability: capability.id, tools: [...capability.tools], standing },
+            };
+        },
+    });
+
+    pi.registerCommand("capability", {
+        description: "Show withdrawn tool groups, or stop being asked before granting one",
+        getArgumentCompletions: (prefix: string) =>
+            ["status", ...CAPABILITY_NAMES.flatMap((name) => [`allow ${name}`, `ask ${name}`])]
+                .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
+                .map((value) => ({ value, label: value })),
+        handler: async (args: string, ctx: ExtensionContext) => {
+            const [action = "status", name, ...rest] = args.trim().split(/\s+/u).filter(Boolean);
+            const verb = action.toLowerCase();
+            if (rest.length || (name && verb === "status") || (!name && verb !== "status")) {
+                throw new Error(
+                    `Usage: /capability [status|allow <name>|ask <name>] (names: ${CAPABILITY_NAMES.join(", ")})`,
+                );
+            }
+
+            if (verb === "allow" || verb === "ask") {
+                const capability = findCapability(name);
+                if (!capability) {
+                    throw new Error(`Unknown capability. Names: ${CAPABILITY_NAMES.join(", ")}`);
+                }
+
+                // Recording a standing grant is the decision itself, so it needs a human at the
+                // keyboard exactly as the startup preferences do.
+                if (!ctx.hasUI) {
+                    throw new Error("Capability policy changes require a human interactive command");
+                }
+
+                if (verb === "allow") {
+                    allowCapability(capability.id);
+                    ctx.ui.notify(
+                        `${capability.label} will be offered whenever the agent asks for it, without a prompt. This session is unchanged until it asks. Undo with /capability ask ${capability.id}.`,
+                        "info",
+                    );
+
+                    return;
+                }
+
+                askCapability(capability.id);
+                ctx.ui.notify(
+                    `${capability.label} will prompt again before it is offered. Tools already offered to this session stay until ${capability.command} off.`,
+                    "info",
+                );
+
+                return;
+            }
+
+            if (verb !== "status") {
+                throw new Error(
+                    `Usage: /capability [status|allow <name>|ask <name>] (names: ${CAPABILITY_NAMES.join(", ")})`,
+                );
+            }
+
+            const active = typeof pi.getActiveTools === "function" ? pi.getActiveTools() : [];
+            const granted = loadAutoAllowed();
+            const lines = CAPABILITY_NAMES.map((id) => {
+                const capability = findCapability(id)!;
+                const offered = capabilityActive(active, capability) ? "offered" : "withdrawn";
+
+                return `${id}: ${offered}, ${granted.includes(id) ? "granted without asking" : "asks first"}`;
+            });
+            ctx.ui.notify(`${lines.join(" · ")}. Policy: ${policyPath()}`, "info");
         },
     });
 }

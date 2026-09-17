@@ -79,3 +79,13 @@ test("a host without the active-tool API is left alone", () => {
     assert.doesNotThrow(() => syncActiveTools({}, ["browser_open"], true));
     assert.doesNotThrow(() => syncActiveTools(undefined, ["browser_open"], false));
 });
+
+test("no tool carries active-only prompt metadata, so activation cannot rebuild the system prompt", () => {
+    // These tools ship withdrawn and are activated mid-session. Pi rebuilds the system prompt
+    // when an activated tool carries promptSnippet or promptGuidelines, and that rebuild
+    // invalidates the provider's cached prefix even where deferred tool schemas are supported.
+    // Guidance for these tools belongs in their description, which travels with the schema.
+    const source = fs.readFileSync(new URL("../src/index.ts", import.meta.url), "utf8");
+    assert.equal(source.includes("promptSnippet"), false);
+    assert.equal(source.includes("promptGuidelines"), false);
+});

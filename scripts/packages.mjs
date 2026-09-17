@@ -19,7 +19,7 @@ export function runBrowserQA(agentDir, command) {
         const installed = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
         if (
             installed.name !== "specpi-browser-qa" ||
-            installed.version !== "0.2.0" ||
+            installed.version !== "0.3.0" ||
             installed.bin?.["specpi-browser-qa"] !== "./bin/browser-qa.mjs"
         ) {
             throw new Error("Missing or changed pinned Browser QA bin metadata");

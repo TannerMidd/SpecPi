@@ -44,6 +44,8 @@ const requiredFiles = [
     "extensions/tool-wishlist/registry.mjs",
     "extensions/tool-wishlist/validators.mjs",
     "extensions/tool-wishlist/verification.mjs",
+    "extensions/workflow-controls/capabilities.mjs",
+    "extensions/workflow-controls/capability-policy.mjs",
     "extensions/workflow-controls/index.ts",
     "extensions/workflow-controls/scope.mjs",
     "extensions/workflow-controls/smoke.mjs",

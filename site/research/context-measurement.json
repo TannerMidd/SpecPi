@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "measuredAt": "2026-09-17T03:52:35.809Z",
+    "measuredAt": "2026-09-17T16:09:05.325Z",
     "specpiVersion": "0.25.0",
     "piVersion": "0.84.4",
     "nodeVersion": "v24.18.0",
@@ -16,7 +16,8 @@
     ],
     "loadedExtensionCount": 9,
     "opencodeVersion": "1.18.31",
-    "method": "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement. The Oh My Pi row is carried forward from 2026-09-17T01:05:19.390Z, measured on the same terms in this run series; its re-measurement is blocked upstream because its runtime now resolves pi-natives@18.2.3, whose platform binary fails to load.",
+    "deepseekHarnessVersion": "0.1.5-rc.2",
+    "method": "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. The DeepSeek Harness is a separate Node application measured as installed on the same terms with this machine's own harness home excluded through DSH_HOME; only the provider route and default model are declared, through its own patch layer, and its auxiliary session-title request is excluded because it carries no tool schema. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement. The Oh My Pi row is carried forward from 2026-09-17T01:05:19.390Z, measured on the same terms in this run series; its re-measurement is blocked upstream because its runtime now resolves pi-natives@18.2.3, whose platform binary fails to load.",
     "results": [
         {
             "label": "Pi (stock)",
@@ -36,7 +37,7 @@
             },
             "toolSchemaChars": 2901,
             "instructionChars": 2620,
-            "requestSha256": "a991f6d6c2e7b6bc3b9e72fc433d1585652cfc0215f59230aa03f9a9a36af6ab",
+            "requestSha256": "086a30c6a35ece3c9958acf44b567c53211992d64b994f3ec250a24726bd5afe",
             "installedGuidance": false,
             "browserAndDelegationEnabled": false
         },
@@ -68,7 +69,7 @@
             },
             "toolSchemaChars": 8435,
             "instructionChars": 6634,
-            "requestSha256": "3f23f27f0e0bb5f6059f5a3ed94f994b15f6e8162c8a4a1b43e2f1d07c77b16f",
+            "requestSha256": "1650044fe448cc42305b9aebbd3d133194fc9b90819215d892e7d2b613ca889c",
             "installedGuidance": true,
             "browserAndDelegationEnabled": false
         },
@@ -102,7 +103,69 @@
             },
             "toolSchemaChars": 21464,
             "instructionChars": 9579,
-            "requestSha256": "75afff537cdbfce3c7202244a36088393b38907b7518a96b875b2c8cf3b99695"
+            "requestSha256": "5e6fafd0e6b59c555d9765cdf171263327a0f37fb9972b64e52b64209974fc03"
+        },
+        {
+            "label": "DeepSeek Harness",
+            "harness": "DeepSeek Harness 0.1.5-rc.2",
+            "toolCount": 25,
+            "toolNames": [
+                "create_goal",
+                "edit",
+                "exit_plan_mode",
+                "get_goal",
+                "glob",
+                "grep",
+                "interrupt_agent",
+                "job_kill",
+                "job_list",
+                "job_output",
+                "list_agents",
+                "pwsh",
+                "ralph",
+                "read",
+                "read_image",
+                "send_message",
+                "skill",
+                "subagent",
+                "subagent_fork",
+                "todo_write",
+                "update_goal",
+                "web_fetch",
+                "web_search",
+                "workflow",
+                "write"
+            ],
+            "toolChars": {
+                "create_goal": 743,
+                "edit": 1118,
+                "exit_plan_mode": 595,
+                "get_goal": 365,
+                "glob": 968,
+                "grep": 811,
+                "interrupt_agent": 756,
+                "job_kill": 503,
+                "job_list": 214,
+                "job_output": 878,
+                "list_agents": 1395,
+                "pwsh": 4465,
+                "ralph": 872,
+                "read": 484,
+                "read_image": 806,
+                "send_message": 799,
+                "skill": 422,
+                "subagent": 1502,
+                "subagent_fork": 1174,
+                "todo_write": 1390,
+                "update_goal": 1187,
+                "web_fetch": 288,
+                "web_search": 443,
+                "workflow": 4032,
+                "write": 821
+            },
+            "toolSchemaChars": 27057,
+            "instructionChars": 4686,
+            "requestSha256": "90624cdaac570ca2022efad75e602bf56917cff5a831593d65f615d097a2c47a"
         },
         {
             "label": "SpecPi enabled",
@@ -170,7 +233,7 @@
             },
             "toolSchemaChars": 32251,
             "instructionChars": 7952,
-            "requestSha256": "7adc414e46cdaeef5ed5714306cba88600ad5820a569d665ecfe3bfbb8f31ed9",
+            "requestSha256": "e372217c768f5474bc2d606418a0e931ac510e51503f993b558c909f204485c0",
             "installedGuidance": true,
             "browserAndDelegationEnabled": true
         },
@@ -209,8 +272,8 @@
             "requestSha256": "51b752e09ea3d99ed36ee3cbc6a6ec7346555cb2d3d15639f0f4fd826eb8d727"
         }
     ],
+    "ohMyPiVersion": "18.2.2",
     "carriedForward": {
         "Oh My Pi": "2026-09-17T01:05:19.390Z"
-    },
-    "ohMyPiVersion": "18.2.2"
+    }
 }
