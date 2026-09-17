@@ -221,8 +221,10 @@ try {
         "WORKFLOW_CONTROLS_HARNESS=",
         "workflow extension harness",
     );
-    assert.deepEqual(workflowReport.commands, ["scope", "webaccess"]);
-    assert.equal(workflowReport.toolRegistered, false);
+    assert.deepEqual(workflowReport.commands, ["capability", "scope", "webaccess"]);
+    // The capability request is the only tool this extension offers; everything else it controls
+    // stays withdrawn until a human grants it.
+    assert.deepEqual(workflowReport.toolNames, ["request_capability"]);
     assert.equal(workflowReport.emittedScopeStatus, true);
 
     const wishlistReport = readHarnessReport(
