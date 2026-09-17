@@ -129,8 +129,11 @@ process.exit(0);
     );
     passed = true;
 } finally {
+    // Windows releases a spawned Pi's handle on its working directory after the process itself is gone, so a
+    // teardown that runs immediately can lose a passing check to EBUSY. Retry rather than report a failure that
+    // the check above already disproved.
     if (passed) {
-        fs.rmSync(root, { recursive: true, force: true });
+        fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } else {
         console.error(`Failed isolated base check retained for diagnosis: ${root}`);
     }

@@ -305,5 +305,8 @@ try {
     assert.equal(fs.readFileSync(authPath, "utf8"), authCanary, "Pi package smoke modified authentication state");
     console.log(`Pi package check passed: ${artifactLabel} loaded through Pi ${piVersion}`);
 } finally {
-    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    // Windows releases a spawned Pi's handle on its working directory after the process itself is gone, so a
+    // teardown that runs immediately can lose a passing check to EBUSY. Retry rather than report a failure that
+    // the check above already disproved.
+    fs.rmSync(temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 }
