@@ -48,6 +48,7 @@ const requiredFiles = [
     "extensions/workflow-controls/scope.mjs",
     "extensions/workflow-controls/smoke.mjs",
     "extensions/workflow-controls/task-contract.mjs",
+    "extensions/workflow-controls/web-access.mjs",
     "package.json",
     "scripts/lib.mjs",
     "scripts/lock.mjs",

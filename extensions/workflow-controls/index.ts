@@ -12,6 +12,13 @@ import {
 } from "./scope.mjs";
 
 import { readTaskContract, renderTaskContract } from "./task-contract.mjs";
+import {
+    WEB_TOOL_NAMES,
+    loadStartupActivation,
+    saveStartupActivation,
+    settingsPath,
+    syncActiveTools as syncWebAccessTools,
+} from "./web-access.mjs";
 const SCOPE_ENTRY = "specpi-scope-state";
 const SCOPE_STATUS = "specpi-scope";
 const MAX_PENDING_SCOPE = 40;
@@ -337,7 +344,17 @@ export default function workflowControls(pi: ExtensionAPI) {
         emitScopeStatus(ctx);
     };
 
-    pi.on("session_start", (_event, ctx) => restoreSession(ctx));
+    // Web access ships hidden. A missing or unreadable preference means off, and the
+    // gate only ever touches its own four tool names.
+    let webAccessEnabled = loadStartupActivation();
+    const applyWebAccess = () => syncWebAccessTools(pi, WEB_TOOL_NAMES, webAccessEnabled);
+
+    pi.on("session_start", (_event, ctx) => {
+        webAccessEnabled = loadStartupActivation();
+        applyWebAccess();
+        restoreSession(ctx);
+    });
+
     pi.on("session_tree", (_event, ctx) => restoreSession(ctx));
 
     pi.on("session_shutdown", (_event, ctx) => {
@@ -747,6 +764,72 @@ export default function workflowControls(pi: ExtensionAPI) {
             } catch (error) {
                 ctx.ui.notify(safeMessage(error), "error");
             }
+        },
+    });
+
+    pi.registerCommand("webaccess", {
+        description: "Offer or withdraw the web access tools, or choose whether they start offered",
+        getArgumentCompletions: (prefix: string) =>
+            ["on", "off", "status", "startup", "startup on", "startup off"]
+                .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
+                .map((value) => ({ value, label: value })),
+        handler: async (args: string, ctx: ExtensionContext) => {
+            const [action = "status", choice, ...rest] = args.trim().split(/\s+/u).filter(Boolean);
+            if (rest.length || (choice && action.toLowerCase() !== "startup")) {
+                throw new Error("Usage: /webaccess [on|off|status|startup [on|off]]");
+            }
+
+            const verb = action.toLowerCase();
+            if (verb === "on" || verb === "off") {
+                webAccessEnabled = verb === "on";
+                applyWebAccess();
+                ctx.ui.notify(
+                    webAccessEnabled
+                        ? `Web access offered ${WEB_TOOL_NAMES.length} tools to this session (web_search, source_check, fetch_content, get_search_content). They add about 11 KB of tool schema to each request until /webaccess off.`
+                        : "Web access withdrew its tools from this session. Search and fetch now require /webaccess on.",
+                    "info",
+                );
+
+                return;
+            }
+
+            if (verb === "startup") {
+                if (!choice) {
+                    ctx.ui.notify(
+                        `Web access starts ${loadStartupActivation() ? "offered" : "withdrawn"}. Preference: ${settingsPath()}`,
+                        "info",
+                    );
+
+                    return;
+                }
+
+                if (!ctx.hasUI) {
+                    throw new Error("Startup changes require a human interactive command");
+                }
+
+                if (!["on", "off"].includes(choice.toLowerCase())) {
+                    throw new Error("Usage: /webaccess startup [on|off]");
+                }
+
+                saveStartupActivation(choice.toLowerCase() === "on");
+                ctx.ui.notify(
+                    choice.toLowerCase() === "on"
+                        ? "Web access tools will be offered in new Pi sessions, adding their schemas to every request. This session is unchanged."
+                        : "Web access tools will start withdrawn in new Pi sessions and their schemas will not be sent. This session is unchanged.",
+                    "info",
+                );
+
+                return;
+            }
+
+            if (verb !== "status") {
+                throw new Error("Usage: /webaccess [on|off|status|startup [on|off]]");
+            }
+
+            ctx.ui.notify(
+                `Web access is ${webAccessEnabled ? "offering" : "not offering"} its ${WEB_TOOL_NAMES.length} tools to this session, and starts ${loadStartupActivation() ? "offered" : "withdrawn"}.`,
+                "info",
+            );
         },
     });
 }

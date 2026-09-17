@@ -56,6 +56,13 @@ const pi: any = {
         entries.push(entry);
         branch.push(entry);
     },
+    // Mirror Pi: the built-ins plus pi-web-access tools start active; setActiveTools replaces the set.
+    getActiveTools() {
+        return [...activeTools];
+    },
+    setActiveTools(names: string[]) {
+        activeTools = [...names];
+    },
     sendMessage(message: any, options: any) {
         messages.push({ message, options });
     },
@@ -81,6 +88,8 @@ registerWorkflowControls(pi);
 let branch: any[] = [];
 let currentCwd = nestedCwd;
 let branchReads = 0;
+const webAccessTools = ["web_search", "source_check", "fetch_content", "get_search_content"];
+let activeTools: string[] = ["read", "bash", "edit", "write", ...webAccessTools];
 const sessionManager = {
     getBranch: () => {
         branchReads += 1;
@@ -128,9 +137,22 @@ const ctx: any = {
     },
 };
 
+// Web access ships hidden: the first session_start must withdraw its four tools, /webaccess on
+// must offer them again, and a saved startup preference must re-offer them on later sessions.
+const activeAtLoad = [...activeTools];
 for (const handler of events.get("session_start") || []) {
     await handler({}, ctx);
 }
+
+const activeAfterFirstStart = [...activeTools];
+await commands.get("webaccess").handler("on", ctx);
+const activeAfterOn = [...activeTools];
+await commands.get("webaccess").handler("off", ctx);
+const activeAfterOff = [...activeTools];
+await commands.get("webaccess").handler("startup on", ctx);
+const startupPreferenceSaved =
+    JSON.parse(fs.readFileSync(path.join(agentDir, "specpi", "web-access", "settings.json"), "utf8"))
+        ?.startupActivation === true;
 
 await commands.get("scope").handler("set", ctx);
 
@@ -281,6 +303,8 @@ for (const handler of events.get("session_start") || []) {
     await handler({}, ctx);
 }
 
+const activeAfterResumeStart = [...activeTools];
+
 await commands.get("scope").handler("add docs/", ctx);
 const restoredRecordUnchanged = JSON.stringify(branch.slice(0, -1)) === beforeResume;
 const exec = pi.exec;
@@ -309,6 +333,14 @@ const treeCleared = notifications.at(-1).message === "Scope monitoring is inacti
 const report = {
     commands: [...commands.keys()].sort(),
     toolRegistered: tools.size > 0,
+    webToolsOfferedAtLoad: webAccessTools.every((name) => activeAtLoad.includes(name)),
+    webToolsHiddenAtStart:
+        !webAccessTools.some((name) => activeAfterFirstStart.includes(name)) &&
+        ["read", "bash", "edit", "write"].every((name) => activeAfterFirstStart.includes(name)),
+    webToolsOfferedAfterOn: webAccessTools.every((name) => activeAfterOn.includes(name)),
+    webToolsWithdrawnAfterOff: !webAccessTools.some((name) => activeAfterOff.includes(name)),
+    startupPreferenceSaved,
+    startupPreferenceReofferedOnResume: webAccessTools.every((name) => activeAfterResumeStart.includes(name)),
     nestedCwdOutOfScopeDenied,
     nestedCwdInScopeAllowed,
     denied,

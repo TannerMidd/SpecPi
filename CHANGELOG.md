@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.0 - 2026-09-17
+
+- Hide the web access tools until needed. `web_search`, `source_check`, `fetch_content` and `get_search_content` are no longer offered to a session until `/webaccess on`; `/webaccess startup on` saves that choice. The working agreement, security model and wiki say so, and the agent asks the human to run it rather than attempting a hidden tool.
+- Re-measure first-call context from the complete installed base instead of first-party extensions alone. A default session sends 15,069 characters and the enabled profile (`/browser on`, `/delegate on`, `/webaccess on`) sends 40,203. The earlier 10,536-character figure omitted installed guidance and third-party pins and is corrected on the research page. The measurement, pins and method are published as `site/research/context-measurement.json`.
+- Add a capability chart that partitions the enabled profile's tool schema group by group: web access is the largest at 11,298 characters, ahead of Browser QA's fourteen tools at 8,046. Leaving the three opt-in groups hidden keeps 23,797 characters of tool schema out of every request.
+- Re-measure Oh My Pi on the same terms at 65,816 characters and keep it a measured row: HarnessTax covers Claude Code, Codex CLI and Pi only, so the fork was never a study figure.
+
 ## 0.24.0 - 2026-09-16
 
 - Replace `pi-subagents@0.67.0` in the default base with first-party `specpi-delegation@0.2.0`, and add `specpi-experiments@0.1.0`. The base is now seven pinned packages; the other five are unchanged.

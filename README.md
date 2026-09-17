@@ -38,22 +38,35 @@ The setup optimizes for four things:
 - **Accuracy** — exact pins, checksum-tracked state, rollback on failure, and evidence over claims
 - **Improvement** — local observations become bounded, verified changes through `/harness-improvement`
 - **Efficiency** — subagent delegation, persistent goals, and browser QA handled by the right tools
+- **Lean default** — web access, browser QA, and delegation ship hidden; `/webaccess on`, `/browser on`, and `/delegate on` offer them per session
 
 Everything it manages is declared, versioned, and reversible.
 
 ## Measured context
 
-SpecPi configures Pi rather than replacing it, so what that configuration costs was measured rather than assumed. A default session sends 10,536 characters on its first model call — about 1.9× stock Pi, and a quarter of Codex CLI.
+The chart measures first-call context from a clean installation: all seven pinned packages, the installed working agreement, and discovered skills. “Enabled” means browser QA, delegation, and web access are switched on; no goal, scope, or improvement selection is active. The solid rows — including Oh My Pi, a Bun-based fork of Pi measured as installed — are ours, taken from the request each harness actually sends through one local synthetic provider. The dimmed Codex CLI and Claude Code rows are HarnessTax's published figures, taken under the study's configuration: a reference, not a matched comparison. These are character counts, not tokens, spending, or task-quality scores. The research page [breaks the enabled profile down by capability](https://tannermidd.github.io/SpecPi/research/#specpi), so the cost of each switch is visible on its own.
 
 <p align="center">
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/context-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi 5,420, SpecPi 10,536, SpecPi all on 23,710, Codex CLI 41,616, Oh My Pi 65,843, Claude Code 90,460.">
+      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 15,069, SpecPi enabled 40,203, Codex CLI 41,616, Oh My Pi 65,816, Claude Code 90,460.">
     </picture>
   </a>
 </p>
-<p align="center"><sub>Characters on the first model call, split into tool schemas and instructions · SpecPi and Oh My Pi measured with <code>scripts/measure-context.mjs</code>, the rest per <a href="https://harnesstax.github.io/">HarnessTax</a> · <a href="https://tannermidd.github.io/SpecPi/research/#specpi">Method and caveats</a></sub></p>
+<p align="center"><sub>Measured tool schemas + system/developer instructions · <code>node scripts/measure-context.mjs --chart --omp=&lt;path to its cli.js&gt;</code> · <a href="site/research/context-measurement.json">Recorded measurements and package pins</a> · <a href="https://tannermidd.github.io/SpecPi/research/#specpi">Method and caveats</a></sub></p>
+
+The gap between the two SpecPi bars is not one decision, so the enabled profile's tool schema is also measured group by group. Browser QA's fourteen tools cost less together than web access's four:
+
+<p align="center">
+  <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/capability-chart-dark.svg">
+      <img src="https://tannermidd.github.io/SpecPi/media/capability-chart-light.svg" width="880" alt="Bar chart of tool-schema characters each capability adds: Pi built-ins 2,896, Improvement loop 4,214, Goals 1,315, Browser QA 8,046, Delegation 4,453, Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.">
+    </picture>
+  </a>
+</p>
+<p align="center"><sub>Every tool in the measured request belongs to exactly one group · Leaving all three opt-in groups hidden keeps 23,797 characters of tool schema out of every request</sub></p>
 
 ## Install
 

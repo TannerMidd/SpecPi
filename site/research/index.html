@@ -49,7 +49,7 @@
                     ><a href="#specpi"><span>05</span>For this base</a
                     ><a href="#unproven"><span>06</span>Not established</a><a href="#sources"><span>07</span>Sources</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.24.0<br />Chat 0.11.1<br />Evidence to 16 Sep 2026</div>
+                <div class="index-meta">SpecPi 0.25.0<br />Chat 0.11.1<br />Evidence to 16 Sep 2026</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -515,7 +515,7 @@
                 <section class="doc-section" id="specpi">
                     <header><h2>For this base</h2><span>05</span></header>
                     <p>
-                        SpecPi 0.24.0 pins seven packages and keeps its own extensions to scope control and the
+                        SpecPi 0.25.0 pins seven packages and keeps its own extensions to scope control and the
                         improvement loop. Read against the evidence above, that shape is defensible for specific
                         reasons, and it leaves specific things unmeasured.
                     </p>
@@ -547,56 +547,96 @@
                         </p>
                     </div>
                     <figure class="chart-figure">
-                        <svg class="chart" id="chart-context" viewBox="0 0 720 380" role="img" aria-labelledby="chart-context-title chart-context-desc" preserveAspectRatio="xMidYMid meet"><title id="chart-context-title">Characters sent on the first model call</title><desc id="chart-context-desc">Horizontal bar chart of characters a harness sends before any work happens. Pi 5,420; SpecPi 10,536; SpecPi all on 23,710; Codex CLI 41,616; Oh My Pi 65,843; Claude Code 90,460. Each bar is split into tool schemas and instructions.</desc><line x1="108" y1="22" x2="108" y2="326" stroke="var(--line)" opacity=".6" /><text x="108" y="346" text-anchor="middle" class="ct-ax">0k</text><line x1="263.208" y1="22" x2="263.208" y2="326" stroke="var(--line)" opacity=".6" /><text x="263.208" y="346" text-anchor="middle" class="ct-ax">25k</text><line x1="418.417" y1="22" x2="418.417" y2="326" stroke="var(--line)" opacity=".6" /><text x="418.417" y="346" text-anchor="middle" class="ct-ax">50k</text><line x1="573.625" y1="22" x2="573.625" y2="326" stroke="var(--line)" opacity=".6" /><text x="573.625" y="346" text-anchor="middle" class="ct-ax">75k</text><text x="406" y="370" text-anchor="middle" class="ct-lb">Characters on the first model call</text><text x="98" y="43" text-anchor="end" class="ct-row">Pi</text><text x="98" y="58" text-anchor="end" class="ct-sub">4 tools</text><rect x="108" y="30" width="15.837" height="22" rx="4" fill="var(--ct-pi)" opacity="1"><title>Pi tool schema: 2,873 chars</title></rect><rect x="125.837" y="30" width="15.813" height="22" rx="4" fill="var(--ct-pi)" opacity=".42"><title>Pi instructions: 2,547 chars</title></rect><text x="149.649" y="46" class="ct-val">5,420</text><text x="98" y="97" text-anchor="end" class="ct-row">SpecPi</text><text x="98" y="112" text-anchor="end" class="ct-sub">7 tools</text><rect x="108" y="84" width="42.191" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>SpecPi tool schema: 7,118 chars</title></rect><rect x="152.191" y="84" width="21.22" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi instructions: 3,418 chars</title></rect><text x="181.411" y="100" class="ct-val">10,536</text><text x="98" y="151" text-anchor="end" class="ct-row">SpecPi, all on</text><text x="98" y="166" text-anchor="end" class="ct-sub">22 tools</text><rect x="108" y="138" width="119.795" height="22" rx="4" fill="var(--ct-specpi)" opacity="0.55"><title>SpecPi, all on tool schema: 19,618 chars</title></rect><rect x="229.795" y="138" width="25.405" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi, all on instructions: 4,092 chars</title></rect><text x="263.2" y="154" class="ct-val">23,710</text><text x="98" y="205" text-anchor="end" class="ct-row">Codex CLI</text><text x="98" y="220" text-anchor="end" class="ct-sub">7.4 tools</text><rect x="108" y="192" width="110.458" height="22" rx="4" fill="var(--ct-codex)" opacity="1"><title>Codex CLI tool schema: 18,114 chars</title></rect><rect x="220.458" y="192" width="145.908" height="22" rx="4" fill="var(--ct-codex)" opacity=".42"><title>Codex CLI instructions: 23,502 chars</title></rect><text x="374.366" y="208" class="ct-val">41,616</text><text x="98" y="259" text-anchor="end" class="ct-row">Oh My Pi</text><text x="98" y="274" text-anchor="end" class="ct-sub">11 tools</text><rect x="108" y="246" width="293.361" height="22" rx="4" fill="var(--ct-omp)" opacity="1"><title>Oh My Pi tool schema: 47,575 chars</title></rect><rect x="403.361" y="246" width="113.414" height="22" rx="4" fill="var(--ct-omp)" opacity=".42"><title>Oh My Pi instructions: 18,268 chars</title></rect><text x="524.775" y="262" class="ct-val">65,843</text><text x="98" y="313" text-anchor="end" class="ct-row">Claude Code</text><text x="98" y="328" text-anchor="end" class="ct-sub">23 tools</text><rect x="108" y="300" width="476.011" height="22" rx="4" fill="var(--ct-claudecode)" opacity="1"><title>Claude Code tool schema: 76,995 chars</title></rect><rect x="586.011" y="300" width="83.595" height="22" rx="4" fill="var(--ct-claudecode)" opacity=".42"><title>Claude Code instructions: 13,465 chars</title></rect><text x="677.606" y="316" class="ct-val">90,460</text><rect x="108" y="6" width="11" height="11" rx="2" fill="var(--muted)" /><text x="125" y="16" class="ct-ax">tool schemas</text><rect x="216" y="6" width="11" height="11" rx="2" fill="var(--muted)" opacity=".42" /><text x="233" y="16" class="ct-ax">instructions</text></svg>
+                        <svg class="chart" id="chart-context" viewBox="0 0 720 424" role="img" aria-labelledby="chart-context-title chart-context-desc" preserveAspectRatio="xMidYMid meet"><title id="chart-context-title">Characters sent on the first model call</title><desc id="chart-context-desc">Horizontal bar chart of characters a harness sends before any work happens. Pi stock 5,521; SpecPi default 15,069; SpecPi enabled 40,203; Codex CLI 41,616; Oh My Pi 65,816; Claude Code 90,460. Each bar is split into tool schemas and instructions. The Pi and SpecPi rows were measured on this repository's harness; the dimmed Codex CLI and Claude Code rows are HarnessTax published figures taken under a different configuration.</desc><line x1="175" y1="22" x2="175" y2="306" stroke="var(--line)" opacity=".6" /><text x="175" y="326" text-anchor="middle" class="ct-ax">0k</text><line x1="223" y1="22" x2="223" y2="306" stroke="var(--line)" opacity=".6" /><text x="223" y="326" text-anchor="middle" class="ct-ax">10k</text><line x1="271" y1="22" x2="271" y2="306" stroke="var(--line)" opacity=".6" /><text x="271" y="326" text-anchor="middle" class="ct-ax">20k</text><line x1="319" y1="22" x2="319" y2="306" stroke="var(--line)" opacity=".6" /><text x="319" y="326" text-anchor="middle" class="ct-ax">30k</text><line x1="367" y1="22" x2="367" y2="306" stroke="var(--line)" opacity=".6" /><text x="367" y="326" text-anchor="middle" class="ct-ax">40k</text><line x1="415" y1="22" x2="415" y2="306" stroke="var(--line)" opacity=".6" /><text x="415" y="326" text-anchor="middle" class="ct-ax">50k</text><line x1="463" y1="22" x2="463" y2="306" stroke="var(--line)" opacity=".6" /><text x="463" y="326" text-anchor="middle" class="ct-ax">60k</text><line x1="511" y1="22" x2="511" y2="306" stroke="var(--line)" opacity=".6" /><text x="511" y="326" text-anchor="middle" class="ct-ax">70k</text><line x1="559" y1="22" x2="559" y2="306" stroke="var(--line)" opacity=".6" /><text x="559" y="326" text-anchor="middle" class="ct-ax">80k</text><line x1="607" y1="22" x2="607" y2="306" stroke="var(--line)" opacity=".6" /><text x="607" y="326" text-anchor="middle" class="ct-ax">90k</text><line x1="655" y1="22" x2="655" y2="306" stroke="var(--line)" opacity=".6" /><text x="655" y="326" text-anchor="middle" class="ct-ax">100k</text><text x="415" y="350" text-anchor="middle" class="ct-lb">Characters: tool schemas + system/developer instructions</text><text x="165" y="43" text-anchor="end" class="ct-row">Pi stock</text><text x="165" y="58" text-anchor="end" class="ct-sub">4 tools</text><rect x="175" y="30" width="11.925" height="22" rx="4" fill="var(--ct-pi)" opacity="1"><title>Pi stock tool schema: 2,901 chars</title></rect><rect x="188.925" y="30" width="12.576" height="22" rx="4" fill="var(--ct-pi)" opacity=".42"><title>Pi stock instructions: 2,620 chars</title></rect><text x="209.501" y="46" class="ct-val">5,521</text><text x="165" y="93" text-anchor="end" class="ct-row">SpecPi default</text><text x="165" y="108" text-anchor="end" class="ct-sub">9 tools</text><rect x="175" y="80" width="38.488" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>SpecPi default tool schema: 8,435 chars</title></rect><rect x="215.488" y="80" width="31.843" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi default instructions: 6,634 chars</title></rect><text x="255.331" y="96" class="ct-val">15,069</text><text x="165" y="143" text-anchor="end" class="ct-row">SpecPi enabled</text><text x="165" y="158" text-anchor="end" class="ct-sub">28 tools</text><rect x="175" y="130" width="152.805" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>SpecPi enabled tool schema: 32,251 chars</title></rect><rect x="329.805" y="130" width="38.17" height="22" rx="4" fill="var(--ct-specpi)" opacity=".42"><title>SpecPi enabled instructions: 7,952 chars</title></rect><text x="375.974" y="146" class="ct-val">40,203</text><text x="165" y="193" text-anchor="end" class="ct-row">Codex CLI</text><text x="165" y="208" text-anchor="end" class="ct-sub">7.4 tools</text><rect x="175" y="180" width="84.947" height="22" rx="4" fill="var(--ct-codex)" opacity="0.55"><title>Codex CLI tool schema: 18,114 chars</title></rect><rect x="261.947" y="180" width="112.81" height="22" rx="4" fill="var(--ct-codex)" opacity=".42"><title>Codex CLI instructions: 23,502 chars</title></rect><text x="382.757" y="196" class="ct-val">41,616</text><text x="165" y="243" text-anchor="end" class="ct-row">Oh My Pi</text><text x="165" y="258" text-anchor="end" class="ct-sub">11 tools</text><rect x="175" y="230" width="226.36" height="22" rx="4" fill="var(--ct-omp)" opacity="1"><title>Oh My Pi tool schema: 47,575 chars</title></rect><rect x="403.36" y="230" width="87.557" height="22" rx="4" fill="var(--ct-omp)" opacity=".42"><title>Oh My Pi instructions: 18,241 chars</title></rect><text x="498.917" y="246" class="ct-val">65,816</text><text x="165" y="293" text-anchor="end" class="ct-row">Claude Code</text><text x="165" y="308" text-anchor="end" class="ct-sub">23 tools</text><rect x="175" y="280" width="367.576" height="22" rx="4" fill="var(--ct-claudecode)" opacity="0.55"><title>Claude Code tool schema: 76,995 chars</title></rect><rect x="544.576" y="280" width="64.632" height="22" rx="4" fill="var(--ct-claudecode)" opacity=".42"><title>Claude Code instructions: 13,465 chars</title></rect><text x="617.208" y="296" class="ct-val">90,460</text><rect x="175" y="6" width="11" height="11" rx="2" fill="var(--muted)" /><text x="192" y="16" class="ct-ax">tool schemas</text><rect x="310" y="6" width="11" height="11" rx="2" fill="var(--muted)" opacity=".42" /><text x="327" y="16" class="ct-ax">instructions</text><text x="175" y="372" class="ct-ax">Solid rows measured here: Pi 0.84.4 and omp 18.2.2, synthetic provider, all 7 pins.</text><text x="175" y="390" class="ct-ax">Dimmed rows: HarnessTax figures for Codex CLI and Claude Code, taken on</text><text x="175" y="408" class="ct-ax">Pi 0.85.1 with real providers. Characters, not tokens or cost.</text></svg>
                         <figcaption class="figure-note">
-                            Pi, Codex and Claude Code are HarnessTax's measurements. The SpecPi and Oh My Pi bars are ours,
-                            taken the same way — from the request the harness actually sends — by
-                            <code>node scripts/measure-context.mjs</code>, which you can run yourself. Oh My Pi needs
-                            <code>--omp=&lt;path to its cli.js&gt;</code> and a Bun runtime; without it that row is skipped.
+                            The solid rows are ours, captured from the request each harness actually sends through the
+                            same local synthetic provider and the same empty workspace. The dimmed Codex CLI and Claude
+                            Code rows are HarnessTax's published figures, taken under the study's configuration — a
+                            reference, not a matched comparison. Reproduce with
+                            <code>node scripts/measure-context.mjs --chart --omp=&lt;path to its cli.js&gt;</code>
+                            (npm access and a Bun runtime required).
+                            <a class="text-link" href="context-measurement.json">Measurement record and exact pins</a>.
                         </figcaption>
                     </figure>
                     <p>
-                        A default session sends <strong>10,536 characters</strong> on its first call. The same measurement
-                        records <strong>5,521</strong> for stock Pi, so the base as installed is about <strong>1.9x</strong> the
-                        harness it configures — the improvement loop's three tools, <code>/scope</code> and their skills.
+                        Both SpecPi profiles include all seven installed packages, the installed working agreement,
+                        and normal skill discovery. The default leaves browser QA and delegation off. The enabled
+                        profile runs <code>/browser on</code>, <code>/delegate on</code> and
+                        <code>/webaccess on</code> before its first model call; it does not estimate their
+                        contribution by adding registered schemas. The web access tools are absent from the default
+                        profile: web search, fetch and check show up only after <code>/webaccess on</code>.
+                        Neither profile has an active goal, scope, improvement selection, or user configuration.
                     </p>
                     <p>
-                        It was not always. An earlier reading of this page put the base at 4.3x, because Browser QA's fourteen
-                        tools and delegation's one were offered to every session whether or not anyone used them. Both now ship
-                        behind a saved preference that defaults to off, which is what the second bar costs if you turn
-                        everything on. That change came directly out of measuring this figure, which is the argument for
-                        measuring it.
+                        The script verifies all seven installed pins and all nine production extensions load without
+                        errors. It runs in a disposable home and an empty workspace, with no personal credentials or
+                        histories. Chromium setup is skipped because no browser action is executed. The model receives
+                        only a synthetic prompt; no paid inference is used.
                     </p>
                     <p>
-                        <strong>Oh My Pi</strong> is the fifth bar, and a different kind of thing from the two above it: a
-                        Bun-based fork of Pi rather than a package set on top of one. Its default session sends
-                        <strong>65,843 characters</strong> across 11 tools — about <strong>11.9x</strong> stock Pi, and
-                        six times a default SpecPi — which places a configured Pi fork between Codex and Claude Code.
-                        That figure is measured rather than reported: the same script, the same synthetic provider and the
-                        same empty workspace, on <code>omp</code> 18.2.2. Disabling its skills and rules discovery changed
-                        it by nothing at all, so what the chart shows is the fork's own prompt and tool surface, not
-                        anything this machine had configured.
+                        The gap between the two SpecPi bars is not a single decision, so the enabled profile's tool
+                        schema is also published group by group. These are the same measured schemas as the bar above,
+                        partitioned rather than re-estimated: every tool in the request belongs to exactly one group,
+                        and the groups sum to 32,222 of that profile's 32,251 schema characters. The remaining 29 are
+                        the delimiters JSON puts between definitions, which belong to no single tool.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg class="chart" id="chart-capability" viewBox="0 0 720 368" role="img" aria-labelledby="chart-capability-title chart-capability-desc" preserveAspectRatio="xMidYMid meet"><title id="chart-capability-title">What each capability adds to the tool schema</title><desc id="chart-capability-desc">Horizontal bar chart of the characters each capability group adds to the tool schema. Pi built-ins 2,896; Improvement loop 4,214; Goals 1,315; Browser QA 8,046; Delegation 4,453; Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.</desc><line x1="175" y1="22" x2="175" y2="286" stroke="var(--line)" opacity=".6" /><text x="175" y="306" text-anchor="middle" class="ct-ax">0k</text><line x1="248.333" y1="22" x2="248.333" y2="286" stroke="var(--line)" opacity=".6" /><text x="248.333" y="306" text-anchor="middle" class="ct-ax">2k</text><line x1="321.667" y1="22" x2="321.667" y2="286" stroke="var(--line)" opacity=".6" /><text x="321.667" y="306" text-anchor="middle" class="ct-ax">4k</text><line x1="395" y1="22" x2="395" y2="286" stroke="var(--line)" opacity=".6" /><text x="395" y="306" text-anchor="middle" class="ct-ax">6k</text><line x1="468.333" y1="22" x2="468.333" y2="286" stroke="var(--line)" opacity=".6" /><text x="468.333" y="306" text-anchor="middle" class="ct-ax">8k</text><line x1="541.667" y1="22" x2="541.667" y2="286" stroke="var(--line)" opacity=".6" /><text x="541.667" y="306" text-anchor="middle" class="ct-ax">10k</text><line x1="615" y1="22" x2="615" y2="286" stroke="var(--line)" opacity=".6" /><text x="615" y="306" text-anchor="middle" class="ct-ax">12k</text><text x="395" y="330" text-anchor="middle" class="ct-lb">Characters of tool-definition JSON in the enabled profile</text><text x="165" y="43" text-anchor="end" class="ct-row">Pi built-ins</text><text x="165" y="58" text-anchor="end" class="ct-sub">4 tools · in default</text><rect x="175" y="30" width="106.187" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>Pi built-ins: 2,896 chars</title></rect><text x="289.187" y="46" class="ct-val">2,896</text><text x="165" y="89" text-anchor="end" class="ct-row">Improvement loop</text><text x="165" y="104" text-anchor="end" class="ct-sub">3 tools · in default</text><rect x="175" y="76" width="154.513" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>Improvement loop: 4,214 chars</title></rect><text x="337.513" y="92" class="ct-val">4,214</text><text x="165" y="135" text-anchor="end" class="ct-row">Goals</text><text x="165" y="150" text-anchor="end" class="ct-sub">2 tools · in default</text><rect x="175" y="122" width="48.217" height="22" rx="4" fill="var(--ct-specpi)" opacity="1"><title>Goals: 1,315 chars</title></rect><text x="231.217" y="138" class="ct-val">1,315</text><text x="165" y="181" text-anchor="end" class="ct-row">Browser QA</text><text x="165" y="196" text-anchor="end" class="ct-sub">14 tools · /browser on</text><rect x="175" y="168" width="295.02" height="22" rx="4" fill="var(--ct-specpi)" opacity="0.55"><title>Browser QA: 8,046 chars</title></rect><text x="478.02" y="184" class="ct-val">8,046</text><text x="165" y="227" text-anchor="end" class="ct-row">Delegation</text><text x="165" y="242" text-anchor="end" class="ct-sub">1 tool · /delegate on</text><rect x="175" y="214" width="163.277" height="22" rx="4" fill="var(--ct-specpi)" opacity="0.55"><title>Delegation: 4,453 chars</title></rect><text x="346.277" y="230" class="ct-val">4,453</text><text x="165" y="273" text-anchor="end" class="ct-row">Web access</text><text x="165" y="288" text-anchor="end" class="ct-sub">4 tools · /webaccess on</text><rect x="175" y="260" width="414.26" height="22" rx="4" fill="var(--ct-specpi)" opacity="0.55"><title>Web access: 11,298 chars</title></rect><text x="597.26" y="276" class="ct-val">11,298</text><rect x="175" y="6" width="11" height="11" rx="2" fill="var(--ct-specpi)" /><text x="192" y="16" class="ct-ax">offered by default</text><rect x="310" y="6" width="11" height="11" rx="2" fill="var(--ct-specpi)" opacity="0.55" /><text x="327" y="16" class="ct-ax">hidden until switched on</text><text x="175" y="352" class="ct-ax">Withholding the opt-in groups keeps 23,797 characters of tool schema out of every request.</text></svg>
+                        <figcaption class="figure-note">
+                            Tool-definition JSON only; the instructions segment is excluded because it does not divide
+                            along the same lines. Whether a group ships in the default profile is read from the default
+                            measurement, so a package that changes its default visibility fails the render rather than
+                            keeping a stale label.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        Browser QA's fourteen tools cost less together than web access's four, which is the kind of
+                        thing an estimate gets wrong. Web access is the single largest group at 11,298 characters, and
+                        <code>web_search</code> alone accounts for 4,858 of them. Leaving all three opt-in groups hidden
+                        keeps 23,797 characters of tool schema out of every request. That is most, but not all, of the
+                        25,134-character gap between the two SpecPi bars above: switching them on also grows the
+                        instructions segment by 1,318 characters, and the wider tool array adds 19 characters of JSON
+                        delimiter.
                     </p>
                     <p>
-                        It is worth holding that next to the two places Oh My Pi already appears on this page. It costs 84%
-                        more per attempt than Pi on FrontierHarness and solves one task fewer; it beats Pi by 16 points on
-                        Composio's SaaS workflows. A first call twelve times the size is neither the reason it wins nor the
-                        reason it loses. The tax is real and measurable — and measuring it settles nothing about what it buys.
+                        Counts are compact tool-definition JSON plus system/developer text, measured as JavaScript
+                        UTF-16 code units. The user prompt and transport envelope are excluded. Discovered skill metadata
+                        is included; skill bodies are only included if actually loaded into the request. Temporary path
+                        text is counted unchanged, so host paths, dates, provider encoding and versions can change totals.
+                        The recorded figures are exact for these requests, not universal session sizes or token counts.
                     </p>
                     <p>
-                        Three caveats keep this honest. The figure omits the four third-party pins, so it is a floor rather
-                        than a ceiling. It was taken on Pi 0.84.4 against a synthetic provider, where the study used Pi
-                        0.85.1 against real ones — which is also why the chart's Pi bar reads 5,420 rather than our 5,521,
-                        a 2% gap that is the best evidence the two measurements are comparable at all. And characters are
-                        not tokens: they track each other closely for this kind of text, but a token count would be the
-                        better number if a synthetic provider could report one.
+                        <strong>Oh My Pi</strong> is a different kind of thing from the SpecPi rows: a Bun-based fork of
+                        Pi rather than a package set on top of one, with its own tools, skills and prompt built in. It is
+                        measured as installed — nothing added, only local rule and extension discovery disabled — and its
+                        default session sends <strong>65,816 characters</strong> across 11 tools. That is about
+                        <strong>11.9x</strong> stock Pi and over four times a default SpecPi, which places a configured
+                        Pi fork between Codex CLI and Claude Code.
                     </p>
                     <p>
-                        The reading is now less uncomfortable but no less conditional. A configured SpecPi is light by the
-                        study's own yardstick — a quarter of Codex, a sixth of Oh My Pi and an eighth of Claude Code —
-                        and turning on every
-                        optional package still leaves it under Codex. What nobody has measured is whether any of that added
-                        context pays for itself in solved tasks. Enable what you use and watch <code>/usage</code>.
+                        It is worth holding that next to the two places Oh My Pi already appears on this page. It costs
+                        84% more per attempt than Pi on FrontierHarness and solves one task fewer; it beats Pi by 16
+                        points on Composio's SaaS workflows. A first call twelve times the size is neither the reason it
+                        wins nor the reason it loses. The tax is real and measurable — and measuring it settles nothing
+                        about what it buys.
+                    </p>
+                    <div class="callout callout-warn">
+                        <p>
+                            <strong>Correction.</strong> The earlier 10,536-character SpecPi figure measured only
+                            first-party extensions, without the installed AGENTS guidance or the four third-party
+                            packages, so it was not a complete default-install measurement; the earlier “all on” row was
+                            not reproduced by enabling those tools either. Both are replaced here by observed requests.
+                            A draft of this revision also moved the Oh My Pi bar into the dimmed study group. That was
+                            wrong: HarnessTax covers Claude Code, Codex CLI and Pi only, and the Oh My Pi figure has
+                            always been ours. It is measured again above, and now reads 65,816 rather than the 65,843
+                            published earlier — a 27-character drift in the instructions segment, which is the kind of
+                            variation the method notes warn about.
+                        </p>
+                    </div>
+                    <p>
+                        Less initial context does not establish lower total spending or better task outcomes. The
+                        external studies above remain separate evidence; none establishes that these SpecPi profiles
+                        improve task success. Enable the capabilities you need and measure the resulting work.
                     </p>
 
                     <h3>Settings worth choosing deliberately</h3>
@@ -653,9 +693,8 @@
                     <p>
                         The conservative reading of the evidence is therefore close to the package's defaults: bounded
                         spending, shallow delegation, fresh context, and children used for review and bounded research
-                        while the parent session keeps writing the code. Delegation is on from Pi startup whenever a model is
-                        configured, so its tool schema is part of every first call unless you run
-                        <code>/delegate off</code>.
+                        while the parent session keeps writing the code. Delegation ships off; use
+                        <code>/delegate on</code> for this session or <code>/delegate startup on</code> to save that preference.
                     </p>
                 </section>
 
@@ -667,9 +706,9 @@
                     </p>
                     <ul>
                         <li>
-                            <strong>SpecPi has never been measured against an alternative.</strong> Every number here
-                            describes stock Pi or another product. Version proximity is a hypothesis about transfer, not
-                            a result.
+                            <strong>SpecPi task effectiveness has not been established against an alternative.</strong>
+                            The installed-profile comparison measures initial context only. External task results describe
+                            stock Pi or another product; version proximity does not establish transfer.
                         </li>
                         <li>
                             <strong>No savings multiplier transfers.</strong> Published ratios span roughly 1.2x to 7x
@@ -799,8 +838,9 @@
                         </li>
                         <li>
                             <b>Oh My Pi</b> — a Bun-based fork of Pi, by can1357 and contributors. Not a study: the npm
-                            package <code>@oh-my-pi/pi-coding-agent</code> 18.2.2, installed and measured on 16 September
-                            2026 for the first-call figure in <a class="text-link" href="#specpi">section 05</a>.
+                            package <code>@oh-my-pi/pi-coding-agent</code> 18.2.2, installed and measured here for the
+                            first-call figure in <a class="text-link" href="#specpi">section 05</a>. HarnessTax does not
+                            publish a figure for it.
                             <span><a class="text-link" href="https://omp.sh">omp.sh</a></span>
                         </li>
                         <li>
@@ -814,7 +854,7 @@
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.24.0">v0.24.0</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.25.0">v0.25.0</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>
