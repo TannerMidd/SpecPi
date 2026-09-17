@@ -131,9 +131,14 @@ function connect(child) {
                 },
             };
             // Name the hung step: a bare timeout cannot tell a slow boot from a
-            // stuck dialog, and this test has both kinds of waits.
+            // stuck dialog, and this test has both kinds of waits. Attach the tail
+            // of the event stream so a failure shows what Pi actually sent last.
             const timer = setTimeout(() => {
-                finish(reject, new Error(`RPC ${label} timed out. ${stderr}`));
+                const tail = events
+                    .slice(-8)
+                    .map((event) => JSON.stringify(event).slice(0, 300))
+                    .join("\n");
+                finish(reject, new Error(`RPC ${label} timed out. Recent events:\n${tail}\n${stderr}`));
             }, 90000);
             waiting.add(waiter);
         });
