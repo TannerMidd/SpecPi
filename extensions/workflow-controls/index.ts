@@ -267,6 +267,7 @@ export default function workflowControls(pi: ExtensionAPI) {
 
         scope.active = true;
         scope.entries = entries;
+        ctx.ui.notify(`DIAG set root=${scope.root} count=${entries.length}`, "info");
         if (options.taskDigest !== undefined) {
             scope.taskDigest = options.taskDigest;
         } else {
@@ -279,11 +280,13 @@ export default function workflowControls(pi: ExtensionAPI) {
         persistScope(ctx);
     };
 
-    const restoreSession = async (ctx: ExtensionContext) => {
+    // TEMP-DIAG-CI-HANG: narrows the Windows-only scope wipe. Revert after reading.
+    const restoreSession = async (ctx: ExtensionContext, trigger = "unknown") => {
         sessionGeneration += 1;
         const origin = captureSession(ctx);
         // Retire armed prompts synchronously, before root lookup can yield to a tool call or another branch change.
         scope = emptyScope(path.resolve(origin.cwd));
+        ctx.ui.notify(`DIAG restore start ${trigger} gen=${origin.generation} root=${scope.root}`, "info");
         latestTaskContract = undefined;
         taskContractError = undefined;
         latestSnapshot = undefined;
@@ -296,6 +299,10 @@ export default function workflowControls(pi: ExtensionAPI) {
         }
 
         scope = emptyScope(root);
+        ctx.ui.notify(
+            `DIAG restore read ${trigger} root=${root} entries=${(ctx.sessionManager.getBranch?.() ?? []).length}`,
+            "info",
+        );
 
         for (const entry of ctx.sessionManager.getBranch?.() ?? []) {
             if (entry.type !== "custom") {
@@ -352,10 +359,10 @@ export default function workflowControls(pi: ExtensionAPI) {
     pi.on("session_start", (_event, ctx) => {
         webAccessEnabled = loadStartupActivation();
         applyWebAccess();
-        restoreSession(ctx);
+        restoreSession(ctx, `start:${(_event as any)?.reason ?? "?"}`);
     });
 
-    pi.on("session_tree", (_event, ctx) => restoreSession(ctx));
+    pi.on("session_tree", (_event, ctx) => restoreSession(ctx, "tree"));
 
     pi.on("session_shutdown", (_event, ctx) => {
         sessionGeneration += 1;
