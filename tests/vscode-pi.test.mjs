@@ -130,11 +130,13 @@ function connect(child) {
                     finish(reject, error);
                 },
             };
-            // Cold CI runners (notably Windows) can take well over 20s to boot Pi with
-            // every extension loaded, while the process stays alive but silent throughout.
+            // CI evidence: this deadline fired with Pi alive but silent while ~400 sibling
+            // tests completed in the same minute on a small Windows runner, so the boot
+            // was starved, not broken. Local boots answer in about a second; only a
+            // genuinely hung boot should fail, and it still does, just later.
             const timer = setTimeout(() => {
                 finish(reject, new Error(`RPC response timed out. ${stderr}`));
-            }, 45000);
+            }, 90000);
             waiting.add(waiter);
         });
     };
@@ -155,7 +157,7 @@ function connect(child) {
 
 test(
     "real isolated Pi RPC starts all SpecPi extensions and preserves scope, wishlist, and visible command workflows",
-    { timeout: 120000 },
+    { timeout: 300000 },
     async () => {
         assert.ok(
             fs.existsSync(piShim),
@@ -222,7 +224,8 @@ test(
 
         try {
             // A cold or crowded runner can leave the first Pi boot silent past the
-            // deadline. Respawn once on a silent boot; any other failure still fails.
+            // deadline, as observed on CI. Respawn once on a silent boot; any other
+            // failure still fails, as does a second silent boot.
             let initial;
             try {
                 initial = await rpc.request("get_state");
