@@ -168,31 +168,35 @@ test(
         const env = isolatedEnvironment(root);
         const launch = await resolveLaunch({ piPath: piShim, nodePath: process.execPath, env });
         assert.match(launch.args[0], /dist[/\\]bundle[/\\]cli\.js$/u);
-        const child = spawn(
-            launch.command,
-            [
-                ...launch.args,
-                "--mode",
-                "rpc",
-                "--offline",
-                "--no-session",
-                "--no-context-files",
-                "--no-extensions",
-                "--no-skills",
-                "--no-prompt-templates",
-                "--no-themes",
-                "-e",
-                path.join(repository, "tests/fixtures/vscode-pi-harness.ts"),
-                ...extensionArguments,
-                "--provider",
-                "specpi-rpc-fixture",
-                "--model",
-                "offline-fixture",
-            ],
-            { cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
-        );
-        const closed = once(child, "close");
-        const rpc = connect(child);
+        const spawnPi = () => {
+            const child = spawn(
+                launch.command,
+                [
+                    ...launch.args,
+                    "--mode",
+                    "rpc",
+                    "--offline",
+                    "--no-session",
+                    "--no-context-files",
+                    "--no-extensions",
+                    "--no-skills",
+                    "--no-prompt-templates",
+                    "--no-themes",
+                    "-e",
+                    path.join(repository, "tests/fixtures/vscode-pi-harness.ts"),
+                    ...extensionArguments,
+                    "--provider",
+                    "specpi-rpc-fixture",
+                    "--model",
+                    "offline-fixture",
+                ],
+                { cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
+            );
+
+            return { child, closed: once(child, "close"), rpc: connect(child) };
+        };
+
+        let { child, closed, rpc } = spawnPi();
 
         async function notification(command, pattern) {
             const cursor = rpc.events.length;
@@ -217,7 +221,21 @@ test(
         }
 
         try {
-            const initial = await rpc.request("get_state");
+            // A cold or crowded runner can leave the first Pi boot silent past the
+            // deadline. Respawn once on a silent boot; any other failure still fails.
+            let initial;
+            try {
+                initial = await rpc.request("get_state");
+            } catch (error) {
+                if (!(error instanceof Error) || !error.message.startsWith("RPC response timed out")) {
+                    throw error;
+                }
+
+                child.kill();
+                ({ child, closed, rpc } = spawnPi());
+                initial = await rpc.request("get_state");
+            }
+
             assert.equal(initial.model.provider, "specpi-rpc-fixture");
             assert.equal(initial.sessionFile, undefined);
             assert.equal(
