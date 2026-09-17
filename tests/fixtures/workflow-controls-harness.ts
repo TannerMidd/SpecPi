@@ -309,10 +309,17 @@ await commands.get("scope").handler("add docs/", ctx);
 const restoredRecordUnchanged = JSON.stringify(branch.slice(0, -1)) === beforeResume;
 const exec = pi.exec;
 let releaseRoot: () => void;
+let rootLookupReached: () => void;
+// The command reaches its root lookup asynchronously, so hand back the real exec only once the stub is holding it;
+// swapping on the next line instead would let the command sail past and leave `releaseRoot` unassigned.
+const rootLookupHeld = new Promise<void>((resolve) => {
+    rootLookupReached = resolve;
+});
 pi.exec = async (command: string, args: string[], options: any) => {
     if (args[0] === "rev-parse") {
         await new Promise<void>((resolve) => {
             releaseRoot = resolve;
+            rootLookupReached();
         });
     }
 
@@ -320,6 +327,7 @@ pi.exec = async (command: string, args: string[], options: any) => {
 };
 
 const pending = commands.get("scope").handler("status", ctx);
+await rootLookupHeld;
 branch = [];
 pi.exec = exec;
 for (const handler of events.get("session_tree") || []) {
@@ -330,6 +338,40 @@ releaseRoot!();
 await pending;
 await commands.get("scope").handler("status", ctx);
 const treeCleared = notifications.at(-1).message === "Scope monitoring is inactive.";
+
+// Restore retires scope immediately but only learns the repository root once `git rev-parse` returns. A human who
+// declares scope inside that window must not have it recorded against the session cwd the restore was still guessing
+// at, because the replay that follows rejects a foreign root and would silently retire the contract it just confirmed.
+ctx.cwd = nestedCwd;
+editorValue = "src/";
+branch = [];
+let releaseRestoreRoot: () => void;
+pi.exec = async (command: string, args: string[], options: any) => {
+    if (args[0] === "rev-parse") {
+        await new Promise<void>((resolve) => {
+            releaseRestoreRoot = resolve;
+        });
+    }
+
+    return exec(command, args, options);
+};
+
+for (const handler of events.get("session_start") || []) {
+    await handler({}, ctx);
+}
+
+const declaredDuringRestore = commands.get("scope").handler("set", ctx);
+pi.exec = exec;
+releaseRestoreRoot!();
+await declaredDuringRestore;
+const racedScopeState = entries.filter((entry) => entry.customType === "specpi-scope-state").at(-1)?.data;
+const restoreRaceKeptRepositoryRoot =
+    racedScopeState?.active === true &&
+    racedScopeState.root === fs.realpathSync.native(repository) &&
+    racedScopeState.entries.some((entry: any) => entry.path === "src" && entry.directory === true);
+await commands.get("scope").handler("status", ctx);
+const restoreRaceSurvived = notifications.at(-1).message.startsWith("Scope: src/;");
+
 const report = {
     commands: [...commands.keys()].sort(),
     toolRegistered: tools.size > 0,
@@ -357,6 +399,8 @@ const report = {
     taskBound,
     restoredRecordUnchanged,
     treeCleared,
+    restoreRaceKeptRepositoryRoot,
+    restoreRaceSurvived,
     emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
 };
 console.log("WORKFLOW_CONTROLS_HARNESS=" + JSON.stringify(report));

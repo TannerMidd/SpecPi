@@ -267,7 +267,6 @@ export default function workflowControls(pi: ExtensionAPI) {
 
         scope.active = true;
         scope.entries = entries;
-        ctx.ui.notify(`DIAG set root=${scope.root} count=${entries.length}`, "info");
         if (options.taskDigest !== undefined) {
             scope.taskDigest = options.taskDigest;
         } else {
@@ -280,13 +279,16 @@ export default function workflowControls(pi: ExtensionAPI) {
         persistScope(ctx);
     };
 
-    // TEMP-DIAG-CI-HANG: narrows the Windows-only scope wipe. Revert after reading.
-    const restoreSession = async (ctx: ExtensionContext, trigger = "unknown") => {
+    // Restore empties scope first and only learns the real root once `git rev-parse` returns, so between those two
+    // moments `scope.root` is a guess at the session cwd: not yet canonical, and not yet the enclosing repository.
+    // A human command that declared scope in that gap recorded it under the guessed root, and the replay below then
+    // rejected its own branch entry as belonging elsewhere, silently retiring a contract the human was told was set.
+    // Scope commands therefore wait for `sessionRestore` rather than racing it.
+    const restoreSession = async (ctx: ExtensionContext) => {
         sessionGeneration += 1;
         const origin = captureSession(ctx);
         // Retire armed prompts synchronously, before root lookup can yield to a tool call or another branch change.
         scope = emptyScope(path.resolve(origin.cwd));
-        ctx.ui.notify(`DIAG restore start ${trigger} gen=${origin.generation} root=${scope.root}`, "info");
         latestTaskContract = undefined;
         taskContractError = undefined;
         latestSnapshot = undefined;
@@ -299,10 +301,6 @@ export default function workflowControls(pi: ExtensionAPI) {
         }
 
         scope = emptyScope(root);
-        ctx.ui.notify(
-            `DIAG restore read ${trigger} root=${root} entries=${(ctx.sessionManager.getBranch?.() ?? []).length}`,
-            "info",
-        );
 
         for (const entry of ctx.sessionManager.getBranch?.() ?? []) {
             if (entry.type !== "custom") {
@@ -351,6 +349,12 @@ export default function workflowControls(pi: ExtensionAPI) {
         emitScopeStatus(ctx);
     };
 
+    let sessionRestore: Promise<void> = Promise.resolve();
+    const beginRestore = (ctx: ExtensionContext) => {
+        // Waiters only need to know the restore is over; restoreSession reports its own failures.
+        sessionRestore = restoreSession(ctx).catch(() => {});
+    };
+
     // Web access ships hidden. A missing or unreadable preference means off, and the
     // gate only ever touches its own four tool names.
     let webAccessEnabled = loadStartupActivation();
@@ -359,10 +363,10 @@ export default function workflowControls(pi: ExtensionAPI) {
     pi.on("session_start", (_event, ctx) => {
         webAccessEnabled = loadStartupActivation();
         applyWebAccess();
-        restoreSession(ctx, `start:${(_event as any)?.reason ?? "?"}`);
+        beginRestore(ctx);
     });
 
-    pi.on("session_tree", (_event, ctx) => restoreSession(ctx, "tree"));
+    pi.on("session_tree", (_event, ctx) => beginRestore(ctx));
 
     pi.on("session_shutdown", (_event, ctx) => {
         sessionGeneration += 1;
@@ -541,6 +545,9 @@ export default function workflowControls(pi: ExtensionAPI) {
                 .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
                 .map((value) => ({ value, label: value })),
         handler: async (args, ctx) => {
+            // Read scope only after any restore in flight has settled: before that, both the default action and the
+            // root every branch below records are taken from a provisional, pre-Git-lookup guess.
+            await sessionRestore;
             const origin = captureSession(ctx);
             const [actionRaw, ...rest] = args.trim().split(/\s+/u).filter(Boolean);
             const action = actionRaw?.toLowerCase() || (scope.active ? "status" : "set");
