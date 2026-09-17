@@ -28,23 +28,25 @@
 
 ---
 
-SpecPi is a small base for the [Pi coding agent](https://pi.dev/), assembled from deliberate choices about how the agent should work — not a curated marketplace.
+SpecPi is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
-Two first-party extensions set the terms: **scope control**, which holds each task to the files it declared, and an **improvement loop**, which turns recurring friction into tested, evidence-backed harness changes instead of accumulated prompts and workarounds. Around them sit seven hand-picked packages, each pinned to an exact version and verified before any transaction completes, and **SpecPi Chat**, a VS Code frontend for working beside the agent.
+At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are seven hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
-The setup optimizes for four things:
+It focuses on five things:
 
-- **Control** — declared scope, tool permissions, and confirmation-gated lifecycle commands
-- **Accuracy** — exact pins, checksum-tracked state, rollback on failure, and evidence over claims
-- **Improvement** — local observations become bounded, verified changes through `/harness-improvement`
-- **Efficiency** — subagent delegation, persistent goals, and browser QA handled by the right tools
-- **Lean default** — web access, browser QA, and delegation ship hidden; `/webaccess on`, `/browser on`, and `/delegate on` offer them per session
+- **Control:** clear scope, tool permissions, and lifecycle commands that ask before they change anything
+- **Accuracy:** exact version pins, checksums on state, rollback on failure, and proof over promises
+- **Improvement:** local notes become small, checked changes through `/harness-improvement`
+- **Efficiency:** delegation, persistent goals, and browser QA handled by the right tool for the job
+- **Lean default:** web access, browser QA, and delegation stay off until you need them. Turn them on for a session with `/webaccess on`, `/browser on`, and `/delegate on`
 
-Everything it manages is declared, versioned, and reversible.
+Everything it touches is written down, versioned, and easy to undo.
 
 ## Measured context
 
-The chart measures first-call context from a clean installation: all seven pinned packages, the installed working agreement, and discovered skills. “Enabled” means browser QA, delegation, and web access are switched on; no goal, scope, or improvement selection is active. The solid rows — including OpenCode and Oh My Pi, both measured as installed — are ours, taken from the request each harness actually sends through one local synthetic provider. The dimmed Codex CLI and Claude Code rows are HarnessTax's published figures, taken under the study's configuration: a reference, not a matched comparison. These are character counts, not tokens, spending, or task-quality scores. The research page [breaks the enabled profile down by capability](https://tannermidd.github.io/SpecPi/research/#specpi), so the cost of each switch is visible on its own.
+This chart shows first-call context from a clean install: all seven pinned packages, the working agreement, and the skills Pi finds. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
+
+The solid rows are measured by us, from the request each setup actually sends through one local test provider. That includes OpenCode and Oh My Pi, both measured as installed. The faded Codex CLI and Claude Code rows come from HarnessTax's published numbers, measured under their own setup. Treat those as a rough reference, not a head-to-head test. These are character counts. They say nothing about tokens, cost, or how well each tool does the job. The research page [breaks down the enabled setup by feature](https://tannermidd.github.io/SpecPi/research/#specpi), so you can see what each switch costs on its own.
 
 <p align="center">
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
@@ -56,7 +58,7 @@ The chart measures first-call context from a clean installation: all seven pinne
 </p>
 <p align="center"><sub>Measured tool schemas + system/developer instructions · <code>node scripts/measure-context.mjs --chart --omp=&lt;path to Oh My Pi's cli.js&gt; --oc=&lt;path to OpenCode's binary&gt;</code> · <a href="site/research/context-measurement.json">Recorded measurements and package pins</a> · <a href="https://tannermidd.github.io/SpecPi/research/#specpi">Method and caveats</a></sub></p>
 
-The gap between the two SpecPi bars is not one decision, so the enabled profile's tool schema is also measured group by group. Browser QA's fourteen tools cost less together than web access's four:
+The gap between the two SpecPi bars comes from a few separate switches, so the enabled tools are also measured group by group. For example, the fourteen browser QA tools add up to less than the four web access tools:
 
 <p align="center">
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
