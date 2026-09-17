@@ -221,7 +221,7 @@ try {
         "WORKFLOW_CONTROLS_HARNESS=",
         "workflow extension harness",
     );
-    assert.deepEqual(workflowReport.commands, ["scope"]);
+    assert.deepEqual(workflowReport.commands, ["scope", "webaccess"]);
     assert.equal(workflowReport.toolRegistered, false);
     assert.equal(workflowReport.emittedScopeStatus, true);
 
