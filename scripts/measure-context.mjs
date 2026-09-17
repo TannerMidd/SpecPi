@@ -3,9 +3,10 @@
 // Network is used only to acquire the exact default packages in a disposable home.
 // No live Pi state or provider credentials are read. The model endpoint is localhost.
 // Usage: node scripts/measure-context.mjs [--chart] [--json] [--omp=<path to Oh My Pi's cli.js>]
-//          [--oc=<path to OpenCode's binary>]
-// --chart also saves the bounded measurement artifact used by the chart renderer, and
-// requires --omp and --oc because the chart carries measured Oh My Pi and OpenCode rows.
+//          [--oc=<path to OpenCode's binary>] [--dsh=<path to the DeepSeek Harness bin>]
+// --chart also saves the bounded measurement artifact used by the chart renderer, and requires
+// --omp, --oc and --dsh because the chart carries the measured Oh My Pi, OpenCode and DeepSeek
+// Harness rows.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -44,6 +45,12 @@ const ompVersion = ompCli ? readPackageVersion(path.resolve(ompCli, "..", ".."))
 const ocFlag = process.argv.find((argument) => argument.startsWith("--oc="));
 const ocCli = ocFlag ? path.resolve(ocFlag.slice("--oc=".length)) : process.env.SPECPI_OPENCODE_CLI;
 const ocVersion = ocCli ? readPackageVersion(path.resolve(ocCli, "..", "..")) : undefined;
+
+// The DeepSeek Harness is a separate Node application with its own profile composition,
+// reached the same way: --dsh or SPECPI_DSH_CLI point at its installed bin.
+const dshFlag = process.argv.find((argument) => argument.startsWith("--dsh="));
+const dshCli = dshFlag ? path.resolve(dshFlag.slice("--dsh=".length)) : process.env.SPECPI_DSH_CLI;
+const dshVersion = dshCli ? readPackageVersion(path.resolve(dshCli, "..", "..")) : undefined;
 
 const npmrc = path.join(directory, "npmrc");
 fs.writeFileSync(npmrc, "");
@@ -470,6 +477,84 @@ async function measureOpenCode({ label, harness, cli }) {
     }
 }
 
+// The DeepSeek Harness (`dsh`) is a separate Node application whose composition is a stack of
+// profile patch layers, which this repository does not own. It is measured as installed on the
+// same terms as the rows above: one synthetic provider, one empty workspace, this machine's own
+// harness home excluded through DSH_HOME. Nothing is added to it; only the provider route and
+// the default model are declared through its documented home-level patch layer. A headless run
+// also fires a small auxiliary request to write the session title, which carries no tool
+// schema, so the measured request is the one carrying the conversation's tools.
+async function measureDeepSeek({ label, harness, cli }) {
+    const provider = await startProvider();
+    const dshHome = path.join(directory, "dsh-home");
+    fs.mkdirSync(dshHome, { recursive: true });
+    fs.writeFileSync(
+        path.join(dshHome, "cordis.patch.yml"),
+        `- id: llm-pi-ai
+  config:
+    providers:
+      measure:
+        displayName: Measure
+        api: openai-completions
+        baseURL: ${provider.url}
+        apiKeyEnv: DSH_MEASURE_API_KEY
+        models:
+          - id: measure-model
+            name: Measurement model
+            contextWindow: 200000
+- id: agent-default-model
+  config:
+    provider: measure
+    model: measure-model
+`,
+    );
+    const child = spawn(process.execPath, [cli, "--profile", "headless", "Reply with ok."], {
+        cwd: workspace,
+        env: {
+            ...environment(directory),
+            DSH_HOME: dshHome,
+            DSH_MEASURE_API_KEY: "synthetic-only",
+        },
+        stdio: ["ignore", "ignore", "pipe"],
+        windowsHide: true,
+    });
+    let errors = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const closed = new Promise((resolve) => child.once("close", resolve));
+    let launchError;
+    child.on("error", (error) => {
+        launchError = error;
+    });
+    try {
+        const deadline = Date.now() + 180_000;
+        while (child.exitCode === null && child.signalCode === null && !launchError && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        assert.ok(!launchError, `${label} failed to launch: ${launchError}`);
+        assert.equal(child.exitCode, 0, `${label} exited: ${errors.slice(-2000)}`);
+        assert.ok(Date.now() < deadline, `${label} timed out: ${errors.slice(-2000)}`);
+        const conversation = provider.requests.filter((body) => (body.tools ?? []).length > 0);
+        assert.equal(
+            conversation.length,
+            1,
+            `${label} sent ${conversation.length} requests carrying tools, expected exactly one`,
+        );
+        const summary = summarize(conversation[0]);
+        delete summary.tools;
+        delete summary.instructionText;
+
+        return { label, harness, ...summary };
+    } finally {
+        child.kill();
+        await closed;
+        await provider.close();
+    }
+}
+
 try {
     console.error(
         `Acquiring all ${basePackages.length} pinned packages in a disposable home; Chromium download skipped.`,
@@ -534,15 +619,29 @@ process.exit(0);`,
         );
     }
 
+    if (dshCli) {
+        assert.ok(fs.existsSync(dshCli), `No DeepSeek Harness bin at ${dshCli}`);
+        console.error("Measuring the DeepSeek Harness...");
+        results.push(
+            await measureDeepSeek({
+                label: "DeepSeek Harness",
+                harness: `DeepSeek Harness ${dshVersion ?? "(unknown version)"}`,
+                cli: dshCli,
+            }),
+        );
+    }
+
     if (process.argv.includes("--chart")) {
         const missing = [
             !ompCli && "--omp=<path to Oh My Pi's cli.js>",
             !ocCli && "--oc=<path to OpenCode's binary>",
+            !dshCli && "--dsh=<path to the DeepSeek Harness bin>",
         ].filter(Boolean);
         if (missing.length > 0) {
             throw new Error(
-                `The chart carries measured Oh My Pi and OpenCode rows, so writing it needs ${missing.join(" and ")}. ` +
-                    "Measure them or remove the rows from scripts/context-chart.mjs; they must not be filled in from elsewhere.",
+                `The chart carries measured Oh My Pi, OpenCode and DeepSeek Harness rows, so writing it needs ` +
+                    `${missing.join(", ")}. Measure them or remove the rows from scripts/context-chart.mjs; ` +
+                    "they must not be filled in from elsewhere.",
             );
         }
     }
@@ -558,7 +657,8 @@ process.exit(0);`,
         loadedExtensionCount: resources.count,
         ...(ompCli ? { ohMyPiVersion: ompVersion } : {}),
         ...(ocCli ? { opencodeVersion: ocVersion } : {}),
-        method: "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
+        ...(dshCli ? { deepseekHarnessVersion: dshVersion } : {}),
+        method: "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. The DeepSeek Harness is a separate Node application measured as installed on the same terms with this machine's own harness home excluded through DSH_HOME; only the provider route and default model are declared, through its own patch layer, and its auxiliary session-title request is excluded because it carries no tool schema. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
         results,
     };
     console.log(

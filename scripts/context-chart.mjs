@@ -67,6 +67,7 @@ const PALETTES = {
         pi: "#1b5fd6",
         specpi: "#157f4c",
         codex: "#9a5b00",
+        deepseek: "#0e7490",
         opencode: "#c2410c",
         omp: "#8c6ebd",
         claudecode: "#a3197f",
@@ -78,6 +79,7 @@ const PALETTES = {
         pi: "#5a8ae8",
         specpi: "#3f9e6b",
         codex: "#c08420",
+        deepseek: "#2aa8c4",
         opencode: "#f0883e",
         omp: "#864ad2",
         claudecode: "#c25299",
@@ -93,6 +95,7 @@ const TOKENS = {
     pi: "var(--ct-pi)",
     specpi: "var(--ct-specpi)",
     codex: "var(--ct-codex)",
+    deepseek: "var(--ct-deepseek)",
     opencode: "var(--ct-opencode)",
     omp: "var(--ct-omp)",
     claudecode: "var(--ct-claudecode)",
@@ -114,8 +117,8 @@ const TEXT_ROLES = {
 // HarnessTax's published figures (Pan, Yang, Arabzadeh, Chiang, Stoica and Zaharia,
 // 16 September 2026, https://harnesstax.github.io/), taken under the study's configuration.
 // That study covers Claude Code, Codex CLI and Pi only, so no other harness may be entered
-// as a study row -- Oh My Pi's and OpenCode's bars are our own measurements and stay
-// measured rows.
+// as a study row -- the Oh My Pi, OpenCode and DeepSeek Harness bars are our own measurements
+// and stay measured rows.
 //
 // Reduced opacity means "this figure is not ours" and nothing else, which is what lets the
 // footnote name the method difference without implicating a row we measured.
@@ -123,6 +126,7 @@ const ROWS = [
     { label: "Pi stock", hue: "pi", measured: "Pi (stock)" },
     { label: "SpecPi default", hue: "specpi", measured: "SpecPi default" },
     { label: "OpenCode", hue: "opencode", measured: "OpenCode" },
+    { label: "DeepSeek Harness", hue: "deepseek", measured: "DeepSeek Harness" },
     { label: "SpecPi enabled", hue: "specpi", measured: "SpecPi enabled" },
     {
         label: "Codex CLI",
@@ -167,7 +171,10 @@ function footnoteY(gridBottom, line) {
     return gridBottom + 66 + line * 18;
 }
 
-const HEIGHT = footnoteY(gridBottomFor(ROWS.length, ROW_STEP), 2) + 16;
+// The comparison chart's footnotes run to four lines: three measured harness versions no
+// longer fit one line inside the plot width where the value labels sit.
+const FOOTNOTE_LINES = 3;
+const HEIGHT = footnoteY(gridBottomFor(ROWS.length, ROW_STEP), FOOTNOTE_LINES) + 16;
 const CAP_HEIGHT = footnoteY(gridBottomFor(CAPABILITY_GROUPS.length, CAP_ROW_STEP), 0) + 16;
 
 /** Trim a computed coordinate to sub-pixel precision, so re-rendering is stable. */
@@ -280,14 +287,16 @@ function axisMax(values, step) {
 function footnotes(report) {
     const versions = [
         `Pi ${report.piVersion}`,
-        report.ohMyPiVersion && `omp ${report.ohMyPiVersion}`,
         report.opencodeVersion && `opencode ${report.opencodeVersion}`,
+        report.deepseekHarnessVersion && `dsh ${report.deepseekHarnessVersion}`,
+        report.ohMyPiVersion && `omp ${report.ohMyPiVersion}`,
     ].filter(Boolean);
     const measured =
         versions.length > 2 ? `${versions.slice(0, -1).join(", ")} and ${versions.at(-1)}` : versions.join(" and ");
 
     return [
-        `Solid rows measured here: ${measured}, synthetic provider, all ${report.packages.length} pins.`,
+        `Solid rows measured here: ${measured}.`,
+        `Synthetic provider, all ${report.packages.length} pins.`,
         "Dimmed rows: HarnessTax figures for Codex CLI and Claude Code, taken on",
         `Pi ${STUDY_PI_VERSION} with real providers. Characters, not tokens or cost.`,
     ];
@@ -485,8 +494,8 @@ function description(rows) {
     return (
         "Horizontal bar chart of characters a harness sends before any work happens. " +
         `${figures(rows, "; ")}. Each bar is split into tool schemas and instructions. ` +
-        "The Pi, SpecPi, OpenCode and Oh My Pi rows were measured by this repository; the dimmed Codex CLI and " +
-        "Claude Code rows are HarnessTax published figures taken under a different configuration."
+        "The Pi, SpecPi, OpenCode, DeepSeek Harness and Oh My Pi rows were measured by this repository; the dimmed " +
+        "Codex CLI and Claude Code rows are HarnessTax published figures taken under a different configuration."
     );
 }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Measure the DeepSeek Harness on the same terms and add it to the first-call chart. Its default session sends 31,743 characters across 25 tools, about 5.7x stock Pi and within 700 characters of OpenCode. `scripts/measure-context.mjs --dsh=<path to its bin>` takes that row, declared through the harness's own patch layer; its auxiliary session-title request is excluded because it carries no tool schema. The Oh My Pi row is carried forward from the same-terms run while its runtime's dependency resolution stays broken upstream.
+
 ## 0.26.0 - 2026-09-17
 
 - Let the agent ask for a withdrawn tool group instead of working around it. Hiding web access and Browser QA keeps 19,344 characters of tool schema out of every request, but it also hides them from the agent, so a session that turns out to need one had no way to say so. The new `request_capability` tool names the withdrawn groups and asks the human, who may decline; accepting offers that group's tools from the agent's next message, for the rest of the session. It grants nothing on its own: it refuses without an interactive human, and a decline leaves the session unchanged. `/webaccess on` and `/browser on` are unchanged. Delegation is not requestable, because its own package requires a human command to bind a model.
