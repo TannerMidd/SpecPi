@@ -12,12 +12,23 @@ test("published context charts match the recorded installed-profile measurements
     assert.equal(report.packages.length, 7);
     assert.equal(report.loadedExtensionCount, 9);
     assert.deepEqual(staleChartFiles(report), []);
-    const [stock, defaults, enabled, ohMyPi] = report.results;
+    const [stock, defaults, openCode, enabled, ohMyPi] = report.results;
 
-    // Oh My Pi is a separate harness measured on the same terms, never a published figure.
+    // Oh My Pi and OpenCode are separate harnesses measured on the same terms, never
+    // published figures. The Oh My Pi row may be carried forward from a same-terms run
+    // recorded in `carriedForward` while its own runtime stays broken; every other row is
+    // from this record's run.
+    assert.equal(stock.label, "Pi (stock)");
+    assert.equal(defaults.label, "SpecPi default");
+    assert.equal(openCode.label, "OpenCode");
+    assert.equal(openCode.harness, `OpenCode ${report.opencodeVersion}`);
+    assert.equal(enabled.label, "SpecPi enabled");
     assert.equal(ohMyPi.label, "Oh My Pi");
     assert.equal(ohMyPi.harness, `Oh My Pi ${report.ohMyPiVersion}`);
+    assert.ok(openCode.requestSha256);
     assert.ok(ohMyPi.requestSha256);
+    assert.ok(openCode.installedGuidance === undefined);
+    assert.ok(ohMyPi.installedGuidance === undefined);
     for (const row of [stock, defaults, enabled]) {
         assert.equal(row.harness, "Pi");
     }
@@ -70,12 +81,19 @@ test("only harnesses the study covers may carry published figures", () => {
         ROWS.some((row) => row.label === "Oh My Pi" && row.measured && !row.study),
         "Oh My Pi is our measurement and must stay a measured row",
     );
+    assert.ok(
+        ROWS.some((row) => row.label === "OpenCode" && row.measured && !row.study),
+        "OpenCode is our measurement and must stay a measured row",
+    );
 });
 
 // The footnote names harness versions, so it is written from the record rather than by hand.
 test("chart footnotes track the measured versions and pin count", () => {
     const light = fs.readFileSync(new URL("../site/media/context-chart-light.svg", import.meta.url), "utf8");
-    assert.match(light, new RegExp(`Pi ${report.piVersion} and omp ${report.ohMyPiVersion}`, "u"));
+    assert.match(
+        light,
+        new RegExp(`Pi ${report.piVersion}, omp ${report.ohMyPiVersion} and opencode ${report.opencodeVersion}`, "u"),
+    );
     assert.match(light, new RegExp(`all ${report.packages.length} pins`, "u"));
     assert.deepEqual(staleChartFiles({ ...report, piVersion: "9.9.9" }).includes("README.md"), false);
     assert.ok(staleChartFiles({ ...report, piVersion: "9.9.9" }).includes("site/media/context-chart-light.svg"));

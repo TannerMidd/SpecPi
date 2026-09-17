@@ -2,9 +2,10 @@
 // Measure real first requests from stock Pi and the complete installed SpecPi base.
 // Network is used only to acquire the exact default packages in a disposable home.
 // No live Pi state or provider credentials are read. The model endpoint is localhost.
-// Usage: node scripts/measure-context.mjs [--chart] [--json] [--omp=<path to its cli.js>]
+// Usage: node scripts/measure-context.mjs [--chart] [--json] [--omp=<path to Oh My Pi's cli.js>]
+//          [--oc=<path to OpenCode's binary>]
 // --chart also saves the bounded measurement artifact used by the chart renderer, and
-// requires --omp because the chart carries a measured Oh My Pi row.
+// requires --omp and --oc because the chart carries measured Oh My Pi and OpenCode rows.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -37,6 +38,12 @@ const ompFlag = process.argv.find((argument) => argument.startsWith("--omp="));
 const ompCli = ompFlag ? path.resolve(ompFlag.slice("--omp=".length)) : process.env.SPECPI_OMP_CLI;
 const ompRuntime = process.env.SPECPI_OMP_RUNTIME ?? "bun";
 const ompVersion = ompCli ? readPackageVersion(path.resolve(ompCli, "..", "..")) : undefined;
+
+// OpenCode is likewise a separate harness, published as a compiled Bun binary: opt-in via
+// --oc or SPECPI_OPENCODE_CLI so it is measured where it is installed, never assumed.
+const ocFlag = process.argv.find((argument) => argument.startsWith("--oc="));
+const ocCli = ocFlag ? path.resolve(ocFlag.slice("--oc=".length)) : process.env.SPECPI_OPENCODE_CLI;
+const ocVersion = ocCli ? readPackageVersion(path.resolve(ocCli, "..", "..")) : undefined;
 
 const npmrc = path.join(directory, "npmrc");
 fs.writeFileSync(npmrc, "");
@@ -372,6 +379,97 @@ async function measureForeign({ label, harness, runtime, cli, isolation }) {
     }
 }
 
+// OpenCode is a separate harness built as a compiled Bun binary with its own config schema,
+// which this repository does not own. It is measured as installed on the same terms as the
+// rows above -- one synthetic provider, one empty workspace, this machine's own config,
+// auth and data excluded through the XDG redirects -- so its bar is ours and is never
+// filled in from a published figure. Nothing is added to it; only the provider is
+// registered, through its documented config surface. `opencode run` normally fires a
+// parallel small-model call to write a session title; pinning --title suppresses it, so the
+// turn sends exactly one request and the recorded one is the conversation call.
+async function measureOpenCode({ label, harness, cli }) {
+    const provider = await startProvider();
+    const configDir = path.join(directory, "XDG_CONFIG_HOME", "opencode");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.mkdirSync(path.join(directory, "XDG_CACHE_HOME"), { recursive: true });
+    fs.mkdirSync(path.join(directory, "XDG_STATE_HOME"), { recursive: true });
+    fs.writeFileSync(
+        path.join(configDir, "opencode.json"),
+        JSON.stringify(
+            {
+                $schema: "https://opencode.ai/config.json",
+                provider: {
+                    measure: {
+                        npm: "@ai-sdk/openai-compatible",
+                        name: "Measure",
+                        options: { baseURL: provider.url, apiKey: "synthetic-only" },
+                        models: {
+                            "measure-model": {
+                                name: "Measurement model",
+                                contextWindow: 200000,
+                                maxTokens: 8192,
+                                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                            },
+                        },
+                    },
+                },
+            },
+            null,
+            4,
+        ),
+    );
+    const child = spawn(
+        cli,
+        ["run", "Reply with ok.", "--model", "measure/measure-model", "--title", "Measurement", "--port", "0"],
+        {
+            cwd: workspace,
+            // Oh My Pi resolves its dependencies through Bun's install cache, which is part
+            // of how it is installed, so only OpenCode gets the cache and state redirects.
+            env: {
+                ...environment(directory),
+                XDG_CACHE_HOME: path.join(directory, "XDG_CACHE_HOME"),
+                XDG_STATE_HOME: path.join(directory, "XDG_STATE_HOME"),
+            },
+            stdio: ["ignore", "ignore", "pipe"],
+            windowsHide: true,
+        },
+    );
+    let errors = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const closed = new Promise((resolve) => child.once("close", resolve));
+    let launchError;
+    child.on("error", (error) => {
+        launchError = error;
+    });
+    try {
+        const deadline = Date.now() + 180_000;
+        while (child.exitCode === null && child.signalCode === null && !launchError && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+
+        assert.ok(!launchError, `${label} failed to launch: ${launchError}`);
+        assert.equal(child.exitCode, 0, `${label} exited: ${errors.slice(-2000)}`);
+        assert.ok(Date.now() < deadline, `${label} timed out: ${errors.slice(-2000)}`);
+        assert.equal(
+            provider.requests.length,
+            1,
+            `${label} sent ${provider.requests.length} model requests, expected exactly one`,
+        );
+        const summary = summarize(provider.requests[0]);
+        delete summary.tools;
+        delete summary.instructionText;
+
+        return { label, harness, ...summary };
+    } finally {
+        child.kill();
+        await closed;
+        await provider.close();
+    }
+}
+
 try {
     console.error(
         `Acquiring all ${basePackages.length} pinned packages in a disposable home; Chromium download skipped.`,
@@ -422,11 +520,31 @@ process.exit(0);`,
                 isolation: ["--no-rules", "--no-extensions"],
             }),
         );
-    } else if (process.argv.includes("--chart")) {
-        throw new Error(
-            "The chart has an Oh My Pi row, so writing it needs --omp=<path to its cli.js> and a Bun runtime. " +
-                "Measure it or remove the row from scripts/context-chart.mjs; it must not be filled in from elsewhere.",
+    }
+
+    if (ocCli) {
+        assert.ok(fs.existsSync(ocCli), `No OpenCode binary at ${ocCli}`);
+        console.error("Measuring OpenCode...");
+        results.push(
+            await measureOpenCode({
+                label: "OpenCode",
+                harness: `OpenCode ${ocVersion ?? "(unknown version)"}`,
+                cli: ocCli,
+            }),
         );
+    }
+
+    if (process.argv.includes("--chart")) {
+        const missing = [
+            !ompCli && "--omp=<path to Oh My Pi's cli.js>",
+            !ocCli && "--oc=<path to OpenCode's binary>",
+        ].filter(Boolean);
+        if (missing.length > 0) {
+            throw new Error(
+                `The chart carries measured Oh My Pi and OpenCode rows, so writing it needs ${missing.join(" and ")}. ` +
+                    "Measure them or remove the rows from scripts/context-chart.mjs; they must not be filled in from elsewhere.",
+            );
+        }
     }
 
     const report = {
@@ -439,7 +557,8 @@ process.exit(0);`,
         packages: basePackages,
         loadedExtensionCount: resources.count,
         ...(ompCli ? { ohMyPiVersion: ompVersion } : {}),
-        method: "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
+        ...(ocCli ? { opencodeVersion: ocVersion } : {}),
+        method: "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
         results,
     };
     console.log(

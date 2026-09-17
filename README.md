@@ -44,17 +44,17 @@ Everything it manages is declared, versioned, and reversible.
 
 ## Measured context
 
-The chart measures first-call context from a clean installation: all seven pinned packages, the installed working agreement, and discovered skills. “Enabled” means browser QA, delegation, and web access are switched on; no goal, scope, or improvement selection is active. The solid rows — including Oh My Pi, a Bun-based fork of Pi measured as installed — are ours, taken from the request each harness actually sends through one local synthetic provider. The dimmed Codex CLI and Claude Code rows are HarnessTax's published figures, taken under the study's configuration: a reference, not a matched comparison. These are character counts, not tokens, spending, or task-quality scores. The research page [breaks the enabled profile down by capability](https://tannermidd.github.io/SpecPi/research/#specpi), so the cost of each switch is visible on its own.
+The chart measures first-call context from a clean installation: all seven pinned packages, the installed working agreement, and discovered skills. “Enabled” means browser QA, delegation, and web access are switched on; no goal, scope, or improvement selection is active. The solid rows — including OpenCode and Oh My Pi, both measured as installed — are ours, taken from the request each harness actually sends through one local synthetic provider. The dimmed Codex CLI and Claude Code rows are HarnessTax's published figures, taken under the study's configuration: a reference, not a matched comparison. These are character counts, not tokens, spending, or task-quality scores. The research page [breaks the enabled profile down by capability](https://tannermidd.github.io/SpecPi/research/#specpi), so the cost of each switch is visible on its own.
 
 <p align="center">
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/context-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 15,069, SpecPi enabled 40,203, Codex CLI 41,616, Oh My Pi 65,816, Claude Code 90,460.">
+      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 15,069, OpenCode 31,043, SpecPi enabled 40,203, Codex CLI 41,616, Oh My Pi 65,816, Claude Code 90,460.">
     </picture>
   </a>
 </p>
-<p align="center"><sub>Measured tool schemas + system/developer instructions · <code>node scripts/measure-context.mjs --chart --omp=&lt;path to its cli.js&gt;</code> · <a href="site/research/context-measurement.json">Recorded measurements and package pins</a> · <a href="https://tannermidd.github.io/SpecPi/research/#specpi">Method and caveats</a></sub></p>
+<p align="center"><sub>Measured tool schemas + system/developer instructions · <code>node scripts/measure-context.mjs --chart --omp=&lt;path to Oh My Pi's cli.js&gt; --oc=&lt;path to OpenCode's binary&gt;</code> · <a href="site/research/context-measurement.json">Recorded measurements and package pins</a> · <a href="https://tannermidd.github.io/SpecPi/research/#specpi">Method and caveats</a></sub></p>
 
 The gap between the two SpecPi bars is not one decision, so the enabled profile's tool schema is also measured group by group. Browser QA's fourteen tools cost less together than web access's four:
 

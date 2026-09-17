@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "measuredAt": "2026-09-17T01:05:19.390Z",
+    "measuredAt": "2026-09-17T03:52:35.809Z",
     "specpiVersion": "0.25.0",
     "piVersion": "0.84.4",
     "nodeVersion": "v24.18.0",
@@ -15,8 +15,8 @@
         "npm:@gotgenes/pi-permission-system@32.0.2"
     ],
     "loadedExtensionCount": 9,
-    "ohMyPiVersion": "18.2.2",
-    "method": "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
+    "opencodeVersion": "1.18.31",
+    "method": "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement. The Oh My Pi row is carried forward from 2026-09-17T01:05:19.390Z, measured on the same terms in this run series; its re-measurement is blocked upstream because its runtime now resolves pi-natives@18.2.3, whose platform binary fails to load.",
     "results": [
         {
             "label": "Pi (stock)",
@@ -36,7 +36,7 @@
             },
             "toolSchemaChars": 2901,
             "instructionChars": 2620,
-            "requestSha256": "37623bc5f7e1a5ece1c069f0738d8187964d55c13a7c48697d3b7bd3c553d927",
+            "requestSha256": "a991f6d6c2e7b6bc3b9e72fc433d1585652cfc0215f59230aa03f9a9a36af6ab",
             "installedGuidance": false,
             "browserAndDelegationEnabled": false
         },
@@ -68,9 +68,41 @@
             },
             "toolSchemaChars": 8435,
             "instructionChars": 6634,
-            "requestSha256": "465dbd32f19cf0badf9eb2308d336ff95dfa281174adc30f51e84ce22e57cce9",
+            "requestSha256": "3f23f27f0e0bb5f6059f5a3ed94f994b15f6e8162c8a4a1b43e2f1d07c77b16f",
             "installedGuidance": true,
             "browserAndDelegationEnabled": false
+        },
+        {
+            "label": "OpenCode",
+            "harness": "OpenCode 1.18.31",
+            "toolCount": 10,
+            "toolNames": [
+                "bash",
+                "edit",
+                "glob",
+                "grep",
+                "read",
+                "skill",
+                "task",
+                "todowrite",
+                "webfetch",
+                "write"
+            ],
+            "toolChars": {
+                "bash": 5927,
+                "edit": 1958,
+                "glob": 1114,
+                "grep": 1183,
+                "read": 1734,
+                "skill": 676,
+                "task": 3856,
+                "todowrite": 2686,
+                "webfetch": 1293,
+                "write": 1026
+            },
+            "toolSchemaChars": 21464,
+            "instructionChars": 9579,
+            "requestSha256": "75afff537cdbfce3c7202244a36088393b38907b7518a96b875b2c8cf3b99695"
         },
         {
             "label": "SpecPi enabled",
@@ -138,7 +170,7 @@
             },
             "toolSchemaChars": 32251,
             "instructionChars": 7952,
-            "requestSha256": "dc0b5a47d1fc9bc876702c73bb515ca39fca24534edd49e7a6c42b7cb53d09ec",
+            "requestSha256": "7adc414e46cdaeef5ed5714306cba88600ad5820a569d665ecfe3bfbb8f31ed9",
             "installedGuidance": true,
             "browserAndDelegationEnabled": true
         },
@@ -176,5 +208,9 @@
             "instructionChars": 18241,
             "requestSha256": "51b752e09ea3d99ed36ee3cbc6a6ec7346555cb2d3d15639f0f4fd826eb8d727"
         }
-    ]
+    ],
+    "carriedForward": {
+        "Oh My Pi": "2026-09-17T01:05:19.390Z"
+    },
+    "ohMyPiVersion": "18.2.2"
 }
