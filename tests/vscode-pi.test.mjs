@@ -130,9 +130,11 @@ function connect(child) {
                     finish(reject, error);
                 },
             };
+            // Cold CI runners (notably Windows) can take well over 20s to boot Pi with
+            // every extension loaded, while the process stays alive but silent throughout.
             const timer = setTimeout(() => {
                 finish(reject, new Error(`RPC response timed out. ${stderr}`));
-            }, 20000);
+            }, 45000);
             waiting.add(waiter);
         });
     };
@@ -153,7 +155,7 @@ function connect(child) {
 
 test(
     "real isolated Pi RPC starts all SpecPi extensions and preserves scope, wishlist, and visible command workflows",
-    { timeout: 60000 },
+    { timeout: 120000 },
     async () => {
         assert.ok(
             fs.existsSync(piShim),
