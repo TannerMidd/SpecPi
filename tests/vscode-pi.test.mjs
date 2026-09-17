@@ -103,7 +103,7 @@ function connect(child) {
         }
     });
 
-    const wait = (predicate, since = 0) => {
+    const wait = (predicate, since = 0, label = "response") => {
         const existing = events.slice(since).find(predicate);
         if (existing) {
             return Promise.resolve(existing);
@@ -130,12 +130,10 @@ function connect(child) {
                     finish(reject, error);
                 },
             };
-            // CI evidence: this deadline fired with Pi alive but silent while ~400 sibling
-            // tests completed in the same minute on a small Windows runner, so the boot
-            // was starved, not broken. Local boots answer in about a second; only a
-            // genuinely hung boot should fail, and it still does, just later.
+            // Name the hung step: a bare timeout cannot tell a slow boot from a
+            // stuck dialog, and this test has both kinds of waits.
             const timer = setTimeout(() => {
-                finish(reject, new Error(`RPC response timed out. ${stderr}`));
+                finish(reject, new Error(`RPC ${label} timed out. ${stderr}`));
             }, 90000);
             waiting.add(waiter);
         });
@@ -144,7 +142,7 @@ function connect(child) {
     const send = (value) => child.stdin.write(`${JSON.stringify(value)}\n`);
     const request = async (type, fields = {}) => {
         const id = `test-${++sequence}`;
-        const response = wait((event) => event.type === "response" && event.id === id);
+        const response = wait((event) => event.type === "response" && event.id === id, 0, type);
         send({ id, type, ...fields });
         const result = await response;
         assert.equal(result.success, true, result.error);
@@ -203,7 +201,11 @@ test(
         async function notification(command, pattern) {
             const cursor = rpc.events.length;
             await rpc.request("prompt", { message: command });
-            const event = await rpc.wait((item) => item.method === "notify" && pattern.test(item.message), cursor);
+            const event = await rpc.wait(
+                (item) => item.method === "notify" && pattern.test(item.message),
+                cursor,
+                "notify",
+            );
 
             return event.message;
         }
@@ -211,7 +213,11 @@ test(
         async function editCommand(command, title, value) {
             const cursor = rpc.events.length;
             const pending = rpc.request("prompt", { message: command });
-            const editor = await rpc.wait((item) => item.method === "editor" && item.title === title, cursor);
+            const editor = await rpc.wait(
+                (item) => item.method === "editor" && item.title === title,
+                cursor,
+                "editor",
+            );
             rpc.send({
                 type: "extension_ui_response",
                 id: editor.id,
@@ -230,7 +236,7 @@ test(
             try {
                 initial = await rpc.request("get_state");
             } catch (error) {
-                if (!(error instanceof Error) || !error.message.startsWith("RPC response timed out")) {
+                if (!(error instanceof Error) || !error.message.includes("timed out")) {
                     throw error;
                 }
 
@@ -273,6 +279,7 @@ test(
                 const dialog = await rpc.wait(
                     (event) => event.method === method && event.title.startsWith("RPC "),
                     cursor,
+                    `dialog ${method}`,
                 );
                 rpc.send({ type: "extension_ui_response", id: dialog.id, value });
             }
@@ -281,6 +288,7 @@ test(
             const result = await rpc.wait(
                 (event) => event.method === "notify" && event.message.includes('"selected":"Second"'),
                 cursor,
+                "dialog result",
             );
             assert.deepEqual(JSON.parse(result.message), {
                 selected: "Second",
