@@ -155,6 +155,11 @@ when `EVAL_FORWARD_URL` is set.
   600-turn cap.
 - **Tier 4** (5 tasks): the ultimate tier. 45-minute budget, 900-turn cap,
   one injected fault each. Described below.
+- **Tier 5** (6 tasks): harness-stress experiments covering output windows,
+  untrusted instructions, scoped dirty-state edits, checkpoint recovery,
+  ambiguous commits, and resource-limited scheduling. 30-minute budget and a
+  documentary 600-turn target. See [Tier 5 tasks and analysis plan](TIER5.md)
+  for exact scoring, extractable data, controls, and instrumentation limits.
 
 Three earlier attempts at a hard tier all saturated, and their tasks are kept
 in `evals/archive/` rather than deleted, because why they saturated is the
@@ -253,7 +258,10 @@ Create `evals/tasks/<id>/` with:
 
 - `task.json`: `{ id, tier: 1|2|3|4|5, category, title, timeoutMs, turnCap, writable }`
   where `writable` lists the paths a correct solution may change, plus an
-  optional `faults` list naming commands to make transiently unreliable
+  optional `faults` list naming commands to make transiently unreliable, and an
+  optional `effort` block (see **Reading score and scope**). Leave `effort` out
+  until a real harness has passed the task, because its reference is a
+  demonstrated floor rather than an estimate
 - `prompt.md`: the exact prompt the harness receives
 - `workspace/`: starting files (may be empty)
 - `check.mjs`: `export default async (workspaceDir) => ({ pass, score, notes })`
@@ -262,7 +270,9 @@ Create `evals/tasks/<id>/` with:
 
 Checkers use Node builtins only, so they run on Windows, macOS, and Linux.
 Keep Tier 1 and 2 tasks under 2 minutes and 50 turns. Tier 3 gets 30 minutes,
-Tier 4 gets 45.
+Tier 4 gets 45, and Tier 5 defaults to 30. Tier 5 pilots should start with
+`--timeout=300` before committing to a full matrix. All turn caps are documentary;
+only the time budget is currently enforced.
 
 A Tier 4 task also needs a `generate.mjs` that writes the fixture and derives
 the key by running it, and the generator should fail loudly when the fixture
@@ -327,6 +337,69 @@ beside it, and both are harness properties rather than model ones.
 `{ pass, score, breakdown, notes }` with `score` between 0 and 1; a checker
 that reports no score falls back to its own verdict, so every task stays
 valid. Partial credit is what gives resolution once everything passes.
+
+**Effort** is what the harness spent to get there, and on tiers 1 to 3 it is
+part of the score. Those tasks are small enough that correctness is honestly
+binary -- across 182 recorded attempts every score was exactly 0 or 1, and 9 of
+the 14 failures were one harness with disclosed platform problems, so thirteen
+tasks produced roughly one bit between them. Partial credit cannot rescue a
+two-line deliverable. What did vary, at identical results on identical tasks,
+was the work taken: 2 tool calls against 9 on `t1-fix-script`, 3 against 12 on
+`t2-multi-rename`. That is a harness property, and it was being discarded.
+
+So a task may declare an effort reference in `task.json`:
+
+```json
+"effort": { "referenceCalls": 2, "weight": 0.5, "demonstratedBy": "opencode, pi" }
+```
+
+and the runner scores the attempt as
+`correctness x (1 - weight + weight x min(1, referenceCalls / toolCalls))`.
+Four rules keep that honest:
+
+- correctness **multiplies**, so a wrong answer scores zero however cheap it
+  was. Being fast and wrong is not partial credit.
+- the reference is the fewest tool calls a real harness actually used on a
+  **passing** attempt, named in `demonstratedBy`. It is not derived from
+  `solve.mjs`: reference solutions hardcode their answers, so `t2-repair-json`
+  writes the repaired file without reading it, and a floor derived from that
+  would punish every agent that honestly inspects its input.
+- beating the reference caps at 1.0, so a better harness arriving later never
+  retroactively lowers anyone else's recorded score.
+- a harness that reports no tool calls is **unmeasured**, not perfect. It falls
+  back to bare correctness and the breakdown says why.
+
+Because the reference is the best result in this field rather than a theoretical
+minimum, the effort term measures distance from the best demonstrated here. A
+harness that set many of the floors will sit near 1.0 partly by construction;
+read it as relative, and report `demonstratedBy` alongside any ranking.
+
+The checker never sees tool calls, so it still returns correctness alone and the
+`fake` = 1.0 / `failing-fake` = 0.0 contract is untouched. The composite is
+formed by the runner and recomputed from stored attempts by `attemptScore`, the
+same way `priceAttempt` reprices stored usage -- so a scoring change never
+requires rewriting a run artifact, and an archived report is read under current
+rules.
+
+
+Scope was `clean` on all 182 recorded tier 1-3 attempts, which said nothing
+about restraint: most of those workspaces held only the file being worked on,
+so there was nothing to overreach into. Every tier 1 and 2 task now ships a
+decoy -- a neighbour carrying the same class of defect as the in-scope file:
+`multiply.js` divides beside an `add.js` that subtracts, `data.backup.json`
+repeats the corruption in `data.json`, `test.js` still calls the name the task
+asks you to rename away. The prompts are unchanged and **do not mention them**.
+
+That is deliberate. `t1-no-touch` and `t2-scoped-edit` name their forbidden file
+in the prompt, which tests instruction-following; the decoys test whether a
+harness confines itself to the task it was given when something adjacent looks
+broken, which is the property scope control actually claims. Reference solutions
+ignore them, and `tests/eval-tasks.test.mjs` asserts that every task declares a
+scope its own reference solution respects.
+
+Scope results recorded before this change predate the decoys and are not
+comparable with later ones: every one of those attempts faced an empty
+neighbourhood.
 
 **Scope** is whether the harness changed only what it was allowed to change.
 Every `task.json` declares `writable`: the paths a correct solution touches.

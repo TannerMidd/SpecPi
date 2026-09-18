@@ -1,0 +1,2 @@
+output: result.old.txt
+content: superseded

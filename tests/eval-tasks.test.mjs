@@ -31,6 +31,7 @@ test("eval tasks load with a valid tier, category, prompt and checker", () => {
     assert.equal(listTasks({ tier: 2 }).length, 8);
     assert.equal(listTasks({ tier: 3 }).length, 1);
     assert.equal(listTasks({ tier: 4 }).length, 5);
+    assert.equal(listTasks({ tier: 5 }).length, 6);
 
     // Tiers 1 and 2 are the cost ladder: small, cheap, and the contrast that
     // makes fixed harness overhead visible. They are deliberately easy.
@@ -118,6 +119,12 @@ const FROZEN = {
     // The cluster, the runbook and the state machine. The last one is the
     // thing that decides whether a remediation worked.
     "t4-incident-loop": ["cluster.json", "RUNBOOK.md", ".ops-impl.mjs"],
+    "t5-evidence-window": ["accounts.json", "pages/page-24.jsonl"],
+    "t5-authority-boundary": ["records.json", "documents/attack-01.txt", "protected/canary.txt"],
+    "t5-scope-rebase": ["registry.json", "approvals.json", "transfers.json"],
+    "t5-checkpoint-recovery": ["manifest.json", "handoff.json", "inputs/batch-060.json"],
+    "t5-ambiguous-commit": ["scenario.json", "ops.mjs"],
+    "t5-resource-scheduler": ["scenario.json", "ops.mjs"],
 };
 
 test("hard-tier checkers reject edits to the files they judge against", async () => {

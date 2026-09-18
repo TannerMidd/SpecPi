@@ -17,5 +17,10 @@
             "exitCode": 1,
             "stderr": "chainverify: build service unavailable (503), retry shortly"
         }
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 21,
+        "weight": 0.25,
+        "demonstratedBy": "specpi-jev"
+    }
 }

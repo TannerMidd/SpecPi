@@ -7,5 +7,10 @@
     "turnCap": 50,
     "writable": [
         "src/app.js"
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 2,
+        "weight": 0.5,
+        "demonstratedBy": "dsh, opencode, pi, specpi-jev"
+    }
 }

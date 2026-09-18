@@ -7,5 +7,10 @@
     "turnCap": 50,
     "writable": [
         "CHANGELOG.md"
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 2,
+        "weight": 0.5,
+        "demonstratedBy": "omp, opencode, pi, specpi-jev"
+    }
 }

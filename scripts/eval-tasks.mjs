@@ -108,6 +108,16 @@ export function loadTask(id) {
         title: manifest.title,
         writable,
         faults,
+        // Demonstrated tool-call floor for this task, plus how much of the score effort may move.
+        // Optional: a task without one is scored on correctness alone.
+        effort:
+            manifest.effort && Number.isFinite(manifest.effort.referenceCalls)
+                ? {
+                      referenceCalls: manifest.effort.referenceCalls,
+                      weight: Number.isFinite(manifest.effort.weight) ? manifest.effort.weight : 0.25,
+                      demonstratedBy: String(manifest.effort.demonstratedBy ?? "unrecorded"),
+                  }
+                : null,
         timeoutMs: Number.isSafeInteger(manifest.timeoutMs) ? manifest.timeoutMs : 120000,
         turnCap: Number.isSafeInteger(manifest.turnCap) ? manifest.turnCap : 50,
         prompt,
