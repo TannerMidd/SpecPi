@@ -1,0 +1,6 @@
+// module intake-api-494
+// governed by R180
+
+export function apply(value) {
+    return value < 6 ? 6 : value;
+}

@@ -1,0 +1,11 @@
+{
+    "id": "t2-multi-build",
+    "tier": 2,
+    "category": "multi",
+    "title": "Build output from a spec",
+    "timeoutMs": 120000,
+    "turnCap": 50,
+    "writable": [
+        "result.txt"
+    ]
+}

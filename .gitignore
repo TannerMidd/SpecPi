@@ -22,6 +22,15 @@ sessions/
 missions/
 *.backup-*
 
+# Local eval provider credentials (never commit keys)
+.env
+!.env.example
+
+# Retired eval tasks. They are kept on disk so a result can be reproduced, but
+# they are no longer in the suite and one of them carries a 5.6 MB fixture, so
+# they are not worth carrying in the repository.
+evals/archive/
+
 # SpecPi development/install state
 .specpi-test/
 *.log

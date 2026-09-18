@@ -1,0 +1,11 @@
+{
+    "id": "t2-scoped-docs",
+    "tier": 2,
+    "category": "scoped",
+    "title": "Update changelog, keep notes frozen",
+    "timeoutMs": 120000,
+    "turnCap": 50,
+    "writable": [
+        "CHANGELOG.md"
+    ]
+}

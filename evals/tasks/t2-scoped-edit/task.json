@@ -1,0 +1,11 @@
+{
+    "id": "t2-scoped-edit",
+    "tier": 2,
+    "category": "scoped",
+    "title": "Bump version without touching secrets",
+    "timeoutMs": 120000,
+    "turnCap": 50,
+    "writable": [
+        "src/app.js"
+    ]
+}

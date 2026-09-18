@@ -1,0 +1,1028 @@
+#!/usr/bin/env node
+// Harness adapters for evals. Each adapter knows how to run one harness
+// against a workspace with the model pointed at the logging proxy.
+// Real harnesses are judged by files, not transcripts: the checker decides
+// pass/fail, the proxy log decides context, tokens and cost.
+// Adapters never touch the live Pi directory; every run gets a disposable home.
+
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import process from "node:process";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { runReferenceSolution } from "./eval-tasks.mjs";
+import { prepareFaults, readFaults, withFaultPath } from "./eval-faults.mjs";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const piCli = path.join(root, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
+
+function allowlistedEnv(homeDir, extra = {}) {
+    const env = {};
+    for (const name of ["PATH", "Path", "SystemRoot", "WINDIR", "ComSpec", "COMSPEC", "PATHEXT"]) {
+        if (process.env[name]) {
+            env[name] = process.env[name];
+        }
+    }
+
+    for (const name of ["HOME", "USERPROFILE", "TEMP", "TMP", "TMPDIR"]) {
+        env[name] = homeDir;
+    }
+
+    for (const name of ["APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME"]) {
+        env[name] = path.join(homeDir, name);
+        fs.mkdirSync(env[name], { recursive: true });
+    }
+
+    env.PI_CODING_AGENT_DIR = path.join(homeDir, "agent");
+    fs.mkdirSync(env.PI_CODING_AGENT_DIR, { recursive: true });
+    env.PI_OFFLINE = "1";
+
+    return { ...env, ...extra };
+}
+
+function providerConfig(proxyUrl, model) {
+    return JSON.stringify({
+        providers: {
+            eval: {
+                baseUrl: proxyUrl,
+                api: "openai-completions",
+                apiKey: "synthetic-only",
+                models: [
+                    {
+                        id: model,
+                        name: "Eval model",
+                        reasoning: false,
+                        input: ["text"],
+                        contextWindow: 200000,
+                        maxTokens: 8192,
+                        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                    },
+                ],
+            },
+        },
+    });
+}
+
+// OpenCode reaches a provider through the AI SDK, so an OpenAI-compatible
+// provider pointed at the logging proxy puts it on the same footing as the
+// Pi family: its tool schema and offered-tool counts become visible, and its
+// token accounting arrives in the same shape as everyone else's instead of
+// being self-reported with cache read out separately.
+function openCodeProxyConfig(proxyUrl, model) {
+    return JSON.stringify(
+        {
+            $schema: "https://opencode.ai/config.json",
+            provider: {
+                eval: {
+                    npm: "@ai-sdk/openai-compatible",
+                    name: "Eval proxy",
+                    options: { baseURL: proxyUrl, apiKey: "synthetic-only" },
+                    models: { [model]: { name: "Eval model" } },
+                },
+            },
+        },
+        null,
+        2,
+    );
+}
+
+function waitForExit(child, timeoutMs) {
+    return new Promise((resolve) => {
+        const deadline = setTimeout(() => {
+            child.kill();
+            resolve({ timedOut: true });
+        }, timeoutMs);
+        child.once("close", (code) => {
+            clearTimeout(deadline);
+            resolve({ timedOut: false, code });
+        });
+        child.once("error", () => {
+            clearTimeout(deadline);
+            resolve({ timedOut: false, code: null });
+        });
+    });
+}
+
+// Oh My Pi is a Bun-based fork of Pi with its own tools and prompt. It takes
+// a provider through an extension rather than models.json, so the proxy is
+// registered the same way scripts/measure-context.mjs does it, and local
+// rules and extensions are switched off so the bar measured is the harness
+// as published rather than this machine's configuration.
+function ohMyPiExtension(proxyUrl, model) {
+    const spec = {
+        baseUrl: proxyUrl,
+        api: "openai-completions",
+        apiKey: "synthetic-only",
+        models: [
+            {
+                id: model,
+                name: "Eval model",
+                reasoning: false,
+                input: ["text"],
+                contextWindow: 200000,
+                maxTokens: 8192,
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            },
+        ],
+    };
+
+    return `export default function (pi) {
+    pi.registerProvider("eval", ${JSON.stringify(spec)});
+    pi.on("session_start", async (_event, ctx) => {
+        await pi.setModel(ctx.modelRegistry.find("eval", ${JSON.stringify(model)}));
+    });
+}
+`;
+}
+
+async function runPiRpc({
+    cli,
+    task,
+    workspaceDir,
+    homeDir,
+    proxyUrl,
+    model,
+    timeoutMs,
+    setup,
+    faults,
+    runtime = process.execPath,
+    buildArgs = null,
+}) {
+    const startedAt = Date.now();
+    const agentDir = path.join(homeDir, "agent");
+    fs.mkdirSync(agentDir, { recursive: true });
+    let args = null;
+    if (typeof buildArgs === "function") {
+        args = await buildArgs({ cli, agentDir, homeDir, proxyUrl, model });
+    } else {
+        fs.writeFileSync(path.join(agentDir, "models.json"), providerConfig(proxyUrl, model));
+        const settingsFile = path.join(agentDir, "settings.json");
+        const settings = fs.existsSync(settingsFile) ? JSON.parse(fs.readFileSync(settingsFile, "utf8")) : {};
+        fs.writeFileSync(settingsFile, JSON.stringify({ ...settings, defaultProvider: "eval", defaultModel: model }));
+        args = [cli, "--mode", "rpc", "--no-session", "--provider", "eval", "--model", model];
+    }
+
+    if (typeof setup === "function") {
+        await setup(agentDir);
+    }
+
+    const child = spawn(runtime, args, {
+        cwd: workspaceDir,
+        env: withFaultPath(allowlistedEnv(homeDir), faults),
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+    });
+    let output = "";
+    let errors = "";
+    const events = [];
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    child.stdout.on("data", (text) => {
+        output += text;
+        let newline = -1;
+        while ((newline = output.indexOf("\n")) !== -1) {
+            const line = output.slice(0, newline).trim();
+            output = output.slice(newline + 1);
+            try {
+                events.push(JSON.parse(line));
+            } catch {
+                // Non-RPC diagnostics from packages are ignored.
+            }
+        }
+    });
+    const send = (payload) => {
+        child.stdin.write(`${JSON.stringify(payload)}\n`);
+    };
+
+    const deadline = Date.now() + timeoutMs;
+    const untilAgentEnd = new Promise((resolve) => {
+        const timer = setInterval(() => {
+            const done = events.some((event) => event.type === "agent_end");
+            const failed = events.find((event) => event.type === "extension_error");
+            if (done || failed || Date.now() > deadline || child.exitCode !== null) {
+                clearInterval(timer);
+                resolve({ done, failed });
+            }
+        }, 50);
+    });
+    // Wait for the harness to become ready, then send one prompt.
+    const readyDeadline = Date.now() + 30000;
+    send({ id: "ready", type: "get_state" });
+    while (Date.now() < readyDeadline) {
+        if (events.some((event) => event.type === "response" && event.id === "ready")) {
+            break;
+        }
+
+        if (child.exitCode !== null) {
+            break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    send({ id: "eval", type: "prompt", message: task.prompt });
+    const outcome = await untilAgentEnd;
+    child.stdin.end();
+    child.kill();
+    await waitForExit(child, 10000);
+    const eventCounts = {};
+    for (const event of events) {
+        eventCounts[event.type] = (eventCounts[event.type] ?? 0) + 1;
+    }
+
+    return {
+        exitCode: outcome.failed ? 1 : 0,
+        timedOut: !outcome.done && !outcome.failed,
+        durationMs: Date.now() - startedAt,
+        stderrTail: errors.slice(-2000),
+        rpcEvents: eventCounts,
+    };
+}
+
+export const OPENCODE_MODEL_MAP = {
+    "deepseek-v4.1-flash": "opencode-go/deepseek-v4.1-flash",
+    "muse-spark-1.3-contributor": "opencode-go/muse-spark-1.3-contributor",
+};
+
+// Logical eval model ids map onto the provider-qualified ids OpenCode
+// expects. Anything already qualified (contains a slash) passes through
+// untouched, so a model behind newly added credentials works without a
+// code change once its frozen price is added to evals/prices.json.
+export function resolveOpenCodeModel(model) {
+    if (String(model).includes("/")) {
+        return String(model);
+    }
+
+    const mapped = OPENCODE_MODEL_MAP[String(model)];
+    if (!mapped) {
+        throw new Error(
+            `Unknown eval model for OpenCode: ${model}. Use a qualified id such as opencode-go/deepseek-v4.1-flash or add a mapping.`,
+        );
+    }
+
+    return mapped;
+}
+
+// Codex CLI is a third-party harness like OpenCode: found where it is
+// installed, never assumed. Its own home is redirected per attempt, so the
+// machine's Codex config, sessions and credentials are untouched.
+export function findCodexCli() {
+    const configured = process.env.SPECPI_CODEX_CLI;
+    if (configured && fs.existsSync(configured)) {
+        return resolveWindowsBinary(configured);
+    }
+
+    const found = findOnPath("codex");
+
+    return found ? resolveWindowsBinary(found) : undefined;
+}
+
+// Codex sends the model id to its provider verbatim, so the provider-
+// qualified form the OpenCode CLI needs (opencode-go/<id>) is reduced to the
+// provider's own id here. Every other id passes through untouched, which
+// keeps a model behind new credentials runnable without a code change.
+export function resolveCodexModel(model) {
+    const qualifier = "opencode-go/";
+    const text = String(model);
+
+    return text.startsWith(qualifier) ? text.slice(qualifier.length) : text;
+}
+
+// Codex reads one TOML file for provider routing. The key named here is a
+// placeholder the proxy swaps for the real credential at forward time, so no
+// credential is written into the disposable home. `wire_api = "responses"`
+// is the only protocol this Codex version speaks to a custom provider, which
+// is why the eval proxy accepts the responses path.
+export function codexConfig({ baseUrl, model, provider = "eval" }) {
+    return [
+        `model = ${JSON.stringify(model)}`,
+        `model_provider = ${JSON.stringify(provider)}`,
+        'approval_policy = "never"',
+        "",
+        `[model_providers.${provider}]`,
+        'name = "Eval proxy"',
+        `base_url = ${JSON.stringify(baseUrl)}`,
+        'env_key = "CODEX_EVAL_API_KEY"',
+        'wire_api = "responses"',
+        "",
+    ].join("\n");
+}
+
+// Windows npm installs land as .cmd shims, which Node cannot spawn without a
+// shell. Only the prompt would need quoting through cmd.exe, and it travels
+// on stdin, so the shim path keeps a fixed command line with no user content
+// in it.
+function spawnCodex(cli, args, { cwd, env }) {
+    if (process.platform === "win32" && /\.(cmd|bat)$/iu.test(cli)) {
+        const comspec = process.env.ComSpec ?? process.env.COMSPEC ?? "cmd.exe";
+        const commandLine = [cli, ...args].map((value) => `"${value}"`).join(" ");
+
+        return spawn(comspec, ["/d", "/s", "/c", commandLine], {
+            cwd,
+            env,
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
+        });
+    }
+
+    return spawn(cli, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+}
+
+async function runCodex({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) {
+    const startedAt = Date.now();
+    const cli = findCodexCli();
+    if (!cli) {
+        throw new Error("Codex CLI not found: set SPECPI_CODEX_CLI or put codex on PATH");
+    }
+
+    const codexHome = path.join(homeDir, "codex-home");
+    fs.mkdirSync(codexHome, { recursive: true });
+    fs.writeFileSync(
+        path.join(codexHome, "config.toml"),
+        codexConfig({ baseUrl: proxyUrl, model: resolveCodexModel(model) }),
+    );
+    // Codex's own sandbox denies every command on Windows, so the run uses
+    // its full-access mode inside the attempt's disposable workspace: an
+    // agent that cannot run a command cannot be measured at all. The report
+    // method string discloses this, the same way it discloses the SpecPi
+    // permission package's opt-in.
+    const args = [
+        "exec",
+        "--json",
+        "--skip-git-repo-check",
+        "--sandbox",
+        "danger-full-access",
+        "-C",
+        workspaceDir,
+        "-",
+    ];
+    const child = spawnCodex(cli, args, {
+        cwd: workspaceDir,
+        env: withFaultPath(
+            allowlistedEnv(homeDir, { CODEX_HOME: codexHome, CODEX_EVAL_API_KEY: "eval-proxy" }),
+            faults,
+        ),
+    });
+    // The prompt travels on stdin: eval prompts are multi-line markdown, and
+    // no shell on Windows can carry a newline inside a quoted argument.
+    child.stdin.end(task.prompt);
+    let errors = "";
+    child.stdout.resume();
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const outcome = await waitForExit(child, timeoutMs);
+
+    return {
+        exitCode: outcome.timedOut ? 1 : (child.exitCode ?? 1),
+        timedOut: outcome.timedOut,
+        durationMs: Date.now() - startedAt,
+        stderrTail: errors.slice(-2000),
+    };
+}
+
+// OpenCode reports usage per step on its JSON event stream. This folds the
+// stream into step counts, summed tokens, summed cost, tool-call counts and
+// the session id (the first event carrying one).
+export function parseOpenCodeJsonl(output) {
+    const totals = { input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 };
+    let cost = 0;
+    let steps = 0;
+    let sessionId = null;
+    const toolCalls = {};
+    for (const line of String(output).split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("{")) {
+            continue;
+        }
+
+        let event = null;
+        try {
+            event = JSON.parse(trimmed);
+        } catch {
+            continue;
+        }
+
+        if (!sessionId && typeof event?.sessionID === "string") {
+            sessionId = event.sessionID;
+        }
+
+        if (event?.type === "tool_use") {
+            const name = event.part?.tool ?? "unknown";
+            toolCalls[name] = (toolCalls[name] ?? 0) + 1;
+        } else if (event?.type === "step_finish") {
+            steps += 1;
+            const tokens = event.part?.tokens ?? {};
+            totals.input += tokens.input ?? 0;
+            totals.output += tokens.output ?? 0;
+            totals.reasoning += tokens.reasoning ?? 0;
+            totals.cacheRead += tokens.cache?.read ?? 0;
+            totals.cacheWrite += tokens.cache?.write ?? 0;
+            if (Number.isFinite(event.part?.cost)) {
+                cost += event.part.cost;
+            }
+        }
+    }
+
+    return { totals, cost, steps, toolCalls, sessionId };
+}
+
+// The CLI path comes from the flag or the environment, and both the
+// availability check and the adapter read it the same way.
+function findOhMyPiCli() {
+    const flag = process.argv.find((argument) => argument.startsWith("--omp="));
+
+    return flag ? flag.slice("--omp=".length) : process.env.SPECPI_OMP_CLI;
+}
+
+function findOnPath(command) {
+    const directories = String(process.env.PATH ?? process.env.Path ?? "").split(path.delimiter);
+    const suffixes =
+        process.platform === "win32" && !path.extname(command)
+            ? String(process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";")
+            : [""];
+    for (const directory of directories) {
+        for (const suffix of suffixes) {
+            const candidate = path.join(directory || ".", `${command}${suffix}`);
+            try {
+                if (fs.statSync(candidate).isFile()) {
+                    return candidate;
+                }
+            } catch {
+                // Not here; keep looking.
+            }
+        }
+    }
+
+    return undefined;
+}
+
+export function findOpenCodeCli() {
+    const configured = process.env.SPECPI_OPENCODE_CLI;
+    if (configured && fs.existsSync(configured)) {
+        return resolveWindowsBinary(configured);
+    }
+
+    const found = findOnPath("opencode");
+
+    return found ? resolveWindowsBinary(found) : undefined;
+}
+
+// On Windows, global npm installs land as a .cmd shim beside a real exe
+// one level down in the standard npm prefix layout. Spawning the exe
+// directly keeps multi-line prompts intact; the shim path needs a shell
+// and cmd.exe cannot carry newlines inside quoted arguments.
+function resolveWindowsBinary(cli) {
+    if (process.platform !== "win32" || !/\.(cmd|bat)$/iu.test(cli)) {
+        return cli;
+    }
+
+    const directory = path.dirname(cli);
+    const base = path.basename(cli, path.extname(cli));
+    const siblings = [path.join(directory, `${base}.exe`)];
+    if (base.toLowerCase() === "opencode") {
+        siblings.push(path.join(directory, "node_modules", "opencode-ai", "bin", "opencode.exe"));
+    }
+
+    for (const candidate of siblings) {
+        try {
+            if (fs.statSync(candidate).isFile()) {
+                return candidate;
+            }
+        } catch {
+            // Keep looking.
+        }
+    }
+
+    return cli;
+}
+
+async function runOpenCode({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults, viaProxy = false }) {
+    const startedAt = Date.now();
+    const cli = findOpenCodeCli();
+    if (!cli) {
+        throw new Error("OpenCode binary not found: set SPECPI_OPENCODE_CLI or put opencode on PATH");
+    }
+
+    // Routed through the proxy the model id is ours, so the provider map that
+    // exists to name OpenCode Go's ids is not consulted.
+    const providerModel = viaProxy ? `eval/${model}` : resolveOpenCodeModel(model);
+    // Ambient environment on purpose: OpenCode reads its own credentials
+    // itself and this runner never inspects, copies or logs them. That
+    // means eval sessions land in the normal OpenCode session store.
+    // PWD is pinned to the workspace because OpenCode resolves its project
+    // from $PWD when set, which would otherwise leak the invoker's
+    // directory into the run.
+    const childEnv = withFaultPath({ ...process.env, PWD: workspaceDir }, faults);
+    if (viaProxy) {
+        const configDir = homeDir ?? workspaceDir;
+        fs.mkdirSync(configDir, { recursive: true });
+        const configFile = path.join(configDir, "opencode.json");
+        fs.writeFileSync(configFile, openCodeProxyConfig(proxyUrl, model));
+        childEnv.OPENCODE_CONFIG = configFile;
+    }
+
+    // Windows npm shims (.cmd) are scripts, not executables, so they go
+    // through ComSpec. Each argument travels in its own environment
+    // variable, the same quoting trick the Pi harness helper uses, so
+    // prompts with quotes or shell characters survive intact. (cmd.exe
+    // still cannot carry newlines inside quotes, hence the .exe fast path
+    // in resolveWindowsBinary above.)
+    const windowsScript = process.platform === "win32" && /\.(cmd|bat)$/iu.test(cli);
+    const args = ["run", task.prompt, "--model", providerModel, "--title", `Eval ${task.id}`, "--format", "json"];
+    let child = null;
+    if (windowsScript) {
+        const comspec = process.env.ComSpec ?? process.env.COMSPEC ?? "cmd.exe";
+        const env = { ...childEnv };
+        const commandLine = [cli, ...args]
+            .map((value, index) => {
+                const name = `SPECPI_EVAL_ARG_${index}`;
+                env[name] = String(value);
+
+                return `"%${name}%"`;
+            })
+            .join(" ");
+        child = spawn(commandLine, [], {
+            cwd: workspaceDir,
+            env,
+            stdio: ["ignore", "pipe", "pipe"],
+            windowsHide: true,
+            shell: comspec,
+        });
+    } else {
+        child = spawn(cli, args, {
+            cwd: workspaceDir,
+            env: childEnv,
+            stdio: ["ignore", "pipe", "pipe"],
+            windowsHide: true,
+        });
+    }
+
+    let output = "";
+    let errors = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (text) => {
+        output += text;
+    });
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const outcome = await waitForExit(child, timeoutMs);
+    const parsed = parseOpenCodeJsonl(output);
+    const firstStepInput = (() => {
+        for (const line of output.split("\n")) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("{")) {
+                continue;
+            }
+
+            try {
+                const event = JSON.parse(trimmed);
+                if (event?.type === "step_finish" && Number.isFinite(event.part?.tokens?.input)) {
+                    return event.part.tokens.input;
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        return 0;
+    })();
+
+    const result = {
+        exitCode: outcome.timedOut ? 1 : (child.exitCode ?? 1),
+        timedOut: outcome.timedOut,
+        durationMs: Date.now() - startedAt,
+        stderrTail: errors.slice(-2000),
+    };
+    // Through the proxy there is nothing to self-report: the proxy saw every
+    // request, and returning usage here would mark the attempt native and make
+    // the runner prefer OpenCode's own numbers over the observed ones.
+    if (viaProxy) {
+        return result;
+    }
+
+    return {
+        ...result,
+        usage: {
+            providerModel,
+            steps: parsed.steps,
+            inputTokens: parsed.totals.input,
+            outputTokens: parsed.totals.output,
+            reasoningTokens: parsed.totals.reasoning,
+            cachedTokens: parsed.totals.cacheRead,
+            cacheWriteTokens: parsed.totals.cacheWrite,
+            nativeCost: parsed.cost,
+            toolCalls: parsed.toolCalls,
+            firstStepInputTokens: firstStepInput,
+        },
+    };
+}
+
+// The DeepSeek Harness composes its setup from stacked profile patch
+// layers in its home directory. The eval adds one home-level layer that
+// routes a provider at the logging proxy, mirroring the wiring proven in
+// scripts/measure-context.mjs. Its auxiliary session-title request carries
+// no tool schema, so reporting selects the conversation request (see
+// conversationSummary in eval-proxy.mjs).
+function dshPatch(proxyUrl, model) {
+    return [
+        "- id: llm-pi-ai",
+        "  config:",
+        "    providers:",
+        "      eval:",
+        "        displayName: Eval",
+        "        api: openai-completions",
+        `        baseURL: ${proxyUrl}`,
+        "        apiKeyEnv: DSH_EVAL_API_KEY",
+        "        models:",
+        `          - id: ${model}`,
+        "            name: Eval model",
+        "            contextWindow: 200000",
+        "- id: agent-default-model",
+        "  config:",
+        "    provider: eval",
+        `    model: ${model}`,
+        "",
+    ].join("\n");
+}
+
+async function runDeepSeek({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) {
+    const startedAt = Date.now();
+    const cli = process.env.SPECPI_DSH_CLI;
+    if (!cli || !fs.existsSync(cli)) {
+        throw new Error("DeepSeek Harness bin not found: set SPECPI_DSH_CLI to the installed bin");
+    }
+
+    const dshHome = path.join(homeDir, "dsh-home");
+    fs.mkdirSync(dshHome, { recursive: true });
+    fs.writeFileSync(path.join(dshHome, "cordis.patch.yml"), dshPatch(proxyUrl, model));
+    // Ambient environment plus the harness home redirect: DSH reads its own
+    // state under DSH_HOME and its key from the named variable, which the
+    // runner sets to a proxy placeholder it never inspects.
+    const child = spawn(process.execPath, [cli, "--profile", "headless", task.prompt], {
+        cwd: workspaceDir,
+        env: withFaultPath(
+            { ...process.env, PWD: workspaceDir, DSH_HOME: dshHome, DSH_EVAL_API_KEY: "eval-proxy" },
+            faults,
+        ),
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+    });
+    let errors = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    child.stdout.resume();
+    const outcome = await waitForExit(child, timeoutMs);
+
+    return {
+        exitCode: outcome.timedOut ? 1 : (child.exitCode ?? 1),
+        timedOut: outcome.timedOut,
+        durationMs: Date.now() - startedAt,
+        stderrTail: errors.slice(-2000),
+    };
+}
+
+// The SpecPi base install (seven pinned packages) is identical for every
+// attempt, so one install per runner process is cached and copied. The
+// per-attempt models.json and settings are still written fresh by runPiRpc,
+// which is what points each attempt at its own proxy.
+let specpiBaseCache = null;
+
+function ensureSpecpiBase() {
+    if (specpiBaseCache && fs.existsSync(path.join(specpiBaseCache, "agent", "settings.json"))) {
+        return { cached: true, agentDir: path.join(specpiBaseCache, "agent") };
+    }
+
+    specpiBaseCache = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-eval-base-")));
+    const agentDir = path.join(specpiBaseCache, "agent");
+    fs.mkdirSync(agentDir, { recursive: true });
+
+    return { cached: false, agentDir };
+}
+
+// Proxy harnesses (Pi family, DeepSeek Harness) reach the OpenCode Go
+// subscription through the logging proxy, and that endpoint only routes
+// requests carrying a live OpenCode session id. Minting one tiny session
+// per attempt keeps every attempt independent; its usage is recorded on
+// the attempt so the mint cost stays visible instead of silently
+// subsidizing proxy harnesses next to OpenCode's self-managed sessions.
+// Minting writes to OpenCode's own session store, which is a single database
+// shared by every process on the machine. Running harnesses side by side made
+// several mints land at once and SQLite rejected them with "database is
+// locked", which surfaced as an attempt that never made a model call and was
+// then scored as a task failure. Retrying with a spread-out backoff keeps a
+// parallel run honest; the alternative is silently publishing launch failures
+// as though the harness had tried and lost.
+const MINT_ATTEMPTS = 5;
+
+function isBusyError(message) {
+    return /database is locked|SQLITE_BUSY|database table is locked/iu.test(String(message));
+}
+
+export async function mintOpenCodeSession(options) {
+    let last = null;
+    for (let attempt = 1; attempt <= MINT_ATTEMPTS; attempt += 1) {
+        try {
+            return await mintOnce(options);
+        } catch (error) {
+            last = error;
+            if (!isBusyError(error?.message) || attempt === MINT_ATTEMPTS) {
+                throw error;
+            }
+
+            // Jittered, so two processes that collide do not retry in step.
+            const wait = 400 * 2 ** (attempt - 1) + Math.floor(Math.random() * 400);
+            await new Promise((resolve) => setTimeout(resolve, wait));
+        }
+    }
+
+    throw last;
+}
+
+async function mintOnce({ workspaceDir, model, timeoutMs = 120000 }) {
+    const startedAt = Date.now();
+    const cli = findOpenCodeCli();
+    if (!cli) {
+        throw new Error("OpenCode binary not found: set SPECPI_OPENCODE_CLI or put opencode on PATH");
+    }
+
+    const providerModel = resolveOpenCodeModel(model);
+    const windowsScript = process.platform === "win32" && /\.(cmd|bat)$/iu.test(cli);
+    if (windowsScript) {
+        throw new Error(`Refusing to mint through a shell shim (multi-line prompts do not survive cmd.exe): ${cli}`);
+    }
+
+    const child = spawn(
+        cli,
+        ["run", "Reply with ok.", "--model", providerModel, "--title", "Eval session", "--format", "json"],
+        {
+            cwd: workspaceDir,
+            env: { ...process.env, PWD: workspaceDir },
+            stdio: ["ignore", "pipe", "pipe"],
+            windowsHide: true,
+        },
+    );
+    let output = "";
+    let errors = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (text) => {
+        output += text;
+    });
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const outcome = await waitForExit(child, timeoutMs);
+    if (outcome.timedOut) {
+        throw new Error("OpenCode session mint timed out");
+    }
+
+    const parsed = parseOpenCodeJsonl(output);
+    if (!parsed.sessionId) {
+        throw new Error(`OpenCode session mint produced no session: ${errors.slice(-500)}`);
+    }
+
+    return {
+        sessionId: parsed.sessionId,
+        durationMs: Date.now() - startedAt,
+        inputTokens: parsed.totals.input,
+        outputTokens: parsed.totals.output,
+        reasoningTokens: parsed.totals.reasoning,
+        cachedTokens: parsed.totals.cacheRead,
+        cacheWriteTokens: parsed.totals.cacheWrite,
+        nativeCost: parsed.cost,
+    };
+}
+
+export const harnessAdapters = {
+    fake: {
+        id: "fake",
+        label: "Fake (reference solution)",
+        isAvailable: () => ({ available: true, detail: "built-in reference solver" }),
+        run: async ({ task, workspaceDir }) => {
+            const startedAt = Date.now();
+            await runReferenceSolution(task, workspaceDir);
+
+            return { exitCode: 0, timedOut: false, durationMs: Date.now() - startedAt, stderrTail: "" };
+        },
+    },
+    "failing-fake": {
+        id: "failing-fake",
+        label: "Fake (always fails)",
+        isAvailable: () => ({ available: true, detail: "built-in negative control" }),
+        run: async () => {
+            return { exitCode: 0, timedOut: false, durationMs: 1, stderrTail: "" };
+        },
+    },
+    pi: {
+        id: "pi",
+        label: "Pi (stock)",
+        needsProxySession: true,
+        isAvailable: () => {
+            if (!fs.existsSync(piCli)) {
+                return { available: false, detail: `missing pinned Pi CLI at ${piCli}` };
+            }
+
+            return { available: true, detail: `pinned Pi CLI ${piCli}` };
+        },
+        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs }) => {
+            const stockDir = path.join(homeDir, "agent");
+            fs.mkdirSync(stockDir, { recursive: true });
+
+            return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs });
+        },
+    },
+    "specpi-default": {
+        id: "specpi-default",
+        label: "SpecPi default",
+        needsProxySession: true,
+        isAvailable: () => {
+            if (!fs.existsSync(piCli)) {
+                return { available: false, detail: `missing pinned Pi CLI at ${piCli}` };
+            }
+
+            return { available: true, detail: "SpecPi base via installer into disposable home" };
+        },
+        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs }) => {
+            const { runPiFixture } = await import("./pi-test-harness.mjs");
+            const base = ensureSpecpiBase();
+            if (!base.cached) {
+                // piCommand must be the installer itself: runPiFixture
+                // executes piCommand, and Pi has no install --yes flag.
+                // The installer locates Pi through SPECPI_PI instead.
+                const install = runPiFixture(path.join(root, "scripts", "specpi.mjs"), {
+                    piCommand: path.join(root, "scripts", "specpi.mjs"),
+                    cwd: workspaceDir,
+                    agentDir: base.agentDir,
+                    args: ["install", "--yes", "--skip-browser-install"],
+                    env: { SPECPI_PI: piCli },
+                    timeout: 300000,
+                });
+                if (install.status !== 0) {
+                    specpiBaseCache = null;
+
+                    return {
+                        exitCode: 1,
+                        timedOut: false,
+                        durationMs: install.durationMs,
+                        stderrTail: install.stderr.slice(-2000),
+                    };
+                }
+            }
+
+            fs.rmSync(path.join(homeDir, "agent"), { recursive: true, force: true });
+            fs.cpSync(base.agentDir, path.join(homeDir, "agent"), { recursive: true });
+            // Unattended runs cannot answer approval dialogs, and the
+            // installed permission system fails closed to ask. Yolo mode is
+            // the package's explicit full-permissive opt-in for exactly this
+            // case; it is scoped to the disposable home and disclosed in the
+            // report method so the gate is never silently measured away.
+            const permissionDir = path.join(homeDir, "agent", "extensions", "pi-permission-system");
+            fs.mkdirSync(permissionDir, { recursive: true });
+            fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
+
+            return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs });
+        },
+    },
+    omp: {
+        id: "omp",
+        label: "Oh My Pi",
+        isAvailable: () => {
+            const cli = findOhMyPiCli();
+            if (!cli) {
+                return { available: false, detail: "set --omp=<path to cli.js> or SPECPI_OMP_CLI" };
+            }
+
+            if (!fs.existsSync(cli)) {
+                return { available: false, detail: `no Oh My Pi CLI at ${cli}` };
+            }
+
+            // It is a Bun fork, so an installed CLI without the runtime still
+            // cannot run and should say which half is missing.
+            const runtime = process.env.SPECPI_OMP_RUNTIME ?? "bun";
+            if (!path.isAbsolute(runtime) && !findOnPath(runtime)) {
+                return { available: false, detail: `Oh My Pi needs ${runtime} on PATH` };
+            }
+
+            return { available: true, detail: cli };
+        },
+        needsProxySession: true,
+        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) => {
+            const cli = findOhMyPiCli();
+
+            return runPiRpc({
+                cli,
+                task,
+                workspaceDir,
+                homeDir,
+                proxyUrl,
+                model,
+                timeoutMs,
+                faults,
+                runtime: process.env.SPECPI_OMP_RUNTIME ?? "bun",
+                // The provider arrives as an extension, and local rules and
+                // extensions are off so the row is the harness as published
+                // rather than whatever this machine happens to have installed.
+                buildArgs: async ({ agentDir }) => {
+                    const helper = path.join(agentDir, "eval-provider.ts");
+                    fs.writeFileSync(helper, ohMyPiExtension(proxyUrl, model));
+
+                    return [cli, "--mode", "rpc", "--no-session", "--no-rules", "--no-extensions", "-e", helper];
+                },
+            });
+        },
+    },
+    opencode: {
+        id: "opencode",
+        label: "OpenCode",
+        needsProxySession: true,
+        isAvailable: () => {
+            const cli = findOpenCodeCli();
+            if (!cli) {
+                return { available: false, detail: "set SPECPI_OPENCODE_CLI or put opencode on PATH" };
+            }
+
+            return { available: true, detail: `${cli} (via proxy)` };
+        },
+        run: async (options) => runOpenCode({ ...options, viaProxy: true }),
+    },
+    // The self-reporting wiring is kept as its own harness rather than
+    // deleted: it is the control that says whether routing OpenCode through
+    // the proxy changed how it behaves, and it is the only row that can
+    // cross-check the proxy's accounting against a provider's own invoice.
+    "opencode-native": {
+        id: "opencode-native",
+        label: "OpenCode (native)",
+        isAvailable: () => {
+            const cli = findOpenCodeCli();
+            if (!cli) {
+                return { available: false, detail: "set SPECPI_OPENCODE_CLI or put opencode on PATH" };
+            }
+
+            return { available: true, detail: `${cli} (self-reported usage)` };
+        },
+        run: runOpenCode,
+    },
+    codex: {
+        id: "codex",
+        label: "Codex CLI",
+        needsProxySession: true,
+        isAvailable: () => {
+            const cli = findCodexCli();
+            if (!cli) {
+                return { available: false, detail: "set SPECPI_CODEX_CLI or put codex on PATH" };
+            }
+
+            return { available: true, detail: cli };
+        },
+        run: runCodex,
+    },
+    dsh: {
+        id: "dsh",
+        label: "DeepSeek Harness",
+        needsProxySession: true,
+        isAvailable: () => {
+            const cli = process.env.SPECPI_DSH_CLI;
+            if (!cli) {
+                return { available: false, detail: "set SPECPI_DSH_CLI to the installed bin" };
+            }
+
+            if (!fs.existsSync(cli)) {
+                return { available: false, detail: `no DeepSeek Harness bin at ${cli}` };
+            }
+
+            return { available: true, detail: cli };
+        },
+        run: runDeepSeek,
+    },
+};
+
+export function resolveHarnesses(requested) {
+    if (!requested || requested.length === 0) {
+        return [harnessAdapters.fake, harnessAdapters["failing-fake"]];
+    }
+
+    return requested.map((id) => {
+        const adapter = harnessAdapters[id];
+        if (!adapter) {
+            throw new Error(`Unknown harness: ${id}. Known: ${Object.keys(harnessAdapters).join(", ")}`);
+        }
+
+        return adapter;
+    });
+}
+
+export function isolatedHome() {
+    const homeDir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-eval-")));
+
+    return homeDir;
+}

@@ -1,0 +1,12 @@
+{
+    "id": "t2-multi-rename",
+    "tier": 2,
+    "category": "multi",
+    "title": "Rename a function across two files",
+    "timeoutMs": 120000,
+    "turnCap": 50,
+    "writable": [
+        "lib.js",
+        "main.js"
+    ]
+}

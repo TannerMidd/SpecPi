@@ -1,0 +1,11 @@
+{
+    "id": "t1-edit-file",
+    "tier": 1,
+    "category": "terminal",
+    "title": "Flip a JSON flag",
+    "timeoutMs": 60000,
+    "turnCap": 25,
+    "writable": [
+        "config.json"
+    ]
+}

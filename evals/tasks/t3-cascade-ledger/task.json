@@ -1,0 +1,21 @@
+{
+    "id": "t3-cascade-ledger",
+    "tier": 3,
+    "category": "repair",
+    "title": "Follow a 120-step repair chain through 1200 modules",
+    "timeoutMs": 1800000,
+    "turnCap": 600,
+    "writable": [
+        "src",
+        "notes"
+    ],
+    "faults": [
+        {
+            "command": "chainverify",
+            "real": ".verify-impl.mjs",
+            "failures": 3,
+            "exitCode": 1,
+            "stderr": "chainverify: build service unavailable (503), retry shortly"
+        }
+    ]
+}

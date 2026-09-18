@@ -1,0 +1,11 @@
+{
+    "id": "t2-terminal-sort",
+    "tier": 2,
+    "category": "terminal",
+    "title": "Sort lines into a new file",
+    "timeoutMs": 120000,
+    "turnCap": 50,
+    "writable": [
+        "sorted.txt"
+    ]
+}

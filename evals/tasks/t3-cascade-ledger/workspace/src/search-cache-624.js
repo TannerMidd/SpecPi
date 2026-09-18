@@ -1,0 +1,6 @@
+// module search-cache-624
+// governed by R486
+
+export function apply(value) {
+    return value + 29;
+}

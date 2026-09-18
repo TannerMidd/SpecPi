@@ -1,0 +1,2 @@
+output file: result.txt
+content: build ok

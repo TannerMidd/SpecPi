@@ -24,6 +24,7 @@ const documents = [
     "site/index.html",
     "site/wiki/index.html",
     "site/research/index.html",
+    "site/evaluations/index.html",
 ];
 for (const file of documents) {
     const text = await fs.readFile(path.join(root, file), "utf8");
@@ -50,10 +51,11 @@ const routes = new Map([
     ["/SpecPi/wiki.css", ["wiki.css", "text/css"]],
     ["/SpecPi/research.css", ["research.css", "text/css"]],
     ["/SpecPi/research/context-measurement.json", ["research/context-measurement.json", "application/json"]],
+    ["/SpecPi/evaluations/harness-eval.json", ["evaluations/harness-eval.json", "application/json"]],
     ["/SpecPi/theme.js", ["theme.js", "text/javascript"]],
     ["/SpecPi/page.js", ["page.js", "text/javascript"]],
     ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
-    ...["wiki", "research", "why-pi", "single-agent"].map((name) => [
+    ...["wiki", "research", "evaluations", "why-pi", "single-agent"].map((name) => [
         `/SpecPi/${name}/`,
         [`${name}/index.html`, "text/html"],
     ]),
@@ -193,6 +195,39 @@ try {
         await page.locator("#chart-capability").screenshot({ path: path.join(screenshots, `capability-${name}.png`) });
         const measurement = await page.request.get(`${origin}/SpecPi/research/context-measurement.json`);
         assert.equal(measurement.status(), 200);
+
+        // The evaluations page draws itself from harness-eval.json: every figure is
+        // injected by scripts/eval-site.mjs and the headline metrics are read at load.
+        // An empty slot means a run was published without regenerating the page, which
+        // would leave prose asserting numbers no chart supports.
+        await page.getByRole("link", { name: "Evals", exact: true }).click();
+        await page.waitForURL(`${origin}/SpecPi/evaluations/`);
+        assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
+        assert.ok((await page.locator(".index-meta").innerText()).includes(manifest.version));
+        await page.locator("#metric-row div").first().waitFor();
+        const evaluations = await page.evaluate(() => ({
+            overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            missingAnchors: [...document.querySelectorAll('a[href^="#"]')]
+                .map((link) => link.getAttribute("href").slice(1))
+                .filter((id) => !document.getElementById(id)),
+            sections: document.querySelectorAll(".doc-section").length,
+            navLinks: document.querySelectorAll(".wiki-sidebar nav a").length,
+            charts: document.querySelectorAll(".chart").length,
+            tableRows: document.querySelectorAll("#table-overall tbody tr").length,
+            metrics: document.querySelectorAll("#metric-row div").length,
+            unfilled: [...document.querySelectorAll("[data-eval]")].filter((node) => node.textContent.trim() === "")
+                .length,
+            generated: document.getElementById("meta-generated").textContent,
+        }));
+        assert.equal(evaluations.overflow, false, `${name} evaluations overflows`);
+        assert.deepEqual(evaluations.missingAnchors, []);
+        assert.equal(evaluations.sections, evaluations.navLinks);
+        assert.equal(evaluations.charts, 5, "every chart slot must hold a rendered figure");
+        assert.ok(evaluations.tableRows > 0, "the summary table was not generated");
+        assert.equal(evaluations.metrics, 4, "headline metrics did not load from harness-eval.json");
+        assert.equal(evaluations.unfilled, 0, "a figure quoted in the prose was not filled from the dataset");
+        assert.match(evaluations.generated, /^Run \d{4}-\d{2}-\d{2}$/u);
+        await page.screenshot({ path: path.join(screenshots, `evaluations-${name}.png`), fullPage: true });
         process.stdout.write(`Site ${name}: PASS\n`);
     }
 

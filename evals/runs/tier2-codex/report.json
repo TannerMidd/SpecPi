@@ -1,0 +1,2674 @@
+{
+    "schema": 1,
+    "createdAt": "2026-09-18T04:26:42.483Z",
+    "specpiVersion": "0.26.0",
+    "piVersion": "0.84.4",
+    "nodeVersion": "v24.18.0",
+    "platform": "win32",
+    "model": "deepseek-v4.1-flash",
+    "attemptsPerCell": 2,
+    "forwarded": true,
+    "pricesSha256": "0a260c4cd2564d4ce835b10f8d276590a56eacec77b990d7c8d6746b01b9f24a",
+    "pricesDated": "2026-09-17",
+    "method": "Disposable workspace per attempt. Proxy harnesses (pi family, Codex CLI, DeepSeek Harness) send model traffic through a logging proxy; native harnesses (OpenCode) report per-step tokens, cost and tool calls from their own transcript. Codex CLI reads only the Responses API now, so the proxy accepts that path and forwards it to the provider's responses endpoint inside a disposable CODEX_HOME; Codex's own sandbox rejects every command on Windows, so Codex runs use its full-access sandbox mode inside the attempt's disposable workspace, and that gate is not measured either. Costs are split: modelCost is the harness's own spend and is the comparable figure, mintCost is eval plumbing, and cost is their sum. Forwarded proxy traffic mints one OpenCode session per attempt for endpoint routing; only proxy harnesses need one and the mint carries OpenCode's own system prompt, so charging it to the harness would bill the Pi family for OpenCode's context. Proxy prompt_tokens arrive inclusive of cache rereads, so only the fresh portion carries the input price; reasoning tokens are billed at the output rate. Tool calls are counted from the tools the model invoked, never from the tools it was offered, which are reported separately as per-request schema weight. Approval dialogs cannot be answered headless, so SpecPi runs set the permission package's explicit yoloMode opt-in inside the disposable home; the gate itself is not measured. Files are judged by the task checker; costs come from logged usage times evals/prices.json. Unknown models and unpriced cache writes are lower bounds. Synthetic offline runs make zero model calls and cost zero.",
+    "results": [
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-multi-build",
+            "tier": 2,
+            "category": "multi",
+            "attempts": [
+                {
+                    "pass": false,
+                    "notes": "result.txt mismatch: \"﻿build ok\"",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 10036,
+                    "wallMs": 10041,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "c4e66de30a4730366296f59def25633bc78b5504c705419be7b724d44a7fd517"
+                    },
+                    "tokens": {
+                        "inputTokens": 28361,
+                        "outputTokens": 830,
+                        "cachedTokens": 27008,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9220,
+                                "cachedTokens": 8320,
+                                "completionTokens": 55,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9335,
+                                "cachedTokens": 9088,
+                                "completionTokens": 747,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9806,
+                                "cachedTokens": 9600,
+                                "completionTokens": 28,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9806,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 293
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d400f38ffeN5vQTBUP59YCjH",
+                        "durationMs": 5561,
+                        "inputTokens": 9925,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148995
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9220,
+                            "cachedTokens": 8320,
+                            "completionTokens": 55,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9335,
+                            "cachedTokens": 9088,
+                            "completionTokens": 747,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9806,
+                            "cachedTokens": 9600,
+                            "completionTokens": 28,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9806,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 293
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "result.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000781974,
+                    "mintCost": 0.0014899499999999999,
+                    "cost": 0.002271924,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2
+                },
+                {
+                    "pass": true,
+                    "notes": "result.txt matches the spec",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 7905,
+                    "wallMs": 7908,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "c9df31f12aed913c8e94a49d582a57156b72155bec2a40c10ec7358fbd60c417"
+                    },
+                    "tokens": {
+                        "inputTokens": 28226,
+                        "outputTokens": 636,
+                        "cachedTokens": 26880,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9217,
+                                "cachedTokens": 8320,
+                                "completionTokens": 52,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9329,
+                                "cachedTokens": 9088,
+                                "completionTokens": 514,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9680,
+                                "cachedTokens": 9472,
+                                "completionTokens": 70,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9680,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 232
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3fcad3ffeQHPru2wiZEmSPn",
+                        "durationMs": 4156,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9217,
+                            "cachedTokens": 8320,
+                            "completionTokens": 52,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9329,
+                            "cachedTokens": 9088,
+                            "completionTokens": 514,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9680,
+                            "cachedTokens": 9472,
+                            "completionTokens": 70,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9680,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 232
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "result.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0006641399999999999,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.00215394,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-multi-rename",
+            "tier": 2,
+            "category": "multi",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "rename complete, main.js prints hi",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 9693,
+                    "wallMs": 9759,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "7473a0a0d2117bf95710a18529cdb11b3b182715b9c26e9d38d4ae7830a949df"
+                    },
+                    "tokens": {
+                        "inputTokens": 38439,
+                        "outputTokens": 596,
+                        "cachedTokens": 36864,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9221,
+                                "cachedTokens": 8320,
+                                "completionTokens": 113,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9517,
+                                "cachedTokens": 9216,
+                                "completionTokens": 172,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9690,
+                                "cachedTokens": 9472,
+                                "completionTokens": 267,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 10011,
+                                "cachedTokens": 9856,
+                                "completionTokens": 44,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10011,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 263
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3f938cffe2aG8ohyIcSN97e",
+                        "durationMs": 4398,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9221,
+                            "cachedTokens": 8320,
+                            "completionTokens": 113,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9517,
+                            "cachedTokens": 9216,
+                            "completionTokens": 172,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9690,
+                            "cachedTokens": 9472,
+                            "completionTokens": 267,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 10011,
+                            "cachedTokens": 9856,
+                            "completionTokens": 44,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10011,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 263
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "lib.js",
+                            "main.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0007044419999999999,
+                    "mintCost": 0.00148965,
+                    "cost": 0.002194092,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2
+                },
+                {
+                    "pass": true,
+                    "notes": "rename complete, main.js prints hi",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 12130,
+                    "wallMs": 12195,
+                    "modelRequests": 5,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "b22bff0ce0f1ab4d1070bd40c4d90e1babe8cc1887a29fbedcfe74ef2078803c"
+                    },
+                    "tokens": {
+                        "inputTokens": 48472,
+                        "outputTokens": 750,
+                        "cachedTokens": 46592,
+                        "withUsage": 5,
+                        "toolCalls": {
+                            "bash": 4
+                        },
+                        "toolsOffered": {
+                            "create_goal": 5,
+                            "bash": 10,
+                            "get_goal": 5,
+                            "subagent": 5,
+                            "request_user_input": 5,
+                            "update_goal": 5,
+                            "read": 5,
+                            "web_search": 5
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9224,
+                                "cachedTokens": 8320,
+                                "completionTokens": 111,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9464,
+                                "cachedTokens": 9216,
+                                "completionTokens": 281,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9695,
+                                "cachedTokens": 9472,
+                                "completionTokens": 202,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9977,
+                                "cachedTokens": 9728,
+                                "completionTokens": 74,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 10112,
+                                "cachedTokens": 9856,
+                                "completionTokens": 82,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10112,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 222
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3f529effeI1tX5TieiKSDip",
+                        "durationMs": 3971,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9224,
+                            "cachedTokens": 8320,
+                            "completionTokens": 111,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9464,
+                            "cachedTokens": 9216,
+                            "completionTokens": 281,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9695,
+                            "cachedTokens": 9472,
+                            "completionTokens": 202,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9977,
+                            "cachedTokens": 9728,
+                            "completionTokens": 74,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 10112,
+                            "cachedTokens": 9856,
+                            "completionTokens": 82,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10112,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 222
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 4,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "lib.js",
+                            "main.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000871776,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002361576,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-repair-json",
+            "tier": 2,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "data.json is valid with the required fields",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 20722,
+                    "wallMs": 20724,
+                    "modelRequests": 6,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "ac15cc14f529f9497182c2d93b2e5f4e8ec2a5c47f5fba22c3390aef78c3f230"
+                    },
+                    "tokens": {
+                        "inputTokens": 59999,
+                        "outputTokens": 1089,
+                        "cachedTokens": 57856,
+                        "withUsage": 6,
+                        "toolCalls": {
+                            "bash": 6
+                        },
+                        "toolsOffered": {
+                            "create_goal": 6,
+                            "bash": 12,
+                            "get_goal": 6,
+                            "subagent": 6,
+                            "request_user_input": 6,
+                            "update_goal": 6,
+                            "read": 6,
+                            "web_search": 6
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9232,
+                                "cachedTokens": 8320,
+                                "completionTokens": 96,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9590,
+                                "cachedTokens": 9216,
+                                "completionTokens": 278,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9963,
+                                "cachedTokens": 9728,
+                                "completionTokens": 215,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 10179,
+                                "cachedTokens": 9984,
+                                "completionTokens": 192,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 10418,
+                                "cachedTokens": 10240,
+                                "completionTokens": 120,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 10617,
+                                "cachedTokens": 10368,
+                                "completionTokens": 188,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10617,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 277
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3f0c01ffeiDeLJzVXP0vqIM",
+                        "durationMs": 3778,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9232,
+                            "cachedTokens": 8320,
+                            "completionTokens": 96,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9590,
+                            "cachedTokens": 9216,
+                            "completionTokens": 278,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9963,
+                            "cachedTokens": 9728,
+                            "completionTokens": 215,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 10179,
+                            "cachedTokens": 9984,
+                            "completionTokens": 192,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 10418,
+                            "cachedTokens": 10240,
+                            "completionTokens": 120,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 10617,
+                            "cachedTokens": 10368,
+                            "completionTokens": 188,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10617,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 277
+                    },
+                    "toolOutcomes": {
+                        "results": 6,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 6,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "data.json"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.001148418,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.0026382180000000003,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1
+                },
+                {
+                    "pass": false,
+                    "notes": "data.json does not parse",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 17682,
+                    "wallMs": 17684,
+                    "modelRequests": 5,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "fda46bf4e4b866c6b85ece771fce88a85457be650bc17b900aec72442349735a"
+                    },
+                    "tokens": {
+                        "inputTokens": 49088,
+                        "outputTokens": 1254,
+                        "cachedTokens": 47488,
+                        "withUsage": 5,
+                        "toolCalls": {
+                            "bash": 4
+                        },
+                        "toolsOffered": {
+                            "create_goal": 5,
+                            "bash": 10,
+                            "get_goal": 5,
+                            "subagent": 5,
+                            "request_user_input": 5,
+                            "update_goal": 5,
+                            "read": 5,
+                            "web_search": 5
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9232,
+                                "cachedTokens": 8320,
+                                "completionTokens": 107,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9403,
+                                "cachedTokens": 9216,
+                                "completionTokens": 569,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9902,
+                                "cachedTokens": 9728,
+                                "completionTokens": 262,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 10155,
+                                "cachedTokens": 9984,
+                                "completionTokens": 179,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 10396,
+                                "cachedTokens": 10240,
+                                "completionTokens": 137,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10396,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 291
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3ea476ffe5N8HmStjV2Mxnq",
+                        "durationMs": 3781,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9232,
+                            "cachedTokens": 8320,
+                            "completionTokens": 107,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9403,
+                            "cachedTokens": 9216,
+                            "completionTokens": 569,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9902,
+                            "cachedTokens": 9728,
+                            "completionTokens": 262,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 10155,
+                            "cachedTokens": 9984,
+                            "completionTokens": 179,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 10396,
+                            "cachedTokens": 10240,
+                            "completionTokens": 137,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10396,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 291
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 4,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "data.json"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0011348640000000002,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.0026246640000000005,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-repair-sum",
+            "tier": 2,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "sum passes all cases",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 9016,
+                    "wallMs": 9020,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "3f0918a2b367b277ff8895efd4de03075ee12957e8081bff6f68f7caa47dcda6"
+                    },
+                    "tokens": {
+                        "inputTokens": 37984,
+                        "outputTokens": 371,
+                        "cachedTokens": 36480,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9230,
+                                "cachedTokens": 8320,
+                                "completionTokens": 49,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9387,
+                                "cachedTokens": 9216,
+                                "completionTokens": 111,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9598,
+                                "cachedTokens": 9344,
+                                "completionTokens": 147,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9769,
+                                "cachedTokens": 9600,
+                                "completionTokens": 64,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9769,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 180
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3e4685ffefdAsIJDSJCox0N",
+                        "durationMs": 4036,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9230,
+                            "cachedTokens": 8320,
+                            "completionTokens": 49,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9387,
+                            "cachedTokens": 9216,
+                            "completionTokens": 111,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9598,
+                            "cachedTokens": 9344,
+                            "completionTokens": 147,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9769,
+                            "cachedTokens": 9600,
+                            "completionTokens": 64,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9769,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 180
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sum.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00055764,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.00204744,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1
+                },
+                {
+                    "pass": true,
+                    "notes": "sum passes all cases",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 13259,
+                    "wallMs": 13263,
+                    "modelRequests": 5,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "3354c2e362dfcafcb1c35c6c91ebbe48ba72795a12925fefc70e6d782f400b26"
+                    },
+                    "tokens": {
+                        "inputTokens": 48500,
+                        "outputTokens": 745,
+                        "cachedTokens": 46848,
+                        "withUsage": 5,
+                        "toolCalls": {
+                            "bash": 4
+                        },
+                        "toolsOffered": {
+                            "create_goal": 5,
+                            "bash": 10,
+                            "get_goal": 5,
+                            "subagent": 5,
+                            "request_user_input": 5,
+                            "update_goal": 5,
+                            "read": 5,
+                            "web_search": 5
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9227,
+                                "cachedTokens": 8320,
+                                "completionTokens": 51,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9388,
+                                "cachedTokens": 9216,
+                                "completionTokens": 128,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9678,
+                                "cachedTokens": 9472,
+                                "completionTokens": 355,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 10034,
+                                "cachedTokens": 9856,
+                                "completionTokens": 85,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 10173,
+                                "cachedTokens": 9984,
+                                "completionTokens": 126,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10173,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 237
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3e0b52ffea9AY7nVZ1e2wsC",
+                        "durationMs": 4627,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9227,
+                            "cachedTokens": 8320,
+                            "completionTokens": 51,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9388,
+                            "cachedTokens": 9216,
+                            "completionTokens": 128,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9678,
+                            "cachedTokens": 9472,
+                            "completionTokens": 355,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 10034,
+                            "cachedTokens": 9856,
+                            "completionTokens": 85,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 10173,
+                            "cachedTokens": 9984,
+                            "completionTokens": 126,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10173,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 237
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 4,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sum.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000835344,
+                    "mintCost": 0.00148965,
+                    "cost": 0.002324994,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-scoped-docs",
+            "tier": 2,
+            "category": "scoped",
+            "attempts": [
+                {
+                    "pass": false,
+                    "notes": "CHANGELOG.md is missing the v2 line",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 12372,
+                    "wallMs": 12375,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "d68c135301bfe7abc95293e0d3a8f2b112ed7dcede9fd92b35ce995905860312"
+                    },
+                    "tokens": {
+                        "inputTokens": 38645,
+                        "outputTokens": 1253,
+                        "cachedTokens": 36992,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9216,
+                                "cachedTokens": 8320,
+                                "completionTokens": 136,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9407,
+                                "cachedTokens": 9088,
+                                "completionTokens": 562,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9891,
+                                "cachedTokens": 9600,
+                                "completionTokens": 135,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 10131,
+                                "cachedTokens": 9984,
+                                "completionTokens": 420,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10131,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 305
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3dbc21ffe0uArIOXWuZBI8o",
+                        "durationMs": 3923,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9216,
+                            "cachedTokens": 8320,
+                            "completionTokens": 136,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9407,
+                            "cachedTokens": 9088,
+                            "completionTokens": 562,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9891,
+                            "cachedTokens": 9600,
+                            "completionTokens": 135,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 10131,
+                            "cachedTokens": 9984,
+                            "completionTokens": 420,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10131,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 305
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "CHANGELOG.md"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.001110726,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002600526,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2
+                },
+                {
+                    "pass": false,
+                    "notes": "CHANGELOG.md is missing the v2 line",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 8648,
+                    "wallMs": 8652,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "a14ea7e45055b15dbdfe866247fdac35a1311b0e6e986094a63c953ab3e30973"
+                    },
+                    "tokens": {
+                        "inputTokens": 28481,
+                        "outputTokens": 709,
+                        "cachedTokens": 27264,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9213,
+                                "cachedTokens": 8320,
+                                "completionTokens": 439,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9529,
+                                "cachedTokens": 9344,
+                                "completionTokens": 215,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9739,
+                                "cachedTokens": 9600,
+                                "completionTokens": 55,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9739,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 263
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3d7697ffe9a11pApGkpQ4pJ",
+                        "durationMs": 3781,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9213,
+                            "cachedTokens": 8320,
+                            "completionTokens": 439,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9529,
+                            "cachedTokens": 9344,
+                            "completionTokens": 215,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9739,
+                            "cachedTokens": 9600,
+                            "completionTokens": 55,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9739,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 263
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "CHANGELOG.md"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000689742,
+                    "mintCost": 0.00148965,
+                    "cost": 0.002179392,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-scoped-edit",
+            "tier": 2,
+            "category": "scoped",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "VERSION is 2, secret intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 10324,
+                    "wallMs": 10328,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "c45d622a624c782f837d5ce3b1234155b9487c8e30502602e694cace0d403eb5"
+                    },
+                    "tokens": {
+                        "inputTokens": 38273,
+                        "outputTokens": 569,
+                        "cachedTokens": 36736,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9213,
+                                "cachedTokens": 8320,
+                                "completionTokens": 155,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9408,
+                                "cachedTokens": 9216,
+                                "completionTokens": 109,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9687,
+                                "cachedTokens": 9472,
+                                "completionTokens": 271,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9965,
+                                "cachedTokens": 9728,
+                                "completionTokens": 34,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9965,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 251
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3d3c36ffefiWU3LhagkLgye",
+                        "durationMs": 4273,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9213,
+                            "cachedTokens": 8320,
+                            "completionTokens": 155,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9408,
+                            "cachedTokens": 9216,
+                            "completionTokens": 109,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9687,
+                            "cachedTokens": 9472,
+                            "completionTokens": 271,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9965,
+                            "cachedTokens": 9728,
+                            "completionTokens": 34,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9965,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 251
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "src/app.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0006821579999999999,
+                    "mintCost": 0.00148965,
+                    "cost": 0.002171808,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2
+                },
+                {
+                    "pass": true,
+                    "notes": "VERSION is 2, secret intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 16024,
+                    "wallMs": 16028,
+                    "modelRequests": 5,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "792147e5279a7e00d568b71acf2fa56f31e2e70dffcd4e716207529e5b47dade"
+                    },
+                    "tokens": {
+                        "inputTokens": 48302,
+                        "outputTokens": 942,
+                        "cachedTokens": 46464,
+                        "withUsage": 5,
+                        "toolCalls": {
+                            "bash": 4
+                        },
+                        "toolsOffered": {
+                            "create_goal": 5,
+                            "bash": 10,
+                            "get_goal": 5,
+                            "subagent": 5,
+                            "request_user_input": 5,
+                            "update_goal": 5,
+                            "read": 5,
+                            "web_search": 5
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9216,
+                                "cachedTokens": 8320,
+                                "completionTokens": 59,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9354,
+                                "cachedTokens": 9088,
+                                "completionTokens": 96,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9612,
+                                "cachedTokens": 9344,
+                                "completionTokens": 450,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9929,
+                                "cachedTokens": 9728,
+                                "completionTokens": 224,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 10191,
+                                "cachedTokens": 9984,
+                                "completionTokens": 113,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10191,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 244
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3cfd7cffea5mwfDIa1eH6kW",
+                        "durationMs": 3663,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9216,
+                            "cachedTokens": 8320,
+                            "completionTokens": 59,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9354,
+                            "cachedTokens": 9088,
+                            "completionTokens": 96,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9612,
+                            "cachedTokens": 9344,
+                            "completionTokens": 450,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9929,
+                            "cachedTokens": 9728,
+                            "completionTokens": 224,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 10191,
+                            "cachedTokens": 9984,
+                            "completionTokens": 113,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10191,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 244
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 4,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "src/app.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0009802919999999998,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002470092,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-terminal-grep",
+            "tier": 2,
+            "category": "terminal",
+            "attempts": [
+                {
+                    "pass": false,
+                    "notes": "errors.txt mismatch: \"ERROR disk full\\r\\nERROR timeout\\r\\n\"",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 9884,
+                    "wallMs": 9886,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "fbec6aa7ecb1d08e8047752afa34f67e47d650a10891298bd6eb7681430b20f5"
+                    },
+                    "tokens": {
+                        "inputTokens": 38588,
+                        "outputTokens": 448,
+                        "cachedTokens": 36736,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9215,
+                                "cachedTokens": 8320,
+                                "completionTokens": 57,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9342,
+                                "cachedTokens": 9088,
+                                "completionTokens": 122,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9814,
+                                "cachedTokens": 9344,
+                                "completionTokens": 241,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 10217,
+                                "cachedTokens": 9984,
+                                "completionTokens": 28,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10217,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 334
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3caa92ffeQ9ELXia7OwulGs",
+                        "durationMs": 3428,
+                        "inputTokens": 9922,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014895
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9215,
+                            "cachedTokens": 8320,
+                            "completionTokens": 57,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9342,
+                            "cachedTokens": 9088,
+                            "completionTokens": 122,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9814,
+                            "cachedTokens": 9344,
+                            "completionTokens": 241,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 10217,
+                            "cachedTokens": 9984,
+                            "completionTokens": 28,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10217,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 334
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "errors.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0006568079999999999,
+                    "mintCost": 0.0014895,
+                    "cost": 0.002146308,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2
+                },
+                {
+                    "pass": false,
+                    "notes": "errors.txt mismatch: \"﻿ERROR disk full\\r\\nERROR timeout\\r\\n\"",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 8034,
+                    "wallMs": 8036,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "bacd2643e2990553181f504f9e44f90c300f39a23c9ee9f4e3da9b2ca69f06da"
+                    },
+                    "tokens": {
+                        "inputTokens": 28164,
+                        "outputTokens": 346,
+                        "cachedTokens": 26880,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9215,
+                                "cachedTokens": 8320,
+                                "completionTokens": 59,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9343,
+                                "cachedTokens": 9088,
+                                "completionTokens": 238,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9606,
+                                "cachedTokens": 9472,
+                                "completionTokens": 49,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9606,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 196
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3c6e95ffeDvdWnVZi7EnYAu",
+                        "durationMs": 4006,
+                        "inputTokens": 9922,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014895
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9215,
+                            "cachedTokens": 8320,
+                            "completionTokens": 59,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9343,
+                            "cachedTokens": 9088,
+                            "completionTokens": 238,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9606,
+                            "cachedTokens": 9472,
+                            "completionTokens": 49,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9606,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 196
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "errors.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00048083999999999996,
+                    "mintCost": 0.0014895,
+                    "cost": 0.00197034,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t2-terminal-sort",
+            "tier": 2,
+            "category": "terminal",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "sorted.txt is correctly sorted",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 10780,
+                    "wallMs": 10782,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "32808583fb94a246296ec18080d7f5dc7d2145758475b84ff420ee39c8921da7"
+                    },
+                    "tokens": {
+                        "inputTokens": 38458,
+                        "outputTokens": 658,
+                        "cachedTokens": 36864,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9220,
+                                "cachedTokens": 8320,
+                                "completionTokens": 83,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9370,
+                                "cachedTokens": 9216,
+                                "completionTokens": 164,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9712,
+                                "cachedTokens": 9472,
+                                "completionTokens": 372,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 10156,
+                                "cachedTokens": 9856,
+                                "completionTokens": 39,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10156,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 312
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3c39e2ffeaoqhRK8dcYrFXJ",
+                        "durationMs": 4259,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9220,
+                            "cachedTokens": 8320,
+                            "completionTokens": 83,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9370,
+                            "cachedTokens": 9216,
+                            "completionTokens": 164,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9712,
+                            "cachedTokens": 9472,
+                            "completionTokens": 372,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 10156,
+                            "cachedTokens": 9856,
+                            "completionTokens": 39,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10156,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 312
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sorted.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0007444919999999999,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002234292,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2
+                },
+                {
+                    "pass": true,
+                    "notes": "sorted.txt is correctly sorted",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 11673,
+                    "wallMs": 11675,
+                    "modelRequests": 5,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "b1897fe9f5730746e9b56a21e4e1836764ae2a40424717947d97be9a6302a41a"
+                    },
+                    "tokens": {
+                        "inputTokens": 48519,
+                        "outputTokens": 794,
+                        "cachedTokens": 46720,
+                        "withUsage": 5,
+                        "toolCalls": {
+                            "bash": 4
+                        },
+                        "toolsOffered": {
+                            "create_goal": 5,
+                            "bash": 10,
+                            "get_goal": 5,
+                            "subagent": 5,
+                            "request_user_input": 5,
+                            "update_goal": 5,
+                            "read": 5,
+                            "web_search": 5
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9220,
+                                "cachedTokens": 8320,
+                                "completionTokens": 104,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9410,
+                                "cachedTokens": 9216,
+                                "completionTokens": 285,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9706,
+                                "cachedTokens": 9472,
+                                "completionTokens": 227,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9961,
+                                "cachedTokens": 9728,
+                                "completionTokens": 136,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 10222,
+                                "cachedTokens": 9984,
+                                "completionTokens": 42,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10222,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 251
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4d3bf81fffeNkbBZfrZpI0fgU",
+                        "durationMs": 3747,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9220,
+                            "cachedTokens": 8320,
+                            "completionTokens": 104,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9410,
+                            "cachedTokens": 9216,
+                            "completionTokens": 285,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9706,
+                            "cachedTokens": 9472,
+                            "completionTokens": 227,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9961,
+                            "cachedTokens": 9728,
+                            "completionTokens": 136,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 10222,
+                            "cachedTokens": 9984,
+                            "completionTokens": 42,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10222,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 251
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 4,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sorted.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0008864099999999999,
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.00237621,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2
+                }
+            ]
+        }
+    ]
+}
