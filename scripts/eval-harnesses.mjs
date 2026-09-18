@@ -148,6 +148,10 @@ async function runPiRpc({
     faults,
     runtime = process.execPath,
     buildArgs = null,
+    // Variables an adapter must add on top of the allowlist. allowlistedEnv deliberately starts
+    // from almost nothing so a harness cannot inherit the developer's environment; anything a
+    // harness genuinely needs is named here by the adapter that needs it.
+    extraEnv = {},
 }) {
     const startedAt = Date.now();
     const agentDir = path.join(homeDir, "agent");
@@ -169,7 +173,7 @@ async function runPiRpc({
 
     const child = spawn(runtime, args, {
         cwd: workspaceDir,
-        env: withFaultPath(allowlistedEnv(homeDir), faults),
+        env: withFaultPath(allowlistedEnv(homeDir, extraEnv), faults),
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
     });
@@ -891,6 +895,119 @@ export const harnessAdapters = {
             fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
 
             return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults });
+        },
+    },
+    // SpecPi with the Jev advisor switched on. Everything else is identical to specpi-default, so
+    // the pair is a controlled comparison: same install, same model, same frozen prices, same
+    // tasks, with only the advisor changing.
+    //
+    // The advisor is pointed at the eval proxy rather than straight at api.typesafe.ai, so its
+    // calls land in the same log as the model's. That is what lets the cost column include the
+    // advisor: a row whose advisor spend was invisible would look cheaper than the plain SpecPi
+    // row for no reason other than where its traffic went.
+    "specpi-jev": {
+        id: "specpi-jev",
+        label: "SpecPi + Jev",
+        needsProxySession: true,
+        isAvailable: () => {
+            if (!fs.existsSync(piCli)) {
+                return { available: false, detail: `missing pinned Pi CLI at ${piCli}` };
+            }
+
+            if (!process.env.OPENROUTER_API_KEY && !process.env.TYPESAFE_API_KEY) {
+                return { available: false, detail: "OPENROUTER_API_KEY is not set" };
+            }
+
+            return { available: true, detail: "SpecPi base with the Jev advisor enabled, priced through the proxy" };
+        },
+        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) => {
+            const { runPiFixture } = await import("./pi-test-harness.mjs");
+            const base = ensureSpecpiBase();
+            if (!base.cached) {
+                const install = runPiFixture(path.join(root, "scripts", "specpi.mjs"), {
+                    piCommand: path.join(root, "scripts", "specpi.mjs"),
+                    cwd: workspaceDir,
+                    agentDir: base.agentDir,
+                    args: ["install", "--yes", "--skip-browser-install"],
+                    env: { SPECPI_PI: piCli },
+                    timeout: 300000,
+                });
+                if (install.status !== 0) {
+                    specpiBaseCache = null;
+
+                    return {
+                        exitCode: 1,
+                        timedOut: false,
+                        durationMs: install.durationMs,
+                        stderrTail: install.stderr.slice(-2000),
+                    };
+                }
+            }
+
+            const agentDir = path.join(homeDir, "agent");
+            fs.rmSync(agentDir, { recursive: true, force: true });
+            fs.cpSync(base.agentDir, agentDir, { recursive: true });
+            const permissionDir = path.join(agentDir, "extensions", "pi-permission-system");
+            fs.mkdirSync(permissionDir, { recursive: true });
+            fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
+
+            // The advisor asks a human before its first transmission and refuses without a UI, so
+            // an unattended run would otherwise send nothing and measure the same thing twice. The
+            // grant is written explicitly into the disposable home and disclosed in the report
+            // method, exactly as yoloMode is, so the gate is never silently measured away.
+            const jevDir = path.join(agentDir, "specpi", "jev");
+            fs.mkdirSync(jevDir, { recursive: true });
+            fs.writeFileSync(
+                path.join(jevDir, "settings.json"),
+                JSON.stringify(
+                    {
+                        schema: 1,
+                        master: true,
+                        startup: true,
+                        systems: { retention: true, compaction: true, gap: true, sources: false },
+                        callBudgetPerSession: 16,
+                    },
+                    null,
+                    4,
+                ),
+            );
+            fs.writeFileSync(
+                path.join(jevDir, "consent.json"),
+                JSON.stringify(
+                    {
+                        schema: 1,
+                        granted: true,
+                        // Must equal endpointLabel() in the advisor, which is the host of the base
+                        // URL the advisor will actually post to. Here that is the eval proxy, not
+                        // openrouter.ai. A mismatch makes the grant unreadable and the advisor
+                        // silently sends nothing, which would measure plain SpecPi twice.
+                        endpoint: new URL(proxyUrl.replace(/\/v1$/u, "")).host,
+                        maxStateBytes: 1024,
+                        grantedAt: new Date().toISOString(),
+                    },
+                    null,
+                    4,
+                ),
+            );
+
+            return runPiRpc({
+                cli: piCli,
+                task,
+                workspaceDir,
+                homeDir,
+                proxyUrl,
+                model,
+                timeoutMs,
+                faults,
+                extraEnv: {
+                    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY ?? process.env.TYPESAFE_API_KEY,
+                    TYPESAFE_API_KEY: process.env.TYPESAFE_API_KEY,
+                    JEV_BACKEND: process.env.JEV_BACKEND,
+                    // client.mjs appends /v1/systemone, and proxyUrl already ends in /v1, so the
+                    // suffix is trimmed here rather than producing /v1/v1/systemone.
+                    TYPESAFE_BASE_URL: proxyUrl.replace(/\/v1$/u, ""),
+                },
+            });
         },
     },
     omp: {

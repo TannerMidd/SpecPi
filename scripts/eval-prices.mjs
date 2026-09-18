@@ -59,7 +59,7 @@ export function priceUsage(prices, model, usage = {}) {
 // so an archived report is always read under the current rules rather than
 // whatever was in force the day it was written. Both inputs it needs —
 // logged usage and the frozen list — are kept in the report.
-export function priceAttempt(prices, model, { native, totals, sessionMint } = {}) {
+export function priceAttempt(prices, model, { native, totals, sessionMint, advisor } = {}) {
     const priced = native
         ? priceUsage(prices, model, {
               inputTokens: native.inputTokens,
@@ -89,11 +89,22 @@ export function priceAttempt(prices, model, { native, totals, sessionMint } = {}
           })
         : null;
 
+    // Advisor spend is the harness's own spend, not eval plumbing: a SpecPi + Jev session pays for
+    // it to do the work. Folding it into modelCost is what keeps that row comparable with the plain
+    // SpecPi row; leaving it out would make the advisor look free, which is the exact failure the
+    // frozen price list exists to prevent. It is also reported separately so it can be seen.
+    const advisorPriced =
+        advisor && advisor.calls > 0
+            ? priceUsage(prices, advisor.model ?? "jev-1.13.0", { inputTokens: advisor.inputTokens ?? 0 })
+            : null;
+    const advisorCost = advisorPriced?.cost ?? 0;
+
     return {
-        modelCost: priced.cost,
+        modelCost: priced.cost + advisorCost,
+        advisorCost,
         mintCost: mint?.cost ?? 0,
-        cost: priced.cost + (mint?.cost ?? 0),
-        costComplete: priced.complete && (mint?.complete ?? true),
+        cost: priced.cost + advisorCost + (mint?.cost ?? 0),
+        costComplete: priced.complete && (mint?.complete ?? true) && (advisorPriced?.complete ?? true),
     };
 }
 
