@@ -1,0 +1,11 @@
+{
+    "id": "t1-fix-script",
+    "tier": 1,
+    "category": "repair",
+    "title": "Fix a one-line subtraction bug",
+    "timeoutMs": 60000,
+    "turnCap": 25,
+    "writable": [
+        "add.js"
+    ]
+}

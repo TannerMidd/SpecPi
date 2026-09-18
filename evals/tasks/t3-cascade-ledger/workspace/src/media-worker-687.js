@@ -1,0 +1,6 @@
+// module media-worker-687
+// governed by R589
+
+export function apply(value) {
+    return value * 35;
+}

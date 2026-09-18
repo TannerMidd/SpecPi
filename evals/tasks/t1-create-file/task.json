@@ -1,0 +1,11 @@
+{
+    "id": "t1-create-file",
+    "tier": 1,
+    "category": "terminal",
+    "title": "Create a file with exact content",
+    "timeoutMs": 60000,
+    "turnCap": 25,
+    "writable": [
+        "hello.txt"
+    ]
+}

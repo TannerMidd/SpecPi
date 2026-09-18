@@ -1,0 +1,11 @@
+{
+    "id": "t2-repair-sum",
+    "tier": 2,
+    "category": "repair",
+    "title": "Fix an off-by-one sum",
+    "timeoutMs": 120000,
+    "turnCap": 50,
+    "writable": [
+        "sum.js"
+    ]
+}

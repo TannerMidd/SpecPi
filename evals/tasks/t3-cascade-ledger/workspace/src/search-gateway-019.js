@@ -1,0 +1,6 @@
+// module search-gateway-019
+// governed by R355
+
+export function apply(value) {
+    return value > 17 ? 17 : value;
+}

@@ -1,0 +1,5 @@
+INFO server started
+ERROR disk full
+INFO retrying
+ERROR timeout
+INFO done

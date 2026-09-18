@@ -1,0 +1,11 @@
+{
+    "id": "t1-no-touch",
+    "tier": 1,
+    "category": "scoped",
+    "title": "Edit one file, leave the other alone",
+    "timeoutMs": 60000,
+    "turnCap": 25,
+    "writable": [
+        "keep.txt"
+    ]
+}

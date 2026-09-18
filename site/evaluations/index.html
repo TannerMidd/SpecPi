@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <script src="../theme.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#fafbfc" />
+        <meta
+            name="description"
+            content="A harness comparison run on one model and one task suite: what changes when only the harness changes, and what stays the same."
+        />
+        <meta property="og:title" content="Evaluations · SpecPi" />
+        <meta
+            property="og:description"
+            content="Six harnesses, one model, one frozen price list. What changes when only the harness changes."
+        />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/evaluations/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/evaluations/" />
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+        <link rel="stylesheet" href="../research.css" />
+        <title>Evaluations · SpecPi</title>
+    </head>
+    <body>
+        <a class="skip-link" href="#content">Skip to content</a>
+        <header class="site-header wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="../#core">Scope</a><a href="../#packages">Packages</a><a href="../#install">Install</a
+                ><a href="../#vscode-chat">VS Code</a><a href="../wiki/">Docs</a><a href="../research/">Research</a
+                ><a href="./" aria-current="page">Evals</a><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
+            </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
+        </header>
+        <main class="wiki-layout wrap" id="content">
+            <aside class="wiki-sidebar" aria-label="Evaluation contents">
+                <p>SPECPI / EVALUATIONS</p>
+                <nav>
+                    <a href="#summary"><span>01</span>Summary</a><a href="#method"><span>02</span>Method</a
+                    ><a href="#outcome"><span>03</span>Did it solve it?</a
+                    ><a href="#overhead"><span>04</span>Fixed cost</a
+                    ><a href="#converge"><span>05</span>Where it lands</a
+                    ><a href="#tools"><span>06</span>Tool surface</a
+                    ><a href="#limits"><span>07</span>What this is not</a>
+                </nav>
+                <div class="index-meta">SpecPi 0.26.0<br />Pi 0.84.4<br /><span id="meta-generated"></span></div>
+            </aside>
+            <div class="wiki-content">
+                <div class="wiki-intro">
+                    <p class="eyebrow">Evaluations</p>
+                    <h1>Only the harness<br />changes.</h1>
+                    <p class="wiki-summary">
+                        Six coding harnesses, the same tasks, the same model and the same frozen price list. Anything
+                        that differs between the rows is the harness, because nothing else was allowed to move. This is
+                        an early suite, and it measures cost and behaviour far better than it measures skill.
+                    </p>
+                    <p class="wiki-release-note">
+                        Unlike the <a class="text-link" href="../research/">research page</a>, which reads other
+                        people's published studies, these are measurements taken in this repository against this base.
+                        The runner, the tasks and the price list are in
+                        <a class="text-link" href="https://github.com/TannerMidd/SpecPi/tree/main/evals">evals/</a>, and
+                        every figure below is redrawn from
+                        <a class="text-link" href="./harness-eval.json">harness-eval.json</a> by one command.
+                    </p>
+                </div>
+
+                <section class="doc-section" id="summary">
+                    <header>
+                        <h2>Summary</h2>
+                        <span>01</span>
+                    </header>
+                    <p>
+                        The suite was built to find out which harness solves more. For a long time it could not answer
+                        that, because nearly everything passed. Three rounds of harder tasks changed nothing. What
+                        finally produced a difference was adding more harnesses rather than harder work, and the more
+                        useful question turned out to be what each harness costs you before the model does anything.
+                    </p>
+                    <dl class="verdict">
+                        <div>
+                            <dt>Measured</dt>
+                            <dd>
+                                <strong>Fixed overhead varies several-fold.</strong>
+                                Before a single instruction is read, the lightest harness sends
+                                <b data-eval="overhead-min"></b> characters of tool schema and system prompt on every
+                                call. The heaviest sends <b data-eval="overhead-max"></b>.
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Measured</dt>
+                            <dd>
+                                <strong>The gap does not close on bigger work.</strong>
+                                Cheapest to dearest is <b data-eval="spread-first"></b> on the smallest tasks and
+                                <b data-eval="spread-last"></b> on the longest, so the premium is closer to a
+                                multiplier than a one-off toll.
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Measured</dt>
+                            <dd>
+                                <strong>Most of the tool surface goes unused.</strong>
+                                Averaged over the run, the heaviest harness sends
+                                <b data-eval="offer-max"></b> tool definitions per attempt and makes
+                                <b data-eval="offer-max-calls"></b> calls.
+                            </dd>
+                        </div>
+                        <div>
+                            <dt>Measured</dt>
+                            <dd>
+                                <strong>Solve rate finally separates, but only just.</strong>
+                                Most harnesses pass nearly everything, so one of them failing is worth reading as an
+                                observation about that harness rather than a ranking of the rest.
+                            </dd>
+                        </div>
+                    </dl>
+                    <div class="metric-row" id="metric-row"></div>
+                    <p>
+                        The practical reading: harness overhead is charged on every model call, and a longer task means
+                        more calls rather than cheaper ones. Picking a lighter harness is not a saving that fades once
+                        the work gets real.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="method">
+                    <header>
+                        <h2>How it is measured</h2>
+                        <span>02</span>
+                    </header>
+                    <p>
+                        Each attempt runs one harness against one task in a disposable home directory, with a fresh copy
+                        of the task's workspace and the model pointed at a logging proxy. The proxy records every
+                        request and response, so token counts and tool calls are observed rather than self-reported. A
+                        task checker then grades the resulting workspace.
+                    </p>
+                    <ul>
+                        <li>
+                            <b>One model throughout.</b> Every harness runs the same model, so a difference in the table
+                            is a difference in how the harness uses it.
+                        </li>
+                        <li>
+                            <b>One price list, frozen.</b> Costs are recomputed from recorded usage against a dated
+                            price file, so a provider's pricing change cannot silently rewrite an old result.
+                        </li>
+                        <li>
+                            <b>Graded, not pass or fail.</b> Each task returns a score from 0 to 1, because a boolean
+                            verdict throws away the difference between a near miss and no attempt.
+                        </li>
+                        <li>
+                            <b>Scope is checked separately.</b> Every workspace is content-hashed before and after. A
+                            harness that edits files the task did not put in scope is recorded as out of scope whether
+                            or not it passed.
+                        </li>
+                    </ul>
+                    <div class="callout">
+                        <p>
+                            <strong>Attempts that never started are excluded.</strong> Harnesses run side by side, and
+                            that contention can occasionally stop one launching before it makes a single model call.
+                            Such an attempt never ran the task, so counting it as a loss would blame a harness for the
+                            evaluation's own plumbing. They are dropped from every average and counted separately as
+                            <code>launchFailures</code> in the data file, so the exclusion is visible rather than
+                            quietly applied.
+                        </p>
+                    </div>
+                    <div class="table-scroll" id="table-overall">
+                        <!-- table-overall --><table class="numeric"><thead><tr><th>Harness</th><th>Solved</th><th>Score</th><th>Cost/attempt</th><th>Prompt tok</th><th>Output tok</th><th>Cache hit</th><th>Calls</th><th>In scope</th></tr></thead><tbody><tr><th>Pi</th><td>25/26</td><td>0.962</td><td>$0.0012</td><td>31,772</td><td>956</td><td>89%</td><td>3.5</td><td>26/26</td></tr><tr><th>SpecPi</th><td>26/26</td><td>1.000</td><td>$0.0021</td><td>57,243</td><td>1,428</td><td>88%</td><td>4.5</td><td>26/26</td></tr><tr><th>OpenCode</th><td>24/26</td><td>0.923</td><td>$0.0021</td><td>51,488</td><td>624</td><td>80%</td><td>3.5</td><td>26/26</td></tr><tr><th>Codex CLI</th><td>17/26</td><td>0.654</td><td>$0.0027</td><td>112,060</td><td>3,035</td><td>97%</td><td>6.3</td><td>26/26</td></tr><tr><th>Oh My Pi</th><td>25/26</td><td>0.962</td><td>$0.0042</td><td>124,507</td><td>1,630</td><td>85%</td><td>5.6</td><td>26/26</td></tr><tr><th>DeepSeek Harness</th><td>25/26</td><td>0.962</td><td>$0.0035</td><td>119,250</td><td>2,427</td><td>90%</td><td>6.2</td><td>26/26</td></tr></tbody></table><!-- /table-overall -->
+                    </div>
+                </section>
+
+                <section class="doc-section" id="outcome">
+                    <header>
+                        <h2>Did it solve the task?</h2>
+                        <span>03</span>
+                    </header>
+                    <p>
+                        This is the figure the suite was built to produce, and for most of its life it was the least
+                        informative one in the set. Every harness passed almost everything. It is published partly
+                        because that flatness is itself a result, and partly because it has finally started to move.
+                    </p>
+                    <figure class="chart-figure">
+                        <!-- chart-solve --><svg class="chart" id="chart-solve" viewBox="0 0 720 562" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Tasks solved"><text x="0" y="18" class="ct-lb">Tasks solved</text><line x1="150.0" y1="34" x2="150.0" y2="526" stroke="var(--line)" opacity=".85" /><text x="150.0" y="543" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="260.0" y="543" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="370.0" y="543" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="480.0" y="543" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="590.0" y="543" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Tier 1 · smoke</text><rect x="150.0" y="65" width="440.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi</text><text x="598.0" y="78" class="ct-val">100%  8/8</text><rect x="150.0" y="87" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="100" class="ct-val">100%  8/8</text><rect x="150.0" y="109" width="440.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">OpenCode</text><text x="598.0" y="122" class="ct-val">100%  8/8</text><rect x="150.0" y="131" width="275.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">Codex CLI</text><text x="433.0" y="144" class="ct-val">63%  5/8</text><rect x="150.0" y="153" width="385.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="166" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="543.0" y="166" class="ct-val">88%  7/8</text><rect x="150.0" y="175" width="385.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="188" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="543.0" y="188" class="ct-val">88%  7/8</text><text x="0" y="223" class="ct-row">Tier 2 · edits</text><rect x="150.0" y="230" width="440.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">Pi</text><text x="598.0" y="243" class="ct-val">100%  16/16</text><rect x="150.0" y="252" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="265" class="ct-val">100%  16/16</text><rect x="150.0" y="274" width="440.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">OpenCode</text><text x="598.0" y="287" class="ct-val">100%  16/16</text><rect x="150.0" y="296" width="275.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">Codex CLI</text><text x="433.0" y="309" class="ct-val">63%  10/16</text><rect x="150.0" y="318" width="440.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="598.0" y="331" class="ct-val">100%  16/16</text><rect x="150.0" y="340" width="440.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="353" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="598.0" y="353" class="ct-val">100%  16/16</text><text x="0" y="388" class="ct-row">Tier 3 · repair</text><rect x="150.0" y="395" width="220.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="408" text-anchor="end" class="ct-sub">Pi</text><text x="378.0" y="408" class="ct-val">50%  1/2</text><rect x="150.0" y="417" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="430" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="430" class="ct-val">100%  2/2</text><text x="140" y="452" text-anchor="end" class="ct-sub">OpenCode</text><text x="158.0" y="452" class="ct-val">0%  0/2</text><rect x="150.0" y="461" width="440.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="474" text-anchor="end" class="ct-sub">Codex CLI</text><text x="598.0" y="474" class="ct-val">100%  2/2</text><rect x="150.0" y="483" width="440.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="496" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="598.0" y="496" class="ct-val">100%  2/2</text><rect x="150.0" y="505" width="440.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="518" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="598.0" y="518" class="ct-val">100%  2/2</text><text x="0" y="556" class="ct-ax">Share of attempts passing the task checker</text></svg><!-- /chart-solve -->
+                        <figcaption class="figure-note">
+                            Share of attempts passing the checker, by tier. Attempts that failed to start are excluded
+                            rather than scored as losses, because they never ran the task.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        Three rounds of harder tasks were written to try to force a difference. The puzzles seemed
+                        demanding: a wire format inferred from fixtures, an interlocking cache policy, a log far larger
+                        than the context window. Every harness solved them on the first or second turn, because a
+                        capable model solves that kind of problem and the scaffolding around it barely participates.
+                        Harder puzzles were never the answer.
+                    </p>
+                    <p>
+                        What did produce separation was adding harnesses. One of the six now fails a meaningful share of
+                        even the smallest tasks, and it does so consistently across tiers rather than in one unlucky
+                        run. That is a fact about that harness on this model, not a ranking of the others, which remain
+                        bunched near the top where the metric cannot tell them apart.
+                    </p>
+                    <div class="callout callout-warn">
+                        <p>
+                            <strong>Read a failure as an observation, not a score.</strong> With a handful of attempts
+                            per task, one loss and a genuine weakness look identical. The number of attempts behind
+                            every figure is in
+                            <a class="text-link" href="./harness-eval.json">the data file</a>, and where a harness fails
+                            it is worth reading that attempt rather than the rate.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="doc-section" id="overhead">
+                    <header>
+                        <h2>What a harness costs before it starts</h2>
+                        <span>04</span>
+                    </header>
+                    <p>
+                        Every model call carries the harness's tool definitions and system instructions. That payload is
+                        fixed, it is sent again on each request, and it is the clearest difference between the rows.
+                    </p>
+                    <figure class="chart-figure">
+                        <!-- chart-schema --><svg class="chart" id="chart-schema" viewBox="0 0 720 263" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Characters sent on every model call, before any work happens"><text x="0" y="18" class="ct-lb">Characters sent on every model call, before any work happens</text><line x1="150.0" y1="34" x2="150.0" y2="227" stroke="var(--line)" opacity=".85" /><text x="150.0" y="244" text-anchor="middle" class="ct-ax">0</text><line x1="260.0" y1="34" x2="260.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="260.0" y="244" text-anchor="middle" class="ct-ax">16,000</text><line x1="370.0" y1="34" x2="370.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="370.0" y="244" text-anchor="middle" class="ct-ax">32,000</text><line x1="480.0" y1="34" x2="480.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="480.0" y="244" text-anchor="middle" class="ct-ax">48,000</text><line x1="590.0" y1="34" x2="590.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="590.0" y="244" text-anchor="middle" class="ct-ax">64,000</text><rect x="150.0" y="46" width="17.9" height="22" rx="2" fill="var(--ct-pi)" opacity="1" /><rect x="169.9" y="46" width="16.0" height="22" rx="2" fill="var(--ct-pi)" opacity=".42" /><text x="140" y="64" text-anchor="end" class="ct-sub">Pi · 4 tools</text><text x="196.0" y="64" class="ct-val">5,522</text><rect x="150.0" y="77" width="63.0" height="22" rx="2" fill="var(--ct-specpi)" opacity="1" /><rect x="215.0" y="77" width="45.0" height="22" rx="2" fill="var(--ct-specpi)" opacity=".42" /><text x="140" y="95" text-anchor="end" class="ct-sub">SpecPi · 10 tools</text><text x="270.0" y="95" class="ct-val">16,287</text><rect x="150.0" y="108" width="141.1" height="22" rx="2" fill="var(--ct-opencode)" opacity="1" /><rect x="293.1" y="108" width="116.8" height="22" rx="2" fill="var(--ct-opencode)" opacity=".42" /><text x="140" y="126" text-anchor="end" class="ct-sub">OpenCode · 10 tools</text><text x="419.9" y="126" class="ct-val">38,097</text><rect x="150.0" y="139" width="122.5" height="22" rx="2" fill="var(--ct-codex)" opacity="1" /><rect x="274.5" y="139" width="135.8" height="22" rx="2" fill="var(--ct-codex)" opacity=".42" /><text x="140" y="157" text-anchor="end" class="ct-sub">Codex CLI · 9 tools</text><text x="420.3" y="157" class="ct-val">38,148</text><rect x="150.0" y="170" width="303.0" height="22" rx="2" fill="var(--ct-omp)" opacity="1" /><rect x="455.0" y="170" width="123.4" height="22" rx="2" fill="var(--ct-omp)" opacity=".42" /><text x="140" y="188" text-anchor="end" class="ct-sub">Oh My Pi · 11 tools</text><text x="588.5" y="188" class="ct-val">62,612</text><rect x="150.0" y="201" width="184.0" height="22" rx="2" fill="var(--ct-deepseek)" opacity="1" /><rect x="336.0" y="201" width="30.3" height="22" rx="2" fill="var(--ct-deepseek)" opacity=".42" /><text x="140" y="219" text-anchor="end" class="ct-sub">DeepSeek Harness · 25 tools</text><text x="376.3" y="219" class="ct-val">31,750</text><text x="0" y="257" class="ct-ax">Tool schemas (solid) plus system instructions (dimmed)</text></svg><!-- /chart-schema -->
+                        <figcaption class="figure-note">
+                            Characters on the first model call, split into tool schema and system instructions. OpenCode
+                            is absent because its prompt never crosses the proxy; inventing a number for it would be
+                            worse than leaving the row out.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        The gap is almost entirely tool schema, not prose. A harness that ships twenty-five tools pays
+                        for twenty-five tool descriptions on every request, whether or not the task could use any of
+                        them. That cost is multiplied by the number of turns and reduced, but not removed, by prompt
+                        caching.
+                    </p>
+                    <figure class="chart-figure">
+                        <!-- chart-tokens --><svg class="chart" id="chart-tokens" viewBox="0 0 720 263" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt tokens per attempt, all tiers"><text x="0" y="18" class="ct-lb">Prompt tokens per attempt, all tiers</text><line x1="150.0" y1="34" x2="150.0" y2="227" stroke="var(--line)" opacity=".85" /><text x="150.0" y="244" text-anchor="middle" class="ct-ax">0</text><line x1="260.0" y1="34" x2="260.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="260.0" y="244" text-anchor="middle" class="ct-ax">35,000</text><line x1="370.0" y1="34" x2="370.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="370.0" y="244" text-anchor="middle" class="ct-ax">70,000</text><line x1="480.0" y1="34" x2="480.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="480.0" y="244" text-anchor="middle" class="ct-ax">105,000</text><line x1="590.0" y1="34" x2="590.0" y2="227" stroke="var(--line)" opacity=".45" /><text x="590.0" y="244" text-anchor="middle" class="ct-ax">140,000</text><rect x="150.0" y="46" width="99.9" height="22" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="64" text-anchor="end" class="ct-sub">Pi</text><text x="257.9" y="64" class="ct-val">31,772</text><rect x="150.0" y="77" width="179.9" height="22" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="95" text-anchor="end" class="ct-sub">SpecPi</text><text x="337.9" y="95" class="ct-val">57,243</text><rect x="150.0" y="108" width="161.8" height="22" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="126" text-anchor="end" class="ct-sub">OpenCode</text><text x="319.8" y="126" class="ct-val">51,488</text><rect x="150.0" y="139" width="352.2" height="22" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="157" text-anchor="end" class="ct-sub">Codex CLI</text><text x="510.2" y="157" class="ct-val">112,060</text><rect x="150.0" y="170" width="391.3" height="22" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="188" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="549.3" y="188" class="ct-val">124,507</text><rect x="150.0" y="201" width="374.8" height="22" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="219" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="532.8" y="219" class="ct-val">119,250</text><text x="0" y="257" class="ct-ax">Mean prompt tokens, cache rereads included</text></svg><!-- /chart-tokens -->
+                        <figcaption class="figure-note">
+                            Mean prompt tokens per attempt across all tiers, cache rereads included. The ordering
+                            follows the schema chart above.
+                        </figcaption>
+                    </figure>
+                </section>
+
+                <section class="doc-section" id="converge">
+                    <header>
+                        <h2>Where the overhead actually lands</h2>
+                        <span>05</span>
+                    </header>
+                    <p>
+                        The obvious guess is that a fixed cost per call is a large share of a small task and a rounding
+                        error on a large one. That is not what the per-tier spend shows. A longer task means more calls,
+                        and the overhead rides every one of them, so the premium travels with the work rather than being
+                        diluted by it.
+                    </p>
+                    <figure class="chart-figure">
+                        <!-- chart-cost --><svg class="chart" id="chart-cost" viewBox="0 0 720 562" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Model spend per attempt"><text x="0" y="18" class="ct-lb">Model spend per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="526" stroke="var(--line)" opacity=".85" /><text x="150.0" y="543" text-anchor="middle" class="ct-ax">$0.000</text><line x1="260.0" y1="34" x2="260.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="260.0" y="543" text-anchor="middle" class="ct-ax">$0.007</text><line x1="370.0" y1="34" x2="370.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="370.0" y="543" text-anchor="middle" class="ct-ax">$0.015</text><line x1="480.0" y1="34" x2="480.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="480.0" y="543" text-anchor="middle" class="ct-ax">$0.022</text><line x1="590.0" y1="34" x2="590.0" y2="526" stroke="var(--line)" opacity=".45" /><text x="590.0" y="543" text-anchor="middle" class="ct-ax">$0.030</text><text x="0" y="58" class="ct-row">Tier 1 · smoke</text><rect x="150.0" y="65" width="6.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi</text><text x="164.1" y="78" class="ct-val">$0.0004</text><rect x="150.0" y="87" width="13.1" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi</text><text x="171.1" y="100" class="ct-val">$0.0009</text><rect x="150.0" y="109" width="20.5" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">OpenCode</text><text x="178.5" y="122" class="ct-val">$0.0014</text><rect x="150.0" y="131" width="14.2" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">Codex CLI</text><text x="172.2" y="144" class="ct-val">$0.0010</text><rect x="150.0" y="153" width="43.8" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="166" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="201.8" y="166" class="ct-val">$0.0030</text><rect x="150.0" y="175" width="22.6" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="188" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="180.6" y="188" class="ct-val">$0.0015</text><text x="0" y="223" class="ct-row">Tier 2 · edits</text><rect x="150.0" y="230" width="7.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">Pi</text><text x="165.5" y="243" class="ct-val">$0.0005</text><rect x="150.0" y="252" width="15.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">SpecPi</text><text x="173.0" y="265" class="ct-val">$0.0010</text><rect x="150.0" y="274" width="21.9" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">OpenCode</text><text x="179.9" y="287" class="ct-val">$0.0015</text><rect x="150.0" y="296" width="11.9" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">Codex CLI</text><text x="169.9" y="309" class="ct-val">$0.0008</text><rect x="150.0" y="318" width="45.6" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="203.6" y="331" class="ct-val">$0.0031</text><rect x="150.0" y="340" width="25.7" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="353" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="183.7" y="353" class="ct-val">$0.0018</text><text x="0" y="388" class="ct-row">Tier 3 · repair</text><rect x="150.0" y="395" width="137.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="408" text-anchor="end" class="ct-sub">Pi</text><text x="295.9" y="408" class="ct-val">$0.0094</text><rect x="150.0" y="417" width="220.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="430" text-anchor="end" class="ct-sub">SpecPi</text><text x="378.0" y="430" class="ct-val">$0.0150</text><rect x="150.0" y="439" width="138.8" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="452" text-anchor="end" class="ct-sub">OpenCode</text><text x="296.8" y="452" class="ct-val">$0.0095</text><rect x="150.0" y="461" width="358.8" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="474" text-anchor="end" class="ct-sub">Codex CLI</text><text x="516.8" y="474" class="ct-val">$0.0245</text><rect x="150.0" y="483" width="255.1" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="496" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="413.1" y="496" class="ct-val">$0.0174</text><rect x="150.0" y="505" width="370.9" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="518" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="528.9" y="518" class="ct-val">$0.0253</text><text x="0" y="556" class="ct-ax">US dollars per attempt · same model, same tasks, same frozen price list</text></svg><!-- /chart-cost -->
+                        <figcaption class="figure-note">
+                            Mean model spend per attempt, by tier. Tiers 1 and 2 are small edits and short repairs;
+                            tier 3 is a long repair chain across 1,200 modules. The session-mint cost the evaluation
+                            itself incurs is excluded and reported separately in the data file.
+                        </figcaption>
+                    </figure>
+                    <div class="table-scroll" id="table-ratio">
+                        <!-- table-ratio --><table class="numeric"><thead><tr><th>Harness</th><th>Tier 1</th><th>Tier 2</th><th>Tier 3</th></tr></thead><tbody><tr><th>Pi</th><td>1.00&times;</td><td>1.00&times;</td><td>1.00&times;</td></tr><tr><th>SpecPi</th><td>2.14&times;</td><td>2.00&times;</td><td>1.59&times;</td></tr><tr><th>OpenCode</th><td>3.35&times;</td><td>2.92&times;</td><td>1.01&times;</td></tr><tr><th>Codex CLI</th><td>2.32&times;</td><td>1.58&times;</td><td>2.60&times;</td></tr><tr><th>Oh My Pi</th><td>7.17&times;</td><td>6.09&times;</td><td>1.85&times;</td></tr><tr><th>DeepSeek Harness</th><td>3.69&times;</td><td>3.43&times;</td><td>2.69&times;</td></tr></tbody></table><!-- /table-ratio -->
+                    </div>
+                    <p>
+                        Every figure is relative to the cheapest harness in that tier. Read across a row and most stay
+                        roughly where they started: a harness costing twice the lightest on smoke tasks still costs
+                        about twice as much on the long one. The ratios move by a little, not by an order of magnitude,
+                        and nothing converges.
+                    </p>
+                    <p>
+                        Two rows do move sharply, and both get more expensive rather than less. That is worth reading as
+                        a property of the long task, where a harness that takes more turns pays its per-call overhead
+                        more times, rather than as a fixed trait of those harnesses.
+                    </p>
+                    <div class="callout">
+                        <p>
+                            <strong>This is the number to carry away.</strong> A lighter harness is cheaper on small
+                            work and stays cheaper on large work. The saving does not evaporate once the task gets
+                            serious, which is the opposite of what an earlier version of this page concluded from a
+                            smaller set of harnesses and shorter tasks.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="doc-section" id="tools">
+                    <header>
+                        <h2>The tool surface</h2>
+                        <span>06</span>
+                    </header>
+                    <p>
+                        The proxy counts tool definitions sent and tool calls actually made. They differ by a lot, in
+                        every harness.
+                    </p>
+                    <figure class="chart-figure">
+                        <!-- chart-tools --><svg class="chart" id="chart-tools" viewBox="0 0 720 484" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Tool definitions offered against tool calls actually made"><text x="0" y="18" class="ct-lb">Tool definitions offered against tool calls actually made</text><line x1="150.0" y1="34" x2="150.0" y2="448" stroke="var(--line)" opacity=".85" /><text x="150.0" y="465" text-anchor="middle" class="ct-ax">0</text><line x1="260.0" y1="34" x2="260.0" y2="448" stroke="var(--line)" opacity=".45" /><text x="260.0" y="465" text-anchor="middle" class="ct-ax">40</text><line x1="370.0" y1="34" x2="370.0" y2="448" stroke="var(--line)" opacity=".45" /><text x="370.0" y="465" text-anchor="middle" class="ct-ax">80</text><line x1="480.0" y1="34" x2="480.0" y2="448" stroke="var(--line)" opacity=".45" /><text x="480.0" y="465" text-anchor="middle" class="ct-ax">120</text><line x1="590.0" y1="34" x2="590.0" y2="448" stroke="var(--line)" opacity=".45" /><text x="590.0" y="465" text-anchor="middle" class="ct-ax">160</text><text x="0" y="58" class="ct-row">Pi</text><rect x="150.0" y="65" width="44.8" height="15" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="76" text-anchor="end" class="ct-sub">offered</text><text x="202.8" y="76" class="ct-val">16.3</text><rect x="150.0" y="84" width="9.6" height="15" rx="2" fill="var(--ct-pi)" opacity=".42" /><text x="140" y="95" text-anchor="end" class="ct-sub">invoked</text><text x="167.6" y="95" class="ct-val">3.5</text><text x="0" y="127" class="ct-row">SpecPi</text><rect x="150.0" y="134" width="136.4" height="15" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="145" text-anchor="end" class="ct-sub">offered</text><text x="294.4" y="145" class="ct-val">49.6</text><rect x="150.0" y="153" width="12.5" height="15" rx="2" fill="var(--ct-specpi)" opacity=".42" /><text x="140" y="164" text-anchor="end" class="ct-sub">invoked</text><text x="170.5" y="164" class="ct-val">4.5</text><text x="0" y="196" class="ct-row">OpenCode</text><rect x="150.0" y="203" width="102.6" height="15" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="214" text-anchor="end" class="ct-sub">offered</text><text x="260.6" y="214" class="ct-val">37.3</text><rect x="150.0" y="222" width="9.6" height="15" rx="2" fill="var(--ct-opencode)" opacity=".42" /><text x="140" y="233" text-anchor="end" class="ct-sub">invoked</text><text x="167.6" y="233" class="ct-val">3.5</text><text x="0" y="265" class="ct-row">Codex CLI</text><rect x="150.0" y="272" width="150.4" height="15" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="283" text-anchor="end" class="ct-sub">offered</text><text x="308.4" y="283" class="ct-val">54.7</text><rect x="150.0" y="291" width="17.3" height="15" rx="2" fill="var(--ct-codex)" opacity=".42" /><text x="140" y="302" text-anchor="end" class="ct-sub">invoked</text><text x="175.3" y="302" class="ct-val">6.3</text><text x="0" y="334" class="ct-row">Oh My Pi</text><rect x="150.0" y="341" width="161.7" height="15" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="352" text-anchor="end" class="ct-sub">offered</text><text x="319.7" y="352" class="ct-val">58.8</text><rect x="150.0" y="360" width="15.3" height="15" rx="2" fill="var(--ct-omp)" opacity=".42" /><text x="140" y="371" text-anchor="end" class="ct-sub">invoked</text><text x="173.3" y="371" class="ct-val">5.6</text><text x="0" y="403" class="ct-row">DeepSeek Harness</text><rect x="150.0" y="410" width="401.9" height="15" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="421" text-anchor="end" class="ct-sub">offered</text><text x="559.9" y="421" class="ct-val">146.2</text><rect x="150.0" y="429" width="16.9" height="15" rx="2" fill="var(--ct-deepseek)" opacity=".42" /><text x="140" y="440" text-anchor="end" class="ct-sub">invoked</text><text x="174.9" y="440" class="ct-val">6.2</text><text x="0" y="478" class="ct-ax">Per attempt: definitions sent (solid) and calls invoked (dimmed)</text></svg><!-- /chart-tools -->
+                        <figcaption class="figure-note">
+                            Definitions offered against calls invoked, per attempt, averaged over every tier. Native
+                            harnesses are absent: the proxy never sees their tool list.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        Every harness here offers far more than it uses, which is expected. A tool has to be offered
+                        before the model can decide it is not needed. What matters is the ratio, because the unused
+                        definitions are paid for on every call. This measurement is the reason the accounting was
+                        rewritten mid-run: an earlier version of the proxy counted offers and labelled them calls, which
+                        made the busiest harness look like the most productive one.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="limits">
+                    <header>
+                        <h2>What this does not establish</h2>
+                        <span>07</span>
+                    </header>
+                    <p>
+                        This is a starting point. It is a small suite, on one model, on one machine, and it should be
+                        read as such.
+                    </p>
+                    <ul>
+                        <li>
+                            <b>Nothing about capability.</b> Solve rate saturated. No row here supports a claim that one
+                            harness does better work than another.
+                        </li>
+                        <li>
+                            <b>One model.</b> Every result is conditional on it. A model that uses tools differently
+                            would move the tool-surface figures and could reorder the cost table.
+                        </li>
+                        <li>
+                            <b>Two attempts per cell.</b> Enough to notice flakiness, not enough to put an interval
+                            around a solve rate. Where a harness failed, treat it as an observation and not a rate.
+                        </li>
+                        <li>
+                            <b>Synthetic tasks.</b> They are self-contained and deterministic by design, which is what
+                            makes them gradable and also what keeps them from resembling real work on a real repository.
+                        </li>
+                        <li>
+                            <b>Defaults only.</b> Each harness runs as installed. A harness with a large tool surface
+                            may well be configurable down, and that would change its fixed cost.
+                        </li>
+                    </ul>
+                    <p>
+                        The suite will grow. Harder puzzles mostly measure the model, so the promising direction is
+                        tasks where the scaffolding has to participate: long sessions where context management decides
+                        the outcome, and situations where tools fail and the harness has to recover.
+                    </p>
+                </section>
+            </div>
+        </main>
+        <footer class="site-footer wrap">
+            <p>
+                Figures generated by <code>node scripts/eval-site.mjs</code> from the run reports in
+                <code>evals/runs/</code>.
+            </p>
+        </footer>
+        <script src="../page.js"></script>
+        <script>
+            // The dataset is the single source of truth for the page: the headline
+            // metrics and the run date are read from it rather than typed in, so a
+            // regenerated run cannot leave stale prose behind a fresh chart.
+            fetch("./harness-eval.json")
+                .then((response) => response.json())
+                .then((data) => {
+                    const generated = document.getElementById("meta-generated");
+                    if (generated) {
+                        generated.textContent = `Run ${data.generatedAt}`;
+                    }
+
+                    const lightest = data.harnesses.reduce((low, entry) =>
+                        entry.overall.cost < low.overall.cost ? entry : low,
+                    );
+                    const heaviest = data.harnesses.reduce((high, entry) =>
+                        entry.overall.cost > high.overall.cost ? entry : high,
+                    );
+                    const schema = data.harnesses.filter((entry) => entry.firstCall);
+                    const chars = (entry) => entry.firstCall.toolSchemaChars + entry.firstCall.instructionChars;
+                    const overheadSpread = Math.max(...schema.map(chars)) / Math.min(...schema.map(chars));
+                    const metrics = [
+                        [
+                            data.totalAttempts.toLocaleString(),
+                            `attempts across ${data.taskCount} tasks and ${data.tiers.length} tiers`,
+                        ],
+                        [`${overheadSpread.toFixed(1)}×`, "spread in characters sent before any work begins"],
+                        [
+                            `${(heaviest.overall.cost / lightest.overall.cost).toFixed(2)}×`,
+                            `mean cost, ${heaviest.label} against ${lightest.label}`,
+                        ],
+                        [
+                            `${((data.harnesses.reduce((total, entry) => total + entry.overall.solved, 0) / data.totalAttempts) * 100).toFixed(1)}%`,
+                            "of attempts passed, which is why capability is unresolved",
+                        ],
+                    ];
+                    const row = document.getElementById("metric-row");
+                    if (row) {
+                        row.innerHTML = metrics
+                            .map(
+                                ([value, label]) =>
+                                    `<div><span class="metric-value">${value}</span><span class="metric-label">${label}</span></div>`,
+                            )
+                            .join("");
+                    }
+
+                    // Figures quoted in the prose come from the same file as the charts,
+                    // so a regenerated run cannot leave a sentence contradicting a bar.
+                    const spread = (tier) => {
+                        const costs = data.harnesses
+                            .filter((entry) => entry.perTier[tier])
+                            .map((entry) => entry.perTier[tier].cost);
+
+                        return `${(Math.max(...costs) / Math.min(...costs)).toFixed(1)}×`;
+                    };
+                    const busiest = data.harnesses
+                        .filter((entry) => entry.overall.toolsOffered !== null)
+                        .reduce((high, entry) =>
+                            entry.overall.toolsOffered > high.overall.toolsOffered ? entry : high,
+                        );
+                    const quoted = {
+                        "overhead-min": Math.min(...schema.map(chars)).toLocaleString(),
+                        "overhead-max": Math.max(...schema.map(chars)).toLocaleString(),
+                        "spread-first": spread(data.tiers[0]),
+                        "spread-last": spread(data.tiers[data.tiers.length - 1]),
+                        "offer-max": busiest.overall.toolsOffered.toFixed(0),
+                        "offer-max-calls": busiest.overall.toolCalls.toFixed(0),
+                    };
+                    for (const [key, value] of Object.entries(quoted)) {
+                        for (const node of document.querySelectorAll(`[data-eval="${key}"]`)) {
+                            node.textContent = value;
+                        }
+                    }
+                })
+                .catch(() => {
+                    /* The page is readable without the headline metrics. */
+                });
+        </script>
+    </body>
+</html>

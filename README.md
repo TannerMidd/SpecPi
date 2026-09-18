@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://tannermidd.github.io/SpecPi/">Website</a> · <a href="https://tannermidd.github.io/SpecPi/wiki/">Documentation</a> · <a href="https://github.com/TannerMidd/SpecPi/releases">Releases</a>
+  <a href="https://tannermidd.github.io/SpecPi/">Website</a> · <a href="https://tannermidd.github.io/SpecPi/wiki/">Documentation</a> · <a href="https://tannermidd.github.io/SpecPi/evaluations/">Evaluations</a> · <a href="https://github.com/TannerMidd/SpecPi/releases">Releases</a>
 </p>
 
 <p align="center">
@@ -69,6 +69,39 @@ The gap between the two SpecPi bars comes from a few separate switches, so the e
   </a>
 </p>
 <p align="center"><sub>Every tool in the measured request belongs to exactly one group · Leaving all three opt-in groups hidden keeps 23,797 characters of tool schema out of every request</sub></p>
+
+## Harness evaluations
+
+The chart above counts characters. It says nothing about what a harness costs to
+actually use, or whether it finishes the job. That is what the eval suite is for:
+the same tasks, the same model and the same frozen price list, with only the
+harness changing.
+
+<!-- eval-summary -->
+
+**156 attempts across 6 harnesses and 13 tasks**, all on `deepseek-v4.1-flash`.
+
+| Harness | Solved | Cost/attempt | Prompt tokens | Sent before any work |
+| --- | --- | --- | --- | --- |
+| Pi | 25/26 | $0.0012 | 31,772 | 5,522 |
+| SpecPi | 26/26 | $0.0021 | 57,243 | 16,287 |
+| OpenCode | 24/26 | $0.0021 | 51,488 | 38,097 |
+| Codex CLI | 17/26 | $0.0027 | 112,060 | 38,148 |
+| DeepSeek Harness | 25/26 | $0.0035 | 119,250 | 31,750 |
+| Oh My Pi | 25/26 | $0.0042 | 124,507 | 62,612 |
+
+Cost is the harness's own model spend, priced from recorded usage against a
+dated price file. The last column is the tool schema plus system instructions
+riding every single request, which is the fixed toll a harness charges before
+the model does anything.
+
+<!-- /eval-summary -->
+
+Read the method, the charts and the caveats on the
+[evaluations page](https://tannermidd.github.io/SpecPi/evaluations/). The runner,
+the tasks and the recorded results are in [evals/](evals/), and this table is
+regenerated from those reports by `node scripts/eval-site.mjs`, so it cannot
+drift from the published figures.
 
 ## Install
 

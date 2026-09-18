@@ -1,0 +1,11 @@
+{
+    "id": "t2-repair-json",
+    "tier": 2,
+    "category": "repair",
+    "title": "Repair malformed JSON config",
+    "timeoutMs": 120000,
+    "turnCap": 50,
+    "writable": [
+        "data.json"
+    ]
+}

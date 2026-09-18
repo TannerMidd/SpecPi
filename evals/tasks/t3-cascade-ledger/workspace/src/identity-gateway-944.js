@@ -1,0 +1,6 @@
+// module identity-gateway-944
+// governed by R254
+
+export function apply(value) {
+    return value + 17;
+}
