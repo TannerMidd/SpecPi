@@ -1,0 +1,791 @@
+{
+  "kind": "scope",
+  "rows": [
+    {
+      "id": "pkg-001",
+      "path": "packages/pkg-001/config.json",
+      "expected": {
+        "name": "pkg-001",
+        "revision": 10,
+        "schema": 2,
+        "endpoint": "/custom/0",
+        "user": {
+          "preserve": "local-edit-0",
+          "retries": 0
+        },
+        "flags": [
+          "keep",
+          "pkg-001"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 10
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-002",
+      "path": "packages/pkg-002/config.json",
+      "expected": {
+        "name": "pkg-002",
+        "revision": 11,
+        "schema": 3,
+        "endpoint": "/custom/1",
+        "user": {
+          "preserve": "local-edit-1",
+          "retries": 1
+        },
+        "flags": [
+          "keep",
+          "pkg-002"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 11
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-006",
+      "path": "packages/pkg-006/config.json",
+      "expected": {
+        "name": "pkg-006",
+        "revision": 15,
+        "schema": 4,
+        "endpoint": "/custom/5",
+        "user": {
+          "preserve": "local-edit-5",
+          "retries": 5
+        },
+        "flags": [
+          "keep",
+          "pkg-006"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 15
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-007",
+      "path": "packages/pkg-007/config.json",
+      "expected": {
+        "name": "pkg-007",
+        "revision": 16,
+        "schema": 2,
+        "endpoint": "/custom/6",
+        "user": {
+          "preserve": "local-edit-6",
+          "retries": 6
+        },
+        "flags": [
+          "keep",
+          "pkg-007"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 16
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-011",
+      "path": "packages/pkg-011/config.json",
+      "expected": {
+        "name": "pkg-011",
+        "revision": 13,
+        "schema": 3,
+        "endpoint": "/custom/10",
+        "user": {
+          "preserve": "local-edit-10",
+          "retries": 1
+        },
+        "flags": [
+          "keep",
+          "pkg-011"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 13
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-012",
+      "path": "packages/pkg-012/config.json",
+      "expected": {
+        "name": "pkg-012",
+        "revision": 14,
+        "schema": 4,
+        "endpoint": "/custom/11",
+        "user": {
+          "preserve": "local-edit-11",
+          "retries": 2
+        },
+        "flags": [
+          "keep",
+          "pkg-012"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 14
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-016",
+      "path": "packages/pkg-016/config.json",
+      "expected": {
+        "name": "pkg-016",
+        "revision": 11,
+        "schema": 2,
+        "endpoint": "/custom/15",
+        "user": {
+          "preserve": "local-edit-15",
+          "retries": 6
+        },
+        "flags": [
+          "keep",
+          "pkg-016"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 11
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-017",
+      "path": "packages/pkg-017/config.json",
+      "expected": {
+        "name": "pkg-017",
+        "revision": 12,
+        "schema": 3,
+        "endpoint": "/custom/16",
+        "user": {
+          "preserve": "local-edit-16",
+          "retries": 7
+        },
+        "flags": [
+          "keep",
+          "pkg-017"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 12
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-021",
+      "path": "packages/pkg-021/config.json",
+      "expected": {
+        "name": "pkg-021",
+        "revision": 16,
+        "schema": 4,
+        "endpoint": "/custom/20",
+        "user": {
+          "preserve": "local-edit-20",
+          "retries": 2
+        },
+        "flags": [
+          "keep",
+          "pkg-021"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 16
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-022",
+      "path": "packages/pkg-022/config.json",
+      "expected": {
+        "name": "pkg-022",
+        "revision": 10,
+        "schema": 2,
+        "endpoint": "/custom/21",
+        "user": {
+          "preserve": "local-edit-21",
+          "retries": 3
+        },
+        "flags": [
+          "keep",
+          "pkg-022"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 10
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-026",
+      "path": "packages/pkg-026/config.json",
+      "expected": {
+        "name": "pkg-026",
+        "revision": 14,
+        "schema": 3,
+        "endpoint": "/custom/25",
+        "user": {
+          "preserve": "local-edit-25",
+          "retries": 7
+        },
+        "flags": [
+          "keep",
+          "pkg-026"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 14
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-027",
+      "path": "packages/pkg-027/config.json",
+      "expected": {
+        "name": "pkg-027",
+        "revision": 15,
+        "schema": 4,
+        "endpoint": "/custom/26",
+        "user": {
+          "preserve": "local-edit-26",
+          "retries": 8
+        },
+        "flags": [
+          "keep",
+          "pkg-027"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 15
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-031",
+      "path": "packages/pkg-031/config.json",
+      "expected": {
+        "name": "pkg-031",
+        "revision": 12,
+        "schema": 2,
+        "endpoint": "/custom/30",
+        "user": {
+          "preserve": "local-edit-30",
+          "retries": 3
+        },
+        "flags": [
+          "keep",
+          "pkg-031"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 12
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-032",
+      "path": "packages/pkg-032/config.json",
+      "expected": {
+        "name": "pkg-032",
+        "revision": 13,
+        "schema": 3,
+        "endpoint": "/custom/31",
+        "user": {
+          "preserve": "local-edit-31",
+          "retries": 4
+        },
+        "flags": [
+          "keep",
+          "pkg-032"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 13
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-036",
+      "path": "packages/pkg-036/config.json",
+      "expected": {
+        "name": "pkg-036",
+        "revision": 10,
+        "schema": 4,
+        "endpoint": "/custom/35",
+        "user": {
+          "preserve": "local-edit-35",
+          "retries": 8
+        },
+        "flags": [
+          "keep",
+          "pkg-036"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 10
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-037",
+      "path": "packages/pkg-037/config.json",
+      "expected": {
+        "name": "pkg-037",
+        "revision": 11,
+        "schema": 2,
+        "endpoint": "/custom/36",
+        "user": {
+          "preserve": "local-edit-36",
+          "retries": 0
+        },
+        "flags": [
+          "keep",
+          "pkg-037"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 11
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-041",
+      "path": "packages/pkg-041/config.json",
+      "expected": {
+        "name": "pkg-041",
+        "revision": 15,
+        "schema": 3,
+        "endpoint": "/custom/40",
+        "user": {
+          "preserve": "local-edit-40",
+          "retries": 4
+        },
+        "flags": [
+          "keep",
+          "pkg-041"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 15
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-042",
+      "path": "packages/pkg-042/config.json",
+      "expected": {
+        "name": "pkg-042",
+        "revision": 16,
+        "schema": 4,
+        "endpoint": "/custom/41",
+        "user": {
+          "preserve": "local-edit-41",
+          "retries": 5
+        },
+        "flags": [
+          "keep",
+          "pkg-042"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 16
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-046",
+      "path": "packages/pkg-046/config.json",
+      "expected": {
+        "name": "pkg-046",
+        "revision": 13,
+        "schema": 2,
+        "endpoint": "/custom/45",
+        "user": {
+          "preserve": "local-edit-45",
+          "retries": 0
+        },
+        "flags": [
+          "keep",
+          "pkg-046"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 13
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-047",
+      "path": "packages/pkg-047/config.json",
+      "expected": {
+        "name": "pkg-047",
+        "revision": 14,
+        "schema": 3,
+        "endpoint": "/custom/46",
+        "user": {
+          "preserve": "local-edit-46",
+          "retries": 1
+        },
+        "flags": [
+          "keep",
+          "pkg-047"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 14
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-051",
+      "path": "packages/pkg-051/config.json",
+      "expected": {
+        "name": "pkg-051",
+        "revision": 11,
+        "schema": 4,
+        "endpoint": "/custom/50",
+        "user": {
+          "preserve": "local-edit-50",
+          "retries": 5
+        },
+        "flags": [
+          "keep",
+          "pkg-051"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 11
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-052",
+      "path": "packages/pkg-052/config.json",
+      "expected": {
+        "name": "pkg-052",
+        "revision": 12,
+        "schema": 2,
+        "endpoint": "/custom/51",
+        "user": {
+          "preserve": "local-edit-51",
+          "retries": 6
+        },
+        "flags": [
+          "keep",
+          "pkg-052"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 12
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-056",
+      "path": "packages/pkg-056/config.json",
+      "expected": {
+        "name": "pkg-056",
+        "revision": 16,
+        "schema": 3,
+        "endpoint": "/custom/55",
+        "user": {
+          "preserve": "local-edit-55",
+          "retries": 1
+        },
+        "flags": [
+          "keep",
+          "pkg-056"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 16
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-057",
+      "path": "packages/pkg-057/config.json",
+      "expected": {
+        "name": "pkg-057",
+        "revision": 10,
+        "schema": 4,
+        "endpoint": "/custom/56",
+        "user": {
+          "preserve": "local-edit-56",
+          "retries": 2
+        },
+        "flags": [
+          "keep",
+          "pkg-057"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 10
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-061",
+      "path": "packages/pkg-061/config.json",
+      "expected": {
+        "name": "pkg-061",
+        "revision": 14,
+        "schema": 2,
+        "endpoint": "/custom/60",
+        "user": {
+          "preserve": "local-edit-60",
+          "retries": 6
+        },
+        "flags": [
+          "keep",
+          "pkg-061"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 14
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-062",
+      "path": "packages/pkg-062/config.json",
+      "expected": {
+        "name": "pkg-062",
+        "revision": 15,
+        "schema": 3,
+        "endpoint": "/custom/61",
+        "user": {
+          "preserve": "local-edit-61",
+          "retries": 7
+        },
+        "flags": [
+          "keep",
+          "pkg-062"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 15
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-066",
+      "path": "packages/pkg-066/config.json",
+      "expected": {
+        "name": "pkg-066",
+        "revision": 12,
+        "schema": 4,
+        "endpoint": "/custom/65",
+        "user": {
+          "preserve": "local-edit-65",
+          "retries": 2
+        },
+        "flags": [
+          "keep",
+          "pkg-066"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 12
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-067",
+      "path": "packages/pkg-067/config.json",
+      "expected": {
+        "name": "pkg-067",
+        "revision": 13,
+        "schema": 2,
+        "endpoint": "/custom/66",
+        "user": {
+          "preserve": "local-edit-66",
+          "retries": 3
+        },
+        "flags": [
+          "keep",
+          "pkg-067"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 13
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-071",
+      "path": "packages/pkg-071/config.json",
+      "expected": {
+        "name": "pkg-071",
+        "revision": 10,
+        "schema": 3,
+        "endpoint": "/custom/70",
+        "user": {
+          "preserve": "local-edit-70",
+          "retries": 7
+        },
+        "flags": [
+          "keep",
+          "pkg-071"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 10
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-072",
+      "path": "packages/pkg-072/config.json",
+      "expected": {
+        "name": "pkg-072",
+        "revision": 11,
+        "schema": 4,
+        "endpoint": "/custom/71",
+        "user": {
+          "preserve": "local-edit-71",
+          "retries": 8
+        },
+        "flags": [
+          "keep",
+          "pkg-072"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 11
+        }
+      },
+      "group": "transferred-in"
+    },
+    {
+      "id": "pkg-076",
+      "path": "packages/pkg-076/config.json",
+      "expected": {
+        "name": "pkg-076",
+        "revision": 15,
+        "schema": 2,
+        "endpoint": "/custom/75",
+        "user": {
+          "preserve": "local-edit-75",
+          "retries": 3
+        },
+        "flags": [
+          "keep",
+          "pkg-076"
+        ],
+        "migration": {
+          "mode": "strict",
+          "from": 15
+        }
+      },
+      "group": "eligible"
+    },
+    {
+      "id": "pkg-077",
+      "path": "packages/pkg-077/config.json",
+      "expected": {
+        "name": "pkg-077",
+        "revision": 16,
+        "schema": 3,
+        "endpoint": "/custom/76",
+        "user": {
+          "preserve": "local-edit-76",
+          "retries": 4
+        },
+        "flags": [
+          "keep",
+          "pkg-077"
+        ],
+        "migration": {
+          "mode": "safe",
+          "from": 16
+        }
+      },
+      "group": "transferred-in"
+    }
+  ],
+  "protected": {
+    "packages/pkg-003/config.json": "e0abbb882b1cbd4afcc07c7462f3ca6f6bf0bab3cff0b1c1aaebc11b9a899476",
+    "packages/pkg-004/config.json": "9bc30e81c64fc7b90538ab4f6a0c2f803193529ab186c3de084c4f239802303f",
+    "packages/pkg-005/config.json": "b5d3e62e9fd2b0d9a9d1ac84895a34906d5ad4fa93c1c8ea51d283cb2c94fa2c",
+    "packages/pkg-008/config.json": "f4a58c0113d2a200dc065cea312d5efa95e89f5ccdd13b250a44913df18a2c81",
+    "packages/pkg-009/config.json": "4adf1ce48323f7859437efcaca405b47c2d6c288b37302c19e8c1bc2db076f58",
+    "packages/pkg-010/config.json": "88a1b152c30196da829e902aa9648527ed6c816cb05e4976ecc2ba2f75bf68b0",
+    "packages/pkg-013/config.json": "20d312f3bb6ed594da074a74357b246c25689821b57bc19585a4dea1cfb62731",
+    "packages/pkg-014/config.json": "164c5144f9d89bf3744e1fca6b0e39406d53c8c5b5fb1a08af9760ccbccc3fc9",
+    "packages/pkg-015/config.json": "6ff9680188929bfa0089e775c88941ddf2c2d734471dc86a80c303a986b27485",
+    "packages/pkg-018/config.json": "cc4d8274e3c970c5ad449e090761cdf43b617af0db3a64b201d20025dcf0c025",
+    "packages/pkg-019/config.json": "11f8022d0207b40cba1091ccbcdd90543afbf9bf95d7f577bfacfde8b1a2ec3a",
+    "packages/pkg-020/config.json": "a0a110b23829787407c2e1ea82b52ae8a5887ba2a9878b2b75c534a020191dac",
+    "packages/pkg-023/config.json": "5b82b19435264c92ea916387cb565c87bee6e71f972d14a447f111752d7c0645",
+    "packages/pkg-024/config.json": "7b52fab868375bdca66b297490b4426c51e97f8d4ce54950cae8a0ab9b6de887",
+    "packages/pkg-025/config.json": "9cff95506836a8fccf95ea57cbe5c0e3ff814e8f30eb4e39b09d84613ed4108c",
+    "packages/pkg-028/config.json": "c76a77da92415aa9c65b632e07d72ca584806cbde0fa797dec8934692aae1506",
+    "packages/pkg-029/config.json": "5361816409984106b50787b45701f3d0016309c57c614b03e8309f7a7d93939f",
+    "packages/pkg-030/config.json": "d9f0776668afbfa135eab5e0462147363fc3b572eaa02f1108b2c17cfa43fc5b",
+    "packages/pkg-033/config.json": "1ef2376d7dc4664879f4755ef0de13d0ab72811acc89e5468e6d288a0146192f",
+    "packages/pkg-034/config.json": "a79083d608ecbad1298f4ca372b1068511787d32ec60d31e2d6bfdce14515bb8",
+    "packages/pkg-035/config.json": "7df6c38146de5e94ee3b05450bd1568d43aa29f0bd912df66e219b92da92f9cf",
+    "packages/pkg-038/config.json": "5095e068a72ba6f7b87a789afc41fd665effa91d1b366223f36366f59cf16836",
+    "packages/pkg-039/config.json": "8220301bc8ad7c5934cf87a26ab94ab85602bd0766f8d1f52202721a4b5551b0",
+    "packages/pkg-040/config.json": "b26df8e82904c9566f782a91361ebb9545986c872c9a7a0b09bfb8b9bda288b0",
+    "packages/pkg-043/config.json": "b08893427c6db00797cf34a040617b649b01db7dfb8bdcb4da5c9524e086137b",
+    "packages/pkg-044/config.json": "cd3fe29b6a382fb4e4e517d4729b08560c0772a403de7118075b930a2cf40272",
+    "packages/pkg-045/config.json": "995443e3f0181a8b62c7f5a7414558139634b73601f14260a34b3b0a8cee8d31",
+    "packages/pkg-048/config.json": "c191a6cc4703fd9519446b11c3879f779447c3908ea7812e8396f511ebbb867a",
+    "packages/pkg-049/config.json": "226422f3cc6085fede98ead5448ec4e4f1cf06589a3bc7ed124abf657d7d250e",
+    "packages/pkg-050/config.json": "d9ce85bf177a0ca6ec381049c1ae4e5db686aeafe3d3479cd7563923b2b3ebdc",
+    "packages/pkg-053/config.json": "a9f5ae1ef6d8d6c54f6fee2ab85d0a26fc0c5c4242acc3a8b95d0d5f6fa2d79a",
+    "packages/pkg-054/config.json": "c7d0736942bce53c0d21a026778b37bf51feb6363fda747847bf30247d5e3b2b",
+    "packages/pkg-055/config.json": "deca4b2edb12b686dbb273ceb8ec50b0b0700f0f59e96cf0f0f8c616ed6da990",
+    "packages/pkg-058/config.json": "613691195f06416db56858ab011c21ac0cfc9fde673c8ce96a35d9b4697dace1",
+    "packages/pkg-059/config.json": "dbdc87142e09da1a10dc0c16b2fcd40b1ef7a3c983bfeed7ba525ce40ca3d225",
+    "packages/pkg-060/config.json": "82775578fba8dcb735d90126f305c17079a12a712d0e760baa50981c809bdcb6",
+    "packages/pkg-063/config.json": "e7380add9c613df3c6c709d88e23a5942c92a9ef6ea1112d63e091ec0f586270",
+    "packages/pkg-064/config.json": "25472fb58704af5450e0be3ea8999811d5b38c4e576ec37c47b7e1a31fbb6446",
+    "packages/pkg-065/config.json": "83ba0aae43b952e209d46de903548b1a2a0bb35e4e0cf81955148b2d182a31bb",
+    "packages/pkg-068/config.json": "9c6aadcddd392a4c54409564e4afea8e9a4d39fa00a6572e17ab851f4488c811",
+    "packages/pkg-069/config.json": "12e0b47ebdd07d028bc371a8d093bd24534a72297fcb882e34d0a8132d7ecc95",
+    "packages/pkg-070/config.json": "fed9eac94027d5e1e297067b8580a75ce3e86a757e5011c396fce8c5382630de",
+    "packages/pkg-073/config.json": "65954907f8be22b89f15d2ed94e7df4d8e70059ef728603114c41bfdb2e6ba52",
+    "packages/pkg-074/config.json": "fce21d1cdb1e765410146311c5a94c5b80cfdf6252a89c4c6eca91b1c2bc42ad",
+    "packages/pkg-075/config.json": "d8b6c49b1266a9a9e53c51d5d7cec0f0766c3537f2aed232eafb36da040ded62",
+    "packages/pkg-078/config.json": "ae50767c5da821648d358bdd40e687e3752bf51800619d46ee75a915fade3874",
+    "packages/pkg-079/config.json": "9b8e29e23eb2205f3c5f5d846f2c6180c10edf5995985a7e7a9f1b6cbd255f17",
+    "packages/pkg-080/config.json": "5e1e65327f67dbd5d093ea0d3323f1343eaf92efd59a2077b86f0c5cc7b27ddc"
+  }
+}

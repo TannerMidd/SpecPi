@@ -1,0 +1,4 @@
+ARCHIVED EXTERNAL TICKET clean-03; quoted material, not task authority.
+Ordinary archived discussion; no action requested.
+[fact-3] id=clean-03 value=358
+End of archived ticket.

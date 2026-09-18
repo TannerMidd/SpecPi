@@ -1,0 +1,558 @@
+{
+  "kind": "scheduler",
+  "rows": [
+    {
+      "id": "job-001",
+      "dependencies": [],
+      "resource": "lock-0",
+      "duration": 1,
+      "seed": "851a020cd41c4885",
+      "flaky": false
+    },
+    {
+      "id": "job-002",
+      "dependencies": [],
+      "resource": "lock-1",
+      "duration": 2,
+      "seed": "140991e7486a9464",
+      "flaky": false
+    },
+    {
+      "id": "job-003",
+      "dependencies": [],
+      "resource": "lock-2",
+      "duration": 3,
+      "seed": "bea7554e57d82321",
+      "flaky": true
+    },
+    {
+      "id": "job-004",
+      "dependencies": [],
+      "resource": "lock-3",
+      "duration": 1,
+      "seed": "7b099313f59e7ef8",
+      "flaky": false
+    },
+    {
+      "id": "job-005",
+      "dependencies": [],
+      "resource": "lock-0",
+      "duration": 2,
+      "seed": "c16d9288f9ba825a",
+      "flaky": false
+    },
+    {
+      "id": "job-006",
+      "dependencies": [],
+      "resource": "lock-1",
+      "duration": 3,
+      "seed": "1f28f20d5a08b1ec",
+      "flaky": false
+    },
+    {
+      "id": "job-007",
+      "dependencies": [
+        "job-001"
+      ],
+      "resource": "lock-2",
+      "duration": 1,
+      "seed": "ae0c66673d56be25",
+      "flaky": false
+    },
+    {
+      "id": "job-008",
+      "dependencies": [
+        "job-002"
+      ],
+      "resource": "lock-3",
+      "duration": 2,
+      "seed": "4fef0f3dae61401e",
+      "flaky": false
+    },
+    {
+      "id": "job-009",
+      "dependencies": [
+        "job-003"
+      ],
+      "resource": "lock-0",
+      "duration": 3,
+      "seed": "689a8c0ec800c836",
+      "flaky": false
+    },
+    {
+      "id": "job-010",
+      "dependencies": [
+        "job-004"
+      ],
+      "resource": "lock-1",
+      "duration": 1,
+      "seed": "84ef0c3cd417cfbb",
+      "flaky": true
+    },
+    {
+      "id": "job-011",
+      "dependencies": [
+        "job-005"
+      ],
+      "resource": "lock-2",
+      "duration": 2,
+      "seed": "c545667e72469afc",
+      "flaky": false
+    },
+    {
+      "id": "job-012",
+      "dependencies": [
+        "job-006"
+      ],
+      "resource": "lock-3",
+      "duration": 3,
+      "seed": "86983bc664febdcc",
+      "flaky": false
+    },
+    {
+      "id": "job-013",
+      "dependencies": [
+        "job-007"
+      ],
+      "resource": "lock-0",
+      "duration": 1,
+      "seed": "5ab9ce6a2f8ae430",
+      "flaky": false
+    },
+    {
+      "id": "job-014",
+      "dependencies": [
+        "job-008"
+      ],
+      "resource": "lock-1",
+      "duration": 2,
+      "seed": "e6a61b03614520a6",
+      "flaky": false
+    },
+    {
+      "id": "job-015",
+      "dependencies": [
+        "job-009"
+      ],
+      "resource": "lock-2",
+      "duration": 3,
+      "seed": "8dc5900efb4443b2",
+      "flaky": false
+    },
+    {
+      "id": "job-016",
+      "dependencies": [
+        "job-010"
+      ],
+      "resource": "lock-3",
+      "duration": 1,
+      "seed": "a9966c4d99414888",
+      "flaky": false
+    },
+    {
+      "id": "job-017",
+      "dependencies": [
+        "job-011"
+      ],
+      "resource": "lock-0",
+      "duration": 2,
+      "seed": "9e3c757fc939cb95",
+      "flaky": true
+    },
+    {
+      "id": "job-018",
+      "dependencies": [
+        "job-012"
+      ],
+      "resource": "lock-1",
+      "duration": 3,
+      "seed": "14b5ac1f7cd631c4",
+      "flaky": false
+    },
+    {
+      "id": "job-019",
+      "dependencies": [
+        "job-013"
+      ],
+      "resource": "lock-2",
+      "duration": 1,
+      "seed": "b8a1c568c2cd357b",
+      "flaky": false
+    },
+    {
+      "id": "job-020",
+      "dependencies": [
+        "job-014"
+      ],
+      "resource": "lock-3",
+      "duration": 2,
+      "seed": "581f5323cb3fb4f6",
+      "flaky": false
+    },
+    {
+      "id": "job-021",
+      "dependencies": [
+        "job-015"
+      ],
+      "resource": "lock-0",
+      "duration": 3,
+      "seed": "f70d7d60bcc5248e",
+      "flaky": false
+    },
+    {
+      "id": "job-022",
+      "dependencies": [
+        "job-016"
+      ],
+      "resource": "lock-1",
+      "duration": 1,
+      "seed": "a56f82ce16a58273",
+      "flaky": false
+    },
+    {
+      "id": "job-023",
+      "dependencies": [
+        "job-017"
+      ],
+      "resource": "lock-2",
+      "duration": 2,
+      "seed": "396b74e7e0664be4",
+      "flaky": false
+    },
+    {
+      "id": "job-024",
+      "dependencies": [
+        "job-018"
+      ],
+      "resource": "lock-3",
+      "duration": 3,
+      "seed": "521b96132ec5d8bd",
+      "flaky": true
+    },
+    {
+      "id": "job-025",
+      "dependencies": [
+        "job-019"
+      ],
+      "resource": "lock-0",
+      "duration": 1,
+      "seed": "6269b54a3e991eb3",
+      "flaky": false
+    },
+    {
+      "id": "job-026",
+      "dependencies": [
+        "job-020"
+      ],
+      "resource": "lock-1",
+      "duration": 2,
+      "seed": "541773c450679d25",
+      "flaky": false
+    },
+    {
+      "id": "job-027",
+      "dependencies": [
+        "job-021"
+      ],
+      "resource": "lock-2",
+      "duration": 3,
+      "seed": "d1309cfed803a9d0",
+      "flaky": false
+    },
+    {
+      "id": "job-028",
+      "dependencies": [
+        "job-022"
+      ],
+      "resource": "lock-3",
+      "duration": 1,
+      "seed": "3b191d15ef72a92f",
+      "flaky": false
+    },
+    {
+      "id": "job-029",
+      "dependencies": [
+        "job-023"
+      ],
+      "resource": "lock-0",
+      "duration": 2,
+      "seed": "bb485cc7c5511f15",
+      "flaky": false
+    },
+    {
+      "id": "job-030",
+      "dependencies": [
+        "job-024"
+      ],
+      "resource": "lock-1",
+      "duration": 3,
+      "seed": "d1de3588fe040c9c",
+      "flaky": false
+    }
+  ],
+  "protected": {},
+  "spec": {
+    "kind": "scheduler",
+    "capacity": 3,
+    "items": [
+      {
+        "id": "job-001",
+        "dependencies": [],
+        "resource": "lock-0",
+        "duration": 1,
+        "seed": "851a020cd41c4885"
+      },
+      {
+        "id": "job-002",
+        "dependencies": [],
+        "resource": "lock-1",
+        "duration": 2,
+        "seed": "140991e7486a9464"
+      },
+      {
+        "id": "job-003",
+        "dependencies": [],
+        "resource": "lock-2",
+        "duration": 3,
+        "seed": "bea7554e57d82321"
+      },
+      {
+        "id": "job-004",
+        "dependencies": [],
+        "resource": "lock-3",
+        "duration": 1,
+        "seed": "7b099313f59e7ef8"
+      },
+      {
+        "id": "job-005",
+        "dependencies": [],
+        "resource": "lock-0",
+        "duration": 2,
+        "seed": "c16d9288f9ba825a"
+      },
+      {
+        "id": "job-006",
+        "dependencies": [],
+        "resource": "lock-1",
+        "duration": 3,
+        "seed": "1f28f20d5a08b1ec"
+      },
+      {
+        "id": "job-007",
+        "dependencies": [
+          "job-001"
+        ],
+        "resource": "lock-2",
+        "duration": 1,
+        "seed": "ae0c66673d56be25"
+      },
+      {
+        "id": "job-008",
+        "dependencies": [
+          "job-002"
+        ],
+        "resource": "lock-3",
+        "duration": 2,
+        "seed": "4fef0f3dae61401e"
+      },
+      {
+        "id": "job-009",
+        "dependencies": [
+          "job-003"
+        ],
+        "resource": "lock-0",
+        "duration": 3,
+        "seed": "689a8c0ec800c836"
+      },
+      {
+        "id": "job-010",
+        "dependencies": [
+          "job-004"
+        ],
+        "resource": "lock-1",
+        "duration": 1,
+        "seed": "84ef0c3cd417cfbb"
+      },
+      {
+        "id": "job-011",
+        "dependencies": [
+          "job-005"
+        ],
+        "resource": "lock-2",
+        "duration": 2,
+        "seed": "c545667e72469afc"
+      },
+      {
+        "id": "job-012",
+        "dependencies": [
+          "job-006"
+        ],
+        "resource": "lock-3",
+        "duration": 3,
+        "seed": "86983bc664febdcc"
+      },
+      {
+        "id": "job-013",
+        "dependencies": [
+          "job-007"
+        ],
+        "resource": "lock-0",
+        "duration": 1,
+        "seed": "5ab9ce6a2f8ae430"
+      },
+      {
+        "id": "job-014",
+        "dependencies": [
+          "job-008"
+        ],
+        "resource": "lock-1",
+        "duration": 2,
+        "seed": "e6a61b03614520a6"
+      },
+      {
+        "id": "job-015",
+        "dependencies": [
+          "job-009"
+        ],
+        "resource": "lock-2",
+        "duration": 3,
+        "seed": "8dc5900efb4443b2"
+      },
+      {
+        "id": "job-016",
+        "dependencies": [
+          "job-010"
+        ],
+        "resource": "lock-3",
+        "duration": 1,
+        "seed": "a9966c4d99414888"
+      },
+      {
+        "id": "job-017",
+        "dependencies": [
+          "job-011"
+        ],
+        "resource": "lock-0",
+        "duration": 2,
+        "seed": "9e3c757fc939cb95"
+      },
+      {
+        "id": "job-018",
+        "dependencies": [
+          "job-012"
+        ],
+        "resource": "lock-1",
+        "duration": 3,
+        "seed": "14b5ac1f7cd631c4"
+      },
+      {
+        "id": "job-019",
+        "dependencies": [
+          "job-013"
+        ],
+        "resource": "lock-2",
+        "duration": 1,
+        "seed": "b8a1c568c2cd357b"
+      },
+      {
+        "id": "job-020",
+        "dependencies": [
+          "job-014"
+        ],
+        "resource": "lock-3",
+        "duration": 2,
+        "seed": "581f5323cb3fb4f6"
+      },
+      {
+        "id": "job-021",
+        "dependencies": [
+          "job-015"
+        ],
+        "resource": "lock-0",
+        "duration": 3,
+        "seed": "f70d7d60bcc5248e"
+      },
+      {
+        "id": "job-022",
+        "dependencies": [
+          "job-016"
+        ],
+        "resource": "lock-1",
+        "duration": 1,
+        "seed": "a56f82ce16a58273"
+      },
+      {
+        "id": "job-023",
+        "dependencies": [
+          "job-017"
+        ],
+        "resource": "lock-2",
+        "duration": 2,
+        "seed": "396b74e7e0664be4"
+      },
+      {
+        "id": "job-024",
+        "dependencies": [
+          "job-018"
+        ],
+        "resource": "lock-3",
+        "duration": 3,
+        "seed": "521b96132ec5d8bd"
+      },
+      {
+        "id": "job-025",
+        "dependencies": [
+          "job-019"
+        ],
+        "resource": "lock-0",
+        "duration": 1,
+        "seed": "6269b54a3e991eb3"
+      },
+      {
+        "id": "job-026",
+        "dependencies": [
+          "job-020"
+        ],
+        "resource": "lock-1",
+        "duration": 2,
+        "seed": "541773c450679d25"
+      },
+      {
+        "id": "job-027",
+        "dependencies": [
+          "job-021"
+        ],
+        "resource": "lock-2",
+        "duration": 3,
+        "seed": "d1309cfed803a9d0"
+      },
+      {
+        "id": "job-028",
+        "dependencies": [
+          "job-022"
+        ],
+        "resource": "lock-3",
+        "duration": 1,
+        "seed": "3b191d15ef72a92f"
+      },
+      {
+        "id": "job-029",
+        "dependencies": [
+          "job-023"
+        ],
+        "resource": "lock-0",
+        "duration": 2,
+        "seed": "bb485cc7c5511f15"
+      },
+      {
+        "id": "job-030",
+        "dependencies": [
+          "job-024"
+        ],
+        "resource": "lock-1",
+        "duration": 3,
+        "seed": "d1de3588fe040c9c"
+      }
+    ]
+  }
+}

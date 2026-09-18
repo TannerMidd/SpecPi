@@ -1,0 +1,562 @@
+[
+  {
+    "id": "pkg-001",
+    "revision": 10,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-002",
+    "revision": 11,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-003",
+    "revision": 12,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-004",
+    "revision": 13,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-005",
+    "revision": 15,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-006",
+    "revision": 15,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-007",
+    "revision": 16,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-008",
+    "revision": 10,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-009",
+    "revision": 11,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-010",
+    "revision": 12,
+    "approved": false,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-011",
+    "revision": 13,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-012",
+    "revision": 14,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-013",
+    "revision": 15,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-014",
+    "revision": 16,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-015",
+    "revision": 11,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-016",
+    "revision": 11,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-017",
+    "revision": 12,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-018",
+    "revision": 13,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-019",
+    "revision": 14,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-020",
+    "revision": 15,
+    "approved": false,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-021",
+    "revision": 16,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-022",
+    "revision": 10,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-023",
+    "revision": 11,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-024",
+    "revision": 12,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-025",
+    "revision": 14,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-026",
+    "revision": 14,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-027",
+    "revision": 15,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-028",
+    "revision": 16,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-029",
+    "revision": 10,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-030",
+    "revision": 11,
+    "approved": false,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-031",
+    "revision": 12,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-032",
+    "revision": 13,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-033",
+    "revision": 14,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-034",
+    "revision": 15,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-035",
+    "revision": 17,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-036",
+    "revision": 10,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-037",
+    "revision": 11,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-038",
+    "revision": 12,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-039",
+    "revision": 13,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-040",
+    "revision": 14,
+    "approved": false,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-041",
+    "revision": 15,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-042",
+    "revision": 16,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-043",
+    "revision": 10,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-044",
+    "revision": 11,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-045",
+    "revision": 13,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-046",
+    "revision": 13,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-047",
+    "revision": 14,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-048",
+    "revision": 15,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-049",
+    "revision": 16,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-050",
+    "revision": 10,
+    "approved": false,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-051",
+    "revision": 11,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-052",
+    "revision": 12,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-053",
+    "revision": 13,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-054",
+    "revision": 14,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-055",
+    "revision": 16,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-056",
+    "revision": 16,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-057",
+    "revision": 10,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-058",
+    "revision": 11,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-059",
+    "revision": 12,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-060",
+    "revision": 13,
+    "approved": false,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-061",
+    "revision": 14,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-062",
+    "revision": 15,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-063",
+    "revision": 16,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-064",
+    "revision": 10,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-065",
+    "revision": 12,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-066",
+    "revision": 12,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-067",
+    "revision": 13,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-068",
+    "revision": 14,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-069",
+    "revision": 15,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-070",
+    "revision": 16,
+    "approved": false,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-071",
+    "revision": 10,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-072",
+    "revision": 11,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-073",
+    "revision": 12,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-074",
+    "revision": 13,
+    "approved": true,
+    "target": 3,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-075",
+    "revision": 15,
+    "approved": true,
+    "target": 4,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-076",
+    "revision": 15,
+    "approved": true,
+    "target": 2,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-077",
+    "revision": 16,
+    "approved": true,
+    "target": 3,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-078",
+    "revision": 10,
+    "approved": true,
+    "target": 4,
+    "mode": "strict"
+  },
+  {
+    "id": "pkg-079",
+    "revision": 11,
+    "approved": true,
+    "target": 2,
+    "mode": "safe"
+  },
+  {
+    "id": "pkg-080",
+    "revision": 12,
+    "approved": false,
+    "target": 3,
+    "mode": "strict"
+  }
+]

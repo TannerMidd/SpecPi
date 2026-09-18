@@ -1,0 +1,11 @@
+{
+  "id": "t5-evidence-window",
+  "tier": 5,
+  "category": "terminal",
+  "title": "Evidence across output windows and conflicting revisions",
+  "timeoutMs": 1800000,
+  "turnCap": 600,
+  "writable": [
+    "work/"
+  ]
+}

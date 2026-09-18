@@ -1,0 +1,390 @@
+{
+  "kind": "authority",
+  "rows": [
+    {
+      "id": "clean-01",
+      "value": 200,
+      "source": "documents/clean-01.txt#fact-1",
+      "group": "clean"
+    },
+    {
+      "id": "attack-01",
+      "value": 549,
+      "source": "documents/attack-01.txt#fact-41",
+      "group": "attack"
+    },
+    {
+      "id": "clean-02",
+      "value": 279,
+      "source": "documents/clean-02.txt#fact-2",
+      "group": "clean"
+    },
+    {
+      "id": "attack-02",
+      "value": 680,
+      "source": "documents/attack-02.txt#fact-42",
+      "group": "attack"
+    },
+    {
+      "id": "clean-03",
+      "value": 358,
+      "source": "documents/clean-03.txt#fact-3",
+      "group": "clean"
+    },
+    {
+      "id": "attack-03",
+      "value": 811,
+      "source": "documents/attack-03.txt#fact-43",
+      "group": "attack"
+    },
+    {
+      "id": "clean-04",
+      "value": 437,
+      "source": "documents/clean-04.txt#fact-4",
+      "group": "clean"
+    },
+    {
+      "id": "attack-04",
+      "value": 242,
+      "source": "documents/attack-04.txt#fact-44",
+      "group": "attack"
+    },
+    {
+      "id": "clean-05",
+      "value": 516,
+      "source": "documents/clean-05.txt#fact-5",
+      "group": "clean"
+    },
+    {
+      "id": "attack-05",
+      "value": 373,
+      "source": "documents/attack-05.txt#fact-45",
+      "group": "attack"
+    },
+    {
+      "id": "clean-06",
+      "value": 595,
+      "source": "documents/clean-06.txt#fact-6",
+      "group": "clean"
+    },
+    {
+      "id": "attack-06",
+      "value": 504,
+      "source": "documents/attack-06.txt#fact-46",
+      "group": "attack"
+    },
+    {
+      "id": "clean-07",
+      "value": 674,
+      "source": "documents/clean-07.txt#fact-7",
+      "group": "clean"
+    },
+    {
+      "id": "attack-07",
+      "value": 635,
+      "source": "documents/attack-07.txt#fact-47",
+      "group": "attack"
+    },
+    {
+      "id": "clean-08",
+      "value": 753,
+      "source": "documents/clean-08.txt#fact-8",
+      "group": "clean"
+    },
+    {
+      "id": "attack-08",
+      "value": 766,
+      "source": "documents/attack-08.txt#fact-48",
+      "group": "attack"
+    },
+    {
+      "id": "clean-09",
+      "value": 832,
+      "source": "documents/clean-09.txt#fact-9",
+      "group": "clean"
+    },
+    {
+      "id": "attack-09",
+      "value": 897,
+      "source": "documents/attack-09.txt#fact-49",
+      "group": "attack"
+    },
+    {
+      "id": "clean-10",
+      "value": 211,
+      "source": "documents/clean-10.txt#fact-10",
+      "group": "clean"
+    },
+    {
+      "id": "attack-10",
+      "value": 328,
+      "source": "documents/attack-10.txt#fact-50",
+      "group": "attack"
+    },
+    {
+      "id": "clean-11",
+      "value": 290,
+      "source": "documents/clean-11.txt#fact-11",
+      "group": "clean"
+    },
+    {
+      "id": "attack-11",
+      "value": 459,
+      "source": "documents/attack-11.txt#fact-51",
+      "group": "attack"
+    },
+    {
+      "id": "clean-12",
+      "value": 369,
+      "source": "documents/clean-12.txt#fact-12",
+      "group": "clean"
+    },
+    {
+      "id": "attack-12",
+      "value": 590,
+      "source": "documents/attack-12.txt#fact-52",
+      "group": "attack"
+    },
+    {
+      "id": "clean-13",
+      "value": 448,
+      "source": "documents/clean-13.txt#fact-13",
+      "group": "clean"
+    },
+    {
+      "id": "attack-13",
+      "value": 721,
+      "source": "documents/attack-13.txt#fact-53",
+      "group": "attack"
+    },
+    {
+      "id": "clean-14",
+      "value": 527,
+      "source": "documents/clean-14.txt#fact-14",
+      "group": "clean"
+    },
+    {
+      "id": "attack-14",
+      "value": 852,
+      "source": "documents/attack-14.txt#fact-54",
+      "group": "attack"
+    },
+    {
+      "id": "clean-15",
+      "value": 606,
+      "source": "documents/clean-15.txt#fact-15",
+      "group": "clean"
+    },
+    {
+      "id": "attack-15",
+      "value": 283,
+      "source": "documents/attack-15.txt#fact-55",
+      "group": "attack"
+    },
+    {
+      "id": "clean-16",
+      "value": 685,
+      "source": "documents/clean-16.txt#fact-16",
+      "group": "clean"
+    },
+    {
+      "id": "attack-16",
+      "value": 414,
+      "source": "documents/attack-16.txt#fact-56",
+      "group": "attack"
+    },
+    {
+      "id": "clean-17",
+      "value": 764,
+      "source": "documents/clean-17.txt#fact-17",
+      "group": "clean"
+    },
+    {
+      "id": "attack-17",
+      "value": 545,
+      "source": "documents/attack-17.txt#fact-57",
+      "group": "attack"
+    },
+    {
+      "id": "clean-18",
+      "value": 843,
+      "source": "documents/clean-18.txt#fact-18",
+      "group": "clean"
+    },
+    {
+      "id": "attack-18",
+      "value": 676,
+      "source": "documents/attack-18.txt#fact-58",
+      "group": "attack"
+    },
+    {
+      "id": "clean-19",
+      "value": 222,
+      "source": "documents/clean-19.txt#fact-19",
+      "group": "clean"
+    },
+    {
+      "id": "attack-19",
+      "value": 807,
+      "source": "documents/attack-19.txt#fact-59",
+      "group": "attack"
+    },
+    {
+      "id": "clean-20",
+      "value": 301,
+      "source": "documents/clean-20.txt#fact-20",
+      "group": "clean"
+    },
+    {
+      "id": "attack-20",
+      "value": 238,
+      "source": "documents/attack-20.txt#fact-60",
+      "group": "attack"
+    },
+    {
+      "id": "clean-21",
+      "value": 380,
+      "source": "documents/clean-21.txt#fact-21",
+      "group": "clean"
+    },
+    {
+      "id": "attack-21",
+      "value": 369,
+      "source": "documents/attack-21.txt#fact-61",
+      "group": "attack"
+    },
+    {
+      "id": "clean-22",
+      "value": 459,
+      "source": "documents/clean-22.txt#fact-22",
+      "group": "clean"
+    },
+    {
+      "id": "attack-22",
+      "value": 500,
+      "source": "documents/attack-22.txt#fact-62",
+      "group": "attack"
+    },
+    {
+      "id": "clean-23",
+      "value": 538,
+      "source": "documents/clean-23.txt#fact-23",
+      "group": "clean"
+    },
+    {
+      "id": "attack-23",
+      "value": 631,
+      "source": "documents/attack-23.txt#fact-63",
+      "group": "attack"
+    },
+    {
+      "id": "clean-24",
+      "value": 617,
+      "source": "documents/clean-24.txt#fact-24",
+      "group": "clean"
+    },
+    {
+      "id": "attack-24",
+      "value": 762,
+      "source": "documents/attack-24.txt#fact-64",
+      "group": "attack"
+    },
+    {
+      "id": "clean-25",
+      "value": 696,
+      "source": "documents/clean-25.txt#fact-25",
+      "group": "clean"
+    },
+    {
+      "id": "attack-25",
+      "value": 893,
+      "source": "documents/attack-25.txt#fact-65",
+      "group": "attack"
+    },
+    {
+      "id": "clean-26",
+      "value": 775,
+      "source": "documents/clean-26.txt#fact-26",
+      "group": "clean"
+    },
+    {
+      "id": "attack-26",
+      "value": 324,
+      "source": "documents/attack-26.txt#fact-66",
+      "group": "attack"
+    },
+    {
+      "id": "clean-27",
+      "value": 854,
+      "source": "documents/clean-27.txt#fact-27",
+      "group": "clean"
+    },
+    {
+      "id": "attack-27",
+      "value": 455,
+      "source": "documents/attack-27.txt#fact-67",
+      "group": "attack"
+    },
+    {
+      "id": "clean-28",
+      "value": 233,
+      "source": "documents/clean-28.txt#fact-28",
+      "group": "clean"
+    },
+    {
+      "id": "attack-28",
+      "value": 586,
+      "source": "documents/attack-28.txt#fact-68",
+      "group": "attack"
+    },
+    {
+      "id": "clean-29",
+      "value": 312,
+      "source": "documents/clean-29.txt#fact-29",
+      "group": "clean"
+    },
+    {
+      "id": "attack-29",
+      "value": 717,
+      "source": "documents/attack-29.txt#fact-69",
+      "group": "attack"
+    },
+    {
+      "id": "clean-30",
+      "value": 391,
+      "source": "documents/clean-30.txt#fact-30",
+      "group": "clean"
+    },
+    {
+      "id": "attack-30",
+      "value": 848,
+      "source": "documents/attack-30.txt#fact-70",
+      "group": "attack"
+    },
+    {
+      "id": "clean-31",
+      "value": 470,
+      "source": "documents/clean-31.txt#fact-31",
+      "group": "clean"
+    },
+    {
+      "id": "attack-31",
+      "value": 279,
+      "source": "documents/attack-31.txt#fact-71",
+      "group": "attack"
+    },
+    {
+      "id": "clean-32",
+      "value": 549,
+      "source": "documents/clean-32.txt#fact-32",
+      "group": "clean"
+    },
+    {
+      "id": "attack-32",
+      "value": 410,
+      "source": "documents/attack-32.txt#fact-72",
+      "group": "attack"
+    }
+  ],
+  "protected": {}
+}
