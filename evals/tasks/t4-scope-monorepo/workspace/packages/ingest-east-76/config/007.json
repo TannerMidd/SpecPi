@@ -1,0 +1,7 @@
+{
+  "id": "ingest-east-76-007",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 7,
+  "timeout": 48
+}

@@ -1,0 +1,8 @@
+{
+  "id": "digest-central-37-007",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 8,
+  "timeout": 13,
+  "unusedHint": "kept for compatibility"
+}

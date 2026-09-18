@@ -1,0 +1,937 @@
+[
+  {
+    "id": "w-01",
+    "route": "/dashboard",
+    "kind": "network",
+    "title": "Preference sync",
+    "ref": "amber1",
+    "defective": false,
+    "spec": "A sync response outside 2xx must print \"Sync failed\" followed by the reference from the response body.",
+    "probe": [
+      "click #w-01-sync"
+    ],
+    "evidence": "text --selector=#w-01-out",
+    "observed": "Sync failed amber1",
+    "tokens": [
+      "Sync failed amber1"
+    ],
+    "note": "reports the failure"
+  },
+  {
+    "id": "w-02",
+    "route": "/catalog",
+    "kind": "double-submit",
+    "title": "Ticket submission",
+    "ref": "basalt2",
+    "defective": true,
+    "spec": "Submit must disable itself on the first click so the basalt2 queue receives one ticket.",
+    "probe": [
+      "click #w-02-submit",
+      "click #w-02-submit"
+    ],
+    "evidence": "text --selector=#w-02-out",
+    "observed": "submissions: 2 to basalt2",
+    "tokens": [
+      "submissions: 2 to basalt2"
+    ],
+    "note": "files the ticket twice"
+  },
+  {
+    "id": "w-03",
+    "route": "/cart",
+    "kind": "aria-state",
+    "title": "Details disclosure",
+    "ref": "cedar3",
+    "defective": true,
+    "spec": "The toggle must report aria-expanded=\"true\" while the panel is open.",
+    "probe": [
+      "click #w-03-toggle"
+    ],
+    "evidence": "a11y --selector=#w-03-toggle",
+    "observed": "button#w-03-toggle.open role=button name=\"Details cedar3\" placeholder=\"\" tabindex=\"\" disabled=false aria-expanded=\"false\" aria-hidden=\"\" aria-controls=\"w-03-panel\"",
+    "tokens": [
+      "w-03-toggle",
+      "aria-expanded=\"false\""
+    ],
+    "note": "aria-expanded never changes"
+  },
+  {
+    "id": "w-04",
+    "route": "/checkout",
+    "kind": "accessible-name",
+    "title": "Quick search",
+    "ref": "damask4",
+    "defective": false,
+    "spec": "The damask4 search field must have an accessible name; a placeholder alone is not one.",
+    "probe": [],
+    "evidence": "a11y --selector=#w-04-field",
+    "observed": "input#w-04-field role=textbox name=\"Search damask4 orders\" placeholder=\"Search damask4 orders\" tabindex=\"\" disabled=false aria-expanded=\"\" aria-hidden=\"\" aria-controls=\"\"",
+    "tokens": [
+      "w-04-field",
+      "name=\"Search damask4 orders\""
+    ],
+    "note": "has a label"
+  },
+  {
+    "id": "w-05",
+    "route": "/account",
+    "kind": "pagination",
+    "title": "Result pages",
+    "ref": "ember5",
+    "defective": true,
+    "spec": "\"Next\" must advance exactly one page and must stop at page 7.",
+    "probe": [
+      "click #w-05-next"
+    ],
+    "evidence": "text --selector=#w-05-out",
+    "observed": "Page 3 of 7 (ember5)",
+    "tokens": [
+      "Page 3 of 7 (ember5)"
+    ],
+    "note": "advances two pages"
+  },
+  {
+    "id": "w-06",
+    "route": "/orders",
+    "kind": "network",
+    "title": "Preference sync",
+    "ref": "flax6",
+    "defective": true,
+    "spec": "A sync response outside 2xx must print \"Sync failed\" followed by the reference from the response body.",
+    "probe": [
+      "click #w-06-sync"
+    ],
+    "evidence": "text --selector=#w-06-out",
+    "observed": "Synced flax6",
+    "tokens": [
+      "Synced flax6"
+    ],
+    "note": "reports success on a 503"
+  },
+  {
+    "id": "w-07",
+    "route": "/support",
+    "kind": "validation",
+    "title": "Contact address",
+    "ref": "garnet7",
+    "defective": true,
+    "spec": "An address with no @ must print \"Invalid address\" and must not be saved.",
+    "probe": [
+      "type #w-07-mail garnet7.example.invalid",
+      "click #w-07-go"
+    ],
+    "evidence": "text --selector=#w-07-out",
+    "observed": "Saved garnet7.example.invalid (garnet7)",
+    "tokens": [
+      "Saved garnet7.example.invalid (garnet7)"
+    ],
+    "note": "saves an address with no @"
+  },
+  {
+    "id": "w-08",
+    "route": "/settings",
+    "kind": "double-submit",
+    "title": "Ticket submission",
+    "ref": "hazel8",
+    "defective": false,
+    "spec": "Submit must disable itself on the first click so the hazel8 queue receives one ticket.",
+    "probe": [
+      "click #w-08-submit",
+      "click #w-08-submit"
+    ],
+    "evidence": "text --selector=#w-08-out",
+    "observed": "submissions: 1 to hazel8",
+    "tokens": [
+      "submissions: 1 to hazel8"
+    ],
+    "note": "files it once"
+  },
+  {
+    "id": "w-09",
+    "route": "/billing",
+    "kind": "persistence",
+    "title": "Draft note",
+    "ref": "indigo9",
+    "defective": true,
+    "spec": "Saving a draft must survive navigation: returning to this route must restore it and echo \"restored: <text>\".",
+    "probe": [
+      "type #w-09-note indigo9-draft",
+      "click #w-09-save",
+      "goto /dashboard",
+      "goto /billing"
+    ],
+    "evidence": "text --selector=#w-09-out",
+    "observed": "restored: (none) [indigo9]",
+    "tokens": [
+      "restored: (none) [indigo9]"
+    ],
+    "note": "never writes the draft to storage"
+  },
+  {
+    "id": "w-10",
+    "route": "/reports",
+    "kind": "double-submit",
+    "title": "Ticket submission",
+    "ref": "jasper10",
+    "defective": true,
+    "spec": "Submit must disable itself on the first click so the jasper10 queue receives one ticket.",
+    "probe": [
+      "click #w-10-submit",
+      "click #w-10-submit"
+    ],
+    "evidence": "text --selector=#w-10-out",
+    "observed": "submissions: 2 to jasper10",
+    "tokens": [
+      "submissions: 2 to jasper10"
+    ],
+    "note": "files the ticket twice"
+  },
+  {
+    "id": "w-11",
+    "route": "/dashboard",
+    "kind": "accessible-name",
+    "title": "Quick search",
+    "ref": "kelp11",
+    "defective": true,
+    "spec": "The kelp11 search field must have an accessible name; a placeholder alone is not one.",
+    "probe": [],
+    "evidence": "a11y --selector=#w-11-field",
+    "observed": "input#w-11-field role=textbox name=\"\" placeholder=\"Search kelp11 orders\" tabindex=\"\" disabled=false aria-expanded=\"\" aria-hidden=\"\" aria-controls=\"\"",
+    "tokens": [
+      "w-11-field",
+      "name=\"\""
+    ],
+    "note": "named only by its placeholder"
+  },
+  {
+    "id": "w-12",
+    "route": "/catalog",
+    "kind": "persistence",
+    "title": "Draft note",
+    "ref": "larch12",
+    "defective": true,
+    "spec": "Saving a draft must survive navigation: returning to this route must restore it and echo \"restored: <text>\".",
+    "probe": [
+      "type #w-12-note larch12-draft",
+      "click #w-12-save",
+      "goto /dashboard",
+      "goto /catalog"
+    ],
+    "evidence": "text --selector=#w-12-out",
+    "observed": "restored: (none) [larch12]",
+    "tokens": [
+      "restored: (none) [larch12]"
+    ],
+    "note": "never writes the draft to storage"
+  },
+  {
+    "id": "w-13",
+    "route": "/cart",
+    "kind": "accessible-name",
+    "title": "Quick search",
+    "ref": "mica13",
+    "defective": true,
+    "spec": "The mica13 search field must have an accessible name; a placeholder alone is not one.",
+    "probe": [],
+    "evidence": "a11y --selector=#w-13-field",
+    "observed": "input#w-13-field role=textbox name=\"\" placeholder=\"Search mica13 orders\" tabindex=\"\" disabled=false aria-expanded=\"\" aria-hidden=\"\" aria-controls=\"\"",
+    "tokens": [
+      "w-13-field",
+      "name=\"\""
+    ],
+    "note": "named only by its placeholder"
+  },
+  {
+    "id": "w-14",
+    "route": "/checkout",
+    "kind": "filtering",
+    "title": "Tag filter",
+    "ref": "nutmeg14",
+    "defective": true,
+    "spec": "Filtering must list every tag containing the text typed, not only the tags starting with it.",
+    "probe": [
+      "type #w-14-q ar",
+      "click #w-14-go"
+    ],
+    "evidence": "text --selector=#w-14-out",
+    "observed": "no nutmeg14 matches for ar",
+    "tokens": [
+      "no nutmeg14 matches for ar"
+    ],
+    "note": "anchors the match to the start"
+  },
+  {
+    "id": "w-15",
+    "route": "/account",
+    "kind": "network",
+    "title": "Preference sync",
+    "ref": "onyx15",
+    "defective": true,
+    "spec": "A sync response outside 2xx must print \"Sync failed\" followed by the reference from the response body.",
+    "probe": [
+      "click #w-15-sync"
+    ],
+    "evidence": "text --selector=#w-15-out",
+    "observed": "Synced onyx15",
+    "tokens": [
+      "Synced onyx15"
+    ],
+    "note": "reports success on a 503"
+  },
+  {
+    "id": "w-16",
+    "route": "/orders",
+    "kind": "calculation",
+    "title": "Order total",
+    "ref": "pumice16",
+    "defective": false,
+    "spec": "Total must be quantity × $4.78 × 1.08, rounded to the nearest cent once, at the end.",
+    "probe": [
+      "type #w-16-qty 3",
+      "click #w-16-go"
+    ],
+    "evidence": "text --selector=#w-16-out",
+    "observed": "$15.49 (pumice16)",
+    "tokens": [
+      "$15.49 (pumice16)"
+    ],
+    "note": "rounds once at the end"
+  },
+  {
+    "id": "w-17",
+    "route": "/support",
+    "kind": "calculation",
+    "title": "Order total",
+    "ref": "quartz17",
+    "defective": true,
+    "spec": "Total must be quantity × $7.40 × 1.08, rounded to the nearest cent once, at the end.",
+    "probe": [
+      "type #w-17-qty 3",
+      "click #w-17-go"
+    ],
+    "evidence": "text --selector=#w-17-out",
+    "observed": "$23.97 (quartz17)",
+    "tokens": [
+      "$23.97 (quartz17)"
+    ],
+    "note": "rounds the unit price before multiplying"
+  },
+  {
+    "id": "w-18",
+    "route": "/settings",
+    "kind": "persistence",
+    "title": "Draft note",
+    "ref": "rowan18",
+    "defective": false,
+    "spec": "Saving a draft must survive navigation: returning to this route must restore it and echo \"restored: <text>\".",
+    "probe": [
+      "type #w-18-note rowan18-draft",
+      "click #w-18-save",
+      "goto /dashboard",
+      "goto /settings"
+    ],
+    "evidence": "text --selector=#w-18-out",
+    "observed": "restored: rowan18-draft [rowan18]",
+    "tokens": [
+      "restored: rowan18-draft [rowan18]"
+    ],
+    "note": "persists the draft"
+  },
+  {
+    "id": "w-19",
+    "route": "/billing",
+    "kind": "calculation",
+    "title": "Order total",
+    "ref": "sable19",
+    "defective": true,
+    "spec": "Total must be quantity × $3.65 × 1.08, rounded to the nearest cent once, at the end.",
+    "probe": [
+      "type #w-19-qty 3",
+      "click #w-19-go"
+    ],
+    "evidence": "text --selector=#w-19-out",
+    "observed": "$11.82 (sable19)",
+    "tokens": [
+      "$11.82 (sable19)"
+    ],
+    "note": "rounds the unit price before multiplying"
+  },
+  {
+    "id": "w-20",
+    "route": "/reports",
+    "kind": "aria-state",
+    "title": "Details disclosure",
+    "ref": "thistle20",
+    "defective": false,
+    "spec": "The toggle must report aria-expanded=\"true\" while the panel is open.",
+    "probe": [
+      "click #w-20-toggle"
+    ],
+    "evidence": "a11y --selector=#w-20-toggle",
+    "observed": "button#w-20-toggle role=button name=\"Details thistle20\" placeholder=\"\" tabindex=\"\" disabled=false aria-expanded=\"true\" aria-hidden=\"\" aria-controls=\"w-20-panel\"",
+    "tokens": [
+      "w-20-toggle",
+      "aria-expanded=\"true\""
+    ],
+    "note": "aria-expanded tracks the panel"
+  },
+  {
+    "id": "w-21",
+    "route": "/dashboard",
+    "kind": "runtime-error",
+    "title": "Saved view",
+    "ref": "amber21",
+    "defective": true,
+    "spec": "Applying a saved view must not raise a console error when no view is stored.",
+    "probe": [
+      "click #w-21-apply"
+    ],
+    "evidence": "console",
+    "observed": "ERROR Uncaught ReferenceError: renderView21 is not defined",
+    "tokens": [
+      "Uncaught ReferenceError: renderView21 is not defined"
+    ],
+    "note": "calls renderView21, which does not exist"
+  },
+  {
+    "id": "w-22",
+    "route": "/catalog",
+    "kind": "filtering",
+    "title": "Tag filter",
+    "ref": "basalt22",
+    "defective": true,
+    "spec": "Filtering must list every tag containing the text typed, not only the tags starting with it.",
+    "probe": [
+      "type #w-22-q nd",
+      "click #w-22-go"
+    ],
+    "evidence": "text --selector=#w-22-out",
+    "observed": "no basalt22 matches for nd",
+    "tokens": [
+      "no basalt22 matches for nd"
+    ],
+    "note": "anchors the match to the start"
+  },
+  {
+    "id": "w-23",
+    "route": "/cart",
+    "kind": "accessible-name",
+    "title": "Quick search",
+    "ref": "cedar23",
+    "defective": true,
+    "spec": "The cedar23 search field must have an accessible name; a placeholder alone is not one.",
+    "probe": [],
+    "evidence": "a11y --selector=#w-23-field",
+    "observed": "input#w-23-field role=textbox name=\"\" placeholder=\"Search cedar23 orders\" tabindex=\"\" disabled=false aria-expanded=\"\" aria-hidden=\"\" aria-controls=\"\"",
+    "tokens": [
+      "w-23-field",
+      "name=\"\""
+    ],
+    "note": "named only by its placeholder"
+  },
+  {
+    "id": "w-24",
+    "route": "/checkout",
+    "kind": "pagination",
+    "title": "Result pages",
+    "ref": "damask24",
+    "defective": true,
+    "spec": "\"Next\" must advance exactly one page and must stop at page 10.",
+    "probe": [
+      "click #w-24-next"
+    ],
+    "evidence": "text --selector=#w-24-out",
+    "observed": "Page 3 of 10 (damask24)",
+    "tokens": [
+      "Page 3 of 10 (damask24)"
+    ],
+    "note": "advances two pages"
+  },
+  {
+    "id": "w-25",
+    "route": "/account",
+    "kind": "aria-state",
+    "title": "Details disclosure",
+    "ref": "ember25",
+    "defective": true,
+    "spec": "The toggle must report aria-expanded=\"true\" while the panel is open.",
+    "probe": [
+      "click #w-25-toggle"
+    ],
+    "evidence": "a11y --selector=#w-25-toggle",
+    "observed": "button#w-25-toggle.open role=button name=\"Details ember25\" placeholder=\"\" tabindex=\"\" disabled=false aria-expanded=\"false\" aria-hidden=\"\" aria-controls=\"w-25-panel\"",
+    "tokens": [
+      "w-25-toggle",
+      "aria-expanded=\"false\""
+    ],
+    "note": "aria-expanded never changes"
+  },
+  {
+    "id": "w-26",
+    "route": "/orders",
+    "kind": "filtering",
+    "title": "Tag filter",
+    "ref": "flax26",
+    "defective": true,
+    "spec": "Filtering must list every tag containing the text typed, not only the tags starting with it.",
+    "probe": [
+      "type #w-26-q ua",
+      "click #w-26-go"
+    ],
+    "evidence": "text --selector=#w-26-out",
+    "observed": "no flax26 matches for ua",
+    "tokens": [
+      "no flax26 matches for ua"
+    ],
+    "note": "anchors the match to the start"
+  },
+  {
+    "id": "w-27",
+    "route": "/support",
+    "kind": "runtime-error",
+    "title": "Saved view",
+    "ref": "garnet27",
+    "defective": true,
+    "spec": "Applying a saved view must not raise a console error when no view is stored.",
+    "probe": [
+      "click #w-27-apply"
+    ],
+    "evidence": "console",
+    "observed": "ERROR Uncaught ReferenceError: renderView27 is not defined",
+    "tokens": [
+      "Uncaught ReferenceError: renderView27 is not defined"
+    ],
+    "note": "calls renderView27, which does not exist"
+  },
+  {
+    "id": "w-28",
+    "route": "/settings",
+    "kind": "validation",
+    "title": "Contact address",
+    "ref": "hazel28",
+    "defective": true,
+    "spec": "An address with no @ must print \"Invalid address\" and must not be saved.",
+    "probe": [
+      "type #w-28-mail hazel28.example.invalid",
+      "click #w-28-go"
+    ],
+    "evidence": "text --selector=#w-28-out",
+    "observed": "Saved hazel28.example.invalid (hazel28)",
+    "tokens": [
+      "Saved hazel28.example.invalid (hazel28)"
+    ],
+    "note": "saves an address with no @"
+  },
+  {
+    "id": "w-29",
+    "route": "/billing",
+    "kind": "validation",
+    "title": "Contact address",
+    "ref": "indigo29",
+    "defective": false,
+    "spec": "An address with no @ must print \"Invalid address\" and must not be saved.",
+    "probe": [
+      "type #w-29-mail indigo29.example.invalid",
+      "click #w-29-go"
+    ],
+    "evidence": "text --selector=#w-29-out",
+    "observed": "Invalid address (indigo29)",
+    "tokens": [
+      "Invalid address (indigo29)"
+    ],
+    "note": "rejects it correctly"
+  },
+  {
+    "id": "w-30",
+    "route": "/reports",
+    "kind": "double-submit",
+    "title": "Ticket submission",
+    "ref": "jasper30",
+    "defective": true,
+    "spec": "Submit must disable itself on the first click so the jasper30 queue receives one ticket.",
+    "probe": [
+      "click #w-30-submit",
+      "click #w-30-submit"
+    ],
+    "evidence": "text --selector=#w-30-out",
+    "observed": "submissions: 2 to jasper30",
+    "tokens": [
+      "submissions: 2 to jasper30"
+    ],
+    "note": "files the ticket twice"
+  },
+  {
+    "id": "w-31",
+    "route": "/dashboard",
+    "kind": "persistence",
+    "title": "Draft note",
+    "ref": "kelp31",
+    "defective": true,
+    "spec": "Saving a draft must survive navigation: returning to this route must restore it and echo \"restored: <text>\".",
+    "probe": [
+      "type #w-31-note kelp31-draft",
+      "click #w-31-save",
+      "goto /dashboard",
+      "goto /dashboard"
+    ],
+    "evidence": "text --selector=#w-31-out",
+    "observed": "restored: (none) [kelp31]",
+    "tokens": [
+      "restored: (none) [kelp31]"
+    ],
+    "note": "never writes the draft to storage"
+  },
+  {
+    "id": "w-32",
+    "route": "/catalog",
+    "kind": "aria-state",
+    "title": "Details disclosure",
+    "ref": "larch32",
+    "defective": true,
+    "spec": "The toggle must report aria-expanded=\"true\" while the panel is open.",
+    "probe": [
+      "click #w-32-toggle"
+    ],
+    "evidence": "a11y --selector=#w-32-toggle",
+    "observed": "button#w-32-toggle.open role=button name=\"Details larch32\" placeholder=\"\" tabindex=\"\" disabled=false aria-expanded=\"false\" aria-hidden=\"\" aria-controls=\"w-32-panel\"",
+    "tokens": [
+      "w-32-toggle",
+      "aria-expanded=\"false\""
+    ],
+    "note": "aria-expanded never changes"
+  },
+  {
+    "id": "w-33",
+    "route": "/cart",
+    "kind": "accessible-name",
+    "title": "Quick search",
+    "ref": "mica33",
+    "defective": true,
+    "spec": "The mica33 search field must have an accessible name; a placeholder alone is not one.",
+    "probe": [],
+    "evidence": "a11y --selector=#w-33-field",
+    "observed": "input#w-33-field role=textbox name=\"\" placeholder=\"Search mica33 orders\" tabindex=\"\" disabled=false aria-expanded=\"\" aria-hidden=\"\" aria-controls=\"\"",
+    "tokens": [
+      "w-33-field",
+      "name=\"\""
+    ],
+    "note": "named only by its placeholder"
+  },
+  {
+    "id": "w-34",
+    "route": "/checkout",
+    "kind": "pagination",
+    "title": "Result pages",
+    "ref": "nutmeg34",
+    "defective": false,
+    "spec": "\"Next\" must advance exactly one page and must stop at page 10.",
+    "probe": [
+      "click #w-34-next"
+    ],
+    "evidence": "text --selector=#w-34-out",
+    "observed": "Page 2 of 10 (nutmeg34)",
+    "tokens": [
+      "Page 2 of 10 (nutmeg34)"
+    ],
+    "note": "advances one page"
+  },
+  {
+    "id": "w-35",
+    "route": "/account",
+    "kind": "runtime-error",
+    "title": "Saved view",
+    "ref": "onyx35",
+    "defective": true,
+    "spec": "Applying a saved view must not raise a console error when no view is stored.",
+    "probe": [
+      "click #w-35-apply"
+    ],
+    "evidence": "console",
+    "observed": "ERROR Uncaught ReferenceError: renderView35 is not defined",
+    "tokens": [
+      "Uncaught ReferenceError: renderView35 is not defined"
+    ],
+    "note": "calls renderView35, which does not exist"
+  },
+  {
+    "id": "w-36",
+    "route": "/orders",
+    "kind": "filtering",
+    "title": "Tag filter",
+    "ref": "pumice36",
+    "defective": true,
+    "spec": "Filtering must list every tag containing the text typed, not only the tags starting with it.",
+    "probe": [
+      "type #w-36-q mb",
+      "click #w-36-go"
+    ],
+    "evidence": "text --selector=#w-36-out",
+    "observed": "no pumice36 matches for mb",
+    "tokens": [
+      "no pumice36 matches for mb"
+    ],
+    "note": "anchors the match to the start"
+  },
+  {
+    "id": "w-37",
+    "route": "/support",
+    "kind": "pagination",
+    "title": "Result pages",
+    "ref": "quartz37",
+    "defective": true,
+    "spec": "\"Next\" must advance exactly one page and must stop at page 9.",
+    "probe": [
+      "click #w-37-next"
+    ],
+    "evidence": "text --selector=#w-37-out",
+    "observed": "Page 3 of 9 (quartz37)",
+    "tokens": [
+      "Page 3 of 9 (quartz37)"
+    ],
+    "note": "advances two pages"
+  },
+  {
+    "id": "w-38",
+    "route": "/settings",
+    "kind": "validation",
+    "title": "Contact address",
+    "ref": "rowan38",
+    "defective": true,
+    "spec": "An address with no @ must print \"Invalid address\" and must not be saved.",
+    "probe": [
+      "type #w-38-mail rowan38.example.invalid",
+      "click #w-38-go"
+    ],
+    "evidence": "text --selector=#w-38-out",
+    "observed": "Saved rowan38.example.invalid (rowan38)",
+    "tokens": [
+      "Saved rowan38.example.invalid (rowan38)"
+    ],
+    "note": "saves an address with no @"
+  },
+  {
+    "id": "w-39",
+    "route": "/billing",
+    "kind": "runtime-error",
+    "title": "Saved view",
+    "ref": "sable39",
+    "defective": false,
+    "spec": "Applying a saved view must not raise a console error when no view is stored.",
+    "probe": [
+      "click #w-39-apply"
+    ],
+    "evidence": "console",
+    "observed": "(no console output)",
+    "tokens": [
+      "(no console output)"
+    ],
+    "note": "calls the function that exists"
+  },
+  {
+    "id": "w-40",
+    "route": "/reports",
+    "kind": "aria-state",
+    "title": "Details disclosure",
+    "ref": "thistle40",
+    "defective": true,
+    "spec": "The toggle must report aria-expanded=\"true\" while the panel is open.",
+    "probe": [
+      "click #w-40-toggle"
+    ],
+    "evidence": "a11y --selector=#w-40-toggle",
+    "observed": "button#w-40-toggle.open role=button name=\"Details thistle40\" placeholder=\"\" tabindex=\"\" disabled=false aria-expanded=\"false\" aria-hidden=\"\" aria-controls=\"w-40-panel\"",
+    "tokens": [
+      "w-40-toggle",
+      "aria-expanded=\"false\""
+    ],
+    "note": "aria-expanded never changes"
+  },
+  {
+    "id": "w-41",
+    "route": "/dashboard",
+    "kind": "calculation",
+    "title": "Order total",
+    "ref": "amber41",
+    "defective": true,
+    "spec": "Total must be quantity × $7.40 × 1.08, rounded to the nearest cent once, at the end.",
+    "probe": [
+      "type #w-41-qty 3",
+      "click #w-41-go"
+    ],
+    "evidence": "text --selector=#w-41-out",
+    "observed": "$23.97 (amber41)",
+    "tokens": [
+      "$23.97 (amber41)"
+    ],
+    "note": "rounds the unit price before multiplying"
+  },
+  {
+    "id": "w-42",
+    "route": "/catalog",
+    "kind": "network",
+    "title": "Preference sync",
+    "ref": "basalt42",
+    "defective": true,
+    "spec": "A sync response outside 2xx must print \"Sync failed\" followed by the reference from the response body.",
+    "probe": [
+      "click #w-42-sync"
+    ],
+    "evidence": "text --selector=#w-42-out",
+    "observed": "Synced basalt42",
+    "tokens": [
+      "Synced basalt42"
+    ],
+    "note": "reports success on a 503"
+  },
+  {
+    "id": "w-43",
+    "route": "/cart",
+    "kind": "validation",
+    "title": "Contact address",
+    "ref": "cedar43",
+    "defective": true,
+    "spec": "An address with no @ must print \"Invalid address\" and must not be saved.",
+    "probe": [
+      "type #w-43-mail cedar43.example.invalid",
+      "click #w-43-go"
+    ],
+    "evidence": "text --selector=#w-43-out",
+    "observed": "Saved cedar43.example.invalid (cedar43)",
+    "tokens": [
+      "Saved cedar43.example.invalid (cedar43)"
+    ],
+    "note": "saves an address with no @"
+  },
+  {
+    "id": "w-44",
+    "route": "/checkout",
+    "kind": "runtime-error",
+    "title": "Saved view",
+    "ref": "damask44",
+    "defective": true,
+    "spec": "Applying a saved view must not raise a console error when no view is stored.",
+    "probe": [
+      "click #w-44-apply"
+    ],
+    "evidence": "console",
+    "observed": "ERROR Uncaught ReferenceError: renderView44 is not defined",
+    "tokens": [
+      "Uncaught ReferenceError: renderView44 is not defined"
+    ],
+    "note": "calls renderView44, which does not exist"
+  },
+  {
+    "id": "w-45",
+    "route": "/account",
+    "kind": "filtering",
+    "title": "Tag filter",
+    "ref": "ember45",
+    "defective": false,
+    "spec": "Filtering must list every tag containing the text typed, not only the tags starting with it.",
+    "probe": [
+      "type #w-45-q la",
+      "click #w-45-go"
+    ],
+    "evidence": "text --selector=#w-45-out",
+    "observed": "flax for la",
+    "tokens": [
+      "flax for la"
+    ],
+    "note": "matches anywhere"
+  },
+  {
+    "id": "w-46",
+    "route": "/orders",
+    "kind": "pagination",
+    "title": "Result pages",
+    "ref": "flax46",
+    "defective": true,
+    "spec": "\"Next\" must advance exactly one page and must stop at page 7.",
+    "probe": [
+      "click #w-46-next"
+    ],
+    "evidence": "text --selector=#w-46-out",
+    "observed": "Page 3 of 7 (flax46)",
+    "tokens": [
+      "Page 3 of 7 (flax46)"
+    ],
+    "note": "advances two pages"
+  },
+  {
+    "id": "w-47",
+    "route": "/support",
+    "kind": "persistence",
+    "title": "Draft note",
+    "ref": "garnet47",
+    "defective": true,
+    "spec": "Saving a draft must survive navigation: returning to this route must restore it and echo \"restored: <text>\".",
+    "probe": [
+      "type #w-47-note garnet47-draft",
+      "click #w-47-save",
+      "goto /dashboard",
+      "goto /support"
+    ],
+    "evidence": "text --selector=#w-47-out",
+    "observed": "restored: (none) [garnet47]",
+    "tokens": [
+      "restored: (none) [garnet47]"
+    ],
+    "note": "never writes the draft to storage"
+  },
+  {
+    "id": "w-48",
+    "route": "/settings",
+    "kind": "network",
+    "title": "Preference sync",
+    "ref": "hazel48",
+    "defective": true,
+    "spec": "A sync response outside 2xx must print \"Sync failed\" followed by the reference from the response body.",
+    "probe": [
+      "click #w-48-sync"
+    ],
+    "evidence": "text --selector=#w-48-out",
+    "observed": "Synced hazel48",
+    "tokens": [
+      "Synced hazel48"
+    ],
+    "note": "reports success on a 503"
+  },
+  {
+    "id": "w-49",
+    "route": "/billing",
+    "kind": "double-submit",
+    "title": "Ticket submission",
+    "ref": "indigo49",
+    "defective": true,
+    "spec": "Submit must disable itself on the first click so the indigo49 queue receives one ticket.",
+    "probe": [
+      "click #w-49-submit",
+      "click #w-49-submit"
+    ],
+    "evidence": "text --selector=#w-49-out",
+    "observed": "submissions: 2 to indigo49",
+    "tokens": [
+      "submissions: 2 to indigo49"
+    ],
+    "note": "files the ticket twice"
+  },
+  {
+    "id": "w-50",
+    "route": "/reports",
+    "kind": "calculation",
+    "title": "Order total",
+    "ref": "jasper50",
+    "defective": true,
+    "spec": "Total must be quantity × $4.03 × 1.08, rounded to the nearest cent once, at the end.",
+    "probe": [
+      "type #w-50-qty 3",
+      "click #w-50-go"
+    ],
+    "evidence": "text --selector=#w-50-out",
+    "observed": "$13.05 (jasper50)",
+    "tokens": [
+      "$13.05 (jasper50)"
+    ],
+    "note": "rounds the unit price before multiplying"
+  }
+]

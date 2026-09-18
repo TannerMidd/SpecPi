@@ -1,0 +1,11 @@
+{
+  "id": "digest-central-37-013",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 7,
+  "timeout": 13,
+  "legacy": {
+    "pool": "pool-3",
+    "drained": false
+  }
+}

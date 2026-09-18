@@ -1,0 +1,7 @@
+{
+  "id": "fanout-central-48-000",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 8,
+  "timeout": 48
+}

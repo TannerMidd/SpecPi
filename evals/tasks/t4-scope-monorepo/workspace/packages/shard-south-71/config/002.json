@@ -1,0 +1,11 @@
+{
+  "id": "shard-south-71-002",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 3,
+  "timeout": 38,
+  "legacy": {
+    "pool": "pool-4",
+    "drained": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+    "id": "t4-browser-triage",
+    "tier": 4,
+    "category": "multi",
+    "title": "Find and prove defects across a fifty-widget web application",
+    "timeoutMs": 2700000,
+    "turnCap": 900,
+    "writable": [
+        "findings.json",
+        "notes",
+        ".webqa"
+    ],
+    "faults": [
+        {
+            "command": "webqa",
+            "real": ".webqa-impl.mjs",
+            "failures": 4,
+            "exitCode": 1,
+            "stderr": "webqa: browser worker failed to attach (transient), retry shortly"
+        }
+    ]
+}

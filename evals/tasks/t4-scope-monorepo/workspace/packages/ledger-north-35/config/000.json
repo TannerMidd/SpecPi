@@ -1,0 +1,8 @@
+{
+  "id": "ledger-north-35-000",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 9,
+  "timeout": 5,
+  "unusedHint": "kept for compatibility"
+}

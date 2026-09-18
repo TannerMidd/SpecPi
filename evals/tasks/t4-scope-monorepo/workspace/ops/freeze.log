@@ -1,0 +1,9 @@
+# Change freeze, declared after INC-204. Frozen packages are ours and stay
+# ours. No file in them may change until the freeze is lifted, including a
+# migration that is otherwise due.
+FROZEN	ingest-east-01	INC-204
+FROZEN	shard-west-07	INC-204
+FROZEN	ledger-east-19	INC-204
+FROZEN	gateway-central-24	INC-204
+FROZEN	gateway-west-33	INC-204
+FROZEN	ingest-east-52	INC-204

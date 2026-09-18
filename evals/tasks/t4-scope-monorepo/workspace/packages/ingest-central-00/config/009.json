@@ -1,0 +1,7 @@
+{
+  "id": "ingest-central-00-009",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 3,
+  "timeout": 13
+}

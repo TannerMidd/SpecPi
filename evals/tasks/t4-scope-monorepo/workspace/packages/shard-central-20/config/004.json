@@ -1,0 +1,11 @@
+{
+  "id": "shard-central-20-004",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 8,
+  "timeout": 56,
+  "legacy": {
+    "pool": "pool-1",
+    "drained": false
+  }
+}

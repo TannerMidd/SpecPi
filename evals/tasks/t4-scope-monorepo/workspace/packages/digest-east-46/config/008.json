@@ -1,0 +1,8 @@
+{
+  "id": "digest-east-46-008",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 8,
+  "timeout": 34,
+  "unusedHint": "kept for compatibility"
+}

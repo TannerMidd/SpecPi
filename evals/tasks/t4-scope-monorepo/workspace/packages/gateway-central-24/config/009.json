@@ -1,0 +1,8 @@
+{
+  "id": "gateway-central-24-009",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 1,
+  "timeout": 19,
+  "unusedHint": "kept for compatibility"
+}

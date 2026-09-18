@@ -1,0 +1,7 @@
+{
+  "id": "digest-central-28-007",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 9,
+  "timeout": 2
+}

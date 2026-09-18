@@ -1,0 +1,11 @@
+{
+  "id": "reaper-south-41-009",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 6,
+  "timeout": 25,
+  "legacy": {
+    "pool": "pool-5",
+    "drained": false
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "ingest-central-53-000",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 9,
+  "timeout": 3,
+  "legacy": {
+    "pool": "pool-5",
+    "drained": false
+  },
+  "deprecatedPool": "pool-11"
+}

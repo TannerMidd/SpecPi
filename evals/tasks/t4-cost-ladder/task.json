@@ -1,0 +1,21 @@
+{
+    "id": "t4-cost-ladder",
+    "tier": 4,
+    "category": "repair",
+    "title": "Climb a query engine from its shipped cost to one pass over the data",
+    "timeoutMs": 2700000,
+    "turnCap": 900,
+    "writable": [
+        "src/engine.mjs",
+        "notes"
+    ],
+    "faults": [
+        {
+            "command": "bench",
+            "real": ".bench-impl.mjs",
+            "failures": 3,
+            "exitCode": 1,
+            "stderr": "bench: measurement daemon not ready (transient), retry shortly"
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "gateway-west-33-004",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 9,
+  "timeout": 23,
+  "unusedHint": "kept for compatibility"
+}

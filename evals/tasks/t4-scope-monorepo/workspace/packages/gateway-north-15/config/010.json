@@ -1,0 +1,11 @@
+{
+  "id": "gateway-north-15-010",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 4,
+  "timeout": 27,
+  "legacy": {
+    "pool": "pool-4",
+    "drained": false
+  }
+}

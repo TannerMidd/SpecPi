@@ -1,0 +1,8 @@
+{
+  "id": "ingest-south-69-004",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 8,
+  "timeout": 22,
+  "deprecatedPool": "pool-14"
+}

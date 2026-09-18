@@ -1,0 +1,8 @@
+{
+  "id": "digest-north-72-006",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 3,
+  "timeout": 31,
+  "unusedHint": "kept for compatibility"
+}

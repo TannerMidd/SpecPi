@@ -1,0 +1,7 @@
+{
+  "id": "ledger-north-35-006",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 4,
+  "timeout": 10
+}

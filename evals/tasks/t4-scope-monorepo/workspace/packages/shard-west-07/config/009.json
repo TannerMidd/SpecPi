@@ -1,0 +1,8 @@
+{
+  "id": "shard-west-07-009",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 5,
+  "timeout": 19,
+  "unusedHint": "kept for compatibility"
+}

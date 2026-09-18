@@ -1,0 +1,7 @@
+{
+  "id": "ledger-east-19-006",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 5,
+  "timeout": 43
+}

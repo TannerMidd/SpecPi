@@ -1,0 +1,11 @@
+{
+  "id": "digest-west-02-000",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 6,
+  "timeout": 23,
+  "legacy": {
+    "pool": "pool-4",
+    "drained": false
+  }
+}

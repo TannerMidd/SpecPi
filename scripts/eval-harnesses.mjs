@@ -834,11 +834,11 @@ export const harnessAdapters = {
 
             return { available: true, detail: `pinned Pi CLI ${piCli}` };
         },
-        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs }) => {
+        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) => {
             const stockDir = path.join(homeDir, "agent");
             fs.mkdirSync(stockDir, { recursive: true });
 
-            return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs });
+            return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults });
         },
     },
     "specpi-default": {
@@ -852,7 +852,7 @@ export const harnessAdapters = {
 
             return { available: true, detail: "SpecPi base via installer into disposable home" };
         },
-        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs }) => {
+        run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) => {
             const { runPiFixture } = await import("./pi-test-harness.mjs");
             const base = ensureSpecpiBase();
             if (!base.cached) {
@@ -890,7 +890,7 @@ export const harnessAdapters = {
             fs.mkdirSync(permissionDir, { recursive: true });
             fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
 
-            return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs });
+            return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults });
         },
     },
     omp: {

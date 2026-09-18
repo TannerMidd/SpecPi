@@ -1,0 +1,7 @@
+{
+  "id": "digest-north-73-002",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 5,
+  "timeout": 50
+}

@@ -21,6 +21,14 @@ The default run uses two built-in harnesses:
 No network, no API key, no live Pi directory. Every attempt gets a
 disposable home and workspace under the OS temp dir.
 
+The same two harnesses are how a new task is proved: `fake` must score 1.0 on
+it and `failing-fake` must score near zero. The whole ultimate tier runs both
+ways offline in about fifteen seconds:
+
+```sh
+node scripts/eval-run.mjs --harness=fake,failing-fake --tier=4 --out=.specpi-test/eval-t4
+```
+
 ## Suggested models (via OpenCode)
 
 Tier 2 is priced and mapped for two models, both runnable right now through
@@ -140,58 +148,112 @@ when `EVAL_FORWARD_URL` is set.
 
 ## Tiers
 
-- Tier 1 (4 tasks): synthetic smoke tests. Fast, deterministic, offline.
-- Tier 2 (8 tasks): real-model mini-suite across terminal, repair, scoped,
-  and multi-step categories. Small enough to run on every change.
-- Tier 3 (5 tasks): multi-file work across the same four categories.
-  5-minute timeout, 80-turn cap.
-- Tier 4 (4 tasks): adversarial work — decoys, hidden cases, constraints the
-  obvious fix violates. 10-minute timeout, 120-turn cap.
+- **Tier 1** (4 tasks): synthetic smoke tests. Fast, deterministic, offline.
+- **Tier 2** (8 tasks): the real-model mini-suite across terminal, repair,
+  scoped and multi-step categories. Small enough to run on every change.
+- **Tier 3** (1 task): the long-horizon repair chain. 30-minute budget,
+  600-turn cap.
+- **Tier 4** (5 tasks): the ultimate tier. 45-minute budget, 900-turn cap,
+  one injected fault each. Described below.
 
-Tiers 3 and 4 were both built to separate harnesses on solve rate and neither
-did: every harness solved every task. The reason is in the turn counts —
-a median of 8 turns against a 120-turn cap means the model answered and the
-harness never had to do anything interesting. They are useful as cost and
-behaviour probes, not as capability discriminators. Read them through score
-and scope rather than through solve rate.
+Three earlier attempts at a hard tier all saturated, and their tasks are kept
+in `evals/archive/` rather than deleted, because why they saturated is the
+design brief for what replaced them. Every one of them was finishable: the
+work fitted in a single pass, so a harness either did it or did not, and the
+solve column collapsed to 100%. Across 168 attempts spanning four tiers the
+suite produced **two** failures.
 
 Report the subgroup split, not just the aggregate: a harness can lead on
-terminal work and trail on repository repair, and the 70:30 mixture decides
-the headline.
+terminal work and trail on repository repair, and the mixture decides the
+headline.
 
-### Tier 3
+### Tier 4 — the ultimate tier
 
-Tier 2 asks for one edit to one file, so almost anything passes it and the
-solve column stops discriminating. Tier 3 is built to separate harnesses:
+The organising rule is that **no task can be finished**. Each offers more
+verifiable work than its budget holds, and each is scored on how much of that
+work landed. That makes the headline figure a rate — work per dollar, work per
+turn, work per thousand tokens — which is a harness property and cannot
+saturate the way a boolean does.
 
-- `t3-repair-pool` — fix a concurrency-limited task pool. Ordering,
-  a real in-flight cap, rejections recorded rather than thrown, and
-  argument validation. A serial rewrite deadlocks one of the cases.
-- `t3-repair-resolver` — fix a dependency resolver: diamond dependencies,
-  implicit nodes, deterministic tie-breaking, cycle detection that names
-  only the nodes in the cycle, and 5,000 nodes without blowing the stack.
-- `t3-multi-migrate` — migrate 18 messy records spanning three schema eras
-  to a spec: per-record era detection, day-first and Unix dates, dedupe with
-  two different tie-breaks, exact ordering and exact serialization.
-- `t3-scoped-refactor` — rename an API across the source while leaving
-  `vendor/` byte-identical and _not_ renaming a similarly-named function.
-  Tests restraint as much as capability.
-- `t3-terminal-audit` — aggregate a 185-line request log into a ranked TSV:
-  nearest-rank p95, a minimum-requests floor, malformed-line counting, and
-  an exact output format.
+- `t4-browser-triage` (multi) — fifty widgets across ten routes in a real web
+  application, forty of them defective, driven through `webqa`: a hermetic
+  browser with a real DOM, real event dispatch and real page scripts, with the
+  clock, the timers and the network made deterministic. Every widget carries
+  its own acceptance criterion in the page, so a defect is a fact rather than
+  an opinion. Credit is 40% for naming a defect and 60% for quoting what the
+  browser printed, and reporting one of the ten correct widgets costs a whole
+  defect. Listing all fifty scores 0.15.
+- `t4-research-dossier` (terminal) — 1,675 documents, about 2 MB, and a bank
+  of 45 questions that each need two to four of them. Policy documents name
+  services only by codename and the registry is what maps one to the other, so
+  nothing is a single lookup. Superseded policies stay in the corpus and are
+  repeated in archived drafts, so ranked search usually hands back the stale
+  value first. Answers score 0.75, citations the other 0.25, and a citation
+  only counts when the answer is right.
+- `t4-cost-ladder` (repair) — a query engine that is correct and slow. The
+  only cost counted is `table.row()` calls, which is a property of the
+  algorithm rather than of the machine, so the figure is identical in CI and
+  on a laptop. Each of six query kinds is scored on its own log-scaled ladder
+  from the shipped cost down to one pass over the data, so fixing one kind is
+  worth about a sixth whichever kind it is. Scored on a dataset the engine has
+  never seen, so an engine that remembers answers scores nothing.
+- `t4-scope-monorepo` (scoped) — eighty packages, 976 config files, and no
+  single file that says which are ours: ownership is a join across `OWNERS`,
+  the registry, a transfer log that contradicts `OWNERS` in both directions,
+  and a freeze log naming packages that are ours and must still not be
+  touched. Each owned package carries its own `MIGRATION.md` with its own
+  target schema version, so a global rewrite is wrong everywhere at once.
+  Completeness and restraint multiply: a sweep scores zero.
+- `t4-incident-loop` (multi) — a 24-service cluster mid-incident, driven
+  through `ops`, a state machine where actions are refused unless the service
+  is drained and refusals are recorded. Recovery runs in dependency order,
+  three services fail on an expired certificate rather than an exhausted pool,
+  and two are stateful: restarting one destroys it permanently, and the
+  runbook says so. Scored on what is serving at the end, scaled by how much
+  backlog it took to get there.
 
-Every Tier 3 task holds files the harness must not rewrite — the test file
-stating the contract, the vendored code, the fixed inputs. Checkers verify
-them by hash, because otherwise the cheapest way to pass is to delete the
-thing doing the judging. Several also run a hidden case the visible contract
-does not spell out, so special-casing the published tests is not enough.
+Four design rules hold across all five, and each closes a shortcut that
+saturated an earlier tier:
+
+1. **Evidence, not inference.** Where a task can be reasoned about from
+   source, the larger share of the credit is for output the fixture actually
+   produced. Reading names the defect; running proves it.
+2. **A cost for being wrong.** Every task has decoys — correct widgets,
+   upstream packages, stale-but-real documents, a service that must not be
+   restarted — and reporting or touching one costs more than leaving it out.
+   Shotgunning scores worse than a short careful list.
+3. **Graded, not boolean.** Scores are continuous and every breakdown reports
+   its denominator, so twelve of forty is a number rather than a failure.
+4. **Answers derived, never asserted.** Every answer key is produced by
+   running the fixture, not by writing down what it ought to do. The browser
+   generator builds a second, entirely correct copy of the application and
+   fails if any "defect" behaves identically to its own fixed version — which
+   caught a tax bug that rounded to the same cent as the correct formula, a
+   defect that was not one.
+
+Every tier 4 task also injects a transient fault into the command it depends
+on. The fault clears on its own, so a harness that retries finishes and one
+that gives up does not, and `faults` in the report says what each one actually
+met rather than what was intended.
+
+### Tier 4 budgets
+
+45 minutes and a 900-turn cap per attempt, so a full sweep is expensive: five
+tasks across six harnesses at three attempts is 90 attempts and up to 67 hours
+of wall clock if every one runs to its limit. Run one task across harnesses
+before running the tier, and use `--timeout` to shorten a scouting pass.
+
+`turnCap` is documentary. The runner enforces `timeoutMs`; nothing reads
+`turnCap`, and the figure records the intended shape of the task rather than a
+limit the harness meets.
 
 ## Adding a task
 
 Create `evals/tasks/<id>/` with:
 
-- `task.json`: `{ id, tier: 1|2|3|4, category, title, timeoutMs, turnCap, writable }`
-  where `writable` lists the paths a correct solution may change
+- `task.json`: `{ id, tier: 1|2|3|4|5, category, title, timeoutMs, turnCap, writable }`
+  where `writable` lists the paths a correct solution may change, plus an
+  optional `faults` list naming commands to make transiently unreliable
 - `prompt.md`: the exact prompt the harness receives
 - `workspace/`: starting files (may be empty)
 - `check.mjs`: `export default async (workspaceDir) => ({ pass, score, notes })`
@@ -199,8 +261,14 @@ Create `evals/tasks/<id>/` with:
 - `solve.mjs`: reference solution for the fake harness and checker validation
 
 Checkers use Node builtins only, so they run on Windows, macOS, and Linux.
-Keep Tier 1 and 2 tasks under 2 minutes and 50 turns; Tier 3 gets 5 minutes
-and 80 turns.
+Keep Tier 1 and 2 tasks under 2 minutes and 50 turns. Tier 3 gets 30 minutes,
+Tier 4 gets 45.
+
+A Tier 4 task also needs a `generate.mjs` that writes the fixture and derives
+the key by running it, and the generator should fail loudly when the fixture
+stops measuring what it claims to: a defect that behaves like its own fix, two
+packages with identical rules, a ladder with no room on it. Those checks have
+each already caught a real bug in this suite.
 
 Two rules the suite enforces for you, in `tests/eval-tasks.test.mjs`:
 

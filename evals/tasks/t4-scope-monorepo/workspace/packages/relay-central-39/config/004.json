@@ -1,0 +1,11 @@
+{
+  "id": "relay-central-39-004",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 6,
+  "timeout": 48,
+  "legacy": {
+    "pool": "pool-2",
+    "drained": false
+  }
+}

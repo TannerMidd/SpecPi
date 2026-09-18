@@ -1,0 +1,8 @@
+{
+  "id": "reaper-north-65-003",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 2,
+  "timeout": 33,
+  "unusedHint": "kept for compatibility"
+}

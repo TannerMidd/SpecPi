@@ -1,0 +1,12 @@
+{
+  "id": "ingest-west-66-008",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 2,
+  "timeout": 47,
+  "legacy": {
+    "pool": "pool-7",
+    "drained": false
+  },
+  "unusedHint": "kept for compatibility"
+}

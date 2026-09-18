@@ -1,0 +1,12 @@
+{
+  "id": "digest-north-73-010",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 6,
+  "timeout": 28,
+  "legacy": {
+    "pool": "pool-4",
+    "drained": false
+  },
+  "deprecatedPool": "pool-10"
+}

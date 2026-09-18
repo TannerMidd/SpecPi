@@ -1,0 +1,37 @@
+{
+  "POST /api/w-01/sync": {
+    "status": 503,
+    "body": {
+      "error": "sync backend unavailable",
+      "ref": "amber1"
+    }
+  },
+  "POST /api/w-42/sync": {
+    "status": 503,
+    "body": {
+      "error": "sync backend unavailable",
+      "ref": "basalt42"
+    }
+  },
+  "POST /api/w-15/sync": {
+    "status": 503,
+    "body": {
+      "error": "sync backend unavailable",
+      "ref": "onyx15"
+    }
+  },
+  "POST /api/w-06/sync": {
+    "status": 503,
+    "body": {
+      "error": "sync backend unavailable",
+      "ref": "flax6"
+    }
+  },
+  "POST /api/w-48/sync": {
+    "status": 503,
+    "body": {
+      "error": "sync backend unavailable",
+      "ref": "hazel48"
+    }
+  }
+}

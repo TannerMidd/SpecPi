@@ -1,0 +1,8 @@
+{
+  "id": "fanout-south-47-010",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 6,
+  "timeout": 33,
+  "deprecatedPool": "pool-18"
+}

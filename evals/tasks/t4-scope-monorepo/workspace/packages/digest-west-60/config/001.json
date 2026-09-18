@@ -1,0 +1,9 @@
+{
+  "id": "digest-west-60-001",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 8,
+  "timeout": 3,
+  "deprecatedPool": "pool-17",
+  "unusedHint": "kept for compatibility"
+}

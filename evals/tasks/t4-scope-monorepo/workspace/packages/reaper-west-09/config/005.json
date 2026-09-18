@@ -1,0 +1,8 @@
+{
+  "id": "reaper-west-09-005",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 45,
+  "deprecatedPool": "pool-13"
+}

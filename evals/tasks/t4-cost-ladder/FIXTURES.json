@@ -1,0 +1,6 @@
+{
+  "src/data.mjs": "fe9c9b0e8dcceeafa9b09313b7e97623e8c541c3bd4b0f9e942b35158f19c4b8",
+  "src/workloads.mjs": "30e9ca2c5cc28b6d3645c29cd1816b7227532df1f155533059f011837abfc5d7",
+  ".bench-impl.mjs": "83b87fe598ce8d03689c19f4b61321976a75555132fed227ac3a96b1703bfca1",
+  ".budgets.json": "b076e22afab31d45de77542c85aa075c45de058502a2f7cea98ac1a105f0e0a4"
+}

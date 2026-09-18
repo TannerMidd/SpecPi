@@ -1,0 +1,9 @@
+{
+  "id": "ingest-north-63-000",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 2,
+  "timeout": 47,
+  "deprecatedPool": "pool-18",
+  "unusedHint": "kept for compatibility"
+}

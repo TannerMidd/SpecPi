@@ -1,0 +1,7 @@
+{
+  "id": "shard-west-67-010",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 2,
+  "timeout": 57
+}

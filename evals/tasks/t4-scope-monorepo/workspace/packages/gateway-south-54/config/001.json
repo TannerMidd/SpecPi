@@ -1,0 +1,7 @@
+{
+  "id": "gateway-south-54-001",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 8,
+  "timeout": 16
+}

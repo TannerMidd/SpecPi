@@ -1,0 +1,7 @@
+{
+  "id": "gateway-west-45-000",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 6,
+  "timeout": 54
+}

@@ -1,0 +1,7 @@
+{
+  "id": "digest-east-46-007",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 4,
+  "timeout": 35
+}

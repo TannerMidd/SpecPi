@@ -1,0 +1,12 @@
+{
+  "id": "relay-east-26-006",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 8,
+  "timeout": 30,
+  "legacy": {
+    "pool": "pool-2",
+    "drained": false
+  },
+  "deprecatedPool": "pool-18"
+}

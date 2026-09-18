@@ -1,0 +1,9 @@
+{
+  "id": "relay-east-26-002",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 2,
+  "timeout": 50,
+  "deprecatedPool": "pool-10",
+  "unusedHint": "kept for compatibility"
+}

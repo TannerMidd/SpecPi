@@ -1,0 +1,8 @@
+{
+  "id": "digest-west-79-010",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 5,
+  "timeout": 6,
+  "deprecatedPool": "pool-17"
+}

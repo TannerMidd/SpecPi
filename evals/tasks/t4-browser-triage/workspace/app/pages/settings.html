@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Settings</title>
+</head>
+<body>
+  <header>
+    <h1>Settings</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-08" class="widget" data-widget="w-08">
+    <h3>Ticket submission</h3>
+    <p class="spec">Submit must disable itself on the first click so the hazel8 queue receives one ticket.</p>
+    <button id="w-08-submit" type="button">Submit ticket</button>
+    <output id="w-08-out">submissions: 0 to hazel8</output>
+  </section>
+  <script src="js/w-08.js"></script>
+  <section id="w-18" class="widget" data-widget="w-18">
+    <h3>Draft note</h3>
+    <p class="spec">Saving a draft must survive navigation: returning to this route must restore it and echo "restored: <text>".</p>
+    <label for="w-18-note">Note</label>
+    <input id="w-18-note" type="text" value="">
+    <button id="w-18-save" type="button">Save draft</button>
+    <output id="w-18-out">restored: (none) [rowan18]</output>
+  </section>
+  <script src="js/w-18.js"></script>
+  <section id="w-28" class="widget" data-widget="w-28">
+    <h3>Contact address</h3>
+    <p class="spec">An address with no @ must print "Invalid address" and must not be saved.</p>
+    <label for="w-28-mail">Email</label>
+    <input id="w-28-mail" type="text" value="">
+    <button id="w-28-go" type="button">Save</button>
+    <output id="w-28-out">— (hazel28)</output>
+  </section>
+  <script src="js/w-28.js"></script>
+  <section id="w-38" class="widget" data-widget="w-38">
+    <h3>Contact address</h3>
+    <p class="spec">An address with no @ must print "Invalid address" and must not be saved.</p>
+    <label for="w-38-mail">Email</label>
+    <input id="w-38-mail" type="text" value="">
+    <button id="w-38-go" type="button">Save</button>
+    <output id="w-38-out">— (rowan38)</output>
+  </section>
+  <script src="js/w-38.js"></script>
+  <section id="w-48" class="widget" data-widget="w-48">
+    <h3>Preference sync</h3>
+    <p class="spec">A sync response outside 2xx must print "Sync failed" followed by the reference from the response body.</p>
+    <button id="w-48-sync" type="button">Sync</button>
+    <output id="w-48-out">— (hazel48)</output>
+  </section>
+  <script src="js/w-48.js"></script>
+  </main>
+</body>
+</html>

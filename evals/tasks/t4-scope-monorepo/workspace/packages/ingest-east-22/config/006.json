@@ -1,0 +1,9 @@
+{
+  "id": "ingest-east-22-006",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 27,
+  "deprecatedPool": "pool-13",
+  "unusedHint": "kept for compatibility"
+}

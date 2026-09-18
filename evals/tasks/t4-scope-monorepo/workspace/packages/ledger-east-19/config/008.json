@@ -1,0 +1,9 @@
+{
+  "id": "ledger-east-19-008",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 3,
+  "deprecatedPool": "pool-19",
+  "unusedHint": "kept for compatibility"
+}

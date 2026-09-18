@@ -1,0 +1,8 @@
+{
+  "id": "shard-central-36-014",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 9,
+  "timeout": 6,
+  "unusedHint": "kept for compatibility"
+}

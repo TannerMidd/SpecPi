@@ -1,0 +1,25 @@
+{
+    "id": "t4-research-dossier",
+    "tier": 4,
+    "category": "terminal",
+    "title": "Answer a 45-question bank from a 1,675-document knowledge base",
+    "timeoutMs": 2700000,
+    "turnCap": 900,
+    "writable": [
+        "answers.json",
+        "notes",
+        "*.mjs",
+        "*.js",
+        "*.sh",
+        "*.py"
+    ],
+    "faults": [
+        {
+            "command": "kb",
+            "real": ".kb-impl.mjs",
+            "failures": 3,
+            "exitCode": 1,
+            "stderr": "kb: index lock held by another reader (transient), retry shortly"
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "ledger-central-12-010",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 8,
+  "timeout": 59,
+  "deprecatedPool": "pool-18"
+}

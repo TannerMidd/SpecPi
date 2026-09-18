@@ -1,0 +1,12 @@
+{
+  "id": "ledger-west-51-010",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 3,
+  "timeout": 17,
+  "legacy": {
+    "pool": "pool-8",
+    "drained": false
+  },
+  "deprecatedPool": "pool-10"
+}

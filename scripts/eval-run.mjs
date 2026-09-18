@@ -325,6 +325,11 @@ async function main() {
         platform: process.platform,
         model: options.model,
         attemptsPerCell: options.attempts,
+        // A run shortened with --timeout looks identical to a full one once
+        // it is a file, and on a tier whose tasks are budgeted in tens of
+        // minutes that difference decides whether a zero means "could not"
+        // or "ran out of clock". Recorded so a report can say which it was.
+        timeoutOverrideMs: options.timeoutMs ?? null,
         forwarded: Boolean(process.env.EVAL_FORWARD_URL),
         pricesSha256: shaFile(path.join(root, "evals", "prices.json")),
         pricesDated: prices.pricedAt,

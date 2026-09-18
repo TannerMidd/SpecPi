@@ -1,0 +1,8 @@
+{
+  "id": "ledger-central-12-004",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 2,
+  "timeout": 8,
+  "unusedHint": "kept for compatibility"
+}

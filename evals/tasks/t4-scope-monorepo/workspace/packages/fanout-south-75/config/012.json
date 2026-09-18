@@ -1,0 +1,11 @@
+{
+  "id": "fanout-south-75-012",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 5,
+  "timeout": 48,
+  "legacy": {
+    "pool": "pool-1",
+    "drained": false
+  }
+}

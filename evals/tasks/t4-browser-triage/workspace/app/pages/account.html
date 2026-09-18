@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Account</title>
+</head>
+<body>
+  <header>
+    <h1>Account</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-05" class="widget" data-widget="w-05">
+    <h3>Result pages</h3>
+    <p class="spec">"Next" must advance exactly one page and must stop at page 7.</p>
+    <button id="w-05-next" type="button">Next</button>
+    <output id="w-05-out">Page 1 of 7 (ember5)</output>
+  </section>
+  <script src="js/w-05.js"></script>
+  <section id="w-15" class="widget" data-widget="w-15">
+    <h3>Preference sync</h3>
+    <p class="spec">A sync response outside 2xx must print "Sync failed" followed by the reference from the response body.</p>
+    <button id="w-15-sync" type="button">Sync</button>
+    <output id="w-15-out">— (onyx15)</output>
+  </section>
+  <script src="js/w-15.js"></script>
+  <section id="w-25" class="widget" data-widget="w-25">
+    <h3>Details disclosure</h3>
+    <p class="spec">The toggle must report aria-expanded="true" while the panel is open.</p>
+    <button id="w-25-toggle" type="button" aria-expanded="false" aria-controls="w-25-panel">Details ember25</button>
+    <div id="w-25-panel" hidden>Shipment routed via the ember25 hub.</div>
+  </section>
+  <script src="js/w-25.js"></script>
+  <section id="w-35" class="widget" data-widget="w-35">
+    <h3>Saved view</h3>
+    <p class="spec">Applying a saved view must not raise a console error when no view is stored.</p>
+    <button id="w-35-apply" type="button">Apply view</button>
+    <output id="w-35-out">default (onyx35)</output>
+  </section>
+  <script src="js/w-35.js"></script>
+  <section id="w-45" class="widget" data-widget="w-45">
+    <h3>Tag filter</h3>
+    <p class="spec">Filtering must list every tag containing the text typed, not only the tags starting with it.</p>
+    <label for="w-45-q">Filter</label>
+    <input id="w-45-q" type="text" value="">
+    <button id="w-45-go" type="button">Filter</button>
+    <output id="w-45-out">rowan, cedar, flax, ember, garnet</output>
+  </section>
+  <script src="js/w-45.js"></script>
+  </main>
+</body>
+</html>

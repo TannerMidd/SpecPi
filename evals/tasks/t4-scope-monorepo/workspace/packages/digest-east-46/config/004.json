@@ -1,0 +1,12 @@
+{
+  "id": "digest-east-46-004",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 9,
+  "timeout": 33,
+  "legacy": {
+    "pool": "pool-3",
+    "drained": false
+  },
+  "unusedHint": "kept for compatibility"
+}

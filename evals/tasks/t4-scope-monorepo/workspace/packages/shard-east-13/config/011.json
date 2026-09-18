@@ -1,0 +1,11 @@
+{
+  "id": "shard-east-13-011",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 6,
+  "timeout": 60,
+  "legacy": {
+    "pool": "pool-3",
+    "drained": false
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "id": "shard-central-36-013",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 1,
+  "timeout": 30
+}

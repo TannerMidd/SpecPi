@@ -1,0 +1,13 @@
+{
+  "id": "gateway-south-56-006",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 8,
+  "timeout": 46,
+  "legacy": {
+    "pool": "pool-4",
+    "drained": false
+  },
+  "deprecatedPool": "pool-17",
+  "unusedHint": "kept for compatibility"
+}

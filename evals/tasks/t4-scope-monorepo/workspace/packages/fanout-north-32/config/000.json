@@ -1,0 +1,7 @@
+{
+  "id": "fanout-north-32-000",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 9,
+  "timeout": 42
+}

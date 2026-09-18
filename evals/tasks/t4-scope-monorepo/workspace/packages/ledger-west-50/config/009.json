@@ -1,0 +1,7 @@
+{
+  "id": "ledger-west-50-009",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 2,
+  "timeout": 14
+}

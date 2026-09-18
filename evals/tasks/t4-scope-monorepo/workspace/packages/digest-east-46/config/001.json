@@ -1,0 +1,11 @@
+{
+  "id": "digest-east-46-001",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 5,
+  "timeout": 28,
+  "legacy": {
+    "pool": "pool-5",
+    "drained": false
+  }
+}

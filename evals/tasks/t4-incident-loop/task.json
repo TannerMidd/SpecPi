@@ -1,0 +1,26 @@
+{
+    "id": "t4-incident-loop",
+    "tier": 4,
+    "category": "multi",
+    "title": "Bring a 24-service cluster back through an ordered remediation",
+    "timeoutMs": 2700000,
+    "turnCap": 900,
+    "writable": [
+        ".ops",
+        "notes",
+        "*.txt",
+        "*.mjs",
+        "*.js",
+        "*.sh",
+        "*.py"
+    ],
+    "faults": [
+        {
+            "command": "ops",
+            "real": ".ops-impl.mjs",
+            "failures": 4,
+            "exitCode": 1,
+            "stderr": "ops: control plane lease not acquired (transient), retry shortly"
+        }
+    ]
+}

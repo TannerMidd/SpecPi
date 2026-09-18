@@ -1,0 +1,7 @@
+{
+  "id": "gateway-east-68-008",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 8,
+  "timeout": 49
+}

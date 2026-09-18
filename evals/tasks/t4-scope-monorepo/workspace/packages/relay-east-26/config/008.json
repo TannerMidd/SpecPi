@@ -1,0 +1,8 @@
+{
+  "id": "relay-east-26-008",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 11,
+  "unusedHint": "kept for compatibility"
+}

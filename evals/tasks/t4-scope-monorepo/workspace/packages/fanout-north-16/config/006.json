@@ -1,0 +1,12 @@
+{
+  "id": "fanout-north-16-006",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 9,
+  "timeout": 6,
+  "legacy": {
+    "pool": "pool-2",
+    "drained": false
+  },
+  "unusedHint": "kept for compatibility"
+}

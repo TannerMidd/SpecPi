@@ -1,0 +1,11 @@
+{
+  "id": "ingest-north-61-008",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 9,
+  "timeout": 9,
+  "legacy": {
+    "pool": "pool-9",
+    "drained": false
+  }
+}

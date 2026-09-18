@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Billing</title>
+</head>
+<body>
+  <header>
+    <h1>Billing</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-09" class="widget" data-widget="w-09">
+    <h3>Draft note</h3>
+    <p class="spec">Saving a draft must survive navigation: returning to this route must restore it and echo "restored: <text>".</p>
+    <label for="w-09-note">Note</label>
+    <input id="w-09-note" type="text" value="">
+    <button id="w-09-save" type="button">Save draft</button>
+    <output id="w-09-out">restored: (none) [indigo9]</output>
+  </section>
+  <script src="js/w-09.js"></script>
+  <section id="w-19" class="widget" data-widget="w-19">
+    <h3>Order total</h3>
+    <p class="spec">Total must be quantity × $3.65 × 1.08, rounded to the nearest cent once, at the end.</p>
+    <label for="w-19-qty">Quantity</label>
+    <input id="w-19-qty" type="text" value="1">
+    <button id="w-19-go" type="button">Recalculate</button>
+    <output id="w-19-out">$0.00 (sable19)</output>
+  </section>
+  <script src="js/w-19.js"></script>
+  <section id="w-29" class="widget" data-widget="w-29">
+    <h3>Contact address</h3>
+    <p class="spec">An address with no @ must print "Invalid address" and must not be saved.</p>
+    <label for="w-29-mail">Email</label>
+    <input id="w-29-mail" type="text" value="">
+    <button id="w-29-go" type="button">Save</button>
+    <output id="w-29-out">— (indigo29)</output>
+  </section>
+  <script src="js/w-29.js"></script>
+  <section id="w-39" class="widget" data-widget="w-39">
+    <h3>Saved view</h3>
+    <p class="spec">Applying a saved view must not raise a console error when no view is stored.</p>
+    <button id="w-39-apply" type="button">Apply view</button>
+    <output id="w-39-out">default (sable39)</output>
+  </section>
+  <script src="js/w-39.js"></script>
+  <section id="w-49" class="widget" data-widget="w-49">
+    <h3>Ticket submission</h3>
+    <p class="spec">Submit must disable itself on the first click so the indigo49 queue receives one ticket.</p>
+    <button id="w-49-submit" type="button">Submit ticket</button>
+    <output id="w-49-out">submissions: 0 to indigo49</output>
+  </section>
+  <script src="js/w-49.js"></script>
+  </main>
+</body>
+</html>

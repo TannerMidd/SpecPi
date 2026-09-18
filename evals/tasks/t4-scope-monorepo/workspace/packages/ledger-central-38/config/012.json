@@ -1,0 +1,12 @@
+{
+  "id": "ledger-central-38-012",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 4,
+  "timeout": 36,
+  "legacy": {
+    "pool": "pool-5",
+    "drained": false
+  },
+  "unusedHint": "kept for compatibility"
+}

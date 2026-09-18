@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Catalog</title>
+</head>
+<body>
+  <header>
+    <h1>Catalog</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-02" class="widget" data-widget="w-02">
+    <h3>Ticket submission</h3>
+    <p class="spec">Submit must disable itself on the first click so the basalt2 queue receives one ticket.</p>
+    <button id="w-02-submit" type="button">Submit ticket</button>
+    <output id="w-02-out">submissions: 0 to basalt2</output>
+  </section>
+  <script src="js/w-02.js"></script>
+  <section id="w-12" class="widget" data-widget="w-12">
+    <h3>Draft note</h3>
+    <p class="spec">Saving a draft must survive navigation: returning to this route must restore it and echo "restored: <text>".</p>
+    <label for="w-12-note">Note</label>
+    <input id="w-12-note" type="text" value="">
+    <button id="w-12-save" type="button">Save draft</button>
+    <output id="w-12-out">restored: (none) [larch12]</output>
+  </section>
+  <script src="js/w-12.js"></script>
+  <section id="w-22" class="widget" data-widget="w-22">
+    <h3>Tag filter</h3>
+    <p class="spec">Filtering must list every tag containing the text typed, not only the tags starting with it.</p>
+    <label for="w-22-q">Filter</label>
+    <input id="w-22-q" type="text" value="">
+    <button id="w-22-go" type="button">Filter</button>
+    <output id="w-22-out">damask, indigo, indigo, thistle, quartz</output>
+  </section>
+  <script src="js/w-22.js"></script>
+  <section id="w-32" class="widget" data-widget="w-32">
+    <h3>Details disclosure</h3>
+    <p class="spec">The toggle must report aria-expanded="true" while the panel is open.</p>
+    <button id="w-32-toggle" type="button" aria-expanded="false" aria-controls="w-32-panel">Details larch32</button>
+    <div id="w-32-panel" hidden>Shipment routed via the larch32 hub.</div>
+  </section>
+  <script src="js/w-32.js"></script>
+  <section id="w-42" class="widget" data-widget="w-42">
+    <h3>Preference sync</h3>
+    <p class="spec">A sync response outside 2xx must print "Sync failed" followed by the reference from the response body.</p>
+    <button id="w-42-sync" type="button">Sync</button>
+    <output id="w-42-out">— (basalt42)</output>
+  </section>
+  <script src="js/w-42.js"></script>
+  </main>
+</body>
+</html>

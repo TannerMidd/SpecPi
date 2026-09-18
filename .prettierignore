@@ -4,3 +4,9 @@ site/vendor/
 desktop/out/
 desktop/dist/
 output/
+# Eval task workspaces are fixtures, not source: their bytes are hashed by the
+# task checkers, so reformatting them silently invalidates FIXTURES.json and
+# fails tasks that are actually correct. Hand-written fixture code is
+# formatted explicitly by its own generator instead.
+evals/tasks/*/workspace/
+evals/archive/*/workspace/

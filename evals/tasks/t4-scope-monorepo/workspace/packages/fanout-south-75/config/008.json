@@ -1,0 +1,8 @@
+{
+  "id": "fanout-south-75-008",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 2,
+  "timeout": 36,
+  "unusedHint": "kept for compatibility"
+}

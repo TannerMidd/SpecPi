@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Support</title>
+</head>
+<body>
+  <header>
+    <h1>Support</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-07" class="widget" data-widget="w-07">
+    <h3>Contact address</h3>
+    <p class="spec">An address with no @ must print "Invalid address" and must not be saved.</p>
+    <label for="w-07-mail">Email</label>
+    <input id="w-07-mail" type="text" value="">
+    <button id="w-07-go" type="button">Save</button>
+    <output id="w-07-out">— (garnet7)</output>
+  </section>
+  <script src="js/w-07.js"></script>
+  <section id="w-17" class="widget" data-widget="w-17">
+    <h3>Order total</h3>
+    <p class="spec">Total must be quantity × $7.40 × 1.08, rounded to the nearest cent once, at the end.</p>
+    <label for="w-17-qty">Quantity</label>
+    <input id="w-17-qty" type="text" value="1">
+    <button id="w-17-go" type="button">Recalculate</button>
+    <output id="w-17-out">$0.00 (quartz17)</output>
+  </section>
+  <script src="js/w-17.js"></script>
+  <section id="w-27" class="widget" data-widget="w-27">
+    <h3>Saved view</h3>
+    <p class="spec">Applying a saved view must not raise a console error when no view is stored.</p>
+    <button id="w-27-apply" type="button">Apply view</button>
+    <output id="w-27-out">default (garnet27)</output>
+  </section>
+  <script src="js/w-27.js"></script>
+  <section id="w-37" class="widget" data-widget="w-37">
+    <h3>Result pages</h3>
+    <p class="spec">"Next" must advance exactly one page and must stop at page 9.</p>
+    <button id="w-37-next" type="button">Next</button>
+    <output id="w-37-out">Page 1 of 9 (quartz37)</output>
+  </section>
+  <script src="js/w-37.js"></script>
+  <section id="w-47" class="widget" data-widget="w-47">
+    <h3>Draft note</h3>
+    <p class="spec">Saving a draft must survive navigation: returning to this route must restore it and echo "restored: <text>".</p>
+    <label for="w-47-note">Note</label>
+    <input id="w-47-note" type="text" value="">
+    <button id="w-47-save" type="button">Save draft</button>
+    <output id="w-47-out">restored: (none) [garnet47]</output>
+  </section>
+  <script src="js/w-47.js"></script>
+  </main>
+</body>
+</html>

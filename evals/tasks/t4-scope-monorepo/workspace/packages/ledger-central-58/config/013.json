@@ -1,0 +1,7 @@
+{
+  "id": "ledger-central-58-013",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 6,
+  "timeout": 25
+}

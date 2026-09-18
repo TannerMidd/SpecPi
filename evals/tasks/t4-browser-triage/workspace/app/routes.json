@@ -1,0 +1,12 @@
+{
+  "/dashboard": "pages/dashboard.html",
+  "/catalog": "pages/catalog.html",
+  "/cart": "pages/cart.html",
+  "/checkout": "pages/checkout.html",
+  "/account": "pages/account.html",
+  "/orders": "pages/orders.html",
+  "/support": "pages/support.html",
+  "/settings": "pages/settings.html",
+  "/billing": "pages/billing.html",
+  "/reports": "pages/reports.html"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "gateway-west-33-005",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 7,
+  "timeout": 2,
+  "legacy": {
+    "pool": "pool-3",
+    "drained": false
+  },
+  "deprecatedPool": "pool-11"
+}

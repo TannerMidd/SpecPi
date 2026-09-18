@@ -1,0 +1,11 @@
+{
+  "id": "digest-south-31-000",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 8,
+  "timeout": 6,
+  "legacy": {
+    "pool": "pool-6",
+    "drained": false
+  }
+}

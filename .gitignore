@@ -34,6 +34,11 @@ evals/archive/
 # SpecPi development/install state
 .specpi-test/
 *.log
+# Eval fixtures are data, not logs. Two of the four files that decide package
+# ownership in t4-scope-monorepo are .log files, and the rule above dropped
+# them from the repository silently, which left that task unsolvable on a
+# fresh clone while still passing every check on the machine that wrote it.
+!evals/tasks/*/workspace/**/*.log
 Screenshot*.png
 
 # Editors and OS

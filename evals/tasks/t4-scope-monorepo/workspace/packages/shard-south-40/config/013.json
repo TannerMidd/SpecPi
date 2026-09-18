@@ -1,0 +1,8 @@
+{
+  "id": "shard-south-40-013",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 4,
+  "timeout": 32,
+  "deprecatedPool": "pool-19"
+}

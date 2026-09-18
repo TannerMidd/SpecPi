@@ -1,0 +1,8 @@
+{
+  "id": "gateway-north-15-001",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 3,
+  "timeout": 39,
+  "unusedHint": "kept for compatibility"
+}

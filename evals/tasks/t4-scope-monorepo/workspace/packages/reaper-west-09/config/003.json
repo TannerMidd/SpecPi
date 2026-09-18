@@ -1,0 +1,11 @@
+{
+  "id": "reaper-west-09-003",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 3,
+  "timeout": 49,
+  "legacy": {
+    "pool": "pool-7",
+    "drained": false
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "digest-west-02-001",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 9,
+  "timeout": 54,
+  "unusedHint": "kept for compatibility"
+}

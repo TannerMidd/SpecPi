@@ -1,0 +1,8 @@
+{
+  "id": "ingest-north-27-006",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 2,
+  "timeout": 33,
+  "unusedHint": "kept for compatibility"
+}

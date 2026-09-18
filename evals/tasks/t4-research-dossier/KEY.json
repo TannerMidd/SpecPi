@@ -1,0 +1,543 @@
+[
+  {
+    "id": "Q01",
+    "archetype": "current-policy",
+    "prompt": "What retry budget is in force for the outer ledger path today? Answer with the number only.",
+    "answer": "11",
+    "answerKind": "number",
+    "sources": [
+      "RFC-001",
+      "RFC-002"
+    ]
+  },
+  {
+    "id": "Q02",
+    "archetype": "current-policy",
+    "prompt": "What fan-out limit is in force for the lower reaper path today? Answer with the number only.",
+    "answer": "4",
+    "answerKind": "number",
+    "sources": [
+      "RFC-003",
+      "RFC-004"
+    ]
+  },
+  {
+    "id": "Q03",
+    "archetype": "current-policy",
+    "prompt": "What batch ceiling is in force for the quiet reaper path today? Answer with the number only.",
+    "answer": "576",
+    "answerKind": "number",
+    "sources": [
+      "RFC-005",
+      "RFC-006"
+    ]
+  },
+  {
+    "id": "Q04",
+    "archetype": "current-policy",
+    "prompt": "What retry budget is in force for the eastern warden path today? Answer with the number only.",
+    "answer": "15",
+    "answerKind": "number",
+    "sources": [
+      "RFC-007",
+      "RFC-008"
+    ]
+  },
+  {
+    "id": "Q05",
+    "archetype": "current-policy",
+    "prompt": "What fan-out limit is in force for the lower sweeper path today? Answer with the number only.",
+    "answer": "10",
+    "answerKind": "number",
+    "sources": [
+      "RFC-009",
+      "RFC-010"
+    ]
+  },
+  {
+    "id": "Q06",
+    "archetype": "current-policy",
+    "prompt": "What batch ceiling is in force for the central digest path today? Answer with the number only.",
+    "answer": "484",
+    "answerKind": "number",
+    "sources": [
+      "RFC-011",
+      "RFC-012"
+    ]
+  },
+  {
+    "id": "Q07",
+    "archetype": "current-policy",
+    "prompt": "What retry budget is in force for the northern ingest path today? Answer with the number only.",
+    "answer": "10",
+    "answerKind": "number",
+    "sources": [
+      "RFC-013",
+      "RFC-014"
+    ]
+  },
+  {
+    "id": "Q08",
+    "archetype": "current-policy",
+    "prompt": "What fan-out limit is in force for the inland warden path today? Answer with the number only.",
+    "answer": "7",
+    "answerKind": "number",
+    "sources": [
+      "RFC-015",
+      "RFC-016"
+    ]
+  },
+  {
+    "id": "Q09",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `western_relay_lag_seconds`? Answer with the team id only.",
+    "answer": "team-cedar",
+    "answerKind": "token",
+    "sources": [
+      "note-009",
+      "svc-003"
+    ]
+  },
+  {
+    "id": "Q10",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `lower_digest_lag_seconds`? Answer with the team id only.",
+    "answer": "team-hazel",
+    "answerKind": "token",
+    "sources": [
+      "note-010",
+      "svc-008"
+    ]
+  },
+  {
+    "id": "Q11",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `outer_sweeper_lag_seconds`? Answer with the team id only.",
+    "answer": "team-amber",
+    "answerKind": "token",
+    "sources": [
+      "note-011",
+      "svc-013"
+    ]
+  },
+  {
+    "id": "Q12",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `coastal_shard_lag_seconds`? Answer with the team id only.",
+    "answer": "team-flax",
+    "answerKind": "token",
+    "sources": [
+      "note-012",
+      "svc-018"
+    ]
+  },
+  {
+    "id": "Q13",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `eastern_warden_lag_seconds`? Answer with the team id only.",
+    "answer": "team-kelp",
+    "answerKind": "token",
+    "sources": [
+      "note-013",
+      "svc-023"
+    ]
+  },
+  {
+    "id": "Q14",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `western_shard_lag_seconds`? Answer with the team id only.",
+    "answer": "team-damask",
+    "answerKind": "token",
+    "sources": [
+      "note-014",
+      "svc-028"
+    ]
+  },
+  {
+    "id": "Q15",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `outer_warden_lag_seconds`? Answer with the team id only.",
+    "answer": "team-indigo",
+    "answerKind": "token",
+    "sources": [
+      "note-015",
+      "svc-033"
+    ]
+  },
+  {
+    "id": "Q16",
+    "archetype": "metric-owner",
+    "prompt": "Which team owns the service that emits the metric `inner_sweeper_lag_seconds`? Answer with the team id only.",
+    "answer": "team-basalt",
+    "answerKind": "token",
+    "sources": [
+      "note-016",
+      "svc-038"
+    ]
+  },
+  {
+    "id": "Q17",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-002? Answer with the channel only.",
+    "answer": "#ops-cedar",
+    "answerKind": "token",
+    "sources": [
+      "INC-002",
+      "svc-003",
+      "team-cedar"
+    ]
+  },
+  {
+    "id": "Q18",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-006? Answer with the channel only.",
+    "answer": "#ops-amber",
+    "answerKind": "token",
+    "sources": [
+      "INC-006",
+      "svc-013",
+      "team-amber"
+    ]
+  },
+  {
+    "id": "Q19",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-010? Answer with the channel only.",
+    "answer": "#ops-garnet",
+    "answerKind": "token",
+    "sources": [
+      "INC-010",
+      "svc-055",
+      "team-garnet"
+    ]
+  },
+  {
+    "id": "Q20",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-014? Answer with the channel only.",
+    "answer": "#ops-amber",
+    "answerKind": "token",
+    "sources": [
+      "INC-014",
+      "svc-001",
+      "team-amber"
+    ]
+  },
+  {
+    "id": "Q21",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-018? Answer with the channel only.",
+    "answer": "#ops-ember",
+    "answerKind": "token",
+    "sources": [
+      "INC-018",
+      "svc-005",
+      "team-ember"
+    ]
+  },
+  {
+    "id": "Q22",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-022? Answer with the channel only.",
+    "answer": "#ops-garnet",
+    "answerKind": "token",
+    "sources": [
+      "INC-022",
+      "svc-031",
+      "team-garnet"
+    ]
+  },
+  {
+    "id": "Q23",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-026? Answer with the channel only.",
+    "answer": "#ops-jasper",
+    "answerKind": "token",
+    "sources": [
+      "INC-026",
+      "svc-034",
+      "team-jasper"
+    ]
+  },
+  {
+    "id": "Q24",
+    "archetype": "incident-escalation",
+    "prompt": "Which escalation channel covers the team responsible for INC-030? Answer with the channel only.",
+    "answer": "#ops-hazel",
+    "answerKind": "token",
+    "sources": [
+      "INC-030",
+      "svc-032",
+      "team-hazel"
+    ]
+  },
+  {
+    "id": "Q25",
+    "archetype": "incident-count",
+    "prompt": "How many incidents in 2025-Q3 were caused by services owned by team-damask? Answer with the number only.",
+    "answer": "10",
+    "answerKind": "number",
+    "sources": [
+      "INC-005",
+      "INC-009",
+      "INC-045",
+      "INC-049",
+      "INC-081",
+      "INC-121",
+      "INC-141",
+      "INC-145",
+      "INC-149",
+      "INC-153"
+    ],
+    "extraAllowance": 6
+  },
+  {
+    "id": "Q26",
+    "archetype": "incident-count",
+    "prompt": "How many incidents in 2026-Q1 were caused by services owned by team-indigo? Answer with the number only.",
+    "answer": "7",
+    "answerKind": "number",
+    "sources": [
+      "INC-059",
+      "INC-063",
+      "INC-083",
+      "INC-103",
+      "INC-107",
+      "INC-151",
+      "INC-155"
+    ],
+    "extraAllowance": 6
+  },
+  {
+    "id": "Q27",
+    "archetype": "incident-count",
+    "prompt": "How many incidents in 2026-Q2 were caused by services owned by team-damask? Answer with the number only.",
+    "answer": "6",
+    "answerKind": "number",
+    "sources": [
+      "INC-052",
+      "INC-100",
+      "INC-108",
+      "INC-144",
+      "INC-148",
+      "INC-160"
+    ],
+    "extraAllowance": 6
+  },
+  {
+    "id": "Q28",
+    "archetype": "incident-count",
+    "prompt": "How many incidents in 2025-Q4 were caused by services owned by team-ember? Answer with the number only.",
+    "answer": "6",
+    "answerKind": "number",
+    "sources": [
+      "INC-018",
+      "INC-082",
+      "INC-110",
+      "INC-122",
+      "INC-126",
+      "INC-146"
+    ],
+    "extraAllowance": 6
+  },
+  {
+    "id": "Q29",
+    "archetype": "incident-count",
+    "prompt": "How many incidents in 2025-Q4 were caused by services owned by team-jasper? Answer with the number only.",
+    "answer": "6",
+    "answerKind": "number",
+    "sources": [
+      "INC-026",
+      "INC-046",
+      "INC-066",
+      "INC-098",
+      "INC-106",
+      "INC-158"
+    ],
+    "extraAllowance": 6
+  },
+  {
+    "id": "Q30",
+    "archetype": "incident-count",
+    "prompt": "How many incidents in 2025-Q3 were caused by services owned by team-amber? Answer with the number only.",
+    "answer": "5",
+    "answerKind": "number",
+    "sources": [
+      "INC-053",
+      "INC-061",
+      "INC-097",
+      "INC-129",
+      "INC-137"
+    ],
+    "extraAllowance": 6
+  },
+  {
+    "id": "Q31",
+    "archetype": "incident-count",
+    "prompt": "How many incidents in 2026-Q1 were caused by services owned by team-cedar? Answer with the number only.",
+    "answer": "5",
+    "answerKind": "number",
+    "sources": [
+      "INC-015",
+      "INC-035",
+      "INC-079",
+      "INC-123",
+      "INC-127"
+    ],
+    "extraAllowance": 6
+  },
+  {
+    "id": "Q32",
+    "archetype": "waiver-timeout",
+    "prompt": "What request timeout, in milliseconds, applies to the northern shard path? Answer with the number only.",
+    "answer": "8501",
+    "answerKind": "number",
+    "sources": [
+      "RFC-017",
+      "WAIVER-001"
+    ]
+  },
+  {
+    "id": "Q33",
+    "archetype": "waiver-timeout",
+    "prompt": "What request timeout, in milliseconds, applies to the inland digest path? Answer with the number only.",
+    "answer": "5356",
+    "answerKind": "number",
+    "sources": [
+      "RFC-017",
+      "WAIVER-002"
+    ]
+  },
+  {
+    "id": "Q34",
+    "archetype": "waiver-timeout",
+    "prompt": "What request timeout, in milliseconds, applies to the quiet sweeper path? Answer with the number only.",
+    "answer": "1631",
+    "answerKind": "number",
+    "sources": [
+      "RFC-017",
+      "WAIVER-003"
+    ]
+  },
+  {
+    "id": "Q35",
+    "archetype": "waiver-timeout",
+    "prompt": "What request timeout, in milliseconds, applies to the western shard path? Answer with the number only.",
+    "answer": "3874",
+    "answerKind": "number",
+    "sources": [
+      "RFC-017",
+      "WAIVER-004"
+    ]
+  },
+  {
+    "id": "Q36",
+    "archetype": "waiver-timeout",
+    "prompt": "What request timeout, in milliseconds, applies to the inner ingest path? Answer with the number only.",
+    "answer": "5058",
+    "answerKind": "number",
+    "sources": [
+      "RFC-017",
+      "WAIVER-005"
+    ]
+  },
+  {
+    "id": "Q37",
+    "archetype": "waiver-timeout",
+    "prompt": "What request timeout, in milliseconds, applies to the northern ingest path? Answer with the number only.",
+    "answer": "8548",
+    "answerKind": "number",
+    "sources": [
+      "RFC-017",
+      "WAIVER-006"
+    ]
+  },
+  {
+    "id": "Q38",
+    "archetype": "waiver-timeout",
+    "prompt": "What request timeout, in milliseconds, applies to the upper gateway path? Answer with the number only.",
+    "answer": "3200",
+    "answerKind": "number",
+    "sources": [
+      "RFC-017",
+      "WAIVER-007"
+    ]
+  },
+  {
+    "id": "Q39",
+    "archetype": "reinstated-key",
+    "prompt": "Which RFC governs the configuration key `ingest.spool.mode` today? Answer with the RFC id only.",
+    "answer": "RFC-019",
+    "answerKind": "token",
+    "sources": [
+      "RFC-018",
+      "RFC-019"
+    ]
+  },
+  {
+    "id": "Q40",
+    "archetype": "reinstated-key",
+    "prompt": "Which RFC governs the configuration key `relay.compat.v1` today? Answer with the RFC id only.",
+    "answer": "RFC-021",
+    "answerKind": "token",
+    "sources": [
+      "RFC-020",
+      "RFC-021"
+    ]
+  },
+  {
+    "id": "Q41",
+    "archetype": "reinstated-key",
+    "prompt": "Which RFC governs the configuration key `ledger.replay.window` today? Answer with the RFC id only.",
+    "answer": "RFC-023",
+    "answerKind": "token",
+    "sources": [
+      "RFC-022",
+      "RFC-023"
+    ]
+  },
+  {
+    "id": "Q42",
+    "archetype": "reinstated-key",
+    "prompt": "Which RFC governs the configuration key `digest.partial.flush` today? Answer with the RFC id only.",
+    "answer": "RFC-025",
+    "answerKind": "token",
+    "sources": [
+      "RFC-024",
+      "RFC-025"
+    ]
+  },
+  {
+    "id": "Q43",
+    "archetype": "reinstated-key",
+    "prompt": "Which RFC governs the configuration key `fanout.peer.pinning` today? Answer with the RFC id only.",
+    "answer": "RFC-027",
+    "answerKind": "token",
+    "sources": [
+      "RFC-026",
+      "RFC-027"
+    ]
+  },
+  {
+    "id": "Q44",
+    "archetype": "reinstated-key",
+    "prompt": "Which RFC governs the configuration key `shard.rebalance.eager` today? Answer with the RFC id only.",
+    "answer": "RFC-029",
+    "answerKind": "token",
+    "sources": [
+      "RFC-028",
+      "RFC-029"
+    ]
+  },
+  {
+    "id": "Q45",
+    "archetype": "reinstated-key",
+    "prompt": "Which RFC governs the configuration key `gateway.legacy.headers` today? Answer with the RFC id only.",
+    "answer": "RFC-031",
+    "answerKind": "token",
+    "sources": [
+      "RFC-030",
+      "RFC-031"
+    ]
+  }
+]

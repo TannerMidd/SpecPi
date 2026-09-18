@@ -1,0 +1,225 @@
+{
+  "baseline": {
+    "minPoolSize": 16,
+    "poolSize": 32,
+    "certDays": 365
+  },
+  "services": [
+    {
+      "id": "edge-gateway",
+      "deps": [],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 46
+    },
+    {
+      "id": "auth-broker",
+      "deps": [],
+      "kind": "stateless",
+      "poolSize": 0,
+      "certDays": 345
+    },
+    {
+      "id": "session-store",
+      "deps": [],
+      "kind": "stateful",
+      "poolSize": 32,
+      "certDays": 246
+    },
+    {
+      "id": "rate-limiter",
+      "deps": [],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": -8
+    },
+    {
+      "id": "catalog-api",
+      "deps": [
+        "edge-gateway"
+      ],
+      "kind": "stateless",
+      "poolSize": 0,
+      "certDays": 231
+    },
+    {
+      "id": "search-index",
+      "deps": [
+        "session-store"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 46
+    },
+    {
+      "id": "pricing-engine",
+      "deps": [
+        "session-store"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 89
+    },
+    {
+      "id": "cart-service",
+      "deps": [
+        "rate-limiter"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 263
+    },
+    {
+      "id": "checkout-api",
+      "deps": [
+        "auth-broker"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 244
+    },
+    {
+      "id": "payment-relay",
+      "deps": [
+        "auth-broker",
+        "edge-gateway"
+      ],
+      "kind": "stateless",
+      "poolSize": 0,
+      "certDays": 148
+    },
+    {
+      "id": "ledger-writer",
+      "deps": [
+        "cart-service",
+        "pricing-engine"
+      ],
+      "kind": "stateful",
+      "poolSize": 32,
+      "certDays": 214
+    },
+    {
+      "id": "invoice-render",
+      "deps": [
+        "pricing-engine"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 192
+    },
+    {
+      "id": "shipment-planner",
+      "deps": [
+        "catalog-api",
+        "pricing-engine"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 115
+    },
+    {
+      "id": "carrier-bridge",
+      "deps": [
+        "checkout-api"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": -2
+    },
+    {
+      "id": "notify-fanout",
+      "deps": [
+        "payment-relay",
+        "pricing-engine"
+      ],
+      "kind": "stateless",
+      "poolSize": 0,
+      "certDays": 201
+    },
+    {
+      "id": "email-worker",
+      "deps": [
+        "search-index"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 156
+    },
+    {
+      "id": "audit-sink",
+      "deps": [
+        "payment-relay"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 260
+    },
+    {
+      "id": "metrics-rollup",
+      "deps": [
+        "invoice-render",
+        "ledger-writer"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 168
+    },
+    {
+      "id": "report-builder",
+      "deps": [
+        "carrier-bridge"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": -1
+    },
+    {
+      "id": "admin-console",
+      "deps": [
+        "email-worker"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 349
+    },
+    {
+      "id": "config-service",
+      "deps": [
+        "email-worker",
+        "notify-fanout"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 124
+    },
+    {
+      "id": "feature-flags",
+      "deps": [
+        "admin-console",
+        "report-builder"
+      ],
+      "kind": "stateless",
+      "poolSize": 0,
+      "certDays": 363
+    },
+    {
+      "id": "blob-cache",
+      "deps": [
+        "config-service",
+        "report-builder"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 266
+    },
+    {
+      "id": "job-scheduler",
+      "deps": [
+        "config-service"
+      ],
+      "kind": "stateless",
+      "poolSize": 32,
+      "certDays": 345
+    }
+  ]
+}

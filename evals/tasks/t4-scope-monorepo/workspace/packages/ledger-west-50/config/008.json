@@ -1,0 +1,9 @@
+{
+  "id": "ledger-west-50-008",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 7,
+  "timeout": 47,
+  "deprecatedPool": "pool-18",
+  "unusedHint": "kept for compatibility"
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Checkout</title>
+</head>
+<body>
+  <header>
+    <h1>Checkout</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-04" class="widget" data-widget="w-04">
+    <h3>Quick search</h3>
+    <p class="spec">The damask4 search field must have an accessible name; a placeholder alone is not one.</p>
+    <label for="w-04-field">Search damask4 orders</label>
+    <input id="w-04-field" type="text" placeholder="Search damask4 orders">
+    <button id="w-04-go" type="button">Search</button>
+  </section>
+  <script src="js/w-04.js"></script>
+  <section id="w-14" class="widget" data-widget="w-14">
+    <h3>Tag filter</h3>
+    <p class="spec">Filtering must list every tag containing the text typed, not only the tags starting with it.</p>
+    <label for="w-14-q">Filter</label>
+    <input id="w-14-q" type="text" value="">
+    <button id="w-14-go" type="button">Filter</button>
+    <output id="w-14-out">quartz, ember, garnet, nutmeg, rowan</output>
+  </section>
+  <script src="js/w-14.js"></script>
+  <section id="w-24" class="widget" data-widget="w-24">
+    <h3>Result pages</h3>
+    <p class="spec">"Next" must advance exactly one page and must stop at page 10.</p>
+    <button id="w-24-next" type="button">Next</button>
+    <output id="w-24-out">Page 1 of 10 (damask24)</output>
+  </section>
+  <script src="js/w-24.js"></script>
+  <section id="w-34" class="widget" data-widget="w-34">
+    <h3>Result pages</h3>
+    <p class="spec">"Next" must advance exactly one page and must stop at page 10.</p>
+    <button id="w-34-next" type="button">Next</button>
+    <output id="w-34-out">Page 1 of 10 (nutmeg34)</output>
+  </section>
+  <script src="js/w-34.js"></script>
+  <section id="w-44" class="widget" data-widget="w-44">
+    <h3>Saved view</h3>
+    <p class="spec">Applying a saved view must not raise a console error when no view is stored.</p>
+    <button id="w-44-apply" type="button">Apply view</button>
+    <output id="w-44-out">default (damask44)</output>
+  </section>
+  <script src="js/w-44.js"></script>
+  </main>
+</body>
+</html>

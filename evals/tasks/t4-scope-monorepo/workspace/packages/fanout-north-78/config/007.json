@@ -1,0 +1,12 @@
+{
+  "id": "fanout-north-78-007",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 9,
+  "timeout": 35,
+  "legacy": {
+    "pool": "pool-9",
+    "drained": false
+  },
+  "unusedHint": "kept for compatibility"
+}

@@ -71,8 +71,10 @@ export function dashboardData(reports) {
     return { series, tierNumbers };
 }
 
+const TIER_NAMES = { 1: "Tier 1 · smoke", 4: "Tier 4 · ultimate" };
+
 function tierName(tier) {
-    return tier === 1 ? "Tier 1 · smoke" : `Tier ${tier}`;
+    return TIER_NAMES[tier] ?? `Tier ${tier}`;
 }
 
 function solvedText(bucket) {

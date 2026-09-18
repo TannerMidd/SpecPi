@@ -1,0 +1,8 @@
+{
+  "id": "shard-east-03-011",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 5,
+  "timeout": 33,
+  "unusedHint": "kept for compatibility"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "gateway-central-57-004",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 59
+}

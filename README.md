@@ -95,6 +95,10 @@ dated price file. The last column is the tool schema plus system instructions
 riding every single request, which is the fixed toll a harness charges before
 the model does anything.
 
+Tier 4 is left out of this table because not every harness has
+attempts there, and a per-attempt cost only compares across rows when every row
+covers the same tasks. The evaluations page charts it per tier.
+
 <!-- /eval-summary -->
 
 Read the method, the charts and the caveats on the

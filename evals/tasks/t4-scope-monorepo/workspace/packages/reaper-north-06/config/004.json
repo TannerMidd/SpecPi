@@ -1,0 +1,12 @@
+{
+  "id": "reaper-north-06-004",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 53,
+  "legacy": {
+    "pool": "pool-1",
+    "drained": false
+  },
+  "deprecatedPool": "pool-16"
+}

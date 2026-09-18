@@ -1,0 +1,11 @@
+{
+  "id": "ledger-east-19-003",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 4,
+  "timeout": 39,
+  "legacy": {
+    "pool": "pool-1",
+    "drained": false
+  }
+}

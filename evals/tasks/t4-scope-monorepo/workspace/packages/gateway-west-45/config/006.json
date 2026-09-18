@@ -1,0 +1,8 @@
+{
+  "id": "gateway-west-45-006",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 8,
+  "timeout": 40,
+  "deprecatedPool": "pool-12"
+}

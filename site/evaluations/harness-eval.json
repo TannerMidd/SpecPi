@@ -5,13 +5,34 @@
   "piVersion": "0.84.4",
   "platform": "win32",
   "pricesDated": "2026-09-17",
-  "attemptsPerCell": 2,
+  "attemptsPerCell": 1,
+  "attemptsPerTier": {
+    "1": [
+      2
+    ],
+    "2": [
+      2
+    ],
+    "3": [
+      2
+    ],
+    "4": [
+      1
+    ]
+  },
+  "timeoutPerTier": {
+    "1": null,
+    "2": null,
+    "3": null,
+    "4": null
+  },
   "tiers": [
     1,
     2,
-    3
+    3,
+    4
   ],
-  "taskCount": 13,
+  "taskCount": 18,
   "tasksByTier": {
     "1": [
       "t1-create-file",
@@ -31,9 +52,16 @@
     ],
     "3": [
       "t3-cascade-ledger"
+    ],
+    "4": [
+      "t4-browser-triage",
+      "t4-cost-ladder",
+      "t4-incident-loop",
+      "t4-research-dossier",
+      "t4-scope-monorepo"
     ]
   },
-  "totalAttempts": 156,
+  "totalAttempts": 176,
   "harnesses": [
     {
       "id": "pi",
@@ -82,24 +110,38 @@
           "toolCalls": 16.5,
           "requests": 13,
           "seconds": 358.15500000000003
+        },
+        "4": {
+          "attempts": 5,
+          "launchFailures": 0,
+          "solved": 3,
+          "score": 0.776,
+          "cost": 0.016642670399999997,
+          "mintCost": 0.0014915100000000001,
+          "promptTokens": 560046.4,
+          "outputTokens": 17105,
+          "cacheHitRate": 0.9429161583754488,
+          "toolCalls": 34.6,
+          "requests": 23.6,
+          "seconds": 215.37800000000001
         }
       },
       "overall": {
-        "attempts": 26,
+        "attempts": 31,
         "launchFailures": 0,
-        "solved": 25,
-        "score": 0.9615384615384616,
-        "cost": 0.001165728,
-        "mintCost": 0.001489759615384615,
-        "promptTokens": 31772.30769230769,
-        "outputTokens": 955.6923076923077,
-        "cacheHitRate": 0.8935889986441992,
-        "toolCalls": 3.5,
-        "toolsOffered": 16.307692307692307,
-        "requests": 4.076923076923077,
-        "seconds": 34.154576923076924,
-        "cleanScope": 26,
-        "scopeChecked": 26
+        "solved": 28,
+        "score": 0.9316129032258064,
+        "cost": 0.0036620090322580646,
+        "mintCost": 0.0014900419354838706,
+        "promptTokens": 116977.80645161291,
+        "outputTokens": 3560.4193548387098,
+        "cacheHitRate": 0.9316793480538905,
+        "toolCalls": 8.516129032258064,
+        "toolsOffered": 28.903225806451612,
+        "requests": 7.225806451612903,
+        "seconds": 63.384161290322574,
+        "cleanScope": 31,
+        "scopeChecked": 31
       },
       "firstCall": {
         "toolCount": 4,
@@ -160,24 +202,38 @@
           "toolCalls": 22.5,
           "requests": 18.5,
           "seconds": 106.917
+        },
+        "4": {
+          "attempts": 5,
+          "launchFailures": 0,
+          "solved": 3,
+          "score": 0.9535736040609137,
+          "cost": 0.0181081752,
+          "mintCost": 0.00148977,
+          "promptTokens": 763902,
+          "outputTokens": 19612.6,
+          "cacheHitRate": 0.9639435424962888,
+          "toolCalls": 34.6,
+          "requests": 25.2,
+          "seconds": 187.0984
         }
       },
       "overall": {
-        "attempts": 26,
+        "attempts": 31,
         "launchFailures": 0,
-        "solved": 26,
-        "score": 1,
-        "cost": 0.002055550846153846,
-        "mintCost": 0.001489765384615384,
-        "promptTokens": 57242.730769230766,
-        "outputTokens": 1427.6538461538462,
-        "cacheHitRate": 0.8779240360381667,
-        "toolCalls": 4.538461538461538,
-        "toolsOffered": 49.61538461538461,
-        "requests": 4.961538461538462,
-        "seconds": 22.27346153846154,
-        "cleanScope": 26,
-        "scopeChecked": 26
+        "solved": 29,
+        "score": 0.992511871622728,
+        "cost": 0.004644683806451612,
+        "mintCost": 0.0014897661290322575,
+        "promptTokens": 171220.03225806452,
+        "outputTokens": 4360.709677419355,
+        "cacheHitRate": 0.9398237054339248,
+        "toolCalls": 9.387096774193548,
+        "toolsOffered": 82.25806451612904,
+        "requests": 8.225806451612904,
+        "seconds": 48.85812903225806,
+        "cleanScope": 31,
+        "scopeChecked": 31
       },
       "firstCall": {
         "toolCount": 10,
@@ -244,24 +300,38 @@
           "toolCalls": 15.5,
           "requests": 8.5,
           "seconds": 37.153999999999996
+        },
+        "4": {
+          "attempts": 5,
+          "launchFailures": 0,
+          "solved": 2,
+          "score": 0.4,
+          "cost": 0.0111927408,
+          "mintCost": 0.0014896799999999997,
+          "promptTokens": 439470.4,
+          "outputTokens": 8235.8,
+          "cacheHitRate": 0.9236426389581642,
+          "toolCalls": 21,
+          "requests": 13.6,
+          "seconds": 75.1854
         }
       },
       "overall": {
-        "attempts": 26,
+        "attempts": 31,
         "launchFailures": 0,
-        "solved": 24,
-        "score": 0.9230769230769231,
-        "cost": 0.0020756582307692307,
-        "mintCost": 0.0014897480769230768,
-        "promptTokens": 51487.96153846154,
-        "outputTokens": 623.8461538461538,
-        "cacheHitRate": 0.7956213812489402,
-        "toolCalls": 3.5,
-        "toolsOffered": 37.30769230769231,
-        "requests": 3.730769230769231,
-        "seconds": 10.120153846153844,
-        "cleanScope": 26,
-        "scopeChecked": 26
+        "solved": 26,
+        "score": 0.8387096774193549,
+        "cost": 0.0035461554193548382,
+        "mintCost": 0.0014897370967741936,
+        "promptTokens": 114065.7741935484,
+        "outputTokens": 1851.5806451612902,
+        "cacheHitRate": 0.8751758676869797,
+        "toolCalls": 6.32258064516129,
+        "toolsOffered": 53.225806451612904,
+        "requests": 5.32258064516129,
+        "seconds": 20.61454838709677,
+        "cleanScope": 31,
+        "scopeChecked": 31
       },
       "firstCall": {
         "toolCount": 10,
@@ -328,24 +398,38 @@
           "toolCalls": 43,
           "requests": 28.5,
           "seconds": 139.341
+        },
+        "4": {
+          "attempts": 5,
+          "launchFailures": 0,
+          "solved": 3,
+          "score": 0.9505736040609136,
+          "cost": 0.027164728800000003,
+          "mintCost": 0.00148968,
+          "promptTokens": 1139530,
+          "outputTokens": 32383.6,
+          "cacheHitRate": 0.9742346405974392,
+          "toolCalls": 36.6,
+          "requests": 30.2,
+          "seconds": 151.5308
         }
       },
       "overall": {
-        "attempts": 26,
+        "attempts": 31,
         "launchFailures": 0,
-        "solved": 17,
-        "score": 0.6538461538461539,
-        "cost": 0.0026761626923076922,
-        "mintCost": 0.0014897538461538457,
-        "promptTokens": 112060.19230769231,
-        "outputTokens": 3034.8846153846152,
-        "cacheHitRate": 0.9684904918888029,
-        "toolCalls": 6.3076923076923075,
-        "toolsOffered": 54.69230769230769,
-        "requests": 6.076923076923077,
-        "seconds": 21.394423076923076,
-        "cleanScope": 26,
-        "scopeChecked": 26
+        "solved": 20,
+        "score": 0.7017054200098248,
+        "cost": 0.006625931419354838,
+        "mintCost": 0.0014897419354838706,
+        "promptTokens": 277781.12903225806,
+        "outputTokens": 7768.548387096775,
+        "cacheHitRate": 0.9722911342940572,
+        "toolCalls": 11.193548387096774,
+        "toolsOffered": 89.70967741935483,
+        "requests": 9.96774193548387,
+        "seconds": 42.38416129032258,
+        "cleanScope": 30,
+        "scopeChecked": 31
       },
       "firstCall": {
         "toolCount": 9,

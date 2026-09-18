@@ -1,0 +1,402 @@
+{
+  "ingest-central-00": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "east"
+  },
+  "ingest-east-01": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "north"
+  },
+  "digest-west-02": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "north"
+  },
+  "shard-east-03": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "east"
+  },
+  "ingest-south-04": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "south"
+  },
+  "fanout-east-05": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "south"
+  },
+  "reaper-north-06": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "south"
+  },
+  "shard-west-07": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "west"
+  },
+  "digest-north-08": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "south"
+  },
+  "reaper-west-09": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "central"
+  },
+  "ledger-north-10": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "east"
+  },
+  "gateway-central-11": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "central"
+  },
+  "ledger-central-12": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "east"
+  },
+  "shard-east-13": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "central"
+  },
+  "reaper-central-14": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "west"
+  },
+  "gateway-north-15": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "central"
+  },
+  "fanout-north-16": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "south"
+  },
+  "fanout-east-17": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "north"
+  },
+  "fanout-south-18": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "west"
+  },
+  "ledger-east-19": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "north"
+  },
+  "shard-central-20": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "north"
+  },
+  "fanout-central-21": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "central"
+  },
+  "ingest-east-22": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "west"
+  },
+  "gateway-west-23": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "east"
+  },
+  "gateway-central-24": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "central"
+  },
+  "fanout-central-25": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "south"
+  },
+  "relay-east-26": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "east"
+  },
+  "ingest-north-27": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "south"
+  },
+  "digest-central-28": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "east"
+  },
+  "ingest-north-29": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "west"
+  },
+  "shard-east-30": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "central"
+  },
+  "digest-south-31": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "central"
+  },
+  "fanout-north-32": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "north"
+  },
+  "gateway-west-33": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "south"
+  },
+  "shard-central-34": {
+    "origin": "internal",
+    "tier": 3,
+    "region": "south"
+  },
+  "ledger-north-35": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "east"
+  },
+  "shard-central-36": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "east"
+  },
+  "digest-central-37": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "central"
+  },
+  "ledger-central-38": {
+    "origin": "internal",
+    "tier": 1,
+    "region": "north"
+  },
+  "relay-central-39": {
+    "origin": "internal",
+    "tier": 2,
+    "region": "west"
+  },
+  "shard-south-40": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "east"
+  },
+  "reaper-south-41": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "central"
+  },
+  "relay-east-42": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "north"
+  },
+  "reaper-north-43": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "north"
+  },
+  "gateway-west-44": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "south"
+  },
+  "gateway-west-45": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "north"
+  },
+  "digest-east-46": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "north"
+  },
+  "fanout-south-47": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "east"
+  },
+  "fanout-central-48": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "east"
+  },
+  "reaper-central-49": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "south"
+  },
+  "ledger-west-50": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "central"
+  },
+  "ledger-west-51": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "south"
+  },
+  "ingest-east-52": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "south"
+  },
+  "ingest-central-53": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "south"
+  },
+  "gateway-south-54": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "south"
+  },
+  "relay-west-55": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "north"
+  },
+  "gateway-south-56": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "north"
+  },
+  "gateway-central-57": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "east"
+  },
+  "ledger-central-58": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "north"
+  },
+  "fanout-north-59": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "central"
+  },
+  "digest-west-60": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "south"
+  },
+  "ingest-north-61": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "north"
+  },
+  "shard-west-62": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "north"
+  },
+  "ingest-north-63": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "east"
+  },
+  "ingest-north-64": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "west"
+  },
+  "reaper-north-65": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "north"
+  },
+  "ingest-west-66": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "east"
+  },
+  "shard-west-67": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "west"
+  },
+  "gateway-east-68": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "west"
+  },
+  "ingest-south-69": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "central"
+  },
+  "relay-west-70": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "north"
+  },
+  "shard-south-71": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "south"
+  },
+  "digest-north-72": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "north"
+  },
+  "digest-north-73": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "south"
+  },
+  "reaper-central-74": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "central"
+  },
+  "fanout-south-75": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "central"
+  },
+  "ingest-east-76": {
+    "origin": "upstream",
+    "tier": 3,
+    "region": "west"
+  },
+  "relay-east-77": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "west"
+  },
+  "fanout-north-78": {
+    "origin": "upstream",
+    "tier": 2,
+    "region": "east"
+  },
+  "digest-west-79": {
+    "origin": "upstream",
+    "tier": 1,
+    "region": "west"
+  }
+}

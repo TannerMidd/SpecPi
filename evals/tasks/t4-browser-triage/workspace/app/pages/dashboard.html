@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Dashboard</title>
+</head>
+<body>
+  <header>
+    <h1>Dashboard</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-01" class="widget" data-widget="w-01">
+    <h3>Preference sync</h3>
+    <p class="spec">A sync response outside 2xx must print "Sync failed" followed by the reference from the response body.</p>
+    <button id="w-01-sync" type="button">Sync</button>
+    <output id="w-01-out">— (amber1)</output>
+  </section>
+  <script src="js/w-01.js"></script>
+  <section id="w-11" class="widget" data-widget="w-11">
+    <h3>Quick search</h3>
+    <p class="spec">The kelp11 search field must have an accessible name; a placeholder alone is not one.</p>
+    <input id="w-11-field" type="text" placeholder="Search kelp11 orders">
+    <button id="w-11-go" type="button">Search</button>
+  </section>
+  <script src="js/w-11.js"></script>
+  <section id="w-21" class="widget" data-widget="w-21">
+    <h3>Saved view</h3>
+    <p class="spec">Applying a saved view must not raise a console error when no view is stored.</p>
+    <button id="w-21-apply" type="button">Apply view</button>
+    <output id="w-21-out">default (amber21)</output>
+  </section>
+  <script src="js/w-21.js"></script>
+  <section id="w-31" class="widget" data-widget="w-31">
+    <h3>Draft note</h3>
+    <p class="spec">Saving a draft must survive navigation: returning to this route must restore it and echo "restored: <text>".</p>
+    <label for="w-31-note">Note</label>
+    <input id="w-31-note" type="text" value="">
+    <button id="w-31-save" type="button">Save draft</button>
+    <output id="w-31-out">restored: (none) [kelp31]</output>
+  </section>
+  <script src="js/w-31.js"></script>
+  <section id="w-41" class="widget" data-widget="w-41">
+    <h3>Order total</h3>
+    <p class="spec">Total must be quantity × $7.40 × 1.08, rounded to the nearest cent once, at the end.</p>
+    <label for="w-41-qty">Quantity</label>
+    <input id="w-41-qty" type="text" value="1">
+    <button id="w-41-go" type="button">Recalculate</button>
+    <output id="w-41-out">$0.00 (amber41)</output>
+  </section>
+  <script src="js/w-41.js"></script>
+  </main>
+</body>
+</html>

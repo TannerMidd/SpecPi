@@ -1,0 +1,8 @@
+{
+  "id": "ledger-west-51-007",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 7,
+  "timeout": 3,
+  "unusedHint": "kept for compatibility"
+}

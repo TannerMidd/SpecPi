@@ -1,0 +1,11 @@
+{
+  "id": "reaper-central-74-007",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 47,
+  "legacy": {
+    "pool": "pool-7",
+    "drained": false
+  }
+}

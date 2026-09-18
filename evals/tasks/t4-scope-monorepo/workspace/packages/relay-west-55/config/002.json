@@ -1,0 +1,7 @@
+{
+  "id": "relay-west-55-002",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 3,
+  "timeout": 47
+}

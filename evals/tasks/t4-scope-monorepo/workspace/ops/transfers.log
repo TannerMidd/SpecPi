@@ -1,0 +1,5 @@
+# Ownership transfers, most recent last. These override OWNERS.
+2026-05-18	shard-east-03	-> vendor-north	handed to the vendor with the platform split
+2026-08-16	gateway-central-11	-> vendor-south	vendored after the reorganisation
+2026-07-13	ingest-east-52	-> team-amber	brought in-house when the contract ended
+2026-06-14	ingest-north-61	-> team-cedar	adopted from the partner during the migration

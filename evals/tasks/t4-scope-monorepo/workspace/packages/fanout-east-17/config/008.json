@@ -1,0 +1,12 @@
+{
+  "id": "fanout-east-17-008",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 7,
+  "timeout": 36,
+  "legacy": {
+    "pool": "pool-5",
+    "drained": false
+  },
+  "deprecatedPool": "pool-13"
+}

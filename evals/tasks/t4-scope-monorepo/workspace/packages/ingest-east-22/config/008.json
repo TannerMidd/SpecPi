@@ -1,0 +1,12 @@
+{
+  "id": "ingest-east-22-008",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 1,
+  "timeout": 32,
+  "legacy": {
+    "pool": "pool-3",
+    "drained": false
+  },
+  "unusedHint": "kept for compatibility"
+}

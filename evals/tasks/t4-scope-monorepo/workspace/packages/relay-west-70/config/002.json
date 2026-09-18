@@ -1,0 +1,13 @@
+{
+  "id": "relay-west-70-002",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 7,
+  "timeout": 8,
+  "legacy": {
+    "pool": "pool-2",
+    "drained": false
+  },
+  "deprecatedPool": "pool-14",
+  "unusedHint": "kept for compatibility"
+}

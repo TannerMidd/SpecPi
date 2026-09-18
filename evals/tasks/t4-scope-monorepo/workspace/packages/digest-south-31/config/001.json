@@ -1,0 +1,7 @@
+{
+  "id": "digest-south-31-001",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 4,
+  "timeout": 39
+}

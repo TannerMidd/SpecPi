@@ -1,0 +1,8 @@
+{
+  "id": "ingest-central-00-006",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 8,
+  "timeout": 18,
+  "unusedHint": "kept for compatibility"
+}

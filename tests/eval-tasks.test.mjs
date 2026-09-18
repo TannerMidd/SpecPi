@@ -30,6 +30,7 @@ test("eval tasks load with a valid tier, category, prompt and checker", () => {
     assert.equal(listTasks({ tier: 1 }).length, 4);
     assert.equal(listTasks({ tier: 2 }).length, 8);
     assert.equal(listTasks({ tier: 3 }).length, 1);
+    assert.equal(listTasks({ tier: 4 }).length, 5);
 
     // Tiers 1 and 2 are the cost ladder: small, cheap, and the contrast that
     // makes fixed harness overhead visible. They are deliberately easy.
@@ -43,6 +44,33 @@ test("eval tasks load with a valid tier, category, prompt and checker", () => {
     for (const task of listTasks({ tier: 3 })) {
         assert.ok(task.timeoutMs >= 1800000, `${task.id} should allow a long run`);
         assert.ok(task.turnCap >= 400, `${task.id} should allow hundreds of turns`);
+    }
+
+    // Tier 4 is the tier that cannot be finished. Every task in it offers
+    // more verifiable work than its budget holds, so the score is yield
+    // rather than completion — which only means anything if the budget is
+    // large enough that a harness stops because it ran out of time rather
+    // than because it ran out of task.
+    const tier4 = listTasks({ tier: 4 });
+    assert.ok(tier4.length >= 4, "tier 4 should span the categories, not sample them");
+    assert.deepEqual(
+        [...new Set(tier4.map((task) => task.category))].sort(),
+        ["multi", "repair", "scoped", "terminal"],
+        "tier 4 should cover all four categories",
+    );
+    for (const task of tier4) {
+        assert.ok(task.timeoutMs >= 2700000, `${task.id} should allow a 45-minute run`);
+        assert.ok(task.turnCap >= 800, `${task.id} should allow hundreds of turns`);
+    }
+
+    // Every tier 4 task injects a failure it can recover from. Across 192
+    // attempts the suite recorded 14 tool errors, so without injection a
+    // harness is compared on error handling it almost never has to do.
+    for (const task of tier4) {
+        assert.ok(task.faults.length > 0, `${task.id} should inject at least one recoverable fault`);
+        for (const fault of task.faults) {
+            assert.ok(fault.failures > 0, `${task.id} declares a fault that never fires`);
+        }
     }
 });
 
@@ -75,6 +103,21 @@ const FROZEN = {
     // The rules, the verifier and the chain it walks are the exam. Rewriting
     // any of them is the cheapest way to "finish", so each is pinned.
     "t3-cascade-ledger": ["RULES.md", ".verify-impl.mjs", ".chain.json"],
+    // The application, the browser that runs it, and one widget's own script:
+    // editing any of them changes what the evidence would have been.
+    "t4-browser-triage": [".webqa-dom.mjs", "app/routes.json", "app/js/w-01.js"],
+    // The question bank and the documents that answer it. Rewriting one
+    // superseded RFC turns six questions into a single lookup.
+    "t4-research-dossier": ["QUESTIONS.md", "corpus/rfcs/RFC-002.md", "corpus/registry/svc-002.md"],
+    // The cost model, the query bank and the budget the ladder is measured
+    // against. An engine scored against a budget it wrote is unscored.
+    "t4-cost-ladder": ["src/data.mjs", "src/workloads.mjs", ".budgets.json"],
+    // The four files that decide which packages are ours. Editing one makes
+    // whatever was migrated correct after the fact.
+    "t4-scope-monorepo": ["OWNERS", "registry.json", "ops/freeze.log"],
+    // The cluster, the runbook and the state machine. The last one is the
+    // thing that decides whether a remediation worked.
+    "t4-incident-loop": ["cluster.json", "RUNBOOK.md", ".ops-impl.mjs"],
 };
 
 test("hard-tier checkers reject edits to the files they judge against", async () => {

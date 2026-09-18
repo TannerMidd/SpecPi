@@ -1,0 +1,7 @@
+{
+  "id": "relay-east-77-000",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 8,
+  "timeout": 45
+}

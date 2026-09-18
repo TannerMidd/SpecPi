@@ -1,0 +1,12 @@
+{
+  "rows": 12000,
+  "target": 2000,
+  "shipped": {
+    "get": 52542,
+    "range": 96000,
+    "group": 96000,
+    "topk": 96000,
+    "distinct": 96000,
+    "partner": 56938366
+  }
+}

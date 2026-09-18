@@ -1,0 +1,12 @@
+{
+  "id": "shard-west-67-008",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 5,
+  "timeout": 21,
+  "legacy": {
+    "pool": "pool-4",
+    "drained": false
+  },
+  "deprecatedPool": "pool-17"
+}

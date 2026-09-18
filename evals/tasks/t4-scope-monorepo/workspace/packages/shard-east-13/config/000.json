@@ -1,0 +1,7 @@
+{
+  "id": "shard-east-13-000",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 2,
+  "timeout": 52
+}

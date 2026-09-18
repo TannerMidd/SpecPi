@@ -1,0 +1,8 @@
+{
+  "id": "ledger-east-19-011",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 5,
+  "timeout": 26,
+  "unusedHint": "kept for compatibility"
+}

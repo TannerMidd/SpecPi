@@ -1,0 +1,13 @@
+{
+  "id": "ledger-north-35-005",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 5,
+  "timeout": 11,
+  "legacy": {
+    "pool": "pool-1",
+    "drained": false
+  },
+  "deprecatedPool": "pool-14",
+  "unusedHint": "kept for compatibility"
+}

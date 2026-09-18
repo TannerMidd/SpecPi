@@ -24,7 +24,7 @@ const pageDir = path.join(root, "site", "evaluations");
 // from 25 to 57 without anything looking wrong.
 const DEFAULT_REPORTS = [
     path.join(root, "evals", "runs", "all-tier1-deepseek", "report.json"),
-    ...["tier2", "tier3", "tier3b"].flatMap((tier) =>
+    ...["tier2", "tier3", "tier3b", "tier4"].flatMap((tier) =>
         ["pi", "specpi-default", "opencode", "dsh", "omp", "codex"].map((harness) =>
             path.join(root, "evals", "runs", `${tier}-${harness}`, "report.json"),
         ),
@@ -46,7 +46,7 @@ const TIER_NAME = {
     1: "Tier 1 · smoke",
     2: "Tier 2 · edits",
     3: "Tier 3 · repair",
-    4: "Tier 4 · inference",
+    4: "Tier 4 · ultimate",
     5: "Tier 5 · discipline",
 };
 
@@ -78,6 +78,21 @@ export function collect(files) {
     const cells = reports.flatMap((report) => report.results);
     const meta = reports[reports.length - 1];
     const tiers = [...new Set(cells.map((cell) => cell.tier))].sort((a, b) => a - b);
+    // Reports differ in how many attempts they ran and in whether their time
+    // budget was shortened, and one global figure taken from whichever file
+    // sorted last is wrong for every other file — it once published "one
+    // attempt per cell" for tiers that ran three, because a later scouting
+    // run happened to be read last. Per tier, which is the grain a reader
+    // compares at.
+    const attemptsPerTier = {};
+    const timeoutPerTier = {};
+    for (const tier of tiers) {
+        const owning = reports.filter((report) => report.results.some((cell) => cell.tier === tier));
+        attemptsPerTier[tier] = [...new Set(owning.map((report) => report.attemptsPerCell))].sort((a, b) => a - b);
+        const overrides = [...new Set(owning.map((report) => report.timeoutOverrideMs ?? null))];
+        timeoutPerTier[tier] = overrides.length === 1 ? overrides[0] : null;
+    }
+
     const tasksByTier = new Map(
         tiers.map((tier) => [tier, [...new Set(cells.filter((cell) => cell.tier === tier).map((cell) => cell.task))]]),
     );
@@ -167,6 +182,8 @@ export function collect(files) {
         platform: meta.platform,
         pricesDated: meta.pricesDated,
         attemptsPerCell: meta.attemptsPerCell,
+        attemptsPerTier,
+        timeoutPerTier,
         tiers,
         taskCount: sum(tiers.map((tier) => tasksByTier.get(tier).length)),
         tasksByTier: Object.fromEntries(tiers.map((tier) => [tier, tasksByTier.get(tier)])),
@@ -471,8 +488,31 @@ export function renderTables(data) {
 // hand guarantees they drift, so it gets the same marker treatment: one
 // command updates both, or neither.
 export function renderReadme(data) {
+    // A row may only be compared with another row when both cover the same
+    // work. Aggregating whatever tiers a harness happened to run ranks the
+    // ones that skipped the expensive tier as the cheapest: adding tier 4
+    // moved Pi from first to third on cost without Pi changing at all, purely
+    // because two harnesses had no tier 4 attempts to carry. So the headline
+    // is computed over the tiers every listed harness ran, and the rest are
+    // named rather than blended in.
+    const common = data.tiers.filter((tier) => data.harnesses.every((harness) => harness.perTier[tier]));
+    const excluded = data.tiers.filter((tier) => !common.includes(tier));
+    const combine = (harness) => {
+        const parts = common.map((tier) => harness.perTier[tier]);
+        const attempts = sum(parts.map((part) => part.attempts));
+        const weighted = (pick) =>
+            attempts === 0 ? 0 : sum(parts.map((part) => pick(part) * part.attempts)) / attempts;
+
+        return {
+            attempts,
+            solved: sum(parts.map((part) => part.solved)),
+            cost: weighted((part) => part.cost),
+            promptTokens: weighted((part) => part.promptTokens),
+        };
+    };
+
     const row = (harness) => {
-        const cell = harness.overall;
+        const cell = combine(harness);
         const overhead = harness.firstCall
             ? thousands(harness.firstCall.toolSchemaChars + harness.firstCall.instructionChars)
             : "not measured";
@@ -480,10 +520,12 @@ export function renderReadme(data) {
         return `| ${harness.label} | ${cell.solved}/${cell.attempts} | $${cell.cost.toFixed(4)} | ${thousands(cell.promptTokens)} | ${overhead} |`;
     };
 
-    const ordered = [...data.harnesses].sort((a, b) => a.overall.cost - b.overall.cost);
+    const ordered = [...data.harnesses].sort((a, b) => combine(a).cost - combine(b).cost);
+    const covered = sum(common.map((tier) => data.tasksByTier[tier].length));
+    const attempts = sum(data.harnesses.map((harness) => combine(harness).attempts));
 
     return [
-        `**${data.totalAttempts} attempts across ${data.harnesses.length} harnesses and ${data.taskCount} tasks**, all on \`${data.model}\`.`,
+        `**${attempts} attempts across ${data.harnesses.length} harnesses and ${covered} tasks**, all on \`${data.model}\`.`,
         "",
         "| Harness | Solved | Cost/attempt | Prompt tokens | Sent before any work |",
         "| --- | --- | --- | --- | --- |",
@@ -493,6 +535,14 @@ export function renderReadme(data) {
         "dated price file. The last column is the tool schema plus system instructions",
         "riding every single request, which is the fixed toll a harness charges before",
         "the model does anything.",
+        ...(excluded.length === 0
+            ? []
+            : [
+                  "",
+                  `Tier ${excluded.join(", ")} is left out of this table because not every harness has`,
+                  "attempts there, and a per-attempt cost only compares across rows when every row",
+                  "covers the same tasks. The evaluations page charts it per tier.",
+              ]),
     ].join("\n");
 }
 

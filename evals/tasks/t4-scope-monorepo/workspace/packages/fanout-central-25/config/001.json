@@ -1,0 +1,11 @@
+{
+  "id": "fanout-central-25-001",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 9,
+  "timeout": 10,
+  "legacy": {
+    "pool": "pool-3",
+    "drained": false
+  }
+}

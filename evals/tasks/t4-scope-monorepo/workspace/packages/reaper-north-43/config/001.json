@@ -1,0 +1,9 @@
+{
+  "id": "reaper-north-43-001",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 6,
+  "timeout": 25,
+  "deprecatedPool": "pool-18",
+  "unusedHint": "kept for compatibility"
+}

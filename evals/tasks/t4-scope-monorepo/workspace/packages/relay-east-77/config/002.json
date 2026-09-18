@@ -1,0 +1,11 @@
+{
+  "id": "relay-east-77-002",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 2,
+  "timeout": 6,
+  "legacy": {
+    "pool": "pool-7",
+    "drained": false
+  }
+}

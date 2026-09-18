@@ -5,7 +5,18 @@ const sourceFiles = ["**/*.js", "**/*.mjs", "**/*.ts", "**/*.mts", "**/*.tsx"];
 
 export default [
     {
-        ignores: ["node_modules/**", ".specpi-test/**", "desktop/out/**", "desktop/dist/**"],
+        // Eval task workspaces are fixtures, not source. Their bytes are
+        // hashed by the task checkers, and several of them are wrong on
+        // purpose, so an --fix pass over them would both invalidate
+        // FIXTURES.json and quietly repair the defects under test.
+        ignores: [
+            "node_modules/**",
+            ".specpi-test/**",
+            "desktop/out/**",
+            "desktop/dist/**",
+            "evals/tasks/*/workspace/**",
+            "evals/archive/*/workspace/**",
+        ],
     },
     {
         files: sourceFiles,

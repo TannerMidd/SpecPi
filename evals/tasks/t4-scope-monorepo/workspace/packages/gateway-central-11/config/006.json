@@ -1,0 +1,12 @@
+{
+  "id": "gateway-central-11-006",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 1,
+  "timeout": 40,
+  "legacy": {
+    "pool": "pool-5",
+    "drained": false
+  },
+  "unusedHint": "kept for compatibility"
+}

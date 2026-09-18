@@ -1,0 +1,11 @@
+{
+  "id": "ledger-north-10-007",
+  "schemaVersion": 1,
+  "tier": 1,
+  "retries": 9,
+  "timeout": 38,
+  "legacy": {
+    "pool": "pool-4",
+    "drained": false
+  }
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Orders</title>
+</head>
+<body>
+  <header>
+    <h1>Orders</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-06" class="widget" data-widget="w-06">
+    <h3>Preference sync</h3>
+    <p class="spec">A sync response outside 2xx must print "Sync failed" followed by the reference from the response body.</p>
+    <button id="w-06-sync" type="button">Sync</button>
+    <output id="w-06-out">— (flax6)</output>
+  </section>
+  <script src="js/w-06.js"></script>
+  <section id="w-16" class="widget" data-widget="w-16">
+    <h3>Order total</h3>
+    <p class="spec">Total must be quantity × $4.78 × 1.08, rounded to the nearest cent once, at the end.</p>
+    <label for="w-16-qty">Quantity</label>
+    <input id="w-16-qty" type="text" value="1">
+    <button id="w-16-go" type="button">Recalculate</button>
+    <output id="w-16-out">$0.00 (pumice16)</output>
+  </section>
+  <script src="js/w-16.js"></script>
+  <section id="w-26" class="widget" data-widget="w-26">
+    <h3>Tag filter</h3>
+    <p class="spec">Filtering must list every tag containing the text typed, not only the tags starting with it.</p>
+    <label for="w-26-q">Filter</label>
+    <input id="w-26-q" type="text" value="">
+    <button id="w-26-go" type="button">Filter</button>
+    <output id="w-26-out">garnet, larch, quartz, larch, garnet</output>
+  </section>
+  <script src="js/w-26.js"></script>
+  <section id="w-36" class="widget" data-widget="w-36">
+    <h3>Tag filter</h3>
+    <p class="spec">Filtering must list every tag containing the text typed, not only the tags starting with it.</p>
+    <label for="w-36-q">Filter</label>
+    <input id="w-36-q" type="text" value="">
+    <button id="w-36-go" type="button">Filter</button>
+    <output id="w-36-out">flax, sable, amber, thistle, larch</output>
+  </section>
+  <script src="js/w-36.js"></script>
+  <section id="w-46" class="widget" data-widget="w-46">
+    <h3>Result pages</h3>
+    <p class="spec">"Next" must advance exactly one page and must stop at page 7.</p>
+    <button id="w-46-next" type="button">Next</button>
+    <output id="w-46-out">Page 1 of 7 (flax46)</output>
+  </section>
+  <script src="js/w-46.js"></script>
+  </main>
+</body>
+</html>

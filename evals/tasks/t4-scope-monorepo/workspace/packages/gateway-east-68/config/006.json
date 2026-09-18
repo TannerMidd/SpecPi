@@ -1,0 +1,11 @@
+{
+  "id": "gateway-east-68-006",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 1,
+  "timeout": 27,
+  "legacy": {
+    "pool": "pool-7",
+    "drained": false
+  }
+}

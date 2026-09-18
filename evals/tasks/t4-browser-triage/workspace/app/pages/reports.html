@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Reports</title>
+</head>
+<body>
+  <header>
+    <h1>Reports</h1>
+    <nav aria-label="Main">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/catalog">Catalog</a>
+      <a href="/cart">Cart</a>
+      <a href="/checkout">Checkout</a>
+      <a href="/account">Account</a>
+      <a href="/orders">Orders</a>
+      <a href="/support">Support</a>
+      <a href="/settings">Settings</a>
+      <a href="/billing">Billing</a>
+      <a href="/reports">Reports</a>
+    </nav>
+  </header>
+  <main>
+  <section id="w-10" class="widget" data-widget="w-10">
+    <h3>Ticket submission</h3>
+    <p class="spec">Submit must disable itself on the first click so the jasper10 queue receives one ticket.</p>
+    <button id="w-10-submit" type="button">Submit ticket</button>
+    <output id="w-10-out">submissions: 0 to jasper10</output>
+  </section>
+  <script src="js/w-10.js"></script>
+  <section id="w-20" class="widget" data-widget="w-20">
+    <h3>Details disclosure</h3>
+    <p class="spec">The toggle must report aria-expanded="true" while the panel is open.</p>
+    <button id="w-20-toggle" type="button" aria-expanded="false" aria-controls="w-20-panel">Details thistle20</button>
+    <div id="w-20-panel" hidden>Shipment routed via the thistle20 hub.</div>
+  </section>
+  <script src="js/w-20.js"></script>
+  <section id="w-30" class="widget" data-widget="w-30">
+    <h3>Ticket submission</h3>
+    <p class="spec">Submit must disable itself on the first click so the jasper30 queue receives one ticket.</p>
+    <button id="w-30-submit" type="button">Submit ticket</button>
+    <output id="w-30-out">submissions: 0 to jasper30</output>
+  </section>
+  <script src="js/w-30.js"></script>
+  <section id="w-40" class="widget" data-widget="w-40">
+    <h3>Details disclosure</h3>
+    <p class="spec">The toggle must report aria-expanded="true" while the panel is open.</p>
+    <button id="w-40-toggle" type="button" aria-expanded="false" aria-controls="w-40-panel">Details thistle40</button>
+    <div id="w-40-panel" hidden>Shipment routed via the thistle40 hub.</div>
+  </section>
+  <script src="js/w-40.js"></script>
+  <section id="w-50" class="widget" data-widget="w-50">
+    <h3>Order total</h3>
+    <p class="spec">Total must be quantity × $4.03 × 1.08, rounded to the nearest cent once, at the end.</p>
+    <label for="w-50-qty">Quantity</label>
+    <input id="w-50-qty" type="text" value="1">
+    <button id="w-50-go" type="button">Recalculate</button>
+    <output id="w-50-out">$0.00 (jasper50)</output>
+  </section>
+  <script src="js/w-50.js"></script>
+  </main>
+</body>
+</html>

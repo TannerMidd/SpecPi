@@ -1,0 +1,11 @@
+{
+  "id": "relay-west-55-005",
+  "schemaVersion": 1,
+  "tier": 3,
+  "retries": 2,
+  "timeout": 40,
+  "legacy": {
+    "pool": "pool-1",
+    "drained": false
+  }
+}

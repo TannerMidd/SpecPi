@@ -1,0 +1,9 @@
+{
+  "id": "digest-north-72-007",
+  "schemaVersion": 1,
+  "tier": 2,
+  "retries": 8,
+  "timeout": 37,
+  "deprecatedPool": "pool-15",
+  "unusedHint": "kept for compatibility"
+}
