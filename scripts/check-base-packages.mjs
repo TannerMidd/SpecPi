@@ -70,8 +70,9 @@ process.exit(0);
     assert.ok(line, output);
     const resources = JSON.parse(line.slice("SPECPI_BASE=".length));
     assert.deepEqual(resources.errors, [], JSON.stringify(resources.errors));
-    // Each separately installed package supplies one extension, alongside the two harness extensions.
-    assert.equal(resources.paths.length, basePackages.length + 2, JSON.stringify(resources.paths));
+    // Each separately installed package supplies one extension, alongside the three harness
+    // extensions: scope control, the improvement loop and the Jev advisor.
+    assert.equal(resources.paths.length, basePackages.length + 3, JSON.stringify(resources.paths));
     assert.equal(
         resources.paths.some((file) => file.includes("pi-background-tasks")),
         false,

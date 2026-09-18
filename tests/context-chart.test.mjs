@@ -9,6 +9,9 @@ const report = JSON.parse(
 
 test("published context charts match the recorded installed-profile measurements", () => {
     assert.equal(report.schema, 1);
+    // Seven, not eight: this record was measured before specpi-jev-guard joined the base set. The
+    // number asserts what the recorded run actually covered, so it must not be edited to match the
+    // current pin list — re-run scripts/measure-context.mjs and replace the record instead.
     assert.equal(report.packages.length, 7);
     assert.equal(report.loadedExtensionCount, 9);
     assert.deepEqual(staleChartFiles(report), []);

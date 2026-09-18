@@ -13,6 +13,7 @@ import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-a
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Box, Markdown, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { syncAuthoringTools } from "./authoring-tools.mjs";
 import {
     appendWishlistDecision,
     archiveWishlist,
@@ -498,6 +499,9 @@ export default function toolWishlist(pi: ExtensionAPI) {
     let activeRunId = randomUUID();
     let activeImprovement: ActiveImprovement | undefined;
     let improvementLifecycleGeneration = 0;
+    // The authoring tools ride every request whether or not they can be used. Local state knows
+    // when they cannot be, so the answer is a boolean rather than a prediction.
+    const syncAuthoring = () => syncAuthoringTools(pi, activeImprovement !== undefined);
     let improvementMenuGeneration = 0;
     let finishBusy = false;
     let contractBusy = false;
@@ -583,15 +587,18 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
     pi.on("session_start", (_event, ctx) => {
         restoreActiveImprovement(ctx);
+        syncAuthoring();
     });
 
     pi.on("session_tree", (_event, ctx) => {
         restoreActiveImprovement(ctx);
+        syncAuthoring();
     });
 
     pi.on("session_shutdown", () => {
         improvementLifecycleGeneration += 1;
         activeImprovement = undefined;
+        syncAuthoring();
     });
 
     const assertImprovementStillCurrent = (expected: ActiveImprovement, generation: number, ctx: any, signal?: any) => {
@@ -1131,6 +1138,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
                 });
                 if (activeImprovement?.selectionId === selectedImprovement.selectionId) {
                     activeImprovement = undefined;
+                    syncAuthoring();
                 }
 
                 return {
@@ -1312,6 +1320,9 @@ export default function toolWishlist(pi: ExtensionAPI) {
                 ...policy,
             };
             assertSelectionContextCurrent();
+            // Pi offers tools added during a call from the next assistant message, so restoring
+            // them here lands exactly when the selection they belong to becomes usable.
+            syncAuthoring();
             pi.appendEntry(TASK_CONTRACT_ENTRY, { kind: "cleared" });
             leafId = ctx.sessionManager.getLeafId?.();
             assertSelectionContextCurrent();
