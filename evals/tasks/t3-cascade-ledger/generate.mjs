@@ -21,8 +21,9 @@
 // below change. Afterwards run prettier over the generated verifier and
 // re-pin FIXTURES.json, because the checker compares those files by hash.
 //
-// Score is the deepest chain position reached, so partial progress is kept
-// and a harness that gets 40 of 64 scores 0.625 rather than zero.
+// Score is the share of chain modules left correct, so partial progress is
+// kept and a harness that repairs 40 of 120 scores 0.333 rather than zero.
+// The consecutive depth the verifier reaches is reported alongside it.
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -36,6 +37,7 @@ const write = (relative, text) => {
     fs.mkdirSync(path.dirname(full), { recursive: true });
     fs.writeFileSync(full, text);
 };
+
 const writeTaskFile = (relative, text) => fs.writeFileSync(path.join(root, "..", relative), text);
 
 let seed = 20260918;
@@ -102,7 +104,7 @@ while (modules.length < TOTAL_MODULES) {
     modules.push({ name, relative: `src/${name}.js` });
 }
 
-// The chain: 64 modules scattered through the 420, in an order that has
+// The chain: a subset of the modules scattered through the tree, in an order that has
 // nothing to do with their names or their position on disk.
 const chainIndexes = new Set();
 while (chainIndexes.size < CHAIN_LENGTH) {
@@ -116,7 +118,7 @@ for (let index = chain.length - 1; index > 0; index--) {
     [chain[index], chain[swap]] = [chain[swap], chain[index]];
 }
 
-// Assign each chain step a governing rule. Eight late steps supersede an
+// Assign each chain step a governing rule. Fifteen late steps supersede an
 // earlier step's rule, which sends the harness back to a module it already
 // fixed and had accepted.
 const steps = chain.map((module, position) => ({
