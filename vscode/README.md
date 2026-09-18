@@ -2,12 +2,12 @@
 
 Use [Pi](https://github.com/earendil-works/pi) from a chat beside your code in VS Code. Ask a question, attach a file or screenshot, and follow along as Pi reads, edits, and runs commands in your project.
 
-Chat uses the models, provider accounts, and extensions you've already set up in Pi. It works with Pi alone. [SpecPi](https://github.com/TannerMidd/SpecPi) adds `/scope`, the harness improvement loop, and six pinned packages. SpecPi Chat **0.11.1** supports that base.
+Chat uses the models, provider accounts, and extensions you've already set up in Pi. It works with Pi alone. [SpecPi](https://github.com/TannerMidd/SpecPi) adds `/scope`, the harness improvement loop, and eight pinned packages. SpecPi Chat **0.12.0** supports that base.
 
 ## Get started
 
 1. **Set up Pi.** Install [Pi](https://github.com/earendil-works/pi) and confirm it runs in a terminal. You can sign in to a provider there with `/login`, or let Chat open that terminal for you in step 3.
-2. **Open your project.** Download the [SpecPi Chat 0.11.1 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.26.0/specpi-chat-0.11.1.vsix), run **Extensions: Install from VSIX…** in VS Code, then open and trust your project folder.
+2. **Open your project.** Download the [SpecPi Chat 0.12.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.27.0/specpi-chat-0.12.0.vsix), run **Extensions: Install from VSIX…** in VS Code, then open and trust your project folder.
 3. **Start chatting.** Click **SpecPi** in the Activity Bar and choose **Connect Pi**. If Pi has no provider yet, Chat says so and offers **Sign in to a provider**, which opens Pi in a terminal for `/login` and reloads Pi when you close it. Pick a model and send your first message.
 
 Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4** for the reviewed default base. For SSH, WSL, or containers, Pi and the extension need to be installed on the workspace host. Browser-only VS Code isn't supported.
@@ -27,7 +27,7 @@ Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4** for the review
 
 Press **Enter** to send, **Shift+Enter** for a new line, or type `/` to see available commands.
 
-See [package support](GUIDE.md#default-package-support) for the seven packages, including commands, delegated agent activity, usage, and terminal-only settings.
+See [package support](GUIDE.md#default-package-support) for the eight packages, including commands, delegated agent activity, usage, and terminal-only settings.
 
 ## A few things to know
 

@@ -2,6 +2,7 @@
     window.SpecPiPackageSettings = {
         install({ send, getState }) {
             const webAccess = window.SpecPiWebAccessConfig;
+            const jev = window.SpecPiJevConfig;
             const byId = (id) => document.getElementById(id);
             const dialog = byId("package-settings");
             const form = byId("package-fields");
@@ -16,10 +17,15 @@
             let saved = false;
 
             const isWeb = () => snapshot?.target === "webAccess";
+            const isJev = () => snapshot?.target === "jevLayer";
 
             // Each target names one file and one validator. The host resolves
             // the path itself; the webview never sends or sees one it chose.
             function schema() {
+                if (isJev()) {
+                    return { fields: jev.fields, validate: (text) => jev.validate(text), parse: jev.parse };
+                }
+
                 return {
                     fields: webAccess.fields,
                     validate: (text) => webAccess.validate(text),
@@ -77,7 +83,7 @@
                 controls.clear();
                 form.textContent = "";
                 const legend = document.createElement("legend");
-                legend.textContent = isWeb() ? "Providers and behaviour" : "Settings";
+                legend.textContent = isWeb() ? "Providers and behaviour" : isJev() ? "Jev layer" : "Settings";
                 form.append(legend);
                 for (const [key, title, type, help] of schema().fields) {
                     const wrapper = document.createElement("div");

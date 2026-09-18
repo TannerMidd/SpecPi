@@ -40,6 +40,7 @@ export const packageFiles = Object.freeze([
     "media/permission-settings.js",
     "media/permission-settings.css",
     "media/web-access-config.js",
+    "media/jev-config.js",
     "media/package-settings.js",
     "media/chat-extras.js",
     "media/chat-extras.css",

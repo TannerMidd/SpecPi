@@ -39,8 +39,11 @@ function fixture(t, env = {}) {
 
 test("package targets resolve to the files each package actually reads", (t) => {
     const { home, options } = fixture(t);
-    assert.deepEqual(TARGETS, ["webAccess"]);
+    assert.deepEqual(TARGETS, ["webAccess", "jevLayer"]);
     assert.equal(targetPath("webAccess", options), path.join(home, ".pi", "agent", "web-search.json"));
+    // The advisor resolves <agent-dir>/specpi/jev/settings.json and has no XDG variant, so this
+    // path is fixed rather than following web access's precedence rules.
+    assert.equal(targetPath("jevLayer", options), path.join(home, ".pi", "agent", "specpi", "jev", "settings.json"));
     assert.throws(() => targetPath("someOtherPackage", options), /Choose a package configuration/u);
     assert.throws(() => loadPackageSettings("someOtherPackage", options), /Choose a package configuration/u);
 });

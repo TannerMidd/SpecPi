@@ -1,5 +1,12 @@
 # SpecPi Chat changelog
 
+## 0.12.0
+
+- Add a Jev layer panel to package settings. The master switch, the four advisor systems, the per-session call budget and the command guard are toggles that write `<agent-dir>/specpi/jev/settings.json`, the same file the extension reads, through the same guarded transaction as every other settings target: bounded read with link and identity checks, lock, revision check, backup, atomic replace, verification, and rollback on failure.
+- Present the layer flat even though it nests on disk. The four systems live under `systems` and the guard under `guard`, and a nested object renders as a JSON textarea, which is the opposite of a toggle. The panel holds a flat shape and the host translates in both directions; a refused draft never reaches disk, and an unknown key is reported rather than carried, because the advisor reads an unrecognised shape as all-off and a stray key would turn the layer off later without anything having said so.
+- Hold the panel to the advisor's own schema. A test asserts the switches offered are exactly the advisor's systems and that the panel's default equals the advisor's default, so the two cannot drift into a panel that saves successfully and changes nothing.
+- Follow the base to eight pinned packages. The Chat docs still said six in one place and seven in another.
+
 ## 0.11.1
 
 - Follow the default base off `pi-subagents`. The live agent panel, result cards and configuration UI for that package are removed; Chat's existing delegation support now covers the base package, `specpi-delegation`. The panel shows each worker's mode, task, elapsed time, model calls and tool calls, and its Stop button sends the package's own `/delegate cancel-worker` command — a per-worker control the fleet panel never had.

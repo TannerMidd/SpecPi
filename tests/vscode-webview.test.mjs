@@ -125,6 +125,7 @@ test("chat webview denies content by default and authorizes only its nonce-beari
             "https://specpi-test.vscode-cdn.net/media/permission-config.js",
             "https://specpi-test.vscode-cdn.net/media/permission-settings.js",
             "https://specpi-test.vscode-cdn.net/media/web-access-config.js",
+            "https://specpi-test.vscode-cdn.net/media/jev-config.js",
             "https://specpi-test.vscode-cdn.net/media/package-settings.js",
             "https://specpi-test.vscode-cdn.net/media/chat-extras.js",
             "https://specpi-test.vscode-cdn.net/media/chat-picker.js",
@@ -162,12 +163,13 @@ test("webview resource attributes cannot inject executable markup", () => {
         permissionStyleUri: "https://specpi-test.vscode-cdn.net/media/permission-settings.css" + payload,
         nonce: webviewOptions.nonce + payload,
     });
-    assert.equal(Array.from(html.matchAll(/<script\b/gu)).length, 7);
+    assert.equal(Array.from(html.matchAll(/<script\b/gu)).length, 8);
     assert.doesNotMatch(html, /<img src=x|<script>alert\(2\)/u);
     const scripts = Array.from(html.matchAll(/<script\b[^>]*>/gu), (match) => match[0]);
     assert.deepEqual(
         scripts.map((script) => decodeAttribute(attributeValue(script, "src"))),
         [
+            webviewOptions.scriptUri + payload,
             webviewOptions.scriptUri + payload,
             webviewOptions.scriptUri + payload,
             webviewOptions.scriptUri + payload,

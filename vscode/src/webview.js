@@ -31,6 +31,7 @@ function getWebviewHtml({
     const permissionConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-config.js");
     const permissionSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "permission-settings.js");
     const webAccessConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "web-access-config.js");
+    const jevConfigScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "jev-config.js");
     const packageSettingsScript = String(scriptUri).replace(/chat\.js(?=[?#]|$)/u, "package-settings.js");
     const policy = `default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cspSource}; img-src data:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';`;
 
@@ -260,6 +261,7 @@ function getWebviewHtml({
     <script nonce="${attribute(nonce)}" src="${attribute(permissionConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(permissionSettingsScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(webAccessConfigScript)}"></script>
+    <script nonce="${attribute(nonce)}" src="${attribute(jevConfigScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(packageSettingsScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(extrasScript)}"></script>
     <script nonce="${attribute(nonce)}" src="${attribute(historyScript)}"></script>
