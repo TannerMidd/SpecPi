@@ -43,7 +43,7 @@ import {
     applyConfig,
     configPath,
     desiredConfig,
-    keyEnvName as guardKeyEnvName,
+    guardKeyEnvName,
     readConfig,
     statusLine,
 } from "../extensions/jev-advisor/guard.mjs";
@@ -63,7 +63,14 @@ function withAgentDir(run) {
     // machine with a real OPENROUTER_API_KEY the "a missing key reads as unavailable" case found
     // one and failed, and on a machine without it the same test passed. A test whose result depends
     // on the shell it was started from is not testing the thing it names.
-    const previousKeys = ["TYPESAFE_API_KEY", "OPENROUTER_API_KEY"].map((name) => [name, process.env[name]]);
+    // Every variable that steers key resolution, not merely the two that hold one. `JEV_KEY_SOURCE`
+    // is the variable AGENTS.md tells developers the eval scripts set, so leaving it alone meant six
+    // tests here failed for anyone who had exported it -- the same shell dependence this helper's
+    // own comment calls out, reintroduced by the commit that added the variable.
+    const previousKeys = ["TYPESAFE_API_KEY", "OPENROUTER_API_KEY", "JEV_KEY_SOURCE", "JEV_BACKEND"].map((name) => [
+        name,
+        process.env[name],
+    ]);
     const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-jev-test-")));
     process.env.PI_CODING_AGENT_DIR = dir;
     process.env.HOME = dir;
@@ -744,14 +751,14 @@ test("the guard's key variable follows the guard's own backend, not the advisor'
     // OPENROUTER_API_KEY nobody set -- blocking every shell and file call.
     withAgentDir(() => {
         assert.equal(desiredConfig(true).backend, "openrouter");
-        assert.equal(guardKeyEnvName(true), "OPENROUTER_API_KEY");
+        assert.equal(guardKeyEnvName(), "OPENROUTER_API_KEY");
 
         process.env.JEV_BACKEND = "typesafe";
         try {
             assert.equal(backend(), "typesafe");
             assert.equal(keyEnvName(backend()), "TYPESAFE_API_KEY", "the advisor reads this one");
-            assert.equal(guardKeyEnvName(true), "OPENROUTER_API_KEY", "the guard still reads this one");
-            assert.notEqual(guardKeyEnvName(true), keyEnvName(backend()));
+            assert.equal(guardKeyEnvName(), "OPENROUTER_API_KEY", "the guard still reads this one");
+            assert.notEqual(guardKeyEnvName(), keyEnvName(backend()));
         } finally {
             delete process.env.JEV_BACKEND;
         }

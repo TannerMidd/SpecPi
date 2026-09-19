@@ -1,7 +1,9 @@
 // Jev is the first thing in SpecPi that talks to a third party, so its switch is the first thing
-// every other module in this directory consults. Master off means no key read, no consent read, no
-// network call and no prompt injection: the harness behaves exactly as it did before the extension
-// existed.
+// every other module in this directory consults. Master off means no key value read, no consent
+// read, no network call and no prompt injection: the harness behaves exactly as it did before the
+// extension existed. `/jev status` still reports whether a key exists while the layer is off, by
+// name and never by value, because "how do I configure this" is a question asked before enabling
+// anything -- see key-source.mjs.
 //
 // The file is SpecPi's own, hardened the same way as web-access and capability-policy: atomic
 // write, mode 0600, symlinks refused, and a missing or unreadable file read as off.

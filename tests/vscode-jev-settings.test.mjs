@@ -448,27 +448,53 @@ test("switching the layer on in the form switches its systems on with it", () =>
     assert.deepEqual(jevConfig.couple(chosen, off).config, chosen);
     assert.equal(jevConfig.couple(chosen, off).note, "");
 
-    // Nothing happens while the layer is off, or when it was already on.
+    // Nothing happens while the layer is off.
     assert.deepEqual(jevConfig.couple({ ...off, enabled: false }, off).config, { ...off, enabled: false });
+
+    // Turning the last system off while the layer is on is the dead state arriving by another
+    // route, so it is repaired and announced rather than silently saved.
     const alreadyOn = { ...off, enabled: true, gap: true };
-    assert.deepEqual(jevConfig.couple({ ...alreadyOn, gap: false }, alreadyOn).config, { ...alreadyOn, gap: false });
+    const emptied = jevConfig.couple({ ...alreadyOn, gap: false }, alreadyOn);
+    assert.ok(emptied.note);
+    for (const name of jevConfig.SYSTEMS) {
+        assert.equal(emptied.config[name], true);
+    }
 });
 
-test("the panel refuses a layer that is on with nothing to run", () => {
-    // `couple` maintains this in the form, but the "Full configuration JSON" textarea never calls
-    // it, so the dead-layer state the panel exists to prevent stayed one hand-edit away. Refused
-    // rather than silently corrected: a save that rewrites settings the person did not touch is the
-    // other way to make a panel untrustworthy.
+test("a layer that is on with nothing to run cannot be saved, but can still be opened", () => {
+    // The rule lives in the host, not the webview validator. As a validation error it fired while
+    // merely opening a file in this state -- the exact file the panel exists to repair -- so the
+    // panel rendered red with Save disabled before anything was touched.
     const off = jevConfig.fromStored({});
-    assert.throws(
-        () => jevConfig.validate(JSON.stringify({ ...off, enabled: true })),
-        /runs and does nothing/u,
-        "enabled with every system off must not reach disk",
-    );
+    const dead = { ...off, enabled: true };
+    assert.equal(jevConfig.deadLayer(dead), true);
+    assert.equal(jevConfig.deadLayer({ ...dead, retention: true }), false);
+    assert.equal(jevConfig.deadLayer(off), false, "the shipped default is off, not dead");
 
-    // One system is enough; the layer off with none is the shipped default and stays valid.
-    jevConfig.validate(JSON.stringify({ ...off, enabled: true, retention: true }));
+    // Opening must never throw, whatever the file says.
+    jevConfig.validate(JSON.stringify(dead));
     jevConfig.validate(JSON.stringify(off));
+
+    // And the form repairs it rather than leaving it stuck.
+    const repaired = jevConfig.couple(dead, dead);
+    assert.ok(repaired.note, "a loaded dead file must be repaired and the repair announced");
+    for (const name of jevConfig.SYSTEMS) {
+        assert.equal(repaired.config[name], true);
+    }
+
+    withAgentDir((dir) => {
+        const loaded = loadPackageSettings("jevLayer", { workspace: dir });
+        assert.throws(
+            () =>
+                savePackageSettings(
+                    loaded,
+                    `${JSON.stringify(dead)}
+`,
+                ),
+            /runs and does nothing/u,
+            "the host is the authority the JSON textarea cannot bypass",
+        );
+    });
 });
 
 test("the key report follows the backend the advisor will actually use", () => {
@@ -507,4 +533,58 @@ test("the key report resolves the same directory before and after a save", () =>
         const saved = savePackageSettings(loaded, `${JSON.stringify(draft)}\n`);
         assert.equal(saved.key.active, "auth.json", "saving must not change where the key is looked for");
     });
+});
+
+test("Chat's key report and the advisor's resolver agree about every source", async () => {
+    // Two readers of one contract, kept in step by a test rather than by hope. Chat cannot import
+    // the advisor's ESM resolver from a synchronous CommonJS host, and the resolver returns keys
+    // which the webview host has no business holding -- so the copy stays and this pins it, the same
+    // way DEFAULT_BUDGETS is pinned to the advisor's own defaults above.
+    const { keySources } = await import("../extensions/jev-advisor/key-source.mjs");
+    const previous = { ...process.env };
+    withAgentDir((dir) => {
+        const settingsFile = jevPath({ workspace: dir });
+        for (const env of [
+            {},
+            { OPENROUTER_API_KEY: "sk-or-v1-x" },
+            { TYPESAFE_API_KEY: "ts" },
+            { JEV_BACKEND: "typesafe" },
+            { JEV_BACKEND: "typesafe", TYPESAFE_API_KEY: "ts" },
+            { JEV_KEY_SOURCE: "environment" },
+        ]) {
+            for (const withStore of [false, true]) {
+                if (withStore) {
+                    writeAuth(dir, { openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+                } else {
+                    fs.rmSync(path.join(dir, "auth.json"), { force: true });
+                }
+
+                for (const name of ["OPENROUTER_API_KEY", "TYPESAFE_API_KEY", "JEV_BACKEND", "JEV_KEY_SOURCE"]) {
+                    delete process.env[name];
+                }
+
+                Object.assign(process.env, env);
+                const mine = jevKeyStatus({ settingsFile, env: process.env });
+                const theirs = keySources();
+                assert.deepEqual(
+                    mine.sources.map((item) => [item.name, item.present]),
+                    theirs.map((item) => [item.name, item.present]),
+                    `sources disagree for ${JSON.stringify(env)} (store: ${withStore})`,
+                );
+                assert.equal(
+                    mine.active,
+                    theirs.find((item) => item.present)?.name,
+                    `active source disagrees for ${JSON.stringify(env)} (store: ${withStore})`,
+                );
+            }
+        }
+    });
+
+    for (const name of ["OPENROUTER_API_KEY", "TYPESAFE_API_KEY", "JEV_BACKEND", "JEV_KEY_SOURCE"]) {
+        if (previous[name] === undefined) {
+            delete process.env[name];
+        } else {
+            process.env[name] = previous[name];
+        }
+    }
 });

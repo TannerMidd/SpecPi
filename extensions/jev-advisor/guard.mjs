@@ -87,6 +87,11 @@ export function desiredConfig(enabled = false) {
  * The environment variable specpi-jev-guard will actually read, derived from the backend SpecPi
  * writes into its configuration rather than from the advisor's own `JEV_BACKEND`.
  *
+ * It is named distinctly from key-source.mjs's `keyEnvName` on purpose. Two exported functions with
+ * one name, taking different arguments and each returning a plausible answer when handed the
+ * other's, is a trap rather than an API: on the direct-TypeSafe route they disagree, and disagreeing
+ * silently is the failure this docstring spends nine lines describing.
+ *
  * Those two are not the same thing and assuming they were produced the exact failure this layer
  * exists to avoid. `desiredConfig` pins `backend: "openrouter"` unconditionally, so on a session
  * running the advisor against the direct TypeSafe API, checking `TYPESAFE_API_KEY` would find a key,
@@ -94,8 +99,8 @@ export function desiredConfig(enabled = false) {
  * never set -- blocking every shell and file call in the session. Deriving the name from the config
  * that is about to be written is what keeps the check honest if that pin ever changes.
  */
-export function keyEnvName(enabled = false) {
-    return desiredConfig(enabled).backend === "typesafe" ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY";
+export function guardKeyEnvName() {
+    return desiredConfig().backend === "typesafe" ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY";
 }
 
 export function readConfig() {

@@ -6,7 +6,7 @@
 // the path it would have run before this extension existed. That is fail-silent, not fail-closed —
 // nothing here is ever the reason a tool is blocked.
 
-import { resolveKey } from "./key-source.mjs";
+import { backend, resolveKey } from "./key-source.mjs";
 
 /**
  * Where a key comes from is resolved in key-source.mjs, which follows Pi's own order: the
@@ -24,7 +24,9 @@ export function apiKey() {
     return resolveKey(backend());
 }
 
-export { keySource, keySources, keyEnvName } from "./key-source.mjs";
+// All four bind the active backend themselves now, so re-exporting them is safe: there is no
+// parameter default left for a no-arg caller to be silently bound to.
+export { backend, keyEnvName, keyPresent, keySource, keySources } from "./key-source.mjs";
 
 export const DEFAULT_MODEL = "jev-1.13.0";
 export const OPENROUTER_MODEL = "typesafe/jev-1.13";
@@ -33,15 +35,6 @@ export const OPENROUTER_MODEL = "typesafe/jev-1.13";
 // above the observed spread rather than at it.
 export const DEFAULT_TIMEOUT_MS = 1500;
 const MAX_TIMEOUT_MS = 5000;
-
-/**
- * Jev is reached through OpenRouter by default: that is where it is published, it is what
- * specpi-jev-guard already uses, and an OpenRouter key (`sk-or-...`) is rejected by the direct
- * TypeSafe API with a bare 401. `JEV_BACKEND=typesafe` selects the direct API for a TypeSafe key.
- */
-export function backend() {
-    return process.env.JEV_BACKEND === "typesafe" ? "typesafe" : "openrouter";
-}
 
 /** Overridable so tests never reach the network and the eval proxy can price the traffic. */
 export function baseUrl() {

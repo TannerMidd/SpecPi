@@ -144,7 +144,17 @@
 
             function populate() {
                 try {
-                    const config = schema().parse(source.value);
+                    const parsed = schema().parse(source.value);
+                    // A file that is on with no system running is repaired as it is loaded, so the
+                    // boxes tick where the person can see them. The repair used to be reachable
+                    // only by toggling the layer, which a file already in that state cannot do.
+                    const repaired = isJev() ? jev.couple(parsed, parsed) : { config: parsed, note: "" };
+                    const config = repaired.config;
+                    if (repaired.note) {
+                        source.value = `${JSON.stringify(config, null, 4)}
+`;
+                    }
+
                     for (const [key, , type] of schema().fields) {
                         const control = controls.get(key);
                         const value = config[key];
@@ -157,6 +167,12 @@
                     }
 
                     formValid = true;
+                    if (repaired.note) {
+                        check();
+                        report(`${byId("package-feedback").textContent}${repaired.note}`);
+
+                        return;
+                    }
                 } catch {
                     // Keep a malformed file editable in the full JSON editor.
                     formValid = false;

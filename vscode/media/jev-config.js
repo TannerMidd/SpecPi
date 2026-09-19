@@ -212,14 +212,15 @@
      * buy the same behaviour at the cost of trusting the panel.
      */
     function couple(config, previous) {
-        if (config.enabled !== true || previous?.enabled === true) {
+        // Two cases, not one. The transition from off to on is the common path. The other is a file
+        // that is *already* on with nothing running -- the broken state this panel is for -- which
+        // the old `previous?.enabled === true` guard skipped, leaving the one mechanism that could
+        // repair it deliberately declining to.
+        if (!deadLayer(config)) {
             return { config, note: "" };
         }
 
-        if (SYSTEMS.some((name) => config[name] === true)) {
-            return { config, note: "" };
-        }
-
+        const arriving = previous?.enabled !== true;
         const next = { ...config };
         for (const name of SYSTEMS) {
             next[name] = true;
@@ -227,7 +228,9 @@
 
         return {
             config: next,
-            note: ` All ${SYSTEMS.length} systems were switched on with the layer; turn any back off before saving.`,
+            note: arriving
+                ? ` All ${SYSTEMS.length} systems were switched on with the layer; turn any back off before saving.`
+                : ` This file had the layer on with every system off, which runs and does nothing. All ${SYSTEMS.length} were switched on; turn any back off before saving.`,
         };
     }
 
@@ -347,19 +350,20 @@
             }
         }
 
-        // The same invariant `couple` maintains in the form, enforced where every path reaches --
-        // including the "Full configuration JSON" textarea, which never calls `couple`. Without it
-        // the dead-layer state this panel exists to prevent stayed one hand-edit away: `enabled`
-        // true with every system off saves cleanly and produces a layer that runs and does nothing.
-        // Refused rather than silently corrected, because a save that rewrites settings the person
-        // did not touch is the other way to make a panel untrustworthy.
-        if (config.enabled === true && SYSTEMS.every((name) => config[name] !== true)) {
-            throw new Error(
-                "The Jev layer is enabled with every system off, which runs and does nothing. Turn on at least one system, or turn the layer off.",
-            );
-        }
-
         return { config, unknown };
+    }
+
+    /**
+     * Is this a layer that is on with nothing to run?
+     *
+     * Deliberately *not* part of `validate`. Making it a validation error meant the panel threw
+     * while merely opening a file in that state -- which is precisely the file this panel exists to
+     * repair -- so it rendered red with Save disabled before the person had touched anything, and
+     * `couple` skipped it because the layer was already on. The rule belongs where a write happens:
+     * `couple` fixes it in the form, and the host refuses it on save.
+     */
+    function deadLayer(config) {
+        return config.enabled === true && SYSTEMS.every((name) => config[name] !== true);
     }
 
     const api = {
@@ -374,6 +378,7 @@
         parse,
         validate,
         couple,
+        deadLayer,
         fromStored,
         toStored,
         fromStoredUsage,

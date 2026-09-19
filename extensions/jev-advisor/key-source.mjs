@@ -63,12 +63,18 @@ function stripBom(text) {
 function storedCredential(providerId) {
     try {
         const file = authPath();
-        const stat = fs.lstatSync(file, { throwIfNoEntry: false });
-        // Symlinks are refused for the same reason config.mjs refuses them on its own files: a link
-        // is a way to point a trusted read somewhere it was not meant to go. Unlike the settings
-        // file this one is Pi's rather than ours, so an unsupported shape reads as "no credential"
-        // rather than throwing -- it is not our file to have opinions about.
-        if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_AUTH_BYTES) {
+        // `stat`, not `lstat`: a symlinked auth.json has to resolve, because dotfile managers like
+        // chezmoi and stow routinely link it into a managed directory. Refusing links here would
+        // recreate the exact divergence this module was written to remove -- Pi resolves the
+        // credential and every model call works, while this layer alone reports "key: none found"
+        // and gives no way to tell that from a missing key.
+        //
+        // config.mjs refuses links on its own files for a reason that does not apply here: those
+        // are writes, where a link can redirect a trusted write somewhere it was not meant to go.
+        // This is a bounded read of a file Pi owns, so an unsupported shape reads as "no credential"
+        // rather than throwing. It is not our file to have opinions about.
+        const stat = fs.statSync(file, { throwIfNoEntry: false });
+        if (!stat || !stat.isFile() || stat.size > MAX_AUTH_BYTES) {
             return undefined;
         }
 
@@ -106,10 +112,6 @@ function environmentKey(name) {
 }
 
 /**
- * The environment variable for a backend, matching specpi-jev-guard's `keyEnvName` so one key
- * serves the whole layer.
- */
-/**
  * Whether the credential store is consulted at all.
  *
  * `JEV_KEY_SOURCE=environment` restricts resolution to the environment variables. That exists for
@@ -123,8 +125,22 @@ function environmentOnly() {
     return process.env.JEV_KEY_SOURCE === "environment";
 }
 
-export function keyEnvName(backend) {
-    return backend === "typesafe" ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY";
+/**
+ * Jev is reached through OpenRouter by default: that is where it is published, it is what
+ * specpi-jev-guard already uses, and an OpenRouter key (`sk-or-...`) is rejected by the direct
+ * TypeSafe API with a bare 401. `JEV_BACKEND=typesafe` selects the direct API for a TypeSafe key.
+ *
+ * It lives here rather than in client.mjs because everything below has to bind it. A parameter
+ * defaulting to the string "openrouter" is not a binding: re-exporting such a function under a name
+ * whose previous version read the backend itself silently rebound every no-arg caller to the wrong
+ * route, which is how `keyPresent()` came to report a key that `resolveKey()` would not return.
+ */
+export function backend() {
+    return process.env.JEV_BACKEND === "typesafe" ? "typesafe" : "openrouter";
+}
+
+export function keyEnvName(route = backend()) {
+    return route === "typesafe" ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY";
 }
 
 /**
@@ -136,12 +152,12 @@ export function keyEnvName(backend) {
  * to fix" is the question someone with no key is actually asking, and a bare "missing" has never
  * answered it.
  */
-export function keySources(backend = "openrouter") {
-    const variable = keyEnvName(backend);
+export function keySources(route = backend()) {
+    const variable = keyEnvName(route);
     const sources = [];
     // Only the OpenRouter route has a provider entry to read: `auth.json` is keyed by Pi provider
     // id, and the direct TypeSafe API is not one of Pi's providers.
-    if (backend !== "typesafe" && !environmentOnly()) {
+    if (route !== "typesafe" && !environmentOnly()) {
         sources.push({
             name: "auth.json",
             label: `Pi credential store (${OPENROUTER_PROVIDER})`,
@@ -160,7 +176,7 @@ export function keySources(backend = "openrouter") {
     // Accepted on the OpenRouter route so an env file predating the OpenRouter default keeps
     // working. Listed last because it is a compatibility path, and listed at all because a person
     // whose key is only here should be able to see that that is why it still works.
-    if (backend !== "typesafe") {
+    if (route !== "typesafe") {
         sources.push({
             name: "TYPESAFE_API_KEY",
             label: "TYPESAFE_API_KEY in the environment (legacy)",
@@ -173,31 +189,29 @@ export function keySources(backend = "openrouter") {
 }
 
 /** The name of the source a key would be taken from, or undefined when there is none. */
-export function keySource(backend = "openrouter") {
-    return keySources(backend).find((source) => source.present)?.name;
+export function keySource(route = backend()) {
+    return keySources(route).find((source) => source.present)?.name;
 }
 
 /**
  * The key itself. The only function here that returns one, and the only caller is the request
  * header in client.mjs.
  */
-export function resolveKey(backend = "openrouter") {
-    if (backend !== "typesafe" && !environmentOnly()) {
+export function resolveKey(route = backend()) {
+    if (route !== "typesafe" && !environmentOnly()) {
         const stored = apiKeyOf(storedCredential(OPENROUTER_PROVIDER));
         if (stored) {
             return stored;
         }
     }
 
-    return (
-        environmentKey(keyEnvName(backend)) ?? (backend !== "typesafe" ? environmentKey("TYPESAFE_API_KEY") : undefined)
-    );
+    return environmentKey(keyEnvName(route)) ?? (route !== "typesafe" ? environmentKey("TYPESAFE_API_KEY") : undefined);
 }
 
 /**
  * Whether any source holds a key. Callers only ever ask this; the client reads the value itself at
  * call time, so a key never has to exist inside a structure that something might log or serialize.
  */
-export function keyPresent(backend = "openrouter") {
-    return keySources(backend).some((source) => source.present);
+export function keyPresent(route = backend()) {
+    return keySources(route).some((source) => source.present);
 }

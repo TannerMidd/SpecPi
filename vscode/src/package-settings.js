@@ -305,6 +305,15 @@ function saveJev(snapshot, draft) {
         throw new Error(JEV_MESSAGES.changed);
     }
 
+    // Enforced here rather than in the webview's validator: the host is the authority the "Full
+    // configuration JSON" textarea cannot route around, and putting it in `validate` made the panel
+    // unopenable for files already in this state.
+    if (jevConfig.deadLayer(draft)) {
+        throw new Error(
+            "The Jev layer is enabled with every system off, which runs and does nothing. Turn on at least one system, or turn the layer off.",
+        );
+    }
+
     const next = jevConfig.toStored(draft);
     const text = `${JSON.stringify(next, null, 4)}
 `;
