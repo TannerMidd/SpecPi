@@ -1,22 +1,38 @@
 // Local triage for shell and file calls, before anything is sent anywhere.
 //
-// This is the first half of the native command guard. It answers, from the call alone and with no
-// network, which of three things a tool call is:
+// This is the first half of the native command guard. Jev is the second half and the one that does
+// the analysis; everything here exists to decide what Jev is asked about. Three answers:
 //
-//   safe      -- a read-only command with no way to chain into something else. Passes untouched,
-//                costing nothing. Most calls in a session land here, which is what keeps the guard
-//                from spending a budget on `ls`.
-//   dangerous -- catastrophic and unambiguous. Blocked here, so the one case where a network round
-//                trip is least affordable is the one case that does not need one.
-//   unknown   -- everything else, which is where Jev is asked.
+//   safe      -- settled locally. Jev is never asked, and nothing else will look at this call.
+//   dangerous -- blocked locally, with no call and no human.
+//   unknown   -- Jev is asked.
 //
-// Two principles, both learned the hard way from the package this replaces.
+// THE THREE ARE NOT SYMMETRIC, and that asymmetry is the whole design:
 //
-// The dangerous list is deliberately tiny. A regex that blocks real work is worse than no regex,
-// because the person then turns the whole guard off and keeps none of it. Anything that needs
-// judgement is `unknown` and goes to a model that can weigh intent, rather than to a pattern that
-// cannot. If you are tempted to add a rule here, ask whether you would stake "this is never
-// legitimate" on it; if not, it belongs in the question set instead.
+//   a wrong `safe`      is a silent, permanent hole -- the one verdict with no second reader
+//   a wrong `unknown`   costs one call out of a per-session budget of 208, and Jev decides
+//   a wrong `dangerous` blocks real work with no recourse but switching the guard off
+//
+// So the two lists below are maintained under opposite pressures, and the mistake worth naming is
+// treating them as one thing called "the guard" and hardening both the same way.
+//
+// READ_ONLY is a BUDGET mechanism, not a safety one. The guard has 208 calls and each is a few
+// hundred milliseconds awaited on the tool path, so a session that greps and cats a few hundred
+// times would spend the lot and then defer everything for the rest of its life -- a guard that runs
+// out is weaker than one with a fast path. The admission test is therefore NOT "is this harmless".
+// It is: is this binary simple whatever flags it is given, and common enough to be worth it? A
+// binary that can launch a program, write a file or change machine state under any flag is not
+// simple, however harmless its name reads, and Jev parses it. `env` and `fd` launch things,
+// `find` has -delete, `rg` has --pre, `date -s` sets the clock, `hostname` sets the hostname,
+// `file -C` writes a compiled magic file. Every one of those was on this list, and every one was a
+// general bypass that cost almost no budget to keep.
+//
+// CATASTROPHIC is deliberately tiny, and its only real job is the case where Jev is NOT THERE: no
+// key, budget spent, a timeout. Jev catches everything this list would, and weighs intent besides,
+// which a pattern cannot. So resist adding to it. A rule here fires with no model and no human, and
+// a false positive is a blocked session whose only remedy is switching the whole guard off -- and a
+// guard people switch off protects nobody. Ask whether you would stake "this is never legitimate"
+// on it; if not, it belongs in the question set, where being wrong costs one call.
 //
 // And nothing here throws. A classifier that can fail is a classifier that can take a session down,
 // so an unparseable command reads as `unknown` -- ask about it -- rather than as an error.
@@ -51,19 +67,29 @@ export const WRITE_TOOLS = Object.freeze(["write", "edit", "multi_edit", "apply_
 export const GATED_TOOLS = Object.freeze([...SHELL_TOOLS, ...WRITE_TOOLS]);
 
 /**
- * Read-only binaries that cannot modify state on their own. The bar is "running this with any
- * arguments still changes nothing", which is why `git` is absent (it has `push`, `reset`, `clean`)
- * and `git status` is not special-cased -- a subcommand allowlist is a second policy to maintain.
+ * Simple binaries: ones that change nothing whatever flags they are given.
  *
- * The bar is strict enough to exclude several binaries that read as read-only. `env` and `fd` launch
- * other programs (`env rm -rf build`, `fd -x rm`); `find` has `-delete` and `-exec`; `sort -o` and
- * `uniq in out` name an output file. None of them changes state when used the way its name suggests,
- * which is precisely what would have made each one a reliable bypass.
+ * "Whatever flags" is the whole test, and it is stricter than it sounds. `git` fails it obviously
+ * (`push`, `reset`, `clean`), and special-casing `git status` would only add a subcommand allowlist
+ * to maintain beside this one. These fail it less obviously, which is what made each of them a
+ * bypass worth having:
  *
- * `printenv` is absent for a different reason: it changes nothing and still hands over a secret, and
- * the risk question this guard asks names exfiltration alongside destruction. Being on this list is
- * not "harmless", it is "not worth a question" -- and for the commands that read credentials, the
- * argument check below is what keeps that true of the rest.
+ *   env, fd        launch another program outright -- `env rm -rf build`, `fd -x rm`
+ *   find           has -delete and -exec
+ *   rg             has --pre, which runs an arbitrary preprocessor per file
+ *   sort, uniq     name an output file (`sort -o`, `uniq in out`)
+ *   date           -s sets the system clock
+ *   hostname       with an argument, sets the hostname
+ *   file           -C compiles and writes a magic file
+ *   printenv       changes nothing and hands over a secret, which the risk question also asks about
+ *
+ * None of them reads as dangerous, and none of them was common enough for the fast path to be
+ * buying much. That is the trade: a rare binary on this list saves almost no budget and costs a
+ * silent hole, so when in doubt it comes off and Jev parses it.
+ *
+ * Being here is not a claim that a call is harmless. It is a claim that asking about it would spend
+ * the budget without learning anything -- which is why the arguments are still checked below, and
+ * `cat ~/.ssh/id_rsa` leaves the fast path even though `cat` never belongs anywhere else.
  */
 const READ_ONLY = new Set([
     "ls",
@@ -74,20 +100,16 @@ const READ_ONLY = new Set([
     "head",
     "tail",
     "wc",
-    "file",
     "stat",
     "du",
     "df",
-    "date",
     "whoami",
-    "hostname",
     "uname",
     "echo",
     "printf",
     "which",
     "type",
     "grep",
-    "rg",
     "diff",
     "cut",
     "tr",

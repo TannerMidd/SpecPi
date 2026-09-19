@@ -166,7 +166,7 @@ test("the scope line says what the change applied to, and never claims more", ()
 });
 
 test("the key line names its source and never carries a value", () => {
-    const secret = "sk-or-v1-supersecret";
+    const secret = "openrouter-fixture-supersecret";
     const onWithStore = applyLayer(
         { on: true },
         { settings: stored(), guardEnabled: false },

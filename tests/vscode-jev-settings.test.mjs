@@ -401,13 +401,15 @@ test("the panel names the key source instead of asking for a key it cannot hold"
             ],
         );
 
-        writeAuth(dir, { openrouter: { type: "api_key", key: "sk-or-v1-x" } });
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-x" } });
         assert.equal(jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env }).active, "auth.json");
 
         // The store wins, matching the advisor and matching Pi's own documented order.
         assert.equal(
-            jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: { OPENROUTER_API_KEY: "sk-or-v1-y" } })
-                .active,
+            jevKeyStatus({
+                settingsFile: jevPath({ workspace: dir }),
+                env: { OPENROUTER_API_KEY: "openrouter-fixture-y" },
+            }).active,
             "auth.json",
         );
     });
@@ -416,13 +418,13 @@ test("the panel names the key source instead of asking for a key it cannot hold"
 test("the panel never learns a key, only whether there is one", () => {
     withAgentDir((dir) => {
         fs.mkdirSync(dir, { recursive: true });
-        writeAuth(dir, { openrouter: { type: "api_key", key: "sk-or-v1-secret" } });
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-secret" } });
         const status = jevKeyStatus({
             settingsFile: jevPath({ workspace: dir }),
-            env: { OPENROUTER_API_KEY: "sk-or-v1-other" },
+            env: { OPENROUTER_API_KEY: "openrouter-fixture-other" },
         });
         assert.ok(
-            !JSON.stringify(status).includes("sk-or-v1-"),
+            !JSON.stringify(status).includes("openrouter-fixture-"),
             "a key must not reach the webview through the status it renders",
         );
         for (const item of status.sources) {
@@ -546,7 +548,7 @@ test("the key report follows the backend the advisor will actually use", () => {
     // credential store on that route would promise a key the advisor never reads.
     withAgentDir((dir) => {
         const settingsFile = jevPath({ workspace: dir });
-        writeAuth(dir, { openrouter: { type: "api_key", key: "sk-or-v1-x" } });
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-x" } });
 
         const openrouter = jevKeyStatus({ settingsFile, env: {} });
         assert.equal(openrouter.active, "auth.json");
@@ -569,7 +571,7 @@ test("the key report resolves the same directory before and after a save", () =>
     // workspace-relative PI_CODING_AGENT_DIR made pressing Save flip a working panel to "No key
     // anywhere" -- a false report caused only by saving. Both now derive it from the settings file.
     withAgentDir((dir) => {
-        writeAuth(dir, { openrouter: { type: "api_key", key: "sk-or-v1-x" } });
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-x" } });
         const loaded = loadPackageSettings("jevLayer", { workspace: dir });
         assert.equal(loaded.key.active, "auth.json");
 
@@ -590,7 +592,7 @@ test("Chat's key report and the advisor's resolver agree about every source", as
         const settingsFile = jevPath({ workspace: dir });
         for (const env of [
             {},
-            { OPENROUTER_API_KEY: "sk-or-v1-x" },
+            { OPENROUTER_API_KEY: "openrouter-fixture-x" },
             { TYPESAFE_API_KEY: "ts" },
             { JEV_BACKEND: "typesafe" },
             { JEV_BACKEND: "typesafe", TYPESAFE_API_KEY: "ts" },
@@ -598,7 +600,7 @@ test("Chat's key report and the advisor's resolver agree about every source", as
         ]) {
             for (const withStore of [false, true]) {
                 if (withStore) {
-                    writeAuth(dir, { openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+                    writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
                 } else {
                     fs.rmSync(path.join(dir, "auth.json"), { force: true });
                 }
@@ -640,7 +642,7 @@ test("Chat and the advisor agree about a symlinked credential store", () => {
     // "in use from auth.json" beside a panel reporting "No key anywhere".
     withAgentDir((dir) => {
         const real = path.join(dir, "managed-auth.json");
-        fs.writeFileSync(real, JSON.stringify({ openrouter: { type: "api_key", key: "sk-or-v1-linked" } }));
+        fs.writeFileSync(real, JSON.stringify({ openrouter: { type: "api_key", key: "openrouter-fixture-linked" } }));
         try {
             fs.symlinkSync(real, path.join(dir, "auth.json"));
         } catch {

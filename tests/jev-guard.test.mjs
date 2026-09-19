@@ -22,17 +22,32 @@ import { THRESHOLDS } from "../extensions/jev-advisor/gate.mjs";
 
 const answer = (value, confidence = 0.9) => ({ kind: "score", value, confidence });
 
-test("read-only commands pass without a call, which is what keeps the budget for real questions", () => {
-    for (const command of ["ls -la", "pwd", "cat README.md", "grep -rn foo src", "git", "rg pattern"]) {
-        const result = classifyCommand(command);
-        if (command === "git") {
-            // Deliberately not read-only: it has push, reset and clean. A subcommand allowlist would
-            // be a second policy to keep correct.
-            assert.equal(result.decision, "unknown", "git must not take the fast path");
-            continue;
-        }
+test("simple commands pass without a call, which is what keeps the budget for real questions", () => {
+    for (const command of ["ls -la", "pwd", "cat README.md", "grep -rn foo src", "head -5 a", "wc -l a"]) {
+        assert.equal(classifyCommand(command).decision, "safe", `${command} should be free`);
+    }
+});
 
-        assert.equal(result.decision, "safe", `${command} should be free`);
+test("a binary that is simple only until you read its flags is not on the fast path", () => {
+    // The admission test is "simple whatever flags it is given", which is stricter than it reads.
+    // Each of these changed nothing under the spelling that put it on the list, and each was a
+    // general bypass under another -- and none was common enough for the fast path to be buying
+    // much. Jev is the analyser; a rare binary belongs to it, not to a local allowlist.
+    const tricky = {
+        "git status": "git has push, reset and clean",
+        "rg --pre ./x pattern": "rg --pre runs an arbitrary preprocessor",
+        "env rm -rf build": "env launches another program",
+        "find . -delete": "find has -delete and -exec",
+        "fd -x rm": "fd -x launches another program",
+        "sort -o /etc/passwd a": "sort -o names an output file",
+        "uniq in out": "uniq writes its second argument",
+        "date -s 2020-01-01": "date -s sets the system clock",
+        "hostname evil": "hostname with an argument sets it",
+        "file -C -m custom": "file -C writes a compiled magic file",
+        "printenv OPENROUTER_API_KEY": "printenv hands over a secret",
+    };
+    for (const [command, why] of Object.entries(tricky)) {
+        assert.equal(classifyCommand(command).decision, "unknown", `${command}: ${why}`);
     }
 });
 

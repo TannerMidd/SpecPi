@@ -589,14 +589,14 @@ test("the default backend is OpenRouter, which is where the key works", () => {
 
         // The key variable follows the backend, matching the guard's own keyEnvName.
         assert.equal(apiKey(), undefined);
-        process.env.OPENROUTER_API_KEY = "sk-or-v1-example";
-        assert.equal(apiKey(), "sk-or-v1-example");
+        process.env.OPENROUTER_API_KEY = "openrouter-fixture-example";
+        assert.equal(apiKey(), "openrouter-fixture-example");
         assert.equal(keyPresent(), true);
 
         // An existing env file that put the OpenRouter key in TYPESAFE_API_KEY still works.
         delete process.env.OPENROUTER_API_KEY;
-        process.env.TYPESAFE_API_KEY = "sk-or-v1-legacy";
-        assert.equal(apiKey(), "sk-or-v1-legacy");
+        process.env.TYPESAFE_API_KEY = "openrouter-fixture-legacy";
+        assert.equal(apiKey(), "openrouter-fixture-legacy");
     });
 });
 
@@ -628,8 +628,8 @@ test("the key Pi already stored is the key the layer uses", () => {
         assert.equal(resolveKey("openrouter"), undefined, "no store and no variable is genuinely no key");
         assert.equal(keySource("openrouter"), undefined);
 
-        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
-        assert.equal(resolveKey("openrouter"), "sk-or-v1-stored");
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-stored");
         assert.equal(keySource("openrouter"), "auth.json");
         assert.equal(keyPresent(), true);
     });
@@ -640,9 +640,9 @@ test("the credential store is consulted before the environment, as Pi consults i
     // that picked a different key from the one Pi itself is using would be a second, invisible
     // configuration to keep in step.
     withAgentDir(() => {
-        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
-        process.env.OPENROUTER_API_KEY = "sk-or-v1-environment";
-        assert.equal(resolveKey("openrouter"), "sk-or-v1-stored");
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        process.env.OPENROUTER_API_KEY = "openrouter-fixture-environment";
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-stored");
         assert.equal(keySource("openrouter"), "auth.json");
 
         // Both are reported as present, because "which of these do I need to fix" is the question,
@@ -669,7 +669,7 @@ test("only an api_key entry is read, and an unusable store is no key rather than
         writeAuth({ openrouter: { type: "api_key", key: "   " } });
         assert.equal(resolveKey("openrouter"), undefined, "a blank key is not a key");
 
-        writeAuth({ anthropic: { type: "api_key", key: "sk-ant-x" } });
+        writeAuth({ anthropic: { type: "api_key", key: "anthropic-fixture-x" } });
         assert.equal(resolveKey("openrouter"), undefined, "another provider's key is not ours to use");
 
         // Every unreadable shape is silence, never a throw: a credential store that can fail a
@@ -712,8 +712,8 @@ test("an unparseable credential store is cached like a parseable one", () => {
 
             // And it is still invalidated when the file actually changes, which is the whole reason
             // the cache is keyed on identity rather than memoised outright.
-            writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-repaired" } });
-            assert.equal(resolveKey("openrouter"), "sk-or-v1-repaired");
+            writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-repaired" } });
+            assert.equal(resolveKey("openrouter"), "openrouter-fixture-repaired");
         } finally {
             fs.readFileSync = real;
         }
@@ -724,14 +724,14 @@ test("an auth.json written with a byte order mark still parses", () => {
     // Pi strips one before parsing. Not doing the same here would produce the worst possible
     // split: the key works for every model call and this layer alone calls it missing.
     withAgentDir(() => {
-        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-bom" } }, { bom: true });
-        assert.equal(resolveKey("openrouter"), "sk-or-v1-bom");
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-bom" } }, { bom: true });
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-bom");
     });
 });
 
 test("the direct TypeSafe route reads its variable and never the OpenRouter entry", () => {
     withAgentDir(() => {
-        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
         // auth.json is keyed by Pi provider id and TypeSafe is not one of Pi's providers, so there
         // is nothing there to read -- and an OpenRouter key on the direct API is a bare 401.
         assert.equal(resolveKey("typesafe"), undefined);
@@ -751,7 +751,7 @@ test("a key in the store is enough for ask() to reach the transport", async () =
     await withAgentDir(async () => {
         assert.equal((await ask({}, { q: noul("x") })).reason, "no-key");
 
-        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
         let seen;
         const server = await startStub((request, response) => {
             seen = request.headers.authorization;
@@ -761,7 +761,7 @@ test("a key in the store is enough for ask() to reach the transport", async () =
         try {
             process.env.TYPESAFE_BASE_URL = server.url;
             assert.equal((await ask({}, { q: noul("x") })).ok, true);
-            assert.equal(seen, "Bearer sk-or-v1-stored");
+            assert.equal(seen, "Bearer openrouter-fixture-stored");
         } finally {
             await server.close();
         }
@@ -774,8 +774,8 @@ test("apiKey() follows the active backend rather than defaulting to OpenRouter",
     // `if (!apiKey())` guard passed on a stored OpenRouter key while every request it then made
     // came back no-key.
     withAgentDir(() => {
-        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
-        assert.equal(apiKey(), "sk-or-v1-stored");
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        assert.equal(apiKey(), "openrouter-fixture-stored");
 
         process.env.JEV_BACKEND = "typesafe";
         try {
@@ -793,13 +793,13 @@ test("JEV_KEY_SOURCE=environment keeps a measured run off a personal login", () 
     // evals/.env would resolve the developer's /login credential first and bill their account,
     // while --probe verified a key the run did not use.
     withAgentDir(() => {
-        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-personal" } });
-        process.env.OPENROUTER_API_KEY = "sk-or-v1-eval";
-        assert.equal(resolveKey("openrouter"), "sk-or-v1-personal");
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-personal" } });
+        process.env.OPENROUTER_API_KEY = "openrouter-fixture-eval";
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-personal");
 
         process.env.JEV_KEY_SOURCE = "environment";
         try {
-            assert.equal(resolveKey("openrouter"), "sk-or-v1-eval");
+            assert.equal(resolveKey("openrouter"), "openrouter-fixture-eval");
             assert.equal(keySource("openrouter"), "OPENROUTER_API_KEY");
             assert.ok(
                 !keySources("openrouter").some((source) => source.name === "auth.json"),
