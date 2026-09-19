@@ -144,7 +144,17 @@
 
             function populate() {
                 try {
-                    const config = schema().parse(source.value);
+                    const parsed = schema().parse(source.value);
+                    // A file that is on with no system running is repaired as it is loaded, so the
+                    // boxes tick where the person can see them. The repair used to be reachable
+                    // only by toggling the layer, which a file already in that state cannot do.
+                    const repaired = isJev() ? jev.couple(parsed, parsed) : { config: parsed, note: "" };
+                    const config = repaired.config;
+                    if (repaired.note) {
+                        source.value = `${JSON.stringify(config, null, 4)}
+`;
+                    }
+
                     for (const [key, , type] of schema().fields) {
                         const control = controls.get(key);
                         const value = config[key];
@@ -157,6 +167,16 @@
                     }
 
                     formValid = true;
+                    if (repaired.note) {
+                        check();
+                        // Carry the error flag rather than defaulting it to false: appending a note
+                        // to a draft that failed validation was re-styling the error as an ordinary
+                        // message, leaving Save disabled with no visible reason.
+                        const status = byId("package-feedback");
+                        report(`${status.textContent}${repaired.note}`, status.dataset.error === "true");
+
+                        return;
+                    }
                 } catch {
                     // Keep a malformed file editable in the full JSON editor.
                     formValid = false;
@@ -169,6 +189,7 @@
             function fromForm() {
                 try {
                     const config = schema().parse(source.value);
+                    const before = { ...config };
                     for (const [key, , type] of schema().fields) {
                         const value = controls.get(key).value;
                         if (!value.trim()) {
@@ -188,7 +209,19 @@
                         }
                     }
 
-                    source.value = `${JSON.stringify(config, null, 4)}\n`;
+                    // Enabling the Jev layer fills in its systems when none are on, in the form,
+                    // so the boxes visibly tick before anything is saved. See `couple` in
+                    // media/jev-config.js for why that happens here rather than on the way to disk.
+                    const coupled = isJev() ? jev.couple(config, before) : { config, note: "" };
+                    source.value = `${JSON.stringify(coupled.config, null, 4)}\n`;
+                    if (coupled.note) {
+                        populate();
+                        const status = byId("package-feedback");
+                        report(`${status.textContent}${coupled.note}`, status.dataset.error === "true");
+
+                        return;
+                    }
+
                     check();
                 } catch (error) {
                     valid = false;
@@ -237,7 +270,7 @@
                 const summary = byId("package-usage-summary");
                 if (!usage) {
                     summary.textContent =
-                        "No calls recorded. The advisor writes this file once the master switch is on, so an untouched layer has none.";
+                        "No calls recorded. The advisor writes this file once the layer is on, so an untouched layer has none.";
 
                     return;
                 }
@@ -258,6 +291,46 @@
                     detail.textContent = `${row.calls} of ${row.budget}${changed}${spent}`;
                     item.append(name, detail);
                     list.append(item);
+                }
+            }
+
+            /**
+             * Where a key would come from, and which source is in force. Presence only: the host
+             * sends a boolean per source and never a value, so there is nothing here that could
+             * render a secret even by mistake.
+             *
+             * Every source is listed, including the empty ones, because "which of these do I have
+             * to fix" is the question someone with no key is actually asking. A bare "not
+             * configured" is what sent people looking for a key field that does not exist.
+             */
+            function renderKey() {
+                const section = byId("package-key");
+                section.hidden = !isJev();
+                const list = byId("package-key-list");
+                list.textContent = "";
+                if (!isJev()) {
+                    return;
+                }
+
+                const status = snapshot.key || { sources: [] };
+                const summary = byId("package-key-summary");
+                const active = status.sources.find((item) => item.name === status.active);
+                summary.textContent = active
+                    ? `In use: ${active.label}. Every system above, the command guard included, reaches Jev with this one key.`
+                    : "No key anywhere. Every system will report no advice, and the harness runs exactly as it did before the layer existed. Run /login openrouter in Pi to store one.";
+                for (const item of status.sources) {
+                    const row = document.createElement("li");
+                    const name = document.createElement("code");
+                    name.textContent = item.label;
+                    const detail = document.createElement("span");
+                    const state = !item.present
+                        ? "Empty"
+                        : item.name === status.active
+                          ? "In use"
+                          : "Present, but a source above it is used first";
+                    detail.textContent = `${state} — ${item.detail}`;
+                    row.append(name, detail);
+                    list.append(row);
                 }
             }
 
@@ -356,6 +429,7 @@
                         source.value = snapshot.text;
                         rebuildFields();
                         renderUsage();
+                        renderKey();
                         renderCredentials();
                         describe();
                         populate();
@@ -380,6 +454,7 @@
                             snapshot = message.settings;
                             source.value = snapshot.text;
                             renderUsage();
+                            renderKey();
                             renderCredentials();
                             describe();
                             saved = true;

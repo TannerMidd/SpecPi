@@ -156,6 +156,20 @@ export const THRESHOLDS = Object.freeze({
         high: 0.85,
         low: 0.15,
     }),
+    guard: Object.freeze({
+        // The same measured Score operating point as every other system, written out rather than
+        // inherited by falling through `thresholdsFor`'s default. The guard asked under the name
+        // "gap" for exactly as long as it took to notice that adding a `guard` entry would then have
+        // changed nothing -- a silent no-op on the one system whose action takes a tool call away.
+        scoreConfidence: 0.6,
+        boundary: 0.3,
+        choiceConfidence: 0.75,
+        margin: 0.2,
+        // Unused: this system reads only the Score side. Kept so every system has a full set, and
+        // so the calibration tests cover this entry like any other.
+        high: 0.85,
+        low: 0.15,
+    }),
     sources: Object.freeze({
         scoreConfidence: 0.6,
         boundary: 0.3,

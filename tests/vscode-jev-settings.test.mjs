@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const jevConfig = require("../vscode/media/jev-config.js");
 const {
     TARGETS,
+    jevKeyStatus,
     jevPath,
     jevUsagePath,
     loadPackageSettings,
@@ -16,13 +17,21 @@ const {
 } = require("../vscode/src/package-settings.js");
 const { packageSettingsState } = require("../vscode/src/package-state.js");
 
+// The same shape as the advisor suite's helper, and fixed the same way for the same reason. This
+// copy was left behind when that one was corrected, which is its own lesson: the bug was duplicated
+// before it was understood, so fixing the file where it fired left an identical landmine in the
+// file that gained the most new tests -- including ones that write fixture credential stores.
+//
+// A `try/finally` around a bare `return run(dir)` stops isolating at an async callback's first
+// `await`: the cleanup restores PI_CODING_AGENT_DIR and deletes the temporary directory there, and
+// the rest of the body runs against the developer's real `~/.pi/agent`. Every callback here is
+// synchronous today, so this was latent rather than firing -- but "latent" is not a property anyone
+// can see when adding the one `await` that arms it.
 function withAgentDir(run) {
     const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-jev-chat-")));
     const previous = process.env.PI_CODING_AGENT_DIR;
     process.env.PI_CODING_AGENT_DIR = dir;
-    try {
-        return run(dir);
-    } finally {
+    const restore = () => {
         if (previous === undefined) {
             delete process.env.PI_CODING_AGENT_DIR;
         } else {
@@ -30,7 +39,52 @@ function withAgentDir(run) {
         }
 
         fs.rmSync(dir, { recursive: true, force: true });
+    };
+
+    let result;
+    try {
+        result = run(dir);
+    } catch (error) {
+        restore();
+        throw error;
     }
+
+    if (!result || typeof result.then !== "function") {
+        restore();
+
+        return result;
+    }
+
+    return result.then(
+        (value) => {
+            restore();
+
+            return value;
+        },
+        (error) => {
+            restore();
+            throw error;
+        },
+    );
+}
+
+/**
+ * Write a fixture credential store, and never outside the temporary directory.
+ *
+ * The advisor suite's equivalent guard exists because the missing one cost a real developer every
+ * provider they had logged into. These tests write `auth.json` too, so they carry the same check
+ * rather than relying on the helper above staying correct.
+ */
+function writeAuth(directory, entries) {
+    const file = path.join(directory, "auth.json");
+    if (!file.startsWith(fs.realpathSync.native(os.tmpdir()))) {
+        throw new Error(`Refusing to write a fixture auth.json outside the temporary directory: ${file}`);
+    }
+
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(entries, null, 2)}\n`);
+
+    return file;
 }
 
 test("Chat edits the file the advisor actually reads", () => {
@@ -47,7 +101,7 @@ test("an absent settings file reads as the whole layer off", () => {
         const loaded = loadPackageSettings("jevLayer", { workspace: dir });
         assert.equal(loaded.exists, false);
         const flat = JSON.parse(loaded.text);
-        for (const key of ["master", "startup", "guardEnabled", "guardStartup", ...jevConfig.SYSTEMS]) {
+        for (const key of ["enabled", ...jevConfig.SYSTEMS]) {
             assert.equal(flat[key], false, `${key} should default off`);
         }
     });
@@ -58,36 +112,70 @@ test("the nested disk shape survives a round trip through the flat form", () => 
     // one place instead of a test that fails for the wrong reason.
     const on = new Set(["retention", "gap"]);
     const stored = {
-        schema: 2,
+        schema: 3,
         master: true,
-        startup: false,
+        startup: true,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, on.has(name)])),
         budgets: { ...jevConfig.DEFAULT_BUDGETS, total: 16, retention: 8 },
         progressNudge: "message",
-        guard: { enabled: false, startup: true },
     };
     assert.deepEqual(jevConfig.toStored(jevConfig.fromStored(stored)), stored);
+});
+
+test("a file that is on but not at startup is read as off, because that is what it does", () => {
+    // `master` and `startup` are two keys for one intention and the advisor requires both: its
+    // session_start zeroes a stored master whenever startup is false. So `master: true,
+    // startup: false` is not a layer that is on -- it is a layer that never runs, and a panel
+    // showing it as enabled would be describing behaviour no session will ever have. The round
+    // trip is deliberately not the identity here: it resolves the pair to what the advisor does.
+    const stored = {
+        schema: 3,
+        master: true,
+        startup: false,
+        systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, true])),
+        budgets: { ...jevConfig.DEFAULT_BUDGETS },
+        progressNudge: "notify",
+    };
+    const flat = jevConfig.fromStored(stored);
+    assert.equal(flat.enabled, false);
+    const round = jevConfig.toStored(flat);
+    assert.equal(round.master, false);
+    assert.equal(round.startup, false);
+
+    // And the pair is always written together, so the checkbox means the same thing next session.
+    const on = jevConfig.toStored({ ...flat, enabled: true });
+    assert.equal(on.master, true);
+    assert.equal(on.startup, true);
+
+    // The mirror case, which `/jev startup on` used to produce: startup set, master never written.
+    // session_start keeps a stored master only when startup is true, and here there is none to
+    // keep, so this file also describes a layer that never runs. Reading it as off is correct, and
+    // normalising both keys costs nothing because there was no working preference to preserve.
+    const mirrored = jevConfig.fromStored({ ...stored, master: false, startup: true });
+    assert.equal(mirrored.enabled, false);
+    assert.equal(jevConfig.toStored(mirrored).startup, false);
 });
 
 test("saving writes the nested shape the extension expects, not the flat one", () => {
     withAgentDir((dir) => {
         const loaded = loadPackageSettings("jevLayer", { workspace: dir });
-        const draft = { ...JSON.parse(loaded.text), master: true, retention: true, guardEnabled: true };
+        const draft = { ...JSON.parse(loaded.text), enabled: true, retention: true, guard: true };
         savePackageSettings(loaded, `${JSON.stringify(draft)}\n`);
         const written = JSON.parse(fs.readFileSync(jevPath({ workspace: dir }), "utf8"));
         // The advisor collapses any shape it does not recognise to all-off, so the marker is
         // load-bearing: a panel still writing schema 1 would produce a file the advisor migrates
         // rather than reads, and a panel writing schema 3 would switch the whole layer off.
-        assert.equal(written.schema, 2);
+        assert.equal(written.schema, 3);
         assert.equal(written.master, true);
+        assert.equal(written.startup, true, "the panel writes a preference, so on means on next session too");
         assert.deepEqual(
             written.systems,
-            Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, name === "retention"])),
+            Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, name === "retention" || name === "guard"])),
         );
         assert.equal(written.progressNudge, "notify", "the layer must not default to steering the model");
-        assert.deepEqual(written.guard, { enabled: true, startup: false });
+        assert.ok(!("guard" in written), "schema 3 has no guard object beside the systems");
         assert.deepEqual(written.budgets, jevConfig.DEFAULT_BUDGETS);
-        for (const key of ["retention", "guardEnabled", "budgetTotal", "budgetRetention"]) {
+        for (const key of ["enabled", "retention", "budgetTotal", "budgetRetention"]) {
             assert.ok(!(key in written), `the flat key ${key} must not leak onto disk`);
         }
     });
@@ -97,7 +185,7 @@ test("a draft the advisor would reject is refused before it reaches disk", () =>
     withAgentDir((dir) => {
         const loaded = loadPackageSettings("jevLayer", { workspace: dir });
         const bad = [
-            { master: "yes" },
+            { enabled: "yes" },
             // The total and the per-system ceilings differ, and the form has to enforce each one
             // against its own limit rather than against whichever is larger.
             { budgetTotal: jevConfig.MAX_TOTAL_BUDGET + 1 },
@@ -147,11 +235,45 @@ test("a schema 1 file is migrated rather than read as the layer switched off", a
                 })}\n`,
             );
             const flat = JSON.parse(loadPackageSettings("jevLayer", { workspace: dir }).text);
-            assert.equal(flat.master, true, "a migrated file must not read as the layer off");
+            assert.equal(flat.enabled, true, "a migrated file must not read as the layer off");
             assert.equal(flat.retention, true);
             assert.equal(flat.budgetTotal, expected, "the old shared ceiling becomes the new total");
             assert.deepEqual(jevConfig.toStored(flat), loadSettings(), "the panel and the advisor must migrate alike");
         });
+    }
+});
+
+test("the guard preference survives from either older schema, in both readers", async () => {
+    // Schema 1 and schema 2 both carried the command guard in a `guard` pair of its own. The
+    // advisor's 1-to-2 step preserves the whole file and only its 2-to-3 step folds that pair into
+    // `systems`, so both schemas arrive at the panel still carrying it -- and a panel that read it
+    // from schema 2 alone showed an enabled guard as off on a schema 1 file, so the first save would
+    // have written the user's own choice away. That is the reader drift this pairing exists to stop.
+    const { loadSettings } = await import("../extensions/jev-advisor/config.mjs");
+    for (const schema of [1, 2]) {
+        for (const wanted of [true, false]) {
+            withAgentDir((dir) => {
+                const file = jevPath({ workspace: dir });
+                fs.mkdirSync(path.dirname(file), { recursive: true });
+                fs.writeFileSync(
+                    file,
+                    `${JSON.stringify({
+                        schema,
+                        master: true,
+                        startup: true,
+                        systems: { retention: true },
+                        ...(schema === 1 ? { callBudgetPerSession: 6 } : { budgets: { total: 6 } }),
+                        // `guard.startup` is the preference; `guard.enabled` was a session flag.
+                        guard: { enabled: !wanted, startup: wanted },
+                    })}
+`,
+                );
+                const flat = JSON.parse(loadPackageSettings("jevLayer", { workspace: dir }).text);
+                assert.equal(flat.guard, wanted, `schema ${schema}: the panel lost the guard preference`);
+                assert.equal(loadSettings().systems.guard, wanted, `schema ${schema}: the advisor disagrees`);
+                assert.deepEqual(jevConfig.toStored(flat), loadSettings(), "the two readers must migrate alike");
+            });
+        }
     }
 });
 
@@ -212,7 +334,10 @@ test("Chat reports the advisor's own call counts, and never writes them", () => 
         // Saving settings must leave the counter exactly as the advisor wrote it. The panel reports
         // spend; it cannot edit the evidence.
         const before = fs.readFileSync(usage, "utf8");
-        savePackageSettings(loaded, `${JSON.stringify({ ...JSON.parse(loaded.text), master: true })}\n`);
+        savePackageSettings(
+            loaded,
+            `${JSON.stringify({ ...JSON.parse(loaded.text), enabled: true, retention: true })}\n`,
+        );
         assert.equal(fs.readFileSync(usage, "utf8"), before);
     });
 });
@@ -236,7 +361,7 @@ test("a count Chat cannot read leaves the panel working", () => {
 test("an unknown key is reported rather than silently carried", () => {
     // The advisor reads an unrecognised shape as all-off, so keeping a stray key would turn the
     // layer off later without anything having said so.
-    const result = jevConfig.validate(JSON.stringify({ master: true, leftover: 1 }));
+    const result = jevConfig.validate(JSON.stringify({ enabled: true, retention: true, leftover: 1 }));
     assert.deepEqual(result.unknown, ["leftover"]);
 });
 
@@ -255,4 +380,276 @@ test("every switch the panel offers exists in the advisor's own schema", async (
             `${name} has no budget field`,
         );
     }
+});
+
+test("the panel names the key source instead of asking for a key it cannot hold", () => {
+    // "There is no interface for the API key" was accurate: the panel held no credential and said
+    // nothing about where one comes from, so a person with a working key had no way to learn the
+    // layer was ignoring it. The fix is reporting, not a key field -- Pi already owns the store.
+    withAgentDir((dir) => {
+        const env = {};
+        fs.mkdirSync(dir, { recursive: true });
+
+        const empty = jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env });
+        assert.equal(empty.active, undefined);
+        assert.deepEqual(
+            empty.sources.map((item) => [item.name, item.present]),
+            [
+                ["auth.json", false],
+                ["OPENROUTER_API_KEY", false],
+                ["TYPESAFE_API_KEY", false],
+            ],
+        );
+
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-x" } });
+        assert.equal(jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env }).active, "auth.json");
+
+        // The store wins, matching the advisor and matching Pi's own documented order.
+        assert.equal(
+            jevKeyStatus({
+                settingsFile: jevPath({ workspace: dir }),
+                env: { OPENROUTER_API_KEY: "openrouter-fixture-y" },
+            }).active,
+            "auth.json",
+        );
+    });
+});
+
+test("the panel never learns a key, only whether there is one", () => {
+    withAgentDir((dir) => {
+        fs.mkdirSync(dir, { recursive: true });
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-secret" } });
+        const status = jevKeyStatus({
+            settingsFile: jevPath({ workspace: dir }),
+            env: { OPENROUTER_API_KEY: "openrouter-fixture-other" },
+        });
+        assert.ok(
+            !JSON.stringify(status).includes("openrouter-fixture-"),
+            "a key must not reach the webview through the status it renders",
+        );
+        for (const item of status.sources) {
+            assert.equal(typeof item.present, "boolean");
+        }
+    });
+});
+
+test("no source is singled out for the command guard, because it reads all of them", () => {
+    // While the guard was a separate package reading OPENROUTER_API_KEY alone, one row was marked as
+    // the only one it could see. As the layer's eighth system it resolves its key the same way every
+    // other system does, so a mark on any row would now be telling someone with a stored credential
+    // that the guard cannot use it.
+    withAgentDir((dir) => {
+        const { sources } = jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: {} });
+        assert.ok(sources.length > 1);
+        for (const item of sources) {
+            assert.ok(!("guard" in item), `${item.name} still carries a guard-only flag`);
+            assert.ok(!/only this|invisible to the guard/i.test(item.detail), `${item.name}: stale guard wording`);
+        }
+    });
+});
+
+test("an unreadable credential store leaves the panel working", () => {
+    // Same rule as the usage counter beside it: this is a report, and no way it can fail may stop
+    // the switches opening.
+    withAgentDir((dir) => {
+        fs.mkdirSync(dir, { recursive: true });
+        for (const text of ["", "{", "null", "[]", JSON.stringify({ openrouter: { type: "oauth" } })]) {
+            fs.writeFileSync(path.join(dir, "auth.json"), text);
+            assert.equal(
+                jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: {} }).active,
+                undefined,
+                `readable: ${text}`,
+            );
+        }
+
+        assert.ok(loadPackageSettings("jevLayer", { workspace: dir }).key);
+    });
+});
+
+test("switching the layer on in the form switches its systems on with it", () => {
+    // A layer enabled with every system off runs and does nothing, which is the state people kept
+    // arriving at. The form fills them in on the off-to-on transition so the boxes visibly tick,
+    // rather than a save quietly rewriting seven settings nobody touched.
+    const off = jevConfig.fromStored({});
+    const { config, note } = jevConfig.couple({ ...off, enabled: true }, off);
+    assert.ok(note, "the panel has to say that it did this");
+    for (const name of jevConfig.SYSTEMS) {
+        assert.equal(config[name], true, `${name} should come on with the layer`);
+    }
+
+    // A deliberate subset is a choice, and toggling the layer must not hand back the rest.
+    const chosen = { ...off, enabled: true, retention: true };
+    assert.deepEqual(jevConfig.couple(chosen, off).config, chosen);
+    assert.equal(jevConfig.couple(chosen, off).note, "");
+
+    // Nothing happens while the layer is off.
+    assert.deepEqual(jevConfig.couple({ ...off, enabled: false }, off).config, { ...off, enabled: false });
+
+    // Unticking the last system in a working file is a decision, not a broken file, and this test
+    // used to assert the opposite -- that all eight were switched back on, the blocking command
+    // guard among them, with a note describing a file that never existed. `/jev disable` reads the
+    // same situation as "switch the layer off", so the panel does too.
+    const alreadyOn = { ...off, enabled: true, gap: true };
+    const emptied = jevConfig.couple({ ...alreadyOn, gap: false }, alreadyOn);
+    assert.ok(emptied.note);
+    assert.equal(emptied.config.enabled, false, "the layer goes off rather than the systems coming back");
+    for (const name of jevConfig.SYSTEMS) {
+        assert.equal(emptied.config[name], false, `${name} must stay as the person left it`);
+    }
+
+    // A file that arrives already dead is still repaired: nobody chose that state in front of us.
+    const dead = { ...off, enabled: true };
+    const repaired = jevConfig.couple(dead, dead);
+    assert.ok(repaired.note);
+    assert.equal(repaired.config.enabled, true);
+    for (const name of jevConfig.SYSTEMS) {
+        assert.equal(repaired.config[name], true, `${name} should be filled in for a broken file`);
+    }
+});
+
+test("a layer that is on with nothing to run cannot be saved, but can still be opened", () => {
+    // The rule lives in the host, not the webview validator. As a validation error it fired while
+    // merely opening a file in this state -- the exact file the panel exists to repair -- so the
+    // panel rendered red with Save disabled before anything was touched.
+    const off = jevConfig.fromStored({});
+    const dead = { ...off, enabled: true };
+    assert.equal(jevConfig.deadLayer(dead), true);
+    assert.equal(jevConfig.deadLayer({ ...dead, retention: true }), false);
+    assert.equal(jevConfig.deadLayer(off), false, "the shipped default is off, not dead");
+
+    // Opening must never throw, whatever the file says.
+    jevConfig.validate(JSON.stringify(dead));
+    jevConfig.validate(JSON.stringify(off));
+
+    // And the form repairs it rather than leaving it stuck.
+    const repaired = jevConfig.couple(dead, dead);
+    assert.ok(repaired.note, "a loaded dead file must be repaired and the repair announced");
+    for (const name of jevConfig.SYSTEMS) {
+        assert.equal(repaired.config[name], true);
+    }
+
+    withAgentDir((dir) => {
+        const loaded = loadPackageSettings("jevLayer", { workspace: dir });
+        assert.throws(
+            () =>
+                savePackageSettings(
+                    loaded,
+                    `${JSON.stringify(dead)}
+`,
+                ),
+            /runs and does nothing/u,
+            "the host is the authority the JSON textarea cannot bypass",
+        );
+    });
+});
+
+test("the key report follows the backend the advisor will actually use", () => {
+    // auth.json is keyed by Pi provider id and TypeSafe is not one of Pi's providers, so naming the
+    // credential store on that route would promise a key the advisor never reads.
+    withAgentDir((dir) => {
+        const settingsFile = jevPath({ workspace: dir });
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-x" } });
+
+        const openrouter = jevKeyStatus({ settingsFile, env: {} });
+        assert.equal(openrouter.active, "auth.json");
+
+        const typesafe = jevKeyStatus({ settingsFile, env: { JEV_BACKEND: "typesafe" } });
+        assert.equal(typesafe.active, undefined, "the store holds nothing for the direct API");
+        assert.deepEqual(
+            typesafe.sources.map((item) => item.name),
+            ["TYPESAFE_API_KEY"],
+        );
+
+        // And the repository's own environment-only mode hides a source it will not consult.
+        const evalRun = jevKeyStatus({ settingsFile, env: { JEV_KEY_SOURCE: "environment" } });
+        assert.ok(!evalRun.sources.some((item) => item.name === "auth.json"));
+    });
+});
+
+test("the key report resolves the same directory before and after a save", () => {
+    // loadJev passed its options through and saveJev called the reporter with none, so a
+    // workspace-relative PI_CODING_AGENT_DIR made pressing Save flip a working panel to "No key
+    // anywhere" -- a false report caused only by saving. Both now derive it from the settings file.
+    withAgentDir((dir) => {
+        writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-x" } });
+        const loaded = loadPackageSettings("jevLayer", { workspace: dir });
+        assert.equal(loaded.key.active, "auth.json");
+
+        const draft = { ...JSON.parse(loaded.text), enabled: true, retention: true };
+        const saved = savePackageSettings(loaded, `${JSON.stringify(draft)}\n`);
+        assert.equal(saved.key.active, "auth.json", "saving must not change where the key is looked for");
+    });
+});
+
+test("Chat's key report and the advisor's resolver agree about every source", async () => {
+    // Two readers of one contract, kept in step by a test rather than by hope. Chat cannot import
+    // the advisor's ESM resolver from a synchronous CommonJS host, and the resolver returns keys
+    // which the webview host has no business holding -- so the copy stays and this pins it, the same
+    // way DEFAULT_BUDGETS is pinned to the advisor's own defaults above.
+    const { keySources } = await import("../extensions/jev-advisor/key-source.mjs");
+    const previous = { ...process.env };
+    withAgentDir((dir) => {
+        const settingsFile = jevPath({ workspace: dir });
+        for (const env of [
+            {},
+            { OPENROUTER_API_KEY: "openrouter-fixture-x" },
+            { TYPESAFE_API_KEY: "ts" },
+            { JEV_BACKEND: "typesafe" },
+            { JEV_BACKEND: "typesafe", TYPESAFE_API_KEY: "ts" },
+            { JEV_KEY_SOURCE: "environment" },
+        ]) {
+            for (const withStore of [false, true]) {
+                if (withStore) {
+                    writeAuth(dir, { openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+                } else {
+                    fs.rmSync(path.join(dir, "auth.json"), { force: true });
+                }
+
+                for (const name of ["OPENROUTER_API_KEY", "TYPESAFE_API_KEY", "JEV_BACKEND", "JEV_KEY_SOURCE"]) {
+                    delete process.env[name];
+                }
+
+                Object.assign(process.env, env);
+                const mine = jevKeyStatus({ settingsFile, env: process.env });
+                const theirs = keySources();
+                assert.deepEqual(
+                    mine.sources.map((item) => [item.name, item.present]),
+                    theirs.map((item) => [item.name, item.present]),
+                    `sources disagree for ${JSON.stringify(env)} (store: ${withStore})`,
+                );
+                assert.equal(
+                    mine.active,
+                    theirs.find((item) => item.present)?.name,
+                    `active source disagrees for ${JSON.stringify(env)} (store: ${withStore})`,
+                );
+            }
+        }
+    });
+
+    for (const name of ["OPENROUTER_API_KEY", "TYPESAFE_API_KEY", "JEV_BACKEND", "JEV_KEY_SOURCE"]) {
+        if (previous[name] === undefined) {
+            delete process.env[name];
+        } else {
+            process.env[name] = previous[name];
+        }
+    }
+});
+
+test("Chat and the advisor agree about a symlinked credential store", () => {
+    // The parity test above never created a link, so it passed while the two readers disagreed:
+    // one used lstat and refused links, the other used stat and followed them. A dotfile manager
+    // linking auth.json is the case key-source.mjs cites, and the result was /jev status reporting
+    // "in use from auth.json" beside a panel reporting "No key anywhere".
+    withAgentDir((dir) => {
+        const real = path.join(dir, "managed-auth.json");
+        fs.writeFileSync(real, JSON.stringify({ openrouter: { type: "api_key", key: "openrouter-fixture-linked" } }));
+        try {
+            fs.symlinkSync(real, path.join(dir, "auth.json"));
+        } catch {
+            return; // Unprivileged Windows cannot create links; the assertion below needs one.
+        }
+
+        const status = jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: {} });
+        assert.equal(status.active, "auth.json", "a linked store must read the same as a plain one");
+    });
 });

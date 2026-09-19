@@ -1,18 +1,19 @@
 ((root) => {
-    // Configuration shape reviewed against extensions/jev-advisor/config.mjs.
+    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 3).
     //
     // The Jev layer ships entirely off, and every switch here is a way to turn part of it on, so
     // this file is the one place Chat can start sending session summaries to a third party. It
     // holds no credential: the key comes from the environment Pi was started with and Chat never
     // reads, writes or displays it.
     //
-    // Two shapes, deliberately. On disk the systems are nested under `systems`, the budgets
-    // under `budgets` and the guard under `guard`, because the advisor and the guard are separate
-    // packages with separate gates. In the form they are flat, because a nested object renders as a
-    // JSON textarea and the point of this panel is a toggle. `fromStored`/`toStored` are the only
-    // translation, and both directions are total so a round trip cannot silently drop a key.
+    // Two shapes, deliberately. On disk the systems are nested under `systems` and the budgets under
+    // `budgets`; in the form they are flat, because a nested object renders as a JSON textarea and
+    // the point of this panel is a toggle. `fromStored`/`toStored` are the only translation, and both
+    // directions are total so a round trip cannot silently drop a key. Schemas 1 and 2 kept the
+    // command guard in a `guard` pair of its own, from when it was a separate package; schema 3 makes
+    // it the eighth system and `fromStored` migrates the old pair rather than reading past it.
 
-    const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability"];
+    const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability", "guard"];
     const MAX_CALL_BUDGET = 256;
     const MAX_TOTAL_BUDGET = 512;
     const NUDGE_MODES = ["notify", "message"];
@@ -27,6 +28,7 @@
         progress: 176,
         untrusted: 104,
         capability: 2,
+        guard: 208,
     };
     // The label a row gets in the usage table. Same names the advisor prints in /jev status, so a
     // person reading both does not have to work out that two words mean one system.
@@ -38,6 +40,7 @@
         progress: "Progress and thrash detection",
         untrusted: "Untrusted-content classification",
         capability: "Turn-zero capability arming",
+        guard: "Command guard",
     };
     const BUDGET_KEYS = { total: "budgetTotal" };
     for (const name of SYSTEMS) {
@@ -47,16 +50,10 @@
     // [key, label, type, help]. Order is the order the panel renders.
     const fields = [
         [
-            "master",
-            "Jev layer enabled (this session)",
+            "enabled",
+            "Jev layer enabled",
             "boolean",
-            "Master switch. While this is off nothing is sent, no key is read, and the harness behaves exactly as it did before the layer existed.",
-        ],
-        [
-            "startup",
-            "Enable the Jev layer on startup",
-            "boolean",
-            "Default the master switch on for new sessions. A session toggle never writes this preference.",
+            "The one switch. While it is off nothing is sent, no key is read, and the harness behaves exactly as it did before the layer existed. Turning it on here enables every system below that is currently off, because a layer with no systems on is a switch that does nothing. Pi reads this when a session starts, so restart Pi after saving.",
         ],
         [
             "retention",
@@ -95,6 +92,12 @@
             "Asks whether a fetched page or browser snapshot contains instructions aimed at an AI reading it, and prepends a fixed warning line when it confidently does. Defence in depth: it never blocks, never touches the agent's own output, and costs no extra call while the retention system is also on.",
         ],
         [
+            "guard",
+            "System: score shell and file calls before they run",
+            "boolean",
+            "The command guard, native since schema 3. Read-only commands and ordinary project writes are settled locally for nothing; anything else is scored, and a call is blocked only on a confident destructive verdict the request does not account for. It fails open: no key, no budget, a timeout or an unconfident answer all hand the call to @gotgenes/pi-permission-system, which decides it exactly as it did before.",
+        ],
+        [
             "capability",
             "System: arm a withdrawn tool group before the first request",
             "boolean",
@@ -118,18 +121,6 @@
             "number",
             `Ceiling for the ${name} system alone, 0 to ${MAX_CALL_BUDGET}. Per-system ceilings exist so one busy system cannot starve the others; 0 means no calls, and switching the system off above is the way to disable it.`,
         ]),
-        [
-            "guardEnabled",
-            "Command guard enabled (this session)",
-            "boolean",
-            "Lets specpi-jev-guard score shell and file calls before the permission system sees them. It is fail-closed: with no key, an unreachable endpoint, or an uncertain verdict and no UI, it blocks the call.",
-        ],
-        [
-            "guardStartup",
-            "Enable the command guard on startup",
-            "boolean",
-            "Default the guard on for new sessions. While it is off, @gotgenes/pi-permission-system decides every call exactly as before.",
-        ],
     ];
 
     function object(value) {
@@ -151,7 +142,14 @@
     function fromStored(stored) {
         const source = object(stored) ? stored : {};
         const systems = object(source.systems) ? source.systems : {};
+        // Schema 2 carried the guard as its own pair outside the systems map, and so did schema 1 --
+        // the advisor's 1-to-2 step preserves the whole file and only its 2-to-3 step folds the pair
+        // into `systems`, so both older schemas arrive here carrying it. Reading it from schema 2
+        // alone made the panel show an enabled guard as off on a schema-1 file, and saving from that
+        // panel would then have written the user's own preference away. What migrates is
+        // `guard.startup` -- the preference the user chose -- not the session flag beside it.
         const guard = object(source.guard) ? source.guard : {};
+        const pairedGuard = source.schema === 1 || source.schema === 2;
         const budgets = object(source.budgets) ? source.budgets : {};
         // Schema 1 read 0 as "no ceiling"; schema 2 reads it as "no calls".
         const legacy = source.schema === 1;
@@ -160,15 +158,17 @@
             ? budget(stale, DEFAULT_BUDGETS.total, MAX_TOTAL_BUDGET)
             : budget(budgets.total, DEFAULT_BUDGETS.total, MAX_TOTAL_BUDGET);
         const flat = {
-            master: source.master === true,
-            startup: source.startup === true,
+            // `master` and `startup` are two stored keys for one intention, and the advisor only
+            // acts when both are true: `session_start` zeroes a stored master whenever startup is
+            // false. A panel that showed them as independent checkboxes was therefore offering a
+            // combination -- on, but not at startup -- that describes a layer which is never on at
+            // all. The panel shows the effective state and writes both together.
+            enabled: source.master === true && source.startup === true,
             progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
             [BUDGET_KEYS.total]: total,
-            guardEnabled: guard.enabled === true,
-            guardStartup: guard.startup === true,
         };
         for (const name of SYSTEMS) {
-            flat[name] = systems[name] === true;
+            flat[name] = name === "guard" && pairedGuard ? guard.startup === true : systems[name] === true;
             flat[BUDGET_KEYS[name]] = legacy
                 ? Math.min(DEFAULT_BUDGETS[name], total)
                 : budget(budgets[name], DEFAULT_BUDGETS[name], MAX_CALL_BUDGET);
@@ -185,14 +185,63 @@
             budgets[name] = budget(source[BUDGET_KEYS[name]], DEFAULT_BUDGETS[name], MAX_CALL_BUDGET);
         }
 
+        const enabled = source.enabled === true;
+
         return {
-            schema: 2,
-            master: source.master === true,
-            startup: source.startup === true,
+            schema: 3,
+            // Always written together; see `fromStored`. Keeping them in step is what makes the
+            // checkbox mean what it says in the next session rather than only in this file.
+            master: enabled,
+            startup: enabled,
             systems: Object.fromEntries(SYSTEMS.map((name) => [name, source[name] === true])),
             budgets,
             progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
-            guard: { enabled: source.guardEnabled === true, startup: source.guardStartup === true },
+        };
+    }
+
+    /**
+     * Enabling the layer has to enable something.
+     *
+     * Every system ships off, so a fresh file with the layer switched on describes a layer that
+     * runs and does nothing -- which is exactly the state people kept arriving at, because nothing
+     * in the panel said that seven more boxes were load-bearing. This fills them in on the
+     * transition from off to on, and only when none are already on: a person running retention
+     * alone has chosen that, and toggling the layer must not quietly hand back the other six.
+     *
+     * It deliberately runs in the form rather than in `toStored`, so the boxes visibly tick before
+     * anything is saved. A save that silently rewrote seven settings the person never touched would
+     * buy the same behaviour at the cost of trusting the panel.
+     */
+    function couple(config, previous) {
+        // Three cases, and the third is the one that was missing. Turning the layer on fills the
+        // systems in; a file that arrives already on with nothing running is the broken state this
+        // panel exists to repair, and it is repaired the same way. But a person unticking the last
+        // system in a working file has not arrived at either: they have said "none of these", and
+        // re-ticking all eight -- the blocking command guard among them -- answered a deliberate act
+        // by undoing it, with a note describing a file that never existed. The advisor's own
+        // `/jev disable` reads the same situation as "switch the layer off", so this does too.
+        if (!deadLayer(config)) {
+            return { config, note: "" };
+        }
+
+        if (previous?.enabled === true && !deadLayer(previous)) {
+            return {
+                config: { ...config, enabled: false },
+                note: " That was the last system, so the layer was switched off; it would otherwise run and do nothing.",
+            };
+        }
+
+        const arriving = previous?.enabled !== true;
+        const next = { ...config };
+        for (const name of SYSTEMS) {
+            next[name] = true;
+        }
+
+        return {
+            config: next,
+            note: arriving
+                ? ` All ${SYSTEMS.length} systems were switched on with the layer; turn any back off before saving.`
+                : ` This file had the layer on with every system off, which runs and does nothing. All ${SYSTEMS.length} were switched on; turn any back off before saving.`,
         };
     }
 
@@ -212,7 +261,7 @@
      *
      * Returns undefined for any shape this version does not know, including a missing file. The
      * panel renders that as "the layer has not run", which is the honest reading: the advisor only
-     * writes this file once the master switch is on.
+     * writes this file once the layer is on.
      */
     function fromStoredUsage(raw) {
         if (!object(raw) || raw.schema !== 1) {
@@ -315,6 +364,19 @@
         return { config, unknown };
     }
 
+    /**
+     * Is this a layer that is on with nothing to run?
+     *
+     * Deliberately *not* part of `validate`. Making it a validation error meant the panel threw
+     * while merely opening a file in that state -- which is precisely the file this panel exists to
+     * repair -- so it rendered red with Save disabled before the person had touched anything, and
+     * `couple` skipped it because the layer was already on. The rule belongs where a write happens:
+     * `couple` fixes it in the form, and the host refuses it on save.
+     */
+    function deadLayer(config) {
+        return config.enabled === true && SYSTEMS.every((name) => config[name] !== true);
+    }
+
     const api = {
         SYSTEMS,
         SYSTEM_LABELS,
@@ -326,6 +388,8 @@
         fields,
         parse,
         validate,
+        couple,
+        deadLayer,
         fromStored,
         toStored,
         fromStoredUsage,

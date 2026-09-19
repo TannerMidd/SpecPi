@@ -6,7 +6,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { basePackages } from "../scripts/packages.mjs";
+import { basePackages, retiredPackages } from "../scripts/packages.mjs";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const cli = path.join(repoRoot, "scripts/specpi.mjs");
@@ -92,7 +92,7 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
     return { root, agent, settings, log, browserLog, fake, invoke, run };
 }
 
-test("the default base is exactly the eight human-selected pinned packages", () => {
+test("the default base is exactly the seven human-selected pinned packages", () => {
     assert.deepEqual(basePackages, [
         "npm:pi-web-access@0.29.0",
         "npm:specpi-browser-qa@0.3.0",
@@ -101,7 +101,6 @@ test("the default base is exactly the eight human-selected pinned packages", () 
         "npm:pi-goal-x@0.31.2",
         "npm:@sreetej510/pi-usage@0.10.0",
         "npm:@gotgenes/pi-permission-system@32.0.2",
-        "npm:specpi-jev-guard@0.1.0",
     ]);
 });
 
@@ -199,6 +198,61 @@ test("updates retire only unchanged SpecPi-added retired package entries", async
             });
         }
     }
+});
+
+test("a retired package is unpinned even when package acquisition is skipped", async (t) => {
+    // Dropping a line from templates/settings.json stops new installs getting a package and does
+    // nothing to a machine that already has it. For specpi-jev-guard that gap was not survivable:
+    // it fails closed, and this release deleted both the code that kept it inert and the command
+    // that could disarm it, so an install left holding it would block every shell call the moment
+    // its key or endpoint went away. --skip-package-install is the case the restore path misses.
+    assert.deepEqual(retiredPackages, ["npm:specpi-jev-guard"]);
+
+    // Whatever shape the entry has, including one the user has given filters of their own. That is a
+    // deliberate exception to "a modified entry is yours", and the only one: preserving a modified
+    // entry preserves a fail-closed gate whose off switch this release deleted.
+    for (const modified of [false, true]) {
+        await t.test(modified ? "a user-modified entry goes too" : "SpecPi's own entry goes", (t) => {
+            const f = fixture(t);
+            f.run("install", "--yes");
+            const retired = "npm:specpi-jev-guard@0.1.0";
+            const entry = modified ? { source: retired, extensions: [] } : retired;
+            const settings = JSON.parse(fs.readFileSync(f.settings));
+            settings.packages.push(entry);
+            fs.writeFileSync(f.settings, JSON.stringify(settings));
+
+            const doctor = f.invoke(["doctor"]);
+            assert.notEqual(doctor.status, 0, "doctor must report a retired package that is still loaded");
+            assert.match(doctor.stdout + doctor.stderr, /Retired base package still configured/);
+
+            const update = f.run("update", "--yes", "--skip-package-install");
+            assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, basePackages);
+            assert.match(update.stdout + update.stderr, /Unpinned retired package/);
+            f.run("doctor");
+        });
+    }
+});
+
+test("a retirement that cannot be completed is rolled back with the rest of the run", (t) => {
+    // The write happens outside the `--skip-package-install` guard, so the transaction's watched set
+    // has to cover it on that path too. It did not, which left this one write unbacked-up and
+    // un-rolled-back while every other file in the same run was both.
+    const f = fixture(t);
+    f.run("install", "--yes", "--skip-package-install");
+    fs.writeFileSync(f.settings, JSON.stringify({ theme: "user", packages: ["npm:specpi-jev-guard@0.1.0"] }));
+    const before = fs.readFileSync(f.settings, "utf8");
+
+    const failed = f.invoke(["update", "--yes", "--skip-package-install"], {
+        SPECPI_TESTING: "1",
+        SPECPI_TEST_FAIL_POINT: "after-first-managed-file",
+    });
+    assert.notEqual(failed.status, 0);
+    assert.equal(fs.readFileSync(f.settings, "utf8"), before, "the retirement must roll back with the run");
+
+    f.run("update", "--yes", "--skip-package-install");
+    const after = JSON.parse(fs.readFileSync(f.settings));
+    assert.deepEqual(after.packages, [], "the retired entry is gone");
+    assert.equal(after.theme, "user", "and nothing else in the file moved");
 });
 
 test("failed package acquisition restores configuration and managed files with explicit cache limitation", (t) => {

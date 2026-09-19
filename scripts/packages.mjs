@@ -48,6 +48,54 @@ export function runBrowserQA(agentDir, command) {
     }
 }
 
+/**
+ * Packages a past SpecPi version pinned and this one no longer does.
+ *
+ * Dropping an entry from `templates/settings.json` stops new installs getting it and does nothing at
+ * all to a machine that already has it: the entry stays in `settings.json` and Pi keeps loading it.
+ * That is tolerable for a package that merely stopped being useful, and not tolerable for
+ * `specpi-jev-guard`, which fails closed -- an install left holding it after SpecPi deleted both the
+ * code that kept it inert and the `/jev guard off` command that could disarm it would block every
+ * shell call the moment its key or its endpoint went away, with nothing left to turn it off.
+ *
+ * So retirement is explicit, and it removes the entry rather than waiting for the restore path to.
+ */
+export const retiredPackages = Object.freeze(["npm:specpi-jev-guard"]);
+
+/**
+ * Drop retired entries from a settings object, in place, returning what was removed.
+ *
+ * Every entry goes, whatever shape it has. That is a deliberate exception to the ownership rule the
+ * restore path applies elsewhere -- "a user-modified entry is theirs" -- and the exception is the
+ * reason the list is not open to additions. Preserving a modified `specpi-jev-guard` entry preserved
+ * a fail-closed gate that this release removed the controls for: the code that rewrote its global
+ * configuration to `enabled: false` at every session start is gone, and so is `/jev guard off`, so a
+ * preserved entry is a gate that refuses every shell call the moment its key or endpoint goes away,
+ * with nothing left to turn it off. Filters are worth less than that.
+ *
+ * The removed entry is returned verbatim so the caller can print it back, and the write it belongs
+ * to is inside the installer's transaction and backed up with everything else. Version is not
+ * consulted: the reason for retirement is the package.
+ */
+export function removeRetiredPackages(settings) {
+    if (!Array.isArray(settings?.packages)) {
+        return [];
+    }
+
+    const removed = [];
+    settings.packages = settings.packages.filter((entry) => {
+        if (!retiredPackages.includes(packageIdentity(entry))) {
+            return true;
+        }
+
+        removed.push(packageSource(entry));
+
+        return false;
+    });
+
+    return removed;
+}
+
 export function packageChanges(before, after) {
     return basePackages.map((source) => {
         const identity = packageIdentity(source);
@@ -134,6 +182,14 @@ export function installBasePackages(agentDir) {
 
 export function checkBasePackages(agentDir, settings) {
     const errors = [];
+    for (const entry of Array.isArray(settings.packages) ? settings.packages : []) {
+        if (retiredPackages.includes(packageIdentity(entry))) {
+            errors.push(
+                `Retired base package still configured: ${packageSource(entry)}. Run specpi update to unpin it.`,
+            );
+        }
+    }
+
     for (const source of basePackages) {
         const identity = packageIdentity(source);
         const entry =

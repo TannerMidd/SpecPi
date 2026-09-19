@@ -239,11 +239,17 @@ function getWebviewHtml({
         </div>
         <p id="package-path" class="permission-path"></p>
         <p id="package-scope-note" class="package-note" hidden></p>
+        <section id="package-key" class="package-credentials package-key" aria-labelledby="package-key-title" hidden>
+            <h3 id="package-key-title">Jev API key</h3>
+            <p id="package-key-summary"></p>
+            <ul id="package-key-list"></ul>
+            <p>The Jev layer resolves its key the way every other Pi provider does: the <code>openrouter</code> entry that <code>/login openrouter</code> writes to Pi's <code>auth.json</code>, then <code>OPENROUTER_API_KEY</code> from the environment Pi was started with. The first one present is the one in force. Chat checks whether each holds a key and never reads, stores, displays or sends the value &mdash; to add or change one, use <code>/login openrouter</code> in Pi rather than this panel. The command guard is one of the systems above rather than a separate package, so this one key serves all eight; with no key it asks nothing and every tool call goes to the permission system exactly as it did before.</p>
+        </section>
         <section id="package-usage" class="package-credentials package-usage" aria-labelledby="package-usage-title" hidden>
             <h3 id="package-usage-title">Advisor calls against their budgets</h3>
             <p id="package-usage-summary"></p>
             <ul id="package-usage-list"></ul>
-            <p>Counts come from the advisor's own <code>usage.json</code>, which holds numbers and nothing else &mdash; no session state, no questions, no answers. Chat reads it and never writes it, and reloads it when you load or save these settings. Like the settings above, it belongs to the agent directory rather than to this chat: several Pi sessions can share one, and the file describes whichever wrote to it last. The advisor only starts writing it once the master switch is on, and a session that ends abruptly leaves its last count marked as still running.</p>
+            <p>Counts come from the advisor's own <code>usage.json</code>, which holds numbers and nothing else &mdash; no session state, no questions, no answers. Chat reads it and never writes it, and reloads it when you load or save these settings. Like the settings above, it belongs to the agent directory rather than to this chat: several Pi sessions can share one, and the file describes whichever wrote to it last. The advisor only starts writing it once the layer is on, and a session that ends abruptly leaves its last count marked as still running.</p>
         </section>
         <section id="package-credentials" class="package-credentials" aria-labelledby="package-credential-title" hidden>
             <h3 id="package-credential-title">Provider credentials</h3>

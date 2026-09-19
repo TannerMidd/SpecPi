@@ -4,12 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { createBroker } from "../extensions/jev-advisor/broker.mjs";
+import { SYSTEM_LABELS, createBroker } from "../extensions/jev-advisor/broker.mjs";
 import {
     NUDGE_MODES,
     SYSTEM_NAMES,
     defaultSettings,
-    keyPresent,
     loadSettings,
     saveSettings,
     settingsPath,
@@ -22,10 +21,12 @@ import {
     choice,
     defaultModel,
     endpoint,
+    keyEnvName,
     noul,
     score,
 } from "../extensions/jev-advisor/client.mjs";
 import { choiceValue, nounFalse, nounTrue, scoreLevel } from "../extensions/jev-advisor/gate.mjs";
+import { authPath, keyPresent, keySource, keySources, resolveKey } from "../extensions/jev-advisor/key-source.mjs";
 import { ledgerPath, read as readLedger, record } from "../extensions/jev-advisor/ledger.mjs";
 import { readUsage, usagePath } from "../extensions/jev-advisor/usage.mjs";
 import { MAX_STATE_BYTES, buildState, looksAbsolute, outline, redact } from "../extensions/jev-advisor/sanitize.mjs";
@@ -36,43 +37,43 @@ import * as sources from "../extensions/jev-advisor/questions/sources.mjs";
 import * as progress from "../extensions/jev-advisor/questions/progress.mjs";
 import * as untrusted from "../extensions/jev-advisor/questions/untrusted.mjs";
 import * as capabilities from "../extensions/jev-advisor/questions/capabilities.mjs";
-import {
-    GUARD_PIN,
-    applyConfig,
-    configPath,
-    desiredConfig,
-    readConfig,
-    statusLine,
-} from "../extensions/jev-advisor/guard.mjs";
 import { basePackages } from "../scripts/packages.mjs";
 import { AUTHORING_TOOL_NAMES, syncAuthoringTools } from "../extensions/tool-wishlist/authoring-tools.mjs";
 
 /** Every test gets its own agent directory so nothing reads or writes the developer's real state. */
 function withAgentDir(run) {
     const previousDir = process.env.PI_CODING_AGENT_DIR;
-    const previousKey = process.env.TYPESAFE_API_KEY;
     const previousBase = process.env.TYPESAFE_BASE_URL;
     // The guard's settings file lives under the user's home directory, not the agent directory, so
     // the home has to be redirected too or a test would write to the developer's real ~/.pi.
     const previousHome = process.env.HOME;
     const previousProfile = process.env.USERPROFILE;
+    // Both key variables are cleared for the body of the test, not merely restored afterwards.
+    // Restoring alone left the suite reading whatever the developer happened to have exported: on a
+    // machine with a real OPENROUTER_API_KEY the "a missing key reads as unavailable" case found
+    // one and failed, and on a machine without it the same test passed. A test whose result depends
+    // on the shell it was started from is not testing the thing it names.
+    // Every variable that steers key resolution, not merely the two that hold one. `JEV_KEY_SOURCE`
+    // is the variable AGENTS.md tells developers the eval scripts set, so leaving it alone meant six
+    // tests here failed for anyone who had exported it -- the same shell dependence this helper's
+    // own comment calls out, reintroduced by the commit that added the variable.
+    const previousKeys = ["TYPESAFE_API_KEY", "OPENROUTER_API_KEY", "JEV_KEY_SOURCE", "JEV_BACKEND"].map((name) => [
+        name,
+        process.env[name],
+    ]);
     const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-jev-test-")));
     process.env.PI_CODING_AGENT_DIR = dir;
     process.env.HOME = dir;
     process.env.USERPROFILE = dir;
-    try {
-        return run(dir);
-    } finally {
+    for (const [name] of previousKeys) {
+        delete process.env[name];
+    }
+
+    const restore = () => {
         if (previousDir === undefined) {
             delete process.env.PI_CODING_AGENT_DIR;
         } else {
             process.env.PI_CODING_AGENT_DIR = previousDir;
-        }
-
-        if (previousKey === undefined) {
-            delete process.env.TYPESAFE_API_KEY;
-        } else {
-            process.env.TYPESAFE_API_KEY = previousKey;
         }
 
         if (previousBase === undefined) {
@@ -81,10 +82,7 @@ function withAgentDir(run) {
             process.env.TYPESAFE_BASE_URL = previousBase;
         }
 
-        for (const [name, value] of [
-            ["HOME", previousHome],
-            ["USERPROFILE", previousProfile],
-        ]) {
+        for (const [name, value] of [...previousKeys, ["HOME", previousHome], ["USERPROFILE", previousProfile]]) {
             if (value === undefined) {
                 delete process.env[name];
             } else {
@@ -93,7 +91,44 @@ function withAgentDir(run) {
         }
 
         fs.rmSync(dir, { recursive: true, force: true });
+    };
+
+    // The cleanup has to wait for an async body to finish, and `try/finally` around a bare
+    // `return run(dir)` does not: an async callback returns its promise at the first `await`, the
+    // finally block runs there, and everything after that `await` executes with the real agent
+    // directory restored and the temporary one already deleted. Nineteen tests in this file pass an
+    // async callback, so most of this suite was only isolated up to its first suspension point.
+    //
+    // That is not hypothetical. It destroyed a real credential store: a test wrote its fixture
+    // `auth.json` after an `await`, the write landed in the developer's own `~/.pi/agent`, and it
+    // replaced every provider they had logged into with the one fake entry the fixture contained.
+    // An isolation helper that silently stops isolating is worse than none, because every test in
+    // the file reads as safe.
+    let result;
+    try {
+        result = run(dir);
+    } catch (error) {
+        restore();
+        throw error;
     }
+
+    if (!result || typeof result.then !== "function") {
+        restore();
+
+        return result;
+    }
+
+    return result.then(
+        (value) => {
+            restore();
+
+            return value;
+        },
+        (error) => {
+            restore();
+            throw error;
+        },
+    );
 }
 
 const enabledSettings = (overrides = {}) => ({
@@ -554,14 +589,225 @@ test("the default backend is OpenRouter, which is where the key works", () => {
 
         // The key variable follows the backend, matching the guard's own keyEnvName.
         assert.equal(apiKey(), undefined);
-        process.env.OPENROUTER_API_KEY = "sk-or-v1-example";
-        assert.equal(apiKey(), "sk-or-v1-example");
+        process.env.OPENROUTER_API_KEY = "openrouter-fixture-example";
+        assert.equal(apiKey(), "openrouter-fixture-example");
         assert.equal(keyPresent(), true);
 
         // An existing env file that put the OpenRouter key in TYPESAFE_API_KEY still works.
         delete process.env.OPENROUTER_API_KEY;
-        process.env.TYPESAFE_API_KEY = "sk-or-v1-legacy";
-        assert.equal(apiKey(), "sk-or-v1-legacy");
+        process.env.TYPESAFE_API_KEY = "openrouter-fixture-legacy";
+        assert.equal(apiKey(), "openrouter-fixture-legacy");
+    });
+});
+
+/** Write an auth.json the way Pi's own /login does, so the fixture and the real file share a shape. */
+function writeAuth(entries, { bom = false } = {}) {
+    const file = authPath();
+    // A fixture credential store is only ever written inside a temporary directory, and this
+    // asserts it rather than assuming it. The assumption failed once: `withAgentDir` stopped
+    // isolating at an async test's first `await`, this function resolved the developer's own
+    // `~/.pi/agent/auth.json`, and one `writeFileSync` replaced every provider they had logged into
+    // with a single fake entry. OAuth tokens are not recoverable, so the only acceptable cost here
+    // is a failed test, and the check is two lines.
+    if (!file.startsWith(fs.realpathSync.native(os.tmpdir()))) {
+        throw new Error(`Refusing to write a fixture auth.json outside the temporary directory: ${file}`);
+    }
+
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${bom ? "\ufeff" : ""}${JSON.stringify(entries, null, 2)}\n`);
+
+    return file;
+}
+
+test("the key Pi already stored is the key the layer uses", () => {
+    // The whole bug in one test. A person who ran /login openrouter has a working OpenRouter
+    // credential in the same file every other Pi provider uses, and the layer reported "key:
+    // missing" at them because it read the environment and nothing else. There was no interface to
+    // fix that with, because the key was never meant to be configured twice.
+    withAgentDir(() => {
+        assert.equal(resolveKey("openrouter"), undefined, "no store and no variable is genuinely no key");
+        assert.equal(keySource("openrouter"), undefined);
+
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-stored");
+        assert.equal(keySource("openrouter"), "auth.json");
+        assert.equal(keyPresent(), true);
+    });
+});
+
+test("the credential store is consulted before the environment, as Pi consults it", () => {
+    // Pi's documented order is auth.json then the variable, and matching it is the point: a layer
+    // that picked a different key from the one Pi itself is using would be a second, invisible
+    // configuration to keep in step.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        process.env.OPENROUTER_API_KEY = "openrouter-fixture-environment";
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-stored");
+        assert.equal(keySource("openrouter"), "auth.json");
+
+        // Both are reported as present, because "which of these do I need to fix" is the question,
+        // and only the first is in force.
+        const sources = keySources("openrouter");
+        assert.deepEqual(
+            sources.map((item) => [item.name, item.present]),
+            [
+                ["auth.json", true],
+                ["OPENROUTER_API_KEY", true],
+                ["TYPESAFE_API_KEY", false],
+            ],
+        );
+    });
+});
+
+test("only an api_key entry is read, and an unusable store is no key rather than an error", () => {
+    withAgentDir(() => {
+        // An OAuth entry is Pi's to refresh under its own lock. Reading an access token out of the
+        // file behind Pi's back would race a rotation, so it reads as absent instead.
+        writeAuth({ openrouter: { type: "oauth", access: "at", refresh: "rt", expires: 1 } });
+        assert.equal(resolveKey("openrouter"), undefined);
+
+        writeAuth({ openrouter: { type: "api_key", key: "   " } });
+        assert.equal(resolveKey("openrouter"), undefined, "a blank key is not a key");
+
+        writeAuth({ anthropic: { type: "api_key", key: "anthropic-fixture-x" } });
+        assert.equal(resolveKey("openrouter"), undefined, "another provider's key is not ours to use");
+
+        // Every unreadable shape is silence, never a throw: a credential store that can fail a
+        // session is worse than one that finds nothing.
+        for (const text of ["", "{", "null", "[]", "not json at all"]) {
+            fs.writeFileSync(authPath(), text);
+            assert.equal(resolveKey("openrouter"), undefined, `unreadable: ${text}`);
+            assert.equal(keyPresent(), false);
+        }
+
+        fs.rmSync(authPath());
+        assert.equal(resolveKey("openrouter"), undefined);
+    });
+});
+
+test("an unparseable credential store is cached like a parseable one", () => {
+    // The cache exists because `ask()` resolves a key per request, on the tool path, inside a 1500ms
+    // budget. Recording only successful parses left the worst case uncached: a truncated auth.json
+    // threw on every call, so every request paid a fresh stat, read and failing parse -- forever,
+    // since nothing about the file was going to change. Counted here through `fs.readFileSync`,
+    // because "it was not re-read" is the claim and a timing assertion is not one.
+    withAgentDir(() => {
+        fs.writeFileSync(authPath(), '{"openrouter": {"type": "api_k');
+        const real = fs.readFileSync;
+        let reads = 0;
+        fs.readFileSync = (...args) => {
+            if (String(args[0]) === authPath()) {
+                reads += 1;
+            }
+
+            return real(...args);
+        };
+
+        try {
+            for (let i = 0; i < 5; i += 1) {
+                assert.equal(resolveKey("openrouter"), undefined);
+            }
+
+            assert.equal(reads, 1, `a broken store was read ${reads} times for five resolutions`);
+
+            // And it is still invalidated when the file actually changes, which is the whole reason
+            // the cache is keyed on identity rather than memoised outright.
+            writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-repaired" } });
+            assert.equal(resolveKey("openrouter"), "openrouter-fixture-repaired");
+        } finally {
+            fs.readFileSync = real;
+        }
+    });
+});
+
+test("an auth.json written with a byte order mark still parses", () => {
+    // Pi strips one before parsing. Not doing the same here would produce the worst possible
+    // split: the key works for every model call and this layer alone calls it missing.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-bom" } }, { bom: true });
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-bom");
+    });
+});
+
+test("the direct TypeSafe route reads its variable and never the OpenRouter entry", () => {
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        // auth.json is keyed by Pi provider id and TypeSafe is not one of Pi's providers, so there
+        // is nothing there to read -- and an OpenRouter key on the direct API is a bare 401.
+        assert.equal(resolveKey("typesafe"), undefined);
+        assert.deepEqual(
+            keySources("typesafe").map((item) => item.name),
+            ["TYPESAFE_API_KEY"],
+        );
+
+        process.env.TYPESAFE_API_KEY = "ts-key";
+        assert.equal(resolveKey("typesafe"), "ts-key");
+    });
+});
+
+test("a key in the store is enough for ask() to reach the transport", async () => {
+    // The end of the chain the bug broke: with a stored key and no variable at all, a request now
+    // goes out instead of coming back as no-key.
+    await withAgentDir(async () => {
+        assert.equal((await ask({}, { q: noul("x") })).reason, "no-key");
+
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        let seen;
+        const server = await startStub((request, response) => {
+            seen = request.headers.authorization;
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(JSON.stringify({ answers: { q: { noul: 0.5 } } }));
+        });
+        try {
+            process.env.TYPESAFE_BASE_URL = server.url;
+            assert.equal((await ask({}, { q: noul("x") })).ok, true);
+            assert.equal(seen, "Bearer openrouter-fixture-stored");
+        } finally {
+            await server.close();
+        }
+    });
+});
+
+test("apiKey() follows the active backend rather than defaulting to OpenRouter", () => {
+    // Every caller invokes it with no argument. Re-exporting the resolver under this name silently
+    // rebound all of them to the parameter default, so with JEV_BACKEND=typesafe a script's
+    // `if (!apiKey())` guard passed on a stored OpenRouter key while every request it then made
+    // came back no-key.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-stored" } });
+        assert.equal(apiKey(), "openrouter-fixture-stored");
+
+        process.env.JEV_BACKEND = "typesafe";
+        try {
+            assert.equal(apiKey(), undefined, "an OpenRouter entry is not a TypeSafe key");
+            process.env.TYPESAFE_API_KEY = "ts-key";
+            assert.equal(apiKey(), "ts-key");
+        } finally {
+            delete process.env.JEV_BACKEND;
+        }
+    });
+});
+
+test("JEV_KEY_SOURCE=environment keeps a measured run off a personal login", () => {
+    // What the calibration and triage scripts set. Without it a run loading the eval key from
+    // evals/.env would resolve the developer's /login credential first and bill their account,
+    // while --probe verified a key the run did not use.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "openrouter-fixture-personal" } });
+        process.env.OPENROUTER_API_KEY = "openrouter-fixture-eval";
+        assert.equal(resolveKey("openrouter"), "openrouter-fixture-personal");
+
+        process.env.JEV_KEY_SOURCE = "environment";
+        try {
+            assert.equal(resolveKey("openrouter"), "openrouter-fixture-eval");
+            assert.equal(keySource("openrouter"), "OPENROUTER_API_KEY");
+            assert.ok(
+                !keySources("openrouter").some((source) => source.name === "auth.json"),
+                "a source that will not be consulted must not be reported",
+            );
+        } finally {
+            delete process.env.JEV_KEY_SOURCE;
+        }
     });
 });
 
@@ -886,50 +1132,6 @@ test("source ranking orders without dropping and keeps ungated items in place", 
     assert.equal(ranked.ordered.at(-1).path, "c.js", "an ungated score sorts last, not out");
 });
 
-test("the guard seam defers to the permission system and never auto-allows", () => {
-    withAgentDir(() => {
-        // The real specpi-jev-guard schema, not an invented one: applyPatch only reads these names.
-        const config = desiredConfig();
-        assert.equal(config.enabled, false, "the guard's own default is enabled:true, so SpecPi must override it");
-        assert.equal(
-            config.backend,
-            "openrouter",
-            "one OPENROUTER_API_KEY must power the advisor and the guard together",
-        );
-        assert.equal(config.uncertain, "ask");
-        assert.equal(Object.hasOwn(config, "askThreshold"), false, "thresholds stay the package's business");
-        assert.match(statusLine(), /not installed/u);
-        assert.equal(applyConfig().reason, "not-installed", "an absent guard is never configured into existence");
-    });
-});
-
-test("the guard and the permission system are both pinned", () => {
-    assert.ok(basePackages.includes(GUARD_PIN), `${GUARD_PIN} must be in the pinned base set`);
-    assert.ok(
-        basePackages.some((entry) => entry.startsWith("npm:@gotgenes/pi-permission-system@")),
-        "the permission system must stay pinned: it is what decides every call while the guard is off",
-    );
-});
-
-test("a fresh install writes the guard's inert posture without depending on the advisor loading", () => {
-    withAgentDir((dir) => {
-        const root = path.join(dir, "npm", "node_modules", "specpi-jev-guard");
-        fs.mkdirSync(root, { recursive: true });
-        fs.writeFileSync(
-            path.join(root, "package.json"),
-            JSON.stringify({ name: "specpi-jev-guard", version: "0.1.0" }),
-        );
-
-        // The guard's own DEFAULT_SETTINGS.enabled is true and it reads its file per tool call, so
-        // an absent file means an active guard. With no key that fails closed on every gated call,
-        // which is a first install that will not run commands. The installer calls this directly
-        // for exactly that reason.
-        assert.equal(readConfig(), undefined, "no settings file yet");
-        assert.equal(applyConfig(false).reason, "created");
-        assert.equal(readConfig().enabled, false);
-    });
-});
-
 const healthy = {
     turn: 6,
     signatures: ["read:a", "grep:b", "write:c", "bash:d"],
@@ -1188,64 +1390,34 @@ test("nothing in the Jev layer is on by default", () => {
         const fresh = loadSettings();
         assert.equal(fresh.master, false);
         assert.equal(fresh.startup, false);
-        assert.equal(fresh.guard.enabled, false);
-        assert.equal(fresh.guard.startup, false);
         for (const name of SYSTEM_NAMES) {
             assert.equal(fresh.systems[name], false, `${name} must ship off`);
         }
 
-        // Off is a real written configuration, not an absence of one.
-        assert.equal(desiredConfig().enabled, false);
-        assert.equal(desiredConfig(false).enabled, false);
-        assert.equal(desiredConfig(true).enabled, true);
+        // The command guard is one of those systems since schema 3, so "nothing is on" covers it
+        // without a second switch outside the master to check separately.
+        assert.ok(SYSTEM_NAMES.includes("guard"));
+        assert.ok(!("guard" in fresh), "schema 3 has no separate guard object");
     });
+});
+
+test("every system has a label, because two of them are read out to a human", () => {
+    // `SYSTEM_LABELS` names the system in the first-transmission consent prompt and in the
+    // budget-exhaustion notice. A system added to `SYSTEM_NAMES` without one falls back to its raw
+    // key, so the prompt asking a person to approve sending a redacted shell command to a third
+    // party would have said "guard".
+    for (const name of SYSTEM_NAMES) {
+        assert.equal(typeof SYSTEM_LABELS[name], "string", `${name} has no label`);
+        assert.notEqual(SYSTEM_LABELS[name], name, `${name} falls back to its own key`);
+    }
 });
 
 test("a user can default the layer on without a session toggle writing that preference", () => {
     withAgentDir(() => {
-        const saved = saveSettings({ ...defaultSettings(), startup: true, guard: { enabled: false, startup: true } });
+        const saved = saveSettings({ ...defaultSettings(), startup: true });
         assert.equal(saved.startup, true);
-        assert.equal(saved.guard.startup, true);
-        assert.equal(loadSettings().guard.startup, true);
 
         // The stored preference is what a new session reads; enabling in-session must not reach it.
-        assert.equal(loadSettings().guard.enabled, false);
-    });
-});
-
-test("guard configuration is written once and is idempotent afterwards", () => {
-    withAgentDir((dir) => {
-        const root = path.join(dir, "npm", "node_modules", "specpi-jev-guard");
-        fs.mkdirSync(root, { recursive: true });
-        fs.writeFileSync(
-            path.join(root, "package.json"),
-            JSON.stringify({ name: "specpi-jev-guard", version: "0.1.0" }),
-        );
-
-        // A fresh install writes the inert posture, not an active one.
-        assert.equal(applyConfig().reason, "created");
-        const written = readConfig();
-        assert.equal(written.enabled, false);
-        assert.equal(written.backend, "openrouter");
-        assert.ok(fs.existsSync(configPath()));
-        assert.match(statusLine(), /installed but off/u);
-
-        assert.equal(applyConfig().applied, false, "an unchanged config must not be rewritten");
-
-        assert.equal(applyConfig(true).reason, "updated");
-        assert.equal(readConfig().enabled, true);
-        assert.match(statusLine(), /ON via openrouter/u);
-
-        // A user's own thresholds and globs survive; only SpecPi's three fields are asserted.
-        fs.writeFileSync(
-            configPath(),
-            JSON.stringify({ enabled: true, backend: "typesafe", askThreshold: 0.6, safeCommands: ["ls *"] }),
-        );
-        assert.equal(applyConfig(true).reason, "updated");
-        const merged = readConfig();
-        assert.equal(merged.backend, "openrouter", "the backend is re-pinned so one key still powers both halves");
-        assert.equal(merged.askThreshold, 0.6, "a user threshold must not be clobbered");
-        assert.deepEqual(merged.safeCommands, ["ls *"]);
     });
 });
 

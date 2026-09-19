@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
-            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, seven systems that use it, the gates in front of every call, and what it has actually measured."
+            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, eight systems that use it, the gates in front of every call, and what it has actually measured."
         />
         <meta property="og:title" content="The Jev layer · SpecPi" />
         <meta
@@ -45,7 +45,7 @@
                 <p>SPECPI / JEV</p>
                 <nav>
                     <a href="#what"><span>01</span>What it is</a><a href="#where"><span>02</span>Where it sits</a
-                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Seven systems</a
+                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Eight systems</a
                     ><a href="#economics"><span>05</span>Why on arrival</a
                     ><a href="#cache-probe"><span>06</span>Pricing the cache rule</a
                     ><a href="#calibration"><span>07</span>Calibrating the gate</a
@@ -53,7 +53,7 @@
                     ><a href="#measured"><span>09</span>What it measured</a
                     ><a href="#switches"><span>10</span>Turning it on</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.27.0<br />Chat 0.12.0<br />Off by default</div>
+                <div class="index-meta">SpecPi 0.28.0<br />Chat 0.13.0<br />Off by default</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -106,8 +106,9 @@
                     <p>
                         The layer has two halves that share a key and nothing else. The <strong>advisor</strong> is
                         first-party SpecPi code that answers questions about session state and never holds authority:
-                        it cannot call a tool, grant a capability or allow an action. The <strong>guard</strong> is a
-                        separate pinned package that scores commands before the permission system sees them.
+                        it cannot call a tool, grant a capability or allow an action. The <strong>guard</strong> is its
+                        eighth system, and the one exception: it scores commands before the permission system sees
+                        them, and can refuse one.
                     </p>
                     <figure class="chart-figure">
                         <svg
@@ -132,7 +133,7 @@
                             <rect x="168" y="24" width="132" height="52" rx="7" class="dg-box-accent" />
                             <text x="234" y="41" text-anchor="middle" class="dg-tag">OPTIONAL</text>
                             <text x="234" y="57" text-anchor="middle" class="dg-title">Command guard</text>
-                            <text x="234" y="71" text-anchor="middle" class="dg-note">fail-closed</text>
+                            <text x="234" y="71" text-anchor="middle" class="dg-note">fails open</text>
 
                             <rect x="340" y="24" width="140" height="52" rx="7" class="dg-box" />
                             <text x="410" y="46" text-anchor="middle" class="dg-title">Permission system</text>
@@ -277,7 +278,7 @@
                 </section>
 
                 <section class="doc-section" id="systems">
-                    <header><h2>Seven systems</h2><span>04</span></header>
+                    <header><h2>Eight systems</h2><span>04</span></header>
                     <p>
                         One design rule governs all of them: <em>ask local state first, and spend a Jev call only on a
                         question local state genuinely cannot answer</em>. Applying it is what removed the largest
@@ -500,32 +501,55 @@
                 </section>
 
                 <section class="doc-section" id="guard">
-                    <header><h2>The guard is a different trade</h2><span>08</span></header>
+                    <header><h2>The guard, and why it fails open</h2><span>08</span></header>
                     <p>
-                        The advisor is fail-silent and holds no authority. The guard is the opposite on both counts,
-                        and that is worth stating plainly rather than configuring away.
-                        <code>specpi-jev-guard</code> is <strong>fail-closed by design</strong>: with no key, an
-                        unreachable endpoint, or a middle-band verdict in a session with no interactive UI, it blocks
-                        the call and says so. There is no setting that hands the decision back to the permission
-                        system.
+                        The command guard is the layer's eighth system and the only one that can take a tool call away
+                        from you, so its failure posture is the thing worth stating plainly. It was a separate pinned
+                        package until that package's shape turned out to be its own source of defects: a global
+                        configuration file with no session scope, a key read from the environment only &mdash; so a
+                        credential <code>/login</code> had already stored was invisible to it &mdash; and
+                        <strong>fail-closed</strong> behaviour, which meant an outage or a missing key stopped shell
+                        work rather than degrading. Native, it is gated, budgeted and switched exactly like the other
+                        seven, and it resolves the same key.
+                    </p>
+                    <p>
+                        It <strong>fails open</strong>, which is not a weakening: the guard sits in front of
+                        <code>@gotgenes/pi-permission-system</code>, which still decides every call the guard defers.
+                        Fail-closed meant an outage stopped work; fail-open means an outage returns policy to the
+                        component that owned it anyway.
                     </p>
                     <ul>
                         <li>
-                            <strong>Off</strong>, which is the default, means the guard is not in the tool path at all
-                            and <code>@gotgenes/pi-permission-system</code> decides every call exactly as it did before
-                            the package existed.
+                            <strong>Local rules first, for nothing.</strong> Read-only commands and ordinary project
+                            writes never leave the machine &mdash; read-only meaning the binary <em>and</em> what it is
+                            pointed at, because <code>cat ~/.ssh/id_rsa</code> changes nothing and still hands over a
+                            key. A very short list of catastrophic, unambiguous commands
+                            &mdash; a recursive delete of the filesystem root, writing a raw disk device, piping a
+                            download into a shell &mdash; is blocked with no call at all. The list is deliberately tiny:
+                            a rule that blocks real work gets the whole guard switched off, and then it protects nobody.
                         </li>
                         <li>
-                            <strong>On</strong> means the guard decides first, asks a human in the middle band when
-                            there is a UI, and blocks when it cannot reach Jev. An outage stops gated work until it is
-                            switched off.
+                            <strong>Blocking needs two confident answers to agree.</strong> A destructive reading
+                            <em>and</em> a reading that the request does not account for the call &mdash; both of which
+                            must clear the confidence gate, because roughly four answers in five do not and treating a
+                            missing one as agreement would leave the safeguard applying to about a fifth of calls.
+                            Both, because the likeliest way to be
+                            wrong is a destructive-looking command you asked for in as many words &mdash;
+                            <code>rm -rf node_modules</code>, a force push to a branch you named. A confident verdict
+                            that a write targets a real credential file blocks on its own.
+                        </li>
+                        <li>
+                            <strong>Everything else defers.</strong> No key, no budget, a timeout, an unconfident
+                            answer, or a middle-band verdict with nobody to ask: the call goes to the permission system
+                            and is decided exactly as it was before this layer existed. Deferring is not allowing.
+                        </li>
+                        <li>
+                            <strong>Except once anyone has been asked.</strong> Everything above fails open
+                            <em>before</em> a person is involved. After a verdict says a call needs your approval, a
+                            dialog you dismiss and a dialog that could not be shown are both refusals &mdash; an
+                            unanswerable question resolved as yes is the one thing a confirmation cannot do.
                         </li>
                     </ul>
-                    <p>
-                        The package's own default is <code>enabled: true</code>, so SpecPi writes an inert
-                        configuration at install time rather than at first session start &mdash; otherwise a fresh
-                        install with no key would begin by refusing to run commands.
-                    </p>
                 </section>
 
                 <section class="doc-section" id="measured">
@@ -645,14 +669,27 @@
                 <section class="doc-section" id="switches">
                     <header><h2>Turning it on</h2><span>10</span></header>
                     <p>
-                        Nothing here is on after an install. Each switch has a session form and a
-                        <code>startup</code> form, and a session toggle never writes the startup preference.
+                        Nothing here is on after an install. Turning the layer on turns its systems on with it
+                        &mdash; a layer with every system off runs and does nothing &mdash; and is remembered, so a
+                        switch you set once stays set. <code>--session</code> makes a change apply to the session in
+                        front of you without touching what the next one starts as.
                     </p>
                     <ul>
                         <li><code>/jev</code> &mdash; show the layer's state and change it.</li>
-                        <li><code>/jev on</code>, <code>/jev startup on</code> &mdash; the master switch.</li>
-                        <li><code>/jev guard on</code>, <code>/jev guard startup on</code> &mdash; the command guard.</li>
-                        <li><code>/jev status</code> &mdash; which posture is in force, and whether a key is present.</li>
+                        <li>
+                            <code>/jev on</code> &mdash; the whole layer: the master switch and every system that
+                            is off, the command guard included. The notification says so, because seven of the eight
+                            only add advice and that one can refuse a command. Remembered for new sessions;
+                            <code>/jev on --session</code> for this one only.
+                        </li>
+                        <li>
+                            <code>/jev enable guard</code>, <code>/jev disable guard</code> &mdash; the command guard
+                            on its own, like any other system.
+                        </li>
+                        <li>
+                            <code>/jev status</code> &mdash; which posture is in force, and every place a key could
+                            come from with the one in force marked.
+                        </li>
                         <li>
                             <code>/jev ledger</code> &mdash; read back a local hash of every payload ever sent. Every
                             call is recorded in <code>transmissions.jsonl</code> on this machine.
@@ -666,8 +703,8 @@
                         times, changed nothing&rdquo; is exactly the finding a bare call count hides, and it is the
                         finding this layer turned out to have. Those counts come from a separate <code>usage.json</code>
                         holding numbers and nothing else, which is what makes it safe for a second process to read at
-                        all; Chat reads it and never writes it, and the advisor does not write it until the master
-                        switch is on. Like the settings beside them the counts belong to the agent directory rather
+                        all; Chat reads it and never writes it, and the advisor does not write it until the layer
+                        is on. Like the settings beside them the counts belong to the agent directory rather
                         than to one conversation, so they are dated and marked running or ended rather than presented
                         as whichever chat you happen to have open.
                     </p>
@@ -683,11 +720,22 @@
                         like one that had nothing to say.
                     </p>
                     <p>
-                        One key serves the whole layer:
-                        <code>OPENROUTER_API_KEY</code>, since Jev is published on OpenRouter and both halves reach it
-                        that way by default. <code>JEV_BACKEND=typesafe</code> selects TypeSafe's direct API instead,
-                        which needs a <code>TYPESAFE_API_KEY</code>; the two keys are not interchangeable and the wrong
-                        one returns a bare 401.
+                        Jev is published on OpenRouter, so an OpenRouter key serves the layer &mdash; and it is
+                        resolved the way Pi resolves every other provider credential, in Pi's own documented order:
+                        the <code>openrouter</code> entry that <code>/login openrouter</code> writes to
+                        <code>auth.json</code>, then <code>OPENROUTER_API_KEY</code> from the environment. There is
+                        nothing separate to configure, which is the point &mdash; the advisor used to read the
+                        environment alone and report a missing key at people whose OpenRouter login was working
+                        perfectly well. <code>JEV_BACKEND=typesafe</code> selects TypeSafe's direct API instead, which
+                        needs a <code>TYPESAFE_API_KEY</code>; the two keys are not interchangeable and the wrong one
+                        returns a bare 401.
+                    </p>
+                    <p>
+                        The command guard used to be the exception: a separate package reading
+                        <code>OPENROUTER_API_KEY</code> from the environment and nothing else, so a key stored by
+                        <code>/login</code> served the advisor and was invisible to it. As the eighth system it resolves
+                        its key through the same two sources as everything else, so one key covers the layer and there
+                        is no second thing to configure.
                     </p>
                     <p>
                         Retention, processing and logging of what is sent are governed by OpenRouter and TypeSafe, not

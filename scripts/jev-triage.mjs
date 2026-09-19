@@ -22,6 +22,12 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { loadEnvFile } from "./eval-env.mjs";
 
+// This repository's own runs use the key they were handed -- `evals/.env` or the shell -- and never
+// a developer's `/login openrouter` credential. Without this, resolution would prefer `auth.json`
+// and a calibration run would silently bill a personal account while `--probe` verified a key the
+// run did not use. Set before the client is imported, because it is read at call time.
+process.env.JEV_KEY_SOURCE ??= "environment";
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function pathToUrl(value) {

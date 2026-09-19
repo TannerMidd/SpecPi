@@ -1,7 +1,9 @@
 // Jev is the first thing in SpecPi that talks to a third party, so its switch is the first thing
-// every other module in this directory consults. Master off means no key read, no consent read, no
-// network call and no prompt injection: the harness behaves exactly as it did before the extension
-// existed.
+// every other module in this directory consults. Master off means no key value read, no consent
+// read, no network call and no prompt injection: the harness behaves exactly as it did before the
+// extension existed. `/jev status` still reports whether a key exists while the layer is off, by
+// name and never by value, because "how do I configure this" is a question asked before enabling
+// anything -- see key-source.mjs.
 //
 // The file is SpecPi's own, hardened the same way as web-access and capability-policy: atomic
 // write, mode 0600, symlinks refused, and a missing or unreadable file read as off.
@@ -20,6 +22,14 @@ export const SYSTEM_NAMES = Object.freeze([
     "progress",
     "untrusted",
     "capability",
+    // The command guard, native since schema 3. It used to be a separate pinned package with its own
+    // global configuration file, which is why it used to carry its own switch here: a second switch,
+    // outside the master, with its own startup preference and its own persistence rules. Those rules
+    // disagreed with the layer's often enough to be their own source of defects -- a preference
+    // erased by a command that had decided nothing about the guard, a state written by one command
+    // and reverted by the next session. As a system it is gated, budgeted, reported and toggled by
+    // exactly the same code as the other seven.
+    "guard",
 ]);
 
 /**
@@ -91,6 +101,12 @@ export const DEFAULT_BUDGETS = Object.freeze({
     // Once per session by construction, and only when local signals already suggest it. Two rather
     // than one so a retried first turn is not silently un-served.
     capability: 2,
+    // Per gated tool call that local rules could not settle, so its frequency is retention's rather
+    // than compaction's -- and like retention, most calls never reach it: read-only commands and
+    // ordinary project writes are answered locally for nothing. Running out means the guard defers
+    // to the permission system for the rest of the session, which is what it does for every other
+    // kind of unavailability.
+    guard: 208,
 });
 
 /** 0 is a real budget meaning no calls. Switching a system off is what `systems[name] = false` is for. */
@@ -127,16 +143,12 @@ export function regularFile(file, label) {
 /** Every unknown shape collapses to the same all-off default rather than a partial enable. */
 export function defaultSettings() {
     return {
-        schema: 2,
+        schema: 3,
         master: false,
         startup: false,
         systems: Object.fromEntries(SYSTEM_NAMES.map((name) => [name, false])),
         budgets: { ...DEFAULT_BUDGETS },
         progressNudge: "notify",
-        // The guard is a separate package with its own gate, so it carries its own switch rather
-        // than riding the advisor's master. Both ship off: nothing in the Jev layer is active on a
-        // fresh install, and `startup` is how a user chooses to default one on.
-        guard: { enabled: false, startup: false },
     };
 }
 
@@ -174,22 +186,42 @@ function migrate(raw) {
     return { ...raw, schema: 2, budgets, callBudgetPerSession: undefined };
 }
 
+/**
+ * Schema 2 carried the command guard as a separate `guard: { enabled, startup }` pair, because it
+ * was a separate package with its own global configuration file. Schema 3 makes it the eighth
+ * system, so the stored preference becomes `systems.guard`.
+ *
+ * `guard.startup` is what migrates, not `guard.enabled`: the former is what the user chose for new
+ * sessions, and the latter was a session flag that happened to be written to disk. A file where the
+ * guard was wanted at startup but the layer itself was not produces a system that is on inside a
+ * layer that is off, which is inactive -- the guard used to sit outside the master switch and now
+ * does not. That direction is deliberate: a gate quietly becoming inactive is recoverable in one
+ * command, and a gate quietly becoming active is how a session stops being able to run anything.
+ */
+function migrateToThree(raw) {
+    const systems = { ...(raw?.systems ?? {}), guard: raw?.guard?.startup === true };
+
+    const { guard: _guard, ...rest } = raw ?? {};
+
+    return { ...rest, schema: 3, systems };
+}
+
 function normalize(raw) {
-    const source = raw?.schema === 1 ? migrate(raw) : raw;
-    if (source?.schema !== 2) {
+    const one = raw?.schema === 1 ? migrate(raw) : raw;
+    const source = one?.schema === 2 ? migrateToThree(one) : one;
+    if (source?.schema !== 3) {
         return defaultSettings();
     }
 
     const systems = Object.fromEntries(SYSTEM_NAMES.map((name) => [name, source.systems?.[name] === true]));
 
     return {
-        schema: 2,
+        schema: 3,
         master: source.master === true,
         startup: source.startup === true,
         systems,
         budgets: normalizeBudgets(source.budgets),
         progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
-        guard: { enabled: source.guard?.enabled === true, startup: source.guard?.startup === true },
     };
 }
 
@@ -222,7 +254,7 @@ export function writeFileAtomic(file, contents) {
 export function saveSettings(settings) {
     // A caller handing back a schema-1 shape is migrated rather than reset, so a round trip through
     // an old reader cannot quietly disable the layer.
-    const next = normalize(settings?.schema === 1 ? settings : { ...settings, schema: 2 });
+    const next = normalize(settings?.schema === 1 || settings?.schema === 2 ? settings : { ...settings, schema: 3 });
     const file = settingsFile();
     if (fs.existsSync(file)) {
         regularFile(file, "Jev settings");
@@ -235,20 +267,4 @@ export function saveSettings(settings) {
 
 export function settingsPath() {
     return settingsFile();
-}
-
-/**
- * The key is never read into any structure that gets logged or serialized. Callers only ever ask
- * whether one is present; the client reads it directly at call time.
- */
-export function keyPresent() {
-    // OPENROUTER_API_KEY on the default path, TYPESAFE_API_KEY on the direct one; see client.mjs.
-    for (const name of ["OPENROUTER_API_KEY", "TYPESAFE_API_KEY"]) {
-        const value = process.env[name];
-        if (typeof value === "string" && value.trim().length > 0) {
-            return true;
-        }
-    }
-
-    return false;
 }

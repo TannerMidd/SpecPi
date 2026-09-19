@@ -104,7 +104,7 @@ function usageBeside(settingsFile) {
  * here may stop the panel opening: an absent file, an unreadable one, a linked one and one written
  * by a newer advisor all come back the same way, and the panel says the layer has not run.
  *
- * The size bound is deliberately small. The file is counts for seven systems and nothing else, so
+ * The size bound is deliberately small. The file is counts for eight systems and nothing else, so
  * anything approaching the settings limit was not written by the advisor.
  */
 function loadJevUsage(settingsFile) {
@@ -120,6 +120,102 @@ function loadJevUsage(settingsFile) {
     } catch {
         return undefined;
     }
+}
+
+// Pi's own credential store, read for one question only: is there a key. The Jev layer resolves
+// its key the way every other Pi provider does -- the `openrouter` entry that `/login openrouter`
+// writes to auth.json, then OPENROUTER_API_KEY in the environment -- and before the panel could say
+// which of those was in force, "no interface for the API key" was the honest description of it.
+//
+// Chat reads presence and never the value. Nothing below returns, stores, logs or sends a
+// credential: each source reports a boolean and a label, which is everything the panel renders and
+// nothing a key could leak through. That is also why this duplicates the advisor's resolver rather
+// than importing it -- the resolver returns keys, and the webview host has no business holding one.
+// Derived from the settings path rather than resolved again, exactly as `usageBeside` is, so the
+// two can never point at different agent directories. They already had: `loadJev` passed its
+// options through and `saveJev` called this with none, so with PI_CODING_AGENT_DIR set to a
+// workspace-relative path -- which pi-defaults.js supports -- resolution threw after a save, the
+// catch reported no key, and pressing Save flipped a working panel to "No key anywhere".
+function authBeside(settingsFile) {
+    return path.join(path.dirname(path.dirname(path.dirname(settingsFile))), "auth.json");
+}
+
+function storedOpenRouterKey(filename) {
+    try {
+        // `stat`, not `lstat`, matching key-source.mjs: a dotfile manager linking auth.json into a
+        // managed directory is the case that reader cites, and refusing links here while the
+        // advisor follows them produced the divergence both are written to avoid -- `/jev status`
+        // saying "in use from auth.json" while this panel said "No key anywhere".
+        const stat = fs.statSync(filename, { throwIfNoEntry: false });
+        if (!stat || !stat.isFile() || stat.size > MAX_BYTES) {
+            return false;
+        }
+
+        const text = fs.readFileSync(filename, "utf8");
+        const data = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+        // `!Array.isArray` matches the advisor's own reader: `["x"].openrouter` is undefined, but
+        // two copies of one check that differ are how the copies drift apart.
+        const entry = data && typeof data === "object" && !Array.isArray(data) ? data.openrouter : undefined;
+
+        return Boolean(entry && entry.type === "api_key" && typeof entry.key === "string" && entry.key.trim());
+    } catch {
+        return false;
+    }
+}
+
+function environmentPresent(name, env) {
+    const value = env[name];
+
+    return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * The sources a Jev key can come from, in the order the advisor consults them, each with whether it
+ * holds one. The first present source is the one in force.
+ *
+ * Each row used to carry a `guard` flag, because the separate specpi-jev-guard package read
+ * `OPENROUTER_API_KEY` and nothing else: "there is a key" and "the guard has a key" were different
+ * facts, and the difference decided whether shell calls still worked. The guard is now the layer's
+ * eighth system and resolves its key exactly as the other seven do, so the flag is gone rather than
+ * kept as a column that would now mark the wrong row.
+ */
+function jevKeyStatus({ env, settingsFile } = {}) {
+    env = env ?? process.env;
+    // The same two conditions the advisor applies, because this is a second reader of one contract
+    // and a panel that names a source the advisor will never consult is worse than no panel. The
+    // direct TypeSafe API is not one of Pi's providers, so `auth.json` holds nothing for it; and
+    // `JEV_KEY_SOURCE=environment` is this repository's own opt-out.
+    const typesafe = env.JEV_BACKEND === "typesafe";
+    const storeConsulted = !typesafe && env.JEV_KEY_SOURCE !== "environment";
+    const sources = [];
+    if (storeConsulted) {
+        sources.push({
+            name: "auth.json",
+            label: "Pi credential store",
+            detail: "Stored by /login openrouter, alongside every other provider.",
+            present: Boolean(settingsFile) && storedOpenRouterKey(authBeside(settingsFile)),
+        });
+    }
+
+    sources.push({
+        name: typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY",
+        label: typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY",
+        detail: typesafe
+            ? "Read from the environment Pi was started with, because JEV_BACKEND=typesafe selects the direct API."
+            : "Read from the environment Pi was started with, when the credential store holds nothing.",
+        present: environmentPresent(typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY", env),
+    });
+
+    if (!typesafe) {
+        sources.push({
+            name: "TYPESAFE_API_KEY",
+            label: "TYPESAFE_API_KEY",
+            detail: "Accepted on the OpenRouter route so an older environment file keeps working.",
+            present: environmentPresent("TYPESAFE_API_KEY", env),
+        });
+    }
+
+    return { sources, active: sources.find((source) => source.present)?.name };
 }
 
 function targetPath(target, options = {}) {
@@ -196,7 +292,9 @@ function loadJev(options) {
         text: `${JSON.stringify(jevConfig.fromStored(stored), null, 4)}
 `,
         credentials: [],
+        env: options.env,
         usage: loadJevUsage(filename),
+        key: jevKeyStatus({ settingsFile: filename, env: options.env }),
     };
 }
 
@@ -206,6 +304,15 @@ function saveJev(snapshot, draft) {
     const current = readSnapshot(filename, JEV_MESSAGES);
     if (current.revision !== snapshot.revision) {
         throw new Error(JEV_MESSAGES.changed);
+    }
+
+    // Enforced here rather than in the webview's validator: the host is the authority the "Full
+    // configuration JSON" textarea cannot route around, and putting it in `validate` made the panel
+    // unopenable for files already in this state.
+    if (jevConfig.deadLayer(draft)) {
+        throw new Error(
+            "The Jev layer is enabled with every system off, which runs and does nothing. Turn on at least one system, or turn the layer off.",
+        );
     }
 
     const next = jevConfig.toStored(draft);
@@ -228,6 +335,7 @@ function saveJev(snapshot, draft) {
         // Re-read rather than carried over from the load: saving a budget and still seeing the old
         // ceiling beside the current spend is the kind of small lie that makes a panel untrustworthy.
         usage: loadJevUsage(filename),
+        key: jevKeyStatus({ settingsFile: filename }),
     };
 }
 
@@ -331,6 +439,7 @@ module.exports = {
     webAccessPath,
     jevPath,
     jevUsagePath,
+    jevKeyStatus,
     targetPath,
     loadPackageSettings,
     savePackageSettings,
