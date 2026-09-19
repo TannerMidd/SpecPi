@@ -143,8 +143,9 @@ function loadWebAccess(options) {
 }
 
 // The Jev layer holds no credential, so unlike web access its file is shown as it is. The panel
-// still sees the flattened form shape rather than the nested one on disk, because four systems
-// under `systems` and two switches under `guard` render as JSON textareas otherwise, and the
+// still sees the flattened form shape rather than the nested one on disk, because the systems
+// nested under `systems`, the budgets under `budgets` and two switches under `guard` would render
+// as JSON textareas otherwise, and the
 // point of the panel is that they are toggles.
 function loadJev(options) {
     const filename = targetPath("jevLayer", options);

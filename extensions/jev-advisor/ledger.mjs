@@ -58,6 +58,57 @@ function rotate(file) {
     fs.writeFileSync(file, kept.length > 0 ? `${kept.join("\n")}\n` : "", { mode: 0o600 });
 }
 
+/**
+ * Roll the ledger up into the few numbers a report wants. Kept here rather than in the eval suite
+ * because the shape of a line is this module's business, and a reader that has to know it is a
+ * second copy of the schema waiting to drift.
+ */
+export function summarize(entries) {
+    const lines = Array.isArray(entries) ? entries : [];
+    const bySystem = {};
+    for (const entry of lines) {
+        const name = typeof entry?.system === "string" ? entry.system : "unknown";
+        const bucket = (bySystem[name] ??= {
+            calls: 0,
+            failed: 0,
+            applied: 0,
+            savedBytes: 0,
+            stateBytes: 0,
+            outcomes: {},
+        });
+        bucket.calls += 1;
+        bucket.failed += entry?.ok === true ? 0 : 1;
+        bucket.applied += entry?.applied === true ? 1 : 0;
+        bucket.savedBytes += Number.isFinite(entry?.savedBytes) ? entry.savedBytes : 0;
+        bucket.stateBytes += Number.isFinite(entry?.stateBytes) ? entry.stateBytes : 0;
+        // "Asked 3 times, applied 0" is a number. "Asked 3 times, applied 0, all three because the
+        // result might hold the answer" is a finding.
+        const outcome =
+            typeof entry?.outcome === "string" ? entry.outcome : entry?.ok === true ? "unrecorded" : "failed";
+        bucket.outcomes[outcome] = (bucket.outcomes[outcome] ?? 0) + 1;
+    }
+
+    const totals = Object.values(bySystem);
+
+    return {
+        calls: lines.length,
+        failed: totals.reduce((sum, item) => sum + item.failed, 0),
+        applied: totals.reduce((sum, item) => sum + item.applied, 0),
+        savedBytes: totals.reduce((sum, item) => sum + item.savedBytes, 0),
+        stateBytes: totals.reduce((sum, item) => sum + item.stateBytes, 0),
+        // Named for what retention does, because it is the only system that shortens anything and
+        // the number is meaningless averaged with systems that cannot.
+        elisions: bySystem.retention?.applied ?? 0,
+        bytesDropped: bySystem.retention?.savedBytes ?? 0,
+        bySystem,
+    };
+}
+
+/** Every line, for a caller that wants to summarize rather than display. `read` is for display. */
+export function readAll() {
+    return read(Number.MAX_SAFE_INTEGER);
+}
+
 export function read(limit = 20) {
     try {
         const file = ledgerPath();

@@ -208,7 +208,10 @@ async function runAttempt({ harness, task, model, timeoutMs, transcriptDir }) {
     const native = harnessResult.usage ?? null;
     // Synthetic offline runs log requests without token usage; cost stays
     // zero and complete because the frozen list prices fake-model at zero.
-    const advisor = advisorTotals(proxy.requests);
+    // Two halves of one story: the proxy saw the traffic leave, and the ledger inside the
+    // disposable home says whether the answers were taken and what they saved. A cost column
+    // carrying only the first can price the layer but cannot say whether it did anything.
+    const advisor = { ...advisorTotals(proxy.requests), ledger: harnessResult.advisorLedger ?? null };
     const priced = priceAttempt(prices, model, { native, totals, sessionMint, advisor });
     // What the harness actually met, read back from the shim counters rather
     // than assumed from what the task asked for.
