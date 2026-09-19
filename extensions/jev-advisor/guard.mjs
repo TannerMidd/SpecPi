@@ -83,6 +83,21 @@ export function desiredConfig(enabled = false) {
     };
 }
 
+/**
+ * The environment variable specpi-jev-guard will actually read, derived from the backend SpecPi
+ * writes into its configuration rather than from the advisor's own `JEV_BACKEND`.
+ *
+ * Those two are not the same thing and assuming they were produced the exact failure this layer
+ * exists to avoid. `desiredConfig` pins `backend: "openrouter"` unconditionally, so on a session
+ * running the advisor against the direct TypeSafe API, checking `TYPESAFE_API_KEY` would find a key,
+ * report the guard armed, and leave a fail-closed gate looking for an `OPENROUTER_API_KEY` that was
+ * never set -- blocking every shell and file call in the session. Deriving the name from the config
+ * that is about to be written is what keeps the check honest if that pin ever changes.
+ */
+export function keyEnvName(enabled = false) {
+    return desiredConfig(enabled).backend === "typesafe" ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY";
+}
+
 export function readConfig() {
     try {
         const file = guardConfigFile();

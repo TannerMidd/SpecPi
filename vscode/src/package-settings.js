@@ -131,13 +131,17 @@ function loadJevUsage(settingsFile) {
 // credential: each source reports a boolean and a label, which is everything the panel renders and
 // nothing a key could leak through. That is also why this duplicates the advisor's resolver rather
 // than importing it -- the resolver returns keys, and the webview host has no business holding one.
-function authPath(options = {}) {
-    return path.join(agentDirectory(options), "auth.json");
+// Derived from the settings path rather than resolved again, exactly as `usageBeside` is, so the
+// two can never point at different agent directories. They already had: `loadJev` passed its
+// options through and `saveJev` called this with none, so with PI_CODING_AGENT_DIR set to a
+// workspace-relative path -- which pi-defaults.js supports -- resolution threw after a save, the
+// catch reported no key, and pressing Save flipped a working panel to "No key anywhere".
+function authBeside(settingsFile) {
+    return path.join(path.dirname(path.dirname(path.dirname(settingsFile))), "auth.json");
 }
 
-function storedOpenRouterKey(options) {
+function storedOpenRouterKey(filename) {
     try {
-        const filename = authPath(options);
         const stat = fs.lstatSync(filename, { throwIfNoEntry: false });
         if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_BYTES) {
             return false;
@@ -145,7 +149,9 @@ function storedOpenRouterKey(options) {
 
         const text = fs.readFileSync(filename, "utf8");
         const data = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
-        const entry = data && typeof data === "object" ? data.openrouter : undefined;
+        // `!Array.isArray` matches the advisor's own reader: `["x"].openrouter` is undefined, but
+        // two copies of one check that differ are how the copies drift apart.
+        const entry = data && typeof data === "object" && !Array.isArray(data) ? data.openrouter : undefined;
 
         return Boolean(entry && entry.type === "api_key" && typeof entry.key === "string" && entry.key.trim());
     } catch {
@@ -169,30 +175,45 @@ function environmentPresent(name, env) {
  * leaves you able to run a shell command. A panel that collapsed both into "key: present" would be
  * hiding the one distinction that matters here.
  */
-function jevKeyStatus({ env = process.env, ...options } = {}) {
-    const sources = [
-        {
+function jevKeyStatus({ env = process.env, settingsFile } = {}) {
+    // The same two conditions the advisor applies, because this is a second reader of one contract
+    // and a panel that names a source the advisor will never consult is worse than no panel. The
+    // direct TypeSafe API is not one of Pi's providers, so `auth.json` holds nothing for it; and
+    // `JEV_KEY_SOURCE=environment` is this repository's own opt-out.
+    const typesafe = env.JEV_BACKEND === "typesafe";
+    const storeConsulted = !typesafe && env.JEV_KEY_SOURCE !== "environment";
+    const sources = [];
+    if (storeConsulted) {
+        sources.push({
             name: "auth.json",
             label: "Pi credential store",
             detail: "Stored by /login openrouter, alongside every other provider.",
             guard: false,
-            present: storedOpenRouterKey(options),
-        },
-        {
-            name: "OPENROUTER_API_KEY",
-            label: "OPENROUTER_API_KEY",
-            detail: "Read from the environment Pi was started with. The command guard reads only this.",
-            guard: true,
-            present: environmentPresent("OPENROUTER_API_KEY", env),
-        },
-        {
+            present: Boolean(settingsFile) && storedOpenRouterKey(authBeside(settingsFile)),
+        });
+    }
+
+    sources.push({
+        name: typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY",
+        label: typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY",
+        detail: typesafe
+            ? "Read from the environment Pi was started with, because JEV_BACKEND=typesafe selects the direct API."
+            : "Read from the environment Pi was started with. The command guard reads only this.",
+        // The guard is pinned to OpenRouter whatever the advisor is using, so on the TypeSafe route
+        // the variable in force here is not the one the guard reads.
+        guard: !typesafe,
+        present: environmentPresent(typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY", env),
+    });
+
+    if (!typesafe) {
+        sources.push({
             name: "TYPESAFE_API_KEY",
             label: "TYPESAFE_API_KEY",
             detail: "Accepted on the OpenRouter route so an older environment file keeps working.",
             guard: false,
             present: environmentPresent("TYPESAFE_API_KEY", env),
-        },
-    ];
+        });
+    }
 
     return { sources, active: sources.find((source) => source.present)?.name };
 }
@@ -272,7 +293,7 @@ function loadJev(options) {
 `,
         credentials: [],
         usage: loadJevUsage(filename),
-        key: jevKeyStatus(options),
+        key: jevKeyStatus({ settingsFile: filename }),
     };
 }
 
@@ -304,7 +325,7 @@ function saveJev(snapshot, draft) {
         // Re-read rather than carried over from the load: saving a budget and still seeing the old
         // ceiling beside the current spend is the kind of small lie that makes a panel untrustworthy.
         usage: loadJevUsage(filename),
-        key: jevKeyStatus(),
+        key: jevKeyStatus({ settingsFile: filename }),
     };
 }
 

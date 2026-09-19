@@ -20,7 +20,7 @@
 //
 // Two rules hold everywhere below.
 //
-// The key is returned by exactly one function, `apiKey()`, and callers pass it straight to a
+// The key is returned by exactly one function, `resolveKey()`, and callers pass it straight to a
 // request header. Nothing else here ever sees the value: `keySource()` returns a label so status
 // output, the Chat panel and the ledger can say where a key came from without any of them being a
 // place a key could leak from. That split is the whole reason this is a module rather than two
@@ -109,6 +109,20 @@ function environmentKey(name) {
  * The environment variable for a backend, matching specpi-jev-guard's `keyEnvName` so one key
  * serves the whole layer.
  */
+/**
+ * Whether the credential store is consulted at all.
+ *
+ * `JEV_KEY_SOURCE=environment` restricts resolution to the environment variables. That exists for
+ * this repository's own scripts, and it is a correctness fix rather than a convenience: the
+ * calibration and triage runs load a key from the gitignored `evals/.env` and AGENTS.md promises
+ * "a variable already set in the shell always wins". Once `auth.json` was consulted first, those
+ * runs would silently bill a developer's personal `/login openrouter` account instead of the eval
+ * key, and `--probe` would verify a key the run then did not use.
+ */
+function environmentOnly() {
+    return process.env.JEV_KEY_SOURCE === "environment";
+}
+
 export function keyEnvName(backend) {
     return backend === "typesafe" ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY";
 }
@@ -127,7 +141,7 @@ export function keySources(backend = "openrouter") {
     const sources = [];
     // Only the OpenRouter route has a provider entry to read: `auth.json` is keyed by Pi provider
     // id, and the direct TypeSafe API is not one of Pi's providers.
-    if (backend !== "typesafe") {
+    if (backend !== "typesafe" && !environmentOnly()) {
         sources.push({
             name: "auth.json",
             label: `Pi credential store (${OPENROUTER_PROVIDER})`,
@@ -168,7 +182,7 @@ export function keySource(backend = "openrouter") {
  * header in client.mjs.
  */
 export function resolveKey(backend = "openrouter") {
-    if (backend !== "typesafe") {
+    if (backend !== "typesafe" && !environmentOnly()) {
         const stored = apiKeyOf(storedCredential(OPENROUTER_PROVIDER));
         if (stored) {
             return stored;

@@ -9,12 +9,22 @@
 import { resolveKey } from "./key-source.mjs";
 
 /**
- * Where a key comes from is resolved in credentials.mjs, which follows Pi's own order: the
- * `auth.json` entry `/login openrouter` writes, then the environment variable. Re-exported here
- * because this module is the one that puts a key in a header, and because every existing caller
- * already asks the client for it.
+ * Where a key comes from is resolved in key-source.mjs, which follows Pi's own order: the
+ * `auth.json` entry `/login openrouter` writes, then the environment variable.
+ *
+ * This wrapper exists rather than a bare re-export because the backend has to be bound here. The
+ * previous `apiKey()` read `backend()` itself, and re-exporting `resolveKey` under that name
+ * silently changed every no-arg caller -- the calibration and triage scripts, and this module's own
+ * tests -- to the `"openrouter"` default. With `JEV_BACKEND=typesafe` that made `apiKey()` return a
+ * stored OpenRouter key, so a script's `if (!apiKey())` guard passed and it spent a run, while
+ * every request underneath it came back `no-key`. A default parameter is not a substitute for a
+ * binding the caller never supplied.
  */
-export { resolveKey as apiKey, keySource, keySources, keyEnvName } from "./key-source.mjs";
+export function apiKey() {
+    return resolveKey(backend());
+}
+
+export { keySource, keySources, keyEnvName } from "./key-source.mjs";
 
 export const DEFAULT_MODEL = "jev-1.13.0";
 export const OPENROUTER_MODEL = "typesafe/jev-1.13";

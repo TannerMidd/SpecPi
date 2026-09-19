@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { SYSTEM_NAMES, keySource, keySources, loadSettings, saveSettings, settingsPath } from "./config.mjs";
-import { backend, keyEnvName } from "./client.mjs";
+import { SYSTEM_NAMES, loadSettings, saveSettings, settingsPath } from "./config.mjs";
+import { backend } from "./client.mjs";
+import { keySources } from "./key-source.mjs";
 import { consentPath, granted, revokeConsent } from "./consent.mjs";
 import { createBroker } from "./broker.mjs";
 import { ledgerPath, read as readLedger } from "./ledger.mjs";
@@ -9,7 +10,9 @@ import { usagePath } from "./usage.mjs";
 import {
     FALLBACK_PACKAGE,
     applyConfig as applyGuardConfig,
+    configPath as guardConfigPath,
     installed as installedGuard,
+    keyEnvName as guardKeyEnvName,
     statusLine as guardStatusLine,
 } from "./guard.mjs";
 import * as retention from "./questions/retention.mjs";
@@ -99,17 +102,26 @@ export default function jevAdvisor(pi: ExtensionAPI) {
      * expressed a preference, and `/jev off` followed by `/jev on` must not quietly hand back the
      * six they turned off.
      */
-    const setLayer = (on: boolean) => {
+    const setLayer = (on: boolean, sessionOnly: boolean) => {
         const lines: string[] = [];
+        // The guard's configuration is a single global file that every Pi session on the machine
+        // reads, so there is no such thing as switching it on for one session. `--session`
+        // therefore leaves it exactly as it is rather than quietly making a machine-wide change to
+        // a fail-closed gate, and says so instead of leaving the reader to infer it.
+        const guardLines = sessionOnly
+            ? [
+                  `Command guard: unchanged. Its configuration is a global file (${guardConfigPath()}) that every Pi session reads, so --session cannot scope it. Use /jev guard on or off to change it deliberately.`,
+              ]
+            : on
+              ? armGuard()
+              : disarmGuard();
         if (!on) {
             settings = { ...settings, master: false };
-            guardEnabled = false;
-            syncGuard();
             lines.push(
                 "Jev layer off. No state leaves this machine, and every tool call goes to the permission system.",
             );
 
-            return { lines };
+            return { lines: [...lines, ...guardLines], guardChanged: !sessionOnly };
         }
 
         const alreadyOn = SYSTEM_NAMES.filter((name) => settings.systems[name]);
@@ -123,10 +135,20 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         }
 
         lines.push(keyLine());
-        lines.push(...armGuard());
 
-        return { lines };
+        return { lines: [...lines, ...guardLines], guardChanged: !sessionOnly };
     };
+
+    /**
+     * Where a key would come from, resolved once.
+     *
+     * Each of these calls lstats, reads and parses the credential store, and `/jev status` used to
+     * make three of them in one template literal before listing the sources again. Hoisting it is
+     * not micro-optimisation: this runs on the tool path, and a bounded-but-real synchronous file
+     * read repeated five times per command is latency charged to every turn.
+     */
+    const keySourceList = () => keySources(backend());
+    const activeKeySource = () => keySourceList().find((source: { present: boolean }) => source.present)?.name;
 
     /**
      * One line saying where the key is coming from, by name and never by value.
@@ -136,7 +158,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
      * the environment. Naming the source is what makes the answer checkable.
      */
     const keyLine = () => {
-        const source = keySource(backend());
+        const source = activeKeySource();
         if (source) {
             return `Key: found in ${source === "auth.json" ? "Pi's credential store (auth.json)" : source}.`;
         }
@@ -168,9 +190,14 @@ export default function jevAdvisor(pi: ExtensionAPI) {
             return [`Command guard: not installed, so command policy stays with ${FALLBACK_PACKAGE}.`];
         }
 
-        const variable = keyEnvName(backend());
+        // The guard's own variable, derived from the configuration it is about to be given, not from
+        // the advisor's `JEV_BACKEND`. SpecPi pins the guard to OpenRouter unconditionally, so on a
+        // session running the advisor against the direct TypeSafe API those two names differ -- and
+        // checking the wrong one would find a key, report the guard armed, and leave a fail-closed
+        // gate hunting for a variable nobody set.
+        const variable = guardKeyEnvName(true);
         if (!process.env[variable]?.trim()) {
-            const stored = keySource(backend());
+            const stored = activeKeySource();
 
             return [
                 `Command guard: left off. It reads ${variable} from the environment and cannot see ` +
@@ -190,6 +217,18 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         ];
     };
 
+    /** The other half of `armGuard`, so `/jev off` returns command policy where it found it. */
+    const disarmGuard = () => {
+        if (!installedGuard().installed) {
+            return [];
+        }
+
+        guardEnabled = false;
+        syncGuard();
+
+        return [`Command guard: off. Every tool call goes to ${FALLBACK_PACKAGE}.`];
+    };
+
     /**
      * Write the layer's switches back to the preference file, so turning it on is remembered.
      *
@@ -202,14 +241,20 @@ export default function jevAdvisor(pi: ExtensionAPI) {
      * The stored file is the base rather than the session's own copy, so budgets or a nudge mode
      * written by Chat while this session was running survive being switched on and off here.
      */
-    const persistLayer = () => {
+    const persistLayer = (guardChanged: boolean) => {
         try {
+            const stored = loadSettings();
+
             return saveSettings({
-                ...loadSettings(),
+                ...stored,
                 master: settings.master,
                 startup: settings.master,
                 systems: { ...settings.systems },
-                guard: { enabled: guardEnabled, startup: guardEnabled },
+                // Only written when this command actually decided something about the guard.
+                // Writing it unconditionally destroyed a preference the user had set minutes
+                // earlier with `/jev guard startup on`, which that command explicitly promises not
+                // to disturb -- and did it silently, with nothing in the output naming the guard.
+                guard: guardChanged ? { enabled: guardEnabled, startup: guardEnabled } : stored.guard,
             });
         } catch {
             return undefined;
@@ -223,7 +268,9 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         persisted: ReturnType<typeof persistLayer>,
     ) => {
         if (sessionOnly) {
-            return `This session only, as asked. New sessions still start ${loadSettings().startup ? "on" : "off"}.`;
+            const stored = loadSettings();
+
+            return `This session only, as asked. New sessions still start ${stored.startup && stored.master ? "on" : "off"}.`;
         }
 
         if (!ctx.hasUI) {
@@ -826,12 +873,12 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                         throw new Error(`Usage: /jev ${action} [--session]`);
                     }
 
-                    const result = setLayer(on);
+                    const result = setLayer(on, sessionOnly);
                     // Persisting is the default because a switch that forgets is not a switch. The
                     // old rule -- that only /jev startup may write -- protected against a session
                     // toggle silently changing tomorrow's sessions, but the cost of that protection
                     // was a layer people turned on repeatedly and never actually ran.
-                    const persisted = !sessionOnly && ctx.hasUI ? persistLayer() : undefined;
+                    const persisted = !sessionOnly && ctx.hasUI ? persistLayer(result.guardChanged) : undefined;
                     const lines = [...result.lines, layerScopeLine(sessionOnly, ctx, persisted)];
                     ctx.ui.notify(lines.join("\n"), "info");
 
@@ -862,8 +909,9 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 if (action === "startup") {
                     const [choice] = rest;
                     if (!choice) {
+                        const current = loadSettings();
                         ctx.ui.notify(
-                            `Jev starts ${loadSettings().startup ? "on" : "off"} in new sessions. Preference: ${settingsPath()}`,
+                            `Jev starts ${current.startup && current.master ? "on" : "off"} in new sessions. Preference: ${settingsPath()}`,
                             "info",
                         );
 
@@ -878,11 +926,30 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                         throw new Error("Usage: /jev startup [on|off]");
                     }
 
-                    const saved = saveSettings({ ...loadSettings(), startup: choice.toLowerCase() === "on" });
+                    // Both keys, and the systems with them. Writing `startup` alone was the whole
+                    // two-keys-for-one-intention trap, left in the command named after it: the
+                    // advisor's session_start keeps a stored `master` only when `startup` is true,
+                    // so `startup: true, master: false` starts every future session with the layer
+                    // off while this command cheerfully reported it would start on. And a layer
+                    // that starts on with no system enabled runs and does nothing, so the same rule
+                    // `/jev on` uses applies here: fill them in only when none are chosen.
+                    const wanted = choice.toLowerCase() === "on";
+                    const current = loadSettings();
+                    const chosen = SYSTEM_NAMES.filter((name) => current.systems[name]);
+                    const saved = saveSettings({
+                        ...current,
+                        master: wanted,
+                        startup: wanted,
+                        systems:
+                            wanted && chosen.length === 0
+                                ? Object.fromEntries(SYSTEM_NAMES.map((name) => [name, true]))
+                                : current.systems,
+                    });
+                    const enabled = SYSTEM_NAMES.filter((name) => saved.systems[name]);
                     ctx.ui.notify(
-                        saved.startup
-                            ? "New Pi sessions will start with the Jev advisor on. This session is unchanged."
-                            : "New Pi sessions will start with the Jev advisor off. This session is unchanged.",
+                        saved.startup && saved.master
+                            ? `New Pi sessions will start with the Jev layer on, with ${enabled.length} of ${SYSTEM_NAMES.length} systems: ${enabled.join(", ")}. This session is unchanged; run /jev on to switch it on now.`
+                            : "New Pi sessions will start with the Jev layer off. This session is unchanged.",
                         "info",
                     );
 
@@ -987,15 +1054,17 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 }
 
                 const state = broker.status();
+                const sources = keySourceList();
+                const stored = loadSettings();
                 const lines = [
-                    `master: ${settings.master ? "on" : "off"} (new sessions start ${loadSettings().startup ? "on" : "off"})`,
+                    `master: ${settings.master ? "on" : "off"} (new sessions start ${stored.startup && stored.master ? "on" : "off"})`,
                     ...SYSTEM_NAMES.map((name) => `  ${name}: ${settings.systems[name] ? "on" : "off"}`),
                     // Every place a key could come from, in the order they are consulted, with the
                     // one in force marked. A bare "missing" was actively misleading here: it is
                     // what someone saw who had a perfectly good OpenRouter key stored by /login,
                     // and it gave them nothing to act on. Names only -- no key is ever printed.
-                    `key: ${keySource(backend()) ? `in use from ${keySource(backend())}` : "none found"}`,
-                    ...keySources(backend()).map(
+                    `key: ${sources.find((source) => source.present)?.name ? `in use from ${sources.find((source) => source.present)?.name}` : "none found"}`,
+                    ...sources.map(
                         (source: { name: string; label: string; detail: string; present: boolean }) =>
                             `  ${source.present ? "found" : "   - "} ${source.label} (${source.detail})`,
                     ),

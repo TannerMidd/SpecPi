@@ -22,6 +22,7 @@ import {
     choice,
     defaultModel,
     endpoint,
+    keyEnvName,
     noul,
     score,
 } from "../extensions/jev-advisor/client.mjs";
@@ -42,6 +43,7 @@ import {
     applyConfig,
     configPath,
     desiredConfig,
+    keyEnvName as guardKeyEnvName,
     readConfig,
     statusLine,
 } from "../extensions/jev-advisor/guard.mjs";
@@ -730,6 +732,71 @@ test("a key in the store is enough for ask() to reach the transport", async () =
             assert.equal(seen, "Bearer sk-or-v1-stored");
         } finally {
             await server.close();
+        }
+    });
+});
+
+test("the guard's key variable follows the guard's own backend, not the advisor's", () => {
+    // These two are not the same thing, and assuming they were produced the exact harm the layer
+    // exists to avoid. SpecPi pins the guard to OpenRouter whatever the advisor is doing, so on a
+    // session running the advisor against the direct TypeSafe API, checking TYPESAFE_API_KEY would
+    // find a key, report the guard armed, and leave a fail-closed gate hunting for an
+    // OPENROUTER_API_KEY nobody set -- blocking every shell and file call.
+    withAgentDir(() => {
+        assert.equal(desiredConfig(true).backend, "openrouter");
+        assert.equal(guardKeyEnvName(true), "OPENROUTER_API_KEY");
+
+        process.env.JEV_BACKEND = "typesafe";
+        try {
+            assert.equal(backend(), "typesafe");
+            assert.equal(keyEnvName(backend()), "TYPESAFE_API_KEY", "the advisor reads this one");
+            assert.equal(guardKeyEnvName(true), "OPENROUTER_API_KEY", "the guard still reads this one");
+            assert.notEqual(guardKeyEnvName(true), keyEnvName(backend()));
+        } finally {
+            delete process.env.JEV_BACKEND;
+        }
+    });
+});
+
+test("apiKey() follows the active backend rather than defaulting to OpenRouter", () => {
+    // Every caller invokes it with no argument. Re-exporting the resolver under this name silently
+    // rebound all of them to the parameter default, so with JEV_BACKEND=typesafe a script's
+    // `if (!apiKey())` guard passed on a stored OpenRouter key while every request it then made
+    // came back no-key.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+        assert.equal(apiKey(), "sk-or-v1-stored");
+
+        process.env.JEV_BACKEND = "typesafe";
+        try {
+            assert.equal(apiKey(), undefined, "an OpenRouter entry is not a TypeSafe key");
+            process.env.TYPESAFE_API_KEY = "ts-key";
+            assert.equal(apiKey(), "ts-key");
+        } finally {
+            delete process.env.JEV_BACKEND;
+        }
+    });
+});
+
+test("JEV_KEY_SOURCE=environment keeps a measured run off a personal login", () => {
+    // What the calibration and triage scripts set. Without it a run loading the eval key from
+    // evals/.env would resolve the developer's /login credential first and bill their account,
+    // while --probe verified a key the run did not use.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-personal" } });
+        process.env.OPENROUTER_API_KEY = "sk-or-v1-eval";
+        assert.equal(resolveKey("openrouter"), "sk-or-v1-personal");
+
+        process.env.JEV_KEY_SOURCE = "environment";
+        try {
+            assert.equal(resolveKey("openrouter"), "sk-or-v1-eval");
+            assert.equal(keySource("openrouter"), "OPENROUTER_API_KEY");
+            assert.ok(
+                !keySources("openrouter").some((source) => source.name === "auth.json"),
+                "a source that will not be consulted must not be reported",
+            );
+        } finally {
+            delete process.env.JEV_KEY_SOURCE;
         }
     });
 });

@@ -239,7 +239,7 @@ export function settingsPath() {
 
 /**
  * Whether a key is available at all, from any source. Kept here as a re-export so every caller that
- * used to ask config.mjs still can; the resolution itself lives in credentials.mjs, which knows
+ * used to ask config.mjs still can; the resolution itself lives in key-source.mjs, which knows
  * about Pi's own credential store as well as the environment.
  */
 export { keyPresent, keySource, keySources } from "./key-source.mjs";

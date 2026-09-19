@@ -347,6 +347,18 @@
             }
         }
 
+        // The same invariant `couple` maintains in the form, enforced where every path reaches --
+        // including the "Full configuration JSON" textarea, which never calls `couple`. Without it
+        // the dead-layer state this panel exists to prevent stayed one hand-edit away: `enabled`
+        // true with every system off saves cleanly and produces a layer that runs and does nothing.
+        // Refused rather than silently corrected, because a save that rewrites settings the person
+        // did not touch is the other way to make a panel untrustworthy.
+        if (config.enabled === true && SYSTEMS.every((name) => config[name] !== true)) {
+            throw new Error(
+                "The Jev layer is enabled with every system off, which runs and does nothing. Turn on at least one system, or turn the layer off.",
+            );
+        }
+
         return { config, unknown };
     }
 
