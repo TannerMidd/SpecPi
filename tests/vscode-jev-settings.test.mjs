@@ -588,3 +588,22 @@ test("Chat's key report and the advisor's resolver agree about every source", as
         }
     }
 });
+
+test("Chat and the advisor agree about a symlinked credential store", () => {
+    // The parity test above never created a link, so it passed while the two readers disagreed:
+    // one used lstat and refused links, the other used stat and followed them. A dotfile manager
+    // linking auth.json is the case key-source.mjs cites, and the result was /jev status reporting
+    // "in use from auth.json" beside a panel reporting "No key anywhere".
+    withAgentDir((dir) => {
+        const real = path.join(dir, "managed-auth.json");
+        fs.writeFileSync(real, JSON.stringify({ openrouter: { type: "api_key", key: "sk-or-v1-linked" } }));
+        try {
+            fs.symlinkSync(real, path.join(dir, "auth.json"));
+        } catch {
+            return; // Unprivileged Windows cannot create links; the assertion below needs one.
+        }
+
+        const status = jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: {} });
+        assert.equal(status.active, "auth.json", "a linked store must read the same as a plain one");
+    });
+});

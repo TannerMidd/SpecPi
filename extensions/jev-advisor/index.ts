@@ -749,21 +749,31 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                         throw new Error(`Usage: /jev ${action} <${SYSTEM_NAMES.join("|")}>`);
                     }
 
-                    const systems = { ...settings.systems };
-                    for (const name of names) {
-                        systems[name] = action === "enable";
-                    }
-
-                    settings = { ...settings, systems };
-                    // Persisted like every other switch here. While this wrote only the session, a
-                    // later `/jev on` copied the session's systems to disk anyway, so a choice
-                    // announced as temporary became permanent through an unrelated command. One
-                    // rule -- interactive changes are remembered -- is the only version of this that
-                    // can be stated accurately in a single line.
+                    const changes = Object.fromEntries(names.map((name) => [name, action === "enable"]));
+                    const systems = { ...settings.systems, ...changes };
+                    // Disabling the last system while the layer is on leaves it running and doing
+                    // nothing -- the state `enableSystems`, `startupToPersist`, `couple` and the
+                    // Chat panel's save check all exist to prevent, reachable through the one path
+                    // that did not check it. Switching the layer off is the honest reading of
+                    // "disable everything", and it is announced rather than inferred.
+                    const emptied = settings.master && SYSTEM_NAMES.every((name) => !systems[name]);
+                    settings = { ...settings, systems, master: emptied ? false : settings.master };
+                    // Persisted like every other switch here, and merged into the stored map rather
+                    // than overwriting it: this session's copy may predate systems enabled on disk
+                    // since it started, and writing it whole turned those back off silently.
                     const kept = ctx.hasUI
                         ? (() => {
                               try {
-                                  return saveSettings({ ...loadSettings(), systems });
+                                  const current = loadSettings();
+                                  const merged = { ...current.systems, ...changes };
+                                  const dead = current.master && SYSTEM_NAMES.every((name) => !merged[name]);
+
+                                  return saveSettings({
+                                      ...current,
+                                      systems: merged,
+                                      master: dead ? false : current.master,
+                                      startup: dead ? false : current.startup,
+                                  });
                               } catch {
                                   return undefined;
                               }
@@ -772,7 +782,8 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     ctx.ui.notify(
                         `${action === "enable" ? "Enabled" : "Disabled"}: ${names.join(", ")}.` +
                             `${kept ? " Remembered for new sessions." : " This session only."}` +
-                            `${settings.master ? "" : " The layer is still off; run /jev on."}`,
+                            `${emptied ? " That was the last system, so the layer was switched off; it would otherwise run and do nothing." : ""}` +
+                            `${!emptied && !settings.master ? " The layer is still off; run /jev on." : ""}`,
                         "info",
                     );
 
@@ -835,14 +846,36 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                         // had just failed to be written, and persisted a preference for it.
                         const settled = result.applied || result.reason === "already-current";
                         guardEnabled = settled ? wanted : guardEnabled;
+                        // Persisted, or the claim above it is false. `session_start` sets
+                        // `guardEnabled` from the stored `guard.startup` and rewrites the global
+                        // file from it, so a guard switched on here and never written was disarmed
+                        // machine-wide by the next session that started -- while this message
+                        // promised a machine-wide change.
+                        const remembered =
+                            settled && ctx.hasUI
+                                ? (() => {
+                                      try {
+                                          const current = loadSettings();
+
+                                          return saveSettings({
+                                              ...current,
+                                              guard: { enabled: wanted, startup: wanted },
+                                          });
+                                      } catch {
+                                          return undefined;
+                                      }
+                                  })()
+                                : undefined;
                         ctx.ui.notify(
                             result.reason === "not-installed"
                                 ? "specpi-jev-guard is not installed, so there is nothing to switch. Command policy stays with the permission system."
                                 : !settled
                                   ? `The Jev guard's settings file could not be written (${result.reason}), so nothing changed. Command policy stays with the permission system.`
-                                  : wanted
-                                    ? `Jev guard on for every Pi session on this machine (${guardConfigPath()}). It scores shell and file calls and blocks them whenever Jev is unavailable or unconfident.`
-                                    : "Jev guard off. Every tool call goes straight to the permission system.",
+                                  : `${
+                                        wanted
+                                            ? `Jev guard on for every Pi session on this machine (${guardConfigPath()}). It scores shell and file calls and blocks them whenever Jev is unavailable or unconfident.`
+                                            : `Jev guard off for every Pi session on this machine (${guardConfigPath()}). Every tool call goes straight to the permission system.`
+                                    }${remembered ? " Remembered for new sessions." : " This session only; new sessions use the stored preference."}`,
                             "info",
                         );
 

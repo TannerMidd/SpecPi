@@ -12,21 +12,15 @@ import { backend, resolveKey } from "./key-source.mjs";
  * Where a key comes from is resolved in key-source.mjs, which follows Pi's own order: the
  * `auth.json` entry `/login openrouter` writes, then the environment variable.
  *
- * This wrapper exists rather than a bare re-export because the backend has to be bound here. The
- * previous `apiKey()` read `backend()` itself, and re-exporting `resolveKey` under that name
- * silently changed every no-arg caller -- the calibration and triage scripts, and this module's own
- * tests -- to the `"openrouter"` default. With `JEV_BACKEND=typesafe` that made `apiKey()` return a
- * stored OpenRouter key, so a script's `if (!apiKey())` guard passed and it spent a run, while
- * every request underneath it came back `no-key`. A default parameter is not a substitute for a
- * binding the caller never supplied.
+ * Every one of these defaults its route to `backend()` rather than to the string "openrouter", so a
+ * no-arg call resolves against the backend actually in force. That matters because it briefly did
+ * not: when `apiKey` was first replaced by a re-export of a function whose parameter defaulted to a
+ * literal, `apiKey()` returned a stored OpenRouter key under `JEV_BACKEND=typesafe` -- a script's
+ * `if (!apiKey())` guard passed and it spent a run, while every request underneath came back
+ * `no-key`. The fix belongs at the definition, which is where it now is; a wrapper here would only
+ * have hidden that three sibling exports had the same defect.
  */
-export function apiKey() {
-    return resolveKey(backend());
-}
-
-// All four bind the active backend themselves now, so re-exporting them is safe: there is no
-// parameter default left for a no-arg caller to be silently bound to.
-export { backend, keyEnvName, keyPresent, keySource, keySources } from "./key-source.mjs";
+export { backend, keyEnvName, keyPresent, keySource, keySources, resolveKey as apiKey } from "./key-source.mjs";
 
 export const DEFAULT_MODEL = "jev-1.13.0";
 export const OPENROUTER_MODEL = "typesafe/jev-1.13";

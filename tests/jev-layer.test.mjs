@@ -290,3 +290,56 @@ test("the key line names its source and never carries a value", () => {
     const none = applyLayer({ on: true }, { settings: stored(), guardEnabled: false }, deps({ sources: [] }));
     assert.match(none.lines.join("\n"), /Run \/login openrouter to store one/u);
 });
+
+test("turning the layer off does not erase a separate guard startup preference", () => {
+    // `/jev off` disarms the machine-wide gate, which is a real change worth writing. It is not a
+    // statement about whether the user wants it armed next time, and `/jev guard startup on` is the
+    // command that owns that answer.
+    const preference = stored({ guard: { enabled: true, startup: true } });
+    const off = applyLayer(
+        { on: false },
+        { settings: stored({ master: true }), guardEnabled: true },
+        deps({ env: withKey }),
+    );
+
+    assert.equal(off.guardChanged, true);
+    assert.deepEqual(layerToPersist(off, preference).guard, { enabled: false, startup: true });
+
+    // Arming it is a statement, so startup follows.
+    const on = applyLayer({ on: true }, { settings: stored(), guardEnabled: false }, deps({ env: withKey }));
+    assert.deepEqual(layerToPersist(on, preference).guard, { enabled: true, startup: true });
+});
+
+test("disarming the guard is disclosed as machine-wide, exactly as arming it is", () => {
+    const off = applyLayer(
+        { on: false },
+        { settings: stored({ master: true }), guardEnabled: true },
+        deps({ env: withKey }),
+    );
+    assert.match(off.lines.join("\n"), /every Pi session on this machine/u);
+});
+
+test("the credential store is read once per command, not once per mention", () => {
+    // Both the key line and the guard's keyless message want the same answer, and each lookup
+    // stats, reads and parses a file.
+    let reads = 0;
+    const counting = {
+        env: {},
+        keySources: () => {
+            reads += 1;
+
+            return [{ name: "auth.json", present: true }];
+        },
+        guard: fakeGuard().deps,
+    };
+    applyLayer({ on: true }, { settings: stored(), guardEnabled: false }, counting);
+    assert.equal(reads, 1, "one read per command");
+});
+
+test("startupToPersist and enableSystems agree, because they are one rule", () => {
+    const off = stored();
+    assert.deepEqual(startupToPersist(true, off).systems, enableSystems(off).systems);
+
+    const chosen = stored({ systems: { ...allSystems(false), gap: true } });
+    assert.deepEqual(startupToPersist(true, chosen).systems, enableSystems(chosen).systems);
+});

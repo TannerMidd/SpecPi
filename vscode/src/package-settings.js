@@ -142,8 +142,12 @@ function authBeside(settingsFile) {
 
 function storedOpenRouterKey(filename) {
     try {
-        const stat = fs.lstatSync(filename, { throwIfNoEntry: false });
-        if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_BYTES) {
+        // `stat`, not `lstat`, matching key-source.mjs: a dotfile manager linking auth.json into a
+        // managed directory is the case that reader cites, and refusing links here while the
+        // advisor follows them produced the divergence both are written to avoid -- `/jev status`
+        // saying "in use from auth.json" while this panel said "No key anywhere".
+        const stat = fs.statSync(filename, { throwIfNoEntry: false });
+        if (!stat || !stat.isFile() || stat.size > MAX_BYTES) {
             return false;
         }
 
@@ -175,7 +179,8 @@ function environmentPresent(name, env) {
  * leaves you able to run a shell command. A panel that collapsed both into "key: present" would be
  * hiding the one distinction that matters here.
  */
-function jevKeyStatus({ env = process.env, settingsFile } = {}) {
+function jevKeyStatus({ env, settingsFile } = {}) {
+    env = env ?? process.env;
     // The same two conditions the advisor applies, because this is a second reader of one contract
     // and a panel that names a source the advisor will never consult is worse than no panel. The
     // direct TypeSafe API is not one of Pi's providers, so `auth.json` holds nothing for it; and
@@ -292,8 +297,9 @@ function loadJev(options) {
         text: `${JSON.stringify(jevConfig.fromStored(stored), null, 4)}
 `,
         credentials: [],
+        env: options.env,
         usage: loadJevUsage(filename),
-        key: jevKeyStatus({ settingsFile: filename }),
+        key: jevKeyStatus({ settingsFile: filename, env: options.env }),
     };
 }
 
@@ -334,7 +340,7 @@ function saveJev(snapshot, draft) {
         // Re-read rather than carried over from the load: saving a budget and still seeing the old
         // ceiling beside the current spend is the kind of small lie that makes a panel untrustworthy.
         usage: loadJevUsage(filename),
-        key: jevKeyStatus({ settingsFile: filename }),
+        key: jevKeyStatus({ settingsFile: filename, env: snapshot.env }),
     };
 }
 

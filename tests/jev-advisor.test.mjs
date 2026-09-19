@@ -9,7 +9,6 @@ import {
     NUDGE_MODES,
     SYSTEM_NAMES,
     defaultSettings,
-    keyPresent,
     loadSettings,
     saveSettings,
     settingsPath,
@@ -27,7 +26,7 @@ import {
     score,
 } from "../extensions/jev-advisor/client.mjs";
 import { choiceValue, nounFalse, nounTrue, scoreLevel } from "../extensions/jev-advisor/gate.mjs";
-import { authPath, keySource, keySources, resolveKey } from "../extensions/jev-advisor/key-source.mjs";
+import { authPath, keyPresent, keySource, keySources, resolveKey } from "../extensions/jev-advisor/key-source.mjs";
 import { ledgerPath, read as readLedger, record } from "../extensions/jev-advisor/ledger.mjs";
 import { readUsage, usagePath } from "../extensions/jev-advisor/usage.mjs";
 import { MAX_STATE_BYTES, buildState, looksAbsolute, outline, redact } from "../extensions/jev-advisor/sanitize.mjs";

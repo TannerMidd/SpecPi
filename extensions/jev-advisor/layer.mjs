@@ -26,9 +26,12 @@ import { SYSTEM_NAMES } from "./config.mjs";
  * distinction is what stops a later persist from overwriting a preference nobody touched.
  */
 export function applyLayer({ on, sessionOnly = false, interactive = true }, state, deps) {
+    // One read of the credential store per command. Each lookup stats, reads and parses a file, and
+    // both the key line and the guard's message want the same answer.
+    const active = deps.keySources().find((item) => item.present)?.name;
     const settings = on ? enableSystems(state.settings) : { ...state.settings, master: false };
-    const lines = on ? onLines(state.settings, settings, deps) : [offLine()];
-    const guard = decideGuard({ on, sessionOnly, interactive }, state, deps);
+    const lines = on ? onLines(state.settings, settings, active) : [offLine()];
+    const guard = decideGuard({ on, sessionOnly, interactive }, state, deps, active);
 
     return {
         settings,
@@ -55,7 +58,7 @@ export function enableSystems(settings) {
     };
 }
 
-function onLines(before, after, deps) {
+function onLines(before, after, activeSource) {
     const chosen = SYSTEM_NAMES.filter((name) => before.systems[name]);
     const active = SYSTEM_NAMES.filter((name) => after.systems[name]);
     const lines = [`Jev layer on with ${active.length} of ${SYSTEM_NAMES.length} systems: ${active.join(", ")}.`];
@@ -63,7 +66,7 @@ function onLines(before, after, deps) {
         lines.push("No system was enabled, so all of them were. Turn any back off with /jev disable <system>.");
     }
 
-    lines.push(keyLine(deps));
+    lines.push(keyLine(activeSource));
 
     return lines;
 }
@@ -73,11 +76,10 @@ function offLine() {
 }
 
 /**
- * Where the key is coming from, by name and never by value. Resolved once per call rather than once
- * per mention: each lookup reads and parses the credential store.
+ * Where the key is coming from, by name and never by value. Takes the already-resolved source name
+ * rather than looking it up, so one command cannot read the credential store twice.
  */
-export function keyLine(deps) {
-    const source = deps.keySources().find((item) => item.present)?.name;
+export function keyLine(source) {
     if (source) {
         return `Key: found in ${source === "auth.json" ? "Pi's credential store (auth.json)" : source}.`;
     }
@@ -103,7 +105,7 @@ export function keyLine(deps) {
  * one file into one that any `env` in a shell tool can read. Enabling a security feature is not a
  * reason to widen the blast radius of a secret.
  */
-function decideGuard({ on, sessionOnly, interactive }, state, deps) {
+function decideGuard({ on, sessionOnly, interactive }, state, deps, activeSource) {
     const unchanged = (lines) => ({ guardEnabled: state.guardEnabled, changed: false, lines });
     if (!deps.guard.installed()) {
         return unchanged(
@@ -129,16 +131,17 @@ function decideGuard({ on, sessionOnly, interactive }, state, deps) {
     }
 
     if (!on) {
+        // Weakening a security gate machine-wide deserves at least the disclosure that strengthening
+        // it gets. It said only "off" while arming said "for every Pi session on this machine".
         return writeGuard(false, state, deps, [
-            `Command guard: off. Every tool call goes to ${deps.guard.fallbackPackage}.`,
+            `Command guard: off for every Pi session on this machine, not just this one (${deps.guard.configPath()}). Every tool call goes to ${deps.guard.fallbackPackage}.`,
         ]);
     }
 
     const variable = deps.guard.keyEnvName();
     const value = deps.env[variable];
     if (typeof value !== "string" || value.trim().length === 0) {
-        const stored = deps.keySources().find((item) => item.present)?.name;
-        const seen = stored === "auth.json" ? "the key in Pi's credential store" : "any key";
+        const seen = activeSource === "auth.json" ? "the key in Pi's credential store" : "any key";
 
         // Whether it is already on decides which of these is true, and reporting the wrong one is
         // worst precisely here: telling someone the guard was "left off" while it is on and
@@ -197,7 +200,14 @@ export function layerToPersist({ settings, guardEnabled, guardChanged }, stored)
         master: settings.master,
         startup: settings.master,
         systems: { ...settings.systems },
-        guard: guardChanged ? { enabled: guardEnabled, startup: guardEnabled } : stored.guard,
+        // `startup` follows only when the guard was armed. Turning the layer off disarms the guard
+        // for this machine, which is a real change worth writing -- but it is not a statement about
+        // whether the user wants it armed next time, and erasing a preference they set with
+        // `/jev guard startup on` is not this command's business. The guard is a separate switch,
+        // which is exactly why it has its own commands.
+        guard: guardChanged
+            ? { enabled: guardEnabled, startup: guardEnabled ? true : stored.guard.startup }
+            : stored.guard,
     };
 }
 
@@ -224,15 +234,8 @@ export function layerScopeLine({ sessionOnly, interactive, persisted, stored, se
  * sessions would start on when they would not.
  */
 export function startupToPersist(wanted, stored) {
-    const chosen = SYSTEM_NAMES.filter((name) => stored.systems[name]);
-
-    return {
-        ...stored,
-        master: wanted,
-        startup: wanted,
-        systems:
-            wanted && chosen.length === 0
-                ? Object.fromEntries(SYSTEM_NAMES.map((name) => [name, true]))
-                : stored.systems,
-    };
+    // Delegates to `enableSystems` rather than restating the rule. Three copies of "what enabling
+    // the layer means" -- here, there, and `couple` in the Chat panel -- is precisely how the
+    // advisor and the panel drift apart, which is the class of bug this module was extracted over.
+    return wanted ? { ...enableSystems(stored), startup: true } : { ...stored, master: false, startup: false };
 }

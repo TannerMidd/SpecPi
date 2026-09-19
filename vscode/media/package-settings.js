@@ -169,7 +169,11 @@
                     formValid = true;
                     if (repaired.note) {
                         check();
-                        report(`${byId("package-feedback").textContent}${repaired.note}`);
+                        // Carry the error flag rather than defaulting it to false: appending a note
+                        // to a draft that failed validation was re-styling the error as an ordinary
+                        // message, leaving Save disabled with no visible reason.
+                        const status = byId("package-feedback");
+                        report(`${status.textContent}${repaired.note}`, status.dataset.error === "true");
 
                         return;
                     }
@@ -212,7 +216,8 @@
                     source.value = `${JSON.stringify(coupled.config, null, 4)}\n`;
                     if (coupled.note) {
                         populate();
-                        report(`${byId("package-feedback").textContent}${coupled.note}`);
+                        const status = byId("package-feedback");
+                        report(`${status.textContent}${coupled.note}`, status.dataset.error === "true");
 
                         return;
                     }

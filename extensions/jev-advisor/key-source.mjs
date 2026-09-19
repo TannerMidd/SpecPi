@@ -57,6 +57,31 @@ function stripBom(text) {
 }
 
 /**
+ * The parsed store, cached against the file's own identity.
+ *
+ * `ask()` resolves a key per request and retention fires on every large read-only tool result, so an
+ * uncached read put a synchronous stat, read and JSON parse of up to 256 KiB on the tool path inside
+ * a 1500 ms latency budget -- where it used to be one `process.env` lookup. The cache key is the
+ * file's size and modification time, so `/login` writing a new credential mid-session invalidates it
+ * on the next call rather than being masked until restart, which a plain memo would have done.
+ */
+let parsedStore = { key: "", data: undefined };
+
+function readStore(file, stat) {
+    const identity = `${stat.mtimeMs}:${stat.size}:${file}`;
+    if (parsedStore.key === identity) {
+        return parsedStore.data;
+    }
+
+    const text = fs.readFileSync(file, "utf8");
+    const parsed = JSON.parse(stripBom(text));
+    const data = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : undefined;
+    parsedStore = { key: identity, data };
+
+    return data;
+}
+
+/**
  * The raw stored entry for one provider, or undefined. Deliberately not exported: an entry is a
  * credential, and the only thing outside this file that needs one is the request header.
  */
@@ -78,9 +103,7 @@ function storedCredential(providerId) {
             return undefined;
         }
 
-        const data = JSON.parse(stripBom(fs.readFileSync(file, "utf8")));
-
-        return data && typeof data === "object" && !Array.isArray(data) ? data[providerId] : undefined;
+        return readStore(file, stat)?.[providerId];
     } catch {
         return undefined;
     }
