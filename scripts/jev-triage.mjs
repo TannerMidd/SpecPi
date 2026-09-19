@@ -29,23 +29,25 @@ function pathToUrl(value) {
 }
 
 const advisor = path.join(root, "extensions", "jev-advisor");
-const { ask, choice, noul } = await import(pathToUrl(path.join(advisor, "client.mjs")));
+const { apiKey, ask, choice, noul } = await import(pathToUrl(path.join(advisor, "client.mjs")));
 const { buildState, compact } = await import(pathToUrl(path.join(advisor, "sanitize.mjs")));
+const { choiceValue, nounTrue } = await import(pathToUrl(path.join(advisor, "gate.mjs")));
+const { PUBLISHED_REPORTS } = await import(pathToUrl(path.join(root, "scripts", "jev-calibrate.mjs")));
 
-export const FAILURE_MODES = Object.freeze({
-    "gave-up-on-fault": "Met an injected command failure and stopped instead of retrying",
-    "turn-cap": "Ran out of turns or requests while still working",
-    timeout: "Exceeded the wall-clock limit",
-    "wrong-approach": "Worked steadily but solved the wrong problem",
-    "misread-requirement": "Produced output that misses a stated requirement",
-    "scope-violation": "Changed files it was told to leave alone",
-    "tool-error-loop": "Repeated the same failing tool call without progress",
-    "harness-error": "The harness itself crashed or could not start",
-    unknown: "Not determinable from what was recorded",
-});
+// One taxonomy, defined in the shipped extension and re-exported here. This script's output is
+// what calibrates the online classifier in questions/progress.mjs, so the two have to ask against
+// the same enum: two copies that drifted would publish a distribution over categories no session
+// ever actually considers.
+export const { FAILURE_MODES } = await import(pathToUrl(path.join(advisor, "questions", "progress.mjs")));
 
 function parseArgs(argv) {
-    const options = { runs: path.join(root, "evals", "runs"), limit: 200, harness: undefined, dryRun: false };
+    const options = {
+        runs: undefined,
+        limit: 400,
+        harness: undefined,
+        out: path.join(root, "evals", "runs", "jev-triage.json"),
+        dryRun: false,
+    };
     for (const argument of argv) {
         if (argument.startsWith("--runs=")) {
             options.runs = path.resolve(argument.slice("--runs=".length));
@@ -55,6 +57,8 @@ function parseArgs(argv) {
             options.limit = Number.parseInt(argument.slice("--limit=".length), 10);
         } else if (argument.startsWith("--out=")) {
             options.out = path.resolve(argument.slice("--out=".length));
+        } else if (argument === "--no-out") {
+            options.out = undefined;
         } else if (argument.startsWith("--env-file=")) {
             options.envFile = path.resolve(argument.slice("--env-file=".length));
         } else if (argument === "--no-env-file") {
@@ -103,18 +107,19 @@ export function questions() {
     };
 }
 
-export function collectFailures(runsDir, { limit, harness }) {
+/**
+ * The published matrix, not every directory under evals/runs. A distribution assembled from
+ * superseded per-tier runs, scouting runs and the cache probe would be a distribution over a corpus
+ * nobody can name, and this one is meant to be published beside the results it explains.
+ */
+export function collectFailures(reports, { limit, harness }) {
     const rows = [];
-    if (!fs.existsSync(runsDir)) {
-        return rows;
-    }
-
-    for (const entry of fs.readdirSync(runsDir).sort()) {
-        const file = path.join(runsDir, entry, "report.json");
+    for (const file of reports) {
         if (!fs.existsSync(file)) {
             continue;
         }
 
+        const entry = path.basename(path.dirname(file));
         let report;
         try {
             report = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -128,7 +133,7 @@ export function collectFailures(runsDir, { limit, harness }) {
             }
 
             for (const [index, attempt] of (result.attempts ?? []).entries()) {
-                if (attempt.pass !== false) {
+                if (attempt.pass !== false || attempt.skipped === true) {
                     continue;
                 }
 
@@ -136,6 +141,7 @@ export function collectFailures(runsDir, { limit, harness }) {
                     id: `${entry}/${result.harness}/${result.task}#${index}`,
                     harness: result.harness,
                     task: result.task,
+                    tier: result.tier,
                     features: failureFeatures(result.harness, result, attempt),
                 });
                 if (rows.length >= limit) {
@@ -174,7 +180,13 @@ async function main() {
     }
 
     applyEnvFile(options);
-    const rows = collectFailures(options.runs, options);
+    const reports = options.runs
+        ? fs
+              .readdirSync(options.runs)
+              .sort()
+              .map((name) => path.join(options.runs, name, "report.json"))
+        : PUBLISHED_REPORTS.map((file) => path.join(root, file));
+    const rows = collectFailures(reports, options);
     if (rows.length === 0) {
         console.log("No failed attempts found. Nothing to triage.");
 
@@ -189,9 +201,11 @@ async function main() {
         return;
     }
 
-    if (!process.env.TYPESAFE_API_KEY) {
+    // The key name follows the backend, and the default backend is OpenRouter, so reading
+    // TYPESAFE_API_KEY directly refused every environment that had only OPENROUTER_API_KEY set.
+    if (!apiKey()) {
         console.error(
-            "TYPESAFE_API_KEY is not set. Put it in evals/.env (see evals/.env.example) or the environment, or re-run with --dry-run to inspect what would be sent.",
+            "No Jev key found. Put OPENROUTER_API_KEY in evals/.env (see evals/.env.example) or the environment, or re-run with --dry-run to inspect what would be sent.",
         );
         process.exitCode = 1;
 
@@ -207,21 +221,32 @@ async function main() {
             continue;
         }
 
+        // Gated through the same gate a session would use, so the published distribution is the
+        // one the online classifier in Phase 6 would actually act on. An ungated answer is kept as
+        // its own bucket rather than promoted to a verdict: "not determinable" is a real finding
+        // and rounding it into the nearest mode is how a distribution starts lying.
+        const gated = choiceValue(response.answers?.failure_mode, "gap");
         classified.push({
             id: row.id,
             harness: row.harness,
             task: row.task,
-            mode: response.answers?.failure_mode?.value ?? "unknown",
+            tier: row.tier,
+            mode: gated ?? "ungated",
+            claimed: response.answers?.failure_mode?.value ?? "unknown",
             confidence: response.answers?.failure_mode?.confidence,
             recoverable: response.answers?.recoverable?.value,
+            recoverableGated: nounTrue(response.answers?.recoverable, "gap"),
             harnessAtFault: response.answers?.harness_at_fault?.value,
+            harnessAtFaultGated: nounTrue(response.answers?.harness_at_fault, "gap"),
         });
     }
 
     const byHarness = {};
+    const byMode = {};
     for (const item of classified) {
         byHarness[item.harness] = byHarness[item.harness] ?? {};
         byHarness[item.harness][item.mode] = (byHarness[item.harness][item.mode] ?? 0) + 1;
+        byMode[item.mode] = (byMode[item.mode] ?? 0) + 1;
     }
 
     console.log("");
@@ -233,10 +258,29 @@ async function main() {
         }
     }
 
+    console.log("");
+    console.log(`overall (${classified.length} failures)`);
+    for (const [mode, count] of Object.entries(byMode).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${mode.padEnd(20)} ${count}`);
+    }
+
     if (options.out) {
+        fs.mkdirSync(path.dirname(options.out), { recursive: true });
         fs.writeFileSync(
             options.out,
-            `${JSON.stringify({ schema: 1, generatedAt: new Date().toISOString(), classified, byHarness }, null, 4)}\n`,
+            `${JSON.stringify(
+                {
+                    schema: 2,
+                    generatedAt: new Date().toISOString(),
+                    reports: reports.map((file) => path.relative(root, file).replaceAll("\\", "/")),
+                    modes: FAILURE_MODES,
+                    classified,
+                    byHarness,
+                    byMode,
+                },
+                null,
+                4,
+            )}\n`,
         );
         console.log(`\nWrote ${options.out}`);
     }

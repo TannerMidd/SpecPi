@@ -1,0 +1,370 @@
+{
+    "schema": 2,
+    "generatedAt": "2026-09-19T01:02:44.675Z",
+    "reports": [
+        "evals/runs/full-tier1/report.json",
+        "evals/runs/full-tier2/report.json",
+        "evals/runs/full-tier3/report.json",
+        "evals/runs/full-tier4/report.json",
+        "evals/runs/full-tier5/report.json"
+    ],
+    "modes": {
+        "gave-up-on-fault": "Met an injected command failure and stopped instead of retrying",
+        "turn-cap": "Ran out of turns or requests while still working",
+        "timeout": "Exceeded the wall-clock limit",
+        "wrong-approach": "Worked steadily but solved the wrong problem",
+        "misread-requirement": "Produced output that misses a stated requirement",
+        "scope-violation": "Changed files it was told to leave alone",
+        "tool-error-loop": "Repeated the same failing tool call without progress",
+        "harness-error": "The harness itself crashed or could not start",
+        "unknown": "Not determinable from what was recorded"
+    },
+    "classified": [
+        {
+            "id": "full-tier1/codex/t1-no-touch#0",
+            "harness": "codex",
+            "task": "t1-no-touch",
+            "tier": 1,
+            "mode": "misread-requirement",
+            "claimed": "misread-requirement",
+            "confidence": 0.86,
+            "recoverable": 0.37,
+            "recoverableGated": false,
+            "harnessAtFault": 0.54,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier1/codex/t1-no-touch#1",
+            "harness": "codex",
+            "task": "t1-no-touch",
+            "tier": 1,
+            "mode": "misread-requirement",
+            "claimed": "misread-requirement",
+            "confidence": 0.76,
+            "recoverable": 0.37,
+            "recoverableGated": false,
+            "harnessAtFault": 0.49,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier2/codex/t2-repair-json#1",
+            "harness": "codex",
+            "task": "t2-repair-json",
+            "tier": 2,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.55,
+            "recoverable": 0.36,
+            "recoverableGated": false,
+            "harnessAtFault": 0.32,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier2/codex/t2-scoped-docs#0",
+            "harness": "codex",
+            "task": "t2-scoped-docs",
+            "tier": 2,
+            "mode": "misread-requirement",
+            "claimed": "misread-requirement",
+            "confidence": 0.89,
+            "recoverable": 0.38,
+            "recoverableGated": false,
+            "harnessAtFault": 0.37,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier2/codex/t2-scoped-docs#1",
+            "harness": "codex",
+            "task": "t2-scoped-docs",
+            "tier": 2,
+            "mode": "misread-requirement",
+            "claimed": "misread-requirement",
+            "confidence": 0.9,
+            "recoverable": 0.39,
+            "recoverableGated": false,
+            "harnessAtFault": 0.41,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier2/codex/t2-terminal-grep#0",
+            "harness": "codex",
+            "task": "t2-terminal-grep",
+            "tier": 2,
+            "mode": "misread-requirement",
+            "claimed": "misread-requirement",
+            "confidence": 0.77,
+            "recoverable": 0.39,
+            "recoverableGated": false,
+            "harnessAtFault": 0.4,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier3/opencode/t3-cascade-ledger#0",
+            "harness": "opencode",
+            "task": "t3-cascade-ledger",
+            "tier": 3,
+            "mode": "ungated",
+            "claimed": "gave-up-on-fault",
+            "confidence": 0.31,
+            "recoverable": 0.18,
+            "recoverableGated": false,
+            "harnessAtFault": 0.43,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier3/opencode/t3-cascade-ledger#1",
+            "harness": "opencode",
+            "task": "t3-cascade-ledger",
+            "tier": 3,
+            "mode": "ungated",
+            "claimed": "gave-up-on-fault",
+            "confidence": 0.33,
+            "recoverable": 0.18,
+            "recoverableGated": false,
+            "harnessAtFault": 0.43,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/pi/t4-browser-triage#0",
+            "harness": "pi",
+            "task": "t4-browser-triage",
+            "tier": 4,
+            "mode": "timeout",
+            "claimed": "timeout",
+            "confidence": 0.99,
+            "recoverable": 0.42,
+            "recoverableGated": false,
+            "harnessAtFault": 0.4,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/pi/t4-cost-ladder#0",
+            "harness": "pi",
+            "task": "t4-cost-ladder",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.72,
+            "recoverable": 0.42,
+            "recoverableGated": false,
+            "harnessAtFault": 0.21,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/pi/t4-scope-monorepo#0",
+            "harness": "pi",
+            "task": "t4-scope-monorepo",
+            "tier": 4,
+            "mode": "timeout",
+            "claimed": "timeout",
+            "confidence": 0.99,
+            "recoverable": 0.38,
+            "recoverableGated": false,
+            "harnessAtFault": 0.5,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/specpi-default/t4-browser-triage#0",
+            "harness": "specpi-default",
+            "task": "t4-browser-triage",
+            "tier": 4,
+            "mode": "unknown",
+            "claimed": "unknown",
+            "confidence": 0.76,
+            "recoverable": 0.5,
+            "recoverableGated": false,
+            "harnessAtFault": 0.18,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/specpi-default/t4-scope-monorepo#0",
+            "harness": "specpi-default",
+            "task": "t4-scope-monorepo",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.59,
+            "recoverable": 0.4,
+            "recoverableGated": false,
+            "harnessAtFault": 0.19,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/specpi-jev/t4-browser-triage#0",
+            "harness": "specpi-jev",
+            "task": "t4-browser-triage",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.74,
+            "recoverable": 0.56,
+            "recoverableGated": false,
+            "harnessAtFault": 0.24,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/specpi-jev/t4-scope-monorepo#0",
+            "harness": "specpi-jev",
+            "task": "t4-scope-monorepo",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.61,
+            "recoverable": 0.42,
+            "recoverableGated": false,
+            "harnessAtFault": 0.22,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/codex/t4-browser-triage#0",
+            "harness": "codex",
+            "task": "t4-browser-triage",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.72,
+            "recoverable": 0.46,
+            "recoverableGated": false,
+            "harnessAtFault": 0.24,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/dsh/t4-browser-triage#0",
+            "harness": "dsh",
+            "task": "t4-browser-triage",
+            "tier": 4,
+            "mode": "unknown",
+            "claimed": "unknown",
+            "confidence": 0.8,
+            "recoverable": 0.5,
+            "recoverableGated": false,
+            "harnessAtFault": 0.13,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/omp/t4-browser-triage#0",
+            "harness": "omp",
+            "task": "t4-browser-triage",
+            "tier": 4,
+            "mode": "unknown",
+            "claimed": "unknown",
+            "confidence": 0.8,
+            "recoverable": 0.52,
+            "recoverableGated": false,
+            "harnessAtFault": 0.17,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/omp/t4-scope-monorepo#0",
+            "harness": "omp",
+            "task": "t4-scope-monorepo",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.56,
+            "recoverable": 0.42,
+            "recoverableGated": false,
+            "harnessAtFault": 0.21,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/opencode/t4-browser-triage#0",
+            "harness": "opencode",
+            "task": "t4-browser-triage",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.69,
+            "recoverable": 0.47,
+            "recoverableGated": false,
+            "harnessAtFault": 0.2,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/opencode/t4-cost-ladder#0",
+            "harness": "opencode",
+            "task": "t4-cost-ladder",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.55,
+            "recoverable": 0.37,
+            "recoverableGated": false,
+            "harnessAtFault": 0.26,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/opencode/t4-incident-loop#0",
+            "harness": "opencode",
+            "task": "t4-incident-loop",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.42,
+            "recoverable": 0.33,
+            "recoverableGated": false,
+            "harnessAtFault": 0.47,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier4/opencode/t4-scope-monorepo#0",
+            "harness": "opencode",
+            "task": "t4-scope-monorepo",
+            "tier": 4,
+            "mode": "ungated",
+            "claimed": "unknown",
+            "confidence": 0.32,
+            "recoverable": 0.31,
+            "recoverableGated": false,
+            "harnessAtFault": 0.53,
+            "harnessAtFaultGated": false
+        },
+        {
+            "id": "full-tier5/dsh/t5-authority-boundary#0",
+            "harness": "dsh",
+            "task": "t5-authority-boundary",
+            "tier": 5,
+            "mode": "ungated",
+            "claimed": "misread-requirement",
+            "confidence": 0.36,
+            "recoverable": 0.28,
+            "recoverableGated": false,
+            "harnessAtFault": 0.24,
+            "harnessAtFaultGated": false
+        }
+    ],
+    "byHarness": {
+        "codex": {
+            "misread-requirement": 5,
+            "ungated": 2
+        },
+        "opencode": {
+            "ungated": 6
+        },
+        "pi": {
+            "timeout": 2,
+            "ungated": 1
+        },
+        "specpi-default": {
+            "unknown": 1,
+            "ungated": 1
+        },
+        "specpi-jev": {
+            "ungated": 2
+        },
+        "dsh": {
+            "unknown": 1,
+            "ungated": 1
+        },
+        "omp": {
+            "unknown": 1,
+            "ungated": 1
+        }
+    },
+    "byMode": {
+        "misread-requirement": 5,
+        "ungated": 14,
+        "timeout": 2,
+        "unknown": 3
+    }
+}
