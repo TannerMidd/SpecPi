@@ -166,15 +166,17 @@ test("the scope line says what the change applied to, and never claims more", ()
 });
 
 test("the key line names its source and never carries a value", () => {
-    const secret = "openrouter-fixture-supersecret";
+    // Named for what it is. Written in a vendor key shape, or with "secret" in the value, this is
+    // the string a scanner flags and a reader mistakes for the real thing; see fixture-key-shapes.
+    const fixtureKey = "openrouter-fixture-value";
     const onWithStore = applyLayer(
         { on: true },
         { settings: stored(), guardEnabled: false },
-        deps({ env: { OPENROUTER_API_KEY: secret }, sources: [{ name: "auth.json", present: true }] }),
+        deps({ env: { OPENROUTER_API_KEY: fixtureKey }, sources: [{ name: "auth.json", present: true }] }),
     );
     const text = onWithStore.lines.join("\n");
     assert.match(text, /Pi's credential store/u);
-    assert.ok(!text.includes(secret), "a key must never reach a notification");
+    assert.ok(!text.includes(fixtureKey), "a key must never reach a notification");
 
     const none = applyLayer({ on: true }, { settings: stored(), guardEnabled: false }, deps({ sources: [] }));
     assert.match(none.lines.join("\n"), /Run \/login openrouter to store one/u);
