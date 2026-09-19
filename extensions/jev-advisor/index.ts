@@ -7,14 +7,7 @@ import { consentPath, granted, revokeConsent } from "./consent.mjs";
 import { createBroker } from "./broker.mjs";
 import { ledgerPath, read as readLedger } from "./ledger.mjs";
 import { usagePath } from "./usage.mjs";
-import {
-    FALLBACK_PACKAGE,
-    applyConfig as applyGuardConfig,
-    configPath as guardConfigPath,
-    guardKeyEnvName,
-    installed as installedGuard,
-    statusLine as guardStatusLine,
-} from "./guard.mjs";
+import { GATED_TOOLS, classifyCall } from "./risk.mjs";
 import * as retention from "./questions/retention.mjs";
 import * as compaction from "./questions/compaction.mjs";
 import * as gap from "./questions/gap.mjs";
@@ -22,8 +15,18 @@ import * as sources from "./questions/sources.mjs";
 import * as progress from "./questions/progress.mjs";
 import * as untrusted from "./questions/untrusted.mjs";
 import * as capabilities from "./questions/capabilities.mjs";
+import * as guard from "./questions/guard.mjs";
 
 const MAX_RECENT = 8;
+
+/** One line of a call, for a notification or a block reason. Never a digest; never sent anywhere. */
+function short(value: string, limit: number) {
+    const text = String(value ?? "")
+        .replace(/\s+/gu, " ")
+        .trim();
+
+    return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
 
 function safeMessage(error: unknown) {
     return String((error as any)?.message ?? error ?? "unknown error").slice(0, 200);
@@ -79,46 +82,8 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     let capabilityAsked = false;
     const capabilityDeclined = new Set<string>();
 
-    let guardEnabled = false;
-    const syncGuard = (wanted = guardEnabled) => {
-        try {
-            return applyGuardConfig(wanted);
-        } catch {
-            // A guard that cannot be reconfigured keeps whatever posture it has, which
-            // /jev status reports rather than hides.
-            return { applied: false, reason: "unwritable" };
-        }
-    };
-
-    /**
-     * The outside world, as data the layer module can be tested against.
-     *
-     * Everything the decision depends on arrives through here, which is the point: `layer.mjs` has
-     * no module state and touches no global, so a test can drive an unwritable guard file, a missing
-     * key or a headless session without arranging any of them for real.
-     */
-    const layerDeps = () => ({
-        env: process.env,
-        keySources: () => keySources(),
-        guard: {
-            fallbackPackage: FALLBACK_PACKAGE,
-            installed: () => installedGuard().installed,
-            keyEnvName: guardKeyEnvName,
-            configPath: guardConfigPath,
-            apply: (wanted: boolean) => {
-                try {
-                    return applyGuardConfig(wanted);
-                } catch {
-                    // A guard that cannot be reconfigured keeps whatever posture it has, which the
-                    // caller reports rather than hides.
-                    return { applied: false, reason: "unwritable" };
-                }
-            },
-        },
-    });
-
     /** Persist the session's switches, or report that it could not be done. */
-    const persistLayer = (result: { settings: any; guardEnabled: boolean; guardChanged: boolean }) => {
+    const persistLayer = (result: { settings: any }) => {
         try {
             return saveSettings(layerToPersist(result, loadSettings()));
         } catch {
@@ -137,12 +102,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         resetHistory();
         capabilityAsked = false;
         capabilityDeclined.clear();
-        guardEnabled = settings.guard.startup === true;
-        // Deliberately outside the master switch. The guard is a separate package with its own
-        // gate, and whether it is inert is a property of the install rather than a feature of the
-        // advisor, so its configuration is rewritten every session either way. Off is the default
-        // and is a real written configuration, not an absence of one.
-        syncGuard();
     });
 
     pi.on("session_shutdown", () => {
@@ -278,6 +237,90 @@ export default function jevAdvisor(pi: ExtensionAPI) {
 
     // System 1: condense a spent tool result before it is appended. Doing this after the fact would
     // rewrite a cached prefix; on arrival it never touches one.
+    // System 8: the command guard, before a shell or file call runs.
+    //
+    // Fail open at every step. Local triage settles most calls for nothing; anything else is asked
+    // about, and a call is blocked only on a confident verdict that the request does not account
+    // for. Every other outcome -- no key, no budget, a timeout, an unconfident answer, no human to
+    // ask -- returns the call to @gotgenes/pi-permission-system, which decides it exactly as it did
+    // before this layer existed. The package this replaced was fail-closed, so an outage or a
+    // missing key stopped work; that is the single behaviour most worth not reproducing.
+    pi.on("tool_call", async (event: any, ctx: ExtensionContext) => {
+        if (!enabled("guard") || !GATED_TOOLS.includes(event?.toolName)) {
+            return undefined;
+        }
+
+        const command = typeof event?.input?.command === "string" ? event.input.command : "";
+        const target = typeof event?.input?.path === "string" ? event.input.path : "";
+        const local = classifyCall({ tool: event.toolName, command, target, cwd: ctx.cwd });
+        const subject =
+            event.toolName === "bash" || event.toolName === "powershell" ? command : `${event.toolName} ${target}`;
+        if (local.decision === "safe") {
+            return undefined;
+        }
+
+        if (local.decision === "dangerous") {
+            // Catastrophic and unambiguous, so it needs neither a network call nor a human. This is
+            // the one path that blocks without asking Jev, which is why its rule list is tiny.
+            if (ctx.hasUI) {
+                ctx.ui.notify(`Jev guard blocked ${event.toolName}: ${local.reason}.`, "error");
+            }
+
+            return { block: true, reason: `Jev guard: ${local.reason}. Call: ${short(subject, 160)}` };
+        }
+
+        try {
+            const result = await broker.request({
+                system: "guard",
+                state: guard.buildInput({
+                    tool: event.toolName,
+                    subject,
+                    protectedTarget: local.reason === "writes to a protected path",
+                    objective,
+                    recent,
+                    cwd: ctx.cwd,
+                }),
+                questions: guard.questions({ protected: local.reason === "writes to a protected path" }),
+                ctx,
+                root: ctx.cwd,
+                decide: (answers: any) => {
+                    const verdict = guard.decide(answers, { hasUI: ctx.hasUI });
+
+                    return { applied: verdict.action !== "defer", decision: verdict };
+                },
+            });
+            if (!result.ok) {
+                return undefined;
+            }
+
+            const verdict = result.decision;
+            if (verdict.action === "block") {
+                if (ctx.hasUI) {
+                    ctx.ui.notify(`Jev guard blocked ${event.toolName}: ${verdict.reason}.`, "error");
+                }
+
+                return { block: true, reason: `Jev guard: ${verdict.reason}. Call: ${short(subject, 160)}` };
+            }
+
+            if (verdict.action === "ask" && ctx.hasUI) {
+                const choice = await ctx.ui.select({
+                    title: "Jev guard",
+                    message: `This looks ${verdict.reason}: ${short(subject, 300)}`,
+                    options: ["Run it", "Block it"],
+                });
+
+                return choice === "Block it"
+                    ? { block: true, reason: `Jev guard: declined by you. Call: ${short(subject, 160)}` }
+                    : undefined;
+            }
+        } catch {
+            // An advisor must never be the reason a tool call fails. Anything unexpected here hands
+            // the call back to the permission system unchanged.
+        }
+
+        return undefined;
+    });
+
     pi.on("tool_result", async (event: any, ctx: ExtensionContext) => {
         // Bookkeeping first, and unconditionally. Retention's own eligibility gate returns early on
         // most results, and a history that only recorded the large read-only ones would be blind to
@@ -698,7 +741,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     pi.registerCommand("jev", {
         description: "Show or change the Jev advisor: master switch, per-system switches and the transmission ledger",
         getArgumentCompletions: (prefix: string) =>
-            ["status", "on", "off", "startup", "enable", "disable", "guard", "ledger", "forget"]
+            ["status", "on", "off", "startup", "enable", "disable", "ledger", "forget"]
                 .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
                 .map((value) => ({ value, label: value })),
         handler: async (args: string, ctx: ExtensionContext) => {
@@ -717,11 +760,10 @@ export default function jevAdvisor(pi: ExtensionAPI) {
 
                     const result = applyLayer(
                         { on, sessionOnly, interactive: ctx.hasUI },
-                        { settings, guardEnabled },
-                        layerDeps(),
+                        { settings },
+                        { keySources: () => keySources() },
                     );
                     settings = result.settings;
-                    guardEnabled = result.guardEnabled;
                     // Persisting is the default because a switch that forgets is not a switch. The
                     // old rule -- that only /jev startup may write -- protected against a session
                     // toggle silently changing tomorrow's sessions, but the cost of that protection
@@ -830,94 +872,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     return;
                 }
 
-                if (action === "guard") {
-                    const [verb, choice] = rest.map((value) => value.toLowerCase());
-                    if (!verb) {
-                        ctx.ui.notify(guardStatusLine(), "info");
-
-                        return;
-                    }
-
-                    if (verb === "on" || verb === "off") {
-                        const wanted = verb === "on";
-                        const result = syncGuard(wanted);
-                        // Only adopt the state the write actually reached. Setting the flag first
-                        // and never rolling it back left the session believing a guard was on that
-                        // had just failed to be written, and persisted a preference for it.
-                        const settled = result.applied || result.reason === "already-current";
-                        guardEnabled = settled ? wanted : guardEnabled;
-                        // Persisted, or the claim above it is false. `session_start` sets
-                        // `guardEnabled` from the stored `guard.startup` and rewrites the global
-                        // file from it, so a guard switched on here and never written was disarmed
-                        // machine-wide by the next session that started -- while this message
-                        // promised a machine-wide change.
-                        const remembered =
-                            settled && ctx.hasUI
-                                ? (() => {
-                                      try {
-                                          const current = loadSettings();
-
-                                          return saveSettings({
-                                              ...current,
-                                              guard: { enabled: wanted, startup: wanted },
-                                          });
-                                      } catch {
-                                          return undefined;
-                                      }
-                                  })()
-                                : undefined;
-                        ctx.ui.notify(
-                            result.reason === "not-installed"
-                                ? "specpi-jev-guard is not installed, so there is nothing to switch. Command policy stays with the permission system."
-                                : !settled
-                                  ? `The Jev guard's settings file could not be written (${result.reason}), so nothing changed. Command policy stays with the permission system.`
-                                  : `${
-                                        wanted
-                                            ? `Jev guard on for every Pi session on this machine (${guardConfigPath()}). It scores shell and file calls and blocks them whenever Jev is unavailable or unconfident.`
-                                            : `Jev guard off for every Pi session on this machine (${guardConfigPath()}). Every tool call goes straight to the permission system.`
-                                    }${remembered ? " Remembered for new sessions." : " This session only; new sessions use the stored preference."}`,
-                            "info",
-                        );
-
-                        return;
-                    }
-
-                    if (verb !== "startup") {
-                        throw new Error("Usage: /jev guard [on|off|startup [on|off]]");
-                    }
-
-                    if (!choice) {
-                        ctx.ui.notify(
-                            `The Jev guard starts ${loadSettings().guard.startup ? "on" : "off"} in new sessions.`,
-                            "info",
-                        );
-
-                        return;
-                    }
-
-                    if (!ctx.hasUI) {
-                        throw new Error("Startup changes require a human interactive command");
-                    }
-
-                    if (!["on", "off"].includes(choice)) {
-                        throw new Error("Usage: /jev guard startup [on|off]");
-                    }
-
-                    const stored = loadSettings();
-                    const saved = saveSettings({
-                        ...stored,
-                        guard: { ...stored.guard, startup: choice === "on" },
-                    });
-                    ctx.ui.notify(
-                        saved.guard.startup
-                            ? "New Pi sessions will start with the Jev guard on. This session is unchanged."
-                            : "New Pi sessions will start with the Jev guard off. This session is unchanged.",
-                        "info",
-                    );
-
-                    return;
-                }
-
                 if (action === "forget") {
                     if (!ctx.hasUI) {
                         throw new Error("Revoking consent requires a human interactive command");
@@ -952,7 +906,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
 
                 if (action !== "status") {
                     throw new Error(
-                        "Usage: /jev [status|on [--session]|off [--session]|startup [on|off]|enable <system>|disable <system>|guard [on|off|startup [on|off]]|ledger [n]|forget]",
+                        "Usage: /jev [status|on [--session]|off [--session]|startup [on|off]|enable <system>|disable <system>|ledger [n]|forget]",
                     );
                 }
 
@@ -975,7 +929,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     `consent: ${granted() ? "granted" : "not granted"}`,
                     `calls this session: ${state.callsUsed}/${state.budgets.total} total`,
                     ...SYSTEM_NAMES.map((name) => `  ${name}: ${state.usedBySystem[name] ?? 0}/${state.budgets[name]}`),
-                    guardStatusLine(),
                     `settings: ${settingsPath()}`,
                     `consent file: ${consentPath()}`,
                     `ledger: ${ledgerPath()}`,

@@ -173,11 +173,11 @@ function environmentPresent(name, env) {
  * The sources a Jev key can come from, in the order the advisor consults them, each with whether it
  * holds one. The first present source is the one in force.
  *
- * `guard` marks the sources specpi-jev-guard can actually see. It is a separate package that reads
- * only the environment, so a key in auth.json serves the seven advisor systems and is invisible to
- * the guard -- and because the guard fails closed, that difference decides whether switching it on
- * leaves you able to run a shell command. A panel that collapsed both into "key: present" would be
- * hiding the one distinction that matters here.
+ * `guard` used to mark the sources the separate specpi-jev-guard package could see, which was not the
+ * same set the advisor could -- a distinction that decided whether switching the guard on left you
+ * able to run a shell command. The guard is now the layer's eighth system and resolves its key the
+ * same way everything else does, so the flag is kept only so the panel can say so rather than
+ * silently dropping a column people may remember.
  */
 function jevKeyStatus({ env, settingsFile } = {}) {
     env = env ?? process.env;

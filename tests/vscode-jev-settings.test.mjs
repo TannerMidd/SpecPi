@@ -101,7 +101,7 @@ test("an absent settings file reads as the whole layer off", () => {
         const loaded = loadPackageSettings("jevLayer", { workspace: dir });
         assert.equal(loaded.exists, false);
         const flat = JSON.parse(loaded.text);
-        for (const key of ["enabled", "guardEnabled", "guardStartup", ...jevConfig.SYSTEMS]) {
+        for (const key of ["enabled", ...jevConfig.SYSTEMS]) {
             assert.equal(flat[key], false, `${key} should default off`);
         }
     });
@@ -112,13 +112,12 @@ test("the nested disk shape survives a round trip through the flat form", () => 
     // one place instead of a test that fails for the wrong reason.
     const on = new Set(["retention", "gap"]);
     const stored = {
-        schema: 2,
+        schema: 3,
         master: true,
         startup: true,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, on.has(name)])),
         budgets: { ...jevConfig.DEFAULT_BUDGETS, total: 16, retention: 8 },
         progressNudge: "message",
-        guard: { enabled: false, startup: true },
     };
     assert.deepEqual(jevConfig.toStored(jevConfig.fromStored(stored)), stored);
 });
@@ -130,13 +129,12 @@ test("a file that is on but not at startup is read as off, because that is what 
     // showing it as enabled would be describing behaviour no session will ever have. The round
     // trip is deliberately not the identity here: it resolves the pair to what the advisor does.
     const stored = {
-        schema: 2,
+        schema: 3,
         master: true,
         startup: false,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, true])),
         budgets: { ...jevConfig.DEFAULT_BUDGETS },
         progressNudge: "notify",
-        guard: { enabled: false, startup: false },
     };
     const flat = jevConfig.fromStored(stored);
     assert.equal(flat.enabled, false);
@@ -161,23 +159,23 @@ test("a file that is on but not at startup is read as off, because that is what 
 test("saving writes the nested shape the extension expects, not the flat one", () => {
     withAgentDir((dir) => {
         const loaded = loadPackageSettings("jevLayer", { workspace: dir });
-        const draft = { ...JSON.parse(loaded.text), enabled: true, retention: true, guardEnabled: true };
+        const draft = { ...JSON.parse(loaded.text), enabled: true, retention: true, guard: true };
         savePackageSettings(loaded, `${JSON.stringify(draft)}\n`);
         const written = JSON.parse(fs.readFileSync(jevPath({ workspace: dir }), "utf8"));
         // The advisor collapses any shape it does not recognise to all-off, so the marker is
         // load-bearing: a panel still writing schema 1 would produce a file the advisor migrates
         // rather than reads, and a panel writing schema 3 would switch the whole layer off.
-        assert.equal(written.schema, 2);
+        assert.equal(written.schema, 3);
         assert.equal(written.master, true);
         assert.equal(written.startup, true, "the panel writes a preference, so on means on next session too");
         assert.deepEqual(
             written.systems,
-            Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, name === "retention"])),
+            Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, name === "retention" || name === "guard"])),
         );
         assert.equal(written.progressNudge, "notify", "the layer must not default to steering the model");
-        assert.deepEqual(written.guard, { enabled: true, startup: false });
+        assert.ok(!("guard" in written), "schema 3 has no guard object beside the systems");
         assert.deepEqual(written.budgets, jevConfig.DEFAULT_BUDGETS);
-        for (const key of ["enabled", "retention", "guardEnabled", "budgetTotal", "budgetRetention"]) {
+        for (const key of ["enabled", "retention", "budgetTotal", "budgetRetention"]) {
             assert.ok(!(key in written), `the flat key ${key} must not leak onto disk`);
         }
     });

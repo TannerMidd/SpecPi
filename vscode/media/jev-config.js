@@ -1,5 +1,5 @@
 ((root) => {
-    // Configuration shape reviewed against extensions/jev-advisor/config.mjs.
+    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 3).
     //
     // The Jev layer ships entirely off, and every switch here is a way to turn part of it on, so
     // this file is the one place Chat can start sending session summaries to a third party. It
@@ -12,7 +12,7 @@
     // JSON textarea and the point of this panel is a toggle. `fromStored`/`toStored` are the only
     // translation, and both directions are total so a round trip cannot silently drop a key.
 
-    const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability"];
+    const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability", "guard"];
     const MAX_CALL_BUDGET = 256;
     const MAX_TOTAL_BUDGET = 512;
     const NUDGE_MODES = ["notify", "message"];
@@ -27,6 +27,7 @@
         progress: 176,
         untrusted: 104,
         capability: 2,
+        guard: 208,
     };
     // The label a row gets in the usage table. Same names the advisor prints in /jev status, so a
     // person reading both does not have to work out that two words mean one system.
@@ -38,6 +39,7 @@
         progress: "Progress and thrash detection",
         untrusted: "Untrusted-content classification",
         capability: "Turn-zero capability arming",
+        guard: "Command guard",
     };
     const BUDGET_KEYS = { total: "budgetTotal" };
     for (const name of SYSTEMS) {
@@ -89,6 +91,12 @@
             "Asks whether a fetched page or browser snapshot contains instructions aimed at an AI reading it, and prepends a fixed warning line when it confidently does. Defence in depth: it never blocks, never touches the agent's own output, and costs no extra call while the retention system is also on.",
         ],
         [
+            "guard",
+            "System: score shell and file calls before they run",
+            "boolean",
+            "The command guard, native since schema 3. Read-only commands and ordinary project writes are settled locally for nothing; anything else is scored, and a call is blocked only on a confident destructive verdict the request does not account for. It fails open: no key, no budget, a timeout or an unconfident answer all hand the call to @gotgenes/pi-permission-system, which decides it exactly as it did before.",
+        ],
+        [
             "capability",
             "System: arm a withdrawn tool group before the first request",
             "boolean",
@@ -112,18 +120,6 @@
             "number",
             `Ceiling for the ${name} system alone, 0 to ${MAX_CALL_BUDGET}. Per-system ceilings exist so one busy system cannot starve the others; 0 means no calls, and switching the system off above is the way to disable it.`,
         ]),
-        [
-            "guardEnabled",
-            "Command guard enabled (this session)",
-            "boolean",
-            "Lets specpi-jev-guard score shell and file calls before the permission system sees them. It is fail-closed: with no key, an unreachable endpoint, or an uncertain verdict and no UI, it blocks the call.",
-        ],
-        [
-            "guardStartup",
-            "Enable the command guard on startup",
-            "boolean",
-            "Default the guard on for new sessions. While it is off, @gotgenes/pi-permission-system decides every call exactly as before.",
-        ],
     ];
 
     function object(value) {
@@ -145,6 +141,8 @@
     function fromStored(stored) {
         const source = object(stored) ? stored : {};
         const systems = object(source.systems) ? source.systems : {};
+        // Schema 2 carried the guard as its own pair outside the systems map. What migrates is
+        // `guard.startup` -- the preference the user chose -- not the session flag beside it.
         const guard = object(source.guard) ? source.guard : {};
         const budgets = object(source.budgets) ? source.budgets : {};
         // Schema 1 read 0 as "no ceiling"; schema 2 reads it as "no calls".
@@ -162,11 +160,9 @@
             enabled: source.master === true && source.startup === true,
             progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
             [BUDGET_KEYS.total]: total,
-            guardEnabled: guard.enabled === true,
-            guardStartup: guard.startup === true,
         };
         for (const name of SYSTEMS) {
-            flat[name] = systems[name] === true;
+            flat[name] = name === "guard" && source.schema === 2 ? guard.startup === true : systems[name] === true;
             flat[BUDGET_KEYS[name]] = legacy
                 ? Math.min(DEFAULT_BUDGETS[name], total)
                 : budget(budgets[name], DEFAULT_BUDGETS[name], MAX_CALL_BUDGET);
@@ -186,7 +182,7 @@
         const enabled = source.enabled === true;
 
         return {
-            schema: 2,
+            schema: 3,
             // Always written together; see `fromStored`. Keeping them in step is what makes the
             // checkbox mean what it says in the next session rather than only in this file.
             master: enabled,
@@ -194,7 +190,6 @@
             systems: Object.fromEntries(SYSTEMS.map((name) => [name, source[name] === true])),
             budgets,
             progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
-            guard: { enabled: source.guardEnabled === true, startup: source.guardStartup === true },
         };
     }
 

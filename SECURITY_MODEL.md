@@ -1,6 +1,6 @@
 # Security model
 
-SpecPi provides scope monitoring, an explicit harness improvement loop and an optional Jev advisor, and installs eight pinned packages as its default base. Extensions run as trusted code with Pi's permissions. Scope is not an OS sandbox or a general command guard. Use OS isolation for hostile code.
+SpecPi provides scope monitoring, an explicit harness improvement loop and an optional Jev advisor, and installs seven pinned packages as its default base. Extensions run as trusted code with Pi's permissions. Scope is not an OS sandbox or a general command guard. Use OS isolation for hostile code.
 
 ## Scope monitoring
 
@@ -42,11 +42,11 @@ Settings live in `<agent-dir>/specpi/jev/settings.json`, written atomically with
 
 ## Command policy and the Jev guard
 
-`specpi-jev-guard` is pinned in the base set but ships **inert**. Its own default is `enabled: true`, so left alone a fresh install would begin gating shell and file calls through a third-party service immediately; SpecPi writes `enabled: false` and `/jev guard on` is how a human opts in. `@gotgenes/pi-permission-system` stays pinned and, while the guard is off, decides every tool call exactly as it did before the guard existed.
+The command guard is the layer's eighth system, native since schema 3, and ships off like the other seven. It was a pinned third-party package until that package's shape proved to be its own source of defects: a global configuration file with no session scope, a key read from the environment only — so a credential `/login` had stored was invisible to it — and a fail-closed posture, which meant an outage or a missing key stopped shell work rather than degrading. `@gotgenes/pi-permission-system` stays pinned and decides every call the guard defers, which is every call it does not confidently judge destructive.
 
 Be precise about what the guard does once it is on, because it cannot be configured away. The guard is **fail-closed by design**: with no key, an unreachable endpoint, or a middle-band verdict in a session with no UI, it blocks the call and reports why. There is no setting that hands the decision back to the permission system instead. So switching it on accepts that an outage stops gated work until it is switched off again. That trade is the user's to make, which is why it ships off and why `/jev status` and `specpi doctor` state plainly whether it is on, which backend it uses and whether that backend's key is present.
 
-SpecPi asserts only three fields in `<home>/.pi/jev-guard.json` and merges them into whatever is already there, so a user's own thresholds, safe-command globs and protected paths survive: `enabled`, `uncertain: "ask"` so a middle-band verdict asks a human wherever there is one to ask, and `backend: "typesafe"` so the guard and the advisor read the same `TYPESAFE_API_KEY` rather than the guard needing a separate `OPENROUTER_API_KEY`. Those fields are rewritten at every session start, outside the advisor's master switch, because whether the guard is inert is a property of the install rather than a feature of the advisor — and off is a written configuration, not an absence of one. SpecPi writes only the global file; a project-local override under a workspace's `.pi/` remains the user's to make. Neither the guard nor the advisor is an OS sandbox.
+The guard **fails open**, which is the deliberate inversion of what it replaced. Local rules settle most calls without sending anything: read-only commands and ordinary project writes pass for nothing, and a very short list of catastrophic, unambiguous commands is blocked with no call at all. Anything else is scored, and a call is blocked only on a confident destructive verdict that the request does not account for — both, because a destructive-looking command the person asked for in as many words is the likeliest way to be wrong. A confident verdict that a write targets a real credential file blocks on its own. Everything else — no key, no budget, a timeout, an unconfident answer, or a middle-band verdict with no human to ask — hands the call to `@gotgenes/pi-permission-system`, which decides it exactly as it did before this layer existed. Deferring is not allowing. Neither the guard nor the advisor is an OS sandbox.
 
 ## Improvement authority and evidence
 

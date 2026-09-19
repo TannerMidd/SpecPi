@@ -150,7 +150,7 @@ function environmentOnly() {
 
 /**
  * Jev is reached through OpenRouter by default: that is where it is published, it is what
- * specpi-jev-guard already uses, and an OpenRouter key (`sk-or-...`) is rejected by the direct
+ * the command guard uses, and an OpenRouter key (`sk-or-...`) is rejected by the direct
  * TypeSafe API with a bare 401. `JEV_BACKEND=typesafe` selects the direct API for a TypeSafe key.
  *
  * It lives here rather than in client.mjs because everything below has to bind it. A parameter

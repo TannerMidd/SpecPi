@@ -92,7 +92,7 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
     return { root, agent, settings, log, browserLog, fake, invoke, run };
 }
 
-test("the default base is exactly the eight human-selected pinned packages", () => {
+test("the default base is exactly the seven human-selected pinned packages", () => {
     assert.deepEqual(basePackages, [
         "npm:pi-web-access@0.29.0",
         "npm:specpi-browser-qa@0.3.0",
@@ -101,7 +101,6 @@ test("the default base is exactly the eight human-selected pinned packages", () 
         "npm:pi-goal-x@0.31.2",
         "npm:@sreetej510/pi-usage@0.10.0",
         "npm:@gotgenes/pi-permission-system@32.0.2",
-        "npm:specpi-jev-guard@0.1.0",
     ]);
 });
 

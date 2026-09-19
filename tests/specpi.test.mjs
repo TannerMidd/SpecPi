@@ -89,7 +89,7 @@ test("minimal installer completes the lifecycle without changing settings or pri
     fs.writeFileSync(path.join(agentDir, "AGENTS.md"), "Human guidance\n");
     runCli(agentDir, "install", "--yes");
     const manifest = JSON.parse(fs.readFileSync(manifestPath));
-    assert.equal(Object.keys(manifest.files).length, 34);
+    assert.equal(Object.keys(manifest.files).length, 35);
     assert.ok(
         Object.keys(manifest.files).every((file) =>
             /workflow-controls|tool-wishlist|jev-advisor|specpi-improve/.test(file),

@@ -23,7 +23,6 @@ import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
-import { applyConfig as applyGuardConfig } from "../extensions/jev-advisor/guard.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VERSION = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
@@ -57,9 +56,10 @@ const resourcePaths = [
     "extensions/jev-advisor/client.mjs",
     "extensions/jev-advisor/key-source.mjs",
     "extensions/jev-advisor/layer.mjs",
+    "extensions/jev-advisor/risk.mjs",
+    "extensions/jev-advisor/questions/guard.mjs",
     "extensions/jev-advisor/broker.mjs",
     "extensions/jev-advisor/gate.mjs",
-    "extensions/jev-advisor/guard.mjs",
     "extensions/jev-advisor/questions/retention.mjs",
     "extensions/jev-advisor/questions/compaction.mjs",
     "extensions/jev-advisor/questions/gap.mjs",
@@ -354,17 +354,6 @@ async function mutate(options, operation) {
 
             if (!options.skipBrowser) {
                 runBrowserQA(agentDir, "setup");
-            }
-
-            // specpi-jev-guard's own default is enabled:true, so a freshly installed base would
-            // start gating shell and file calls through a third-party service before anyone asked
-            // for it — and with no key it fails closed, which means a first install that refuses to
-            // run commands. The advisor rewrites this at every session start, but that only helps
-            // if the advisor loads, so the inert posture is established here at install time too.
-            try {
-                applyGuardConfig(false);
-            } catch (error) {
-                console.log(`SpecPi: could not write the Jev guard's inert settings: ${error.message}`);
             }
 
             packageState = {

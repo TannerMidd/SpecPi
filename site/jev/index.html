@@ -500,32 +500,44 @@
                 </section>
 
                 <section class="doc-section" id="guard">
-                    <header><h2>The guard is a different trade</h2><span>08</span></header>
+                    <header><h2>The guard, and why it fails open</h2><span>08</span></header>
                     <p>
-                        The advisor is fail-silent and holds no authority. The guard is the opposite on both counts,
-                        and that is worth stating plainly rather than configuring away.
-                        <code>specpi-jev-guard</code> is <strong>fail-closed by design</strong>: with no key, an
-                        unreachable endpoint, or a middle-band verdict in a session with no interactive UI, it blocks
-                        the call and says so. There is no setting that hands the decision back to the permission
-                        system.
+                        The command guard is the layer's eighth system and the only one that can take a tool call away
+                        from you, so its failure posture is the thing worth stating plainly. It was a separate pinned
+                        package until that package's shape turned out to be its own source of defects: a global
+                        configuration file with no session scope, a key read from the environment only &mdash; so a
+                        credential <code>/login</code> had already stored was invisible to it &mdash; and
+                        <strong>fail-closed</strong> behaviour, which meant an outage or a missing key stopped shell
+                        work rather than degrading. Native, it is gated, budgeted and switched exactly like the other
+                        seven, and it resolves the same key.
+                    </p>
+                    <p>
+                        It <strong>fails open</strong>, which is not a weakening: the guard sits in front of
+                        <code>@gotgenes/pi-permission-system</code>, which still decides every call the guard defers.
+                        Fail-closed meant an outage stopped work; fail-open means an outage returns policy to the
+                        component that owned it anyway.
                     </p>
                     <ul>
                         <li>
-                            <strong>Off</strong>, which is the default, means the guard is not in the tool path at all
-                            and <code>@gotgenes/pi-permission-system</code> decides every call exactly as it did before
-                            the package existed.
+                            <strong>Local rules first, for nothing.</strong> Read-only commands and ordinary project
+                            writes never leave the machine. A very short list of catastrophic, unambiguous commands
+                            &mdash; a recursive delete of the filesystem root, writing a raw disk device, piping a
+                            download into a shell &mdash; is blocked with no call at all. The list is deliberately tiny:
+                            a rule that blocks real work gets the whole guard switched off, and then it protects nobody.
                         </li>
                         <li>
-                            <strong>On</strong> means the guard decides first, asks a human in the middle band when
-                            there is a UI, and blocks when it cannot reach Jev. An outage stops gated work until it is
-                            switched off.
+                            <strong>Blocking needs two answers to agree.</strong> A confident destructive reading
+                            <em>and</em> a call the request does not account for. Both, because the likeliest way to be
+                            wrong is a destructive-looking command you asked for in as many words &mdash;
+                            <code>rm -rf node_modules</code>, a force push to a branch you named. A confident verdict
+                            that a write targets a real credential file blocks on its own.
+                        </li>
+                        <li>
+                            <strong>Everything else defers.</strong> No key, no budget, a timeout, an unconfident
+                            answer, or a middle-band verdict with nobody to ask: the call goes to the permission system
+                            and is decided exactly as it was before this layer existed. Deferring is not allowing.
                         </li>
                     </ul>
-                    <p>
-                        The package's own default is <code>enabled: true</code>, so SpecPi writes an inert
-                        configuration at install time rather than at first session start &mdash; otherwise a fresh
-                        install with no key would begin by refusing to run commands.
-                    </p>
                 </section>
 
                 <section class="doc-section" id="measured">

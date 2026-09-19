@@ -37,15 +37,6 @@ import * as sources from "../extensions/jev-advisor/questions/sources.mjs";
 import * as progress from "../extensions/jev-advisor/questions/progress.mjs";
 import * as untrusted from "../extensions/jev-advisor/questions/untrusted.mjs";
 import * as capabilities from "../extensions/jev-advisor/questions/capabilities.mjs";
-import {
-    GUARD_PIN,
-    applyConfig,
-    configPath,
-    desiredConfig,
-    guardKeyEnvName,
-    readConfig,
-    statusLine,
-} from "../extensions/jev-advisor/guard.mjs";
 import { basePackages } from "../scripts/packages.mjs";
 import { AUTHORING_TOOL_NAMES, syncAuthoringTools } from "../extensions/tool-wishlist/authoring-tools.mjs";
 
@@ -742,28 +733,6 @@ test("a key in the store is enough for ask() to reach the transport", async () =
     });
 });
 
-test("the guard's key variable follows the guard's own backend, not the advisor's", () => {
-    // These two are not the same thing, and assuming they were produced the exact harm the layer
-    // exists to avoid. SpecPi pins the guard to OpenRouter whatever the advisor is doing, so on a
-    // session running the advisor against the direct TypeSafe API, checking TYPESAFE_API_KEY would
-    // find a key, report the guard armed, and leave a fail-closed gate hunting for an
-    // OPENROUTER_API_KEY nobody set -- blocking every shell and file call.
-    withAgentDir(() => {
-        assert.equal(desiredConfig(true).backend, "openrouter");
-        assert.equal(guardKeyEnvName(), "OPENROUTER_API_KEY");
-
-        process.env.JEV_BACKEND = "typesafe";
-        try {
-            assert.equal(backend(), "typesafe");
-            assert.equal(keyEnvName(backend()), "TYPESAFE_API_KEY", "the advisor reads this one");
-            assert.equal(guardKeyEnvName(), "OPENROUTER_API_KEY", "the guard still reads this one");
-            assert.notEqual(guardKeyEnvName(), keyEnvName(backend()));
-        } finally {
-            delete process.env.JEV_BACKEND;
-        }
-    });
-});
-
 test("apiKey() follows the active backend rather than defaulting to OpenRouter", () => {
     // Every caller invokes it with no argument. Re-exporting the resolver under this name silently
     // rebound all of them to the parameter default, so with JEV_BACKEND=typesafe a script's
@@ -1128,50 +1097,6 @@ test("source ranking orders without dropping and keeps ungated items in place", 
     assert.equal(ranked.ordered.at(-1).path, "c.js", "an ungated score sorts last, not out");
 });
 
-test("the guard seam defers to the permission system and never auto-allows", () => {
-    withAgentDir(() => {
-        // The real specpi-jev-guard schema, not an invented one: applyPatch only reads these names.
-        const config = desiredConfig();
-        assert.equal(config.enabled, false, "the guard's own default is enabled:true, so SpecPi must override it");
-        assert.equal(
-            config.backend,
-            "openrouter",
-            "one OPENROUTER_API_KEY must power the advisor and the guard together",
-        );
-        assert.equal(config.uncertain, "ask");
-        assert.equal(Object.hasOwn(config, "askThreshold"), false, "thresholds stay the package's business");
-        assert.match(statusLine(), /not installed/u);
-        assert.equal(applyConfig().reason, "not-installed", "an absent guard is never configured into existence");
-    });
-});
-
-test("the guard and the permission system are both pinned", () => {
-    assert.ok(basePackages.includes(GUARD_PIN), `${GUARD_PIN} must be in the pinned base set`);
-    assert.ok(
-        basePackages.some((entry) => entry.startsWith("npm:@gotgenes/pi-permission-system@")),
-        "the permission system must stay pinned: it is what decides every call while the guard is off",
-    );
-});
-
-test("a fresh install writes the guard's inert posture without depending on the advisor loading", () => {
-    withAgentDir((dir) => {
-        const root = path.join(dir, "npm", "node_modules", "specpi-jev-guard");
-        fs.mkdirSync(root, { recursive: true });
-        fs.writeFileSync(
-            path.join(root, "package.json"),
-            JSON.stringify({ name: "specpi-jev-guard", version: "0.1.0" }),
-        );
-
-        // The guard's own DEFAULT_SETTINGS.enabled is true and it reads its file per tool call, so
-        // an absent file means an active guard. With no key that fails closed on every gated call,
-        // which is a first install that will not run commands. The installer calls this directly
-        // for exactly that reason.
-        assert.equal(readConfig(), undefined, "no settings file yet");
-        assert.equal(applyConfig(false).reason, "created");
-        assert.equal(readConfig().enabled, false);
-    });
-});
-
 const healthy = {
     turn: 6,
     signatures: ["read:a", "grep:b", "write:c", "bash:d"],
@@ -1430,64 +1355,23 @@ test("nothing in the Jev layer is on by default", () => {
         const fresh = loadSettings();
         assert.equal(fresh.master, false);
         assert.equal(fresh.startup, false);
-        assert.equal(fresh.guard.enabled, false);
-        assert.equal(fresh.guard.startup, false);
         for (const name of SYSTEM_NAMES) {
             assert.equal(fresh.systems[name], false, `${name} must ship off`);
         }
 
-        // Off is a real written configuration, not an absence of one.
-        assert.equal(desiredConfig().enabled, false);
-        assert.equal(desiredConfig(false).enabled, false);
-        assert.equal(desiredConfig(true).enabled, true);
+        // The command guard is one of those systems since schema 3, so "nothing is on" covers it
+        // without a second switch outside the master to check separately.
+        assert.ok(SYSTEM_NAMES.includes("guard"));
+        assert.ok(!("guard" in fresh), "schema 3 has no separate guard object");
     });
 });
 
 test("a user can default the layer on without a session toggle writing that preference", () => {
     withAgentDir(() => {
-        const saved = saveSettings({ ...defaultSettings(), startup: true, guard: { enabled: false, startup: true } });
+        const saved = saveSettings({ ...defaultSettings(), startup: true });
         assert.equal(saved.startup, true);
-        assert.equal(saved.guard.startup, true);
-        assert.equal(loadSettings().guard.startup, true);
 
         // The stored preference is what a new session reads; enabling in-session must not reach it.
-        assert.equal(loadSettings().guard.enabled, false);
-    });
-});
-
-test("guard configuration is written once and is idempotent afterwards", () => {
-    withAgentDir((dir) => {
-        const root = path.join(dir, "npm", "node_modules", "specpi-jev-guard");
-        fs.mkdirSync(root, { recursive: true });
-        fs.writeFileSync(
-            path.join(root, "package.json"),
-            JSON.stringify({ name: "specpi-jev-guard", version: "0.1.0" }),
-        );
-
-        // A fresh install writes the inert posture, not an active one.
-        assert.equal(applyConfig().reason, "created");
-        const written = readConfig();
-        assert.equal(written.enabled, false);
-        assert.equal(written.backend, "openrouter");
-        assert.ok(fs.existsSync(configPath()));
-        assert.match(statusLine(), /installed but off/u);
-
-        assert.equal(applyConfig().applied, false, "an unchanged config must not be rewritten");
-
-        assert.equal(applyConfig(true).reason, "updated");
-        assert.equal(readConfig().enabled, true);
-        assert.match(statusLine(), /ON via openrouter/u);
-
-        // A user's own thresholds and globs survive; only SpecPi's three fields are asserted.
-        fs.writeFileSync(
-            configPath(),
-            JSON.stringify({ enabled: true, backend: "typesafe", askThreshold: 0.6, safeCommands: ["ls *"] }),
-        );
-        assert.equal(applyConfig(true).reason, "updated");
-        const merged = readConfig();
-        assert.equal(merged.backend, "openrouter", "the backend is re-pinned so one key still powers both halves");
-        assert.equal(merged.askThreshold, 0.6, "a user threshold must not be clobbered");
-        assert.deepEqual(merged.safeCommands, ["ls *"]);
     });
 });
 
