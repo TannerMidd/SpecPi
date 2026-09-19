@@ -30,10 +30,17 @@ export function applyLayer({ on }, state, deps) {
 
 /**
  * Enabling the layer enables its systems, because a layer with none on runs and does nothing -- the
- * state people kept arriving at, with the notification cheerfully reporting "0 of 7".
+ * state people kept arriving at, with the notification cheerfully reporting "0 of 8".
  *
  * Only when none are on. Someone deliberately running retention alone has expressed a preference,
- * and `/jev off` then `/jev on` must not hand back the six they turned off.
+ * and `/jev off` then `/jev on` must not hand back the seven they turned off.
+ *
+ * The command guard is one of the eight, and it is the only system that can refuse a tool call. That
+ * is a deliberate answer to a question this file and `config.mjs` resolve differently on purpose:
+ * `/jev on` is a person acting now, so it arms everything and `onLines` says in as many words that
+ * one of them can refuse a command; `migrateToThree` runs without anyone present, so it arms
+ * nothing new. Silence is the difference -- an unattended migration must not change what a session
+ * is allowed to run, and an explicit command that reports what it did may.
  */
 export function enableSystems(settings) {
     const chosen = SYSTEM_NAMES.filter((name) => settings.systems[name]);
@@ -51,6 +58,16 @@ function onLines(before, after, activeSource) {
     const lines = [`Jev layer on with ${active.length} of ${SYSTEM_NAMES.length} systems: ${active.join(", ")}.`];
     if (chosen.length === 0) {
         lines.push("No system was enabled, so all of them were. Turn any back off with /jev disable <system>.");
+    }
+
+    // Said out loud every time, because seven of the eight only ever add advice and this one can
+    // take a command away. Nobody should discover that from a blocked call.
+    if (after.systems.guard) {
+        lines.push(
+            "guard is the only system that can refuse a tool call: it blocks a call it reads as " +
+                "destructive and unasked-for, asks you about the uncertain ones, and hands everything " +
+                "else to the permission system unchanged. Turn it off with /jev disable guard.",
+        );
     }
 
     lines.push(keyLine(activeSource));
@@ -85,9 +102,8 @@ export function keyLine(source) {
  * `startup` is false, so `master: true, startup: false` describes a layer that is on and never runs.
  *
  * The stored file is the base, so budgets and the nudge mode written by Chat while this session was
- * running survive. The guard is carried over untouched unless this command actually wrote it --
- * `/jev guard startup on` explicitly promises to leave the session alone, and a later `/jev on` was
- * silently discarding that.
+ * running survive -- including any system the panel enabled since this session started, which is why
+ * `systems` is merged rather than written over.
  */
 export function layerToPersist({ settings }, stored) {
     return {

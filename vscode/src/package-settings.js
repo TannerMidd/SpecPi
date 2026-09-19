@@ -104,7 +104,7 @@ function usageBeside(settingsFile) {
  * here may stop the panel opening: an absent file, an unreadable one, a linked one and one written
  * by a newer advisor all come back the same way, and the panel says the layer has not run.
  *
- * The size bound is deliberately small. The file is counts for seven systems and nothing else, so
+ * The size bound is deliberately small. The file is counts for eight systems and nothing else, so
  * anything approaching the settings limit was not written by the advisor.
  */
 function loadJevUsage(settingsFile) {
@@ -173,11 +173,11 @@ function environmentPresent(name, env) {
  * The sources a Jev key can come from, in the order the advisor consults them, each with whether it
  * holds one. The first present source is the one in force.
  *
- * `guard` used to mark the sources the separate specpi-jev-guard package could see, which was not the
- * same set the advisor could -- a distinction that decided whether switching the guard on left you
- * able to run a shell command. The guard is now the layer's eighth system and resolves its key the
- * same way everything else does, so the flag is kept only so the panel can say so rather than
- * silently dropping a column people may remember.
+ * Each row used to carry a `guard` flag, because the separate specpi-jev-guard package read
+ * `OPENROUTER_API_KEY` and nothing else: "there is a key" and "the guard has a key" were different
+ * facts, and the difference decided whether shell calls still worked. The guard is now the layer's
+ * eighth system and resolves its key exactly as the other seven do, so the flag is gone rather than
+ * kept as a column that would now mark the wrong row.
  */
 function jevKeyStatus({ env, settingsFile } = {}) {
     env = env ?? process.env;
@@ -193,7 +193,6 @@ function jevKeyStatus({ env, settingsFile } = {}) {
             name: "auth.json",
             label: "Pi credential store",
             detail: "Stored by /login openrouter, alongside every other provider.",
-            guard: false,
             present: Boolean(settingsFile) && storedOpenRouterKey(authBeside(settingsFile)),
         });
     }
@@ -203,10 +202,7 @@ function jevKeyStatus({ env, settingsFile } = {}) {
         label: typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY",
         detail: typesafe
             ? "Read from the environment Pi was started with, because JEV_BACKEND=typesafe selects the direct API."
-            : "Read from the environment Pi was started with. The command guard reads only this.",
-        // The guard is pinned to OpenRouter whatever the advisor is using, so on the TypeSafe route
-        // the variable in force here is not the one the guard reads.
-        guard: !typesafe,
+            : "Read from the environment Pi was started with, when the credential store holds nothing.",
         present: environmentPresent(typesafe ? "TYPESAFE_API_KEY" : "OPENROUTER_API_KEY", env),
     });
 
@@ -215,7 +211,6 @@ function jevKeyStatus({ env, settingsFile } = {}) {
             name: "TYPESAFE_API_KEY",
             label: "TYPESAFE_API_KEY",
             detail: "Accepted on the OpenRouter route so an older environment file keeps working.",
-            guard: false,
             present: environmentPresent("TYPESAFE_API_KEY", env),
         });
     }

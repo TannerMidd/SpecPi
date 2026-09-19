@@ -75,10 +75,17 @@ export function questions(input) {
 /**
  * Turn the answers into one of three outcomes.
  *
- * `block` needs a confident destructive reading *and* a call the request does not account for. Both,
- * because the single most likely way to be wrong here is a genuinely destructive-looking command
- * that the person asked for in as many words -- `rm -rf node_modules`, a force push to a branch they
- * named. Requiring the intent answer to disagree too is what keeps those working.
+ * `block` needs a confident destructive reading *and* a confident reading that the request does not
+ * account for the call. Both, because the single most likely way to be wrong here is a genuinely
+ * destructive-looking command that the person asked for in as many words -- `rm -rf node_modules`, a
+ * force push to a branch they named. Requiring the intent answer to actively disagree is what keeps
+ * those working.
+ *
+ * "Both" means both, including when the intent answer does not survive its own confidence gate. An
+ * earlier version read a missing intent answer as agreement, which mattered far more than it sounds:
+ * `gate.mjs`'s own calibration records a score coverage near 0.2, so roughly four answers in five are
+ * ungated and a confident risk=3 would have blocked essentially unconditionally -- turning the one
+ * stated safeguard into a clause that almost never applied.
  *
  * `ask` is the middle band, and only when there is a human to ask. Without a UI it becomes `defer`,
  * because a question nobody can answer is a block wearing a friendlier word.
@@ -102,7 +109,7 @@ export function decide(answers, { hasUI = false } = {}) {
         return { action: "block", source: "jev", reason: "writes a real credential file" };
     }
 
-    if (level === 3 && (wanted === undefined || wanted <= 1)) {
+    if (level === 3 && wanted !== undefined && wanted <= 1) {
         return { action: "block", source: "jev", reason: "destructive and not what was asked for" };
     }
 

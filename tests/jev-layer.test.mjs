@@ -1,10 +1,9 @@
 // The behaviour of `/jev on` and `/jev off`, which had no test coverage at all until this file.
 //
 // Everything these assert used to live in closures inside index.ts, which no test imports, so two
-// review rounds found defects that a green suite could not have caught: a guard preference destroyed
-// on a path that decided nothing, a fail-closed gate armed by a headless session that was told
-// nothing changed, a message reporting the guard "left off" while it was on and blocking, and a
-// rollback that never ran because the flag was set before the write.
+// review rounds found defects that a green suite could not have caught: a stored preference
+// destroyed on a path that decided nothing, a notification reporting a gate "left off" while it was
+// on and blocking, and a rollback that never ran because the flag was set before the write.
 //
 // `layer.mjs` takes its world as an argument, so each of those is one object literal here.
 
@@ -41,6 +40,23 @@ test("turning the layer on turns its systems on, and only when none are chosen",
     // A deliberate subset survives, so /jev off then /jev on does not hand back what was turned off.
     const chosen = stored({ systems: { ...allSystems(false), retention: true } });
     assert.deepEqual(enableSystems(chosen).systems, chosen.systems);
+});
+
+test("arming the guard is said out loud, because it is the one system that can refuse a call", () => {
+    // Seven of the eight only ever add advice; this one can take a tool call away. `/jev on` arms it
+    // deliberately -- a person acting now, told what they armed -- which is why the line has to be
+    // there. An unattended schema migration takes the opposite decision for the same reason.
+    const armed = applyLayer({ on: true }, { settings: stored() }, deps());
+    assert.equal(armed.settings.systems.guard, true);
+    const said = armed.lines.join(" ");
+    assert.match(said, /guard is the only system that can refuse a tool call/);
+    assert.match(said, /jev disable guard/);
+
+    // And not said when it is not armed, so the warning keeps meaning something.
+    const partial = stored({ systems: { ...allSystems(false), retention: true } });
+    const quiet = applyLayer({ on: true }, { settings: partial }, deps());
+    assert.equal(quiet.settings.systems.guard, false);
+    assert.ok(!/refuse a tool call/.test(quiet.lines.join(" ")));
 });
 
 test("what is persisted keeps master and startup together and preserves unrelated settings", () => {

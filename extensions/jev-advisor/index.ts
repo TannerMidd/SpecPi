@@ -7,7 +7,7 @@ import { consentPath, granted, revokeConsent } from "./consent.mjs";
 import { createBroker } from "./broker.mjs";
 import { ledgerPath, read as readLedger } from "./ledger.mjs";
 import { usagePath } from "./usage.mjs";
-import { GATED_TOOLS, classifyCall } from "./risk.mjs";
+import { GATED_TOOLS, SHELL_TOOLS, callTargets, classifyCall } from "./risk.mjs";
 import * as retention from "./questions/retention.mjs";
 import * as compaction from "./questions/compaction.mjs";
 import * as gap from "./questions/gap.mjs";
@@ -235,8 +235,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         }
     });
 
-    // System 1: condense a spent tool result before it is appended. Doing this after the fact would
-    // rewrite a cached prefix; on arrival it never touches one.
     // System 8: the command guard, before a shell or file call runs.
     //
     // Fail open at every step. Local triage settles most calls for nothing; anything else is asked
@@ -251,10 +249,13 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         }
 
         const command = typeof event?.input?.command === "string" ? event.input.command : "";
-        const target = typeof event?.input?.path === "string" ? event.input.path : "";
-        const local = classifyCall({ tool: event.toolName, command, target, cwd: ctx.cwd });
-        const subject =
-            event.toolName === "bash" || event.toolName === "powershell" ? command : `${event.toolName} ${target}`;
+        // Every file the call names, because `multi_edit` and `apply_patch` do not carry one `path`
+        // and a target the guard cannot see is a target it never asks the credential question about.
+        const targets = callTargets(event?.input);
+        const local = classifyCall({ tool: event.toolName, command, targets, cwd: ctx.cwd });
+        const subject = SHELL_TOOLS.includes(event.toolName)
+            ? command
+            : `${event.toolName} ${targets.join(", ") || "(target unknown)"}`;
         if (local.decision === "safe") {
             return undefined;
         }
@@ -309,9 +310,13 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     options: ["Run it", "Block it"],
                 });
 
-                return choice === "Block it"
-                    ? { block: true, reason: `Jev guard: declined by you. Call: ${short(subject, 160)}` }
-                    : undefined;
+                // Only the affirmative runs it. Escape, a closed picker and a host that answers with
+                // nothing all arrive here as a non-answer, and counting a non-answer as consent is
+                // the one thing a confirmation dialog must never do -- this is the single path in
+                // the feature where a human was asked directly.
+                return choice === "Run it"
+                    ? undefined
+                    : { block: true, reason: `Jev guard: not approved by you. Call: ${short(subject, 160)}` };
             }
         } catch {
             // An advisor must never be the reason a tool call fails. Anything unexpected here hands
@@ -321,6 +326,8 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         return undefined;
     });
 
+    // System 1: condense a spent tool result before it is appended. Doing this after the fact would
+    // rewrite a cached prefix; on arrival it never touches one.
     pi.on("tool_result", async (event: any, ctx: ExtensionContext) => {
         // Bookkeeping first, and unconditionally. Retention's own eligibility gate returns early on
         // most results, and a history that only recorded the large read-only ones would be blind to

@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
-            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, seven systems that use it, the gates in front of every call, and what it has actually measured."
+            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, eight systems that use it, the gates in front of every call, and what it has actually measured."
         />
         <meta property="og:title" content="The Jev layer · SpecPi" />
         <meta
@@ -45,7 +45,7 @@
                 <p>SPECPI / JEV</p>
                 <nav>
                     <a href="#what"><span>01</span>What it is</a><a href="#where"><span>02</span>Where it sits</a
-                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Seven systems</a
+                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Eight systems</a
                     ><a href="#economics"><span>05</span>Why on arrival</a
                     ><a href="#cache-probe"><span>06</span>Pricing the cache rule</a
                     ><a href="#calibration"><span>07</span>Calibrating the gate</a
@@ -106,8 +106,9 @@
                     <p>
                         The layer has two halves that share a key and nothing else. The <strong>advisor</strong> is
                         first-party SpecPi code that answers questions about session state and never holds authority:
-                        it cannot call a tool, grant a capability or allow an action. The <strong>guard</strong> is a
-                        separate pinned package that scores commands before the permission system sees them.
+                        it cannot call a tool, grant a capability or allow an action. The <strong>guard</strong> is its
+                        eighth system, and the one exception: it scores commands before the permission system sees
+                        them, and can refuse one.
                     </p>
                     <figure class="chart-figure">
                         <svg
@@ -132,7 +133,7 @@
                             <rect x="168" y="24" width="132" height="52" rx="7" class="dg-box-accent" />
                             <text x="234" y="41" text-anchor="middle" class="dg-tag">OPTIONAL</text>
                             <text x="234" y="57" text-anchor="middle" class="dg-title">Command guard</text>
-                            <text x="234" y="71" text-anchor="middle" class="dg-note">fail-closed</text>
+                            <text x="234" y="71" text-anchor="middle" class="dg-note">fails open</text>
 
                             <rect x="340" y="24" width="140" height="52" rx="7" class="dg-box" />
                             <text x="410" y="46" text-anchor="middle" class="dg-title">Permission system</text>
@@ -277,7 +278,7 @@
                 </section>
 
                 <section class="doc-section" id="systems">
-                    <header><h2>Seven systems</h2><span>04</span></header>
+                    <header><h2>Eight systems</h2><span>04</span></header>
                     <p>
                         One design rule governs all of them: <em>ask local state first, and spend a Jev call only on a
                         question local state genuinely cannot answer</em>. Applying it is what removed the largest
@@ -526,8 +527,11 @@
                             a rule that blocks real work gets the whole guard switched off, and then it protects nobody.
                         </li>
                         <li>
-                            <strong>Blocking needs two answers to agree.</strong> A confident destructive reading
-                            <em>and</em> a call the request does not account for. Both, because the likeliest way to be
+                            <strong>Blocking needs two confident answers to agree.</strong> A destructive reading
+                            <em>and</em> a reading that the request does not account for the call &mdash; both of which
+                            must clear the confidence gate, because roughly four answers in five do not and treating a
+                            missing one as agreement would leave the safeguard applying to about a fifth of calls.
+                            Both, because the likeliest way to be
                             wrong is a destructive-looking command you asked for in as many words &mdash;
                             <code>rm -rf node_modules</code>, a force push to a branch you named. A confident verdict
                             that a write targets a real credential file blocks on its own.
@@ -665,11 +669,15 @@
                     <ul>
                         <li><code>/jev</code> &mdash; show the layer's state and change it.</li>
                         <li>
-                            <code>/jev on</code> &mdash; the whole layer: the master switch, every system that is
-                            off, and the command guard when it has a key it can read. Remembered for new sessions;
+                            <code>/jev on</code> &mdash; the whole layer: the master switch and every system that
+                            is off, the command guard included. The notification says so, because seven of the eight
+                            only add advice and that one can refuse a command. Remembered for new sessions;
                             <code>/jev on --session</code> for this one only.
                         </li>
-                        <li><code>/jev guard on</code>, <code>/jev guard startup on</code> &mdash; the command guard.</li>
+                        <li>
+                            <code>/jev enable guard</code>, <code>/jev disable guard</code> &mdash; the command guard
+                            on its own, like any other system.
+                        </li>
                         <li>
                             <code>/jev status</code> &mdash; which posture is in force, and every place a key could
                             come from with the one in force marked.
@@ -715,11 +723,11 @@
                         returns a bare 401.
                     </p>
                     <p>
-                        The command guard is the exception, and it is one worth knowing. It is a separate package that
-                        reads <code>OPENROUTER_API_KEY</code> from the environment and nothing else, so a key stored by
-                        <code>/login</code> alone serves the seven systems and is invisible to it &mdash; and because
-                        the guard blocks calls it cannot score, <code>/jev on</code> leaves it off rather than handing
-                        you a session that refuses to run commands. Export the variable and it comes on with the rest.
+                        The command guard used to be the exception: a separate package reading
+                        <code>OPENROUTER_API_KEY</code> from the environment and nothing else, so a key stored by
+                        <code>/login</code> served the advisor and was invisible to it. As the eighth system it resolves
+                        its key through the same two sources as everything else, so one key covers the layer and there
+                        is no second thing to configure.
                     </p>
                     <p>
                         Retention, processing and logging of what is sent are governed by OpenRouter and TypeSafe, not

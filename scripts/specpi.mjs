@@ -22,7 +22,14 @@ import {
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
-import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
+import {
+    basePackages,
+    checkBasePackages,
+    installBasePackages,
+    packageChanges,
+    removeRetiredPackages,
+    runBrowserQA,
+} from "./packages.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VERSION = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
@@ -80,7 +87,7 @@ Usage:
   specpi doctor
   specpi uninstall [--yes]
 
-Installs /scope, the harness improvement loop, and six pinned packages.
+Installs /scope, the harness improvement loop, and seven pinned packages.
 The base is tested with Pi 0.84.4. Run specpi plan to see package versions.
 --skip-package-install installs only the core, or preserves an existing base on update.
 --skip-browser-install skips Chromium setup, not package acquisition or doctor checks.
@@ -253,6 +260,38 @@ function restoreLegacySettings(manifest, warnings) {
     writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
 }
 
+/**
+ * Unpin a package a past version installed and this one has retired.
+ *
+ * Deliberately outside the `--skip-packages` guard. Skipping package acquisition means not
+ * downloading or re-pinning anything, and it has never meant leaving an entry SpecPi itself wrote
+ * pointing at code SpecPi has since removed the controls for -- `specpi-jev-guard` is fail-closed,
+ * so the machine that skipped packages is exactly the machine that would keep it armed forever.
+ *
+ * `settingsPath` is watched whenever a previous manifest recorded package changes, which is the only
+ * way a retired entry can be present, so this write is inside the transaction and rolls back with it.
+ */
+function retireBasePackages(warnings) {
+    const settings = readJson(settingsPath, {});
+    const { removed, preserved } = removeRetiredPackages(settings);
+    for (const source of preserved) {
+        warnings.push(
+            `Preserved modified retired package setting: ${source}. Remove it yourself if you do not want it.`,
+        );
+    }
+
+    if (removed.length === 0) {
+        return;
+    }
+
+    writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
+    for (const source of removed) {
+        warnings.push(
+            `Unpinned retired package: ${source}. Its downloaded files stay in the agent npm directory and Pi no longer loads it.`,
+        );
+    }
+}
+
 function removeLegacyShell(manifest) {
     if (manifest?.shellRc && fs.existsSync(manifest.shellRc)) {
         const result = removeManagedBlock(fs.readFileSync(manifest.shellRc, "utf8"), SHELL_START, SHELL_END);
@@ -328,6 +367,10 @@ async function mutate(options, operation) {
         const warnings = [];
         const preserveBase = operation !== "uninstall" && options.skipPackages && previous?.basePackages?.length;
         restoreLegacySettings(preserveBase ? { ...previous, packageChanges: [] } : previous, warnings);
+        if (operation !== "uninstall") {
+            retireBasePackages(warnings);
+        }
+
         removeLegacyShell(previous);
         let packageState = preserveBase
             ? {

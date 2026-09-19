@@ -80,7 +80,7 @@ export function readUsage() {
     try {
         const file = usagePath();
         // regularFile refuses links, hard-linked files and anything over 4 KiB. A counts file for
-        // seven systems is a few hundred bytes, so the size check is a real one here.
+        // eight systems is a few hundred bytes, so the size check is a real one here.
         if (!regularFile(file, "Jev usage")) {
             return undefined;
         }

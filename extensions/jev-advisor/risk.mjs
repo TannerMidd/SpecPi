@@ -23,13 +23,42 @@
 
 import path from "node:path";
 
+/**
+ * Shell tools, under every name a harness gives them.
+ *
+ * `scripts/eval-proxy.mjs` already folds `pwsh`, `shell`, `exec`, `exec_command` and `write_stdin`
+ * into `bash`, which means those names reach real sessions. A guard that only knew `bash` would be
+ * bypassed by spelling, so the alias list lives here rather than being rediscovered later.
+ */
+export const SHELL_TOOLS = Object.freeze([
+    "bash",
+    "powershell",
+    "pwsh",
+    "shell",
+    "exec",
+    "exec_command",
+    "write_stdin",
+]);
+
+/**
+ * Tools that write a file. The same list `questions/progress.mjs` uses for "the worktree changed",
+ * deliberately, because a write the guard cannot see is a write the credential question is never
+ * asked about -- and `multi_edit` reaching `~/.ssh/authorized_keys` is exactly that.
+ */
+export const WRITE_TOOLS = Object.freeze(["write", "edit", "multi_edit", "apply_patch", "create_file", "str_replace"]);
+
 /** The tool calls this guard looks at. Everything else passes without inspection. */
-export const GATED_TOOLS = Object.freeze(["bash", "powershell", "write", "edit"]);
+export const GATED_TOOLS = Object.freeze([...SHELL_TOOLS, ...WRITE_TOOLS]);
 
 /**
  * Read-only binaries that cannot modify state on their own. The bar is "running this with any
  * arguments still changes nothing", which is why `git` is absent (it has `push`, `reset`, `clean`)
  * and `git status` is not special-cased -- a subcommand allowlist is a second policy to maintain.
+ *
+ * The bar is strict enough to exclude several binaries that read as read-only. `env` and `fd` launch
+ * other programs (`env rm -rf build`, `fd -x rm`); `find` has `-delete` and `-exec`; `sort -o` and
+ * `uniq in out` name an output file. None of them changes state when used the way its name suggests,
+ * which is precisely what would have made each one a reliable bypass.
  */
 const READ_ONLY = new Set([
     "ls",
@@ -52,15 +81,10 @@ const READ_ONLY = new Set([
     "printf",
     "which",
     "type",
-    "env",
     "printenv",
     "grep",
     "rg",
-    "find",
-    "fd",
     "diff",
-    "sort",
-    "uniq",
     "cut",
     "tr",
     "basename",
@@ -119,18 +143,29 @@ const CATASTROPHIC = Object.freeze([
     },
 ]);
 
-/** Paths whose contents are credentials, keys or version-control internals. */
+/**
+ * Paths whose contents are credentials, keys or version-control internals.
+ *
+ * Every pattern is tested against a path already resolved against the working directory and written
+ * with forward slashes, so a segment is bounded by `/` or by the end of the string. Matching a
+ * directory matters as much as matching a file: `secrets/api.txt` is a secret, and the first version
+ * of this list -- which required the secret's name to be the last segment -- called it an ordinary
+ * project file.
+ */
 const PROTECTED = Object.freeze([
-    /(^|[/\\])\.env(\.|$)/u,
-    /(^|[/\\])\.git([/\\]|$)/u,
-    /(^|[/\\])\.ssh([/\\]|$)/u,
-    /(^|[/\\])\.aws([/\\]|$)/u,
-    /(^|[/\\])(id_rsa|id_dsa|id_ecdsa|id_ed25519)(\.|$)/u,
+    /(^|\/)\.env(\.|\/|$)/u,
+    /\.env$/u,
+    /(^|\/)\.git(\/|$)/u,
+    /(^|\/)\.ssh(\/|$)/u,
+    /(^|\/)\.aws(\/|$)/u,
+    /(^|\/)\.gnupg(\/|$)/u,
+    /(^|\/)(id_rsa|id_dsa|id_ecdsa|id_ed25519)(\.|$)/u,
     /\.(pem|key|pfx|p12|keystore|jks)$/iu,
-    /(^|[/\\])(credentials?|secrets?)(\.|$)/iu,
-    /(^|[/\\])auth\.json$/u,
-    /(^|[/\\])\.npmrc$/u,
-    /(^|[/\\])\.netrc$/u,
+    /(^|\/)(credentials?|secrets?)(\.|\/|$)/iu,
+    /(^|\/)auth\.json$/u,
+    /(^|\/)\.npmrc$/u,
+    /(^|\/)\.netrc$/u,
+    /(^|\/)\.pi(\/|$)/u,
 ]);
 
 function text(value) {
@@ -205,23 +240,98 @@ export function protectedPath(target, cwd = process.cwd()) {
     return PROTECTED.some((pattern) => pattern.test(normalized));
 }
 
+/** Keys a harness uses for "the file this call writes", across the tools in `WRITE_TOOLS`. */
+const TARGET_KEYS = Object.freeze(["path", "file_path", "filePath", "file", "target", "notebook_path"]);
+
+/** Nested arrays of edits, each element carrying a target of its own. */
+const TARGET_LISTS = Object.freeze(["edits", "files", "changes", "operations"]);
+
+/** Header forms that name a file inside a patch body. */
+const PATCH_TARGET = /^(?:\*\*\* (?:Add|Update|Delete) File: |--- (?:a\/)?|\+\+\+ (?:b\/)?)(.+)$/gmu;
+
+function pushTarget(into, value) {
+    if (typeof value === "string" && value.trim().length > 0 && into.length < 64) {
+        into.push(value.trim());
+    }
+}
+
+/**
+ * Every file a tool call names, from a tool input whose shape this module does not control.
+ *
+ * `write` and `edit` carry one `path`; `multi_edit` carries a list; `apply_patch` carries the paths
+ * inside a patch body and nowhere else. Reading only the first of those is how a write to a
+ * credential file reaches disk without the guard ever seeing a target -- so this reads all three,
+ * and returning nothing is itself a meaningful answer to `classifyCall`.
+ */
+export function callTargets(input) {
+    const found = [];
+    if (input === null || typeof input !== "object") {
+        return found;
+    }
+
+    for (const key of TARGET_KEYS) {
+        pushTarget(found, input[key]);
+    }
+
+    for (const key of TARGET_LISTS) {
+        const list = input[key];
+        if (!Array.isArray(list)) {
+            continue;
+        }
+
+        for (const item of list) {
+            if (typeof item === "string") {
+                pushTarget(found, item);
+                continue;
+            }
+
+            if (item !== null && typeof item === "object") {
+                for (const key2 of TARGET_KEYS) {
+                    pushTarget(found, item[key2]);
+                }
+            }
+        }
+    }
+
+    const patch = typeof input.patch === "string" ? input.patch : typeof input.diff === "string" ? input.diff : "";
+    if (patch.length > 0) {
+        // Bounded: a patch is arbitrary size and this runs on every call.
+        for (const match of patch.slice(0, 20_000).matchAll(PATCH_TARGET)) {
+            pushTarget(found, match[1].replace(/\t.*$/u, ""));
+        }
+    }
+
+    return found;
+}
+
 /**
  * What a gated tool call is, before Jev is involved.
  *
- * `write` and `edit` are only interesting when they target something protected: an ordinary source
- * file being edited is the entire point of the agent, and asking about each one would spend a
+ * `write` and its siblings are only interesting when they target something protected: an ordinary
+ * source file being edited is the entire point of the agent, and asking about each one would spend a
  * session's budget on the first directory it refactored.
+ *
+ * A write whose target could not be read is `unknown` rather than `safe`. That costs a question on a
+ * tool shape this module does not recognise, which is the right way round: the alternative is a
+ * silent hole that appears the moment a harness renames a field.
  */
-export function classifyCall({ tool, command, target, cwd }) {
+export function classifyCall({ tool, command, target, targets, cwd }) {
     if (!GATED_TOOLS.includes(tool)) {
         return { decision: "safe", reason: "tool is not gated" };
     }
 
-    if (tool === "bash" || tool === "powershell") {
+    if (SHELL_TOOLS.includes(tool)) {
         return classifyCommand(command);
     }
 
-    return protectedPath(target, cwd)
+    const all = [...(Array.isArray(targets) ? targets : []), ...(typeof target === "string" ? [target] : [])].filter(
+        (item) => typeof item === "string" && item.trim().length > 0,
+    );
+    if (all.length === 0) {
+        return { decision: "unknown", reason: "write target could not be read" };
+    }
+
+    return all.some((item) => protectedPath(item, cwd))
         ? { decision: "unknown", reason: "writes to a protected path" }
         : { decision: "safe", reason: "ordinary project file" };
 }

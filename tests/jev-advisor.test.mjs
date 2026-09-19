@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { createBroker } from "../extensions/jev-advisor/broker.mjs";
+import { SYSTEM_LABELS, createBroker } from "../extensions/jev-advisor/broker.mjs";
 import {
     NUDGE_MODES,
     SYSTEM_NAMES,
@@ -1364,6 +1364,17 @@ test("nothing in the Jev layer is on by default", () => {
         assert.ok(SYSTEM_NAMES.includes("guard"));
         assert.ok(!("guard" in fresh), "schema 3 has no separate guard object");
     });
+});
+
+test("every system has a label, because two of them are read out to a human", () => {
+    // `SYSTEM_LABELS` names the system in the first-transmission consent prompt and in the
+    // budget-exhaustion notice. A system added to `SYSTEM_NAMES` without one falls back to its raw
+    // key, so the prompt asking a person to approve sending a redacted shell command to a third
+    // party would have said "guard".
+    for (const name of SYSTEM_NAMES) {
+        assert.equal(typeof SYSTEM_LABELS[name], "string", `${name} has no label`);
+        assert.notEqual(SYSTEM_LABELS[name], name, `${name} falls back to its own key`);
+    }
 });
 
 test("a user can default the layer on without a session toggle writing that preference", () => {

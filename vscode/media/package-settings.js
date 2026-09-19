@@ -316,7 +316,7 @@
                 const summary = byId("package-key-summary");
                 const active = status.sources.find((item) => item.name === status.active);
                 summary.textContent = active
-                    ? `In use: ${active.label}. The seven systems above can reach Jev.`
+                    ? `In use: ${active.label}. Every system above, the command guard included, reaches Jev with this one key.`
                     : "No key anywhere. Every system will report no advice, and the harness runs exactly as it did before the layer existed. Run /login openrouter in Pi to store one.";
                 for (const item of status.sources) {
                     const row = document.createElement("li");
@@ -328,10 +328,7 @@
                         : item.name === status.active
                           ? "In use"
                           : "Present, but a source above it is used first";
-                    // Said on the row rather than only in the prose below it, because this is the
-                    // difference between a guard that works and a guard that blocks every command.
-                    const guard = item.guard ? " · the command guard reads this one" : "";
-                    detail.textContent = `${state}${guard} — ${item.detail}`;
+                    detail.textContent = `${state} — ${item.detail}`;
                     row.append(name, detail);
                     list.append(row);
                 }

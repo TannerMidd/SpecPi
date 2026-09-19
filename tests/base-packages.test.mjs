@@ -6,7 +6,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { basePackages } from "../scripts/packages.mjs";
+import { basePackages, retiredPackages } from "../scripts/packages.mjs";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const cli = path.join(repoRoot, "scripts/specpi.mjs");
@@ -197,6 +197,42 @@ test("updates retire only unchanged SpecPi-added retired package entries", async
                 assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, modified ? [current] : undefined);
             });
         }
+    }
+});
+
+test("a retired package is unpinned even when package acquisition is skipped", async (t) => {
+    // Dropping a line from templates/settings.json stops new installs getting a package and does
+    // nothing to a machine that already has it. For specpi-jev-guard that gap was not survivable:
+    // it fails closed, and this release deleted both the code that kept it inert and the command
+    // that could disarm it, so an install left holding it would block every shell call the moment
+    // its key or endpoint went away. --skip-package-install is the case the restore path misses.
+    assert.deepEqual(retiredPackages, ["npm:specpi-jev-guard"]);
+
+    for (const modified of [false, true]) {
+        await t.test(modified ? "a user's own entry is preserved and reported" : "SpecPi's own entry goes", (t) => {
+            const f = fixture(t);
+            f.run("install", "--yes");
+            const retired = "npm:specpi-jev-guard@0.1.0";
+            const entry = modified ? { source: retired, extensions: [] } : retired;
+            const settings = JSON.parse(fs.readFileSync(f.settings));
+            settings.packages.push(entry);
+            fs.writeFileSync(f.settings, JSON.stringify(settings));
+
+            const doctor = f.invoke(["doctor"]);
+            assert.equal(doctor.status === 0, modified, doctor.stdout + doctor.stderr);
+            if (!modified) {
+                assert.match(doctor.stdout + doctor.stderr, /Retired base package still configured/);
+            }
+
+            const update = f.run("update", "--yes", "--skip-package-install");
+            const after = JSON.parse(fs.readFileSync(f.settings));
+            assert.deepEqual(after.packages, modified ? [...basePackages, entry] : basePackages);
+            assert.match(
+                update.stdout + update.stderr,
+                modified ? /Preserved modified retired package setting/ : /Unpinned retired package/,
+            );
+            f.run("doctor");
+        });
     }
 });
 

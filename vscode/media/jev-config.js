@@ -6,11 +6,12 @@
     // holds no credential: the key comes from the environment Pi was started with and Chat never
     // reads, writes or displays it.
     //
-    // Two shapes, deliberately. On disk the systems are nested under `systems`, the budgets
-    // under `budgets` and the guard under `guard`, because the advisor and the guard are separate
-    // packages with separate gates. In the form they are flat, because a nested object renders as a
-    // JSON textarea and the point of this panel is a toggle. `fromStored`/`toStored` are the only
-    // translation, and both directions are total so a round trip cannot silently drop a key.
+    // Two shapes, deliberately. On disk the systems are nested under `systems` and the budgets under
+    // `budgets`; in the form they are flat, because a nested object renders as a JSON textarea and
+    // the point of this panel is a toggle. `fromStored`/`toStored` are the only translation, and both
+    // directions are total so a round trip cannot silently drop a key. Schemas 1 and 2 kept the
+    // command guard in a `guard` pair of its own, from when it was a separate package; schema 3 makes
+    // it the eighth system and `fromStored` migrates the old pair rather than reading past it.
 
     const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability", "guard"];
     const MAX_CALL_BUDGET = 256;
@@ -141,9 +142,14 @@
     function fromStored(stored) {
         const source = object(stored) ? stored : {};
         const systems = object(source.systems) ? source.systems : {};
-        // Schema 2 carried the guard as its own pair outside the systems map. What migrates is
+        // Schema 2 carried the guard as its own pair outside the systems map, and so did schema 1 --
+        // the advisor's 1-to-2 step preserves the whole file and only its 2-to-3 step folds the pair
+        // into `systems`, so both older schemas arrive here carrying it. Reading it from schema 2
+        // alone made the panel show an enabled guard as off on a schema-1 file, and saving from that
+        // panel would then have written the user's own preference away. What migrates is
         // `guard.startup` -- the preference the user chose -- not the session flag beside it.
         const guard = object(source.guard) ? source.guard : {};
+        const pairedGuard = source.schema === 1 || source.schema === 2;
         const budgets = object(source.budgets) ? source.budgets : {};
         // Schema 1 read 0 as "no ceiling"; schema 2 reads it as "no calls".
         const legacy = source.schema === 1;
@@ -162,7 +168,7 @@
             [BUDGET_KEYS.total]: total,
         };
         for (const name of SYSTEMS) {
-            flat[name] = name === "guard" && source.schema === 2 ? guard.startup === true : systems[name] === true;
+            flat[name] = name === "guard" && pairedGuard ? guard.startup === true : systems[name] === true;
             flat[BUDGET_KEYS[name]] = legacy
                 ? Math.min(DEFAULT_BUDGETS[name], total)
                 : budget(budgets[name], DEFAULT_BUDGETS[name], MAX_CALL_BUDGET);

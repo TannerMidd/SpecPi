@@ -243,6 +243,40 @@ test("a schema 1 file is migrated rather than read as the layer switched off", a
     }
 });
 
+test("the guard preference survives from either older schema, in both readers", async () => {
+    // Schema 1 and schema 2 both carried the command guard in a `guard` pair of its own. The
+    // advisor's 1-to-2 step preserves the whole file and only its 2-to-3 step folds that pair into
+    // `systems`, so both schemas arrive at the panel still carrying it -- and a panel that read it
+    // from schema 2 alone showed an enabled guard as off on a schema 1 file, so the first save would
+    // have written the user's own choice away. That is the reader drift this pairing exists to stop.
+    const { loadSettings } = await import("../extensions/jev-advisor/config.mjs");
+    for (const schema of [1, 2]) {
+        for (const wanted of [true, false]) {
+            withAgentDir((dir) => {
+                const file = jevPath({ workspace: dir });
+                fs.mkdirSync(path.dirname(file), { recursive: true });
+                fs.writeFileSync(
+                    file,
+                    `${JSON.stringify({
+                        schema,
+                        master: true,
+                        startup: true,
+                        systems: { retention: true },
+                        ...(schema === 1 ? { callBudgetPerSession: 6 } : { budgets: { total: 6 } }),
+                        // `guard.startup` is the preference; `guard.enabled` was a session flag.
+                        guard: { enabled: !wanted, startup: wanted },
+                    })}
+`,
+                );
+                const flat = JSON.parse(loadPackageSettings("jevLayer", { workspace: dir }).text);
+                assert.equal(flat.guard, wanted, `schema ${schema}: the panel lost the guard preference`);
+                assert.equal(loadSettings().systems.guard, wanted, `schema ${schema}: the advisor disagrees`);
+                assert.deepEqual(jevConfig.toStored(flat), loadSettings(), "the two readers must migrate alike");
+            });
+        }
+    }
+});
+
 test("the panel can be opened at all", async () => {
     // It could not. The panel shipped complete -- fields, validation, a guarded write -- and with
     // no entry in PACKAGES, so every attempt to open it was refused as a package that is not
@@ -397,18 +431,18 @@ test("the panel never learns a key, only whether there is one", () => {
     });
 });
 
-test("only the environment source is marked as one the command guard can read", () => {
-    // The guard is a separate package that reads OPENROUTER_API_KEY and nothing else, and it blocks
-    // calls it cannot score. So "there is a key" and "the guard has a key" are different facts, and
-    // a panel that merged them would be hiding the one that decides whether shell calls still work.
+test("no source is singled out for the command guard, because it reads all of them", () => {
+    // While the guard was a separate package reading OPENROUTER_API_KEY alone, one row was marked as
+    // the only one it could see. As the layer's eighth system it resolves its key the same way every
+    // other system does, so a mark on any row would now be telling someone with a stored credential
+    // that the guard cannot use it.
     withAgentDir((dir) => {
-        const guarded = jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: {} }).sources.filter(
-            (item) => item.guard,
-        );
-        assert.deepEqual(
-            guarded.map((item) => item.name),
-            ["OPENROUTER_API_KEY"],
-        );
+        const { sources } = jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: {} });
+        assert.ok(sources.length > 1);
+        for (const item of sources) {
+            assert.ok(!("guard" in item), `${item.name} still carries a guard-only flag`);
+            assert.ok(!/only this|invisible to the guard/i.test(item.detail), `${item.name}: stale guard wording`);
+        }
     });
 });
 

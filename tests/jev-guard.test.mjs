@@ -8,11 +8,15 @@ import test from "node:test";
 
 import {
     GATED_TOOLS,
+    SHELL_TOOLS,
+    WRITE_TOOLS,
+    callTargets,
     classifyCall,
     classifyCommand,
     leadingBinary,
     protectedPath,
 } from "../extensions/jev-advisor/risk.mjs";
+import { MUTATING_TOOLS } from "../extensions/jev-advisor/questions/progress.mjs";
 import { decide, questions } from "../extensions/jev-advisor/questions/guard.mjs";
 
 const answer = (value, confidence = 0.9) => ({ kind: "score", value, confidence });
@@ -119,7 +123,68 @@ test("writes to ordinary project files are free, and only protected targets are 
     assert.equal(classifyCall({ tool: "write", target: "src/app.js", cwd }).decision, "safe");
     assert.equal(classifyCall({ tool: "edit", target: ".env", cwd }).decision, "unknown");
     assert.equal(classifyCall({ tool: "read", command: "rm -rf /", cwd }).decision, "safe", "ungated tool");
-    assert.deepEqual([...GATED_TOOLS], ["bash", "powershell", "write", "edit"]);
+    assert.deepEqual([...GATED_TOOLS], [...SHELL_TOOLS, ...WRITE_TOOLS]);
+});
+
+test("every tool that writes the worktree is gated, under every name it arrives as", () => {
+    // `questions/progress.mjs` already owns the list of tools whose success means the worktree
+    // changed. A guard that knew a shorter one would simply not see a write spelled `multi_edit`,
+    // and the credential question it exists to ask would never be asked about it.
+    for (const tool of MUTATING_TOOLS) {
+        assert.ok(GATED_TOOLS.includes(tool), `${tool} writes files and must be gated`);
+    }
+
+    // The proxy's own alias table maps all of these onto bash, so all of them reach real sessions.
+    for (const tool of ["bash", "pwsh", "shell", "exec", "exec_command", "write_stdin", "powershell"]) {
+        assert.ok(SHELL_TOOLS.includes(tool), `${tool} runs commands and must be gated`);
+        assert.equal(classifyCall({ tool, command: "rm -rf /" }).decision, "dangerous");
+    }
+});
+
+test("a launcher or an output flag is not a read-only command", () => {
+    // Each of these passes "looks like it only reads" and fails "running it with any arguments still
+    // changes nothing", which is the bar. Any one of them left in the list is a general bypass.
+    for (const command of ["env rm -rf build", "env sh -c hi", "find . -delete", "fd -x rm", "sort -o /etc/passwd x"]) {
+        assert.notEqual(classifyCommand(command).decision, "safe", `${command} must not take the fast path`);
+    }
+});
+
+test("a secret inside a directory is a secret", () => {
+    const cwd = "/work/project";
+    for (const target of [
+        "secrets/api.txt",
+        "credentials/aws.json",
+        "secrets/prod.env",
+        "config/prod.env",
+        ".pi/auth.json",
+    ]) {
+        assert.equal(protectedPath(target, cwd), true, `${target} should be protected`);
+    }
+});
+
+test("every file a call names is read, whatever shape the tool input has", () => {
+    const cwd = "/work/project";
+    assert.deepEqual(callTargets({ path: "a.js" }), ["a.js"]);
+    assert.deepEqual(callTargets({ edits: [{ file_path: "a.js" }, { file_path: ".env" }] }), ["a.js", ".env"]);
+    assert.deepEqual(
+        callTargets({
+            patch: `*** Update File: secrets/prod.json
++x
+`,
+        }),
+        ["secrets/prod.json"],
+    );
+    assert.deepEqual(callTargets(undefined), []);
+
+    // One protected target among ordinary ones is still a protected call.
+    assert.equal(
+        classifyCall({ tool: "multi_edit", targets: callTargets({ edits: [{ path: "a.js" }, { path: ".env" }] }), cwd })
+            .decision,
+        "unknown",
+    );
+
+    // A shape this module does not recognise costs a question rather than opening a hole.
+    assert.equal(classifyCall({ tool: "create_file", targets: [], cwd }).decision, "unknown");
 });
 
 test("nothing in local triage throws, whatever it is handed", () => {
@@ -147,6 +212,14 @@ test("blocking needs a destructive reading the request does not account for", ()
     // words. Requiring the intent answer to disagree is what keeps `rm -rf node_modules` working.
     assert.equal(decide({ risk: answer(3), intended: answer(0) }).action, "block");
     assert.equal(decide({ risk: answer(3), intended: answer(1) }).action, "block");
+
+    // "Both answers" has to mean both, including when the second does not survive its own gate.
+    // Score coverage sits near 0.2, so reading an ungated intent answer as agreement would have made
+    // the requirement apply to about one call in five and blocked `rm -rf node_modules` on the rest.
+    assert.equal(decide({ risk: answer(3) }, { hasUI: true }).action, "ask", "no intent answer");
+    assert.equal(decide({ risk: answer(3), intended: answer(0, 0.2) }, { hasUI: true }).action, "ask", "unconfident");
+    assert.equal(decide({ risk: answer(3), intended: answer(0.5) }, { hasUI: true }).action, "ask", "on a boundary");
+    assert.equal(decide({ risk: answer(3) }).action, "defer", "and headless it defers");
 
     // Destructive but clearly asked for is the case that must keep working. It never blocks; with a
     // human present it asks, and with nobody to ask it defers to the permission system.
