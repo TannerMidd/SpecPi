@@ -25,7 +25,9 @@ function save(workspace, relative, value) {
 
 async function fixture(id, action, solved = true) {
     const task = loadTask(id);
-    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-tier5-"));
+    // The fixture CLI skips its entry guard when it is invoked through a temporary-directory alias
+    // (macOS /var -> /private/var, Windows short names) and that reads as a successful no-op.
+    const workspace = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-tier5-")));
     try {
         prepareWorkspace(task, workspace);
         if (solved) {
