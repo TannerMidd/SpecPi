@@ -238,17 +238,8 @@ export function settingsPath() {
 }
 
 /**
- * The key is never read into any structure that gets logged or serialized. Callers only ever ask
- * whether one is present; the client reads it directly at call time.
+ * Whether a key is available at all, from any source. Kept here as a re-export so every caller that
+ * used to ask config.mjs still can; the resolution itself lives in credentials.mjs, which knows
+ * about Pi's own credential store as well as the environment.
  */
-export function keyPresent() {
-    // OPENROUTER_API_KEY on the default path, TYPESAFE_API_KEY on the direct one; see client.mjs.
-    for (const name of ["OPENROUTER_API_KEY", "TYPESAFE_API_KEY"]) {
-        const value = process.env[name];
-        if (typeof value === "string" && value.trim().length > 0) {
-            return true;
-        }
-    }
-
-    return false;
-}
+export { keyPresent, keySource, keySources } from "./key-source.mjs";

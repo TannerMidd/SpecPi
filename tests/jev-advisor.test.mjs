@@ -26,6 +26,7 @@ import {
     score,
 } from "../extensions/jev-advisor/client.mjs";
 import { choiceValue, nounFalse, nounTrue, scoreLevel } from "../extensions/jev-advisor/gate.mjs";
+import { authPath, keySource, keySources, resolveKey } from "../extensions/jev-advisor/key-source.mjs";
 import { ledgerPath, read as readLedger, record } from "../extensions/jev-advisor/ledger.mjs";
 import { readUsage, usagePath } from "../extensions/jev-advisor/usage.mjs";
 import { MAX_STATE_BYTES, buildState, looksAbsolute, outline, redact } from "../extensions/jev-advisor/sanitize.mjs";
@@ -50,16 +51,25 @@ import { AUTHORING_TOOL_NAMES, syncAuthoringTools } from "../extensions/tool-wis
 /** Every test gets its own agent directory so nothing reads or writes the developer's real state. */
 function withAgentDir(run) {
     const previousDir = process.env.PI_CODING_AGENT_DIR;
-    const previousKey = process.env.TYPESAFE_API_KEY;
     const previousBase = process.env.TYPESAFE_BASE_URL;
     // The guard's settings file lives under the user's home directory, not the agent directory, so
     // the home has to be redirected too or a test would write to the developer's real ~/.pi.
     const previousHome = process.env.HOME;
     const previousProfile = process.env.USERPROFILE;
+    // Both key variables are cleared for the body of the test, not merely restored afterwards.
+    // Restoring alone left the suite reading whatever the developer happened to have exported: on a
+    // machine with a real OPENROUTER_API_KEY the "a missing key reads as unavailable" case found
+    // one and failed, and on a machine without it the same test passed. A test whose result depends
+    // on the shell it was started from is not testing the thing it names.
+    const previousKeys = ["TYPESAFE_API_KEY", "OPENROUTER_API_KEY"].map((name) => [name, process.env[name]]);
     const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-jev-test-")));
     process.env.PI_CODING_AGENT_DIR = dir;
     process.env.HOME = dir;
     process.env.USERPROFILE = dir;
+    for (const [name] of previousKeys) {
+        delete process.env[name];
+    }
+
     try {
         return run(dir);
     } finally {
@@ -69,22 +79,13 @@ function withAgentDir(run) {
             process.env.PI_CODING_AGENT_DIR = previousDir;
         }
 
-        if (previousKey === undefined) {
-            delete process.env.TYPESAFE_API_KEY;
-        } else {
-            process.env.TYPESAFE_API_KEY = previousKey;
-        }
-
         if (previousBase === undefined) {
             delete process.env.TYPESAFE_BASE_URL;
         } else {
             process.env.TYPESAFE_BASE_URL = previousBase;
         }
 
-        for (const [name, value] of [
-            ["HOME", previousHome],
-            ["USERPROFILE", previousProfile],
-        ]) {
+        for (const [name, value] of [...previousKeys, ["HOME", previousHome], ["USERPROFILE", previousProfile]]) {
             if (value === undefined) {
                 delete process.env[name];
             } else {
@@ -562,6 +563,129 @@ test("the default backend is OpenRouter, which is where the key works", () => {
         delete process.env.OPENROUTER_API_KEY;
         process.env.TYPESAFE_API_KEY = "sk-or-v1-legacy";
         assert.equal(apiKey(), "sk-or-v1-legacy");
+    });
+});
+
+/** Write an auth.json the way Pi's own /login does, so the fixture and the real file share a shape. */
+function writeAuth(entries, { bom = false } = {}) {
+    const file = authPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${bom ? "\ufeff" : ""}${JSON.stringify(entries, null, 2)}\n`);
+
+    return file;
+}
+
+test("the key Pi already stored is the key the layer uses", () => {
+    // The whole bug in one test. A person who ran /login openrouter has a working OpenRouter
+    // credential in the same file every other Pi provider uses, and the layer reported "key:
+    // missing" at them because it read the environment and nothing else. There was no interface to
+    // fix that with, because the key was never meant to be configured twice.
+    withAgentDir(() => {
+        assert.equal(resolveKey("openrouter"), undefined, "no store and no variable is genuinely no key");
+        assert.equal(keySource("openrouter"), undefined);
+
+        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+        assert.equal(resolveKey("openrouter"), "sk-or-v1-stored");
+        assert.equal(keySource("openrouter"), "auth.json");
+        assert.equal(keyPresent(), true);
+    });
+});
+
+test("the credential store is consulted before the environment, as Pi consults it", () => {
+    // Pi's documented order is auth.json then the variable, and matching it is the point: a layer
+    // that picked a different key from the one Pi itself is using would be a second, invisible
+    // configuration to keep in step.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+        process.env.OPENROUTER_API_KEY = "sk-or-v1-environment";
+        assert.equal(resolveKey("openrouter"), "sk-or-v1-stored");
+        assert.equal(keySource("openrouter"), "auth.json");
+
+        // Both are reported as present, because "which of these do I need to fix" is the question,
+        // and only the first is in force.
+        const sources = keySources("openrouter");
+        assert.deepEqual(
+            sources.map((item) => [item.name, item.present]),
+            [
+                ["auth.json", true],
+                ["OPENROUTER_API_KEY", true],
+                ["TYPESAFE_API_KEY", false],
+            ],
+        );
+    });
+});
+
+test("only an api_key entry is read, and an unusable store is no key rather than an error", () => {
+    withAgentDir(() => {
+        // An OAuth entry is Pi's to refresh under its own lock. Reading an access token out of the
+        // file behind Pi's back would race a rotation, so it reads as absent instead.
+        writeAuth({ openrouter: { type: "oauth", access: "at", refresh: "rt", expires: 1 } });
+        assert.equal(resolveKey("openrouter"), undefined);
+
+        writeAuth({ openrouter: { type: "api_key", key: "   " } });
+        assert.equal(resolveKey("openrouter"), undefined, "a blank key is not a key");
+
+        writeAuth({ anthropic: { type: "api_key", key: "sk-ant-x" } });
+        assert.equal(resolveKey("openrouter"), undefined, "another provider's key is not ours to use");
+
+        // Every unreadable shape is silence, never a throw: a credential store that can fail a
+        // session is worse than one that finds nothing.
+        for (const text of ["", "{", "null", "[]", "not json at all"]) {
+            fs.writeFileSync(authPath(), text);
+            assert.equal(resolveKey("openrouter"), undefined, `unreadable: ${text}`);
+            assert.equal(keyPresent(), false);
+        }
+
+        fs.rmSync(authPath());
+        assert.equal(resolveKey("openrouter"), undefined);
+    });
+});
+
+test("an auth.json written with a byte order mark still parses", () => {
+    // Pi strips one before parsing. Not doing the same here would produce the worst possible
+    // split: the key works for every model call and this layer alone calls it missing.
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-bom" } }, { bom: true });
+        assert.equal(resolveKey("openrouter"), "sk-or-v1-bom");
+    });
+});
+
+test("the direct TypeSafe route reads its variable and never the OpenRouter entry", () => {
+    withAgentDir(() => {
+        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+        // auth.json is keyed by Pi provider id and TypeSafe is not one of Pi's providers, so there
+        // is nothing there to read -- and an OpenRouter key on the direct API is a bare 401.
+        assert.equal(resolveKey("typesafe"), undefined);
+        assert.deepEqual(
+            keySources("typesafe").map((item) => item.name),
+            ["TYPESAFE_API_KEY"],
+        );
+
+        process.env.TYPESAFE_API_KEY = "ts-key";
+        assert.equal(resolveKey("typesafe"), "ts-key");
+    });
+});
+
+test("a key in the store is enough for ask() to reach the transport", async () => {
+    // The end of the chain the bug broke: with a stored key and no variable at all, a request now
+    // goes out instead of coming back as no-key.
+    await withAgentDir(async () => {
+        assert.equal((await ask({}, { q: noul("x") })).reason, "no-key");
+
+        writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-stored" } });
+        let seen;
+        const server = await startStub((request, response) => {
+            seen = request.headers.authorization;
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(JSON.stringify({ answers: { q: { noul: 0.5 } } }));
+        });
+        try {
+            process.env.TYPESAFE_BASE_URL = server.url;
+            assert.equal((await ask({}, { q: noul("x") })).ok, true);
+            assert.equal(seen, "Bearer sk-or-v1-stored");
+        } finally {
+            await server.close();
+        }
     });
 });
 

@@ -122,6 +122,81 @@ function loadJevUsage(settingsFile) {
     }
 }
 
+// Pi's own credential store, read for one question only: is there a key. The Jev layer resolves
+// its key the way every other Pi provider does -- the `openrouter` entry that `/login openrouter`
+// writes to auth.json, then OPENROUTER_API_KEY in the environment -- and before the panel could say
+// which of those was in force, "no interface for the API key" was the honest description of it.
+//
+// Chat reads presence and never the value. Nothing below returns, stores, logs or sends a
+// credential: each source reports a boolean and a label, which is everything the panel renders and
+// nothing a key could leak through. That is also why this duplicates the advisor's resolver rather
+// than importing it -- the resolver returns keys, and the webview host has no business holding one.
+function authPath(options = {}) {
+    return path.join(agentDirectory(options), "auth.json");
+}
+
+function storedOpenRouterKey(options) {
+    try {
+        const filename = authPath(options);
+        const stat = fs.lstatSync(filename, { throwIfNoEntry: false });
+        if (!stat || !stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_BYTES) {
+            return false;
+        }
+
+        const text = fs.readFileSync(filename, "utf8");
+        const data = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+        const entry = data && typeof data === "object" ? data.openrouter : undefined;
+
+        return Boolean(entry && entry.type === "api_key" && typeof entry.key === "string" && entry.key.trim());
+    } catch {
+        return false;
+    }
+}
+
+function environmentPresent(name, env) {
+    const value = env[name];
+
+    return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * The sources a Jev key can come from, in the order the advisor consults them, each with whether it
+ * holds one. The first present source is the one in force.
+ *
+ * `guard` marks the sources specpi-jev-guard can actually see. It is a separate package that reads
+ * only the environment, so a key in auth.json serves the seven advisor systems and is invisible to
+ * the guard -- and because the guard fails closed, that difference decides whether switching it on
+ * leaves you able to run a shell command. A panel that collapsed both into "key: present" would be
+ * hiding the one distinction that matters here.
+ */
+function jevKeyStatus({ env = process.env, ...options } = {}) {
+    const sources = [
+        {
+            name: "auth.json",
+            label: "Pi credential store",
+            detail: "Stored by /login openrouter, alongside every other provider.",
+            guard: false,
+            present: storedOpenRouterKey(options),
+        },
+        {
+            name: "OPENROUTER_API_KEY",
+            label: "OPENROUTER_API_KEY",
+            detail: "Read from the environment Pi was started with. The command guard reads only this.",
+            guard: true,
+            present: environmentPresent("OPENROUTER_API_KEY", env),
+        },
+        {
+            name: "TYPESAFE_API_KEY",
+            label: "TYPESAFE_API_KEY",
+            detail: "Accepted on the OpenRouter route so an older environment file keeps working.",
+            guard: false,
+            present: environmentPresent("TYPESAFE_API_KEY", env),
+        },
+    ];
+
+    return { sources, active: sources.find((source) => source.present)?.name };
+}
+
 function targetPath(target, options = {}) {
     if (target === "webAccess") {
         return webAccessPath(options);
@@ -197,6 +272,7 @@ function loadJev(options) {
 `,
         credentials: [],
         usage: loadJevUsage(filename),
+        key: jevKeyStatus(options),
     };
 }
 
@@ -228,6 +304,7 @@ function saveJev(snapshot, draft) {
         // Re-read rather than carried over from the load: saving a budget and still seeing the old
         // ceiling beside the current spend is the kind of small lie that makes a panel untrustworthy.
         usage: loadJevUsage(filename),
+        key: jevKeyStatus(),
     };
 }
 
@@ -331,6 +408,7 @@ module.exports = {
     webAccessPath,
     jevPath,
     jevUsagePath,
+    jevKeyStatus,
     targetPath,
     loadPackageSettings,
     savePackageSettings,

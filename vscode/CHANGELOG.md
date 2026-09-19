@@ -1,5 +1,11 @@
 # SpecPi Chat changelog
 
+## Unreleased
+
+- Say where the Jev layer's API key comes from. The panel held no credential and said nothing about where one is configured, so "there is no interface for the API key" was an accurate description of it &mdash; and a person whose key was sitting in Pi's own `auth.json` had no way to learn the layer was ignoring it. The panel now lists every source the layer consults, in order, and marks the one in force. It reports presence and never a value: the host checks whether each source holds a key and the webview receives booleans, so adding or changing one stays with `/login openrouter` in Pi. The environment variable is marked as the only source the command guard can read, because that difference decides whether switching the guard on leaves you able to run a shell command.
+- Replace the Jev layer's two switches with one. "Jev layer enabled (this session)" and "Enable the Jev layer on startup" were independent checkboxes for a pair the advisor only honours together, so ticking the first alone saved a file describing a layer that is on and never runs. The panel shows the effective state and writes both.
+- Switch on the systems with the layer. Every system ships off, so enabling the layer in the panel produced a layer that runs and does nothing, with nothing saying that seven more boxes were load-bearing. Ticking the layer now ticks them, in the form and before you save, so they are visible and can be turned back off &mdash; a save that silently rewrote seven settings nobody touched would buy the same behaviour at the cost of trusting the panel.
+
 ## 0.12.0
 
 - Make the Jev layer panel reachable. It shipped complete &mdash; fields, validation, a guarded write &mdash; and unopenable: the dialog only honours a target belonging to a package the session reports, the Jev layer was never registered as one, and the select never offered it, so every attempt was refused as a package that is not installed and the file could only be edited by hand. The panel is now registered against the advisor's own `/jev` command, which is what makes it detectable, and the target list hides packages this session does not have rather than offering a control that always errors.

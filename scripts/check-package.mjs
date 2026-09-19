@@ -40,6 +40,7 @@ const requiredFiles = [
     "THIRD_PARTY.md",
     "extensions/jev-advisor/broker.mjs",
     "extensions/jev-advisor/client.mjs",
+    "extensions/jev-advisor/key-source.mjs",
     "extensions/jev-advisor/config.mjs",
     "extensions/jev-advisor/consent.mjs",
     "extensions/jev-advisor/gate.mjs",

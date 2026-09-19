@@ -47,16 +47,10 @@
     // [key, label, type, help]. Order is the order the panel renders.
     const fields = [
         [
-            "master",
-            "Jev layer enabled (this session)",
+            "enabled",
+            "Jev layer enabled",
             "boolean",
-            "Master switch. While this is off nothing is sent, no key is read, and the harness behaves exactly as it did before the layer existed.",
-        ],
-        [
-            "startup",
-            "Enable the Jev layer on startup",
-            "boolean",
-            "Default the master switch on for new sessions. A session toggle never writes this preference.",
+            "The one switch. While it is off nothing is sent, no key is read, and the harness behaves exactly as it did before the layer existed. Turning it on here enables every system below that is currently off, because a layer with no systems on is a switch that does nothing. Pi reads this when a session starts, so restart Pi after saving.",
         ],
         [
             "retention",
@@ -160,8 +154,12 @@
             ? budget(stale, DEFAULT_BUDGETS.total, MAX_TOTAL_BUDGET)
             : budget(budgets.total, DEFAULT_BUDGETS.total, MAX_TOTAL_BUDGET);
         const flat = {
-            master: source.master === true,
-            startup: source.startup === true,
+            // `master` and `startup` are two stored keys for one intention, and the advisor only
+            // acts when both are true: `session_start` zeroes a stored master whenever startup is
+            // false. A panel that showed them as independent checkboxes was therefore offering a
+            // combination -- on, but not at startup -- that describes a layer which is never on at
+            // all. The panel shows the effective state and writes both together.
+            enabled: source.master === true && source.startup === true,
             progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
             [BUDGET_KEYS.total]: total,
             guardEnabled: guard.enabled === true,
@@ -185,14 +183,51 @@
             budgets[name] = budget(source[BUDGET_KEYS[name]], DEFAULT_BUDGETS[name], MAX_CALL_BUDGET);
         }
 
+        const enabled = source.enabled === true;
+
         return {
             schema: 2,
-            master: source.master === true,
-            startup: source.startup === true,
+            // Always written together; see `fromStored`. Keeping them in step is what makes the
+            // checkbox mean what it says in the next session rather than only in this file.
+            master: enabled,
+            startup: enabled,
             systems: Object.fromEntries(SYSTEMS.map((name) => [name, source[name] === true])),
             budgets,
             progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
             guard: { enabled: source.guardEnabled === true, startup: source.guardStartup === true },
+        };
+    }
+
+    /**
+     * Enabling the layer has to enable something.
+     *
+     * Every system ships off, so a fresh file with the layer switched on describes a layer that
+     * runs and does nothing -- which is exactly the state people kept arriving at, because nothing
+     * in the panel said that seven more boxes were load-bearing. This fills them in on the
+     * transition from off to on, and only when none are already on: a person running retention
+     * alone has chosen that, and toggling the layer must not quietly hand back the other six.
+     *
+     * It deliberately runs in the form rather than in `toStored`, so the boxes visibly tick before
+     * anything is saved. A save that silently rewrote seven settings the person never touched would
+     * buy the same behaviour at the cost of trusting the panel.
+     */
+    function couple(config, previous) {
+        if (config.enabled !== true || previous?.enabled === true) {
+            return { config, note: "" };
+        }
+
+        if (SYSTEMS.some((name) => config[name] === true)) {
+            return { config, note: "" };
+        }
+
+        const next = { ...config };
+        for (const name of SYSTEMS) {
+            next[name] = true;
+        }
+
+        return {
+            config: next,
+            note: ` All ${SYSTEMS.length} systems were switched on with the layer; turn any back off before saving.`,
         };
     }
 
@@ -212,7 +247,7 @@
      *
      * Returns undefined for any shape this version does not know, including a missing file. The
      * panel renders that as "the layer has not run", which is the honest reading: the advisor only
-     * writes this file once the master switch is on.
+     * writes this file once the layer is on.
      */
     function fromStoredUsage(raw) {
         if (!object(raw) || raw.schema !== 1) {
@@ -326,6 +361,7 @@
         fields,
         parse,
         validate,
+        couple,
         fromStored,
         toStored,
         fromStoredUsage,

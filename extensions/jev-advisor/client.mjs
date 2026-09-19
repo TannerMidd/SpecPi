@@ -6,6 +6,16 @@
 // the path it would have run before this extension existed. That is fail-silent, not fail-closed —
 // nothing here is ever the reason a tool is blocked.
 
+import { resolveKey } from "./key-source.mjs";
+
+/**
+ * Where a key comes from is resolved in credentials.mjs, which follows Pi's own order: the
+ * `auth.json` entry `/login openrouter` writes, then the environment variable. Re-exported here
+ * because this module is the one that puts a key in a header, and because every existing caller
+ * already asks the client for it.
+ */
+export { resolveKey as apiKey, keySource, keySources, keyEnvName } from "./key-source.mjs";
+
 export const DEFAULT_MODEL = "jev-1.13.0";
 export const OPENROUTER_MODEL = "typesafe/jev-1.13";
 // Measured round trip is ~250-400ms through OpenRouter. 800ms left no headroom for a slow call,
@@ -21,23 +31,6 @@ const MAX_TIMEOUT_MS = 5000;
  */
 export function backend() {
     return process.env.JEV_BACKEND === "typesafe" ? "typesafe" : "openrouter";
-}
-
-/**
- * The key variable follows the backend, matching specpi-jev-guard's own `keyEnvName`, so one key
- * serves the whole layer. TYPESAFE_API_KEY is still accepted on the OpenRouter path so an existing
- * env file keeps working.
- */
-export function apiKey() {
-    const name = backend() === "openrouter" ? "OPENROUTER_API_KEY" : "TYPESAFE_API_KEY";
-    const direct = process.env[name];
-    if (typeof direct === "string" && direct.trim().length > 0) {
-        return direct.trim();
-    }
-
-    const legacy = backend() === "openrouter" ? process.env.TYPESAFE_API_KEY : undefined;
-
-    return typeof legacy === "string" && legacy.trim().length > 0 ? legacy.trim() : undefined;
 }
 
 /** Overridable so tests never reach the network and the eval proxy can price the traffic. */
@@ -119,7 +112,7 @@ function normalizeAnswer(raw) {
  * every question that state can answer rather than paying for the state again.
  */
 export async function ask(state, questions, options = {}) {
-    const key = apiKey();
+    const key = resolveKey(backend());
     if (!key) {
         return unavailable("no-key");
     }
