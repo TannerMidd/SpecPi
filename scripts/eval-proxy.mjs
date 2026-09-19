@@ -119,8 +119,18 @@ export function summarizeRequest(body) {
 // tool schema. The conversation request is the first one offering tools;
 // harnesses without auxiliaries are unaffected because their first request
 // already carries the schema.
+/**
+ * Model traffic only. Advisor calls share the log so their spend is visible, but they are not
+ * turns of the conversation: counting them would inflate the request count and put null-token
+ * entries into the per-request series that describes context growth.
+ */
+export function modelRequests(requests) {
+    return (requests ?? []).filter((record) => record.kind !== "advisor");
+}
+
 export function conversationSummary(requests) {
-    const conversation = requests.find((record) => (record.summary?.toolCount ?? 0) > 0) ?? requests[0];
+    const model = modelRequests(requests);
+    const conversation = model.find((record) => (record.summary?.toolCount ?? 0) > 0) ?? model[0];
     if (!conversation) {
         return summarizeRequest({ tools: [], messages: [] });
     }
@@ -419,7 +429,7 @@ function repeatedCalls(messages, inputItems) {
 
 export function summarizeToolResults(requests) {
     let best = { results: 0, errors: 0, signatures: {}, byTool: {}, repeatedCalls: 0 };
-    for (const record of requests) {
+    for (const record of modelRequests(requests)) {
         const messages = Array.isArray(record?.body?.messages) ? record.body.messages : [];
         const inputItems = Array.isArray(record?.body?.input) ? record.body.input : [];
         const current = {
@@ -482,7 +492,17 @@ export function startProxy({
         try {
             const raw = await readBody(request);
             const body = raw.length > 0 ? JSON.parse(raw) : {};
-            const responsesRequest = (request.url ?? "").split("?")[0].endsWith("/responses");
+            const routePath = (request.url ?? "").split("?")[0];
+            const responsesRequest = routePath.endsWith("/responses");
+            // The Jev advisor is part of what a SpecPi + Jev session spends, so its calls come
+            // through the same log as everything else. Routing them here is what lets the cost
+            // column include the advisor instead of quietly excluding it.
+            if (routePath.endsWith("/systemone") || routePath.endsWith("/decisions")) {
+                await forwardSystemOne({ raw, response, requests, decisions: routePath.endsWith("/decisions") });
+
+                return;
+            }
+
             const summary = summarizeRequest(body);
             const record = {
                 at: new Date().toISOString(),
@@ -550,6 +570,86 @@ export function startProxy({
     });
 }
 
+// Jev prices input only and reports no usage block of its own, so the request payload is the
+// billable quantity. chars/4 is the same conservative estimate Pi uses for context accounting;
+// an estimate is marked as such so the report can say the figure is a lower bound.
+export function estimateAdvisorTokens(payload) {
+    return Math.ceil(Buffer.byteLength(String(payload ?? ""), "utf8") / 4);
+}
+
+async function forwardSystemOne({ raw, response, requests, decisions }) {
+    const key = process.env.OPENROUTER_API_KEY || process.env.TYPESAFE_API_KEY;
+    // Two reachable backends with the same body. Which one a key works with is not a preference:
+    // the other rejects it with a bare 401, so the advisor picks by key prefix and the proxy simply
+    // forwards to whichever path it was asked for.
+    const fallback = decisions ? "https://openrouter.ai" : "https://api.typesafe.ai";
+    const base = (process.env.TYPESAFE_UPSTREAM_URL || fallback).replace(/\/+$/u, "");
+    const upstreamPath = decisions ? "/api/alpha/decisions" : "/v1/systemone";
+    const record = {
+        at: new Date().toISOString(),
+        kind: "advisor",
+        model: "jev-1.13.0",
+        inputTokens: estimateAdvisorTokens(raw),
+        estimated: true,
+        ok: false,
+    };
+    requests.push(record);
+    if (!key) {
+        response.writeHead(401, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "OPENROUTER_API_KEY is not set for the eval proxy" }));
+
+        return;
+    }
+
+    try {
+        const upstream = await fetch(`${base}${upstreamPath}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${key}`,
+                "HTTP-Referer": "https://pi.dev",
+                "X-Title": "specpi-jev-advisor",
+            },
+            body: raw,
+        });
+        const text = await upstream.text();
+        record.ok = upstream.ok;
+        record.status = upstream.status;
+        // If the service ever does report usage, prefer it over the estimate.
+        try {
+            const reported = JSON.parse(text)?.usage;
+            const tokens = reported?.input_tokens ?? reported?.prompt_tokens;
+            if (Number.isFinite(tokens)) {
+                record.inputTokens = tokens;
+                record.estimated = false;
+            }
+        } catch {
+            // A non-JSON body keeps the estimate.
+        }
+
+        response.writeHead(upstream.status, {
+            "Content-Type": upstream.headers.get("content-type") ?? "application/json",
+        });
+        response.end(text);
+    } catch (error) {
+        record.error = String(error?.message ?? error).slice(0, 160);
+        response.writeHead(502, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: record.error }));
+    }
+}
+
+/** Advisor traffic, kept apart from the harness model's own series. */
+export function advisorTotals(requests) {
+    const advisor = (requests ?? []).filter((item) => item.kind === "advisor");
+
+    return {
+        calls: advisor.length,
+        failed: advisor.filter((item) => !item.ok).length,
+        inputTokens: advisor.reduce((total, item) => total + (item.inputTokens ?? 0), 0),
+        estimated: advisor.some((item) => item.estimated),
+    };
+}
+
 export function proxyTotals(requests) {
     let inputTokens = 0;
     let outputTokens = 0;
@@ -561,7 +661,7 @@ export function proxyTotals(requests) {
     // the shape is the point: whether context climbs turn over turn, and
     // whether it ever drops, which is what compaction looks like from here.
     const series = [];
-    for (const [index, record] of requests.entries()) {
+    for (const [index, record] of modelRequests(requests).entries()) {
         const usage = record.usage;
         if (usage && Number.isFinite(usage.prompt_tokens)) {
             inputTokens += usage.prompt_tokens;

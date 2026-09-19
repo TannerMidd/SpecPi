@@ -11,7 +11,7 @@ Development formatting uses Prettier **3.9.6** (MIT), ESLint **10.9.1** (MIT), `
 
 ## Default packages
 
-Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives. All seven top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
+Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
 
 SpecPi requests exact npm dependency saves for these pins and checks installed top-level versions before completing installation. The override applies to package acquisition without changing the user's global npm configuration.
 
@@ -24,12 +24,21 @@ SpecPi requests exact npm dependency saves for these pins and checks installed t
 | pi-goal-x                      | 0.31.2  | [tmonk/pi-goal-x](https://github.com/tmonk/pi-goal-x)                     |
 | @sreetej510/pi-usage           | 0.10.0  | [Sreetej510/pi-extensions](https://github.com/Sreetej510/pi-extensions)   |
 | @gotgenes/pi-permission-system | 32.0.2  | [gotgenes/pi-packages](https://github.com/gotgenes/pi-packages)           |
+| specpi-jev-guard               | 0.1.0   | [TannerMidd/specpi-jev-guard](https://github.com/TannerMidd/specpi-jev-guard) |
 
 Transitive dependencies and their notices remain in Pi's npm installation tree. Top-level pins do not freeze upstream dependency ranges or constitute a full transitive security audit. Pi invokes npm with its upstream package-management semantics, including dependency lifecycle scripts. Browser QA has no install hook: confirmed SpecPi install/update explicitly invokes its installed Node setup bin, unless acquisition or browser setup is skipped. It downloads package-pinned Chromium without installing OS libraries. BetterWright is optional/manual and retains its own Bun-based setup; SpecPi neither removes Bun nor deletes user-owned tools. Usage reporting and web packages make their own provider/service connections. Consult upstream licenses and security policies before redistributing their components.
 
 Pi Lens is no longer a default package. Normal updates retire only unchanged entries added by SpecPi; independent or modified entries and downloaded bytes remain, with their upstream notices. Restart Pi to unload Lens.
 
 The combined base is tested with Pi 0.84.4. Pi Goal X declares Pi `>=0.83.0 <0.85.0`; compatibility with newer hosts is not assumed. SpecPi's former custom browser, structural-search, background-task, and command-guard implementations, DonSeTch, and Pi themes have been removed. Its delegation and experiment implementations were not discarded: they now ship as the independent `specpi-delegation` and `specpi-experiments` packages described below. Removal restores owned package settings but does not delete downloaded upstream packages or tools. Retired private runtimes remain in local backups with their notices.
+
+## Network services
+
+The optional Jev advisor and `specpi-jev-guard` both reach TypeSafe's System One endpoint. Neither is a bundled dependency: the advisor is first-party source that uses Node's built-in `fetch` and declares no package, and the guard is a pinned MIT package with no declared dependencies. Both require a key supplied by the user through the environment -- `OPENROUTER_API_KEY` on the default OpenRouter route, `TYPESAFE_API_KEY` when `JEV_BACKEND=typesafe` selects the direct API. The two are not interchangeable: the other service rejects the wrong one with a bare 401. SpecPi never provisions, stores or reads provider credentials for them.
+
+Requests go to `openrouter.ai` by default, or to `api.typesafe.ai` on the direct backend, unless `TYPESAFE_BASE_URL` redirects them, which exists so tests never reach the network and the eval proxy can price advisor traffic. Retention and processing of what is sent are governed by TypeSafe and, on the default route, by OpenRouter as well -- not by SpecPi; the advisor ships off, asks before its first transmission and records a hash of every payload locally. The frozen eval price list carries `jev-1.13.0` at $0.042/MTok input and free output so a measured SpecPi + Jev row never reports a cost that excludes its own advisor.
+
+Worth stating plainly, because it is the part a reader is most likely to assume otherwise: what leaves the machine is a bounded sample of the material being judged, not only counts about it. A tool result contributes up to twelve short lines of its own text, redacted and inside a 1 KB budget, because whether a result is spent or whether a fetched page is addressing the agent cannot be decided from byte counts. When the untrusted-content system is enabled, that sample is drawn from externally fetched pages and browser snapshots as well as from local output. [`SECURITY_MODEL.md`](SECURITY_MODEL.md#jev-advisor) states the exact bound and where it is enforced.
 
 ## Standalone delegation and experiments
 

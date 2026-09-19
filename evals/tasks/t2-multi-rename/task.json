@@ -8,5 +8,10 @@
     "writable": [
         "lib.js",
         "main.js"
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 3,
+        "weight": 0.5,
+        "demonstratedBy": "codex"
+    }
 }

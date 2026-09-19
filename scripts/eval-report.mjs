@@ -4,6 +4,25 @@
 // cost per attempt and cost per success together, and unknown prices are
 // lower bounds (≥), never zeroes.
 
+import { compositeScore } from "./eval-effort.mjs";
+import { loadTask } from "./eval-tasks.mjs";
+
+// Manifests are read once per process: rescoring walks every attempt in every report and the
+// reference is a constant of the task, not of the attempt.
+const taskCache = new Map();
+
+function cachedTask(id) {
+    if (!taskCache.has(id)) {
+        try {
+            taskCache.set(id, loadTask(id));
+        } catch {
+            taskCache.set(id, null);
+        }
+    }
+
+    return taskCache.get(id);
+}
+
 export function mean(values) {
     if (values.length === 0) {
         return 0;
@@ -84,12 +103,30 @@ export function attemptToolCounts(attempt) {
 // failures, so solve rate alone carried almost no information. Score is how
 // much of the task landed; scope is whether the harness stayed inside the
 // paths the task allowed. Both are reported next to the verdict.
-export function attemptScore(attempt) {
-    if (Number.isFinite(attempt?.score)) {
-        return attempt.score;
+/**
+ * An attempt's score under the current rules, recomputed rather than read back.
+ *
+ * Reports store whatever scoring was in force when they were written, exactly as they store
+ * whatever prices were in force, so a stored report is rescored here for the same reason it is
+ * repriced in eval-prices: a scoring change must not require rewriting run artifacts, and two runs
+ * recorded months apart have to stay comparable. `taskId` is optional, so a caller with no task
+ * context gets bare correctness rather than an exception.
+ */
+export function attemptScore(attempt, taskId) {
+    const correctness = Number.isFinite(attempt?.score) ? attempt.score : attempt?.pass ? 1 : 0;
+    const task = taskId === undefined ? null : cachedTask(taskId);
+    if (!task) {
+        return correctness;
     }
 
-    return attempt?.pass ? 1 : 0;
+    // A report written before the composite existed carries the checker verdict in `score`, which
+    // is the correctness input the composite wants. One written afterwards carries the composite
+    // there and correctness beside it, so prefer that when it is present.
+    return compositeScore(task, {
+        correctness: Number.isFinite(attempt?.correctness) ? attempt.correctness : correctness,
+        pass: attempt?.pass,
+        tokens: attempt?.tokens,
+    }).score;
 }
 
 export function scopeSummary(attempts) {

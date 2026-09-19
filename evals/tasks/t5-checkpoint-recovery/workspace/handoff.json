@@ -1,0 +1,305 @@
+{
+  "warning": "Unverified previous-agent notes, not ground truth",
+  "claims": [
+    {
+      "id": "batch-001",
+      "claimedDone": false,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-002",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-003",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-004",
+      "claimedDone": false,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-005",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-006",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-007",
+      "claimedDone": false,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-008",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-009",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-010",
+      "claimedDone": false,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-011",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-012",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-013",
+      "claimedDone": false,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-014",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-015",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-016",
+      "claimedDone": false,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-017",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-018",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-019",
+      "claimedDone": false,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-020",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-021",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-022",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-023",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-024",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-025",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-026",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-027",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-028",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-029",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-030",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-031",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-032",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-033",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-034",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-035",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-036",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-037",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-038",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-039",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-040",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-041",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-042",
+      "claimedDone": false,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-043",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-044",
+      "claimedDone": false,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-045",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-046",
+      "claimedDone": false,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-047",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-048",
+      "claimedDone": false,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-049",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-050",
+      "claimedDone": false,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-051",
+      "claimedDone": true,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-052",
+      "claimedDone": false,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-053",
+      "claimedDone": true,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-054",
+      "claimedDone": false,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-055",
+      "claimedDone": true,
+      "claimedRevision": 6
+    },
+    {
+      "id": "batch-056",
+      "claimedDone": false,
+      "claimedRevision": 2
+    },
+    {
+      "id": "batch-057",
+      "claimedDone": true,
+      "claimedRevision": 3
+    },
+    {
+      "id": "batch-058",
+      "claimedDone": false,
+      "claimedRevision": 4
+    },
+    {
+      "id": "batch-059",
+      "claimedDone": true,
+      "claimedRevision": 5
+    },
+    {
+      "id": "batch-060",
+      "claimedDone": false,
+      "claimedRevision": 6
+    }
+  ]
+}

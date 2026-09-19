@@ -1,0 +1,11 @@
+{
+  "id": "t5-resource-scheduler",
+  "tier": 5,
+  "category": "multi",
+  "title": "Bounded scheduling with dependencies and failed workers",
+  "timeoutMs": 1800000,
+  "turnCap": 600,
+  "writable": [
+    "work/"
+  ]
+}

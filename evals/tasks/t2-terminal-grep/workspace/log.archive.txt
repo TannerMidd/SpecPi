@@ -1,0 +1,4 @@
+INFO archived start
+ERROR archived disk full
+WARN archived retry
+ERROR archived timeout

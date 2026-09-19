@@ -195,14 +195,18 @@ try {
     const probeLine = probeResult.stdout.split(/\r?\n/).find((line) => line.startsWith("SPECPI_RESOURCE_PROBE="));
     assert.ok(probeLine, `Pi resource probe did not return structured output:\n${probeResult.stdout}`);
     const resources = JSON.parse(probeLine.slice("SPECPI_RESOURCE_PROBE=".length));
-    for (const expected of ["/extensions/tool-wishlist/index.ts", "/extensions/workflow-controls/index.ts"]) {
+    for (const expected of [
+        "/extensions/jev-advisor/index.ts",
+        "/extensions/tool-wishlist/index.ts",
+        "/extensions/workflow-controls/index.ts",
+    ]) {
         assert.ok(
             resources.extensionPaths.some((entry) => entry.replaceAll("\\", "/").endsWith(expected)),
             `Pi did not discover ${expected}: ${JSON.stringify(resources)}`,
         );
     }
 
-    assert.equal(resources.extensionPaths.length, 2, "Unexpected packaged extension");
+    assert.equal(resources.extensionPaths.length, 3, "Unexpected packaged extension");
     assert.deepEqual(resources.extensionErrors, [], `Pi reported extension load errors: ${JSON.stringify(resources)}`);
     assert.ok(resources.skillNames.includes("specpi-improve"), "Pi did not discover the SpecPi improvement skill");
 

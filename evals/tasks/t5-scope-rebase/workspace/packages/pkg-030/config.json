@@ -1,0 +1,14 @@
+{
+  "name": "pkg-030",
+  "revision": 11,
+  "schema": 1,
+  "endpoint": "/custom/29",
+  "user": {
+    "preserve": "local-edit-29",
+    "retries": 2
+  },
+  "flags": [
+    "keep",
+    "pkg-030"
+  ]
+}

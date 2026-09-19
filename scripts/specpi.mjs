@@ -23,6 +23,7 @@ import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
+import { applyConfig as applyGuardConfig } from "../extensions/jev-advisor/guard.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VERSION = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
@@ -46,6 +47,24 @@ const resourcePaths = [
     "extensions/tool-wishlist/registry.mjs",
     "extensions/tool-wishlist/validators.mjs",
     "extensions/tool-wishlist/capabilities.json",
+    "extensions/tool-wishlist/authoring-tools.mjs",
+    "extensions/jev-advisor/index.ts",
+    "extensions/jev-advisor/config.mjs",
+    "extensions/jev-advisor/consent.mjs",
+    "extensions/jev-advisor/ledger.mjs",
+    "extensions/jev-advisor/sanitize.mjs",
+    "extensions/jev-advisor/usage.mjs",
+    "extensions/jev-advisor/client.mjs",
+    "extensions/jev-advisor/broker.mjs",
+    "extensions/jev-advisor/gate.mjs",
+    "extensions/jev-advisor/guard.mjs",
+    "extensions/jev-advisor/questions/retention.mjs",
+    "extensions/jev-advisor/questions/compaction.mjs",
+    "extensions/jev-advisor/questions/gap.mjs",
+    "extensions/jev-advisor/questions/sources.mjs",
+    "extensions/jev-advisor/questions/progress.mjs",
+    "extensions/jev-advisor/questions/untrusted.mjs",
+    "extensions/jev-advisor/questions/capabilities.mjs",
     "skills/specpi-improve/SKILL.md",
 ];
 
@@ -142,7 +161,9 @@ function validateManifestPaths(manifest) {
         assertLocalPath(target, agentDir);
         const relative = path.relative(agentDir, target).replaceAll("\\", "/");
         if (
-            !/^(extensions\/(?:workflow-controls|tool-wishlist|browser|command-guard|delegation|background-tasks|structural-search|files|spec|specpi-ui-refresh)\/[^/]+|extensions\/spec\.ts|skills\/(?:specpi-improve|donsetch)\/SKILL\.md|themes\/(?:tea-house|specpi-spec)\.json|specpi\/pi-profiles\.sh)$/.test(
+            // jev-advisor is the one managed extension with a subdirectory, so it is listed
+            // separately rather than loosening the single-segment rule for every other family.
+            !/^(extensions\/(?:workflow-controls|tool-wishlist|browser|command-guard|delegation|background-tasks|structural-search|files|spec|specpi-ui-refresh)\/[^/]+|extensions\/jev-advisor\/(?:questions\/)?[^/]+|extensions\/spec\.ts|skills\/(?:specpi-improve|donsetch)\/SKILL\.md|themes\/(?:tea-house|specpi-spec)\.json|specpi\/pi-profiles\.sh)$/.test(
                 relative,
             )
         ) {
@@ -331,6 +352,17 @@ async function mutate(options, operation) {
 
             if (!options.skipBrowser) {
                 runBrowserQA(agentDir, "setup");
+            }
+
+            // specpi-jev-guard's own default is enabled:true, so a freshly installed base would
+            // start gating shell and file calls through a third-party service before anyone asked
+            // for it — and with no key it fails closed, which means a first install that refuses to
+            // run commands. The advisor rewrites this at every session start, but that only helps
+            // if the advisor loads, so the inert posture is established here at install time too.
+            try {
+                applyGuardConfig(false);
+            } catch (error) {
+                console.log(`SpecPi: could not write the Jev guard's inert settings: ${error.message}`);
             }
 
             packageState = {

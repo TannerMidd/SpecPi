@@ -9,7 +9,7 @@ Wishlist observations are leads, not authorization. Only an exact human selectio
 ## Repository map
 
 - `scripts/specpi.mjs` and `scripts/lib.mjs`: installer lifecycle, managed-state transactions, and CLI behavior.
-- `scripts/packages.mjs` and `templates/settings.json`: the seven pinned packages installed by default, including independently published `specpi-browser-qa`. The harness's own extensions remain limited to `/scope` and the improvement loop. Browser QA source lives in `packages/browser-qa` and has its own release process; change default integration in the installer, not in that immutable package release.
+- `scripts/packages.mjs` and `templates/settings.json`: the eight pinned packages installed by default, including independently published `specpi-browser-qa`. The harness's own extensions are `/scope`, the improvement loop, and the off-by-default Jev advisor. Browser QA source lives in `packages/browser-qa` and has its own release process; change default integration in the installer, not in that immutable package release.
 - `templates/`, `extensions/`, and `skills/`: installable source-of-truth files for scope and the improvement loop. Edit these, not installed copies.
 - `tests/`: installer, scope, and improvement-loop regressions.
 - `vscode/`: SpecPi Chat, the separately packaged VS Code frontend. Keep it aligned with the Pi package base; its adapters display public runtime events and do not duplicate tool policy.
@@ -32,6 +32,8 @@ Run the narrowest relevant tests while iterating, then `npm run check` once the 
 Pi fixtures use the repository's pinned development dependency by default; `SPECPI_TEST_PI` explicitly selects another CLI. Package validation creates its own temporary npm cache. Neither requires changing the user's global PATH, cache, or live Pi installation.
 
 For website changes, run `npm run check:site` and inspect desktop, tablet, and mobile screenshots. Do not create or replace visual baselines unless requested.
+
+Scripts that need a TypeSafe key (`scripts/jev-calibrate.mjs`, `scripts/jev-triage.mjs`, and the `specpi-jev` eval harness) read `OPENROUTER_API_KEY` from the environment or from the gitignored `evals/.env`; copy `evals/.env.example` and fill it in. One key covers the whole Jev layer: Jev is published on OpenRouter and both the guard and the advisor reach it there, so an OpenRouter key covers both; `JEV_BACKEND=typesafe` switches to the direct API and a TypeSafe key. A variable already set in the shell always wins, values are never printed, and `--no-env-file` skips the file. Verify a key with `node scripts/jev-calibrate.mjs --probe` before spending a run on it. That file is for this repository's own scripts only: the installed extension reads the environment Pi was started with, so a real session needs the key exported there.
 
 Never run installer integration tests against the live Pi directory. Use a fresh temporary `PI_CODING_AGENT_DIR` and skip external package and tool installation. Installer and release work must exercise the plan/install/update/doctor/uninstall lifecycle in isolated state.
 

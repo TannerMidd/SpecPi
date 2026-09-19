@@ -7,5 +7,10 @@
     "turnCap": 25,
     "writable": [
         "config.json"
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 2,
+        "weight": 0.5,
+        "demonstratedBy": "codex, opencode"
+    }
 }

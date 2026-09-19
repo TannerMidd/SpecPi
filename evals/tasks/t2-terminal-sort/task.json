@@ -7,5 +7,10 @@
     "turnCap": 50,
     "writable": [
         "sorted.txt"
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 2,
+        "weight": 0.5,
+        "demonstratedBy": "opencode, pi, specpi-default, specpi-jev"
+    }
 }

@@ -1,0 +1,4024 @@
+{
+    "schema": 1,
+    "createdAt": "2026-09-19T01:18:08.234Z",
+    "specpiVersion": "0.27.0",
+    "piVersion": "0.84.4",
+    "nodeVersion": "v24.18.0",
+    "platform": "win32",
+    "model": "deepseek-v4.1-flash",
+    "attemptsPerCell": 3,
+    "timeoutOverrideMs": null,
+    "forwarded": true,
+    "pricesSha256": "937b887b14ae07ee5d31ff786c4ff6c3022a633f34fe00a439151dd2153197c7",
+    "pricesDated": "2026-09-17",
+    "method": "Disposable workspace per attempt. Proxy harnesses (pi family, Codex CLI, DeepSeek Harness) send model traffic through a logging proxy; native harnesses (OpenCode) report per-step tokens, cost and tool calls from their own transcript. Codex CLI reads only the Responses API now, so the proxy accepts that path and forwards it to the provider's responses endpoint inside a disposable CODEX_HOME; Codex's own sandbox rejects every command on Windows, so Codex runs use its full-access sandbox mode inside the attempt's disposable workspace, and that gate is not measured either. Costs are split: modelCost is the harness's own spend and is the comparable figure, mintCost is eval plumbing, and cost is their sum. Forwarded proxy traffic mints one OpenCode session per attempt for endpoint routing; only proxy harnesses need one and the mint carries OpenCode's own system prompt, so charging it to the harness would bill the Pi family for OpenCode's context. Proxy prompt_tokens arrive inclusive of cache rereads, so only the fresh portion carries the input price; reasoning tokens are billed at the output rate. Tool calls are counted from the tools the model invoked, never from the tools it was offered, which are reported separately as per-request schema weight. Approval dialogs cannot be answered headless, so SpecPi runs set the permission package's explicit yoloMode opt-in inside the disposable home; the gate itself is not measured. Files are judged by the task checker; costs come from logged usage times evals/prices.json. Unknown models and unpriced cache writes are lower bounds. Synthetic offline runs make zero model calls and cost zero.",
+    "results": [
+        {
+            "harness": "probe-control",
+            "label": "Cache probe: never armed",
+            "task": "t3-cascade-ledger",
+            "tier": 3,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 4,
+                                "failed": 3,
+                                "passed": 1
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 86591,
+                    "wallMs": 126835,
+                    "modelRequests": 14,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "15e04c288758f7755f1aee73d8eac5c98da77b99b14fdda46634f0572d55d7d2"
+                    },
+                    "tokens": {
+                        "inputTokens": 272661,
+                        "outputTokens": 7778,
+                        "cachedTokens": 250240,
+                        "withUsage": 14,
+                        "toolCalls": {
+                            "bash": 13,
+                            "read": 3,
+                            "write": 3
+                        },
+                        "toolsOffered": {
+                            "bash": 14,
+                            "create_goal": 14,
+                            "edit": 14,
+                            "get_goal": 14,
+                            "read": 14,
+                            "report_capability_gap": 14,
+                            "request_capability": 14,
+                            "write": 14
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3585,
+                                "cachedTokens": 0,
+                                "completionTokens": 110,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 4060,
+                                "cachedTokens": 3584,
+                                "completionTokens": 149,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 14556,
+                                "cachedTokens": 4096,
+                                "completionTokens": 526,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 15997,
+                                "cachedTokens": 14976,
+                                "completionTokens": 118,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 17805,
+                                "cachedTokens": 16000,
+                                "completionTokens": 853,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 18863,
+                                "cachedTokens": 18560,
+                                "completionTokens": 1079,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 20046,
+                                "cachedTokens": 19840,
+                                "completionTokens": 877,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 20966,
+                                "cachedTokens": 20736,
+                                "completionTokens": 61,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 21055,
+                                "cachedTokens": 20864,
+                                "completionTokens": 1516,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 25652,
+                                "cachedTokens": 22528,
+                                "completionTokens": 1296,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 26990,
+                                "cachedTokens": 26752,
+                                "completionTokens": 327,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 27342,
+                                "cachedTokens": 27136,
+                                "completionTokens": 184,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 27606,
+                                "cachedTokens": 27392,
+                                "completionTokens": 248,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 28138,
+                                "cachedTokens": 27776,
+                                "completionTokens": 434,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 28138,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 1889
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48d49302ffeRsazwSYxNV4LZ6",
+                        "durationMs": 3560,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 45,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 14,
+                        "message_start": 34,
+                        "message_end": 34,
+                        "message_update": 7358,
+                        "tool_execution_start": 19,
+                        "tool_execution_update": 41,
+                        "tool_execution_end": 19,
+                        "turn_end": 14,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3585,
+                            "cachedTokens": 0,
+                            "completionTokens": 110,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 4060,
+                            "cachedTokens": 3584,
+                            "completionTokens": 149,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 14556,
+                            "cachedTokens": 4096,
+                            "completionTokens": 526,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 15997,
+                            "cachedTokens": 14976,
+                            "completionTokens": 118,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 17805,
+                            "cachedTokens": 16000,
+                            "completionTokens": 853,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 18863,
+                            "cachedTokens": 18560,
+                            "completionTokens": 1079,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 20046,
+                            "cachedTokens": 19840,
+                            "completionTokens": 877,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 20966,
+                            "cachedTokens": 20736,
+                            "completionTokens": 61,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 21055,
+                            "cachedTokens": 20864,
+                            "completionTokens": 1516,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 25652,
+                            "cachedTokens": 22528,
+                            "completionTokens": 1296,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 26990,
+                            "cachedTokens": 26752,
+                            "completionTokens": 327,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 27342,
+                            "cachedTokens": 27136,
+                            "completionTokens": 184,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 27606,
+                            "cachedTokens": 27392,
+                            "completionTokens": 248,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 28138,
+                            "cachedTokens": 27776,
+                            "completionTokens": 434,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 28138,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 1889
+                    },
+                    "toolOutcomes": {
+                        "results": 19,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "bash": {
+                                "results": 13,
+                                "errors": 1
+                            },
+                            "read": {
+                                "results": 3,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 3,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 19,
+                        "efficiency": 1,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 19,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.008780669999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.01027032,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1207,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 5,
+                                "failed": 3,
+                                "passed": 2
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 124772,
+                    "wallMs": 130776,
+                    "modelRequests": 18,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "fdd03575423dd939d8d7c5abef2a8177a5e02f71e04278451578361900d23870"
+                    },
+                    "tokens": {
+                        "inputTokens": 519317,
+                        "outputTokens": 13387,
+                        "cachedTokens": 486016,
+                        "withUsage": 18,
+                        "toolCalls": {
+                            "read": 4,
+                            "bash": 16
+                        },
+                        "toolsOffered": {
+                            "bash": 18,
+                            "create_goal": 18,
+                            "edit": 18,
+                            "get_goal": 18,
+                            "read": 18,
+                            "report_capability_gap": 18,
+                            "request_capability": 18,
+                            "write": 18
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3588,
+                                "cachedTokens": 0,
+                                "completionTokens": 96,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 4049,
+                                "cachedTokens": 3584,
+                                "completionTokens": 159,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 5935,
+                                "cachedTokens": 4096,
+                                "completionTokens": 125,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 15615,
+                                "cachedTokens": 6016,
+                                "completionTokens": 71,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 18326,
+                                "cachedTokens": 15616,
+                                "completionTokens": 1035,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 20621,
+                                "cachedTokens": 19328,
+                                "completionTokens": 1790,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 25803,
+                                "cachedTokens": 22400,
+                                "completionTokens": 924,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 31989,
+                                "cachedTokens": 26624,
+                                "completionTokens": 835,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 33406,
+                                "cachedTokens": 32768,
+                                "completionTokens": 91,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 33681,
+                                "cachedTokens": 33408,
+                                "completionTokens": 924,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 34833,
+                                "cachedTokens": 34560,
+                                "completionTokens": 1724,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 38702,
+                                "cachedTokens": 36480,
+                                "completionTokens": 1095,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 40059,
+                                "cachedTokens": 39680,
+                                "completionTokens": 1008,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 41091,
+                                "cachedTokens": 40832,
+                                "completionTokens": 919,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 42031,
+                                "cachedTokens": 41856,
+                                "completionTokens": 374,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 16,
+                                "promptTokens": 42513,
+                                "cachedTokens": 42368,
+                                "completionTokens": 304,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 17,
+                                "promptTokens": 43172,
+                                "cachedTokens": 42752,
+                                "completionTokens": 557,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 18,
+                                "promptTokens": 43903,
+                                "cachedTokens": 43648,
+                                "completionTokens": 1356,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 43903,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 2371
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48d2643affe1Wgt5PvQfJ8iDR",
+                        "durationMs": 3686,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 53,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 18,
+                        "message_start": 39,
+                        "message_end": 39,
+                        "message_update": 12943,
+                        "tool_execution_start": 20,
+                        "tool_execution_update": 52,
+                        "tool_execution_end": 20,
+                        "turn_end": 18,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3588,
+                            "cachedTokens": 0,
+                            "completionTokens": 96,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 4049,
+                            "cachedTokens": 3584,
+                            "completionTokens": 159,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 5935,
+                            "cachedTokens": 4096,
+                            "completionTokens": 125,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 15615,
+                            "cachedTokens": 6016,
+                            "completionTokens": 71,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 18326,
+                            "cachedTokens": 15616,
+                            "completionTokens": 1035,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 20621,
+                            "cachedTokens": 19328,
+                            "completionTokens": 1790,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 25803,
+                            "cachedTokens": 22400,
+                            "completionTokens": 924,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 31989,
+                            "cachedTokens": 26624,
+                            "completionTokens": 835,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 33406,
+                            "cachedTokens": 32768,
+                            "completionTokens": 91,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 33681,
+                            "cachedTokens": 33408,
+                            "completionTokens": 924,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 34833,
+                            "cachedTokens": 34560,
+                            "completionTokens": 1724,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 38702,
+                            "cachedTokens": 36480,
+                            "completionTokens": 1095,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 40059,
+                            "cachedTokens": 39680,
+                            "completionTokens": 1008,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 41091,
+                            "cachedTokens": 40832,
+                            "completionTokens": 919,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 42031,
+                            "cachedTokens": 41856,
+                            "completionTokens": 374,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 16,
+                            "promptTokens": 42513,
+                            "cachedTokens": 42368,
+                            "completionTokens": 304,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 17,
+                            "promptTokens": 43172,
+                            "cachedTokens": 42752,
+                            "completionTokens": 557,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 18,
+                            "promptTokens": 43903,
+                            "cachedTokens": 43648,
+                            "completionTokens": 1356,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 43903,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 2371
+                    },
+                    "toolOutcomes": {
+                        "results": 20,
+                        "errors": 2,
+                        "signatures": {
+                            "nonzero-exit": 2
+                        },
+                        "byTool": {
+                            "read": {
+                                "results": 4,
+                                "errors": 0
+                            },
+                            "bash": {
+                                "results": 16,
+                                "errors": 2
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 20,
+                        "efficiency": 1,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 20,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.014485398,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.015975198,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1204,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 5,
+                                "failed": 3,
+                                "passed": 2
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 161614,
+                    "wallMs": 167650,
+                    "modelRequests": 17,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "912f85f42f2c7e7a97f517d8053d38e1a09673671799b4d8072fbf1449966670"
+                    },
+                    "tokens": {
+                        "inputTokens": 409057,
+                        "outputTokens": 13108,
+                        "cachedTokens": 381824,
+                        "withUsage": 17,
+                        "toolCalls": {
+                            "read": 4,
+                            "bash": 17
+                        },
+                        "toolsOffered": {
+                            "bash": 17,
+                            "create_goal": 17,
+                            "edit": 17,
+                            "get_goal": 17,
+                            "read": 17,
+                            "report_capability_gap": 17,
+                            "request_capability": 17,
+                            "write": 17
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3588,
+                                "cachedTokens": 0,
+                                "completionTokens": 103,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 4294,
+                                "cachedTokens": 3584,
+                                "completionTokens": 127,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 5993,
+                                "cachedTokens": 4352,
+                                "completionTokens": 61,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 15582,
+                                "cachedTokens": 6016,
+                                "completionTokens": 71,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 18293,
+                                "cachedTokens": 15616,
+                                "completionTokens": 294,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 18905,
+                                "cachedTokens": 18560,
+                                "completionTokens": 1305,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 20859,
+                                "cachedTokens": 20096,
+                                "completionTokens": 296,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 21473,
+                                "cachedTokens": 21120,
+                                "completionTokens": 1704,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 23582,
+                                "cachedTokens": 23168,
+                                "completionTokens": 2092,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 25700,
+                                "cachedTokens": 25472,
+                                "completionTokens": 942,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 29924,
+                                "cachedTokens": 26624,
+                                "completionTokens": 1246,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 33716,
+                                "cachedTokens": 31104,
+                                "completionTokens": 1946,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 35712,
+                                "cachedTokens": 35456,
+                                "completionTokens": 1430,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 37160,
+                                "cachedTokens": 36992,
+                                "completionTokens": 239,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 37522,
+                                "cachedTokens": 37376,
+                                "completionTokens": 365,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 16,
+                                "promptTokens": 37914,
+                                "cachedTokens": 37760,
+                                "completionTokens": 623,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 17,
+                                "promptTokens": 38840,
+                                "cachedTokens": 38528,
+                                "completionTokens": 264,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 38840,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 2203
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48d02677ffeuwZFZwbjWWt1ZC",
+                        "durationMs": 4124,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 51,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 17,
+                        "message_start": 39,
+                        "message_end": 39,
+                        "message_update": 12660,
+                        "tool_execution_start": 21,
+                        "tool_execution_update": 53,
+                        "tool_execution_end": 21,
+                        "turn_end": 17,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3588,
+                            "cachedTokens": 0,
+                            "completionTokens": 103,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 4294,
+                            "cachedTokens": 3584,
+                            "completionTokens": 127,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 5993,
+                            "cachedTokens": 4352,
+                            "completionTokens": 61,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 15582,
+                            "cachedTokens": 6016,
+                            "completionTokens": 71,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 18293,
+                            "cachedTokens": 15616,
+                            "completionTokens": 294,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 18905,
+                            "cachedTokens": 18560,
+                            "completionTokens": 1305,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 20859,
+                            "cachedTokens": 20096,
+                            "completionTokens": 296,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 21473,
+                            "cachedTokens": 21120,
+                            "completionTokens": 1704,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 23582,
+                            "cachedTokens": 23168,
+                            "completionTokens": 2092,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 25700,
+                            "cachedTokens": 25472,
+                            "completionTokens": 942,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 29924,
+                            "cachedTokens": 26624,
+                            "completionTokens": 1246,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 33716,
+                            "cachedTokens": 31104,
+                            "completionTokens": 1946,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 35712,
+                            "cachedTokens": 35456,
+                            "completionTokens": 1430,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 37160,
+                            "cachedTokens": 36992,
+                            "completionTokens": 239,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 37522,
+                            "cachedTokens": 37376,
+                            "completionTokens": 365,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 16,
+                            "promptTokens": 37914,
+                            "cachedTokens": 37760,
+                            "completionTokens": 623,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 17,
+                            "promptTokens": 38840,
+                            "cachedTokens": 38528,
+                            "completionTokens": 264,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 38840,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 2203
+                    },
+                    "toolOutcomes": {
+                        "results": 21,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 4,
+                                "errors": 0
+                            },
+                            "bash": {
+                                "results": 17,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 21,
+                        "efficiency": 1,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 21,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.013095221999999998,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.014585021999999998,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1205,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "probe-flip",
+            "label": "Cache probe: armed at turn 6",
+            "task": "t3-cascade-ledger",
+            "tier": 3,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 5,
+                                "failed": 3,
+                                "passed": 2
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 92181,
+                    "wallMs": 99055,
+                    "modelRequests": 15,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "01ae328d53697a86039bbc62ff0a83cd8252be3e497602f69004f0562add6d5d"
+                    },
+                    "tokens": {
+                        "inputTokens": 424027,
+                        "outputTokens": 13811,
+                        "cachedTokens": 366336,
+                        "withUsage": 15,
+                        "toolCalls": {
+                            "read": 4,
+                            "bash": 14,
+                            "write": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 15,
+                            "create_goal": 15,
+                            "edit": 15,
+                            "get_goal": 15,
+                            "read": 15,
+                            "report_capability_gap": 15,
+                            "request_capability": 15,
+                            "write": 15,
+                            "browser_accessibility": 8,
+                            "browser_click": 8,
+                            "browser_close": 8,
+                            "browser_compare_screenshot": 8,
+                            "browser_diagnostics": 8,
+                            "browser_fill": 8,
+                            "browser_open": 8,
+                            "browser_press": 8,
+                            "browser_save_baseline": 8,
+                            "browser_screenshot": 8,
+                            "browser_select_option": 8,
+                            "browser_set_viewport": 8,
+                            "browser_snapshot": 8,
+                            "browser_wait_for": 8
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3588,
+                                "cachedTokens": 0,
+                                "completionTokens": 79,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 4032,
+                                "cachedTokens": 3584,
+                                "completionTokens": 97,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 14063,
+                                "cachedTokens": 4096,
+                                "completionTokens": 131,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 17477,
+                                "cachedTokens": 14080,
+                                "completionTokens": 1344,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 19864,
+                                "cachedTokens": 18816,
+                                "completionTokens": 2542,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 24251,
+                                "cachedTokens": 22400,
+                                "completionTokens": 1830,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 29657,
+                                "cachedTokens": 25984,
+                                "completionTokens": 1634,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 34537,
+                                "cachedTokens": 3200,
+                                "completionTokens": 454,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 35667,
+                                "cachedTokens": 34944,
+                                "completionTokens": 1238,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 37200,
+                                "cachedTokens": 36864,
+                                "completionTokens": 1793,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 39283,
+                                "cachedTokens": 38912,
+                                "completionTokens": 1143,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 40468,
+                                "cachedTokens": 40320,
+                                "completionTokens": 326,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 40821,
+                                "cachedTokens": 40576,
+                                "completionTokens": 222,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 41149,
+                                "cachedTokens": 40960,
+                                "completionTokens": 564,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 41970,
+                                "cachedTokens": 41600,
+                                "completionTokens": 414,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 41970,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 2742
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48cd5bc8ffevmpQRB6AldVVA2",
+                        "durationMs": 3922,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 47,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 15,
+                        "message_start": 35,
+                        "message_end": 35,
+                        "message_update": 13427,
+                        "tool_execution_start": 19,
+                        "tool_execution_update": 57,
+                        "tool_execution_end": 19,
+                        "turn_end": 15,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3588,
+                            "cachedTokens": 0,
+                            "completionTokens": 79,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 4032,
+                            "cachedTokens": 3584,
+                            "completionTokens": 97,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 14063,
+                            "cachedTokens": 4096,
+                            "completionTokens": 131,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 17477,
+                            "cachedTokens": 14080,
+                            "completionTokens": 1344,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 19864,
+                            "cachedTokens": 18816,
+                            "completionTokens": 2542,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 24251,
+                            "cachedTokens": 22400,
+                            "completionTokens": 1830,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 29657,
+                            "cachedTokens": 25984,
+                            "completionTokens": 1634,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 34537,
+                            "cachedTokens": 3200,
+                            "completionTokens": 454,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 35667,
+                            "cachedTokens": 34944,
+                            "completionTokens": 1238,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 37200,
+                            "cachedTokens": 36864,
+                            "completionTokens": 1793,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 39283,
+                            "cachedTokens": 38912,
+                            "completionTokens": 1143,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 40468,
+                            "cachedTokens": 40320,
+                            "completionTokens": 326,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 40821,
+                            "cachedTokens": 40576,
+                            "completionTokens": 222,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 41149,
+                            "cachedTokens": 40960,
+                            "completionTokens": 564,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 41970,
+                            "cachedTokens": 41600,
+                            "completionTokens": 414,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 41970,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 2742
+                    },
+                    "toolOutcomes": {
+                        "results": 19,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 4,
+                                "errors": 0
+                            },
+                            "bash": {
+                                "results": 14,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 19,
+                        "efficiency": 1,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 19,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.018039257999999996,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.019529057999999995,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1209,
+                    "stderrTail": "[cache-probe] turn 6: added 14 tools (browser_accessibility, browser_open, browser_set_viewport, browser_snapshot, browser_click, browser_fill, browser_diagnostics, browser_press, browser_select_option, browser_wait_for, browser_screenshot, browser_save_baseline, browser_compare_screenshot, browser_close)\n"
+                },
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 129,
+                                "failed": 3,
+                                "passed": 126
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 183009,
+                    "wallMs": 190819,
+                    "modelRequests": 20,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "07a9c25771c2ebc279e1fce5bc47d703913849427c17bd6b4d10aa76aab7ab7d"
+                    },
+                    "tokens": {
+                        "inputTokens": 600275,
+                        "outputTokens": 19330,
+                        "cachedTokens": 546560,
+                        "withUsage": 20,
+                        "toolCalls": {
+                            "bash": 24,
+                            "read": 4,
+                            "write": 1,
+                            "edit": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 20,
+                            "create_goal": 20,
+                            "edit": 20,
+                            "get_goal": 20,
+                            "read": 20,
+                            "report_capability_gap": 20,
+                            "request_capability": 20,
+                            "write": 20,
+                            "browser_accessibility": 13,
+                            "browser_click": 13,
+                            "browser_close": 13,
+                            "browser_compare_screenshot": 13,
+                            "browser_diagnostics": 13,
+                            "browser_fill": 13,
+                            "browser_open": 13,
+                            "browser_press": 13,
+                            "browser_save_baseline": 13,
+                            "browser_screenshot": 13,
+                            "browser_select_option": 13,
+                            "browser_set_viewport": 13,
+                            "browser_snapshot": 13,
+                            "browser_wait_for": 13
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3582,
+                                "cachedTokens": 0,
+                                "completionTokens": 112,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 4059,
+                                "cachedTokens": 3584,
+                                "completionTokens": 197,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 6899,
+                                "cachedTokens": 4224,
+                                "completionTokens": 130,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 7114,
+                                "cachedTokens": 6912,
+                                "completionTokens": 129,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 7831,
+                                "cachedTokens": 7168,
+                                "completionTokens": 156,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 17691,
+                                "cachedTokens": 7936,
+                                "completionTokens": 177,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 21076,
+                                "cachedTokens": 17792,
+                                "completionTokens": 1050,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 25591,
+                                "cachedTokens": 3200,
+                                "completionTokens": 380,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 26181,
+                                "cachedTokens": 25856,
+                                "completionTokens": 2204,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 29945,
+                                "cachedTokens": 28288,
+                                "completionTokens": 513,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 30863,
+                                "cachedTokens": 30336,
+                                "completionTokens": 5261,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 39279,
+                                "cachedTokens": 36096,
+                                "completionTokens": 1677,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 42796,
+                                "cachedTokens": 40832,
+                                "completionTokens": 1946,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 44777,
+                                "cachedTokens": 44544,
+                                "completionTokens": 1142,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 46045,
+                                "cachedTokens": 45824,
+                                "completionTokens": 1392,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 16,
+                                "promptTokens": 47479,
+                                "cachedTokens": 47232,
+                                "completionTokens": 737,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 17,
+                                "promptTokens": 48259,
+                                "cachedTokens": 48000,
+                                "completionTokens": 242,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 18,
+                                "promptTokens": 49138,
+                                "cachedTokens": 48384,
+                                "completionTokens": 373,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 19,
+                                "promptTokens": 50148,
+                                "cachedTokens": 49408,
+                                "completionTokens": 832,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 20,
+                                "promptTokens": 51522,
+                                "cachedTokens": 50944,
+                                "completionTokens": 680,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 51522,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 2523
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48cba764ffeazjUpG39hiTCyX",
+                        "durationMs": 3827,
+                        "inputTokens": 9922,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014895
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 57,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 20,
+                        "message_start": 51,
+                        "message_end": 51,
+                        "message_update": 18693,
+                        "tool_execution_start": 30,
+                        "tool_execution_update": 74,
+                        "tool_execution_end": 30,
+                        "turn_end": 20,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3582,
+                            "cachedTokens": 0,
+                            "completionTokens": 112,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 4059,
+                            "cachedTokens": 3584,
+                            "completionTokens": 197,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 6899,
+                            "cachedTokens": 4224,
+                            "completionTokens": 130,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 7114,
+                            "cachedTokens": 6912,
+                            "completionTokens": 129,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 7831,
+                            "cachedTokens": 7168,
+                            "completionTokens": 156,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 17691,
+                            "cachedTokens": 7936,
+                            "completionTokens": 177,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 21076,
+                            "cachedTokens": 17792,
+                            "completionTokens": 1050,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 25591,
+                            "cachedTokens": 3200,
+                            "completionTokens": 380,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 26181,
+                            "cachedTokens": 25856,
+                            "completionTokens": 2204,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 29945,
+                            "cachedTokens": 28288,
+                            "completionTokens": 513,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 30863,
+                            "cachedTokens": 30336,
+                            "completionTokens": 5261,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 39279,
+                            "cachedTokens": 36096,
+                            "completionTokens": 1677,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 42796,
+                            "cachedTokens": 40832,
+                            "completionTokens": 1946,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 44777,
+                            "cachedTokens": 44544,
+                            "completionTokens": 1142,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 46045,
+                            "cachedTokens": 45824,
+                            "completionTokens": 1392,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 16,
+                            "promptTokens": 47479,
+                            "cachedTokens": 47232,
+                            "completionTokens": 737,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 17,
+                            "promptTokens": 48259,
+                            "cachedTokens": 48000,
+                            "completionTokens": 242,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 18,
+                            "promptTokens": 49138,
+                            "cachedTokens": 48384,
+                            "completionTokens": 373,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 19,
+                            "promptTokens": 50148,
+                            "cachedTokens": 49408,
+                            "completionTokens": 832,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 20,
+                            "promptTokens": 51522,
+                            "cachedTokens": 50944,
+                            "completionTokens": 680,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 51522,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 2523
+                    },
+                    "toolOutcomes": {
+                        "results": 30,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 24,
+                                "errors": 0
+                            },
+                            "read": {
+                                "results": 4,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.925,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 30,
+                        "efficiency": 0.7,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 30,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.02129493,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014895,
+                    "cost": 0.02278443,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1328,
+                    "stderrTail": "[cache-probe] turn 6: added 14 tools (browser_accessibility, browser_open, browser_set_viewport, browser_snapshot, browser_click, browser_fill, browser_diagnostics, browser_press, browser_select_option, browser_wait_for, browser_screenshot, browser_save_baseline, browser_compare_screenshot, browser_close)\n"
+                },
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 4,
+                                "failed": 3,
+                                "passed": 1
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 76438,
+                    "wallMs": 83212,
+                    "modelRequests": 19,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "d2f53fb8a72afd3ce46389e09feaae58ca0d8e97f10580dfdd8082521dae0e96"
+                    },
+                    "tokens": {
+                        "inputTokens": 472991,
+                        "outputTokens": 9708,
+                        "cachedTokens": 427136,
+                        "withUsage": 19,
+                        "toolCalls": {
+                            "read": 4,
+                            "bash": 15,
+                            "write": 3
+                        },
+                        "toolsOffered": {
+                            "bash": 19,
+                            "create_goal": 19,
+                            "edit": 19,
+                            "get_goal": 19,
+                            "read": 19,
+                            "report_capability_gap": 19,
+                            "request_capability": 19,
+                            "write": 19,
+                            "browser_accessibility": 12,
+                            "browser_click": 12,
+                            "browser_close": 12,
+                            "browser_compare_screenshot": 12,
+                            "browser_diagnostics": 12,
+                            "browser_fill": 12,
+                            "browser_open": 12,
+                            "browser_press": 12,
+                            "browser_save_baseline": 12,
+                            "browser_screenshot": 12,
+                            "browser_select_option": 12,
+                            "browser_set_viewport": 12,
+                            "browser_snapshot": 12,
+                            "browser_wait_for": 12
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3585,
+                                "cachedTokens": 0,
+                                "completionTokens": 80,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 4030,
+                                "cachedTokens": 3584,
+                                "completionTokens": 39,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 13597,
+                                "cachedTokens": 3968,
+                                "completionTokens": 101,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 16981,
+                                "cachedTokens": 13696,
+                                "completionTokens": 1347,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 19392,
+                                "cachedTokens": 18304,
+                                "completionTokens": 863,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 20813,
+                                "cachedTokens": 20224,
+                                "completionTokens": 473,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 21312,
+                                "cachedTokens": 21120,
+                                "completionTokens": 62,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 24156,
+                                "cachedTokens": 3200,
+                                "completionTokens": 1130,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 25556,
+                                "cachedTokens": 25216,
+                                "completionTokens": 1409,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 26991,
+                                "cachedTokens": 26752,
+                                "completionTokens": 62,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 29858,
+                                "cachedTokens": 27008,
+                                "completionTokens": 760,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 30952,
+                                "cachedTokens": 30592,
+                                "completionTokens": 656,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 31824,
+                                "cachedTokens": 31488,
+                                "completionTokens": 91,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 32459,
+                                "cachedTokens": 31872,
+                                "completionTokens": 1310,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 33794,
+                                "cachedTokens": 33536,
+                                "completionTokens": 145,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 16,
+                                "promptTokens": 33968,
+                                "cachedTokens": 33792,
+                                "completionTokens": 173,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 17,
+                                "promptTokens": 34172,
+                                "cachedTokens": 33920,
+                                "completionTokens": 148,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 18,
+                                "promptTokens": 34391,
+                                "cachedTokens": 34176,
+                                "completionTokens": 393,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 19,
+                                "promptTokens": 35160,
+                                "cachedTokens": 34688,
+                                "completionTokens": 466,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 35160,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 1754
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48c894d7ffe7f7k036t0Y1sUi",
+                        "durationMs": 3807,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 55,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 19,
+                        "message_start": 42,
+                        "message_end": 42,
+                        "message_update": 9199,
+                        "tool_execution_start": 22,
+                        "tool_execution_update": 50,
+                        "tool_execution_end": 22,
+                        "turn_end": 19,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3585,
+                            "cachedTokens": 0,
+                            "completionTokens": 80,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 4030,
+                            "cachedTokens": 3584,
+                            "completionTokens": 39,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 13597,
+                            "cachedTokens": 3968,
+                            "completionTokens": 101,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 16981,
+                            "cachedTokens": 13696,
+                            "completionTokens": 1347,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 19392,
+                            "cachedTokens": 18304,
+                            "completionTokens": 863,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 20813,
+                            "cachedTokens": 20224,
+                            "completionTokens": 473,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 21312,
+                            "cachedTokens": 21120,
+                            "completionTokens": 62,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 24156,
+                            "cachedTokens": 3200,
+                            "completionTokens": 1130,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 25556,
+                            "cachedTokens": 25216,
+                            "completionTokens": 1409,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 26991,
+                            "cachedTokens": 26752,
+                            "completionTokens": 62,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 29858,
+                            "cachedTokens": 27008,
+                            "completionTokens": 760,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 30952,
+                            "cachedTokens": 30592,
+                            "completionTokens": 656,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 31824,
+                            "cachedTokens": 31488,
+                            "completionTokens": 91,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 32459,
+                            "cachedTokens": 31872,
+                            "completionTokens": 1310,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 33794,
+                            "cachedTokens": 33536,
+                            "completionTokens": 145,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 16,
+                            "promptTokens": 33968,
+                            "cachedTokens": 33792,
+                            "completionTokens": 173,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 17,
+                            "promptTokens": 34172,
+                            "cachedTokens": 33920,
+                            "completionTokens": 148,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 18,
+                            "promptTokens": 34391,
+                            "cachedTokens": 34176,
+                            "completionTokens": 393,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 19,
+                            "promptTokens": 35160,
+                            "cachedTokens": 34688,
+                            "completionTokens": 466,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 35160,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 1754
+                    },
+                    "toolOutcomes": {
+                        "results": 22,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "read": {
+                                "results": 4,
+                                "errors": 0
+                            },
+                            "bash": {
+                                "results": 15,
+                                "errors": 1
+                            },
+                            "write": {
+                                "results": 3,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.9886363636363636,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 22,
+                        "efficiency": 0.9545454545454546,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 22,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.013984458,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.015474108,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1209,
+                    "stderrTail": "[cache-probe] turn 6: added 14 tools (browser_accessibility, browser_open, browser_set_viewport, browser_snapshot, browser_click, browser_fill, browser_diagnostics, browser_press, browser_select_option, browser_wait_for, browser_screenshot, browser_save_baseline, browser_compare_screenshot, browser_close)\n"
+                }
+            ]
+        },
+        {
+            "harness": "probe-armed",
+            "label": "Cache probe: armed from turn 1",
+            "task": "t3-cascade-ledger",
+            "tier": 3,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 5,
+                                "failed": 3,
+                                "passed": 2
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 99865,
+                    "wallMs": 106029,
+                    "modelRequests": 17,
+                    "firstCall": {
+                        "toolCount": 22,
+                        "toolNames": [
+                            "bash",
+                            "browser_accessibility",
+                            "browser_click",
+                            "browser_close",
+                            "browser_compare_screenshot",
+                            "browser_diagnostics",
+                            "browser_fill",
+                            "browser_open",
+                            "browser_press",
+                            "browser_save_baseline",
+                            "browser_screenshot",
+                            "browser_select_option",
+                            "browser_set_viewport",
+                            "browser_snapshot",
+                            "browser_wait_for",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 15214,
+                        "instructionChars": 6833,
+                        "requestSha256": "497ed5de9c8f3a1b0ab6657d96fc76efc4c0c8029d7bd943c449d8d40b044d95"
+                    },
+                    "tokens": {
+                        "inputTokens": 575204,
+                        "outputTokens": 15585,
+                        "cachedTokens": 537728,
+                        "withUsage": 17,
+                        "toolCalls": {
+                            "read": 5,
+                            "bash": 13,
+                            "write": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 17,
+                            "browser_accessibility": 17,
+                            "browser_click": 17,
+                            "browser_close": 17,
+                            "browser_compare_screenshot": 17,
+                            "browser_diagnostics": 17,
+                            "browser_fill": 17,
+                            "browser_open": 17,
+                            "browser_press": 17,
+                            "browser_save_baseline": 17,
+                            "browser_screenshot": 17,
+                            "browser_select_option": 17,
+                            "browser_set_viewport": 17,
+                            "browser_snapshot": 17,
+                            "browser_wait_for": 17,
+                            "create_goal": 17,
+                            "edit": 17,
+                            "get_goal": 17,
+                            "read": 17,
+                            "report_capability_gap": 17,
+                            "request_capability": 17,
+                            "write": 17
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 5677,
+                                "cachedTokens": 0,
+                                "completionTokens": 116,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 6158,
+                                "cachedTokens": 5760,
+                                "completionTokens": 157,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 16562,
+                                "cachedTokens": 6272,
+                                "completionTokens": 343,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 19545,
+                                "cachedTokens": 16896,
+                                "completionTokens": 393,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 20882,
+                                "cachedTokens": 19840,
+                                "completionTokens": 374,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 21508,
+                                "cachedTokens": 21248,
+                                "completionTokens": 1328,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 31741,
+                                "cachedTokens": 22784,
+                                "completionTokens": 123,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 32412,
+                                "cachedTokens": 31744,
+                                "completionTokens": 820,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 35016,
+                                "cachedTokens": 33152,
+                                "completionTokens": 3367,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 41909,
+                                "cachedTokens": 38272,
+                                "completionTokens": 3449,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 45937,
+                                "cachedTokens": 45312,
+                                "completionTokens": 1073,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 47191,
+                                "cachedTokens": 46976,
+                                "completionTokens": 1972,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 49207,
+                                "cachedTokens": 49024,
+                                "completionTokens": 194,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 49621,
+                                "cachedTokens": 49280,
+                                "completionTokens": 88,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 49740,
+                                "cachedTokens": 49536,
+                                "completionTokens": 637,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 16,
+                                "promptTokens": 50614,
+                                "cachedTokens": 50304,
+                                "completionTokens": 826,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 17,
+                                "promptTokens": 51484,
+                                "cachedTokens": 51328,
+                                "completionTokens": 325,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 51484,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 2863
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48c725abffeGRG3JBbI0o2dMh",
+                        "durationMs": 3840,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 51,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 17,
+                        "message_start": 38,
+                        "message_end": 38,
+                        "message_update": 15151,
+                        "tool_execution_start": 20,
+                        "tool_execution_update": 47,
+                        "tool_execution_end": 20,
+                        "turn_end": 17,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 5677,
+                            "cachedTokens": 0,
+                            "completionTokens": 116,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 6158,
+                            "cachedTokens": 5760,
+                            "completionTokens": 157,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 16562,
+                            "cachedTokens": 6272,
+                            "completionTokens": 343,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 19545,
+                            "cachedTokens": 16896,
+                            "completionTokens": 393,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 20882,
+                            "cachedTokens": 19840,
+                            "completionTokens": 374,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 21508,
+                            "cachedTokens": 21248,
+                            "completionTokens": 1328,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 31741,
+                            "cachedTokens": 22784,
+                            "completionTokens": 123,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 32412,
+                            "cachedTokens": 31744,
+                            "completionTokens": 820,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 35016,
+                            "cachedTokens": 33152,
+                            "completionTokens": 3367,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 41909,
+                            "cachedTokens": 38272,
+                            "completionTokens": 3449,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 45937,
+                            "cachedTokens": 45312,
+                            "completionTokens": 1073,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 47191,
+                            "cachedTokens": 46976,
+                            "completionTokens": 1972,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 49207,
+                            "cachedTokens": 49024,
+                            "completionTokens": 194,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 49621,
+                            "cachedTokens": 49280,
+                            "completionTokens": 88,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 49740,
+                            "cachedTokens": 49536,
+                            "completionTokens": 637,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 16,
+                            "promptTokens": 50614,
+                            "cachedTokens": 50304,
+                            "completionTokens": 826,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 17,
+                            "promptTokens": 51484,
+                            "cachedTokens": 51328,
+                            "completionTokens": 325,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 51484,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 2863
+                    },
+                    "toolOutcomes": {
+                        "results": 20,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 5,
+                                "errors": 0
+                            },
+                            "bash": {
+                                "results": 13,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 20,
+                        "efficiency": 1,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 20,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.016585584,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.018075384,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1206,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 5,
+                                "failed": 3,
+                                "passed": 2
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 90701,
+                    "wallMs": 97276,
+                    "modelRequests": 20,
+                    "firstCall": {
+                        "toolCount": 22,
+                        "toolNames": [
+                            "bash",
+                            "browser_accessibility",
+                            "browser_click",
+                            "browser_close",
+                            "browser_compare_screenshot",
+                            "browser_diagnostics",
+                            "browser_fill",
+                            "browser_open",
+                            "browser_press",
+                            "browser_save_baseline",
+                            "browser_screenshot",
+                            "browser_select_option",
+                            "browser_set_viewport",
+                            "browser_snapshot",
+                            "browser_wait_for",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 15214,
+                        "instructionChars": 6833,
+                        "requestSha256": "b7d2ecfa76d3bd4ac7d20fd2f8052aee23e4baa1e90aef18020df5c4b73e1664"
+                    },
+                    "tokens": {
+                        "inputTokens": 517607,
+                        "outputTokens": 12326,
+                        "cachedTokens": 490240,
+                        "withUsage": 20,
+                        "toolCalls": {
+                            "bash": 25,
+                            "read": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 20,
+                            "browser_accessibility": 20,
+                            "browser_click": 20,
+                            "browser_close": 20,
+                            "browser_compare_screenshot": 20,
+                            "browser_diagnostics": 20,
+                            "browser_fill": 20,
+                            "browser_open": 20,
+                            "browser_press": 20,
+                            "browser_save_baseline": 20,
+                            "browser_screenshot": 20,
+                            "browser_select_option": 20,
+                            "browser_set_viewport": 20,
+                            "browser_snapshot": 20,
+                            "browser_wait_for": 20,
+                            "create_goal": 20,
+                            "edit": 20,
+                            "get_goal": 20,
+                            "read": 20,
+                            "report_capability_gap": 20,
+                            "request_capability": 20,
+                            "write": 20
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 5677,
+                                "cachedTokens": 0,
+                                "completionTokens": 140,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 6582,
+                                "cachedTokens": 5760,
+                                "completionTokens": 248,
+                                "toolCalls": 3
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 8450,
+                                "cachedTokens": 6784,
+                                "completionTokens": 223,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9776,
+                                "cachedTokens": 8576,
+                                "completionTokens": 82,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 19386,
+                                "cachedTokens": 9856,
+                                "completionTokens": 87,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 22113,
+                                "cachedTokens": 19456,
+                                "completionTokens": 279,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 22641,
+                                "cachedTokens": 22272,
+                                "completionTokens": 1254,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 24617,
+                                "cachedTokens": 23808,
+                                "completionTokens": 214,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 25326,
+                                "cachedTokens": 24704,
+                                "completionTokens": 1566,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 26917,
+                                "cachedTokens": 26752,
+                                "completionTokens": 826,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 28046,
+                                "cachedTokens": 27648,
+                                "completionTokens": 2081,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 31217,
+                                "cachedTokens": 30080,
+                                "completionTokens": 2115,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 33931,
+                                "cachedTokens": 33280,
+                                "completionTokens": 480,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 34709,
+                                "cachedTokens": 34304,
+                                "completionTokens": 1082,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 35809,
+                                "cachedTokens": 35584,
+                                "completionTokens": 110,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 16,
+                                "promptTokens": 35948,
+                                "cachedTokens": 35712,
+                                "completionTokens": 63,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 17,
+                                "promptTokens": 36040,
+                                "cachedTokens": 35840,
+                                "completionTokens": 81,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 18,
+                                "promptTokens": 36152,
+                                "cachedTokens": 35968,
+                                "completionTokens": 546,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 19,
+                                "promptTokens": 36815,
+                                "cachedTokens": 36608,
+                                "completionTokens": 474,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 20,
+                                "promptTokens": 37455,
+                                "cachedTokens": 37248,
+                                "completionTokens": 375,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 37455,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 1673
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48c55cb0ffeaXiP3jxr68QMp2",
+                        "durationMs": 3973,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 57,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 20,
+                        "message_start": 48,
+                        "message_end": 48,
+                        "message_update": 11760,
+                        "tool_execution_start": 27,
+                        "tool_execution_update": 74,
+                        "tool_execution_end": 27,
+                        "turn_end": 20,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 5677,
+                            "cachedTokens": 0,
+                            "completionTokens": 140,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 6582,
+                            "cachedTokens": 5760,
+                            "completionTokens": 248,
+                            "toolCalls": 3
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 8450,
+                            "cachedTokens": 6784,
+                            "completionTokens": 223,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9776,
+                            "cachedTokens": 8576,
+                            "completionTokens": 82,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 19386,
+                            "cachedTokens": 9856,
+                            "completionTokens": 87,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 22113,
+                            "cachedTokens": 19456,
+                            "completionTokens": 279,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 22641,
+                            "cachedTokens": 22272,
+                            "completionTokens": 1254,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 24617,
+                            "cachedTokens": 23808,
+                            "completionTokens": 214,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 25326,
+                            "cachedTokens": 24704,
+                            "completionTokens": 1566,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 26917,
+                            "cachedTokens": 26752,
+                            "completionTokens": 826,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 28046,
+                            "cachedTokens": 27648,
+                            "completionTokens": 2081,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 31217,
+                            "cachedTokens": 30080,
+                            "completionTokens": 2115,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 33931,
+                            "cachedTokens": 33280,
+                            "completionTokens": 480,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 34709,
+                            "cachedTokens": 34304,
+                            "completionTokens": 1082,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 35809,
+                            "cachedTokens": 35584,
+                            "completionTokens": 110,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 16,
+                            "promptTokens": 35948,
+                            "cachedTokens": 35712,
+                            "completionTokens": 63,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 17,
+                            "promptTokens": 36040,
+                            "cachedTokens": 35840,
+                            "completionTokens": 81,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 18,
+                            "promptTokens": 36152,
+                            "cachedTokens": 35968,
+                            "completionTokens": 546,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 19,
+                            "promptTokens": 36815,
+                            "cachedTokens": 36608,
+                            "completionTokens": 474,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 20,
+                            "promptTokens": 37455,
+                            "cachedTokens": 37248,
+                            "completionTokens": 375,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 37455,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 1673
+                    },
+                    "toolOutcomes": {
+                        "results": 27,
+                        "errors": 2,
+                        "signatures": {
+                            "nonzero-exit": 2
+                        },
+                        "byTool": {
+                            "bash": {
+                                "results": 25,
+                                "errors": 2
+                            },
+                            "read": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 2
+                    },
+                    "score": 0.9444444444444444,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 27,
+                        "efficiency": 0.7777777777777778,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 27,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.01297137,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.014461169999999999,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1208,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "all 120 chain modules satisfy their rules, including 14 amended",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": {
+                        "injected": 3,
+                        "triggered": 3,
+                        "abandoned": [],
+                        "recoveredCommands": 1,
+                        "commands": [
+                            {
+                                "name": "chainverify",
+                                "failures": 3,
+                                "seen": 4,
+                                "failed": 3,
+                                "passed": 1
+                            }
+                        ]
+                    },
+                    "harnessError": "",
+                    "durationMs": 97340,
+                    "wallMs": 105206,
+                    "modelRequests": 19,
+                    "firstCall": {
+                        "toolCount": 22,
+                        "toolNames": [
+                            "bash",
+                            "browser_accessibility",
+                            "browser_click",
+                            "browser_close",
+                            "browser_compare_screenshot",
+                            "browser_diagnostics",
+                            "browser_fill",
+                            "browser_open",
+                            "browser_press",
+                            "browser_save_baseline",
+                            "browser_screenshot",
+                            "browser_select_option",
+                            "browser_set_viewport",
+                            "browser_snapshot",
+                            "browser_wait_for",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 15214,
+                        "instructionChars": 6833,
+                        "requestSha256": "66c29a2fc21ed8250c726bf1604c1fc775986b88cd97c154d10516168f74496c"
+                    },
+                    "tokens": {
+                        "inputTokens": 369022,
+                        "outputTokens": 14589,
+                        "cachedTokens": 349184,
+                        "withUsage": 19,
+                        "toolCalls": {
+                            "bash": 24
+                        },
+                        "toolsOffered": {
+                            "bash": 19,
+                            "browser_accessibility": 19,
+                            "browser_click": 19,
+                            "browser_close": 19,
+                            "browser_compare_screenshot": 19,
+                            "browser_diagnostics": 19,
+                            "browser_fill": 19,
+                            "browser_open": 19,
+                            "browser_press": 19,
+                            "browser_save_baseline": 19,
+                            "browser_screenshot": 19,
+                            "browser_select_option": 19,
+                            "browser_set_viewport": 19,
+                            "browser_snapshot": 19,
+                            "browser_wait_for": 19,
+                            "create_goal": 19,
+                            "edit": 19,
+                            "get_goal": 19,
+                            "read": 19,
+                            "report_capability_gap": 19,
+                            "request_capability": 19,
+                            "write": 19
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 5677,
+                                "cachedTokens": 0,
+                                "completionTokens": 137,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 6579,
+                                "cachedTokens": 5760,
+                                "completionTokens": 196,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 8708,
+                                "cachedTokens": 6656,
+                                "completionTokens": 307,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9716,
+                                "cachedTokens": 8960,
+                                "completionTokens": 175,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 11264,
+                                "cachedTokens": 9856,
+                                "completionTokens": 1586,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 13242,
+                                "cachedTokens": 12800,
+                                "completionTokens": 830,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 7,
+                                "promptTokens": 14100,
+                                "cachedTokens": 13952,
+                                "completionTokens": 92,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 8,
+                                "promptTokens": 14268,
+                                "cachedTokens": 14080,
+                                "completionTokens": 803,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 9,
+                                "promptTokens": 15124,
+                                "cachedTokens": 14976,
+                                "completionTokens": 1136,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 10,
+                                "promptTokens": 16962,
+                                "cachedTokens": 16256,
+                                "completionTokens": 1325,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 11,
+                                "promptTokens": 23841,
+                                "cachedTokens": 18176,
+                                "completionTokens": 827,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 12,
+                                "promptTokens": 24808,
+                                "cachedTokens": 24576,
+                                "completionTokens": 188,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 13,
+                                "promptTokens": 25037,
+                                "cachedTokens": 24832,
+                                "completionTokens": 1262,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 14,
+                                "promptTokens": 26446,
+                                "cachedTokens": 26240,
+                                "completionTokens": 2946,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 15,
+                                "promptTokens": 29431,
+                                "cachedTokens": 29184,
+                                "completionTokens": 419,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 16,
+                                "promptTokens": 29875,
+                                "cachedTokens": 29696,
+                                "completionTokens": 945,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 17,
+                                "promptTokens": 30845,
+                                "cachedTokens": 30592,
+                                "completionTokens": 227,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 18,
+                                "promptTokens": 31182,
+                                "cachedTokens": 30976,
+                                "completionTokens": 469,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 19,
+                                "promptTokens": 31917,
+                                "cachedTokens": 31616,
+                                "completionTokens": 719,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 31917,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 1458
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f48c3b093ffeR8j3qepN3PAL8I",
+                        "durationMs": 3734,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 55,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 19,
+                        "message_start": 44,
+                        "message_end": 44,
+                        "message_update": 14089,
+                        "tool_execution_start": 24,
+                        "tool_execution_update": 72,
+                        "tool_execution_end": 24,
+                        "turn_end": 19,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 5677,
+                            "cachedTokens": 0,
+                            "completionTokens": 137,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 6579,
+                            "cachedTokens": 5760,
+                            "completionTokens": 196,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 8708,
+                            "cachedTokens": 6656,
+                            "completionTokens": 307,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9716,
+                            "cachedTokens": 8960,
+                            "completionTokens": 175,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 11264,
+                            "cachedTokens": 9856,
+                            "completionTokens": 1586,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 13242,
+                            "cachedTokens": 12800,
+                            "completionTokens": 830,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 7,
+                            "promptTokens": 14100,
+                            "cachedTokens": 13952,
+                            "completionTokens": 92,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 8,
+                            "promptTokens": 14268,
+                            "cachedTokens": 14080,
+                            "completionTokens": 803,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 9,
+                            "promptTokens": 15124,
+                            "cachedTokens": 14976,
+                            "completionTokens": 1136,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 10,
+                            "promptTokens": 16962,
+                            "cachedTokens": 16256,
+                            "completionTokens": 1325,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 11,
+                            "promptTokens": 23841,
+                            "cachedTokens": 18176,
+                            "completionTokens": 827,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 12,
+                            "promptTokens": 24808,
+                            "cachedTokens": 24576,
+                            "completionTokens": 188,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 13,
+                            "promptTokens": 25037,
+                            "cachedTokens": 24832,
+                            "completionTokens": 1262,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 14,
+                            "promptTokens": 26446,
+                            "cachedTokens": 26240,
+                            "completionTokens": 2946,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 15,
+                            "promptTokens": 29431,
+                            "cachedTokens": 29184,
+                            "completionTokens": 419,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 16,
+                            "promptTokens": 29875,
+                            "cachedTokens": 29696,
+                            "completionTokens": 945,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 17,
+                            "promptTokens": 30845,
+                            "cachedTokens": 30592,
+                            "completionTokens": 227,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 18,
+                            "promptTokens": 31182,
+                            "cachedTokens": 30976,
+                            "completionTokens": 469,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 19,
+                            "promptTokens": 31917,
+                            "cachedTokens": 31616,
+                            "completionTokens": 719,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 31917,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 1458
+                    },
+                    "toolOutcomes": {
+                        "results": 24,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "bash": {
+                                "results": 24,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.96875,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 21,
+                        "calls": 24,
+                        "efficiency": 0.875,
+                        "weight": 0.25
+                    },
+                    "breakdown": [
+                        {
+                            "check": "chain modules correct",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "verify depth reached",
+                            "got": 120,
+                            "of": 120
+                        },
+                        {
+                            "check": "amended modules revisited",
+                            "got": 14,
+                            "of": 14
+                        },
+                        {
+                            "check": "tool calls used",
+                            "got": 24,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 21,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "src",
+                            "notes"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.012776652,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.014266451999999999,
+                    "costComplete": true,
+                    "filesBefore": 1204,
+                    "filesAfter": 1209,
+                    "stderrTail": ""
+                }
+            ]
+        }
+    ]
+}

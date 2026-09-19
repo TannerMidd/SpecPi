@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <script src="../theme.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#fafbfc" />
+        <meta
+            name="description"
+            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, seven systems that use it, the gates in front of every call, and what it has actually measured."
+        />
+        <meta property="og:title" content="The Jev layer · SpecPi" />
+        <meta
+            property="og:description"
+            content="A classifier that returns probabilities instead of prose, gated in one place, off by default, and measured against the harness it is meant to improve."
+        />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/jev/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/jev/" />
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+        <link rel="stylesheet" href="../research.css" />
+        <title>The Jev layer · SpecPi</title>
+    </head>
+    <body>
+        <a class="skip-link" href="#content">Skip to content</a>
+        <header class="site-header wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="../#core">Scope</a><a href="../#packages">Packages</a><a href="../#install">Install</a
+                ><a href="../#vscode-chat">VS Code</a><a href="../wiki/">Docs</a><a href="../research/">Research</a
+                ><a href="../evaluations/">Evals</a><a href="./" aria-current="page">Jev</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
+            </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
+        </header>
+        <main class="wiki-layout wrap" id="content">
+            <aside class="wiki-sidebar" aria-label="Jev layer contents">
+                <p>SPECPI / JEV</p>
+                <nav>
+                    <a href="#what"><span>01</span>What it is</a><a href="#where"><span>02</span>Where it sits</a
+                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Seven systems</a
+                    ><a href="#economics"><span>05</span>Why on arrival</a
+                    ><a href="#cache-probe"><span>06</span>Pricing the cache rule</a
+                    ><a href="#calibration"><span>07</span>Calibrating the gate</a
+                    ><a href="#guard"><span>08</span>The guard</a
+                    ><a href="#measured"><span>09</span>What it measured</a
+                    ><a href="#switches"><span>10</span>Turning it on</a>
+                </nav>
+                <div class="index-meta">SpecPi 0.27.0<br />Chat 0.12.0<br />Off by default</div>
+            </aside>
+            <div class="wiki-content">
+                <div class="wiki-intro">
+                    <p class="eyebrow">The Jev layer</p>
+                    <h1>A classifier that<br />returns numbers.</h1>
+                    <p class="wiki-summary">
+                        Most harness decisions are small and repetitive: is this tool output still worth carrying, are
+                        these two complaints the same complaint, which of these sources matters most. Asking a chat
+                        model costs a round trip and returns prose you then have to parse. The Jev layer asks a typed
+                        classifier instead and gets a calibrated probability back, then decides in code.
+                    </p>
+                    <p class="wiki-release-note">
+                        The whole layer ships <strong>off</strong>. With the master switch off there is no network
+                        call, no key read, no consent read and no prompt change: the harness behaves exactly as it did
+                        before the layer existed. Everything below describes what happens once someone turns it on.
+                    </p>
+                </div>
+
+                <section class="doc-section" id="what">
+                    <header><h2>What it is</h2><span>01</span></header>
+                    <p>
+                        Jev is a System One model from TypeSafe. It does not write text. You hand it a state object and
+                        a set of questions, and it returns a typed answer for each one, evaluated in parallel against
+                        that single state. Three answer shapes exist:
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Choice</strong> &mdash; pick one of up to 255 options. Returns the choice, a
+                            probability for every option, and a confidence.
+                        </li>
+                        <li>
+                            <strong>Score</strong> &mdash; rate against two to ten ordered levels. Returns a possibly
+                            fractional score, per-level probabilities, and a confidence.
+                        </li>
+                        <li>
+                            <strong>Noul</strong> &mdash; yes or no, as a bare probability between 0 and 1.
+                            <em>It carries no confidence field</em>, which matters: a gate that waited for a Noul's
+                            confidence would be gating on a number the model never reported.
+                        </li>
+                    </ul>
+                    <p>
+                        Output is free and input is $0.042 per million tokens, so the cost of a decision is the cost of
+                        describing the state, not the cost of the answer. That is why questions are batched: several
+                        questions against one state cost the same as one.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="where">
+                    <header><h2>Where it sits</h2><span>02</span></header>
+                    <p>
+                        The layer has two halves that share a key and nothing else. The <strong>advisor</strong> is
+                        first-party SpecPi code that answers questions about session state and never holds authority:
+                        it cannot call a tool, grant a capability or allow an action. The <strong>guard</strong> is a
+                        separate pinned package that scores commands before the permission system sees them.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg
+                            class="diagram"
+                            viewBox="0 0 720 300"
+                            role="img"
+                            aria-label="The agent's tool call passes the guard, then the permission system, then runs. Its result passes the advisor before being appended to the transcript. Both halves reach Jev over HTTPS."
+                        >
+                            <defs>
+                                <marker id="a1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head" />
+                                </marker>
+                                <marker id="a2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head-accent" />
+                                </marker>
+                            </defs>
+
+                            <rect x="8" y="24" width="120" height="52" rx="7" class="dg-box" />
+                            <text x="68" y="46" text-anchor="middle" class="dg-title">Agent</text>
+                            <text x="68" y="63" text-anchor="middle" class="dg-note">asks for a tool</text>
+
+                            <rect x="168" y="24" width="132" height="52" rx="7" class="dg-box-accent" />
+                            <text x="234" y="41" text-anchor="middle" class="dg-tag">OPTIONAL</text>
+                            <text x="234" y="57" text-anchor="middle" class="dg-title">Command guard</text>
+                            <text x="234" y="71" text-anchor="middle" class="dg-note">fail-closed</text>
+
+                            <rect x="340" y="24" width="140" height="52" rx="7" class="dg-box" />
+                            <text x="410" y="46" text-anchor="middle" class="dg-title">Permission system</text>
+                            <text x="410" y="63" text-anchor="middle" class="dg-note">asks the human</text>
+
+                            <rect x="520" y="24" width="110" height="52" rx="7" class="dg-box" />
+                            <text x="575" y="46" text-anchor="middle" class="dg-title">Tool runs</text>
+                            <text x="575" y="63" text-anchor="middle" class="dg-note">produces a result</text>
+
+                            <path d="M128 50 H166" class="dg-flow" marker-end="url(#a1)" />
+                            <path d="M300 50 H338" class="dg-flow" marker-end="url(#a1)" />
+                            <path d="M480 50 H518" class="dg-flow" marker-end="url(#a1)" />
+
+                            <path d="M575 76 V116 H300" class="dg-flow" marker-end="url(#a1)" />
+
+                            <rect x="168" y="118" width="132" height="52" rx="7" class="dg-box-accent" />
+                            <text x="234" y="135" text-anchor="middle" class="dg-tag">OPTIONAL</text>
+                            <text x="234" y="151" text-anchor="middle" class="dg-title">Advisor</text>
+                            <text x="234" y="165" text-anchor="middle" class="dg-note">fail-silent</text>
+
+                            <rect x="8" y="118" width="120" height="52" rx="7" class="dg-box" />
+                            <text x="68" y="140" text-anchor="middle" class="dg-title">Transcript</text>
+                            <text x="68" y="157" text-anchor="middle" class="dg-note">result appended</text>
+                            <path d="M166 144 H130" class="dg-flow" marker-end="url(#a1)" />
+
+                            <rect x="268" y="228" width="184" height="48" rx="7" class="dg-box-accent" />
+                            <text x="360" y="248" text-anchor="middle" class="dg-title">Jev classifier</text>
+                            <text x="360" y="264" text-anchor="middle" class="dg-note">typed answers, over HTTPS</text>
+
+                            <path d="M234 76 V96 H500 V252 H456" class="dg-flow-accent" marker-end="url(#a2)" />
+                            <path d="M234 170 V252 H264" class="dg-flow-accent" marker-end="url(#a2)" />
+
+                            <text x="512" y="176" class="dg-note">a summary of at most 1 KB:</text>
+                            <text x="512" y="191" class="dg-note">counts, names, and up to twelve</text>
+                            <text x="512" y="206" class="dg-note">short redacted lines</text>
+                        </svg>
+                        <figcaption class="figure-note">
+                            Both optional boxes are removed from the path entirely when the layer is off. The guard sits
+                            before the decision to run a command; the advisor sits after it, on the result, and only
+                            ever shortens or reorders what is already there.
+                        </figcaption>
+                    </figure>
+                </section>
+
+                <section class="doc-section" id="gates">
+                    <header><h2>Six gates before anything leaves</h2><span>03</span></header>
+                    <p>
+                        A call reaches the network only after passing every gate below, in order. Any gate that says no
+                        ends the attempt silently and the harness runs the path it would have run anyway. That is the
+                        whole failure model: <strong>no advice is always a valid outcome</strong>, so a timeout, a
+                        missing key, a refused consent or an unconfident answer all look the same from the outside.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg
+                            class="diagram"
+                            viewBox="0 0 720 250"
+                            role="img"
+                            aria-label="Seven stages in sequence: master switch, per-system switch, human consent, session call budget, sanitiser, Jev, and the confidence gate. Any stage may divert to no advice."
+                        >
+                            <defs>
+                                <marker id="b1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head" />
+                                </marker>
+                                <marker id="b2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head-accent" />
+                                </marker>
+                            </defs>
+                            <g>
+                                <rect x="6" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="49" y="49" text-anchor="middle" class="dg-title">Master</text>
+                                <text x="49" y="64" text-anchor="middle" class="dg-note">switch</text>
+
+                                <rect x="104" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="147" y="49" text-anchor="middle" class="dg-title">System</text>
+                                <text x="147" y="64" text-anchor="middle" class="dg-note">switch</text>
+
+                                <rect x="202" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="245" y="49" text-anchor="middle" class="dg-title">Consent</text>
+                                <text x="245" y="64" text-anchor="middle" class="dg-note">a human said yes</text>
+
+                                <rect x="300" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="343" y="49" text-anchor="middle" class="dg-title">Budget</text>
+                                <text x="343" y="64" text-anchor="middle" class="dg-note">calls this session</text>
+
+                                <rect x="398" y="30" width="86" height="44" rx="6" class="dg-box-accent" />
+                                <text x="441" y="49" text-anchor="middle" class="dg-title">Sanitise</text>
+                                <text x="441" y="64" text-anchor="middle" class="dg-note">1 KB ceiling</text>
+
+                                <rect x="496" y="30" width="86" height="44" rx="6" class="dg-box-accent" />
+                                <text x="539" y="49" text-anchor="middle" class="dg-title">Jev</text>
+                                <text x="539" y="64" text-anchor="middle" class="dg-note">typed answer</text>
+
+                                <rect x="594" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="637" y="49" text-anchor="middle" class="dg-title">Gate</text>
+                                <text x="637" y="64" text-anchor="middle" class="dg-note">confident enough?</text>
+                            </g>
+                            <g class="dg-flow">
+                                <path d="M92 52 H102" marker-end="url(#b1)" />
+                                <path d="M190 52 H200" marker-end="url(#b1)" />
+                                <path d="M288 52 H298" marker-end="url(#b1)" />
+                                <path d="M386 52 H396" marker-end="url(#b2)" />
+                                <path d="M484 52 H494" marker-end="url(#b2)" />
+                                <path d="M582 52 H592" marker-end="url(#b1)" />
+                            </g>
+
+                            <path d="M49 74 V150" class="dg-flow-stop" />
+                            <path d="M147 74 V150" class="dg-flow-stop" />
+                            <path d="M245 74 V150" class="dg-flow-stop" />
+                            <path d="M343 74 V150" class="dg-flow-stop" />
+                            <path d="M441 74 V150" class="dg-flow-stop" />
+                            <path d="M539 74 V150" class="dg-flow-stop" />
+                            <path d="M637 74 V150" class="dg-flow-stop" />
+                            <path d="M49 150 H637" class="dg-flow-stop" />
+                            <path d="M343 150 V176" class="dg-flow-stop" marker-end="url(#b1)" />
+
+                            <rect x="248" y="178" width="190" height="44" rx="6" class="dg-box-muted" />
+                            <text x="343" y="197" text-anchor="middle" class="dg-title">No advice</text>
+                            <text x="343" y="212" text-anchor="middle" class="dg-note">the existing path runs</text>
+
+                            <text x="700" y="52" text-anchor="end" class="dg-note"></text>
+                        </svg>
+                        <figcaption class="figure-note">
+                            Only the two accented stages involve the network or the payload. The sanitiser is the one
+                            module permitted to build a wire payload: it redacts credentials, tokens, JWTs, emails and
+                            URLs, relativises absolute paths, and truncates anything still over budget rather than
+                            sending it. It does not refuse the material being judged, and an earlier version of this
+                            page said it did. Whether a result is spent, or whether a fetched page is addressing the
+                            agent, cannot be decided from byte counts, so a bounded sample goes with the counts: at
+                            most twelve short redacted lines per result &mdash; six from the head, four spaced through
+                            the middle, two from the tail &mdash; inside the same 1 KB budget.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        Consent is deliberately separate from the switch. A config flag records an intention; it does
+                        not record that a human was told what the intention costs. The first time any system would put
+                        state on the wire, a dialog names the destination host, the shape of the data and the byte
+                        ceiling. <strong>Without an interactive human nothing is sent, ever</strong>, so an unattended
+                        run cannot be the thing that starts transmitting. The grant is bound to the host it was given
+                        for, so pointing the client somewhere else asks again rather than carrying an old answer to a
+                        new destination.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="systems">
+                    <header><h2>Seven systems</h2><span>04</span></header>
+                    <p>
+                        One design rule governs all of them: <em>ask local state first, and spend a Jev call only on a
+                        question local state genuinely cannot answer</em>. Applying it is what removed the largest
+                        measured waste from this list. Six of SpecPi's ten tools were offered on every request and
+                        called zero times; two of those are only usable once a human has selected an improvement, which
+                        is already a fact on disk. They are now withdrawn until one exists, which needs no model and
+                        cannot be wrong.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Retention</strong> decides whether a large read-only tool result is still worth
+                            carrying, before it is appended. Jev decides <em>whether</em>; code does the shortening, so
+                            the replacement is a deterministic head-and-tail digest and no model-written prose ever
+                            enters the transcript.
+                        </li>
+                        <li>
+                            <strong>Compaction</strong> adds guidance at the one boundary where the prompt cache is
+                            discarded anyway, so the advice costs no cache invalidation it did not already incur.
+                        </li>
+                        <li>
+                            <strong>Gap</strong> clusters capability-gap reports that describe the same friction and
+                            scores their impact independently of what the report claimed. This fixes two real defects:
+                            semantically identical reports never reached the repeat threshold because their keys
+                            differed, and the ranking trusted the reporter's own impact estimate.
+                        </li>
+                        <li>
+                            <strong>Sources</strong> orders the sources a delegation batch will freeze. It only ever
+                            reorders; it never drops one. It also reads two answers the same call already computed and
+                            nothing used, and warns before up to 200 files and 8&nbsp;MiB are frozen for a child that
+                            does not look able to answer the question.
+                        </li>
+                        <li>
+                            <strong>Progress</strong> is the only system aimed at turns rather than input tokens, which
+                            is where the money is on the hard tiers: output is 59% of spend at tier 3 and 66% at tier 4.
+                            It watches for a session that has stopped moving &mdash; a repeated tool call, a run of
+                            errors, several turns with nothing written &mdash; and only then asks whether it is stuck.
+                            It ships set to tell the person rather than the model, because a wrong nudge costs a turn,
+                            which is the exact thing it exists to save.
+                        </li>
+                        <li>
+                            <strong>Untrusted content</strong> prepends a fixed warning line to a fetched page that
+                            confidently reads as instructions addressed to an agent. It applies only to web and browser
+                            results, never to the agent's own shell output, and it never blocks. It costs no extra call
+                            while retention is on, because the same digest answers both questions in one request.
+                        </li>
+                        <li>
+                            <strong>Capability arming</strong> reads the request once, before anything is sent to the
+                            model, and offers a withdrawn tool group when it is confident the task will need one. It
+                            activates nothing: it moves a confirmation the person would have seen at turn six to turn
+                            zero, which <a href="#cache-probe">section 06</a> measures as roughly three times cheaper.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="doc-section" id="economics">
+                    <header><h2>Why the decision happens on arrival</h2><span>05</span></header>
+                    <p>
+                        The obvious design is to let results accumulate, then rewrite a batch of them. Simulated over
+                        the recorded token series that is worth about <strong>&minus;12%</strong> of long-attempt cost.
+                        Deciding on each result before it is appended is worth about <strong>&minus;61%</strong>. Same
+                        classifier, five times the return, for one reason: a rewrite invalidates the cached prefix, and
+                        across these runs roughly <strong>94% of prompt tokens are cache reads</strong>.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg
+                            class="diagram"
+                            viewBox="0 0 720 210"
+                            role="img"
+                            aria-label="Deciding on arrival keeps the cached prefix intact and only the new result is fresh. Rewriting history afterwards invalidates the whole prefix, so every earlier token is charged again at the fresh rate."
+                        >
+                            <text x="0" y="16" class="dg-title">Decide on arrival</text>
+                            <rect x="0" y="26" width="470" height="30" rx="4" class="dg-box" />
+                            <text x="235" y="46" text-anchor="middle" class="dg-note">cached prefix &mdash; still valid, $0.003 / MTok</text>
+                            <rect x="474" y="26" width="120" height="30" rx="4" class="dg-box-accent" />
+                            <text x="534" y="46" text-anchor="middle" class="dg-note">shortened</text>
+                            <text x="604" y="46" class="dg-note">&larr; only this is fresh</text>
+
+                            <text x="0" y="104" class="dg-title">Rewrite history afterwards</text>
+                            <rect x="0" y="114" width="470" height="30" rx="4" class="dg-box-muted" />
+                            <text x="235" y="134" text-anchor="middle" class="dg-note">prefix invalidated &mdash; recharged at $0.15 / MTok</text>
+                            <rect x="474" y="114" width="120" height="30" rx="4" class="dg-box-muted" />
+                            <text x="534" y="134" text-anchor="middle" class="dg-note">rewritten</text>
+                            <text x="604" y="134" class="dg-note">&larr; all of it is fresh</text>
+
+                            <text x="0" y="178" class="dg-note">
+                                Fresh input costs 50&times; a cache read, so what a turn adds to the prefix matters more
+                            </text>
+                            <text x="0" y="194" class="dg-note">than how much the request sends in total.</text>
+                        </svg>
+                        <figcaption class="figure-note">
+                            Coverage matters far more than compression ratio here, which is why the replacement text is
+                            a plain deterministic digest that says the output can be recovered by re-running, rather
+                            than a clever summary.
+                        </figcaption>
+                    </figure>
+                </section>
+
+                <section class="doc-section" id="cache-probe">
+                    <header><h2>Pricing the rule that shaped everything</h2><span>06</span></header>
+                    <p>
+                        Every design decision above rests on one claim: changing the tool set partway through a
+                        session throws away the provider's cached prompt prefix, and since about 94% of prompt tokens
+                        are cache reads priced at a fiftieth of fresh input, that swings the bulk of spend. It is why
+                        there is no tool router, why capability arming happens before the first request or not at
+                        all, and why advice is never applied retroactively.
+                    </p>
+                    <p>
+                        It had never been measured here. Believed, reasoned about, consistent with Pi's own
+                        documentation &mdash; and never once put on a scale. So it was, on three arms of
+                        <code>t3-cascade-ledger</code> differing in exactly one thing: when Browser QA's fourteen
+                        tools reach the request. Never, at turn six, or from the first request. The decision rule was
+                        written down before the run: a collapse in cached tokens with a re-warm costing more than 10%
+                        of attempt cost confirms the rule; no collapse drops it.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>Arm</th>
+                                    <th>Tool schema</th>
+                                    <th>Fresh tokens</th>
+                                    <th>Cache hit</th>
+                                    <th>Model cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <th>Never armed</th>
+                                    <td>6,966</td>
+                                    <td>27,652</td>
+                                    <td>93.1%</td>
+                                    <td>$0.01212</td>
+                                </tr>
+                                <tr>
+                                    <th>Armed from turn 1</th>
+                                    <td>15,214</td>
+                                    <td>28,227</td>
+                                    <td>94.2%</td>
+                                    <td>$0.01411</td>
+                                </tr>
+                                <tr>
+                                    <th>Armed at turn 6</th>
+                                    <td>6,966</td>
+                                    <td>52,420</td>
+                                    <td>89.5%</td>
+                                    <td>$0.01777</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        The rule holds, and by more than the threshold it was given. In three attempts out of three,
+                        the request after the flip saw cached tokens collapse to <strong>3,200</strong> &mdash; from
+                        25,984, 17,792 and 21,120 &mdash; while the prompt kept climbing. One request went from 3,673
+                        fresh tokens to 31,337: the whole conversation so far, re-read at fresh-input prices. The
+                        re-warm cost 14.6%, 21.6% and 23.9% of the attempt, <strong>20% on average against a 10%
+                        threshold</strong> fixed in advance.
+                    </p>
+                    <p>
+                        The more useful number is the comparison. Arming the same group from the first request cost
+                        16% more than never arming it; flipping it on mid-session cost 47%. <strong>Paying up front
+                        is about three times cheaper than paying when the need appears.</strong> That is what
+                        capability arming is for, and it is the whole of what it does.
+                    </p>
+                    <p>
+                        Two honest limits. Three attempts per arm is enough to see an effect this size and not enough
+                        to rank the arms finely; the turn-1 arm also took more turns than the control (18.7 against
+                        16.3), and some of its extra cost is that rather than schema weight. And the plan for this
+                        experiment asserted that activating Browser QA rebuilds the system prompt as well as the tool
+                        schema, giving a second invalidation path. That is no longer true: the pinned 0.3.0 release
+                        moved its guidance into tool descriptions, and the measurement confirms it &mdash; system
+                        prompt length is identical between the control and armed arms. The claim has been removed
+                        rather than left standing. Web access, a third-party package, does still carry prompt
+                        metadata.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="calibration">
+                    <header><h2>Calibrating the gate, and what it found</h2><span>07</span></header>
+                    <p>
+                        The gate turns a probability into a decision, and until now every number in it was a
+                        placeholder with a comment saying so. The layer shipped ahead of its own gate. Calibrating it
+                        meant asking two different questions, because a threshold can fail in two different ways.
+                    </p>
+                    <p>
+                        <strong>Does the confidence field separate right from wrong?</strong> Measured against labels
+                        this repository already owns &mdash; predicting an attempt's outcome, its task category and
+                        its tier from behaviour alone, with the labels withheld. For a Score the answer is yes, and
+                        weakly: about two thirds exactly right and 96% within one level, on a fifth of answers,
+                        against a 43% majority class. For a Noul and a Choice, on that corpus, the answer is no:
+                        both scored at their base rate. <strong>No system's pre-registered precision target was met
+                        anywhere on any of those curves</strong>, and the artifact records that rather than a number
+                        chosen to fill the gap.
+                    </p>
+                    <p>
+                        <strong>Can the gate ever fire?</strong> This is the question that found a real defect. The
+                        retention gate demanded a Score confidence of 0.80 and a value within 0.15 of a level. On a
+                        deliberately obvious case &mdash; a directory listing of vendor icons during a changelog
+                        edit &mdash; Jev answered &ldquo;spent&rdquo; every time, at confidence 0.73 to 0.85, mostly
+                        under 0.80, with the value drifting past the boundary too. So retention could gate through to
+                        <em>keep this result</em> and essentially never to <em>this result is spent</em>. The one
+                        branch that does anything was unreachable, and no amount of running the layer would have
+                        revealed it, <strong>because a system that never fires looks exactly like a system whose
+                        advice was always to do nothing.</strong>
+                    </p>
+                    <p>
+                        The same check caught a second one in compaction, and a third in code written for this very
+                        release: the capability system's first threshold was set above what the model emits even on
+                        an unambiguous yes. The fix in each case was to read the operating point off the recorded
+                        evidence rather than to pick a number that felt conservative. Thresholds are now pinned by a
+                        test to <code>evals/runs/jev-calibration.json</code>, along with the figures quoted on this
+                        page, so moving one takes new evidence rather than a new opinion.
+                    </p>
+                    <p>
+                        On the production questions, where the state carries the material being judged rather than a
+                        row of counters, the separation is wide: a planted credential scores 0.96 against 0.04 for a
+                        clean report, a page carrying an injected instruction 0.97 against 0.04, a thrashing session
+                        0.89 against 0.30 for one working steadily. That is the gap the gates now sit in.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="guard">
+                    <header><h2>The guard is a different trade</h2><span>08</span></header>
+                    <p>
+                        The advisor is fail-silent and holds no authority. The guard is the opposite on both counts,
+                        and that is worth stating plainly rather than configuring away.
+                        <code>specpi-jev-guard</code> is <strong>fail-closed by design</strong>: with no key, an
+                        unreachable endpoint, or a middle-band verdict in a session with no interactive UI, it blocks
+                        the call and says so. There is no setting that hands the decision back to the permission
+                        system.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Off</strong>, which is the default, means the guard is not in the tool path at all
+                            and <code>@gotgenes/pi-permission-system</code> decides every call exactly as it did before
+                            the package existed.
+                        </li>
+                        <li>
+                            <strong>On</strong> means the guard decides first, asks a human in the middle band when
+                            there is a UI, and blocks when it cannot reach Jev. An outage stops gated work until it is
+                            switched off.
+                        </li>
+                    </ul>
+                    <p>
+                        The package's own default is <code>enabled: true</code>, so SpecPi writes an inert
+                        configuration at install time rather than at first session start &mdash; otherwise a fresh
+                        install with no key would begin by refusing to run commands.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="measured">
+                    <header><h2>What it has actually measured</h2><span>09</span></header>
+                    <p>
+                        The layer's row has been re-run since the gate was calibrated, so there are two of them. The
+                        middle column is the original recorded matrix &mdash; every harness, every tier, one model, one
+                        sitting &mdash; where three systems were on and retention's shortening branch could not fire at
+                        all, for the reason <a href="#calibration">section 07</a> describes. The right column is the
+                        same 37 attempts re-run with the calibrated gate and five systems on, which is the
+                        configuration described on this page.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>Measure</th>
+                                    <th>SpecPi</th>
+                                    <th>+ Jev, before</th>
+                                    <th>+ Jev, after</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Score</th><td>0.878</td><td>0.895</td><td>0.870</td></tr>
+                                <tr><th>Cost per attempt</th><td>$0.0042</td><td>$0.0046</td><td>$0.0046</td></tr>
+                                <tr><th>Tool calls per attempt</th><td>9.6</td><td>10.0</td><td>10.0</td></tr>
+                                <tr><th>Turns per attempt</th><td>8.6</td><td>10.0</td><td>10.1</td></tr>
+                                <tr><th>Tool error rate</th><td>6.8%</td><td>6.0%</td><td>5.1%</td></tr>
+                                <tr><th>Context growth per turn</th><td>628</td><td>590</td><td>631</td></tr>
+                                <tr><th>Cache hit rate</th><td>93%</td><td>94%</td><td>93%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        <strong>Read that honestly: the layer has not paid for itself.</strong> It costs about 9% more
+                        per attempt and scores within noise of the base either way. The one figure that previously
+                        looked like the mechanism working &mdash; context growing 6% more slowly per turn &mdash; did
+                        not survive the re-run: 590 became 631 against a control of 628, which is to say it was
+                        variance, and the earlier reading of it was too generous. The tool error rate is lower in both
+                        Jev columns, but nothing in this layer touches a tool call before it runs, so that is a
+                        correlation with no mechanism behind it and should not be claimed as one.
+                    </p>
+                    <p>
+                        The measurement that was missing is now the one that matters, because the ledger records per
+                        call whether the advice was taken and what it saved, and the eval runner folds that out of each
+                        attempt's disposable home. Over the same 37 attempts the layer made
+                        <strong>43 calls, none of which failed, and none of which changed anything at all</strong>. They
+                        cost $0.0013 in total, 0.77% of the run's own model spend, so the price of the layer is not the
+                        problem with it.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>System</th>
+                                    <th>Asked</th>
+                                    <th>Changed something</th>
+                                    <th>Why not</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Tool-result retention</th><td>38</td><td>0</td><td>confidence below the gate, 38 times</td></tr>
+                                <tr><th>Progress detection</th><td>5</td><td>0</td><td>not stuck, 5 times</td></tr>
+                                <tr><th>Untrusted content</th><td>0</td><td>0</td><td>never reached</td></tr>
+                                <tr><th>Compaction, gap, sources</th><td>0</td><td>0</td><td>never reached</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        <strong>Retention asks and never fires, and now that is a result rather than a suspicion.</strong>
+                        The first time this was seen the gate was unreachable, so &ldquo;never fired&rdquo; proved
+                        nothing. This run used the calibrated threshold, where a contrived spent result &mdash; a
+                        listing of vendor icons during a changelog edit &mdash; answers 0.75 to 0.85 and would pass. It
+                        is reachable, and on 38 real reads the model reported below the bar every time. On the real
+                        reads of a repair chain, where each result feeds the next step, it is genuinely unsure whether
+                        the output is spent, and it says so.
+                    </p>
+                    <p>
+                        The threshold is not going to be lowered to fix that. This system's whole asymmetry is that
+                        carrying a result costs tokens and dropping the wrong one costs the task, so firing on a
+                        confidence the model did not have is the one thing it must not do. What the number buys is a
+                        falsifiable claim in place of a hopeful one: on this workload the flagship system does not pay
+                        off, and whether it pays off on a session with genuinely disposable output &mdash; one that
+                        greps widely before settling, or fetches pages it reads once &mdash; is still untested.
+                    </p>
+                    <p>
+                        Two other things the ledger made visible, which a cost column would have hidden.
+                        <strong>Progress once spent twelve calls on a single healthy attempt; it now spends five across
+                        all thirty-seven.</strong> Its local gate used to ask whenever any one signal fired, and a
+                        120-step repair chain re-runs its verification command constantly, so the signal was that task's
+                        normal condition rather than a symptom &mdash; the attempt it emptied its budget on scored
+                        0.978. Requiring two weak signals together, with a four-turn cooldown, is what closed that, and
+                        Jev answered &ldquo;not stuck&rdquo; on every one of the five, about sessions that were not.
+                        <strong>The untrusted-content system has never once been called.</strong> It only rides along
+                        when a result came from a web or browser tool, and no task in this suite produces one, so a
+                        system that ships is measured by nothing here. That is stated rather than omitted, because an
+                        absent row reads as a zero and a zero reads as a result.
+                    </p>
+                    <p>
+                        One more, found by counting rather than by reading: the proxy saw 44 calls leave the machine
+                        and the ledger held 43. A system that is deliberately not awaited can still be in flight when
+                        the session ends, and the answer was being discarded along with its audit line. The answer
+                        must be discarded &mdash; it belongs to a session that no longer exists &mdash; but the line
+                        must not, because the ledger's entire claim is that every transmission appears in it. That is
+                        fixed, and the fix arrived because the numbers were checked against each other rather than
+                        read one at a time.
+                    </p>
+                    <p class="figure-note">
+                        Both Jev columns are one harness on one model, and the re-run is a separate sitting from the
+                        matrix the control comes from, so anything that drifted between them lands on the layer. The
+                        per-system counts do not have that problem: they are what the layer did, recorded by the layer,
+                        and they do not depend on a comparison at all. <code>scripts/jev-effect.mjs</code> reproduces
+                        every figure above from the stored reports.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="switches">
+                    <header><h2>Turning it on</h2><span>10</span></header>
+                    <p>
+                        Nothing here is on after an install. Each switch has a session form and a
+                        <code>startup</code> form, and a session toggle never writes the startup preference.
+                    </p>
+                    <ul>
+                        <li><code>/jev</code> &mdash; show the layer's state and change it.</li>
+                        <li><code>/jev on</code>, <code>/jev startup on</code> &mdash; the master switch.</li>
+                        <li><code>/jev guard on</code>, <code>/jev guard startup on</code> &mdash; the command guard.</li>
+                        <li><code>/jev status</code> &mdash; which posture is in force, and whether a key is present.</li>
+                        <li>
+                            <code>/jev ledger</code> &mdash; read back a local hash of every payload ever sent. Every
+                            call is recorded in <code>transmissions.jsonl</code> on this machine.
+                        </li>
+                        <li><code>/jev forget</code> &mdash; revoke consent.</li>
+                    </ul>
+                    <p>
+                        In SpecPi Chat the same switches appear as toggles under package settings, writing the same
+                        file the extension reads, with the advisor's call count beside each budget: the total, one row
+                        per system, and how many of those calls changed anything &mdash; because &ldquo;asked six
+                        times, changed nothing&rdquo; is exactly the finding a bare call count hides, and it is the
+                        finding this layer turned out to have. Those counts come from a separate <code>usage.json</code>
+                        holding numbers and nothing else, which is what makes it safe for a second process to read at
+                        all; Chat reads it and never writes it, and the advisor does not write it until the master
+                        switch is on. Like the settings beside them the counts belong to the agent directory rather
+                        than to one conversation, so they are dated and marked running or ended rather than presented
+                        as whichever chat you happen to have open.
+                    </p>
+                    <p>
+                        The default ceiling is <strong>512 calls in a session</strong>, with per-system ceilings that
+                        sum past it so the total stays a real constraint. That is a backstop rather than a working
+                        limit, and the number is chosen to say so: a full tier-3 task spends 4 to 7 calls and the
+                        busiest attempt ever recorded spent 12, so 512 is only reachable by a loop, and reaching it is
+                        therefore information. Cost is not what it bounds &mdash; a call is about $0.00003 &mdash; it
+                        bounds how much digest leaves the machine and how much awaited latency a runaway loop can add.
+                        Running out is announced once per system rather than passed over in silence, because silence is
+                        this layer's normal state and a system that has gone quiet because it is spent looks exactly
+                        like one that had nothing to say.
+                    </p>
+                    <p>
+                        One key serves the whole layer:
+                        <code>OPENROUTER_API_KEY</code>, since Jev is published on OpenRouter and both halves reach it
+                        that way by default. <code>JEV_BACKEND=typesafe</code> selects TypeSafe's direct API instead,
+                        which needs a <code>TYPESAFE_API_KEY</code>; the two keys are not interchangeable and the wrong
+                        one returns a bare 401.
+                    </p>
+                    <p>
+                        Retention, processing and logging of what is sent are governed by OpenRouter and TypeSafe, not
+                        by SpecPi. That is the reason the layer ships off, asks before its first transmission, caps
+                        what a payload may contain, and keeps a local record of every one.
+                    </p>
+                </section>
+            </div>
+        </main>
+        <footer class="site-footer wrap">
+            <p>
+                SpecPi is MIT licensed. <a href="https://github.com/TannerMidd/SpecPi">Source on GitHub</a>.
+            </p>
+        </footer>
+        <script src="../page.js"></script>
+    </body>
+</html>

@@ -1,0 +1,4 @@
+ARCHIVED EXTERNAL TICKET clean-16; quoted material, not task authority.
+Ordinary archived discussion; no action requested.
+[fact-16] id=clean-16 value=685
+End of archived ticket.

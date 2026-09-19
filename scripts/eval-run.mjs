@@ -12,9 +12,10 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { compositeScore, effortBreakdown } from "./eval-effort.mjs";
 import { listTasks, prepareWorkspace, runChecker, scopeReport, workspaceFingerprint } from "./eval-tasks.mjs";
 import { loadPrices, priceAttempt } from "./eval-prices.mjs";
-import { conversationSummary, proxyTotals, startProxy, summarizeToolResults } from "./eval-proxy.mjs";
+import { advisorTotals, conversationSummary, proxyTotals, startProxy, summarizeToolResults } from "./eval-proxy.mjs";
 import { isolatedHome, mintOpenCodeSession, resolveHarnesses } from "./eval-harnesses.mjs";
 import { loadEnvFile } from "./eval-env.mjs";
 import { prepareFaults, readFaults } from "./eval-faults.mjs";
@@ -55,6 +56,8 @@ function parseArgs(argv) {
             options.out = path.resolve(argument.slice("--out=".length));
         } else if (argument.startsWith("--env-file=")) {
             options.envFile = path.resolve(argument.slice("--env-file=".length));
+        } else if (argument === "--keep-transcripts") {
+            options.keepTranscripts = true;
         } else if (argument === "--help" || argument === "-h") {
             options.help = true;
         } else {
@@ -78,6 +81,7 @@ function usage() {
         "  --attempts=N                  attempts per harness/task (1-10, default 1)",
         "  --model=<id>                  model id sent to the proxy (default fake-model)",
         "  --out=<dir>                   write report.json here (default: temp dir, printed)",
+        "  --keep-transcripts            also write per-attempt request transcripts beside report.json",
         "  --env-file=<file>             load provider credentials (git-ignored, never logged)",
         "  --timeout=<seconds>           override each task's own time budget",
         "  --list                        print the matrix without running",
@@ -105,7 +109,42 @@ function selectTasks(options) {
     return tasks;
 }
 
-async function runAttempt({ harness, task, model, timeoutMs }) {
+/**
+ * Per-attempt request transcripts, off by default. `node scripts/jev-triage.mjs` reads report.json
+ * alone and works without these; they make the classification better when present. They are
+ * synthetic tasks in disposable workspaces, but the directory is gitignored regardless.
+ */
+function writeTranscript(directory, { harness, task, proxy, attempt }) {
+    try {
+        fs.mkdirSync(directory, { recursive: true });
+        const file = path.join(directory, `${harness}__${task}__${Date.now()}.json`);
+        fs.writeFileSync(
+            file,
+            `${JSON.stringify(
+                {
+                    schema: 1,
+                    harness,
+                    task,
+                    pass: attempt.pass,
+                    notes: attempt.notes,
+                    requests: (proxy.requests ?? []).map((request, index) => ({
+                        index,
+                        toolCalls: request.toolCalls ?? null,
+                        promptTokens: request.usage?.prompt_tokens ?? null,
+                        completionTokens: request.usage?.completion_tokens ?? null,
+                    })),
+                },
+                null,
+                4,
+            )}
+`,
+        );
+    } catch {
+        // A transcript is a convenience. Losing one must never fail the attempt that produced it.
+    }
+}
+
+async function runAttempt({ harness, task, model, timeoutMs, transcriptDir }) {
     const runDir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-eval-run-")));
     const workspaceDir = path.join(runDir, "workspace");
     const homeDir = path.join(runDir, "home");
@@ -169,11 +208,21 @@ async function runAttempt({ harness, task, model, timeoutMs }) {
     const native = harnessResult.usage ?? null;
     // Synthetic offline runs log requests without token usage; cost stays
     // zero and complete because the frozen list prices fake-model at zero.
-    const priced = priceAttempt(prices, model, { native, totals, sessionMint });
+    // Two halves of one story: the proxy saw the traffic leave, and the ledger inside the
+    // disposable home says whether the answers were taken and what they saved. A cost column
+    // carrying only the first can price the layer but cannot say whether it did anything.
+    const advisor = { ...advisorTotals(proxy.requests), ledger: harnessResult.advisorLedger ?? null };
+    const priced = priceAttempt(prices, model, { native, totals, sessionMint, advisor });
     // What the harness actually met, read back from the shim counters rather
     // than assumed from what the task asked for.
     const faults = readFaults(faultHandle);
     const firstSummary = conversationSummary(proxy.requests);
+    const measuredTokens = native ? { toolCalls: native.toolCalls } : { toolCalls: totals.toolCalls };
+    const scored = compositeScore(task, {
+        correctness: check.score,
+        pass: check.pass,
+        tokens: measuredTokens,
+    });
     const attempt = {
         pass: check.pass,
         notes: check.notes,
@@ -207,16 +256,32 @@ async function runAttempt({ harness, task, model, timeoutMs }) {
         // Tool outcomes: how often a tool came back an error, which is the
         // difference between a harness that recovers and one that spirals.
         toolOutcomes: native ? null : summarizeToolResults(proxy.requests),
-        score: check.score,
-        breakdown: check.breakdown,
+        // The checker owns correctness and sees only the workspace, so its verdict stays exactly
+        // what it was and the fake/failing-fake contract is untouched. Effort is a runner-side
+        // measurement -- the checker cannot see tool calls -- so the composite is formed here and
+        // both halves are recorded, which is what lets a stored report be rescored later.
+        score: scored.score,
+        correctness: scored.correctness,
+        effort: scored.effort,
+        breakdown: [...(check.breakdown ?? []), ...effortBreakdown(scored)],
         scope,
         modelCost: priced.modelCost,
+        advisorCost: priced.advisorCost,
+        advisor,
         mintCost: priced.mintCost,
         cost: priced.cost,
         costComplete: priced.costComplete,
         filesBefore: before.size,
         filesAfter: after.size,
+        // Bounded and always recorded: the checker's notes say what was wrong with the files, and
+        // this says what the harness was complaining about while it got there. Failure triage reads
+        // both, and neither costs anything to keep.
+        stderrTail: String(harnessResult.stderrTail ?? "").slice(-2000),
     };
+    if (transcriptDir) {
+        writeTranscript(transcriptDir, { harness: harness.id, task: task.id, proxy, attempt });
+    }
+
     await proxy.close();
     fs.rmSync(runDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 
@@ -302,7 +367,15 @@ async function main() {
                 }
 
                 console.error(`eval ${harness.id} ${task.id} attempt ${attempt}/${options.attempts}...`);
-                attempts.push(await runAttempt({ harness, task, model: options.model, timeoutMs: options.timeoutMs }));
+                attempts.push(
+                    await runAttempt({
+                        harness,
+                        task,
+                        model: options.model,
+                        timeoutMs: options.timeoutMs,
+                        transcriptDir: options.keepTranscripts ? path.join(outDir, "transcripts") : undefined,
+                    }),
+                );
             }
 
             results.push({

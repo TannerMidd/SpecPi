@@ -7,5 +7,10 @@
     "turnCap": 50,
     "writable": [
         "data.json"
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 2,
+        "weight": 0.5,
+        "demonstratedBy": "opencode"
+    }
 }

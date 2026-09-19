@@ -7,5 +7,10 @@
     "turnCap": 50,
     "writable": [
         "sum.js"
-    ]
+    ],
+    "effort": {
+        "referenceCalls": 3,
+        "weight": 0.5,
+        "demonstratedBy": "codex, omp, opencode, pi, specpi-default, specpi-jev"
+    }
 }

@@ -1,0 +1,302 @@
+[
+  {
+    "id": "batch-001",
+    "input": "inputs/batch-001.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-002",
+    "input": "inputs/batch-002.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-003",
+    "input": "inputs/batch-003.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-004",
+    "input": "inputs/batch-004.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-005",
+    "input": "inputs/batch-005.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-006",
+    "input": "inputs/batch-006.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-007",
+    "input": "inputs/batch-007.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-008",
+    "input": "inputs/batch-008.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-009",
+    "input": "inputs/batch-009.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-010",
+    "input": "inputs/batch-010.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-011",
+    "input": "inputs/batch-011.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-012",
+    "input": "inputs/batch-012.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-013",
+    "input": "inputs/batch-013.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-014",
+    "input": "inputs/batch-014.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-015",
+    "input": "inputs/batch-015.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-016",
+    "input": "inputs/batch-016.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-017",
+    "input": "inputs/batch-017.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-018",
+    "input": "inputs/batch-018.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-019",
+    "input": "inputs/batch-019.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-020",
+    "input": "inputs/batch-020.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-021",
+    "input": "inputs/batch-021.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-022",
+    "input": "inputs/batch-022.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-023",
+    "input": "inputs/batch-023.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-024",
+    "input": "inputs/batch-024.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-025",
+    "input": "inputs/batch-025.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-026",
+    "input": "inputs/batch-026.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-027",
+    "input": "inputs/batch-027.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-028",
+    "input": "inputs/batch-028.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-029",
+    "input": "inputs/batch-029.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-030",
+    "input": "inputs/batch-030.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-031",
+    "input": "inputs/batch-031.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-032",
+    "input": "inputs/batch-032.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-033",
+    "input": "inputs/batch-033.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-034",
+    "input": "inputs/batch-034.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-035",
+    "input": "inputs/batch-035.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-036",
+    "input": "inputs/batch-036.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-037",
+    "input": "inputs/batch-037.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-038",
+    "input": "inputs/batch-038.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-039",
+    "input": "inputs/batch-039.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-040",
+    "input": "inputs/batch-040.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-041",
+    "input": "inputs/batch-041.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-042",
+    "input": "inputs/batch-042.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-043",
+    "input": "inputs/batch-043.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-044",
+    "input": "inputs/batch-044.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-045",
+    "input": "inputs/batch-045.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-046",
+    "input": "inputs/batch-046.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-047",
+    "input": "inputs/batch-047.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-048",
+    "input": "inputs/batch-048.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-049",
+    "input": "inputs/batch-049.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-050",
+    "input": "inputs/batch-050.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-051",
+    "input": "inputs/batch-051.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-052",
+    "input": "inputs/batch-052.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-053",
+    "input": "inputs/batch-053.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-054",
+    "input": "inputs/batch-054.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-055",
+    "input": "inputs/batch-055.json",
+    "revision": 5
+  },
+  {
+    "id": "batch-056",
+    "input": "inputs/batch-056.json",
+    "revision": 1
+  },
+  {
+    "id": "batch-057",
+    "input": "inputs/batch-057.json",
+    "revision": 2
+  },
+  {
+    "id": "batch-058",
+    "input": "inputs/batch-058.json",
+    "revision": 3
+  },
+  {
+    "id": "batch-059",
+    "input": "inputs/batch-059.json",
+    "revision": 4
+  },
+  {
+    "id": "batch-060",
+    "input": "inputs/batch-060.json",
+    "revision": 5
+  }
+]

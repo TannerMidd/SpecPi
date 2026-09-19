@@ -1,0 +1,11 @@
+{
+  "id": "t5-ambiguous-commit",
+  "tier": 5,
+  "category": "multi",
+  "title": "Reconcile failures before and after a committed transfer",
+  "timeoutMs": 1800000,
+  "turnCap": 600,
+  "writable": [
+    "work/"
+  ]
+}

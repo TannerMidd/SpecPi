@@ -18,12 +18,13 @@ const path = require("node:path");
 const { checkDirectories, readFile, parseJson, replaceFile } = require("./settings-file.js");
 const { agentDirectory } = require("./pi-defaults.js");
 const webAccessConfig = require("../media/web-access-config.js");
+const jevConfig = require("../media/jev-config.js");
 
 const MAX_BYTES = 256 * 1024;
 
 // Targets are opaque identifiers chosen by the webview; each resolves to one
 // file and one write shape. Nothing here accepts a caller-supplied path.
-const TARGETS = ["webAccess"];
+const TARGETS = ["webAccess", "jevLayer"];
 
 function messagesFor(label) {
     return {
@@ -41,6 +42,7 @@ function messagesFor(label) {
 }
 
 const WEB_MESSAGES = messagesFor("Web access configuration");
+const JEV_MESSAGES = messagesFor("Jev layer settings");
 
 function expandHome(value, home) {
     if (value === "~") {
@@ -78,9 +80,55 @@ function webAccessPath({ workspace, env = process.env, home = os.homedir() } = {
     return path.join(home, ".pi", "agent", "web-search.json");
 }
 
+// The advisor resolves its own settings path from the agent directory, and Chat must match it
+// exactly or this panel would edit a file the extension never reads. From
+// extensions/jev-advisor/config.mjs: <agent-dir>/specpi/jev/settings.json, with no XDG variant.
+function jevPath({ workspace, env = process.env, home = os.homedir() } = {}) {
+    return path.join(agentDirectory({ workspace, env, home }), "specpi", "jev", "settings.json");
+}
+
+// The advisor's running call count for the session, beside its settings. Chat reads it and never
+// writes it: it is the extension's own bookkeeping, and a panel that could edit a usage counter
+// would be editing the evidence rather than reporting it. Derived from the settings path rather
+// than resolved again, so the two can never end up pointing at different agent directories.
+function jevUsagePath(options = {}) {
+    return usageBeside(jevPath(options));
+}
+
+function usageBeside(settingsFile) {
+    return path.join(path.dirname(settingsFile), "usage.json");
+}
+
+/**
+ * Read the count, or nothing. A budget display is a convenience beside the switches, so no failure
+ * here may stop the panel opening: an absent file, an unreadable one, a linked one and one written
+ * by a newer advisor all come back the same way, and the panel says the layer has not run.
+ *
+ * The size bound is deliberately small. The file is counts for seven systems and nothing else, so
+ * anything approaching the settings limit was not written by the advisor.
+ */
+function loadJevUsage(settingsFile) {
+    try {
+        const filename = usageBeside(settingsFile);
+        const snapshot = readFile(filename, {
+            maxBytes: 8 * 1024,
+            missingText: "{}",
+            messages: messagesFor("Jev usage"),
+        });
+
+        return snapshot.exists ? jevConfig.fromStoredUsage(parseJson(snapshot.text)) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 function targetPath(target, options = {}) {
     if (target === "webAccess") {
         return webAccessPath(options);
+    }
+
+    if (target === "jevLayer") {
+        return jevPath(options);
     }
 
     throw new Error("Choose a package configuration to edit.");
@@ -129,12 +177,66 @@ function loadWebAccess(options) {
     };
 }
 
+// The Jev layer holds no credential, so unlike web access its file is shown as it is. The panel
+// still sees the flattened form shape rather than the nested one on disk, because the systems
+// nested under `systems`, the budgets under `budgets` and two switches under `guard` would render
+// as JSON textareas otherwise, and the
+// point of the panel is that they are toggles.
+function loadJev(options) {
+    const filename = targetPath("jevLayer", options);
+    inspect(filename, JEV_MESSAGES);
+    const snapshot = readSnapshot(filename, JEV_MESSAGES);
+    const stored = snapshot.exists ? parseObject(filename, snapshot.text, "Jev layer settings") : {};
+
+    return {
+        target: "jevLayer",
+        path: filename,
+        exists: snapshot.exists,
+        revision: snapshot.revision,
+        text: `${JSON.stringify(jevConfig.fromStored(stored), null, 4)}
+`,
+        credentials: [],
+        usage: loadJevUsage(filename),
+    };
+}
+
+function saveJev(snapshot, draft) {
+    const filename = snapshot.path;
+    inspect(filename, JEV_MESSAGES, true);
+    const current = readSnapshot(filename, JEV_MESSAGES);
+    if (current.revision !== snapshot.revision) {
+        throw new Error(JEV_MESSAGES.changed);
+    }
+
+    const next = jevConfig.toStored(draft);
+    const text = `${JSON.stringify(next, null, 4)}
+`;
+    const result = commit({
+        filename,
+        text,
+        messages: JEV_MESSAGES,
+        revision: snapshot.revision,
+        unchanged: (previous) => sameJson(previous.text, next, filename, "Jev layer settings"),
+        snapshot,
+    });
+
+    return {
+        ...result,
+        text: `${JSON.stringify(jevConfig.fromStored(next), null, 4)}
+`,
+        credentials: [],
+        // Re-read rather than carried over from the load: saving a budget and still seeing the old
+        // ceiling beside the current spend is the kind of small lie that makes a panel untrustworthy.
+        usage: loadJevUsage(filename),
+    };
+}
+
 function loadPackageSettings(target, options = {}) {
     if (!TARGETS.includes(target)) {
         throw new Error("Choose a package configuration to edit.");
     }
 
-    return loadWebAccess(options);
+    return target === "jevLayer" ? loadJev(options) : loadWebAccess(options);
 }
 
 function sameJson(text, next, filename, label) {
@@ -217,7 +319,19 @@ function savePackageSettings(snapshot, text) {
         throw new Error("Configuration exceeds 256 KiB.");
     }
 
+    if (snapshot.target === "jevLayer") {
+        return saveJev(snapshot, jevConfig.validate(text).config);
+    }
+
     return saveWebAccess(snapshot, webAccessConfig.validate(text).config);
 }
 
-module.exports = { TARGETS, webAccessPath, targetPath, loadPackageSettings, savePackageSettings };
+module.exports = {
+    TARGETS,
+    webAccessPath,
+    jevPath,
+    jevUsagePath,
+    targetPath,
+    loadPackageSettings,
+    savePackageSettings,
+};

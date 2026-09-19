@@ -30,7 +30,7 @@
 
 SpecPi is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
-At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are seven hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
+At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
 It focuses on five things:
 
@@ -44,7 +44,7 @@ Everything it touches is written down, versioned, and easy to undo.
 
 ## Measured context
 
-This chart shows first-call context from a clean install: all seven pinned packages, the working agreement, and the skills Pi finds. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
+This chart shows first-call context from a clean install: all seven pinned packages, the working agreement, and the skills Pi finds. It predates `specpi-jev-guard`, the eighth pin, and has not been re-measured since. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
 
 The solid rows are measured by us, from the request each setup actually sends through one local test provider. That includes OpenCode, the DeepSeek Harness, and Oh My Pi, all measured as installed. The faded Codex CLI and Claude Code rows come from HarnessTax's published numbers, measured under their own setup. Treat those as a rough reference, not a head-to-head test. These are character counts. They say nothing about tokens, cost, or how well each tool does the job. The research page [breaks down the enabled setup by feature](https://tannermidd.github.io/SpecPi/research/#specpi), so you can see what each switch costs on its own.
 
@@ -79,25 +79,22 @@ harness changing.
 
 <!-- eval-summary -->
 
-**156 attempts across 6 harnesses and 13 tasks**, all on `deepseek-v4.1-flash`.
+**259 attempts across 7 harnesses and 24 tasks**, all on `deepseek-v4.1-flash`.
 
 | Harness | Solved | Cost/attempt | Prompt tokens | Sent before any work |
 | --- | --- | --- | --- | --- |
-| Pi | 25/26 | $0.0012 | 31,772 | 5,522 |
-| SpecPi | 26/26 | $0.0021 | 57,243 | 16,287 |
-| OpenCode | 24/26 | $0.0021 | 51,488 | 38,097 |
-| Codex CLI | 17/26 | $0.0027 | 112,060 | 38,148 |
-| DeepSeek Harness | 25/26 | $0.0035 | 119,250 | 31,750 |
-| Oh My Pi | 25/26 | $0.0042 | 124,507 | 62,612 |
+| Pi | 34/37 | $0.0038 | 112,681 | 5,522 |
+| SpecPi | 35/37 | $0.0042 | 134,859 | 13,799 |
+| OpenCode | 31/37 | $0.0043 | 143,830 | 38,097 |
+| SpecPi + Jev | 35/37 | $0.0046 | 153,077 | 13,799 |
+| Codex CLI | 30/37 | $0.0067 | 242,031 | 38,148 |
+| Oh My Pi | 35/37 | $0.0070 | 257,783 | 62,612 |
+| DeepSeek Harness | 35/37 | $0.0078 | 281,676 | 31,750 |
 
 Cost is the harness's own model spend, priced from recorded usage against a
 dated price file. The last column is the tool schema plus system instructions
 riding every single request, which is the fixed toll a harness charges before
 the model does anything.
-
-Tier 4 is left out of this table because not every harness has
-attempts there, and a per-attempt cost only compares across rows when every row
-covers the same tasks. The evaluations page charts it per tier.
 
 <!-- /eval-summary -->
 
@@ -126,7 +123,7 @@ Full setup options, package details, and requirements: [website](https://tannerm
 
 | | |
 | --- | --- |
-| [Packages](https://tannermidd.github.io/SpecPi/#packages) | The seven pinned packages and what each provides |
+| [Packages](https://tannermidd.github.io/SpecPi/#packages) | The eight pinned packages and what each provides |
 | [Scope control](https://tannermidd.github.io/SpecPi/wiki/#scope) | `/scope` commands and drift monitoring |
 | [Improvement loop](https://tannermidd.github.io/SpecPi/#loop) | Local wishlist, `/harness-improvement`, and retirement with evidence |
 | [SpecPi Chat](https://tannermidd.github.io/SpecPi/#vscode-chat) | VS Code frontend and VSIX install · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) |

@@ -37,11 +37,35 @@ export const BROWSER_TOOL_NAMES = Object.freeze([
  * the package's own state when it finishes, so a tool-name activation would undo itself.
  * Delegation needs an activation path inside its own package.
  */
+/**
+ * Restoring a group mid-session costs twice, and only one of those costs was ever stated.
+ *
+ * `schemaCost` is the standing price: those bytes ride every request until the group is withdrawn
+ * again. `activationCost` is the one-off, and it is much larger. Adding tool schemas partway
+ * through a session is not an additive change the provider can absorb -- it invalidates the cached
+ * prompt prefix, and the next request pays fresh input rates for the whole conversation so far.
+ *
+ * This was believed and reasoned about here for a long time and never measured. It is measured now.
+ * Three attempts on `t3-cascade-ledger` flipped the browser group on at turn 6: in all three,
+ * cached tokens collapsed to 3,200 at the next request while the prompt kept climbing, and the
+ * re-warm cost 14.6%, 21.6% and 23.9% of the attempt -- 20% on average, against a threshold of 10%
+ * fixed before the run. See `evals/runs/cache-probe/` and `scripts/cache-probe.mjs`.
+ *
+ * The same run says what to do about it: arming the same group from the first request cost 16% more
+ * than never arming it at all, against 47% for flipping mid-session. Paying up front is roughly
+ * three times cheaper than paying when the need appears.
+ */
 export const CAPABILITIES = Object.freeze({
     web: {
         label: "Web access",
         tools: WEB_TOOL_NAMES,
         schemaCost: "about 11 KB of tool schema per request",
+        // Not measured directly, and deliberately not extrapolated into a number. It is the larger
+        // schema, and pi-web-access is a third-party package that still carries promptSnippet and
+        // promptGuidelines, so activating it rebuilds the system prompt as well as the tool schema
+        // -- a second invalidation path Browser QA no longer has.
+        activationCost:
+            "and discards the cached prompt prefix once, which is not measured for this group but is at least as expensive as Browser QA's 20% of attempt cost, because its schema is larger and activating it also rebuilds the system prompt",
         summary: "search the web and fetch page or source content",
         command: "/webaccess",
     },
@@ -49,6 +73,8 @@ export const CAPABILITIES = Object.freeze({
         label: "Browser QA",
         tools: BROWSER_TOOL_NAMES,
         schemaCost: "about 8.7 KB of tool schema per request",
+        activationCost:
+            "and discards the cached prompt prefix once, measured at about 20% of a mid-length attempt's cost",
         summary: "open pages in an isolated browser to verify rendering, behavior and accessibility",
         command: "/browser",
     },

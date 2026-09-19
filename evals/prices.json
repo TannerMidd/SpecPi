@@ -3,6 +3,12 @@
     "pricedAt": "2026-09-17",
     "note": "Fixed list for eval cost math. Costs are computed from logged token usage, never from harness self-reports. Unknown models are a lower bound, not zero.",
     "models": {
+        "jev-1.13.0": {
+            "inputPerMTok": 0.042,
+            "outputPerMTok": 0,
+            "cacheReadPerMTok": 0,
+            "note": "TypeSafe Jev 1.13, System One classifier. Output is free; the advisor's own spend is priced here so a SpecPi + Jev row never reports a cost that excludes its advisor."
+        },
         "measure-model": {
             "inputPerMTok": 0,
             "outputPerMTok": 0,

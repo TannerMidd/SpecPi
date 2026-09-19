@@ -23,12 +23,12 @@ const pageDir = path.join(root, "site", "evaluations");
 // in: it once counted a retired OpenCode run twice and inflated its attempts
 // from 25 to 57 without anything looking wrong.
 const DEFAULT_REPORTS = [
-    path.join(root, "evals", "runs", "all-tier1-deepseek", "report.json"),
-    ...["tier2", "tier3", "tier3b", "tier4"].flatMap((tier) =>
-        ["pi", "specpi-default", "opencode", "dsh", "omp", "codex"].map((harness) =>
-            path.join(root, "evals", "runs", `${tier}-${harness}`, "report.json"),
-        ),
-    ),
+    // One complete matrix: every harness, every tier, one model, one sitting. It replaces the
+    // patchwork of per-tier-per-harness runs this page grew from, where tier 4 covered four of
+    // seven harnesses and tier 5 had never run at all, so no two rows were guaranteed to have
+    // faced the same work. The superseded runs stay in evals/runs as history; naming this set
+    // explicitly is what stops a glob sweeping them back in.
+    ...[1, 2, 3, 4, 5].map((tier) => path.join(root, "evals", "runs", `full-tier${tier}`, "report.json")),
 ];
 
 // Fixed per harness so a colour means the same thing on every surface; these
@@ -36,6 +36,7 @@ const DEFAULT_REPORTS = [
 const HARNESSES = [
     { id: "pi", label: "Pi", colour: "var(--ct-pi)" },
     { id: "specpi-default", label: "SpecPi", colour: "var(--ct-specpi)" },
+    { id: "specpi-jev", label: "SpecPi + Jev", colour: "var(--ct-specpi-jev)" },
     { id: "opencode", label: "OpenCode", colour: "var(--ct-opencode)" },
     { id: "codex", label: "Codex CLI", colour: "var(--ct-codex)" },
     { id: "omp", label: "Oh My Pi", colour: "var(--ct-omp)" },
@@ -77,6 +78,19 @@ export function collect(files) {
     const reports = files.map((file) => JSON.parse(fs.readFileSync(file, "utf8")));
     const cells = reports.flatMap((report) => report.results);
     const meta = reports[reports.length - 1];
+    // The page states one model and prices every row against it, so a set spanning two models
+    // would publish one label over both. The comment below records this being caught once for
+    // attempts per cell; model had the same shape and no guard. Refusing is right rather than
+    // picking a winner: a mixed set is a question about which run to publish, not a rendering
+    // detail, and the answer is the caller's.
+    const models = [...new Set(reports.map((report) => report.model))].sort();
+    if (models.length > 1) {
+        throw new Error(
+            `reports span ${models.length} models (${models.join(", ")}); ` +
+                "render one model at a time, because the page labels and prices every row as one",
+        );
+    }
+
     const tiers = [...new Set(cells.map((cell) => cell.tier))].sort((a, b) => a - b);
     // Reports differ in how many attempts they ran and in whether their time
     // budget was shortened, and one global figure taken from whichever file
@@ -101,31 +115,38 @@ export function collect(files) {
         const own = cells.filter((cell) => cell.harness === harness.id);
         const perTier = {};
         for (const tier of tiers) {
-            const attempts = own.filter((cell) => cell.tier === tier).flatMap((cell) => cell.attempts);
-            const usable = attempts.filter((attempt) => !isLaunchFailure(attempt));
+            // Paired with their task id: rescoring an attempt needs the task's demonstrated
+            // tool-call floor, which flatMapping the attempts on their own throws away.
+            const attempts = own
+                .filter((cell) => cell.tier === tier)
+                .flatMap((cell) => cell.attempts.map((attempt) => ({ attempt, task: cell.task })));
+            const usable = attempts.filter((entry) => !isLaunchFailure(entry.attempt));
             if (attempts.length === 0) {
                 continue;
             }
 
-            const usage = usageSummary(usable);
+            const plain = usable.map((entry) => entry.attempt);
+            const usage = usageSummary(plain);
             perTier[tier] = {
                 attempts: usable.length,
                 launchFailures: attempts.length - usable.length,
-                solved: usable.filter((attempt) => attempt.pass).length,
-                score: mean(usable.map((attempt) => attemptScore(attempt))),
-                cost: mean(usable.map((attempt) => attemptSpend(attempt))),
-                mintCost: mean(usable.map((attempt) => attemptMintCost(attempt) ?? 0)),
+                solved: plain.filter((attempt) => attempt.pass).length,
+                score: mean(usable.map((entry) => attemptScore(entry.attempt, entry.task))),
+                correctness: mean(plain.map((attempt) => attemptScore(attempt))),
+                cost: mean(plain.map((attempt) => attemptSpend(attempt))),
+                mintCost: mean(plain.map((attempt) => attemptMintCost(attempt) ?? 0)),
                 promptTokens: usage.meanInputTokens,
                 outputTokens: usage.meanOutputTokens,
                 cacheHitRate: usage.cacheHitRate,
                 toolCalls: usage.meanToolCalls,
-                requests: mean(usable.map((attempt) => attempt.modelRequests ?? 0)),
-                seconds: mean(usable.map((attempt) => (attempt.durationMs ?? 0) / 1000)),
+                requests: mean(plain.map((attempt) => attempt.modelRequests ?? 0)),
+                seconds: mean(plain.map((attempt) => (attempt.durationMs ?? 0) / 1000)),
             };
         }
 
-        const every = own.flatMap((cell) => cell.attempts);
-        const all = every.filter((attempt) => !isLaunchFailure(attempt));
+        const every = own.flatMap((cell) => cell.attempts.map((attempt) => ({ attempt, task: cell.task })));
+        const paired = every.filter((entry) => !isLaunchFailure(entry.attempt));
+        const all = paired.map((entry) => entry.attempt);
         const usage = usageSummary(all);
         // Reports written before the proxy could tell an offer from a call
         // record offers only. Averaging those in would publish one harness's
@@ -137,6 +158,8 @@ export function collect(files) {
         // sends one through the proxy, so it has no character count here.
         const first = all.map((attempt) => attempt.firstCall).filter((call) => call && call.toolSchemaChars > 2);
         const scopeChecked = all.filter((attempt) => attempt.scope);
+        const outcomes = all.map((attempt) => attempt.toolOutcomes).filter(Boolean);
+        const contexts = all.map((attempt) => attempt.context).filter(Boolean);
 
         return {
             id: harness.id,
@@ -148,7 +171,8 @@ export function collect(files) {
                 attempts: all.length,
                 launchFailures: every.length - all.length,
                 solved: all.filter((attempt) => attempt.pass).length,
-                score: mean(all.map((attempt) => attemptScore(attempt))),
+                score: mean(paired.map((entry) => attemptScore(entry.attempt, entry.task))),
+                correctness: mean(all.map((attempt) => attemptScore(attempt))),
                 cost: mean(all.map((attempt) => attemptSpend(attempt))),
                 mintCost: mean(all.map((attempt) => attemptMintCost(attempt) ?? 0)),
                 promptTokens: usage.meanInputTokens,
@@ -161,6 +185,19 @@ export function collect(files) {
                 seconds: mean(all.map((attempt) => (attempt.durationMs ?? 0) / 1000)),
                 cleanScope: scopeChecked.filter((attempt) => attempt.scope.clean).length,
                 scopeChecked: scopeChecked.length,
+                // Effort, not just spend. A harness is not efficient because it was cheap: it is
+                // efficient when it reaches the same result with fewer calls, fewer turns, fewer
+                // errors to recover from and less context carried. Each of these is collected per
+                // attempt already and was being aggregated nowhere.
+                toolResults: sum(outcomes.map((entry) => entry.results ?? 0)),
+                toolErrors: sum(outcomes.map((entry) => entry.errors ?? 0)),
+                repeatedCalls: sum(outcomes.map((entry) => entry.repeatedCalls ?? 0)),
+                // Null rather than zero for a native harness: it never crosses the proxy, so its
+                // context is unobserved, and publishing 0 would read as "never grew".
+                contextGrowth:
+                    contexts.length === 0 ? null : mean(contexts.map((entry) => entry.growthPerRequest ?? 0)),
+                peakContext: contexts.length === 0 ? null : mean(contexts.map((entry) => entry.peakPromptTokens ?? 0)),
+                compactions: contexts.length === 0 ? null : sum(contexts.map((entry) => entry.compactions ?? 0)),
             },
             firstCall:
                 first.length === 0
@@ -481,7 +518,75 @@ export function renderTables(data) {
         ]),
     );
 
-    return { "table-overall": overall, "table-ratio": ratio };
+    // Cost is one way to be inefficient and the least diagnostic: it is the sum of everything
+    // else. This table keeps the components apart, because they say different things about a
+    // harness. Calls and turns are how much work it took to get there. Tool errors and repeated
+    // calls are whether it recovered or spiralled. Cache hit rate and context growth are what it
+    // carries on every request thereafter, which is what the fresh-token bill is made of.
+    const rate = (part, whole) => (whole > 0 ? `${((100 * part) / whole).toFixed(1)}%` : "&mdash;");
+    const efficiency = table(
+        [
+            "Harness",
+            "Score",
+            "Tool calls",
+            "Turns",
+            "Tool errors",
+            "Repeated calls",
+            "Cache hit",
+            "Context growth / turn",
+            "Compactions",
+            "Score per 100 calls",
+        ],
+        data.harnesses.map((harness) => {
+            const own = harness.overall;
+            const calls = own.toolCalls;
+
+            return [
+                esc(harness.label),
+                own.score.toFixed(3),
+                calls === null ? "not measured" : calls.toFixed(1),
+                own.requests.toFixed(1),
+                rate(own.toolErrors, own.toolResults),
+                String(own.repeatedCalls),
+                pct(own.cacheHitRate),
+                own.contextGrowth === null ? "not measured" : thousands(own.contextGrowth),
+                own.compactions === null ? "not measured" : String(own.compactions),
+                calls === null || calls === 0 ? "not measured" : ((100 * own.score) / calls).toFixed(1),
+            ];
+        }),
+    );
+
+    return { "table-overall": overall, "table-ratio": ratio, "table-efficiency": efficiency };
+}
+
+/**
+ * The failure-mode distribution, from `node scripts/jev-triage.mjs`. "Codex fails 7 of 37" is a
+ * count; this is what a page can say about why.
+ *
+ * Two things this table is careful about. Every verdict here went through the same gate a session
+ * would use, and an answer that did not clear it is published as `ungated` rather than rounded into
+ * the nearest mode -- 14 of 24 did not clear it, and a distribution that hid that would be claiming
+ * a confidence the classifier never reported. And `unknown` is a real option the classifier chose,
+ * which is a different statement from `ungated`: one says the evidence does not determine it, the
+ * other says the model would not commit.
+ */
+export function renderFailureModes(triage) {
+    const total = triage.classified.length;
+    const share = (count) => (total > 0 ? `${((100 * count) / total).toFixed(0)}%` : "&mdash;");
+    const harnessesFor = (mode) => [
+        ...new Set(triage.classified.filter((item) => item.mode === mode).map((item) => item.harness)),
+    ];
+    const rows = Object.entries(triage.byMode)
+        .sort((a, b) => b[1] - a[1])
+        .map(([mode, count]) => [
+            esc(mode),
+            String(count),
+            share(count),
+            esc(harnessesFor(mode).sort().join(", ")),
+            esc(mode === "ungated" ? "No verdict cleared the gate" : (triage.modes[mode] ?? "")),
+        ]);
+
+    return table(["Failure mode", "Attempts", "Share", "Harnesses", "Meaning"], rows, "numeric triage");
 }
 
 // The README carries the same headline figures as the page. Typing them by
@@ -591,9 +696,17 @@ function main() {
     fs.writeFileSync(dataFile, `${JSON.stringify(data, null, 2)}\n`);
     process.stdout.write(`eval site -> ${dataFile} (${data.totalAttempts} attempts, ${data.taskCount} tasks)\n`);
 
+    // Optional, because it is the one artifact on this page that costs a third-party call to
+    // produce. An absent file leaves the slot alone rather than publishing an empty table.
+    const triageFile = path.join(root, "evals", "runs", "jev-triage.json");
+    const triage = fs.existsSync(triageFile) ? JSON.parse(fs.readFileSync(triageFile, "utf8")) : null;
     const pageFile = path.join(pageDir, "index.html");
     if (fs.existsSync(pageFile)) {
-        const slots = { ...renderCharts(data), ...renderTables(data) };
+        const slots = {
+            ...renderCharts(data),
+            ...renderTables(data),
+            ...(triage ? { "table-failure-modes": renderFailureModes(triage) } : {}),
+        };
         fs.writeFileSync(pageFile, inject(fs.readFileSync(pageFile, "utf8"), slots));
         process.stdout.write(`eval site -> ${pageFile} (${Object.keys(slots).length} figures)\n`);
     }
