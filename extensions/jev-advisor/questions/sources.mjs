@@ -7,7 +7,7 @@
 // specpi-delegation keeps its one-sentence boundary and gains no network dependency.
 
 import { choice, noul, score } from "../client.mjs";
-import { choiceValue, nounTrue, scoreLevel } from "../gate.mjs";
+import { choiceValue, nounFalse, nounTrue, scoreLevel } from "../gate.mjs";
 import { compact } from "../sanitize.mjs";
 
 export const RELEVANCE_LEVELS = Object.freeze([
@@ -82,5 +82,10 @@ export function decide(answers, candidates) {
         unrelated: ranked.filter((item) => item.level === 0).map((item) => item.path),
         jobMode: choiceValue(answers?.job_mode, "sources"),
         worthDelegating: nounTrue(answers?.worth_delegating, "sources"),
+        // The useful half. A confident yes tells the caller what it already decided by calling
+        // delegate; a confident no is a warning worth having before up to 200 files and 8 MiB are
+        // frozen for a child that cannot answer the question anyway. Both were computed and thrown
+        // away, and output is free, so they were already paid for.
+        notWorthDelegating: nounFalse(answers?.worth_delegating, "sources"),
     };
 }

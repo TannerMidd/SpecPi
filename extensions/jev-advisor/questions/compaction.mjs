@@ -50,8 +50,48 @@ export function buildInput({ preparation, objective }) {
     };
 }
 
-export function questions() {
+/**
+ * The same digest for a branch being left behind. `/tree` hands a different preparation shape --
+ * session entries rather than messages, and no token count, because nothing is being cut to fit a
+ * budget -- so it gets its own builder rather than a compaction input with three fields quietly
+ * reading undefined.
+ */
+export function buildBranchInput({ preparation, objective }) {
+    const entries = preparation?.entriesToSummarize ?? [];
+    const kinds = {};
+    for (const entry of entries) {
+        const kind = typeof entry?.type === "string" ? entry.type : "unknown";
+        kinds[kind] = (kinds[kind] ?? 0) + 1;
+    }
+
     return {
+        objective: compact(objective ?? "", 180),
+        abandoning: entries.length,
+        kinds,
+        wantsSummary: preparation?.userWantsSummary === true,
+        // Navigating to an ancestor is backing out of a line of work; navigating elsewhere is
+        // moving between siblings. The distinction is most of what a label has to capture.
+        toAncestor: preparation?.targetId === preparation?.commonAncestorId,
+    };
+}
+
+/**
+ * Short, navigational, and a fixed enum so no model-written text reaches the session file. `/tree`
+ * can filter to labelled entries, so a branch that says what it was is the difference between a
+ * navigable tree and a list of timestamps.
+ */
+export const BRANCH_LABELS = Object.freeze({
+    "dead end": "The branch was abandoned because the approach did not work",
+    "alternative tried": "A different approach to the same goal, set aside for another",
+    "work completed": "The branch finished what it set out to do",
+    research: "The branch was reading and answering questions, not changing anything",
+    reverted: "The branch's changes were undone",
+    interrupted: "The branch stopped part-way for an unrelated reason",
+});
+
+export function questions({ branch = false } = {}) {
+    return {
+        ...(branch ? { branch_label: choice("What was this abandoned branch?", BRANCH_LABELS) } : {}),
         work_kind: choice("What kind of work has this session mostly been doing?", WORK_KINDS),
         unresolved_thread: noul("There is an unfinished investigation whose findings must survive compaction"),
         discarded_span_was_dead_ends: noul(
@@ -74,6 +114,16 @@ const FOCUS = Object.freeze({
  * Build `customInstructions` from gated answers only. With nothing gated this returns undefined and
  * Pi's own default prompt is used unchanged.
  */
+/**
+ * The label for a branch summary entry, or undefined when the answer is ungated. Separate from
+ * `decide` because the compaction hook has no label to set and would carry a dead field.
+ */
+export function label(answers) {
+    const value = choiceValue(answers?.branch_label, "compaction");
+
+    return value && Object.hasOwn(BRANCH_LABELS, value) ? value : undefined;
+}
+
 export function decide(answers) {
     const kind = choiceValue(answers?.work_kind, "compaction");
     const unresolved = nounTrue(answers?.unresolved_thread, "compaction");
