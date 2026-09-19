@@ -1051,14 +1051,18 @@ export const harnessAdapters = {
                             // been exercised.
                             capability: false,
                         },
+                        // The shipped defaults, spelled out rather than omitted: this row is meant
+                        // to measure the configuration a user actually gets, so a budget invented
+                        // for the eval would measure something nobody runs.
                         budgets: {
-                            total: 30,
-                            retention: 12,
-                            compaction: 3,
-                            gap: 6,
-                            sources: 4,
-                            progress: 12,
-                            untrusted: 8,
+                            total: 120,
+                            retention: 48,
+                            compaction: 6,
+                            gap: 12,
+                            sources: 8,
+                            progress: 40,
+                            untrusted: 24,
+                            capability: 2,
                         },
                         // Ships on "notify" for users, because the calibration corpus does not yet
                         // support steering a model on a mid-session verdict. The eval runs headless,

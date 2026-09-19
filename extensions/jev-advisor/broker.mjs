@@ -39,11 +39,38 @@ export function createBroker(options = {}) {
     let callsUsed = 0;
     let generation = 0;
     const usedBySystem = new Map();
+    const warned = new Set();
 
     const reset = () => {
         callsUsed = 0;
         usedBySystem.clear();
+        warned.clear();
         generation += 1;
+    };
+
+    /**
+     * Running out of budget used to be indistinguishable from a system that had nothing to say.
+     * Both produce silence, and silence is this layer's normal state, so a session could spend an
+     * hour with retention switched on and quietly dead without anything ever saying so. The notice
+     * fires once per system per session -- repeating it every turn would be its own nuisance -- and
+     * only where there is a human to read it.
+     */
+    const warnExhausted = (system, ctx, scope) => {
+        if (warned.has(system) || !ctx?.hasUI || typeof ctx?.ui?.notify !== "function") {
+            return;
+        }
+
+        warned.add(system);
+        try {
+            ctx.ui.notify(
+                scope === "system"
+                    ? `Jev: the ${SYSTEM_LABELS[system] ?? system} budget for this session is spent, so that system is now off until the session ends. Raise it with /jev or in SpecPi Chat.`
+                    : `Jev: this session's total call budget is spent, so the whole advisor is now quiet until the session ends. Raise it with /jev or in SpecPi Chat.`,
+                "info",
+            );
+        } catch {
+            // A notice that cannot be delivered must not fail the call it was reporting on.
+        }
     };
 
     const status = () => {
@@ -81,10 +108,14 @@ export function createBroker(options = {}) {
         // Per-system first, so an exhausted turn-level system reports its own exhaustion rather
         // than looking like the session as a whole ran out.
         if ((usedBySystem.get(system) ?? 0) >= (settings.budgets?.[system] ?? 0)) {
+            warnExhausted(system, ctx, "system");
+
             return { ok: false, reason: "system-budget-exhausted", answers: {} };
         }
 
         if (callsUsed >= (settings.budgets?.total ?? 0)) {
+            warnExhausted("total", ctx, "total");
+
             return { ok: false, reason: "budget-exhausted", answers: {} };
         }
 

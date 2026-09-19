@@ -19,13 +19,13 @@
     // Must equal DEFAULT_BUDGETS in extensions/jev-advisor/config.mjs; a test pins them together,
     // because a panel whose defaults differ from the advisor's writes a change on every save.
     const DEFAULT_BUDGETS = {
-        total: 30,
-        retention: 12,
-        compaction: 3,
-        gap: 6,
-        sources: 4,
-        progress: 12,
-        untrusted: 8,
+        total: 120,
+        retention: 48,
+        compaction: 6,
+        gap: 12,
+        sources: 8,
+        progress: 40,
+        untrusted: 24,
         capability: 2,
     };
     const BUDGET_KEYS = { total: "budgetTotal" };

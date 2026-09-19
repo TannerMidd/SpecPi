@@ -240,6 +240,46 @@ test("the total is a real ceiling, not the sum of the per-system ones", async ()
     });
 });
 
+test("running out of budget says so once, rather than going quietly dead", async () => {
+    // Exhaustion and "nothing to say" both produce silence, and silence is this layer's normal
+    // state, so without a notice a session can run for an hour with a system switched on and dead.
+    await withAgentDir(async () => {
+        const notices = [];
+        const ctx = { hasUI: true, ui: { notify: (text) => notices.push(text) } };
+        const state = countingBroker(
+            enabledSettings({ budgets: { total: 10, retention: 1, compaction: 4, gap: 4, sources: 4 } }),
+        );
+        assert.equal((await state.broker.request({ ...ask1("retention"), ctx })).ok, true);
+        assert.equal((await state.broker.request({ ...ask1("retention"), ctx })).reason, "system-budget-exhausted");
+        assert.equal(notices.length, 1, "the first refusal announces itself");
+        assert.match(notices[0], /budget for this session is spent/u);
+
+        // Once per system per session: repeating it every turn would be its own nuisance.
+        await state.broker.request({ ...ask1("retention"), ctx });
+        await state.broker.request({ ...ask1("retention"), ctx });
+        assert.equal(notices.length, 1);
+
+        // A fresh session starts able to warn again.
+        state.broker.reset();
+        await state.broker.request({ ...ask1("retention"), ctx });
+        await state.broker.request({ ...ask1("retention"), ctx });
+        assert.equal(notices.length, 2);
+    });
+});
+
+test("with no human to read it, an exhausted budget stays silent", async () => {
+    await withAgentDir(async () => {
+        const notices = [];
+        const ctx = { hasUI: false, ui: { notify: (text) => notices.push(text) } };
+        const state = countingBroker(
+            enabledSettings({ budgets: { total: 10, retention: 1, compaction: 4, gap: 4, sources: 4 } }),
+        );
+        await state.broker.request({ ...ask1("retention"), ctx });
+        assert.equal((await state.broker.request({ ...ask1("retention"), ctx })).reason, "system-budget-exhausted");
+        assert.deepEqual(notices, []);
+    });
+});
+
 test("a budget of zero is zero calls, and is not read as no limit", async () => {
     await withAgentDir(async () => {
         const state = countingBroker(
