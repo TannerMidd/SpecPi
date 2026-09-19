@@ -173,6 +173,10 @@
     flex: 0 0 auto;
     color: var(--muted);
 }
+.package-usage li span {
+    /* A column of counts that shifts sideways as digits change is hard to scan. */
+    font-variant-numeric: tabular-nums;
+}
 #package-feedback {
     border-top: 1px solid var(--border);
     padding-top: 12px;

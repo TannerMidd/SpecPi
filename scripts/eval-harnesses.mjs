@@ -11,6 +11,7 @@ import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { DEFAULT_BUDGETS } from "../extensions/jev-advisor/config.mjs";
 import { summarize as summarizeLedger } from "../extensions/jev-advisor/ledger.mjs";
 import { runReferenceSolution } from "./eval-tasks.mjs";
 import { prepareFaults, readFaults, withFaultPath } from "./eval-faults.mjs";
@@ -1051,19 +1052,11 @@ export const harnessAdapters = {
                             // been exercised.
                             capability: false,
                         },
-                        // The shipped defaults, spelled out rather than omitted: this row is meant
-                        // to measure the configuration a user actually gets, so a budget invented
-                        // for the eval would measure something nobody runs.
-                        budgets: {
-                            total: 120,
-                            retention: 48,
-                            compaction: 6,
-                            gap: 12,
-                            sources: 8,
-                            progress: 40,
-                            untrusted: 24,
-                            capability: 2,
-                        },
+                        // The shipped defaults, imported rather than copied. This row is meant to
+                        // measure the configuration a user actually gets, so a budget invented for
+                        // the eval would measure something nobody runs -- and a copy that drifted
+                        // would do the same thing while still looking correct.
+                        budgets: { ...DEFAULT_BUDGETS },
                         // Ships on "notify" for users, because the calibration corpus does not yet
                         // support steering a model on a mid-session verdict. The eval runs headless,
                         // where a notification reaches nobody, so measuring the notify path would

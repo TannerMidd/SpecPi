@@ -7,7 +7,14 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const jevConfig = require("../vscode/media/jev-config.js");
-const { TARGETS, jevPath, loadPackageSettings, savePackageSettings } = require("../vscode/src/package-settings.js");
+const {
+    TARGETS,
+    jevPath,
+    jevUsagePath,
+    loadPackageSettings,
+    savePackageSettings,
+} = require("../vscode/src/package-settings.js");
+const { packageSettingsState } = require("../vscode/src/package-state.js");
 
 function withAgentDir(run) {
     const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-jev-chat-")));
@@ -93,9 +100,9 @@ test("a draft the advisor would reject is refused before it reaches disk", () =>
             { master: "yes" },
             // The total and the per-system ceilings differ, and the form has to enforce each one
             // against its own limit rather than against whichever is larger.
-            { budgetTotal: 129 },
+            { budgetTotal: jevConfig.MAX_TOTAL_BUDGET + 1 },
             { budgetTotal: -1 },
-            { budgetRetention: 65 },
+            { budgetRetention: jevConfig.MAX_CALL_BUDGET + 1 },
             { budgetRetention: 1.5 },
             // An unrecognised nudge mode reads as "notify" in the advisor, so accepting it here
             // would quietly give the person a weaker setting than the one they typed.
@@ -121,8 +128,9 @@ test("a schema 1 file is migrated rather than read as the layer switched off", a
     const { loadSettings } = await import("../extensions/jev-advisor/config.mjs");
     for (const [budget, expected] of [
         [6, 6],
-        // Schema 1 read 0 as "no ceiling", so it must not migrate into "no calls".
-        [0, 128],
+        // Schema 1 read 0 as "no ceiling", so it must not migrate into "no calls". Written as the
+        // constant rather than the number it happens to be, because the ceiling is meant to move.
+        [0, jevConfig.MAX_TOTAL_BUDGET],
     ]) {
         withAgentDir((dir) => {
             const file = jevPath({ workspace: dir });
@@ -145,6 +153,84 @@ test("a schema 1 file is migrated rather than read as the layer switched off", a
             assert.deepEqual(jevConfig.toStored(flat), loadSettings(), "the panel and the advisor must migrate alike");
         });
     }
+});
+
+test("the panel can be opened at all", async () => {
+    // It could not. The panel shipped complete -- fields, validation, a guarded write -- and with
+    // no entry in PACKAGES, so every attempt to open it was refused as a package that is not
+    // installed, and the file it writes could only be edited by hand.
+    assert.equal(packageSettingsState({ commands: [{ name: "jev" }] }).targets.includes("jevLayer"), true);
+    assert.equal(packageSettingsState({ commands: [{ name: "websearch" }] }).targets.includes("jevLayer"), false);
+
+    // And the select has to offer it, or a reachable target is still unreachable.
+    const { getWebviewHtml } = await import("../vscode/src/webview.js");
+    const html = getWebviewHtml({
+        cspSource: "https://specpi-test.vscode-cdn.net",
+        nonce: "nonce",
+        styleUri: "https://specpi-test.vscode-cdn.net/media/chat.css",
+        scriptUri: "https://specpi-test.vscode-cdn.net/media/chat.js",
+        codiconsUri: "https://specpi-test.vscode-cdn.net/media/codicon.css",
+    });
+    assert.match(html, /<option value="jevLayer"/u);
+});
+
+test("Chat reports the advisor's own call counts, and never writes them", () => {
+    withAgentDir((dir) => {
+        const usage = jevUsagePath({ workspace: dir });
+        fs.mkdirSync(path.dirname(usage), { recursive: true });
+        fs.writeFileSync(
+            usage,
+            `${JSON.stringify({
+                schema: 1,
+                session: "a-session",
+                startedAt: "2026-09-18T10:00:00.000Z",
+                updatedAt: "2026-09-18T10:20:00.000Z",
+                active: true,
+                calls: 7,
+                budgets: { ...jevConfig.DEFAULT_BUDGETS },
+                systems: { retention: { calls: 5, applied: 0, failed: 0, savedBytes: 0 } },
+            })}\n`,
+        );
+
+        const loaded = loadPackageSettings("jevLayer", { workspace: dir });
+        assert.equal(loaded.usage.calls, 7);
+        assert.equal(loaded.usage.active, true);
+        assert.equal(loaded.usage.systems.retention.calls, 5);
+        // A system that never ran is still a row, so "is retention doing anything" has an answer.
+        assert.deepEqual(loaded.usage.systems.progress, { calls: 0, applied: 0, failed: 0, savedBytes: 0 });
+
+        const rows = jevConfig.usageRows(loaded.usage);
+        assert.equal(rows.length, jevConfig.SYSTEMS.length + 1);
+        assert.deepEqual(rows[0], {
+            name: "total",
+            label: "All systems",
+            calls: 7,
+            budget: jevConfig.DEFAULT_BUDGETS.total,
+            applied: null,
+        });
+
+        // Saving settings must leave the counter exactly as the advisor wrote it. The panel reports
+        // spend; it cannot edit the evidence.
+        const before = fs.readFileSync(usage, "utf8");
+        savePackageSettings(loaded, `${JSON.stringify({ ...JSON.parse(loaded.text), master: true })}\n`);
+        assert.equal(fs.readFileSync(usage, "utf8"), before);
+    });
+});
+
+test("a count Chat cannot read leaves the panel working", () => {
+    // A budget display is a convenience beside the switches. Every way it can fail has to end in
+    // the panel opening without it, never in the panel refusing to open.
+    withAgentDir((dir) => {
+        const usage = jevUsagePath({ workspace: dir });
+        fs.mkdirSync(path.dirname(usage), { recursive: true });
+        for (const text of ["", "{", "null", JSON.stringify({ schema: 2, calls: 9 })]) {
+            fs.writeFileSync(usage, text);
+            assert.equal(loadPackageSettings("jevLayer", { workspace: dir }).usage, undefined, `readable: ${text}`);
+        }
+
+        fs.rmSync(usage);
+        assert.equal(loadPackageSettings("jevLayer", { workspace: dir }).usage, undefined);
+    });
 });
 
 test("an unknown key is reported rather than silently carried", () => {

@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
-            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, four systems that use it, the gates in front of every call, and what it has actually measured."
+            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, seven systems that use it, the gates in front of every call, and what it has actually measured."
         />
         <meta property="og:title" content="The Jev layer · SpecPi" />
         <meta
@@ -165,8 +165,9 @@
                             <path d="M234 76 V96 H500 V252 H456" class="dg-flow-accent" marker-end="url(#a2)" />
                             <path d="M234 170 V252 H264" class="dg-flow-accent" marker-end="url(#a2)" />
 
-                            <text x="512" y="176" class="dg-note">a summary of at most 1 KB,</text>
-                            <text x="512" y="191" class="dg-note">never file contents or output</text>
+                            <text x="512" y="176" class="dg-note">a summary of at most 1 KB:</text>
+                            <text x="512" y="191" class="dg-note">counts, names, and up to twelve</text>
+                            <text x="512" y="206" class="dg-note">short redacted lines</text>
                         </svg>
                         <figcaption class="figure-note">
                             Both optional boxes are removed from the path entirely when the layer is off. The guard sits
@@ -256,8 +257,12 @@
                         <figcaption class="figure-note">
                             Only the two accented stages involve the network or the payload. The sanitiser is the one
                             module permitted to build a wire payload: it redacts credentials, tokens, JWTs, emails and
-                            URLs, relativises absolute paths, refuses file contents and command output outright, and
-                            truncates anything still over budget rather than sending it.
+                            URLs, relativises absolute paths, and truncates anything still over budget rather than
+                            sending it. It does not refuse the material being judged, and an earlier version of this
+                            page said it did. Whether a result is spent, or whether a fetched page is addressing the
+                            agent, cannot be decided from byte counts, so a bounded sample goes with the counts: at
+                            most twelve short redacted lines per result &mdash; six from the head, four spaced through
+                            the middle, two from the tail &mdash; inside the same 1 KB budget.
                         </figcaption>
                     </figure>
                     <p>
@@ -526,9 +531,12 @@
                 <section class="doc-section" id="measured">
                     <header><h2>What it has actually measured</h2><span>09</span></header>
                     <p>
-                        Across 259 attempts spanning five tiers, SpecPi with the layer on made
-                        <strong>36 Jev calls with zero failures</strong>, costing $0.001 in total &mdash; about 0.6% of
-                        its own model spend. Against the identical base with the layer off:
+                        The layer's row has been re-run since the gate was calibrated, so there are two of them. The
+                        middle column is the original recorded matrix &mdash; every harness, every tier, one model, one
+                        sitting &mdash; where three systems were on and retention's shortening branch could not fire at
+                        all, for the reason <a href="#calibration">section 07</a> describes. The right column is the
+                        same 37 attempts re-run with the calibrated gate and five systems on, which is the
+                        configuration described on this page.
                     </p>
                     <div class="table-scroll">
                         <table class="numeric">
@@ -536,59 +544,101 @@
                                 <tr>
                                     <th>Measure</th>
                                     <th>SpecPi</th>
-                                    <th>SpecPi + Jev</th>
+                                    <th>+ Jev, before</th>
+                                    <th>+ Jev, after</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><th>Score</th><td>0.896</td><td>0.891</td></tr>
-                                <tr><th>Cost per attempt</th><td>$0.0042</td><td>$0.0046</td></tr>
-                                <tr><th>Tool calls per attempt</th><td>9.5</td><td>10.0</td></tr>
-                                <tr><th>Turns per attempt</th><td>8.5</td><td>10.0</td></tr>
-                                <tr><th>Tool error rate</th><td>6.3%</td><td>5.7%</td></tr>
-                                <tr><th>Context growth per turn</th><td>635</td><td>597</td></tr>
-                                <tr><th>Cache hit rate</th><td>93%</td><td>94%</td></tr>
+                                <tr><th>Score</th><td>0.878</td><td>0.895</td><td>0.870</td></tr>
+                                <tr><th>Cost per attempt</th><td>$0.0042</td><td>$0.0046</td><td>$0.0046</td></tr>
+                                <tr><th>Tool calls per attempt</th><td>9.6</td><td>10.0</td><td>10.0</td></tr>
+                                <tr><th>Turns per attempt</th><td>8.6</td><td>10.0</td><td>10.1</td></tr>
+                                <tr><th>Tool error rate</th><td>6.8%</td><td>6.0%</td><td>5.1%</td></tr>
+                                <tr><th>Context growth per turn</th><td>628</td><td>590</td><td>631</td></tr>
+                                <tr><th>Cache hit rate</th><td>93%</td><td>94%</td><td>93%</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <p>
-                        <strong>Read that honestly: the layer has not yet paid for itself.</strong> It costs about 9%
-                        more per attempt and scores fractionally lower, which at this sample size is noise rather than
-                        a result. The two figures moving the right way are the ones its mechanism actually targets
-                        &mdash; context grows 6% more slowly per turn and fewer tool calls come back as errors &mdash;
-                        but a shorter session reads fewer bytes regardless of whether anything was elided, so neither is
-                        attributable yet.
+                        <strong>Read that honestly: the layer has not paid for itself.</strong> It costs about 9% more
+                        per attempt and scores within noise of the base either way. The one figure that previously
+                        looked like the mechanism working &mdash; context growing 6% more slowly per turn &mdash; did
+                        not survive the re-run: 590 became 631 against a control of 628, which is to say it was
+                        variance, and the earlier reading of it was too generous. The tool error rate is lower in both
+                        Jev columns, but nothing in this layer touches a tool call before it runs, so that is a
+                        correlation with no mechanism behind it and should not be claimed as one.
                     </p>
                     <p>
-                        The missing measurement was the mechanism's own: nothing recorded how many bytes retention
-                        actually dropped, so its effect could only be inferred from a cost delta it may not have
-                        caused. The ledger now records, per call, whether the advice was taken and what it saved, and
-                        the eval runner folds that out of each attempt's disposable home into its report.
+                        The measurement that was missing is now the one that matters, because the ledger records per
+                        call whether the advice was taken and what it saved, and the eval runner folds that out of each
+                        attempt's disposable home. Over the same 37 attempts the layer made
+                        <strong>43 calls, none of which failed, and none of which changed anything at all</strong>. They
+                        cost $0.0013 in total, 0.77% of the run's own model spend, so the price of the layer is not the
+                        problem with it.
                     </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>System</th>
+                                    <th>Asked</th>
+                                    <th>Changed something</th>
+                                    <th>Why not</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Tool-result retention</th><td>38</td><td>0</td><td>confidence below the gate, 38 times</td></tr>
+                                <tr><th>Progress detection</th><td>5</td><td>0</td><td>not stuck, 5 times</td></tr>
+                                <tr><th>Untrusted content</th><td>0</td><td>0</td><td>never reached</td></tr>
+                                <tr><th>Compaction, gap, sources</th><td>0</td><td>0</td><td>never reached</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <p>
-                        <strong>Which means the table above is now known to be measuring less than it looks like it
-                        is.</strong> It was taken before the gate was calibrated &mdash; when retention's shortening
-                        branch could not fire at all, for the reason
-                        <a href="#calibration">section 07</a> describes. So the row is a comparison between plain
-                        SpecPi and plain SpecPi carrying the cost of asking questions whose most expensive answer was
-                        unreachable. It is left standing because it is what was actually recorded, and replacing it
-                        with a claim would be worse than publishing a number that has since been explained.
-                    </p>
-                    <p>
-                        With the instrumentation in place, five live runs say something sharper, and it is not
-                        flattering. <strong>Retention asks three or four times per attempt and has never once
-                        shortened anything.</strong> Every decline was the same: Jev answered, and reported a
-                        confidence below the calibrated bar. On the contrived case it is confident &mdash; a listing
-                        of vendor icons during a changelog edit scores 0.75 to 0.85 &mdash; but on the real reads of
-                        a repair chain, where each result feeds the next step, it is genuinely unsure whether the
-                        output is spent, and says so.
+                        <strong>Retention asks and never fires, and now that is a result rather than a suspicion.</strong>
+                        The first time this was seen the gate was unreachable, so &ldquo;never fired&rdquo; proved
+                        nothing. This run used the calibrated threshold, where a contrived spent result &mdash; a
+                        listing of vendor icons during a changelog edit &mdash; answers 0.75 to 0.85 and would pass. It
+                        is reachable, and on 38 real reads the model reported below the bar every time. On the real
+                        reads of a repair chain, where each result feeds the next step, it is genuinely unsure whether
+                        the output is spent, and it says so.
                     </p>
                     <p>
                         The threshold is not going to be lowered to fix that. This system's whole asymmetry is that
                         carrying a result costs tokens and dropping the wrong one costs the task, so firing on a
-                        confidence the model did not have is the one thing it must not do. The useful outcome is that
-                        the claim is now falsifiable: the flagship system does not pay off on this workload, that is
-                        visible in a report rather than inferred from a cost delta, and whether it pays off on a
-                        session with genuinely disposable output remains untested.
+                        confidence the model did not have is the one thing it must not do. What the number buys is a
+                        falsifiable claim in place of a hopeful one: on this workload the flagship system does not pay
+                        off, and whether it pays off on a session with genuinely disposable output &mdash; one that
+                        greps widely before settling, or fetches pages it reads once &mdash; is still untested.
+                    </p>
+                    <p>
+                        Two other things the ledger made visible, which a cost column would have hidden.
+                        <strong>Progress once spent twelve calls on a single healthy attempt; it now spends five across
+                        all thirty-seven.</strong> Its local gate used to ask whenever any one signal fired, and a
+                        120-step repair chain re-runs its verification command constantly, so the signal was that task's
+                        normal condition rather than a symptom &mdash; the attempt it emptied its budget on scored
+                        0.978. Requiring two weak signals together, with a four-turn cooldown, is what closed that, and
+                        Jev answered &ldquo;not stuck&rdquo; on every one of the five, about sessions that were not.
+                        <strong>The untrusted-content system has never once been called.</strong> It only rides along
+                        when a result came from a web or browser tool, and no task in this suite produces one, so a
+                        system that ships is measured by nothing here. That is stated rather than omitted, because an
+                        absent row reads as a zero and a zero reads as a result.
+                    </p>
+                    <p>
+                        One more, found by counting rather than by reading: the proxy saw 44 calls leave the machine
+                        and the ledger held 43. A system that is deliberately not awaited can still be in flight when
+                        the session ends, and the answer was being discarded along with its audit line. The answer
+                        must be discarded &mdash; it belongs to a session that no longer exists &mdash; but the line
+                        must not, because the ledger's entire claim is that every transmission appears in it. That is
+                        fixed, and the fix arrived because the numbers were checked against each other rather than
+                        read one at a time.
+                    </p>
+                    <p class="figure-note">
+                        Both Jev columns are one harness on one model, and the re-run is a separate sitting from the
+                        matrix the control comes from, so anything that drifted between them lands on the layer. The
+                        per-system counts do not have that problem: they are what the layer did, recorded by the layer,
+                        and they do not depend on a comparison at all. <code>scripts/jev-effect.mjs</code> reproduces
+                        every figure above from the stored reports.
                     </p>
                 </section>
 
@@ -611,7 +661,29 @@
                     </ul>
                     <p>
                         In SpecPi Chat the same switches appear as toggles under package settings, writing the same
-                        file the extension reads. One key serves the whole layer:
+                        file the extension reads, with the advisor's call count beside each budget: the total, one row
+                        per system, and how many of those calls changed anything &mdash; because &ldquo;asked six
+                        times, changed nothing&rdquo; is exactly the finding a bare call count hides, and it is the
+                        finding this layer turned out to have. Those counts come from a separate <code>usage.json</code>
+                        holding numbers and nothing else, which is what makes it safe for a second process to read at
+                        all; Chat reads it and never writes it, and the advisor does not write it until the master
+                        switch is on. Like the settings beside them the counts belong to the agent directory rather
+                        than to one conversation, so they are dated and marked running or ended rather than presented
+                        as whichever chat you happen to have open.
+                    </p>
+                    <p>
+                        The default ceiling is <strong>512 calls in a session</strong>, with per-system ceilings that
+                        sum past it so the total stays a real constraint. That is a backstop rather than a working
+                        limit, and the number is chosen to say so: a full tier-3 task spends 4 to 7 calls and the
+                        busiest attempt ever recorded spent 12, so 512 is only reachable by a loop, and reaching it is
+                        therefore information. Cost is not what it bounds &mdash; a call is about $0.00003 &mdash; it
+                        bounds how much digest leaves the machine and how much awaited latency a runaway loop can add.
+                        Running out is announced once per system rather than passed over in silence, because silence is
+                        this layer's normal state and a system that has gone quiet because it is spent looks exactly
+                        like one that had nothing to say.
+                    </p>
+                    <p>
+                        One key serves the whole layer:
                         <code>OPENROUTER_API_KEY</code>, since Jev is published on OpenRouter and both halves reach it
                         that way by default. <code>JEV_BACKEND=typesafe</code> selects TypeSafe's direct API instead,
                         which needs a <code>TYPESAFE_API_KEY</code>; the two keys are not interchangeable and the wrong

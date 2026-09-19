@@ -87,6 +87,41 @@ function jevPath({ workspace, env = process.env, home = os.homedir() } = {}) {
     return path.join(agentDirectory({ workspace, env, home }), "specpi", "jev", "settings.json");
 }
 
+// The advisor's running call count for the session, beside its settings. Chat reads it and never
+// writes it: it is the extension's own bookkeeping, and a panel that could edit a usage counter
+// would be editing the evidence rather than reporting it. Derived from the settings path rather
+// than resolved again, so the two can never end up pointing at different agent directories.
+function jevUsagePath(options = {}) {
+    return usageBeside(jevPath(options));
+}
+
+function usageBeside(settingsFile) {
+    return path.join(path.dirname(settingsFile), "usage.json");
+}
+
+/**
+ * Read the count, or nothing. A budget display is a convenience beside the switches, so no failure
+ * here may stop the panel opening: an absent file, an unreadable one, a linked one and one written
+ * by a newer advisor all come back the same way, and the panel says the layer has not run.
+ *
+ * The size bound is deliberately small. The file is counts for seven systems and nothing else, so
+ * anything approaching the settings limit was not written by the advisor.
+ */
+function loadJevUsage(settingsFile) {
+    try {
+        const filename = usageBeside(settingsFile);
+        const snapshot = readFile(filename, {
+            maxBytes: 8 * 1024,
+            missingText: "{}",
+            messages: messagesFor("Jev usage"),
+        });
+
+        return snapshot.exists ? jevConfig.fromStoredUsage(parseJson(snapshot.text)) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 function targetPath(target, options = {}) {
     if (target === "webAccess") {
         return webAccessPath(options);
@@ -161,6 +196,7 @@ function loadJev(options) {
         text: `${JSON.stringify(jevConfig.fromStored(stored), null, 4)}
 `,
         credentials: [],
+        usage: loadJevUsage(filename),
     };
 }
 
@@ -189,6 +225,9 @@ function saveJev(snapshot, draft) {
         text: `${JSON.stringify(jevConfig.fromStored(next), null, 4)}
 `,
         credentials: [],
+        // Re-read rather than carried over from the load: saving a budget and still seeing the old
+        // ceiling beside the current spend is the kind of small lie that makes a panel untrustworthy.
+        usage: loadJevUsage(filename),
     };
 }
 
@@ -287,4 +326,12 @@ function savePackageSettings(snapshot, text) {
     return saveWebAccess(snapshot, webAccessConfig.validate(text).config);
 }
 
-module.exports = { TARGETS, webAccessPath, jevPath, targetPath, loadPackageSettings, savePackageSettings };
+module.exports = {
+    TARGETS,
+    webAccessPath,
+    jevPath,
+    jevUsagePath,
+    targetPath,
+    loadPackageSettings,
+    savePackageSettings,
+};

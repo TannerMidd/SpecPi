@@ -233,11 +233,18 @@ function getWebviewHtml({
             <label for="package-target">Configuration</label>
             <select id="package-target">
                 <option value="webAccess">Web access &middot; providers and keys</option>
+                <option value="jevLayer">Jev layer &middot; systems, budgets and the guard</option>
             </select>
             <button id="package-reload" type="button">Load / discard draft</button>
         </div>
         <p id="package-path" class="permission-path"></p>
         <p id="package-scope-note" class="package-note" hidden></p>
+        <section id="package-usage" class="package-credentials package-usage" aria-labelledby="package-usage-title" hidden>
+            <h3 id="package-usage-title">Advisor calls against their budgets</h3>
+            <p id="package-usage-summary"></p>
+            <ul id="package-usage-list"></ul>
+            <p>Counts come from the advisor's own <code>usage.json</code>, which holds numbers and nothing else &mdash; no session state, no questions, no answers. Chat reads it and never writes it, and reloads it when you load or save these settings. Like the settings above, it belongs to the agent directory rather than to this chat: several Pi sessions can share one, and the file describes whichever wrote to it last. The advisor only starts writing it once the master switch is on, and a session that ends abruptly leaves its last count marked as still running.</p>
+        </section>
         <section id="package-credentials" class="package-credentials" aria-labelledby="package-credential-title" hidden>
             <h3 id="package-credential-title">Provider credentials</h3>
             <p id="package-credential-summary"></p>

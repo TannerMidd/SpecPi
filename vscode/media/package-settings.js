@@ -207,6 +207,60 @@
                 command: "Resolved by a local command",
             };
 
+            // Only the packages this session reports may be chosen; the host refuses any other
+            // target anyway, so an option left selectable would be a control that always errors.
+            function renderTargets() {
+                const allowed = new Set(getState().packageSettings?.targets || []);
+                for (const option of target.options) {
+                    option.hidden = !allowed.has(option.value);
+                    option.disabled = option.hidden;
+                }
+            }
+
+            function plural(count, word) {
+                return `${count} ${word}${count === 1 ? "" : "s"}`;
+            }
+
+            // Counts, not effects: this is a budget display, and the one thing a person wants from
+            // it is whether a system has room left. `applied` rides along because "asked 6 times,
+            // changed nothing" is the finding a bare call count hides.
+            function renderUsage() {
+                const section = byId("package-usage");
+                section.hidden = !isJev();
+                const list = byId("package-usage-list");
+                list.textContent = "";
+                if (!isJev()) {
+                    return;
+                }
+
+                const usage = snapshot.usage;
+                const summary = byId("package-usage-summary");
+                if (!usage) {
+                    summary.textContent =
+                        "No calls recorded. The advisor writes this file once the master switch is on, so an untouched layer has none.";
+
+                    return;
+                }
+
+                // "Running" and "ended" are different facts and the panel says which, because a
+                // count with no such label reads as live however old it is.
+                const when = usage.updatedAt ? new Date(usage.updatedAt).toLocaleString() : "an unknown time";
+                summary.textContent = usage.active
+                    ? `A Jev session that started ${usage.startedAt ? new Date(usage.startedAt).toLocaleString() : "recently"} has made ${plural(usage.calls, "call")} of ${usage.budgets.total}, as of ${when}.`
+                    : `The last Jev session ended having made ${plural(usage.calls, "call")} of ${usage.budgets.total}, as of ${when}.`;
+                for (const row of jev.usageRows(usage)) {
+                    const item = document.createElement("li");
+                    const name = document.createElement("code");
+                    name.textContent = row.label;
+                    const detail = document.createElement("span");
+                    const spent = row.budget > 0 && row.calls >= row.budget ? " · budget spent" : "";
+                    const changed = row.applied === null ? "" : `, ${row.applied} changed something`;
+                    detail.textContent = `${row.calls} of ${row.budget}${changed}${spent}`;
+                    item.append(name, detail);
+                    list.append(item);
+                }
+            }
+
             function renderCredentials() {
                 credentials.hidden = !isWeb();
                 const list = byId("package-credential-list");
@@ -287,6 +341,7 @@
                         dialog.close();
                     }
 
+                    renderTargets();
                     updateButtons();
                 },
                 handleMessage(message) {
@@ -296,9 +351,11 @@
                     ) {
                         snapshot = message.settings;
                         pending = false;
+                        renderTargets();
                         target.value = snapshot.target;
                         source.value = snapshot.text;
                         rebuildFields();
+                        renderUsage();
                         renderCredentials();
                         describe();
                         populate();
@@ -322,6 +379,7 @@
                         if (message.settings) {
                             snapshot = message.settings;
                             source.value = snapshot.text;
+                            renderUsage();
                             renderCredentials();
                             describe();
                             saved = true;

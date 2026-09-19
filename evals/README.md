@@ -71,6 +71,44 @@ and three charts into the output directory:
 
 Counts stay on every bar so a headline never hides its denominator.
 
+### The Jev row on its own
+
+The advisor changes often enough that re-running seven harnesses to see what one
+of them did is waste. `specpi-jev` runs alone on the protocol the published
+matrix used — two attempts per cell on tiers 1 to 3 with each task's own budget,
+one attempt on tiers 4 and 5 with the caps below:
+
+```sh
+for tier in 1 2 3; do
+  node scripts/eval-run.mjs --env-file=evals/.env --harness=specpi-jev --tier=$tier \
+    --model=deepseek-v4.1-flash --attempts=2 --out=evals/runs/jev-calibrated-tier$tier
+done
+node scripts/eval-run.mjs --env-file=evals/.env --harness=specpi-jev --tier=4 \
+  --model=deepseek-v4.1-flash --attempts=1 --timeout=600 --out=evals/runs/jev-calibrated-tier4
+node scripts/eval-run.mjs --env-file=evals/.env --harness=specpi-jev --tier=5 \
+  --model=deepseek-v4.1-flash --attempts=1 --timeout=900 --out=evals/runs/jev-calibrated-tier5
+```
+
+Then compare, against the plain-SpecPi row from the published matrix and,
+optionally, against an earlier set of Jev runs:
+
+```sh
+node scripts/jev-effect.mjs \
+  --jev=evals/runs/jev-calibrated-tier1/report.json,evals/runs/jev-calibrated-tier2/report.json,evals/runs/jev-calibrated-tier3/report.json,evals/runs/jev-calibrated-tier4/report.json,evals/runs/jev-calibrated-tier5/report.json \
+  --baseline=evals/runs/full-tier1/report.json,evals/runs/full-tier2/report.json,evals/runs/full-tier3/report.json,evals/runs/full-tier4/report.json,evals/runs/full-tier5/report.json
+```
+
+It prints the comparison from the same aggregates the evaluations page is built
+from, so the two cannot disagree, plus the advisor's own ledger: per system, how
+many calls were made, how many changed anything, and why the rest did not.
+
+Read the control honestly. Running one harness alone means its column and the
+plain-SpecPi column come from different sittings, so anything that moved between
+them — the model's own drift most of all — lands on the layer. The published
+matrix is one sitting precisely because that is not true of it; a single-harness
+re-run is evidence about the layer's own behaviour, and weaker evidence about
+the difference it makes.
+
 ### One image with everything
 
 ```sh

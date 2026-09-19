@@ -27,6 +27,7 @@ import {
 } from "../extensions/jev-advisor/client.mjs";
 import { choiceValue, nounFalse, nounTrue, scoreLevel } from "../extensions/jev-advisor/gate.mjs";
 import { ledgerPath, read as readLedger, record } from "../extensions/jev-advisor/ledger.mjs";
+import { readUsage, usagePath } from "../extensions/jev-advisor/usage.mjs";
 import { MAX_STATE_BYTES, buildState, looksAbsolute, outline, redact } from "../extensions/jev-advisor/sanitize.mjs";
 import * as retention from "../extensions/jev-advisor/questions/retention.mjs";
 import * as compaction from "../extensions/jev-advisor/questions/compaction.mjs";
@@ -277,6 +278,163 @@ test("with no human to read it, an exhausted budget stays silent", async () => {
         await state.broker.request({ ...ask1("retention"), ctx });
         assert.equal((await state.broker.request({ ...ask1("retention"), ctx })).reason, "system-budget-exhausted");
         assert.deepEqual(notices, []);
+    });
+});
+
+// The panel lives in another process and cannot see `callsUsed`, so the count has to reach it
+// through a file. These tests use the real writer rather than an injected one, because the thing
+// being asserted is that a second reader finds the number, not that a callback was invoked.
+function publishingBroker(settings) {
+    const state = { calls: 0 };
+    state.broker = createBroker({
+        loadSettings: () => settings,
+        ask: async () => {
+            state.calls += 1;
+
+            return { ok: true, answers: { q: { kind: "noul", value: 0.5 } } };
+        },
+        ensureConsent: async () => true,
+        record: () => true,
+    });
+
+    return state;
+}
+
+test("the session's spend is published where another process can read it", async () => {
+    await withAgentDir(async () => {
+        const state = publishingBroker(enabledSettings());
+        state.broker.reset();
+
+        const started = readUsage();
+        assert.equal(started.active, true);
+        assert.equal(started.calls, 0);
+        assert.notEqual(started.session, "", "a session without an identity cannot be told from the last one");
+        // Every system is present at zero. A reader should never have to tell "made no calls" from
+        // "this version does not know that system".
+        assert.deepEqual(Object.keys(started.systems).sort(), [...SYSTEM_NAMES].sort());
+        assert.equal(started.budgets.total, enabledSettings().budgets.total);
+
+        await state.broker.request({
+            ...ask1("gap"),
+            decide: () => ({ applied: true, savedBytes: 400 }),
+        });
+        await state.broker.request(ask1("retention"));
+
+        const spent = readUsage();
+        assert.equal(spent.calls, 2);
+        assert.equal(spent.session, started.session, "one session, one identity");
+        assert.deepEqual(spent.systems.gap, { calls: 1, applied: 1, failed: 0, savedBytes: 400 });
+        assert.deepEqual(spent.systems.retention, { calls: 1, applied: 0, failed: 0, savedBytes: 0 });
+    });
+});
+
+test("a payload that outlives its session is still in the ledger", async () => {
+    // Found by counting. A re-run of the whole suite sent 44 advisor calls through the proxy and
+    // logged 43, because a system that is deliberately not awaited -- the normal shape of a
+    // turn-level one -- can still be in flight when the session ends, and the answer was being
+    // dropped along with its audit line. The answer must be dropped: it belongs to a session that
+    // no longer exists. The line must not, because the ledger's whole claim is that every
+    // transmission appears in it.
+    await withAgentDir(async () => {
+        const lines = [];
+        // Two gates rather than a timer, so the ordering is a fact rather than a race: the test
+        // waits until the payload is genuinely on the wire, ends the session, and only then lets
+        // the answer come back.
+        let release;
+        let arrived;
+        const answered = new Promise((resolve) => {
+            release = resolve;
+        });
+        const onTheWire = new Promise((resolve) => {
+            arrived = resolve;
+        });
+        const broker = createBroker({
+            loadSettings: () => enabledSettings(),
+            ask: async () => {
+                arrived();
+                await answered;
+
+                return { ok: true, answers: { q: { kind: "noul", value: 0.9 } } };
+            },
+            ensureConsent: async () => true,
+            record: (entry) => lines.push(entry) > 0,
+        });
+
+        broker.reset();
+        let applied = false;
+        const inFlight = broker.request({
+            ...ask1("progress"),
+            decide: () => {
+                applied = true;
+
+                return { applied: true };
+            },
+        });
+        await onTheWire;
+        // The session ends under the call, exactly as session_shutdown does.
+        broker.finish();
+        release();
+
+        const result = await inFlight;
+        assert.equal(result.reason, "session-changed");
+        assert.equal(applied, false, "an answer from a finished session must never be acted on");
+        assert.equal(lines.length, 1, "the transmission is recorded even though its answer was not used");
+        assert.equal(lines[0].discarded, true);
+        assert.equal(lines[0].outcome, "session-changed");
+        assert.equal(lines[0].applied, false);
+        assert.equal(typeof lines[0].payloadSha256, "string");
+
+        // And it is not charged to the session that followed.
+        assert.equal(broker.status().callsUsed, 0);
+    });
+});
+
+test("a session that has ended still says what it spent", async () => {
+    // Deleting the file at shutdown would leave a reader unable to tell "this layer has never run"
+    // from "the session that just ended spent its whole budget", and the second is the more useful
+    // thing to see after the fact.
+    await withAgentDir(async () => {
+        const state = publishingBroker(enabledSettings());
+        state.broker.reset();
+        await state.broker.request(ask1("gap"));
+        state.broker.finish();
+
+        const ended = readUsage();
+        assert.equal(ended.active, false);
+        assert.equal(ended.calls, 1);
+        assert.equal(ended.systems.gap.calls, 1);
+    });
+});
+
+test("with the layer switched off, nothing is written at all", async () => {
+    // The master switch promises no key read, no consent read and no network call. A counts file
+    // appearing in every session on every machine with SpecPi installed is a trace of the same kind.
+    await withAgentDir(async () => {
+        const state = publishingBroker(defaultSettings());
+        state.broker.reset();
+        assert.equal(fs.existsSync(usagePath()), false);
+        assert.equal(readUsage(), undefined);
+
+        state.broker.finish();
+        assert.equal(fs.existsSync(usagePath()), false);
+        assert.equal(state.calls, 0);
+    });
+});
+
+test("a corrupt count reads as absent rather than as a session with no calls", async () => {
+    await withAgentDir(async () => {
+        fs.mkdirSync(path.dirname(usagePath()), { recursive: true });
+        for (const text of ["", "{", "[]", JSON.stringify({ schema: 99, calls: 4 })]) {
+            fs.writeFileSync(usagePath(), text);
+            assert.equal(readUsage(), undefined, `unreadable: ${text}`);
+        }
+
+        // A known shape with impossible numbers reads as zero for those fields, not as garbage.
+        fs.writeFileSync(usagePath(), JSON.stringify({ schema: 1, calls: -3, systems: { gap: { calls: 1.5 } } }));
+        const usage = readUsage();
+        assert.equal(usage.calls, 0);
+        assert.equal(usage.systems.gap.calls, 0);
+        assert.equal(usage.active, false);
     });
 });
 

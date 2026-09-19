@@ -13,20 +13,31 @@
     // translation, and both directions are total so a round trip cannot silently drop a key.
 
     const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability"];
-    const MAX_CALL_BUDGET = 64;
-    const MAX_TOTAL_BUDGET = 128;
+    const MAX_CALL_BUDGET = 256;
+    const MAX_TOTAL_BUDGET = 512;
     const NUDGE_MODES = ["notify", "message"];
     // Must equal DEFAULT_BUDGETS in extensions/jev-advisor/config.mjs; a test pins them together,
     // because a panel whose defaults differ from the advisor's writes a change on every save.
     const DEFAULT_BUDGETS = {
-        total: 120,
-        retention: 48,
-        compaction: 6,
-        gap: 12,
-        sources: 8,
-        progress: 40,
-        untrusted: 24,
+        total: 512,
+        retention: 208,
+        compaction: 12,
+        gap: 48,
+        sources: 32,
+        progress: 176,
+        untrusted: 104,
         capability: 2,
+    };
+    // The label a row gets in the usage table. Same names the advisor prints in /jev status, so a
+    // person reading both does not have to work out that two words mean one system.
+    const SYSTEM_LABELS = {
+        retention: "Tool-result retention",
+        compaction: "Compaction guidance",
+        gap: "Capability-gap triage",
+        sources: "Delegation source ranking",
+        progress: "Progress and thrash detection",
+        untrusted: "Untrusted-content classification",
+        capability: "Turn-zero capability arming",
     };
     const BUDGET_KEYS = { total: "budgetTotal" };
     for (const name of SYSTEMS) {
@@ -185,6 +196,78 @@
         };
     }
 
+    function counter(value) {
+        return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+    }
+
+    function timestamp(value) {
+        return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : "";
+    }
+
+    /**
+     * The advisor's own running count, from <agent-dir>/specpi/jev/usage.json. It is counts and
+     * nothing else -- no state, no answers, no digests -- which is what makes it safe for a second
+     * process to read at all, and the normaliser here is total so a truncated or half-written file
+     * shows as absent rather than as a session that made no calls.
+     *
+     * Returns undefined for any shape this version does not know, including a missing file. The
+     * panel renders that as "the layer has not run", which is the honest reading: the advisor only
+     * writes this file once the master switch is on.
+     */
+    function fromStoredUsage(raw) {
+        if (!object(raw) || raw.schema !== 1) {
+            return undefined;
+        }
+
+        const systems = {};
+        for (const name of SYSTEMS) {
+            const bucket = object(raw.systems) && object(raw.systems[name]) ? raw.systems[name] : {};
+            systems[name] = {
+                calls: counter(bucket.calls),
+                applied: counter(bucket.applied),
+                failed: counter(bucket.failed),
+                savedBytes: counter(bucket.savedBytes),
+            };
+        }
+
+        const budgets = object(raw.budgets) ? raw.budgets : {};
+
+        return {
+            session: typeof raw.session === "string" ? raw.session.slice(0, 64) : "",
+            startedAt: timestamp(raw.startedAt),
+            updatedAt: timestamp(raw.updatedAt),
+            active: raw.active === true,
+            calls: counter(raw.calls),
+            budgets: {
+                total: counter(budgets.total),
+                ...Object.fromEntries(SYSTEMS.map((name) => [name, counter(budgets[name])])),
+            },
+            systems,
+        };
+    }
+
+    /**
+     * One row per system plus the total, in the order the panel renders them. Systems that have
+     * made no call are kept rather than filtered: "retention: 0 of 208" is the answer to "is this
+     * thing doing anything", and dropping the row would leave that question unanswered.
+     */
+    function usageRows(usage) {
+        if (!usage) {
+            return [];
+        }
+
+        return [
+            { name: "total", label: "All systems", calls: usage.calls, budget: usage.budgets.total, applied: null },
+            ...SYSTEMS.map((name) => ({
+                name,
+                label: SYSTEM_LABELS[name] || name,
+                calls: usage.systems[name].calls,
+                budget: usage.budgets[name],
+                applied: usage.systems[name].applied,
+            })),
+        ];
+    }
+
     function parse(text) {
         const value = JSON.parse(text);
         if (!object(value)) {
@@ -234,6 +317,7 @@
 
     const api = {
         SYSTEMS,
+        SYSTEM_LABELS,
         MAX_CALL_BUDGET,
         MAX_TOTAL_BUDGET,
         NUDGE_MODES,
@@ -244,6 +328,8 @@
         validate,
         fromStored,
         toStored,
+        fromStoredUsage,
+        usageRows,
     };
     if (typeof module !== "undefined" && module.exports) {
         module.exports = api;

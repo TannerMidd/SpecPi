@@ -4,6 +4,7 @@ import { SYSTEM_NAMES, keyPresent, loadSettings, saveSettings, settingsPath } fr
 import { consentPath, granted, revokeConsent } from "./consent.mjs";
 import { createBroker } from "./broker.mjs";
 import { ledgerPath, read as readLedger } from "./ledger.mjs";
+import { usagePath } from "./usage.mjs";
 import { applyConfig as applyGuardConfig, statusLine as guardStatusLine } from "./guard.mjs";
 import * as retention from "./questions/retention.mjs";
 import * as compaction from "./questions/compaction.mjs";
@@ -100,7 +101,10 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     });
 
     pi.on("session_shutdown", () => {
-        broker.reset();
+        // finish, not reset: the counts are published once more as an ended session so anything
+        // reading them from outside -- SpecPi Chat's panel, most of all -- shows what the session
+        // actually spent rather than a zeroed live one.
+        broker.finish();
         recent.length = 0;
         resetHistory();
     });
@@ -821,7 +825,9 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 const lines = [
                     `master: ${settings.master ? "on" : "off"} (new sessions start ${loadSettings().startup ? "on" : "off"})`,
                     ...SYSTEM_NAMES.map((name) => `  ${name}: ${settings.systems[name] ? "on" : "off"}`),
-                    `key: ${keyPresent() ? "present" : "missing"} (TYPESAFE_API_KEY)`,
+                    // Both names, because the default route is OpenRouter and naming only the
+                    // other one sends a reader to set the key that returns a bare 401.
+                    `key: ${keyPresent() ? "present" : "missing"} (OPENROUTER_API_KEY, or TYPESAFE_API_KEY with JEV_BACKEND=typesafe)`,
                     `consent: ${granted() ? "granted" : "not granted"}`,
                     `calls this session: ${state.callsUsed}/${state.budgets.total} total`,
                     ...SYSTEM_NAMES.map((name) => `  ${name}: ${state.usedBySystem[name] ?? 0}/${state.budgets[name]}`),
@@ -829,6 +835,10 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     `settings: ${settingsPath()}`,
                     `consent file: ${consentPath()}`,
                     `ledger: ${ledgerPath()}`,
+                    // Named here because it is the one file another process is meant to read, and
+                    // SpecPi Chat showing a number nobody can find is how a number stops being
+                    // checkable.
+                    `session counts: ${usagePath()}`,
                 ];
                 ctx.ui.notify(lines.join("\n"), "info");
             } catch (error) {

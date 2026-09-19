@@ -42,8 +42,8 @@ export const SYSTEM_NAMES = Object.freeze([
 export const NUDGE_MODES = Object.freeze(["notify", "message"]);
 
 const MAX_SETTINGS_BYTES = 4096;
-const MAX_CALL_BUDGET = 64;
-const MAX_TOTAL_BUDGET = 128;
+const MAX_CALL_BUDGET = 256;
+const MAX_TOTAL_BUDGET = 512;
 
 /**
  * One shared budget could not survive a turn-level system. A system that fires once per turn would
@@ -58,29 +58,36 @@ const MAX_TOTAL_BUDGET = 128;
  * result, compaction once or twice in a long session, gap per report, sources per delegation batch.
  */
 export const DEFAULT_BUDGETS = Object.freeze({
-    // Sized for a long interactive session, not for an eval attempt. Measured, a full tier-3 task
-    // -- a 120-step repair chain over about 25 model requests -- spends 4 to 7 of these, so the
-    // ceilings are nowhere near binding on ordinary work. What they have to survive is a session
-    // that runs for hours: progress may fire once every four turns, so it would reach a ceiling of
-    // 12 somewhere around turn 48 and then go quiet for the rest of the day.
+    // A backstop, not a working limit, and the number says which. Measured, a full tier-3 task -- a
+    // 120-step repair chain over about 25 model requests -- spends 4 to 7 calls, and the busiest
+    // attempt ever recorded spent 12. A session would have to run for days before 512 bound
+    // anything a person was actually doing, which is the point: the ceiling should only ever be hit
+    // by a loop, and hitting it should therefore be information rather than an inconvenience.
     //
-    // Cost is not what these are for. A call is about $0.00003, so the whole total is well under a
-    // cent. They bound two things that do not get cheaper with scale: how much digest leaves the
-    // machine for a third party, at up to 1 KB a call, and how much awaited latency a runaway loop
-    // can add before something stops it.
-    total: 120,
-    retention: 48,
-    compaction: 6,
-    gap: 12,
-    sources: 8,
+    // The earlier 120 was sized against eval attempts, which is the wrong reference. An attempt
+    // runs for two minutes; an interactive session runs for a day, and a turn-level system at one
+    // call every four turns reaches 120 somewhere in the afternoon and then goes quiet without
+    // having found anything wrong. A ceiling that a normal long session reaches is not protecting
+    // anyone, it is just failing later than it looks.
+    //
+    // Cost is not what these are for. A call is about $0.00003, so the whole total is about a cent
+    // and a half. They bound two things that do not get cheaper with scale: how much digest leaves
+    // the machine for a third party, at up to 1 KB a call, and how much awaited latency a runaway
+    // loop can add before something stops it. Half a megabyte of digest and an announced stop is
+    // the shape of the trade.
+    total: 512,
+    retention: 208,
+    compaction: 12,
+    gap: 48,
+    sources: 32,
     // Turn-level, but gated behind local signals and a four-turn cooldown, so it only spends on
     // sessions that already look wrong. The ceiling is what stops a genuinely thrashing session
     // from spending the total on being told it is thrashing.
-    progress: 40,
+    progress: 176,
     // Usually free: when retention is on, system 7's question rides the call retention was already
     // making against the same state. This ceiling only binds when retention is off, or when the
     // fetched result is too small for retention to be interested in it.
-    untrusted: 24,
+    untrusted: 104,
     // Once per session by construction, and only when local signals already suggest it. Two rather
     // than one so a retried first turn is not silently un-served.
     capability: 2,

@@ -11,6 +11,16 @@ const PACKAGES = [
         commands: ["websearch", "curator"],
         targets: ["webAccess"],
     },
+    // The Jev layer's panel shipped without this entry, and without one nothing could open it:
+    // showPackageSettings only honours a target belonging to an installed package, so every attempt
+    // was refused as "not installed in this session" and the file the panel writes could only be
+    // edited by hand. The advisor registers /jev, which is what makes it detectable here.
+    {
+        id: "jevLayer",
+        label: "Jev layer",
+        commands: ["jev"],
+        targets: ["jevLayer"],
+    },
 ];
 
 function packageSettingsState(state) {

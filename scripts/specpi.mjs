@@ -53,6 +53,7 @@ const resourcePaths = [
     "extensions/jev-advisor/consent.mjs",
     "extensions/jev-advisor/ledger.mjs",
     "extensions/jev-advisor/sanitize.mjs",
+    "extensions/jev-advisor/usage.mjs",
     "extensions/jev-advisor/client.mjs",
     "extensions/jev-advisor/broker.mjs",
     "extensions/jev-advisor/gate.mjs",

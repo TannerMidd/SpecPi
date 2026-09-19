@@ -54,6 +54,7 @@ const requiredFiles = [
     "extensions/jev-advisor/questions/sources.mjs",
     "extensions/jev-advisor/questions/untrusted.mjs",
     "extensions/jev-advisor/sanitize.mjs",
+    "extensions/jev-advisor/usage.mjs",
     "extensions/tool-wishlist/authoring-tools.mjs",
     "extensions/tool-wishlist/capabilities.json",
     "extensions/tool-wishlist/core.mjs",
