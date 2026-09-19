@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <script src="../theme.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#fafbfc" />
+        <meta
+            name="description"
+            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, four systems that use it, the gates in front of every call, and what it has actually measured."
+        />
+        <meta property="og:title" content="The Jev layer · SpecPi" />
+        <meta
+            property="og:description"
+            content="A classifier that returns probabilities instead of prose, gated in one place, off by default, and measured against the harness it is meant to improve."
+        />
+        <meta property="og:type" content="article" />
+        <meta property="og:url" content="https://tannermidd.github.io/SpecPi/jev/" />
+        <meta name="twitter:card" content="summary" />
+        <link rel="canonical" href="https://tannermidd.github.io/SpecPi/jev/" />
+        <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+        <link rel="stylesheet" href="../styles.css" />
+        <link rel="stylesheet" href="../wiki.css" />
+        <link rel="stylesheet" href="../research.css" />
+        <title>The Jev layer · SpecPi</title>
+    </head>
+    <body>
+        <a class="skip-link" href="#content">Skip to content</a>
+        <header class="site-header wrap">
+            <a class="brand" href="../"
+                ><img src="../logo.svg" width="32" height="32" alt="" /><strong>SpecPi</strong></a
+            >
+            <nav class="header-nav" aria-label="Primary navigation">
+                <a href="../#core">Scope</a><a href="../#packages">Packages</a><a href="../#install">Install</a
+                ><a href="../#vscode-chat">VS Code</a><a href="../wiki/">Docs</a><a href="../research/">Research</a
+                ><a href="../evaluations/">Evals</a><a href="./" aria-current="page">Jev</a
+                ><a href="https://github.com/TannerMidd/SpecPi">GitHub</a>
+            </nav>
+            <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" hidden>
+                Dark mode
+            </button>
+        </header>
+        <main class="wiki-layout wrap" id="content">
+            <aside class="wiki-sidebar" aria-label="Jev layer contents">
+                <p>SPECPI / JEV</p>
+                <nav>
+                    <a href="#what"><span>01</span>What it is</a><a href="#where"><span>02</span>Where it sits</a
+                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Four systems</a
+                    ><a href="#economics"><span>05</span>Why on arrival</a><a href="#guard"><span>06</span>The guard</a
+                    ><a href="#measured"><span>07</span>What it measured</a
+                    ><a href="#switches"><span>08</span>Turning it on</a>
+                </nav>
+                <div class="index-meta">SpecPi 0.27.0<br />Chat 0.12.0<br />Off by default</div>
+            </aside>
+            <div class="wiki-content">
+                <div class="wiki-intro">
+                    <p class="eyebrow">The Jev layer</p>
+                    <h1>A classifier that<br />returns numbers.</h1>
+                    <p class="wiki-summary">
+                        Most harness decisions are small and repetitive: is this tool output still worth carrying, are
+                        these two complaints the same complaint, which of these sources matters most. Asking a chat
+                        model costs a round trip and returns prose you then have to parse. The Jev layer asks a typed
+                        classifier instead and gets a calibrated probability back, then decides in code.
+                    </p>
+                    <p class="wiki-release-note">
+                        The whole layer ships <strong>off</strong>. With the master switch off there is no network
+                        call, no key read, no consent read and no prompt change: the harness behaves exactly as it did
+                        before the layer existed. Everything below describes what happens once someone turns it on.
+                    </p>
+                </div>
+
+                <section class="doc-section" id="what">
+                    <header><h2>What it is</h2><span>01</span></header>
+                    <p>
+                        Jev is a System One model from TypeSafe. It does not write text. You hand it a state object and
+                        a set of questions, and it returns a typed answer for each one, evaluated in parallel against
+                        that single state. Three answer shapes exist:
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Choice</strong> &mdash; pick one of up to 255 options. Returns the choice, a
+                            probability for every option, and a confidence.
+                        </li>
+                        <li>
+                            <strong>Score</strong> &mdash; rate against two to ten ordered levels. Returns a possibly
+                            fractional score, per-level probabilities, and a confidence.
+                        </li>
+                        <li>
+                            <strong>Noul</strong> &mdash; yes or no, as a bare probability between 0 and 1.
+                            <em>It carries no confidence field</em>, which matters: a gate that waited for a Noul's
+                            confidence would be gating on a number the model never reported.
+                        </li>
+                    </ul>
+                    <p>
+                        Output is free and input is $0.042 per million tokens, so the cost of a decision is the cost of
+                        describing the state, not the cost of the answer. That is why questions are batched: several
+                        questions against one state cost the same as one.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="where">
+                    <header><h2>Where it sits</h2><span>02</span></header>
+                    <p>
+                        The layer has two halves that share a key and nothing else. The <strong>advisor</strong> is
+                        first-party SpecPi code that answers questions about session state and never holds authority:
+                        it cannot call a tool, grant a capability or allow an action. The <strong>guard</strong> is a
+                        separate pinned package that scores commands before the permission system sees them.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg
+                            class="diagram"
+                            viewBox="0 0 720 300"
+                            role="img"
+                            aria-label="The agent's tool call passes the guard, then the permission system, then runs. Its result passes the advisor before being appended to the transcript. Both halves reach Jev over HTTPS."
+                        >
+                            <defs>
+                                <marker id="a1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head" />
+                                </marker>
+                                <marker id="a2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head-accent" />
+                                </marker>
+                            </defs>
+
+                            <rect x="8" y="24" width="120" height="52" rx="7" class="dg-box" />
+                            <text x="68" y="46" text-anchor="middle" class="dg-title">Agent</text>
+                            <text x="68" y="63" text-anchor="middle" class="dg-note">asks for a tool</text>
+
+                            <rect x="168" y="24" width="132" height="52" rx="7" class="dg-box-accent" />
+                            <text x="234" y="41" text-anchor="middle" class="dg-tag">OPTIONAL</text>
+                            <text x="234" y="57" text-anchor="middle" class="dg-title">Command guard</text>
+                            <text x="234" y="71" text-anchor="middle" class="dg-note">fail-closed</text>
+
+                            <rect x="340" y="24" width="140" height="52" rx="7" class="dg-box" />
+                            <text x="410" y="46" text-anchor="middle" class="dg-title">Permission system</text>
+                            <text x="410" y="63" text-anchor="middle" class="dg-note">asks the human</text>
+
+                            <rect x="520" y="24" width="110" height="52" rx="7" class="dg-box" />
+                            <text x="575" y="46" text-anchor="middle" class="dg-title">Tool runs</text>
+                            <text x="575" y="63" text-anchor="middle" class="dg-note">produces a result</text>
+
+                            <path d="M128 50 H166" class="dg-flow" marker-end="url(#a1)" />
+                            <path d="M300 50 H338" class="dg-flow" marker-end="url(#a1)" />
+                            <path d="M480 50 H518" class="dg-flow" marker-end="url(#a1)" />
+
+                            <path d="M575 76 V116 H300" class="dg-flow" marker-end="url(#a1)" />
+
+                            <rect x="168" y="118" width="132" height="52" rx="7" class="dg-box-accent" />
+                            <text x="234" y="135" text-anchor="middle" class="dg-tag">OPTIONAL</text>
+                            <text x="234" y="151" text-anchor="middle" class="dg-title">Advisor</text>
+                            <text x="234" y="165" text-anchor="middle" class="dg-note">fail-silent</text>
+
+                            <rect x="8" y="118" width="120" height="52" rx="7" class="dg-box" />
+                            <text x="68" y="140" text-anchor="middle" class="dg-title">Transcript</text>
+                            <text x="68" y="157" text-anchor="middle" class="dg-note">result appended</text>
+                            <path d="M166 144 H130" class="dg-flow" marker-end="url(#a1)" />
+
+                            <rect x="268" y="228" width="184" height="48" rx="7" class="dg-box-accent" />
+                            <text x="360" y="248" text-anchor="middle" class="dg-title">Jev classifier</text>
+                            <text x="360" y="264" text-anchor="middle" class="dg-note">typed answers, over HTTPS</text>
+
+                            <path d="M234 76 V96 H500 V252 H456" class="dg-flow-accent" marker-end="url(#a2)" />
+                            <path d="M234 170 V252 H264" class="dg-flow-accent" marker-end="url(#a2)" />
+
+                            <text x="512" y="176" class="dg-note">a summary of at most 1 KB,</text>
+                            <text x="512" y="191" class="dg-note">never file contents or output</text>
+                        </svg>
+                        <figcaption class="figure-note">
+                            Both optional boxes are removed from the path entirely when the layer is off. The guard sits
+                            before the decision to run a command; the advisor sits after it, on the result, and only
+                            ever shortens or reorders what is already there.
+                        </figcaption>
+                    </figure>
+                </section>
+
+                <section class="doc-section" id="gates">
+                    <header><h2>Six gates before anything leaves</h2><span>03</span></header>
+                    <p>
+                        A call reaches the network only after passing every gate below, in order. Any gate that says no
+                        ends the attempt silently and the harness runs the path it would have run anyway. That is the
+                        whole failure model: <strong>no advice is always a valid outcome</strong>, so a timeout, a
+                        missing key, a refused consent or an unconfident answer all look the same from the outside.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg
+                            class="diagram"
+                            viewBox="0 0 720 250"
+                            role="img"
+                            aria-label="Seven stages in sequence: master switch, per-system switch, human consent, session call budget, sanitiser, Jev, and the confidence gate. Any stage may divert to no advice."
+                        >
+                            <defs>
+                                <marker id="b1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head" />
+                                </marker>
+                                <marker id="b2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                                    <path d="M0 0 L8 4 L0 8 z" class="dg-head-accent" />
+                                </marker>
+                            </defs>
+                            <g>
+                                <rect x="6" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="49" y="49" text-anchor="middle" class="dg-title">Master</text>
+                                <text x="49" y="64" text-anchor="middle" class="dg-note">switch</text>
+
+                                <rect x="104" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="147" y="49" text-anchor="middle" class="dg-title">System</text>
+                                <text x="147" y="64" text-anchor="middle" class="dg-note">switch</text>
+
+                                <rect x="202" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="245" y="49" text-anchor="middle" class="dg-title">Consent</text>
+                                <text x="245" y="64" text-anchor="middle" class="dg-note">a human said yes</text>
+
+                                <rect x="300" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="343" y="49" text-anchor="middle" class="dg-title">Budget</text>
+                                <text x="343" y="64" text-anchor="middle" class="dg-note">calls this session</text>
+
+                                <rect x="398" y="30" width="86" height="44" rx="6" class="dg-box-accent" />
+                                <text x="441" y="49" text-anchor="middle" class="dg-title">Sanitise</text>
+                                <text x="441" y="64" text-anchor="middle" class="dg-note">1 KB ceiling</text>
+
+                                <rect x="496" y="30" width="86" height="44" rx="6" class="dg-box-accent" />
+                                <text x="539" y="49" text-anchor="middle" class="dg-title">Jev</text>
+                                <text x="539" y="64" text-anchor="middle" class="dg-note">typed answer</text>
+
+                                <rect x="594" y="30" width="86" height="44" rx="6" class="dg-box" />
+                                <text x="637" y="49" text-anchor="middle" class="dg-title">Gate</text>
+                                <text x="637" y="64" text-anchor="middle" class="dg-note">confident enough?</text>
+                            </g>
+                            <g class="dg-flow">
+                                <path d="M92 52 H102" marker-end="url(#b1)" />
+                                <path d="M190 52 H200" marker-end="url(#b1)" />
+                                <path d="M288 52 H298" marker-end="url(#b1)" />
+                                <path d="M386 52 H396" marker-end="url(#b2)" />
+                                <path d="M484 52 H494" marker-end="url(#b2)" />
+                                <path d="M582 52 H592" marker-end="url(#b1)" />
+                            </g>
+
+                            <path d="M49 74 V150" class="dg-flow-stop" />
+                            <path d="M147 74 V150" class="dg-flow-stop" />
+                            <path d="M245 74 V150" class="dg-flow-stop" />
+                            <path d="M343 74 V150" class="dg-flow-stop" />
+                            <path d="M441 74 V150" class="dg-flow-stop" />
+                            <path d="M539 74 V150" class="dg-flow-stop" />
+                            <path d="M637 74 V150" class="dg-flow-stop" />
+                            <path d="M49 150 H637" class="dg-flow-stop" />
+                            <path d="M343 150 V176" class="dg-flow-stop" marker-end="url(#b1)" />
+
+                            <rect x="248" y="178" width="190" height="44" rx="6" class="dg-box-muted" />
+                            <text x="343" y="197" text-anchor="middle" class="dg-title">No advice</text>
+                            <text x="343" y="212" text-anchor="middle" class="dg-note">the existing path runs</text>
+
+                            <text x="700" y="52" text-anchor="end" class="dg-note"></text>
+                        </svg>
+                        <figcaption class="figure-note">
+                            Only the two accented stages involve the network or the payload. The sanitiser is the one
+                            module permitted to build a wire payload: it redacts credentials, tokens, JWTs, emails and
+                            URLs, relativises absolute paths, refuses file contents and command output outright, and
+                            truncates anything still over budget rather than sending it.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        Consent is deliberately separate from the switch. A config flag records an intention; it does
+                        not record that a human was told what the intention costs. The first time any system would put
+                        state on the wire, a dialog names the destination host, the shape of the data and the byte
+                        ceiling. <strong>Without an interactive human nothing is sent, ever</strong>, so an unattended
+                        run cannot be the thing that starts transmitting. The grant is bound to the host it was given
+                        for, so pointing the client somewhere else asks again rather than carrying an old answer to a
+                        new destination.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="systems">
+                    <header><h2>Four systems</h2><span>04</span></header>
+                    <p>
+                        One design rule governs all of them: <em>ask local state first, and spend a Jev call only on a
+                        question local state genuinely cannot answer</em>. Applying it is what removed the largest
+                        measured waste from this list. Six of SpecPi's ten tools were offered on every request and
+                        called zero times; two of those are only usable once a human has selected an improvement, which
+                        is already a fact on disk. They are now withdrawn until one exists, which needs no model and
+                        cannot be wrong.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Retention</strong> decides whether a large read-only tool result is still worth
+                            carrying, before it is appended. Jev decides <em>whether</em>; code does the shortening, so
+                            the replacement is a deterministic head-and-tail digest and no model-written prose ever
+                            enters the transcript.
+                        </li>
+                        <li>
+                            <strong>Compaction</strong> adds guidance at the one boundary where the prompt cache is
+                            discarded anyway, so the advice costs no cache invalidation it did not already incur.
+                        </li>
+                        <li>
+                            <strong>Gap</strong> clusters capability-gap reports that describe the same friction and
+                            scores their impact independently of what the report claimed. This fixes two real defects:
+                            semantically identical reports never reached the repeat threshold because their keys
+                            differed, and the ranking trusted the reporter's own impact estimate.
+                        </li>
+                        <li>
+                            <strong>Sources</strong> orders the sources a delegation batch will freeze. It only ever
+                            reorders; it never drops one.
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="doc-section" id="economics">
+                    <header><h2>Why the decision happens on arrival</h2><span>05</span></header>
+                    <p>
+                        The obvious design is to let results accumulate, then rewrite a batch of them. Simulated over
+                        the recorded token series that is worth about <strong>&minus;12%</strong> of long-attempt cost.
+                        Deciding on each result before it is appended is worth about <strong>&minus;61%</strong>. Same
+                        classifier, five times the return, for one reason: a rewrite invalidates the cached prefix, and
+                        across these runs roughly <strong>94% of prompt tokens are cache reads</strong>.
+                    </p>
+                    <figure class="chart-figure">
+                        <svg
+                            class="diagram"
+                            viewBox="0 0 720 210"
+                            role="img"
+                            aria-label="Deciding on arrival keeps the cached prefix intact and only the new result is fresh. Rewriting history afterwards invalidates the whole prefix, so every earlier token is charged again at the fresh rate."
+                        >
+                            <text x="0" y="16" class="dg-title">Decide on arrival</text>
+                            <rect x="0" y="26" width="470" height="30" rx="4" class="dg-box" />
+                            <text x="235" y="46" text-anchor="middle" class="dg-note">cached prefix &mdash; still valid, $0.003 / MTok</text>
+                            <rect x="474" y="26" width="120" height="30" rx="4" class="dg-box-accent" />
+                            <text x="534" y="46" text-anchor="middle" class="dg-note">shortened</text>
+                            <text x="604" y="46" class="dg-note">&larr; only this is fresh</text>
+
+                            <text x="0" y="104" class="dg-title">Rewrite history afterwards</text>
+                            <rect x="0" y="114" width="470" height="30" rx="4" class="dg-box-muted" />
+                            <text x="235" y="134" text-anchor="middle" class="dg-note">prefix invalidated &mdash; recharged at $0.15 / MTok</text>
+                            <rect x="474" y="114" width="120" height="30" rx="4" class="dg-box-muted" />
+                            <text x="534" y="134" text-anchor="middle" class="dg-note">rewritten</text>
+                            <text x="604" y="134" class="dg-note">&larr; all of it is fresh</text>
+
+                            <text x="0" y="178" class="dg-note">
+                                Fresh input costs 50&times; a cache read, so what a turn adds to the prefix matters more
+                            </text>
+                            <text x="0" y="194" class="dg-note">than how much the request sends in total.</text>
+                        </svg>
+                        <figcaption class="figure-note">
+                            Coverage matters far more than compression ratio here, which is why the replacement text is
+                            a plain deterministic digest that says the output can be recovered by re-running, rather
+                            than a clever summary.
+                        </figcaption>
+                    </figure>
+                </section>
+
+                <section class="doc-section" id="guard">
+                    <header><h2>The guard is a different trade</h2><span>06</span></header>
+                    <p>
+                        The advisor is fail-silent and holds no authority. The guard is the opposite on both counts,
+                        and that is worth stating plainly rather than configuring away.
+                        <code>specpi-jev-guard</code> is <strong>fail-closed by design</strong>: with no key, an
+                        unreachable endpoint, or a middle-band verdict in a session with no interactive UI, it blocks
+                        the call and says so. There is no setting that hands the decision back to the permission
+                        system.
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Off</strong>, which is the default, means the guard is not in the tool path at all
+                            and <code>@gotgenes/pi-permission-system</code> decides every call exactly as it did before
+                            the package existed.
+                        </li>
+                        <li>
+                            <strong>On</strong> means the guard decides first, asks a human in the middle band when
+                            there is a UI, and blocks when it cannot reach Jev. An outage stops gated work until it is
+                            switched off.
+                        </li>
+                    </ul>
+                    <p>
+                        The package's own default is <code>enabled: true</code>, so SpecPi writes an inert
+                        configuration at install time rather than at first session start &mdash; otherwise a fresh
+                        install with no key would begin by refusing to run commands.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="measured">
+                    <header><h2>What it has actually measured</h2><span>07</span></header>
+                    <p>
+                        Across 259 attempts spanning five tiers, SpecPi with the layer on made
+                        <strong>36 Jev calls with zero failures</strong>, costing $0.001 in total &mdash; about 0.6% of
+                        its own model spend. Against the identical base with the layer off:
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>Measure</th>
+                                    <th>SpecPi</th>
+                                    <th>SpecPi + Jev</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Score</th><td>0.896</td><td>0.891</td></tr>
+                                <tr><th>Cost per attempt</th><td>$0.0042</td><td>$0.0046</td></tr>
+                                <tr><th>Tool calls per attempt</th><td>9.5</td><td>10.0</td></tr>
+                                <tr><th>Turns per attempt</th><td>8.5</td><td>10.0</td></tr>
+                                <tr><th>Tool error rate</th><td>6.3%</td><td>5.7%</td></tr>
+                                <tr><th>Context growth per turn</th><td>635</td><td>597</td></tr>
+                                <tr><th>Cache hit rate</th><td>93%</td><td>94%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        <strong>Read that honestly: the layer has not yet paid for itself.</strong> It costs about 9%
+                        more per attempt and scores fractionally lower, which at this sample size is noise rather than
+                        a result. The two figures moving the right way are the ones its mechanism actually targets
+                        &mdash; context grows 6% more slowly per turn and fewer tool calls come back as errors &mdash;
+                        but a shorter session reads fewer bytes regardless of whether anything was elided, so neither is
+                        attributable yet.
+                    </p>
+                    <p>
+                        The missing measurement is the mechanism's own: nothing currently records how many bytes
+                        retention actually dropped, so its effect can only be inferred from a cost delta it may not
+                        have caused. That instrumentation is the next thing worth building, before any claim is made
+                        for this layer.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="switches">
+                    <header><h2>Turning it on</h2><span>08</span></header>
+                    <p>
+                        Nothing here is on after an install. Each switch has a session form and a
+                        <code>startup</code> form, and a session toggle never writes the startup preference.
+                    </p>
+                    <ul>
+                        <li><code>/jev</code> &mdash; show the layer's state and change it.</li>
+                        <li><code>/jev on</code>, <code>/jev startup on</code> &mdash; the master switch.</li>
+                        <li><code>/jev guard on</code>, <code>/jev guard startup on</code> &mdash; the command guard.</li>
+                        <li><code>/jev status</code> &mdash; which posture is in force, and whether a key is present.</li>
+                        <li>
+                            <code>/jev ledger</code> &mdash; read back a local hash of every payload ever sent. Every
+                            call is recorded in <code>transmissions.jsonl</code> on this machine.
+                        </li>
+                        <li><code>/jev forget</code> &mdash; revoke consent.</li>
+                    </ul>
+                    <p>
+                        In SpecPi Chat the same switches appear as toggles under package settings, writing the same
+                        file the extension reads. One key serves the whole layer:
+                        <code>OPENROUTER_API_KEY</code>, since Jev is published on OpenRouter and both halves reach it
+                        that way by default. <code>JEV_BACKEND=typesafe</code> selects TypeSafe's direct API instead,
+                        which needs a <code>TYPESAFE_API_KEY</code>; the two keys are not interchangeable and the wrong
+                        one returns a bare 401.
+                    </p>
+                    <p>
+                        Retention, processing and logging of what is sent are governed by OpenRouter and TypeSafe, not
+                        by SpecPi. That is the reason the layer ships off, asks before its first transmission, caps
+                        what a payload may contain, and keeps a local record of every one.
+                    </p>
+                </section>
+            </div>
+        </main>
+        <footer class="site-footer wrap">
+            <p>
+                SpecPi is MIT licensed. <a href="https://github.com/TannerMidd/SpecPi">Source on GitHub</a>.
+            </p>
+        </footer>
+        <script src="../page.js"></script>
+    </body>
+</html>

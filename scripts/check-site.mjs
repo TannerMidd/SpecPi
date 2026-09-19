@@ -25,6 +25,7 @@ const documents = [
     "site/wiki/index.html",
     "site/research/index.html",
     "site/evaluations/index.html",
+    "site/jev/index.html",
 ];
 for (const file of documents) {
     const text = await fs.readFile(path.join(root, file), "utf8");
@@ -55,7 +56,7 @@ const routes = new Map([
     ["/SpecPi/theme.js", ["theme.js", "text/javascript"]],
     ["/SpecPi/page.js", ["page.js", "text/javascript"]],
     ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
-    ...["wiki", "research", "evaluations", "why-pi", "single-agent"].map((name) => [
+    ...["wiki", "research", "evaluations", "jev", "why-pi", "single-agent"].map((name) => [
         `/SpecPi/${name}/`,
         [`${name}/index.html`, "text/html"],
     ]),

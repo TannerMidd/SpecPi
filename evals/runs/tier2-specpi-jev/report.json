@@ -1,0 +1,3032 @@
+{
+    "schema": 1,
+    "createdAt": "2026-09-18T16:38:38.782Z",
+    "specpiVersion": "0.26.0",
+    "piVersion": "0.84.4",
+    "nodeVersion": "v24.18.0",
+    "platform": "win32",
+    "model": "deepseek-v4.1-flash",
+    "attemptsPerCell": 2,
+    "timeoutOverrideMs": null,
+    "forwarded": true,
+    "pricesSha256": "937b887b14ae07ee5d31ff786c4ff6c3022a633f34fe00a439151dd2153197c7",
+    "pricesDated": "2026-09-17",
+    "method": "Disposable workspace per attempt. Proxy harnesses (pi family, Codex CLI, DeepSeek Harness) send model traffic through a logging proxy; native harnesses (OpenCode) report per-step tokens, cost and tool calls from their own transcript. Codex CLI reads only the Responses API now, so the proxy accepts that path and forwards it to the provider's responses endpoint inside a disposable CODEX_HOME; Codex's own sandbox rejects every command on Windows, so Codex runs use its full-access sandbox mode inside the attempt's disposable workspace, and that gate is not measured either. Costs are split: modelCost is the harness's own spend and is the comparable figure, mintCost is eval plumbing, and cost is their sum. Forwarded proxy traffic mints one OpenCode session per attempt for endpoint routing; only proxy harnesses need one and the mint carries OpenCode's own system prompt, so charging it to the harness would bill the Pi family for OpenCode's context. Proxy prompt_tokens arrive inclusive of cache rereads, so only the fresh portion carries the input price; reasoning tokens are billed at the output rate. Tool calls are counted from the tools the model invoked, never from the tools it was offered, which are reported separately as per-request schema weight. Approval dialogs cannot be answered headless, so SpecPi runs set the permission package's explicit yoloMode opt-in inside the disposable home; the gate itself is not measured. Files are judged by the task checker; costs come from logged usage times evals/prices.json. Unknown models and unpriced cache writes are lower bounds. Synthetic offline runs make zero model calls and cost zero.",
+    "results": [
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-multi-build",
+            "tier": 2,
+            "category": "multi",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "result.txt matches the spec",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 13333,
+                    "wallMs": 53502,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "c59bfdc1ee81c66d3a6a3c6a90383af192cffc038b5311fcff97e003b2883b8e"
+                    },
+                    "tokens": {
+                        "inputTokens": 14302,
+                        "outputTokens": 259,
+                        "cachedTokens": 10240,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "read": 2,
+                            "write": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3436,
+                                "cachedTokens": 0,
+                                "completionTokens": 44,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3503,
+                                "cachedTokens": 3328,
+                                "completionTokens": 131,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3655,
+                                "cachedTokens": 3456,
+                                "completionTokens": 38,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3708,
+                                "cachedTokens": 3456,
+                                "completionTokens": 46,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3708,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 91
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa48579ffe7Ek2N4PExbhMKW",
+                        "durationMs": 3642,
+                        "inputTokens": 9925,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148995
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 8,
+                        "message_end": 8,
+                        "message_update": 182,
+                        "tool_execution_start": 3,
+                        "tool_execution_end": 3,
+                        "turn_end": 4,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3436,
+                            "cachedTokens": 0,
+                            "completionTokens": 44,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3503,
+                            "cachedTokens": 3328,
+                            "completionTokens": 131,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3655,
+                            "cachedTokens": 3456,
+                            "completionTokens": 38,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3708,
+                            "cachedTokens": 3456,
+                            "completionTokens": 46,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3708,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 91
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "result.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0007954199999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014899499999999999,
+                    "cost": 0.0022853699999999997,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "result.txt matches the spec",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 14056,
+                    "wallMs": 19134,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "a366e3d5a51e4a34752655dd01807910c330887d047ef05cdc2f2e82caabc0cc"
+                    },
+                    "tokens": {
+                        "inputTokens": 14175,
+                        "outputTokens": 195,
+                        "cachedTokens": 10240,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "read": 2,
+                            "write": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3433,
+                                "cachedTokens": 0,
+                                "completionTokens": 45,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3501,
+                                "cachedTokens": 3328,
+                                "completionTokens": 72,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3594,
+                                "cachedTokens": 3456,
+                                "completionTokens": 38,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3647,
+                                "cachedTokens": 3456,
+                                "completionTokens": 40,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3647,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 71
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa39f6effeQZn4j6zBPxwt6n",
+                        "durationMs": 3823,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 10,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014958
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 8,
+                        "message_end": 8,
+                        "message_update": 118,
+                        "tool_execution_start": 3,
+                        "tool_execution_end": 3,
+                        "turn_end": 4,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3433,
+                            "cachedTokens": 0,
+                            "completionTokens": 45,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3501,
+                            "cachedTokens": 3328,
+                            "completionTokens": 72,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3594,
+                            "cachedTokens": 3456,
+                            "completionTokens": 38,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3647,
+                            "cachedTokens": 3456,
+                            "completionTokens": 40,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3647,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 71
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "result.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00073797,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014958,
+                    "cost": 0.00223377,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-multi-rename",
+            "tier": 2,
+            "category": "multi",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "rename complete, main.js prints hi",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 17901,
+                    "wallMs": 23188,
+                    "modelRequests": 6,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "ab68a5cbabe7f873b0dda1c79424db0dafdf4c9fc00258aff4d0ac2b4e2a6068"
+                    },
+                    "tokens": {
+                        "inputTokens": 23483,
+                        "outputTokens": 707,
+                        "cachedTokens": 19072,
+                        "withUsage": 6,
+                        "toolCalls": {
+                            "bash": 3,
+                            "read": 2,
+                            "edit": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 6,
+                            "create_goal": 6,
+                            "edit": 6,
+                            "get_goal": 6,
+                            "read": 6,
+                            "report_capability_gap": 6,
+                            "request_capability": 6,
+                            "write": 6
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3440,
+                                "cachedTokens": 0,
+                                "completionTokens": 109,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3677,
+                                "cachedTokens": 3456,
+                                "completionTokens": 55,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3759,
+                                "cachedTokens": 3584,
+                                "completionTokens": 185,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3964,
+                                "cachedTokens": 3712,
+                                "completionTokens": 241,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 4281,
+                                "cachedTokens": 4096,
+                                "completionTokens": 67,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 4362,
+                                "cachedTokens": 4224,
+                                "completionTokens": 50,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 4362,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 184
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa33e19ffeKebJxdog1hfmVY",
+                        "durationMs": 3612,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 29,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 6,
+                        "message_start": 14,
+                        "message_end": 14,
+                        "message_update": 540,
+                        "tool_execution_start": 7,
+                        "tool_execution_update": 6,
+                        "tool_execution_end": 7,
+                        "turn_end": 6,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3440,
+                            "cachedTokens": 0,
+                            "completionTokens": 109,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3677,
+                            "cachedTokens": 3456,
+                            "completionTokens": 55,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3759,
+                            "cachedTokens": 3584,
+                            "completionTokens": 185,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3964,
+                            "cachedTokens": 3712,
+                            "completionTokens": 241,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 4281,
+                            "cachedTokens": 4096,
+                            "completionTokens": 67,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 4362,
+                            "cachedTokens": 4224,
+                            "completionTokens": 50,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 4362,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 184
+                    },
+                    "toolOutcomes": {
+                        "results": 7,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 3,
+                                "errors": 0
+                            },
+                            "read": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "lib.js",
+                            "main.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0011430659999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002632866,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "rename complete, main.js prints hi",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 17064,
+                    "wallMs": 22470,
+                    "modelRequests": 5,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "cd8be303dfae249401ac8f4d78a9e8e0482e7b333c6c89f6d2c9107aa390b8f0"
+                    },
+                    "tokens": {
+                        "inputTokens": 19930,
+                        "outputTokens": 775,
+                        "cachedTokens": 15616,
+                        "withUsage": 5,
+                        "toolCalls": {
+                            "bash": 3,
+                            "read": 2,
+                            "edit": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 5,
+                            "create_goal": 5,
+                            "edit": 5,
+                            "get_goal": 5,
+                            "read": 5,
+                            "report_capability_gap": 5,
+                            "request_capability": 5,
+                            "write": 5
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3440,
+                                "cachedTokens": 0,
+                                "completionTokens": 158,
+                                "toolCalls": 3
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3749,
+                                "cachedTokens": 3584,
+                                "completionTokens": 271,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 4096,
+                                "cachedTokens": 3840,
+                                "completionTokens": 100,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 4222,
+                                "cachedTokens": 3968,
+                                "completionTokens": 145,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 4423,
+                                "cachedTokens": 4224,
+                                "completionTokens": 101,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 4423,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 246
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa2ce01ffe8dePHi856mWjk8",
+                        "durationMs": 3720,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 27,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 5,
+                        "message_start": 13,
+                        "message_end": 13,
+                        "message_update": 626,
+                        "tool_execution_start": 7,
+                        "tool_execution_update": 8,
+                        "tool_execution_end": 7,
+                        "turn_end": 5,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3440,
+                            "cachedTokens": 0,
+                            "completionTokens": 158,
+                            "toolCalls": 3
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3749,
+                            "cachedTokens": 3584,
+                            "completionTokens": 271,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 4096,
+                            "cachedTokens": 3840,
+                            "completionTokens": 100,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 4222,
+                            "cachedTokens": 3968,
+                            "completionTokens": 145,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 4423,
+                            "cachedTokens": 4224,
+                            "completionTokens": 101,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 4423,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 246
+                    },
+                    "toolOutcomes": {
+                        "results": 7,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 3,
+                                "errors": 0
+                            },
+                            "read": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "lib.js",
+                            "main.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.001158948,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.0026487480000000002,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-repair-json",
+            "tier": 2,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "data.json is valid with the required fields",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 14517,
+                    "wallMs": 19812,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "79e1ec94e5b65f81b4eaed68508a32962354c0d86ff50155dd605fc6fa2da069"
+                    },
+                    "tokens": {
+                        "inputTokens": 14440,
+                        "outputTokens": 359,
+                        "cachedTokens": 10368,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "read": 1,
+                            "write": 1,
+                            "bash": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3448,
+                                "cachedTokens": 0,
+                                "completionTokens": 46,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3516,
+                                "cachedTokens": 3328,
+                                "completionTokens": 137,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3674,
+                                "cachedTokens": 3456,
+                                "completionTokens": 96,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3802,
+                                "cachedTokens": 3584,
+                                "completionTokens": 80,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3802,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 118
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa26071ffensZ2eMhqW6ngCe",
+                        "durationMs": 3304,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 8,
+                        "message_end": 8,
+                        "message_update": 282,
+                        "tool_execution_start": 3,
+                        "tool_execution_end": 3,
+                        "turn_end": 4,
+                        "tool_execution_update": 2,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3448,
+                            "cachedTokens": 0,
+                            "completionTokens": 46,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3516,
+                            "cachedTokens": 3328,
+                            "completionTokens": 137,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3674,
+                            "cachedTokens": 3456,
+                            "completionTokens": 96,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3802,
+                            "cachedTokens": 3584,
+                            "completionTokens": 80,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3802,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 118
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "bash": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "data.json"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000857304,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002347104,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "data.json is valid with the required fields",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 14109,
+                    "wallMs": 19403,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "5d5fbc1132b07e8e5cb36f89e7d9ec67bda719cb09932c8d91b5cb1985c5bdf5"
+                    },
+                    "tokens": {
+                        "inputTokens": 14952,
+                        "outputTokens": 470,
+                        "cachedTokens": 10880,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "read": 1,
+                            "bash": 2,
+                            "write": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3445,
+                                "cachedTokens": 0,
+                                "completionTokens": 113,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3671,
+                                "cachedTokens": 3456,
+                                "completionTokens": 137,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3845,
+                                "cachedTokens": 3584,
+                                "completionTokens": 96,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3991,
+                                "cachedTokens": 3840,
+                                "completionTokens": 124,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3991,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 182
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa1fe8effe4FJEMzcIfjRNJP",
+                        "durationMs": 3391,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 9,
+                        "message_end": 9,
+                        "message_update": 378,
+                        "tool_execution_start": 4,
+                        "tool_execution_update": 6,
+                        "tool_execution_end": 4,
+                        "turn_end": 4,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3445,
+                            "cachedTokens": 0,
+                            "completionTokens": 113,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3671,
+                            "cachedTokens": 3456,
+                            "completionTokens": 137,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3845,
+                            "cachedTokens": 3584,
+                            "completionTokens": 96,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3991,
+                            "cachedTokens": 3840,
+                            "completionTokens": 124,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3991,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 182
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "data.json"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00092544,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.00241509,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-repair-sum",
+            "tier": 2,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "sum passes all cases",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 15568,
+                    "wallMs": 21012,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "27b55a1ba864df01d9413611c89fc3f2bd54241de0de5971fca6c973725b9635"
+                    },
+                    "tokens": {
+                        "inputTokens": 14650,
+                        "outputTokens": 330,
+                        "cachedTokens": 10624,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 2,
+                            "edit": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3446,
+                                "cachedTokens": 0,
+                                "completionTokens": 50,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3626,
+                                "cachedTokens": 3456,
+                                "completionTokens": 88,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3737,
+                                "cachedTokens": 3584,
+                                "completionTokens": 84,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3841,
+                                "cachedTokens": 3584,
+                                "completionTokens": 108,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3841,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 132
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa19dffffedBJRrsLWCB780N",
+                        "durationMs": 3444,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 8,
+                        "message_end": 8,
+                        "message_update": 251,
+                        "tool_execution_start": 3,
+                        "tool_execution_update": 5,
+                        "tool_execution_end": 3,
+                        "turn_end": 4,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3446,
+                            "cachedTokens": 0,
+                            "completionTokens": 50,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3626,
+                            "cachedTokens": 3456,
+                            "completionTokens": 88,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3737,
+                            "cachedTokens": 3584,
+                            "completionTokens": 84,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3841,
+                            "cachedTokens": 3584,
+                            "completionTokens": 108,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3841,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 132
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sum.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0008337719999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002323572,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "sum passes all cases",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 14741,
+                    "wallMs": 20210,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "23c563b520a5ac5baf643cf09999b9f0c28a74d9ceedca87490247aa3ca482a7"
+                    },
+                    "tokens": {
+                        "inputTokens": 14856,
+                        "outputTokens": 380,
+                        "cachedTokens": 10752,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 2,
+                            "edit": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3449,
+                                "cachedTokens": 0,
+                                "completionTokens": 74,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3653,
+                                "cachedTokens": 3456,
+                                "completionTokens": 131,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3826,
+                                "cachedTokens": 3584,
+                                "completionTokens": 84,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3928,
+                                "cachedTokens": 3712,
+                                "completionTokens": 91,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3928,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 160
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa136efffeeTvOlM5YcpMMF9",
+                        "durationMs": 3790,
+                        "inputTokens": 9925,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148995
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 8,
+                        "message_end": 8,
+                        "message_update": 300,
+                        "tool_execution_start": 3,
+                        "tool_execution_update": 6,
+                        "tool_execution_end": 3,
+                        "turn_end": 4,
+                        "agent_end": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3449,
+                            "cachedTokens": 0,
+                            "completionTokens": 74,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3653,
+                            "cachedTokens": 3456,
+                            "completionTokens": 131,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3826,
+                            "cachedTokens": 3584,
+                            "completionTokens": 84,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3928,
+                            "cachedTokens": 3712,
+                            "completionTokens": 91,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3928,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 160
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sum.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000875856,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014899499999999999,
+                    "cost": 0.002365806,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 1,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-scoped-docs",
+            "tier": 2,
+            "category": "scoped",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "changelog updated, notes intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 14402,
+                    "wallMs": 19799,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "a134eb0413dd721220c7f638a42455bfeb798657752c55c18c5389dcf5107b61"
+                    },
+                    "tokens": {
+                        "inputTokens": 10950,
+                        "outputTokens": 300,
+                        "cachedTokens": 7168,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 3,
+                            "create_goal": 3,
+                            "edit": 3,
+                            "get_goal": 3,
+                            "read": 3,
+                            "report_capability_gap": 3,
+                            "request_capability": 3,
+                            "write": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3429,
+                                "cachedTokens": 0,
+                                "completionTokens": 120,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3671,
+                                "cachedTokens": 3456,
+                                "completionTokens": 152,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3850,
+                                "cachedTokens": 3712,
+                                "completionTokens": 28,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3850,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 211
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa0d1c8ffeg0hZaQPisdB7c7",
+                        "durationMs": 3964,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 23,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 3,
+                        "message_start": 6,
+                        "message_end": 6,
+                        "message_update": 255,
+                        "tool_execution_start": 2,
+                        "tool_execution_update": 5,
+                        "tool_execution_end": 2,
+                        "turn_end": 3,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3429,
+                            "cachedTokens": 0,
+                            "completionTokens": 120,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3671,
+                            "cachedTokens": 3456,
+                            "completionTokens": 152,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3850,
+                            "cachedTokens": 3712,
+                            "completionTokens": 28,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3850,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 211
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "CHANGELOG.md"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000768804,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.002258454,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "changelog updated, notes intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 15378,
+                    "wallMs": 20634,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "8b36a59c9b8d3bc1da3bce7f2bf5dca9da533eea2bc338b907dc875dad4858e4"
+                    },
+                    "tokens": {
+                        "inputTokens": 14853,
+                        "outputTokens": 337,
+                        "cachedTokens": 10880,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 1,
+                            "edit": 1,
+                            "read": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3429,
+                                "cachedTokens": 0,
+                                "completionTokens": 81,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3637,
+                                "cachedTokens": 3456,
+                                "completionTokens": 171,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3851,
+                                "cachedTokens": 3712,
+                                "completionTokens": 58,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3936,
+                                "cachedTokens": 3712,
+                                "completionTokens": 27,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3936,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 169
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa06ce4ffe6gl18DZFBUyvqj",
+                        "durationMs": 4120,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 8,
+                        "message_end": 8,
+                        "message_update": 257,
+                        "tool_execution_start": 3,
+                        "tool_execution_update": 3,
+                        "tool_execution_end": 3,
+                        "turn_end": 4,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3429,
+                            "cachedTokens": 0,
+                            "completionTokens": 81,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3637,
+                            "cachedTokens": 3456,
+                            "completionTokens": 171,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3851,
+                            "cachedTokens": 3712,
+                            "completionTokens": 58,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3936,
+                            "cachedTokens": 3712,
+                            "completionTokens": 27,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3936,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 169
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "read": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "CHANGELOG.md"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00083079,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.00232044,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-scoped-edit",
+            "tier": 2,
+            "category": "scoped",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "VERSION is 2, secret intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 24011,
+                    "wallMs": 29256,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "b15577764357b7d53bd98f327cf609c46a25d899add3387939b8585db58e3b06"
+                    },
+                    "tokens": {
+                        "inputTokens": 14388,
+                        "outputTokens": 245,
+                        "cachedTokens": 10368,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 1,
+                            "read": 2,
+                            "edit": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 4,
+                            "create_goal": 4,
+                            "edit": 4,
+                            "get_goal": 4,
+                            "read": 4,
+                            "report_capability_gap": 4,
+                            "request_capability": 4,
+                            "write": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3429,
+                                "cachedTokens": 0,
+                                "completionTokens": 73,
+                                "toolCalls": 2
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3552,
+                                "cachedTokens": 3328,
+                                "completionTokens": 84,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3660,
+                                "cachedTokens": 3456,
+                                "completionTokens": 51,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3747,
+                                "cachedTokens": 3584,
+                                "completionTokens": 37,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3747,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 106
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4aa00523ffe2zdSVHHuOV2ie2",
+                        "durationMs": 3733,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 25,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 4,
+                        "message_start": 9,
+                        "message_end": 9,
+                        "message_update": 151,
+                        "tool_execution_start": 4,
+                        "tool_execution_update": 2,
+                        "tool_execution_end": 4,
+                        "turn_end": 4,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3429,
+                            "cachedTokens": 0,
+                            "completionTokens": 73,
+                            "toolCalls": 2
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3552,
+                            "cachedTokens": 3328,
+                            "completionTokens": 84,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3660,
+                            "cachedTokens": 3456,
+                            "completionTokens": 51,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3747,
+                            "cachedTokens": 3584,
+                            "completionTokens": 37,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3747,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 106
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "read": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 1
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "src/app.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000781104,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.002270754,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "VERSION is 2, secret intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 13374,
+                    "wallMs": 18787,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "0f2cb768bb93ff0530e79a5d9fc2b09886ba46ce4a972b9737178042d22463de"
+                    },
+                    "tokens": {
+                        "inputTokens": 10576,
+                        "outputTokens": 175,
+                        "cachedTokens": 6784,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "read": 1,
+                            "edit": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 3,
+                            "create_goal": 3,
+                            "edit": 3,
+                            "get_goal": 3,
+                            "read": 3,
+                            "report_capability_gap": 3,
+                            "request_capability": 3,
+                            "write": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3432,
+                                "cachedTokens": 0,
+                                "completionTokens": 44,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3512,
+                                "cachedTokens": 3328,
+                                "completionTokens": 96,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3632,
+                                "cachedTokens": 3456,
+                                "completionTokens": 35,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3632,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 100
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4a9f7d22ffeObDXCVKgq5fMOl",
+                        "durationMs": 3640,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 23,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 3,
+                        "message_start": 6,
+                        "message_end": 6,
+                        "message_update": 121,
+                        "tool_execution_start": 2,
+                        "tool_execution_end": 2,
+                        "turn_end": 3,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3432,
+                            "cachedTokens": 0,
+                            "completionTokens": 44,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3512,
+                            "cachedTokens": 3328,
+                            "completionTokens": 96,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3632,
+                            "cachedTokens": 3456,
+                            "completionTokens": 35,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3632,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 100
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "read": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "edit": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "src/app.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0006941519999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002183952,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-terminal-grep",
+            "tier": 2,
+            "category": "terminal",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "errors.txt has the two ERROR lines",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 13008,
+                    "wallMs": 18445,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "f61e99f575ace538af0db8120e15c29476374853b3098ea26c0179fef28e090b"
+                    },
+                    "tokens": {
+                        "inputTokens": 10764,
+                        "outputTokens": 196,
+                        "cachedTokens": 6912,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 3,
+                            "create_goal": 3,
+                            "edit": 3,
+                            "get_goal": 3,
+                            "read": 3,
+                            "report_capability_gap": 3,
+                            "request_capability": 3,
+                            "write": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3434,
+                                "cachedTokens": 0,
+                                "completionTokens": 80,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3620,
+                                "cachedTokens": 3456,
+                                "completionTokens": 71,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3710,
+                                "cachedTokens": 3456,
+                                "completionTokens": 45,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3710,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 138
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4a9f1db1ffe4Fa6OAE5wlqaak",
+                        "durationMs": 3680,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 23,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 3,
+                        "message_start": 6,
+                        "message_end": 6,
+                        "message_update": 150,
+                        "tool_execution_start": 2,
+                        "tool_execution_update": 5,
+                        "tool_execution_end": 2,
+                        "turn_end": 3,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3434,
+                            "cachedTokens": 0,
+                            "completionTokens": 80,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3620,
+                            "cachedTokens": 3456,
+                            "completionTokens": 71,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3710,
+                            "cachedTokens": 3456,
+                            "completionTokens": 45,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3710,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 138
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "errors.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0007161359999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.002205786,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "errors.txt has the two ERROR lines",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 15656,
+                    "wallMs": 21213,
+                    "modelRequests": 5,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "05d5bba812b4f63605d07654913117e463ca48401ff24293563ab827ec666150"
+                    },
+                    "tokens": {
+                        "inputTokens": 18457,
+                        "outputTokens": 381,
+                        "cachedTokens": 14208,
+                        "withUsage": 5,
+                        "toolCalls": {
+                            "bash": 2,
+                            "read": 1,
+                            "write": 1
+                        },
+                        "toolsOffered": {
+                            "bash": 5,
+                            "create_goal": 5,
+                            "edit": 5,
+                            "get_goal": 5,
+                            "read": 5,
+                            "report_capability_gap": 5,
+                            "request_capability": 5,
+                            "write": 5
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3434,
+                                "cachedTokens": 0,
+                                "completionTokens": 71,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3593,
+                                "cachedTokens": 3456,
+                                "completionTokens": 54,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3677,
+                                "cachedTokens": 3456,
+                                "completionTokens": 77,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 3792,
+                                "cachedTokens": 3584,
+                                "completionTokens": 150,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 3961,
+                                "cachedTokens": 3712,
+                                "completionTokens": 29,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3961,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 132
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4a9ebff1ffehkuSznCoWY96Pe",
+                        "durationMs": 3747,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 27,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 5,
+                        "message_start": 10,
+                        "message_end": 10,
+                        "message_update": 278,
+                        "tool_execution_start": 4,
+                        "tool_execution_update": 5,
+                        "tool_execution_end": 4,
+                        "turn_end": 5,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3434,
+                            "cachedTokens": 0,
+                            "completionTokens": 71,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3593,
+                            "cachedTokens": 3456,
+                            "completionTokens": 54,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3677,
+                            "cachedTokens": 3456,
+                            "completionTokens": 77,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 3792,
+                            "cachedTokens": 3584,
+                            "completionTokens": 150,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 3961,
+                            "cachedTokens": 3712,
+                            "completionTokens": 29,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3961,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 132
+                    },
+                    "toolOutcomes": {
+                        "results": 4,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            },
+                            "read": {
+                                "results": 1,
+                                "errors": 0
+                            },
+                            "write": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "errors.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0009085739999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.002398224,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                }
+            ]
+        },
+        {
+            "harness": "specpi-jev",
+            "label": "SpecPi + Jev",
+            "task": "t2-terminal-sort",
+            "tier": 2,
+            "category": "terminal",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "sorted.txt is correctly sorted",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 14332,
+                    "wallMs": 19773,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "4fa87b3076d139e260c3ab96d72d3e049afe615de96478a2058956740052b14a"
+                    },
+                    "tokens": {
+                        "inputTokens": 10868,
+                        "outputTokens": 314,
+                        "cachedTokens": 7040,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 3,
+                            "create_goal": 3,
+                            "edit": 3,
+                            "get_goal": 3,
+                            "read": 3,
+                            "report_capability_gap": 3,
+                            "request_capability": 3,
+                            "write": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3433,
+                                "cachedTokens": 0,
+                                "completionTokens": 80,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3613,
+                                "cachedTokens": 3456,
+                                "completionTokens": 187,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3822,
+                                "cachedTokens": 3584,
+                                "completionTokens": 47,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3822,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 195
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4a9e5710ffeX7xOYjFE2nK8FM",
+                        "durationMs": 3612,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 23,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 3,
+                        "message_start": 6,
+                        "message_end": 6,
+                        "message_update": 270,
+                        "tool_execution_start": 2,
+                        "tool_execution_update": 5,
+                        "tool_execution_end": 2,
+                        "turn_end": 3,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3433,
+                            "cachedTokens": 0,
+                            "completionTokens": 80,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3613,
+                            "cachedTokens": 3456,
+                            "completionTokens": 187,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3822,
+                            "cachedTokens": 3584,
+                            "completionTokens": 47,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3822,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 195
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sorted.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00078372,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.00227337,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                },
+                {
+                    "pass": true,
+                    "notes": "sorted.txt is correctly sorted",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 12636,
+                    "wallMs": 17884,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 8,
+                        "toolNames": [
+                            "bash",
+                            "create_goal",
+                            "edit",
+                            "get_goal",
+                            "read",
+                            "report_capability_gap",
+                            "request_capability",
+                            "write"
+                        ],
+                        "toolSchemaChars": 6966,
+                        "instructionChars": 6833,
+                        "requestSha256": "e4bd4be84a1d3531213959308da0d4d902980cbca33cb0de187f155c1fa17c7c"
+                    },
+                    "tokens": {
+                        "inputTokens": 10695,
+                        "outputTokens": 195,
+                        "cachedTokens": 6784,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "bash": 3,
+                            "create_goal": 3,
+                            "edit": 3,
+                            "get_goal": 3,
+                            "read": 3,
+                            "report_capability_gap": 3,
+                            "request_capability": 3,
+                            "write": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 3436,
+                                "cachedTokens": 0,
+                                "completionTokens": 91,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 3558,
+                                "cachedTokens": 3328,
+                                "completionTokens": 71,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 3701,
+                                "cachedTokens": 3456,
+                                "completionTokens": 33,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 3701,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 133
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f4a9df455ffeV8wgXBNOC3G83N",
+                        "durationMs": 3678,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": {
+                        "extension_ui_request": 23,
+                        "response": 2,
+                        "agent_start": 1,
+                        "turn_start": 3,
+                        "message_start": 6,
+                        "message_end": 6,
+                        "message_update": 151,
+                        "tool_execution_start": 2,
+                        "tool_execution_update": 5,
+                        "tool_execution_end": 2,
+                        "turn_end": 3,
+                        "agent_end": 1,
+                        "agent_settled": 1
+                    },
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 3436,
+                            "cachedTokens": 0,
+                            "completionTokens": 91,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 3558,
+                            "cachedTokens": 3328,
+                            "completionTokens": 71,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 3701,
+                            "cachedTokens": 3456,
+                            "completionTokens": 33,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 3701,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 133
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "bash": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "breakdown": [],
+                    "scope": {
+                        "writable": [
+                            "sorted.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0007240020000000001,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.002213802,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": ""
+                }
+            ]
+        }
+    ]
+}
