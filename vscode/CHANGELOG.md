@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.13.1
+
+- Rebuild the VSIX under a new version number. Nothing in the extension changed from 0.13.0: VS Code will not install an extension over a build carrying the same version, so a corrected or re-issued artifact needs a number of its own to be installable at all.
+
 ## 0.13.0
 
 - Turn the layer off when the last system is unticked, rather than ticking all eight back on. The panel read that as the dead-layer file it exists to repair and undid the change, command guard included, reporting a repair of a file that had never been in that state — while `/jev disable` in the terminal read the same action as "switch the layer off". A file that genuinely arrives on with nothing running is still filled in and still says so.
