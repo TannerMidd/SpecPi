@@ -559,6 +559,36 @@ export function renderTables(data) {
     return { "table-overall": overall, "table-ratio": ratio, "table-efficiency": efficiency };
 }
 
+/**
+ * The failure-mode distribution, from `node scripts/jev-triage.mjs`. "Codex fails 7 of 37" is a
+ * count; this is what a page can say about why.
+ *
+ * Two things this table is careful about. Every verdict here went through the same gate a session
+ * would use, and an answer that did not clear it is published as `ungated` rather than rounded into
+ * the nearest mode -- 14 of 24 did not clear it, and a distribution that hid that would be claiming
+ * a confidence the classifier never reported. And `unknown` is a real option the classifier chose,
+ * which is a different statement from `ungated`: one says the evidence does not determine it, the
+ * other says the model would not commit.
+ */
+export function renderFailureModes(triage) {
+    const total = triage.classified.length;
+    const share = (count) => (total > 0 ? `${((100 * count) / total).toFixed(0)}%` : "&mdash;");
+    const harnessesFor = (mode) => [
+        ...new Set(triage.classified.filter((item) => item.mode === mode).map((item) => item.harness)),
+    ];
+    const rows = Object.entries(triage.byMode)
+        .sort((a, b) => b[1] - a[1])
+        .map(([mode, count]) => [
+            esc(mode),
+            String(count),
+            share(count),
+            esc(harnessesFor(mode).sort().join(", ")),
+            esc(mode === "ungated" ? "No verdict cleared the gate" : (triage.modes[mode] ?? "")),
+        ]);
+
+    return table(["Failure mode", "Attempts", "Share", "Harnesses", "Meaning"], rows, "numeric triage");
+}
+
 // The README carries the same headline figures as the page. Typing them by
 // hand guarantees they drift, so it gets the same marker treatment: one
 // command updates both, or neither.
@@ -666,9 +696,17 @@ function main() {
     fs.writeFileSync(dataFile, `${JSON.stringify(data, null, 2)}\n`);
     process.stdout.write(`eval site -> ${dataFile} (${data.totalAttempts} attempts, ${data.taskCount} tasks)\n`);
 
+    // Optional, because it is the one artifact on this page that costs a third-party call to
+    // produce. An absent file leaves the slot alone rather than publishing an empty table.
+    const triageFile = path.join(root, "evals", "runs", "jev-triage.json");
+    const triage = fs.existsSync(triageFile) ? JSON.parse(fs.readFileSync(triageFile, "utf8")) : null;
     const pageFile = path.join(pageDir, "index.html");
     if (fs.existsSync(pageFile)) {
-        const slots = { ...renderCharts(data), ...renderTables(data) };
+        const slots = {
+            ...renderCharts(data),
+            ...renderTables(data),
+            ...(triage ? { "table-failure-modes": renderFailureModes(triage) } : {}),
+        };
         fs.writeFileSync(pageFile, inject(fs.readFileSync(pageFile, "utf8"), slots));
         process.stdout.write(`eval site -> ${pageFile} (${Object.keys(slots).length} figures)\n`);
     }

@@ -45,10 +45,13 @@
                 <p>SPECPI / JEV</p>
                 <nav>
                     <a href="#what"><span>01</span>What it is</a><a href="#where"><span>02</span>Where it sits</a
-                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Four systems</a
-                    ><a href="#economics"><span>05</span>Why on arrival</a><a href="#guard"><span>06</span>The guard</a
-                    ><a href="#measured"><span>07</span>What it measured</a
-                    ><a href="#switches"><span>08</span>Turning it on</a>
+                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Seven systems</a
+                    ><a href="#economics"><span>05</span>Why on arrival</a
+                    ><a href="#cache-probe"><span>06</span>Pricing the cache rule</a
+                    ><a href="#calibration"><span>07</span>Calibrating the gate</a
+                    ><a href="#guard"><span>08</span>The guard</a
+                    ><a href="#measured"><span>09</span>What it measured</a
+                    ><a href="#switches"><span>10</span>Turning it on</a>
                 </nav>
                 <div class="index-meta">SpecPi 0.27.0<br />Chat 0.12.0<br />Off by default</div>
             </aside>
@@ -269,7 +272,7 @@
                 </section>
 
                 <section class="doc-section" id="systems">
-                    <header><h2>Four systems</h2><span>04</span></header>
+                    <header><h2>Seven systems</h2><span>04</span></header>
                     <p>
                         One design rule governs all of them: <em>ask local state first, and spend a Jev call only on a
                         question local state genuinely cannot answer</em>. Applying it is what removed the largest
@@ -297,7 +300,29 @@
                         </li>
                         <li>
                             <strong>Sources</strong> orders the sources a delegation batch will freeze. It only ever
-                            reorders; it never drops one.
+                            reorders; it never drops one. It also reads two answers the same call already computed and
+                            nothing used, and warns before up to 200 files and 8&nbsp;MiB are frozen for a child that
+                            does not look able to answer the question.
+                        </li>
+                        <li>
+                            <strong>Progress</strong> is the only system aimed at turns rather than input tokens, which
+                            is where the money is on the hard tiers: output is 59% of spend at tier 3 and 66% at tier 4.
+                            It watches for a session that has stopped moving &mdash; a repeated tool call, a run of
+                            errors, several turns with nothing written &mdash; and only then asks whether it is stuck.
+                            It ships set to tell the person rather than the model, because a wrong nudge costs a turn,
+                            which is the exact thing it exists to save.
+                        </li>
+                        <li>
+                            <strong>Untrusted content</strong> prepends a fixed warning line to a fetched page that
+                            confidently reads as instructions addressed to an agent. It applies only to web and browser
+                            results, never to the agent's own shell output, and it never blocks. It costs no extra call
+                            while retention is on, because the same digest answers both questions in one request.
+                        </li>
+                        <li>
+                            <strong>Capability arming</strong> reads the request once, before anything is sent to the
+                            model, and offers a withdrawn tool group when it is confident the task will need one. It
+                            activates nothing: it moves a confirmation the person would have seen at turn six to turn
+                            zero, which <a href="#cache-probe">section 06</a> measures as roughly three times cheaper.
                         </li>
                     </ul>
                 </section>
@@ -345,8 +370,132 @@
                     </figure>
                 </section>
 
+                <section class="doc-section" id="cache-probe">
+                    <header><h2>Pricing the rule that shaped everything</h2><span>06</span></header>
+                    <p>
+                        Every design decision above rests on one claim: changing the tool set partway through a
+                        session throws away the provider's cached prompt prefix, and since about 94% of prompt tokens
+                        are cache reads priced at a fiftieth of fresh input, that swings the bulk of spend. It is why
+                        there is no tool router, why capability arming happens before the first request or not at
+                        all, and why advice is never applied retroactively.
+                    </p>
+                    <p>
+                        It had never been measured here. Believed, reasoned about, consistent with Pi's own
+                        documentation &mdash; and never once put on a scale. So it was, on three arms of
+                        <code>t3-cascade-ledger</code> differing in exactly one thing: when Browser QA's fourteen
+                        tools reach the request. Never, at turn six, or from the first request. The decision rule was
+                        written down before the run: a collapse in cached tokens with a re-warm costing more than 10%
+                        of attempt cost confirms the rule; no collapse drops it.
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>Arm</th>
+                                    <th>Tool schema</th>
+                                    <th>Fresh tokens</th>
+                                    <th>Cache hit</th>
+                                    <th>Model cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <th>Never armed</th>
+                                    <td>6,966</td>
+                                    <td>27,652</td>
+                                    <td>93.1%</td>
+                                    <td>$0.01212</td>
+                                </tr>
+                                <tr>
+                                    <th>Armed from turn 1</th>
+                                    <td>15,214</td>
+                                    <td>28,227</td>
+                                    <td>94.2%</td>
+                                    <td>$0.01411</td>
+                                </tr>
+                                <tr>
+                                    <th>Armed at turn 6</th>
+                                    <td>6,966</td>
+                                    <td>52,420</td>
+                                    <td>89.5%</td>
+                                    <td>$0.01777</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        The rule holds, and by more than the threshold it was given. In three attempts out of three,
+                        the request after the flip saw cached tokens collapse to <strong>3,200</strong> &mdash; from
+                        25,984, 17,792 and 21,120 &mdash; while the prompt kept climbing. One request went from 3,673
+                        fresh tokens to 31,337: the whole conversation so far, re-read at fresh-input prices. The
+                        re-warm cost 14.6%, 21.6% and 23.9% of the attempt, <strong>20% on average against a 10%
+                        threshold</strong> fixed in advance.
+                    </p>
+                    <p>
+                        The more useful number is the comparison. Arming the same group from the first request cost
+                        16% more than never arming it; flipping it on mid-session cost 47%. <strong>Paying up front
+                        is about three times cheaper than paying when the need appears.</strong> That is what
+                        capability arming is for, and it is the whole of what it does.
+                    </p>
+                    <p>
+                        Two honest limits. Three attempts per arm is enough to see an effect this size and not enough
+                        to rank the arms finely; the turn-1 arm also took more turns than the control (18.7 against
+                        16.3), and some of its extra cost is that rather than schema weight. And the plan for this
+                        experiment asserted that activating Browser QA rebuilds the system prompt as well as the tool
+                        schema, giving a second invalidation path. That is no longer true: the pinned 0.3.0 release
+                        moved its guidance into tool descriptions, and the measurement confirms it &mdash; system
+                        prompt length is identical between the control and armed arms. The claim has been removed
+                        rather than left standing. Web access, a third-party package, does still carry prompt
+                        metadata.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="calibration">
+                    <header><h2>Calibrating the gate, and what it found</h2><span>07</span></header>
+                    <p>
+                        The gate turns a probability into a decision, and until now every number in it was a
+                        placeholder with a comment saying so. The layer shipped ahead of its own gate. Calibrating it
+                        meant asking two different questions, because a threshold can fail in two different ways.
+                    </p>
+                    <p>
+                        <strong>Does the confidence field separate right from wrong?</strong> Measured against labels
+                        this repository already owns &mdash; predicting an attempt's outcome, its task category and
+                        its tier from behaviour alone, with the labels withheld. For a Score the answer is yes, and
+                        weakly: about two thirds exactly right and 96% within one level, on a fifth of answers,
+                        against a 43% majority class. For a Noul and a Choice, on that corpus, the answer is no:
+                        both scored at their base rate. <strong>No system's pre-registered precision target was met
+                        anywhere on any of those curves</strong>, and the artifact records that rather than a number
+                        chosen to fill the gap.
+                    </p>
+                    <p>
+                        <strong>Can the gate ever fire?</strong> This is the question that found a real defect. The
+                        retention gate demanded a Score confidence of 0.80 and a value within 0.15 of a level. On a
+                        deliberately obvious case &mdash; a directory listing of vendor icons during a changelog
+                        edit &mdash; Jev answered &ldquo;spent&rdquo; every time, at confidence 0.73 to 0.85, mostly
+                        under 0.80, with the value drifting past the boundary too. So retention could gate through to
+                        <em>keep this result</em> and essentially never to <em>this result is spent</em>. The one
+                        branch that does anything was unreachable, and no amount of running the layer would have
+                        revealed it, <strong>because a system that never fires looks exactly like a system whose
+                        advice was always to do nothing.</strong>
+                    </p>
+                    <p>
+                        The same check caught a second one in compaction, and a third in code written for this very
+                        release: the capability system's first threshold was set above what the model emits even on
+                        an unambiguous yes. The fix in each case was to read the operating point off the recorded
+                        evidence rather than to pick a number that felt conservative. Thresholds are now pinned by a
+                        test to <code>evals/runs/jev-calibration.json</code>, along with the figures quoted on this
+                        page, so moving one takes new evidence rather than a new opinion.
+                    </p>
+                    <p>
+                        On the production questions, where the state carries the material being judged rather than a
+                        row of counters, the separation is wide: a planted credential scores 0.96 against 0.04 for a
+                        clean report, a page carrying an injected instruction 0.97 against 0.04, a thrashing session
+                        0.89 against 0.30 for one working steadily. That is the gap the gates now sit in.
+                    </p>
+                </section>
+
                 <section class="doc-section" id="guard">
-                    <header><h2>The guard is a different trade</h2><span>06</span></header>
+                    <header><h2>The guard is a different trade</h2><span>08</span></header>
                     <p>
                         The advisor is fail-silent and holds no authority. The guard is the opposite on both counts,
                         and that is worth stating plainly rather than configuring away.
@@ -375,7 +524,7 @@
                 </section>
 
                 <section class="doc-section" id="measured">
-                    <header><h2>What it has actually measured</h2><span>07</span></header>
+                    <header><h2>What it has actually measured</h2><span>09</span></header>
                     <p>
                         Across 259 attempts spanning five tiers, SpecPi with the layer on made
                         <strong>36 Jev calls with zero failures</strong>, costing $0.001 in total &mdash; about 0.6% of
@@ -410,15 +559,41 @@
                         attributable yet.
                     </p>
                     <p>
-                        The missing measurement is the mechanism's own: nothing currently records how many bytes
-                        retention actually dropped, so its effect can only be inferred from a cost delta it may not
-                        have caused. That instrumentation is the next thing worth building, before any claim is made
-                        for this layer.
+                        The missing measurement was the mechanism's own: nothing recorded how many bytes retention
+                        actually dropped, so its effect could only be inferred from a cost delta it may not have
+                        caused. The ledger now records, per call, whether the advice was taken and what it saved, and
+                        the eval runner folds that out of each attempt's disposable home into its report.
+                    </p>
+                    <p>
+                        <strong>Which means the table above is now known to be measuring less than it looks like it
+                        is.</strong> It was taken before the gate was calibrated &mdash; when retention's shortening
+                        branch could not fire at all, for the reason
+                        <a href="#calibration">section 07</a> describes. So the row is a comparison between plain
+                        SpecPi and plain SpecPi carrying the cost of asking questions whose most expensive answer was
+                        unreachable. It is left standing because it is what was actually recorded, and replacing it
+                        with a claim would be worse than publishing a number that has since been explained.
+                    </p>
+                    <p>
+                        With the instrumentation in place, five live runs say something sharper, and it is not
+                        flattering. <strong>Retention asks three or four times per attempt and has never once
+                        shortened anything.</strong> Every decline was the same: Jev answered, and reported a
+                        confidence below the calibrated bar. On the contrived case it is confident &mdash; a listing
+                        of vendor icons during a changelog edit scores 0.75 to 0.85 &mdash; but on the real reads of
+                        a repair chain, where each result feeds the next step, it is genuinely unsure whether the
+                        output is spent, and says so.
+                    </p>
+                    <p>
+                        The threshold is not going to be lowered to fix that. This system's whole asymmetry is that
+                        carrying a result costs tokens and dropping the wrong one costs the task, so firing on a
+                        confidence the model did not have is the one thing it must not do. The useful outcome is that
+                        the claim is now falsifiable: the flagship system does not pay off on this workload, that is
+                        visible in a report rather than inferred from a cost delta, and whether it pays off on a
+                        session with genuinely disposable output remains untested.
                     </p>
                 </section>
 
                 <section class="doc-section" id="switches">
-                    <header><h2>Turning it on</h2><span>08</span></header>
+                    <header><h2>Turning it on</h2><span>10</span></header>
                     <p>
                         Nothing here is on after an install. Each switch has a session form and a
                         <code>startup</code> form, and a session toggle never writes the startup preference.

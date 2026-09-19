@@ -296,6 +296,31 @@
                         tool invoked again with identical arguments after it had already answered. Compactions are
                         the harness discarding context to make room, and only one harness here ever needed to.
                     </p>
+                    <h3>Why the failures failed</h3>
+                    <p>
+                        A pass rate says how often a harness finished. It does not say whether the ones that did not
+                        ran out of clock, solved the wrong problem, or repeated a failing call until the budget ran
+                        out &mdash; and those call for different fixes. The table below classifies every failed
+                        attempt in this run, using
+                        <a href="https://github.com/TannerMidd/SpecPi/blob/main/scripts/jev-triage.mjs">a typed
+                        classifier</a> over the metadata each attempt already recorded: checker notes, exit code,
+                        stderr tail, duration, the most repeated tool, and which injected faults were met.
+                    </p>
+                    <p>
+                        Every verdict went through the same confidence gate a live session would apply, and answers
+                        that did not clear it are published as <b>ungated</b> rather than folded into the nearest
+                        category. More than half of them did not clear it. That is the honest shape of this
+                        evidence: a report file records what a harness did, not what it was trying to do, and for
+                        most failures that is not enough to say why. It is also the argument for
+                        <code>--keep-transcripts</code>, which records the per-request shape of an attempt beside
+                        its report and makes a richer classification possible without re-running anything.
+                        <b>Ungated</b> and <b>unknown</b> are different statements: the first is the classifier
+                        declining to commit, the second is it committing to "not determinable from what was
+                        recorded".
+                    </p>
+                    <div class="table-scroll" id="table-failure-modes">
+                        <!-- table-failure-modes --><table class="numeric triage"><thead><tr><th>Failure mode</th><th>Attempts</th><th>Share</th><th>Harnesses</th><th>Meaning</th></tr></thead><tbody><tr><th>ungated</th><td>14</td><td>58%</td><td>codex, dsh, omp, opencode, pi, specpi-default, specpi-jev</td><td>No verdict cleared the gate</td></tr><tr><th>misread-requirement</th><td>5</td><td>21%</td><td>codex</td><td>Produced output that misses a stated requirement</td></tr><tr><th>unknown</th><td>3</td><td>13%</td><td>dsh, omp, specpi-default</td><td>Not determinable from what was recorded</td></tr><tr><th>timeout</th><td>2</td><td>8%</td><td>pi</td><td>Exceeded the wall-clock limit</td></tr></tbody></table><!-- /table-failure-modes -->
+                    </div>
                     <div class="table-scroll" id="table-ratio">
                         <!-- table-ratio --><table class="numeric"><thead><tr><th>Harness</th><th>Tier 1</th><th>Tier 2</th><th>Tier 3</th><th>Tier 4</th><th>Tier 5</th></tr></thead><tbody><tr><th>Pi</th><td>1.00&times;</td><td>1.00&times;</td><td>1.24&times;</td><td>1.00&times;</td><td>1.29&times;</td></tr><tr><th>SpecPi</th><td>1.82&times;</td><td>1.83&times;</td><td>1.04&times;</td><td>1.30&times;</td><td>1.00&times;</td></tr><tr><th>SpecPi + Jev</th><td>1.65&times;</td><td>1.79&times;</td><td>1.22&times;</td><td>1.36&times;</td><td>1.25&times;</td></tr><tr><th>OpenCode</th><td>2.99&times;</td><td>3.00&times;</td><td>1.00&times;</td><td>1.07&times;</td><td>1.20&times;</td></tr><tr><th>Codex CLI</th><td>1.20&times;</td><td>1.69&times;</td><td>1.90&times;</td><td>2.36&times;</td><td>1.47&times;</td></tr><tr><th>Oh My Pi</th><td>6.23&times;</td><td>6.24&times;</td><td>1.38&times;</td><td>1.58&times;</td><td>1.85&times;</td></tr><tr><th>DeepSeek Harness</th><td>3.47&times;</td><td>3.79&times;</td><td>1.94&times;</td><td>2.13&times;</td><td>2.32&times;</td></tr></tbody></table><!-- /table-ratio -->
                     </div>
