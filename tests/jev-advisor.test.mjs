@@ -70,9 +70,7 @@ function withAgentDir(run) {
         delete process.env[name];
     }
 
-    try {
-        return run(dir);
-    } finally {
+    const restore = () => {
         if (previousDir === undefined) {
             delete process.env.PI_CODING_AGENT_DIR;
         } else {
@@ -94,7 +92,44 @@ function withAgentDir(run) {
         }
 
         fs.rmSync(dir, { recursive: true, force: true });
+    };
+
+    // The cleanup has to wait for an async body to finish, and `try/finally` around a bare
+    // `return run(dir)` does not: an async callback returns its promise at the first `await`, the
+    // finally block runs there, and everything after that `await` executes with the real agent
+    // directory restored and the temporary one already deleted. Nineteen tests in this file pass an
+    // async callback, so most of this suite was only isolated up to its first suspension point.
+    //
+    // That is not hypothetical. It destroyed a real credential store: a test wrote its fixture
+    // `auth.json` after an `await`, the write landed in the developer's own `~/.pi/agent`, and it
+    // replaced every provider they had logged into with the one fake entry the fixture contained.
+    // An isolation helper that silently stops isolating is worse than none, because every test in
+    // the file reads as safe.
+    let result;
+    try {
+        result = run(dir);
+    } catch (error) {
+        restore();
+        throw error;
     }
+
+    if (!result || typeof result.then !== "function") {
+        restore();
+
+        return result;
+    }
+
+    return result.then(
+        (value) => {
+            restore();
+
+            return value;
+        },
+        (error) => {
+            restore();
+            throw error;
+        },
+    );
 }
 
 const enabledSettings = (overrides = {}) => ({
@@ -569,6 +604,16 @@ test("the default backend is OpenRouter, which is where the key works", () => {
 /** Write an auth.json the way Pi's own /login does, so the fixture and the real file share a shape. */
 function writeAuth(entries, { bom = false } = {}) {
     const file = authPath();
+    // A fixture credential store is only ever written inside a temporary directory, and this
+    // asserts it rather than assuming it. The assumption failed once: `withAgentDir` stopped
+    // isolating at an async test's first `await`, this function resolved the developer's own
+    // `~/.pi/agent/auth.json`, and one `writeFileSync` replaced every provider they had logged into
+    // with a single fake entry. OAuth tokens are not recoverable, so the only acceptable cost here
+    // is a failed test, and the check is two lines.
+    if (!file.startsWith(fs.realpathSync.native(os.tmpdir()))) {
+        throw new Error(`Refusing to write a fixture auth.json outside the temporary directory: ${file}`);
+    }
+
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `${bom ? "\ufeff" : ""}${JSON.stringify(entries, null, 2)}\n`);
 
