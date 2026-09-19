@@ -64,6 +64,11 @@ function stripBom(text) {
  * a 1500 ms latency budget -- where it used to be one `process.env` lookup. The cache key is the
  * file's size and modification time, so `/login` writing a new credential mid-session invalidates it
  * on the next call rather than being masked until restart, which a plain memo would have done.
+ *
+ * A file that will not parse is cached as firmly as one that will. Recording only successes left the
+ * worst case uncached: a truncated or hand-edited auth.json threw on every call, so every request
+ * paid a fresh stat, a 256 KiB read and a failing parse inside the same latency budget the cache
+ * exists to protect -- forever, since nothing about it would change until the file did.
  */
 let parsedStore = { key: "", data: undefined };
 
@@ -73,9 +78,16 @@ function readStore(file, stat) {
         return parsedStore.data;
     }
 
-    const text = fs.readFileSync(file, "utf8");
-    const parsed = JSON.parse(stripBom(text));
-    const data = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : undefined;
+    let data;
+    try {
+        const parsed = JSON.parse(stripBom(fs.readFileSync(file, "utf8")));
+        data = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : undefined;
+    } catch {
+        // An unreadable or unparseable store is "no credential", which is the same answer the caller
+        // would have reached by catching this; caching it is what stops it being recomputed.
+        data = undefined;
+    }
+
     parsedStore = { key: identity, data };
 
     return data;

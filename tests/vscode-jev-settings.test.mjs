@@ -483,13 +483,25 @@ test("switching the layer on in the form switches its systems on with it", () =>
     // Nothing happens while the layer is off.
     assert.deepEqual(jevConfig.couple({ ...off, enabled: false }, off).config, { ...off, enabled: false });
 
-    // Turning the last system off while the layer is on is the dead state arriving by another
-    // route, so it is repaired and announced rather than silently saved.
+    // Unticking the last system in a working file is a decision, not a broken file, and this test
+    // used to assert the opposite -- that all eight were switched back on, the blocking command
+    // guard among them, with a note describing a file that never existed. `/jev disable` reads the
+    // same situation as "switch the layer off", so the panel does too.
     const alreadyOn = { ...off, enabled: true, gap: true };
     const emptied = jevConfig.couple({ ...alreadyOn, gap: false }, alreadyOn);
     assert.ok(emptied.note);
+    assert.equal(emptied.config.enabled, false, "the layer goes off rather than the systems coming back");
     for (const name of jevConfig.SYSTEMS) {
-        assert.equal(emptied.config[name], true);
+        assert.equal(emptied.config[name], false, `${name} must stay as the person left it`);
+    }
+
+    // A file that arrives already dead is still repaired: nobody chose that state in front of us.
+    const dead = { ...off, enabled: true };
+    const repaired = jevConfig.couple(dead, dead);
+    assert.ok(repaired.note);
+    assert.equal(repaired.config.enabled, true);
+    for (const name of jevConfig.SYSTEMS) {
+        assert.equal(repaired.config[name], true, `${name} should be filled in for a broken file`);
     }
 });
 

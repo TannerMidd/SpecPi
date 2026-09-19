@@ -20,12 +20,38 @@ import { SYSTEM_NAMES } from "./config.mjs";
  * `state` is `{ settings }` and is never mutated -- the next state comes back in the result. `deps`
  * supplies the outside world, which is now only `keySources`: the command guard used to need a
  * package's global configuration file arbitrated here, and as the eighth system it needs nothing.
+ *
+ * Scope belongs to `layerScopeLine`, not here, so this takes `{ on }` and nothing else. It used to
+ * be handed `sessionOnly` and `interactive` as well and read neither, which reads as a decision
+ * being made from them.
  */
 export function applyLayer({ on }, state, deps) {
-    const active = deps.keySources().find((item) => item.present)?.name;
-    const settings = on ? enableSystems(state.settings) : { ...state.settings, master: false };
+    if (!on) {
+        return { settings: { ...state.settings, master: false }, lines: [offLine()] };
+    }
 
-    return { settings, lines: on ? onLines(state.settings, settings, active) : [offLine()] };
+    // Resolved inside the on branch only. `offLine` never names a key, so doing this first meant
+    // every `/jev off` paid for a stat, read and parse of Pi's credential store to discard it --
+    // the one file this layer reads under a narrow, stated exception.
+    const active = deps.keySources().find((item) => item.present)?.name;
+    const settings = enableSystems(state.settings);
+
+    return { settings, lines: onLines(state.settings, settings, active) };
+}
+
+/**
+ * What arming the command guard means, in the words every path that arms it has to use.
+ *
+ * Seven of the eight systems only ever add advice; this one can refuse a tool call. Saying so is a
+ * rule rather than a nicety, and it lives here because it was a rule `/jev on` honoured alone while
+ * `/jev enable guard` and `/jev startup on` armed the same system in silence.
+ */
+export function guardWarning() {
+    return (
+        "guard is the only system that can refuse a tool call: it blocks a call it reads as " +
+        "destructive and not what was asked for, asks you about the uncertain ones, and hands " +
+        "everything else to the permission system unchanged. Turn it off with /jev disable guard."
+    );
 }
 
 /**
@@ -63,11 +89,7 @@ function onLines(before, after, activeSource) {
     // Said out loud every time, because seven of the eight only ever add advice and this one can
     // take a command away. Nobody should discover that from a blocked call.
     if (after.systems.guard) {
-        lines.push(
-            "guard is the only system that can refuse a tool call: it blocks a call it reads as " +
-                "destructive and unasked-for, asks you about the uncertain ones, and hands everything " +
-                "else to the permission system unchanged. Turn it off with /jev disable guard.",
-        );
+        lines.push(guardWarning());
     }
 
     lines.push(keyLine(activeSource));

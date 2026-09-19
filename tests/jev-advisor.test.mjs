@@ -685,6 +685,41 @@ test("only an api_key entry is read, and an unusable store is no key rather than
     });
 });
 
+test("an unparseable credential store is cached like a parseable one", () => {
+    // The cache exists because `ask()` resolves a key per request, on the tool path, inside a 1500ms
+    // budget. Recording only successful parses left the worst case uncached: a truncated auth.json
+    // threw on every call, so every request paid a fresh stat, read and failing parse -- forever,
+    // since nothing about the file was going to change. Counted here through `fs.readFileSync`,
+    // because "it was not re-read" is the claim and a timing assertion is not one.
+    withAgentDir(() => {
+        fs.writeFileSync(authPath(), '{"openrouter": {"type": "api_k');
+        const real = fs.readFileSync;
+        let reads = 0;
+        fs.readFileSync = (...args) => {
+            if (String(args[0]) === authPath()) {
+                reads += 1;
+            }
+
+            return real(...args);
+        };
+
+        try {
+            for (let i = 0; i < 5; i += 1) {
+                assert.equal(resolveKey("openrouter"), undefined);
+            }
+
+            assert.equal(reads, 1, `a broken store was read ${reads} times for five resolutions`);
+
+            // And it is still invalidated when the file actually changes, which is the whole reason
+            // the cache is keyed on identity rather than memoised outright.
+            writeAuth({ openrouter: { type: "api_key", key: "sk-or-v1-repaired" } });
+            assert.equal(resolveKey("openrouter"), "sk-or-v1-repaired");
+        } finally {
+            fs.readFileSync = real;
+        }
+    });
+});
+
 test("an auth.json written with a byte order mark still parses", () => {
     // Pi strips one before parsing. Not doing the same here would produce the worst possible
     // split: the key works for every model call and this layer alone calls it missing.

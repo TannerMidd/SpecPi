@@ -59,6 +59,11 @@ export const GATED_TOOLS = Object.freeze([...SHELL_TOOLS, ...WRITE_TOOLS]);
  * other programs (`env rm -rf build`, `fd -x rm`); `find` has `-delete` and `-exec`; `sort -o` and
  * `uniq in out` name an output file. None of them changes state when used the way its name suggests,
  * which is precisely what would have made each one a reliable bypass.
+ *
+ * `printenv` is absent for a different reason: it changes nothing and still hands over a secret, and
+ * the risk question this guard asks names exfiltration alongside destruction. Being on this list is
+ * not "harmless", it is "not worth a question" -- and for the commands that read credentials, the
+ * argument check below is what keeps that true of the rest.
  */
 const READ_ONLY = new Set([
     "ls",
@@ -81,7 +86,6 @@ const READ_ONLY = new Set([
     "printf",
     "which",
     "type",
-    "printenv",
     "grep",
     "rg",
     "diff",
@@ -101,6 +105,34 @@ const READ_ONLY = new Set([
  */
 const SHELL_CONTROL = /[;&|><`$(){}\n\r]|\|\||&&/u;
 
+/** Targets that mean "everything": the filesystem root, or a bare home directory. */
+const ROOT_TARGETS = new Set(["/", "/*", "~", "~/*", "$HOME", "$HOME/*", "%USERPROFILE%", "%USERPROFILE%\\*"]);
+
+/**
+ * A recursive delete aimed at the root or a bare home.
+ *
+ * Written as a function rather than a regex because the regex it replaces anchored on the end of the
+ * string, so it matched `rm -rf /` -- which GNU `rm` refuses on its own -- and missed
+ * `rm -rf / --no-preserve-root`, which is the spelling that actually empties the disk. Flag order and
+ * position are not something a pattern should be asked to track.
+ */
+function removesEverything(value) {
+    const tokens = value.trim().split(/\s+/u);
+    const start = tokens[0] === "sudo" || tokens[0] === "doas" ? 1 : 0;
+    if (leadingBinary(tokens[start]) !== "rm") {
+        return false;
+    }
+
+    const args = tokens.slice(start + 1);
+    const recursive = args.some(
+        (token) => token === "--recursive" || (/^-[a-zA-Z]+$/u.test(token) && /[rR]/u.test(token)),
+    );
+
+    return (
+        recursive && args.some((token) => !token.startsWith("-") && ROOT_TARGETS.has(token.replace(/\/+$/u, "") || "/"))
+    );
+}
+
 /**
  * Catastrophic and unambiguous. Every entry here is something that destroys data or hands the
  * machine to someone else, with no legitimate reading in an agent session.
@@ -111,8 +143,8 @@ const SHELL_CONTROL = /[;&|><`$(){}\n\r]|\|\||&&/u;
  */
 const CATASTROPHIC = Object.freeze([
     {
-        // `rm -rf /`, `rm -rf /*`, and the same against a bare home. Not `rm -rf ./build`.
-        pattern: /\brm\s+(-[a-zA-Z]*\s+)*-?[a-zA-Z]*[rR][a-zA-Z]*f?[a-zA-Z]*\s+(\/|\/\*|~|\$HOME)\s*$/u,
+        // `rm -rf /`, `rm -rf / --no-preserve-root`, `rm -r -f ~`. Not `rm -rf ./build`.
+        test: removesEverything,
         reason: "recursive delete of the filesystem root or home directory",
     },
     {
@@ -191,14 +223,14 @@ export function leadingBinary(command) {
  * matters: dangerous is checked before safe, so a catastrophic command hidden behind a read-only
  * binary cannot pass on the fast path.
  */
-export function classifyCommand(command) {
+export function classifyCommand(command, cwd = process.cwd()) {
     const value = text(command).trim();
     if (value.length === 0) {
         return { decision: "unknown", reason: "empty command" };
     }
 
     for (const rule of CATASTROPHIC) {
-        if (rule.pattern.test(value)) {
+        if (rule.test ? rule.test(value) : rule.pattern.test(value)) {
             return { decision: "dangerous", reason: rule.reason };
         }
     }
@@ -210,10 +242,32 @@ export function classifyCommand(command) {
     }
 
     if (READ_ONLY.has(leadingBinary(value))) {
-        return { decision: "safe", reason: "read-only command" };
+        // Read-only is a statement about what the binary does, not about what it is pointed at, and
+        // the question this guard asks names exfiltration beside destruction. `cat ~/.ssh/id_rsa`
+        // changes nothing and hands over a private key, so the fast path has to look at the
+        // arguments too or half of the question it asks is unreachable for the commands that answer
+        // it. A protected argument costs one question; every other read stays free.
+        return commandArguments(value).some((argument) => protectedPath(argument, cwd))
+            ? { decision: "unknown", reason: "reads a protected path" }
+            : { decision: "safe", reason: "read-only command" };
     }
 
     return { decision: "unknown", reason: "not a known read-only command" };
+}
+
+/**
+ * The non-flag arguments of a command, unquoted.
+ *
+ * Deliberately crude: this decides whether to ask a question, never whether to block, so a token it
+ * splits wrongly costs a question and nothing else.
+ */
+function commandArguments(value) {
+    return value
+        .split(/\s+/u)
+        .slice(1)
+        .filter((token) => !token.startsWith("-"))
+        .map((token) => token.replace(/^["']|["']$/gu, ""))
+        .filter((token) => token.length > 0);
 }
 
 /**
@@ -304,6 +358,35 @@ export function callTargets(input) {
     return found;
 }
 
+/** Keys a harness uses for "the text this call runs", across the tools in `SHELL_TOOLS`. */
+const COMMAND_KEYS = Object.freeze(["command", "cmd", "script", "input", "text", "data", "stdin", "line"]);
+
+/**
+ * The text a shell call will run, from a tool input whose shape this module does not control.
+ *
+ * `bash` carries `command`; `write_stdin` carries the text it types into a live shell under some
+ * other name entirely. Reading `command` alone meant every `write_stdin` was classified as an empty
+ * command -- spending a guard call on the empty string while the `rm -rf ~` being typed went
+ * unexamined -- so the tool most worth reading was the one read as blank.
+ */
+export function commandText(input) {
+    if (typeof input === "string") {
+        return input;
+    }
+
+    if (input === null || typeof input !== "object") {
+        return "";
+    }
+
+    for (const key of COMMAND_KEYS) {
+        if (typeof input[key] === "string" && input[key].trim().length > 0) {
+            return input[key];
+        }
+    }
+
+    return "";
+}
+
 /**
  * What a gated tool call is, before Jev is involved.
  *
@@ -321,7 +404,7 @@ export function classifyCall({ tool, command, target, targets, cwd }) {
     }
 
     if (SHELL_TOOLS.includes(tool)) {
-        return classifyCommand(command);
+        return classifyCommand(command, cwd);
     }
 
     const all = [...(Array.isArray(targets) ? targets : []), ...(typeof target === "string" ? [target] : [])].filter(

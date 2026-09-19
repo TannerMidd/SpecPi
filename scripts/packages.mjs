@@ -63,37 +63,37 @@ export function runBrowserQA(agentDir, command) {
 export const retiredPackages = Object.freeze(["npm:specpi-jev-guard"]);
 
 /**
- * Drop retired entries from a settings object, in place, reporting what was removed and what was not.
+ * Drop retired entries from a settings object, in place, returning what was removed.
  *
- * Only an entry in the shape SpecPi writes -- a bare pinned source string -- is removed. An entry a
- * user has given filters of their own is theirs, which is the same ownership rule the restore path
- * applies to every other retired package, and it is reported rather than deleted. Version is not
+ * Every entry goes, whatever shape it has. That is a deliberate exception to the ownership rule the
+ * restore path applies elsewhere -- "a user-modified entry is theirs" -- and the exception is the
+ * reason the list is not open to additions. Preserving a modified `specpi-jev-guard` entry preserved
+ * a fail-closed gate that this release removed the controls for: the code that rewrote its global
+ * configuration to `enabled: false` at every session start is gone, and so is `/jev guard off`, so a
+ * preserved entry is a gate that refuses every shell call the moment its key or endpoint goes away,
+ * with nothing left to turn it off. Filters are worth less than that.
+ *
+ * The removed entry is returned verbatim so the caller can print it back, and the write it belongs
+ * to is inside the installer's transaction and backed up with everything else. Version is not
  * consulted: the reason for retirement is the package.
  */
 export function removeRetiredPackages(settings) {
     if (!Array.isArray(settings?.packages)) {
-        return { removed: [], preserved: [] };
+        return [];
     }
 
     const removed = [];
-    const preserved = [];
     settings.packages = settings.packages.filter((entry) => {
         if (!retiredPackages.includes(packageIdentity(entry))) {
             return true;
         }
 
-        if (typeof entry !== "string") {
-            preserved.push(packageSource(entry));
-
-            return true;
-        }
-
-        removed.push(entry);
+        removed.push(packageSource(entry));
 
         return false;
     });
 
-    return { removed, preserved };
+    return removed;
 }
 
 export function packageChanges(before, after) {
@@ -182,11 +182,11 @@ export function installBasePackages(agentDir) {
 
 export function checkBasePackages(agentDir, settings) {
     const errors = [];
-    // Only the shape SpecPi writes. An entry the user has given filters of their own is theirs to
-    // keep, and failing doctor forever over a deliberate choice would be the wrong report.
     for (const entry of Array.isArray(settings.packages) ? settings.packages : []) {
-        if (typeof entry === "string" && retiredPackages.includes(packageIdentity(entry))) {
-            errors.push(`Retired base package still configured: ${entry}. Run specpi update to unpin it.`);
+        if (retiredPackages.includes(packageIdentity(entry))) {
+            errors.push(
+                `Retired base package still configured: ${packageSource(entry)}. Run specpi update to unpin it.`,
+            );
         }
     }
 

@@ -335,7 +335,7 @@ function saveJev(snapshot, draft) {
         // Re-read rather than carried over from the load: saving a budget and still seeing the old
         // ceiling beside the current spend is the kind of small lie that makes a panel untrustworthy.
         usage: loadJevUsage(filename),
-        key: jevKeyStatus({ settingsFile: filename, env: snapshot.env }),
+        key: jevKeyStatus({ settingsFile: filename }),
     };
 }
 

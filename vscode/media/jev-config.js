@@ -213,12 +213,22 @@
      * buy the same behaviour at the cost of trusting the panel.
      */
     function couple(config, previous) {
-        // Two cases, not one. The transition from off to on is the common path. The other is a file
-        // that is *already* on with nothing running -- the broken state this panel is for -- which
-        // the old `previous?.enabled === true` guard skipped, leaving the one mechanism that could
-        // repair it deliberately declining to.
+        // Three cases, and the third is the one that was missing. Turning the layer on fills the
+        // systems in; a file that arrives already on with nothing running is the broken state this
+        // panel exists to repair, and it is repaired the same way. But a person unticking the last
+        // system in a working file has not arrived at either: they have said "none of these", and
+        // re-ticking all eight -- the blocking command guard among them -- answered a deliberate act
+        // by undoing it, with a note describing a file that never existed. The advisor's own
+        // `/jev disable` reads the same situation as "switch the layer off", so this does too.
         if (!deadLayer(config)) {
             return { config, note: "" };
+        }
+
+        if (previous?.enabled === true && !deadLayer(previous)) {
+            return {
+                config: { ...config, enabled: false },
+                note: " That was the last system, so the layer was switched off; it would otherwise run and do nothing.",
+            };
         }
 
         const arriving = previous?.enabled !== true;

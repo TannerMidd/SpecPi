@@ -268,18 +268,12 @@ function restoreLegacySettings(manifest, warnings) {
  * pointing at code SpecPi has since removed the controls for -- `specpi-jev-guard` is fail-closed,
  * so the machine that skipped packages is exactly the machine that would keep it armed forever.
  *
- * `settingsPath` is watched whenever a previous manifest recorded package changes, which is the only
- * way a retired entry can be present, so this write is inside the transaction and rolls back with it.
+ * `settingsPath` is in the transaction's watched set for every non-uninstall operation, so this
+ * write is snapshotted, backed up and rolled back with everything else.
  */
 function retireBasePackages(warnings) {
     const settings = readJson(settingsPath, {});
-    const { removed, preserved } = removeRetiredPackages(settings);
-    for (const source of preserved) {
-        warnings.push(
-            `Preserved modified retired package setting: ${source}. Remove it yourself if you do not want it.`,
-        );
-    }
-
+    const removed = removeRetiredPackages(settings);
     if (removed.length === 0) {
         return;
     }
@@ -287,7 +281,7 @@ function retireBasePackages(warnings) {
     writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
     for (const source of removed) {
         warnings.push(
-            `Unpinned retired package: ${source}. Its downloaded files stay in the agent npm directory and Pi no longer loads it.`,
+            `Unpinned retired package: ${source}. Its downloaded files stay in the agent npm directory, Pi no longer loads it, and any settings of your own on that entry are in this run's backup.`,
         );
     }
 }
@@ -346,7 +340,16 @@ async function mutate(options, operation) {
             ...files.map(([, target]) => target),
             ...Object.keys(previous?.files || {}),
         ];
-        if (!options.skipPackages || previous?.settingsChanges?.length || previous?.packageChanges?.length) {
+        // Watched whenever anything in this run can write it. `retireBasePackages` runs on every
+        // non-uninstall operation, including under `--skip-package-install`, so the narrower
+        // condition that used to guard this left that write outside the snapshot -- unbacked up, and
+        // not rolled back by a later failure in the same transaction.
+        if (
+            operation !== "uninstall" ||
+            !options.skipPackages ||
+            previous?.settingsChanges?.length ||
+            previous?.packageChanges?.length
+        ) {
             watched.push(settingsPath);
         }
 

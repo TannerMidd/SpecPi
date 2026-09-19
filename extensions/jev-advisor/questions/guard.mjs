@@ -99,12 +99,12 @@ export function decide(answers, { hasUI = false } = {}) {
         return { action: "defer", source: "deferred", reason: "no answer" };
     }
 
-    const level = scoreLevel(risk, "gap");
-    const wanted = intended ? scoreLevel(intended, "gap") : undefined;
+    const level = scoreLevel(risk, "guard");
+    const wanted = intended ? scoreLevel(intended, "guard") : undefined;
 
     // A confident secret verdict blocks on its own: a write to a real credential file is not made
     // acceptable by having been asked for, and the fixture case is what the question separates.
-    const credential = answers?.credential ? scoreLevel(answers.credential, "gap") : undefined;
+    const credential = answers?.credential ? scoreLevel(answers.credential, "guard") : undefined;
     if (credential === 3) {
         return { action: "block", source: "jev", reason: "writes a real credential file" };
     }
@@ -122,10 +122,27 @@ export function decide(answers, { hasUI = false } = {}) {
     return { action: "defer", source: "deferred", reason: "below the bar" };
 }
 
+/** The two answers the guard's confirmation dialog offers, in the order it offers them. */
+export const CHOICES = Object.freeze({ run: "Run it", block: "Block it" });
+
+/**
+ * Whether a human's answer to that dialog is consent.
+ *
+ * Only the affirmative is. Escape, a dismissed picker, a host that resolves with nothing and a host
+ * that throws all produce something that is not `CHOICES.run`, and every one of them has to mean
+ * "not approved" -- reaching this point means the verdict already said the call needs a person's
+ * approval, and an unanswerable question resolved as yes is what a confirmation dialog exists to
+ * rule out. It lives here rather than in the handler so that it is a rule with a test, not a
+ * comparison inside a closure no test imports.
+ */
+export function approved(choice) {
+    return choice === CHOICES.run;
+}
+
 /** The gate's own numbers, named so `/jev status` and the tests read the same source. */
 export const GATE = Object.freeze({
-    scoreConfidence: THRESHOLDS.gap.scoreConfidence,
-    boundary: THRESHOLDS.gap.boundary,
+    scoreConfidence: THRESHOLDS.guard.scoreConfidence,
+    boundary: THRESHOLDS.guard.boundary,
 });
 
 /**

@@ -521,7 +521,9 @@
                     <ul>
                         <li>
                             <strong>Local rules first, for nothing.</strong> Read-only commands and ordinary project
-                            writes never leave the machine. A very short list of catastrophic, unambiguous commands
+                            writes never leave the machine &mdash; read-only meaning the binary <em>and</em> what it is
+                            pointed at, because <code>cat ~/.ssh/id_rsa</code> changes nothing and still hands over a
+                            key. A very short list of catastrophic, unambiguous commands
                             &mdash; a recursive delete of the filesystem root, writing a raw disk device, piping a
                             download into a shell &mdash; is blocked with no call at all. The list is deliberately tiny:
                             a rule that blocks real work gets the whole guard switched off, and then it protects nobody.
@@ -540,6 +542,12 @@
                             <strong>Everything else defers.</strong> No key, no budget, a timeout, an unconfident
                             answer, or a middle-band verdict with nobody to ask: the call goes to the permission system
                             and is decided exactly as it was before this layer existed. Deferring is not allowing.
+                        </li>
+                        <li>
+                            <strong>Except once anyone has been asked.</strong> Everything above fails open
+                            <em>before</em> a person is involved. After a verdict says a call needs your approval, a
+                            dialog you dismiss and a dialog that could not be shown are both refusals &mdash; an
+                            unanswerable question resolved as yes is the one thing a confirmation cannot do.
                         </li>
                     </ul>
                 </section>

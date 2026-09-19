@@ -17,7 +17,8 @@ import {
     protectedPath,
 } from "../extensions/jev-advisor/risk.mjs";
 import { MUTATING_TOOLS } from "../extensions/jev-advisor/questions/progress.mjs";
-import { decide, questions } from "../extensions/jev-advisor/questions/guard.mjs";
+import { CHOICES, GATE, approved, decide, questions } from "../extensions/jev-advisor/questions/guard.mjs";
+import { THRESHOLDS } from "../extensions/jev-advisor/gate.mjs";
 
 const answer = (value, confidence = 0.9) => ({ kind: "score", value, confidence });
 
@@ -241,6 +242,25 @@ test("a confident real-credential verdict blocks on its own", () => {
     assert.equal(decide({ risk: answer(1), intended: answer(3), credential: answer(3) }).action, "block");
     assert.equal(decide({ risk: answer(1), intended: answer(3), credential: answer(0) }).action, "defer");
     assert.equal(decide({ risk: answer(1), credential: answer(3, 0.2) }).action, "defer", "unconfident");
+});
+
+test("only the affirmative answer runs the call", () => {
+    // Every other value a host can produce -- a dismissed picker, a cancel that resolves with
+    // nothing, an unexpected string, a rejection the caller turns into `undefined` -- has to read as
+    // "not approved". Reaching the dialog at all means the verdict said a person must approve this.
+    assert.equal(approved(CHOICES.run), true);
+    for (const answer of [CHOICES.block, undefined, null, "", "run it", "Run", 0, false, {}]) {
+        assert.equal(approved(answer), false, `${String(answer)} must not read as consent`);
+    }
+});
+
+test("the guard gates on its own thresholds, not on another system's by name", () => {
+    // `thresholdsFor` falls back to gap for an unknown name, so asking under "gap" and asking under
+    // "guard" behaved identically -- which meant adding a guard entry to THRESHOLDS would have
+    // changed nothing at all, silently, on the one system whose action takes a tool call away.
+    assert.ok(THRESHOLDS.guard, "the guard needs an entry of its own for one to be readable");
+    assert.equal(GATE.scoreConfidence, THRESHOLDS.guard.scoreConfidence);
+    assert.equal(GATE.boundary, THRESHOLDS.guard.boundary);
 });
 
 test("the credential question is only asked when the target is protected", () => {

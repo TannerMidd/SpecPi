@@ -208,8 +208,11 @@ test("a retired package is unpinned even when package acquisition is skipped", a
     // its key or endpoint went away. --skip-package-install is the case the restore path misses.
     assert.deepEqual(retiredPackages, ["npm:specpi-jev-guard"]);
 
+    // Whatever shape the entry has, including one the user has given filters of their own. That is a
+    // deliberate exception to "a modified entry is yours", and the only one: preserving a modified
+    // entry preserves a fail-closed gate whose off switch this release deleted.
     for (const modified of [false, true]) {
-        await t.test(modified ? "a user's own entry is preserved and reported" : "SpecPi's own entry goes", (t) => {
+        await t.test(modified ? "a user-modified entry goes too" : "SpecPi's own entry goes", (t) => {
             const f = fixture(t);
             f.run("install", "--yes");
             const retired = "npm:specpi-jev-guard@0.1.0";
@@ -219,21 +222,37 @@ test("a retired package is unpinned even when package acquisition is skipped", a
             fs.writeFileSync(f.settings, JSON.stringify(settings));
 
             const doctor = f.invoke(["doctor"]);
-            assert.equal(doctor.status === 0, modified, doctor.stdout + doctor.stderr);
-            if (!modified) {
-                assert.match(doctor.stdout + doctor.stderr, /Retired base package still configured/);
-            }
+            assert.notEqual(doctor.status, 0, "doctor must report a retired package that is still loaded");
+            assert.match(doctor.stdout + doctor.stderr, /Retired base package still configured/);
 
             const update = f.run("update", "--yes", "--skip-package-install");
-            const after = JSON.parse(fs.readFileSync(f.settings));
-            assert.deepEqual(after.packages, modified ? [...basePackages, entry] : basePackages);
-            assert.match(
-                update.stdout + update.stderr,
-                modified ? /Preserved modified retired package setting/ : /Unpinned retired package/,
-            );
+            assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, basePackages);
+            assert.match(update.stdout + update.stderr, /Unpinned retired package/);
             f.run("doctor");
         });
     }
+});
+
+test("a retirement that cannot be completed is rolled back with the rest of the run", (t) => {
+    // The write happens outside the `--skip-package-install` guard, so the transaction's watched set
+    // has to cover it on that path too. It did not, which left this one write unbacked-up and
+    // un-rolled-back while every other file in the same run was both.
+    const f = fixture(t);
+    f.run("install", "--yes", "--skip-package-install");
+    fs.writeFileSync(f.settings, JSON.stringify({ theme: "user", packages: ["npm:specpi-jev-guard@0.1.0"] }));
+    const before = fs.readFileSync(f.settings, "utf8");
+
+    const failed = f.invoke(["update", "--yes", "--skip-package-install"], {
+        SPECPI_TESTING: "1",
+        SPECPI_TEST_FAIL_POINT: "after-first-managed-file",
+    });
+    assert.notEqual(failed.status, 0);
+    assert.equal(fs.readFileSync(f.settings, "utf8"), before, "the retirement must roll back with the run");
+
+    f.run("update", "--yes", "--skip-package-install");
+    const after = JSON.parse(fs.readFileSync(f.settings));
+    assert.deepEqual(after.packages, [], "the retired entry is gone");
+    assert.equal(after.theme, "user", "and nothing else in the file moved");
 });
 
 test("failed package acquisition restores configuration and managed files with explicit cache limitation", (t) => {

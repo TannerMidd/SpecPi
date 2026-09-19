@@ -14,6 +14,7 @@ import { SYSTEM_NAMES, defaultSettings } from "../extensions/jev-advisor/config.
 import {
     applyLayer,
     enableSystems,
+    guardWarning,
     layerScopeLine,
     layerToPersist,
     startupToPersist,
@@ -57,6 +58,33 @@ test("arming the guard is said out loud, because it is the one system that can r
     const quiet = applyLayer({ on: true }, { settings: partial }, deps());
     assert.equal(quiet.settings.systems.guard, false);
     assert.ok(!/refuse a tool call/.test(quiet.lines.join(" ")));
+});
+
+test("switching the layer off never touches the credential store", () => {
+    // `offLine` names no key, so resolving one before the branch meant every `/jev off` paid for a
+    // stat, read and parse of the one file this layer reads under a narrow, stated exception -- and
+    // then discarded the answer. A deps object that throws proves the call is not made at all.
+    const explode = {
+        keySources: () => {
+            throw new Error("the off path must not resolve a key");
+        },
+    };
+    const off = applyLayer({ on: false }, { settings: stored({ master: true, systems: allSystems(true) }) }, explode);
+    assert.equal(off.settings.master, false);
+    assert.equal(off.lines.length, 1);
+
+    // And the on path still does, because it reports the source it found.
+    assert.throws(() => applyLayer({ on: true }, { settings: stored() }, explode));
+});
+
+test("the guard warning is one sentence, shared by every path that arms the guard", () => {
+    // `/jev on`, `/jev enable guard` and `/jev startup on` all arm the same system. The rule is that
+    // arming it is said out loud; keeping the words in one exported function is what stopped that
+    // being a rule `/jev on` honoured alone while the other two armed it in silence.
+    const warning = guardWarning();
+    assert.match(warning, /refuse a tool call/);
+    assert.match(warning, /\/jev disable guard/);
+    assert.equal(applyLayer({ on: true }, { settings: stored() }, deps()).lines.includes(warning), true);
 });
 
 test("what is persisted keeps master and startup together and preserves unrelated settings", () => {
