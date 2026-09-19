@@ -1,6 +1,6 @@
 # SpecPi Chat changelog
 
-## Unreleased
+## 0.13.0
 
 - Say where the Jev layer's API key comes from. The panel held no credential and said nothing about where one is configured, so "there is no interface for the API key" was an accurate description of it &mdash; and a person whose key was sitting in Pi's own `auth.json` had no way to learn the layer was ignoring it. The panel now lists every source the layer consults, in order, and marks the one in force. It reports presence and never a value: the host checks whether each source holds a key and the webview receives booleans, so adding or changing one stays with `/login openrouter` in Pi. The environment variable is marked as the only source the command guard can read, because that difference decides whether switching the guard on leaves you able to run a shell command.
 - Replace the Jev layer's two switches with one. "Jev layer enabled (this session)" and "Enable the Jev layer on startup" were independent checkboxes for a pair the advisor only honours together, so ticking the first alone saved a file describing a layer that is on and never runs. The panel shows the effective state and writes both.
