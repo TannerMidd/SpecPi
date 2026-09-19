@@ -11,6 +11,7 @@ import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { summarize as summarizeLedger } from "../extensions/jev-advisor/ledger.mjs";
 import { runReferenceSolution } from "./eval-tasks.mjs";
 import { prepareFaults, readFaults, withFaultPath } from "./eval-faults.mjs";
 
@@ -713,6 +714,55 @@ function ensureSpecpiBase() {
     return { cached: false, agentDir };
 }
 
+/**
+ * Everything the SpecPi rows share: one cached install of the base, a fresh copy of it into this
+ * attempt's disposable home, and the permission package's explicit yoloMode opt-in. Unattended runs
+ * cannot answer approval dialogs and the installed permission system fails closed to ask, so the
+ * opt-in is scoped to the disposable home and disclosed in the report method rather than silently
+ * measured away.
+ *
+ * Factored out because specpi-default, specpi-jev and the three cache-probe arms are five bodies
+ * that have to agree on the install for their comparison to mean anything. Returns the agent
+ * directory, or a finished attempt result when the install itself failed.
+ */
+async function prepareSpecpiHome({ workspaceDir, homeDir }) {
+    const { runPiFixture } = await import("./pi-test-harness.mjs");
+    const base = ensureSpecpiBase();
+    if (!base.cached) {
+        // piCommand must be the installer itself: runPiFixture executes piCommand, and Pi has no
+        // install --yes flag. The installer locates Pi through SPECPI_PI instead.
+        const install = runPiFixture(path.join(root, "scripts", "specpi.mjs"), {
+            piCommand: path.join(root, "scripts", "specpi.mjs"),
+            cwd: workspaceDir,
+            agentDir: base.agentDir,
+            args: ["install", "--yes", "--skip-browser-install"],
+            env: { SPECPI_PI: piCli },
+            timeout: 300000,
+        });
+        if (install.status !== 0) {
+            specpiBaseCache = null;
+
+            return {
+                failure: {
+                    exitCode: 1,
+                    timedOut: false,
+                    durationMs: install.durationMs,
+                    stderrTail: install.stderr.slice(-2000),
+                },
+            };
+        }
+    }
+
+    const agentDir = path.join(homeDir, "agent");
+    fs.rmSync(agentDir, { recursive: true, force: true });
+    fs.cpSync(base.agentDir, agentDir, { recursive: true });
+    const permissionDir = path.join(agentDir, "extensions", "pi-permission-system");
+    fs.mkdirSync(permissionDir, { recursive: true });
+    fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
+
+    return { agentDir };
+}
+
 // Proxy harnesses (Pi family, DeepSeek Harness) reach the OpenCode Go
 // subscription through the logging proxy, and that endpoint only routes
 // requests carrying a live OpenCode session id. Minting one tiny session
@@ -807,6 +857,82 @@ async function mintOnce({ workspaceDir, model, timeoutMs = 120000 }) {
     };
 }
 
+// Read off the recorded t3-cascade-ledger runs: the prefix is past 20k tokens by request 6, so a
+// flip there has a large warm prefix to lose, and enough requests follow to watch it re-warm.
+export const PROBE_FLIP_TURN = 6;
+
+export const CACHE_PROBE_ARMS = Object.freeze({
+    "probe-control": {
+        label: "Cache probe: never armed",
+        detail: "SpecPi base with Browser QA withdrawn for the whole session",
+        prepare: () => {},
+    },
+    "probe-flip": {
+        label: `Cache probe: armed at turn ${PROBE_FLIP_TURN}`,
+        detail: "SpecPi base with a fixture extension that adds Browser QA's tools mid-session",
+        prepare: (agentDir) => {
+            // Pi auto-discovers <agent-dir>/extensions/<name>/index.ts. The fixture is copied in
+            // rather than written inline so what ran is a reviewable file in the repository.
+            const directory = path.join(agentDir, "extensions", "cache-probe");
+            fs.mkdirSync(directory, { recursive: true });
+            fs.copyFileSync(
+                path.join(root, "evals", "lib", "cache-probe", "flip.ts"),
+                path.join(directory, "index.ts"),
+            );
+        },
+    },
+    "probe-armed": {
+        label: "Cache probe: armed from turn 1",
+        detail: "SpecPi base with Browser QA's own startup preference switched on",
+        prepare: (agentDir) => {
+            // Browser QA's own documented preference file, which is what `/browser startup on`
+            // writes. Nothing here reaches around the package to force its tools active.
+            const directory = path.join(agentDir, "specpi", "browser-qa");
+            fs.mkdirSync(directory, { recursive: true });
+            fs.writeFileSync(
+                path.join(directory, "settings.json"),
+                `${JSON.stringify({ schema: 1, startupActivation: true })}\n`,
+            );
+        },
+    },
+});
+
+/**
+ * Read the advisor's own audit trail out of an attempt's disposable home. Without this the only
+ * evidence a system did anything is a cost delta it may not have caused, which for a layer whose
+ * whole claim is "it pays for itself" is not evidence at all.
+ *
+ * The file is parsed here rather than through ledger.mjs's own reader because that reader resolves
+ * its path from this process's PI_CODING_AGENT_DIR, which is the developer's directory, not the
+ * attempt's. The rollup is still the ledger's own function so the line shape lives in one place.
+ */
+function readAdvisorLedger(homeDir) {
+    try {
+        const file = path.join(homeDir, "agent", "specpi", "jev", "transmissions.jsonl");
+        if (!fs.existsSync(file)) {
+            return null;
+        }
+
+        const entries = fs
+            .readFileSync(file, "utf8")
+            .split("\n")
+            .filter(Boolean)
+            .map((line) => {
+                try {
+                    return JSON.parse(line);
+                } catch {
+                    return undefined;
+                }
+            })
+            .filter(Boolean);
+
+        return summarizeLedger(entries);
+    } catch {
+        // The ledger is evidence, not plumbing. Losing it must never fail the attempt.
+        return null;
+    }
+}
+
 export const harnessAdapters = {
     fake: {
         id: "fake",
@@ -857,42 +983,10 @@ export const harnessAdapters = {
             return { available: true, detail: "SpecPi base via installer into disposable home" };
         },
         run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) => {
-            const { runPiFixture } = await import("./pi-test-harness.mjs");
-            const base = ensureSpecpiBase();
-            if (!base.cached) {
-                // piCommand must be the installer itself: runPiFixture
-                // executes piCommand, and Pi has no install --yes flag.
-                // The installer locates Pi through SPECPI_PI instead.
-                const install = runPiFixture(path.join(root, "scripts", "specpi.mjs"), {
-                    piCommand: path.join(root, "scripts", "specpi.mjs"),
-                    cwd: workspaceDir,
-                    agentDir: base.agentDir,
-                    args: ["install", "--yes", "--skip-browser-install"],
-                    env: { SPECPI_PI: piCli },
-                    timeout: 300000,
-                });
-                if (install.status !== 0) {
-                    specpiBaseCache = null;
-
-                    return {
-                        exitCode: 1,
-                        timedOut: false,
-                        durationMs: install.durationMs,
-                        stderrTail: install.stderr.slice(-2000),
-                    };
-                }
+            const prepared = await prepareSpecpiHome({ workspaceDir, homeDir });
+            if (prepared.failure) {
+                return prepared.failure;
             }
-
-            fs.rmSync(path.join(homeDir, "agent"), { recursive: true, force: true });
-            fs.cpSync(base.agentDir, path.join(homeDir, "agent"), { recursive: true });
-            // Unattended runs cannot answer approval dialogs, and the
-            // installed permission system fails closed to ask. Yolo mode is
-            // the package's explicit full-permissive opt-in for exactly this
-            // case; it is scoped to the disposable home and disclosed in the
-            // report method so the gate is never silently measured away.
-            const permissionDir = path.join(homeDir, "agent", "extensions", "pi-permission-system");
-            fs.mkdirSync(permissionDir, { recursive: true });
-            fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
 
             return runPiRpc({ cli: piCli, task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults });
         },
@@ -921,36 +1015,12 @@ export const harnessAdapters = {
             return { available: true, detail: "SpecPi base with the Jev advisor enabled, priced through the proxy" };
         },
         run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) => {
-            const { runPiFixture } = await import("./pi-test-harness.mjs");
-            const base = ensureSpecpiBase();
-            if (!base.cached) {
-                const install = runPiFixture(path.join(root, "scripts", "specpi.mjs"), {
-                    piCommand: path.join(root, "scripts", "specpi.mjs"),
-                    cwd: workspaceDir,
-                    agentDir: base.agentDir,
-                    args: ["install", "--yes", "--skip-browser-install"],
-                    env: { SPECPI_PI: piCli },
-                    timeout: 300000,
-                });
-                if (install.status !== 0) {
-                    specpiBaseCache = null;
-
-                    return {
-                        exitCode: 1,
-                        timedOut: false,
-                        durationMs: install.durationMs,
-                        stderrTail: install.stderr.slice(-2000),
-                    };
-                }
+            const prepared = await prepareSpecpiHome({ workspaceDir, homeDir });
+            if (prepared.failure) {
+                return prepared.failure;
             }
 
-            const agentDir = path.join(homeDir, "agent");
-            fs.rmSync(agentDir, { recursive: true, force: true });
-            fs.cpSync(base.agentDir, agentDir, { recursive: true });
-            const permissionDir = path.join(agentDir, "extensions", "pi-permission-system");
-            fs.mkdirSync(permissionDir, { recursive: true });
-            fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
-
+            const agentDir = prepared.agentDir;
             // The advisor asks a human before its first transmission and refuses without a UI, so
             // an unattended run would otherwise send nothing and measure the same thing twice. The
             // grant is written explicitly into the disposable home and disclosed in the report
@@ -961,11 +1031,42 @@ export const harnessAdapters = {
                 path.join(jevDir, "settings.json"),
                 JSON.stringify(
                     {
-                        schema: 1,
+                        // Must track extensions/jev-advisor/config.mjs. The advisor reads any other
+                        // schema as all-off, so a stale marker here would silently measure plain
+                        // SpecPi in the specpi-jev row and report it as the layer.
+                        schema: 2,
                         master: true,
                         startup: true,
-                        systems: { retention: true, compaction: true, gap: true, sources: false },
-                        callBudgetPerSession: 16,
+                        systems: {
+                            retention: true,
+                            compaction: true,
+                            gap: true,
+                            sources: false,
+                            progress: true,
+                            untrusted: true,
+                            // Off deliberately, not by omission. Turn-zero capability arming needs
+                            // an interactive human to confirm and refuses without one, exactly as
+                            // request_capability does, so a headless run would spend nothing and
+                            // measure nothing. Leaving it on would publish a row implying it had
+                            // been exercised.
+                            capability: false,
+                        },
+                        budgets: {
+                            total: 30,
+                            retention: 12,
+                            compaction: 3,
+                            gap: 6,
+                            sources: 4,
+                            progress: 12,
+                            untrusted: 8,
+                        },
+                        // Ships on "notify" for users, because the calibration corpus does not yet
+                        // support steering a model on a mid-session verdict. The eval runs headless,
+                        // where a notification reaches nobody, so measuring the notify path would
+                        // measure the cost of the system and none of its effect. Set to "message"
+                        // here and disclosed in the report method, exactly as yoloMode is: this run
+                        // is how the default earns the right to change.
+                        progressNudge: "message",
                     },
                     null,
                     4,
@@ -990,7 +1091,7 @@ export const harnessAdapters = {
                 ),
             );
 
-            return runPiRpc({
+            const outcome = await runPiRpc({
                 cli: piCli,
                 task,
                 workspaceDir,
@@ -1008,8 +1109,67 @@ export const harnessAdapters = {
                     TYPESAFE_BASE_URL: proxyUrl.replace(/\/v1$/u, ""),
                 },
             });
+
+            // Read before the runner deletes the home. The proxy already counts the calls; this is
+            // the half the proxy cannot see, because whether an answer was taken happens inside
+            // the session.
+            return { ...outcome, advisorLedger: readAdvisorLedger(homeDir) };
         },
     },
+    // Phase 7 cache probe. Three arms that differ in exactly one thing: when Browser QA's fourteen
+    // tools reach the request. Never (control), at one fixed mid-session turn (flip), or from the
+    // first request (armed). Everything else -- install, model, prices, task, permission posture --
+    // is the shared SpecPi base, because the whole point is to price one mechanism rather than to
+    // rank three configurations.
+    //
+    // What each pair says:
+    //   control vs armed  the standing cost of carrying a schema the session never uses
+    //   control vs flip   what a mid-session activation actually costs, which is the number the
+    //                     "no mid-session tool-set change" rule has always been asserted from
+    //   flip vs armed     whether paying up front is cheaper than paying when the need appears
+    //
+    // Browser QA is the right subject and not an arbitrary one: it is the largest schema SpecPi
+    // installs (about 8.7 KB), it is withdrawn by default, and it is the capability
+    // `request_capability` exists to ask for.
+    ...Object.fromEntries(
+        Object.entries(CACHE_PROBE_ARMS).map(([id, arm]) => [
+            id,
+            {
+                id,
+                label: arm.label,
+                needsProxySession: true,
+                isAvailable: () => {
+                    if (!fs.existsSync(piCli)) {
+                        return { available: false, detail: `missing pinned Pi CLI at ${piCli}` };
+                    }
+
+                    return { available: true, detail: arm.detail };
+                },
+                run: async ({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) => {
+                    const prepared = await prepareSpecpiHome({ workspaceDir, homeDir });
+                    if (prepared.failure) {
+                        return prepared.failure;
+                    }
+
+                    arm.prepare(prepared.agentDir);
+
+                    return runPiRpc({
+                        cli: piCli,
+                        task,
+                        workspaceDir,
+                        homeDir,
+                        proxyUrl,
+                        model,
+                        timeoutMs,
+                        faults,
+                        // The fixture and the analysis have to agree on which turn flipped, so the
+                        // number is passed rather than written down twice.
+                        extraEnv: { SPECPI_PROBE_FLIP_TURN: String(PROBE_FLIP_TURN) },
+                    });
+                },
+            },
+        ]),
+    ),
     omp: {
         id: "omp",
         label: "Oh My Pi",

@@ -884,7 +884,7 @@ export default function workflowControls(pi: ExtensionAPI) {
     pi.registerTool({
         name: "request_capability",
         label: "Request Capability",
-        description: `Ask the user to restore a withdrawn SpecPi tool group for this session. Available groups — ${describeCapabilities()}. Their tools are hidden to keep each request small, so request a group only when the current task actually needs it, and continue without it if the user declines. The restored tools are usable from your next message and stay available until the session ends. Delegation is not requestable here; ask the user to run /delegate on.`,
+        description: `Ask the user to restore a withdrawn SpecPi tool group for this session. Available groups — ${describeCapabilities()}. Their tools are hidden to keep each request small, and restoring one mid-session also discards the provider's cached prompt prefix, which measured about 20% of a mid-length attempt's cost in this project's own testing — so request a group only when the current task actually needs it, and continue without it if the user declines. The restored tools are usable from your next message and stay available until the session ends. Delegation is not requestable here; ask the user to run /delegate on.`,
         parameters: Type.Object(
             {
                 capability: StringEnum(CAPABILITY_NAMES, {
@@ -959,7 +959,7 @@ export default function workflowControls(pi: ExtensionAPI) {
                 standing ||
                 (await ctx.ui.confirm(
                     `Allow ${capability.label} for this session?`,
-                    `The agent asked to ${capability.summary}. Reason given: ${safeMessage(params.reason)}\n\nThis offers ${pending.length} tool${pending.length === 1 ? "" : "s"} for the rest of this session and adds ${capability.schemaCost}. Withdraw them again with ${capability.command} off.`,
+                    `The agent asked to ${capability.summary}. Reason given: ${safeMessage(params.reason)}\n\nThis offers ${pending.length} tool${pending.length === 1 ? "" : "s"} for the rest of this session, adds ${capability.schemaCost}, ${capability.activationCost}. Withdraw them again with ${capability.command} off.`,
                 ));
             if (!accepted) {
                 return {
