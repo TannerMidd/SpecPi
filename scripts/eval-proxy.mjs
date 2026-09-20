@@ -128,6 +128,30 @@ export function modelRequests(requests) {
     return (requests ?? []).filter((record) => record.kind !== "advisor");
 }
 
+/**
+ * Conversation turns in a recorded attempt, correct for reports written before the count was.
+ *
+ * `modelRequests` was written as the length of the whole proxy log, advisor posts included, so runs
+ * archived under that code report a specpi-jev attempt as taking two to three times the turns it
+ * took. `series` and `tokens.withUsage` were always built from the filtered set, so the right number
+ * is already in those files beside the wrong one and nothing has to be re-run to recover it.
+ *
+ * Preferring `series` over arithmetic on `advisor.calls` is deliberate: series is what the filter
+ * actually produced, while the subtraction reconstructs it and would silently drift if a future
+ * request kind were neither model nor advisor.
+ */
+export function attemptTurns(attempt) {
+    if (Array.isArray(attempt?.series)) {
+        return attempt.series.length;
+    }
+
+    if (Number.isInteger(attempt?.tokens?.withUsage)) {
+        return attempt.tokens.withUsage;
+    }
+
+    return Math.max(0, (attempt?.modelRequests ?? 0) - (attempt?.advisor?.calls ?? 0));
+}
+
 export function conversationSummary(requests) {
     const model = modelRequests(requests);
     const conversation = model.find((record) => (record.summary?.toolCount ?? 0) > 0) ?? model[0];
@@ -427,37 +451,53 @@ function repeatedCalls(messages, inputItems) {
     return repeats;
 }
 
+/**
+ * One request's tool-result tally, computed while the body is still in hand.
+ *
+ * Called as each request arrives so the body can be released immediately. Retaining every body for a
+ * scan that runs once at the end cost the runner its whole heap: a 24k context window multiplies
+ * turns, Oh My Pi sends the largest prompts in the suite, and the marathon attempt died at 4 GB with
+ * `Reached heap limit` after six minutes. Memory was O(turns x prompt size) for data that reduces to
+ * this object -- a few counters and a small signature map -- and the reduction is not lossy, because
+ * the end-of-run summary only ever kept the single record with the most results.
+ */
+export function toolOutcomeOf(body) {
+    const messages = Array.isArray(body?.messages) ? body.messages : [];
+    const inputItems = Array.isArray(body?.input) ? body.input : [];
+    const current = {
+        results: 0,
+        errors: 0,
+        signatures: {},
+        byTool: {},
+        repeatedCalls: repeatedCalls(messages, inputItems),
+    };
+    const names = toolNamesById(messages, inputItems);
+    for (const message of messages) {
+        if (message?.role !== "tool") {
+            continue;
+        }
+
+        current.results += 1;
+        classifyToolResult(toolMessageText(message), current, names.get(message?.tool_call_id) ?? "");
+    }
+
+    for (const item of inputItems) {
+        if (item?.type !== "function_call_output") {
+            continue;
+        }
+
+        current.results += 1;
+        classifyToolResult(functionCallOutputText(item), current, names.get(item?.call_id) ?? "");
+    }
+
+    return current;
+}
+
 export function summarizeToolResults(requests) {
     let best = { results: 0, errors: 0, signatures: {}, byTool: {}, repeatedCalls: 0 };
     for (const record of modelRequests(requests)) {
-        const messages = Array.isArray(record?.body?.messages) ? record.body.messages : [];
-        const inputItems = Array.isArray(record?.body?.input) ? record.body.input : [];
-        const current = {
-            results: 0,
-            errors: 0,
-            signatures: {},
-            byTool: {},
-            repeatedCalls: repeatedCalls(messages, inputItems),
-        };
-        const names = toolNamesById(messages, inputItems);
-        for (const message of messages) {
-            if (message?.role !== "tool") {
-                continue;
-            }
-
-            current.results += 1;
-            classifyToolResult(toolMessageText(message), current, names.get(message?.tool_call_id) ?? "");
-        }
-
-        for (const item of inputItems) {
-            if (item?.type !== "function_call_output") {
-                continue;
-            }
-
-            current.results += 1;
-            classifyToolResult(functionCallOutputText(item), current, names.get(item?.call_id) ?? "");
-        }
-
+        // Precomputed at arrival; `body` is long gone by now and must not be reached for here.
+        const current = record?.toolOutcome ?? toolOutcomeOf(record?.body);
         if (current.results > best.results) {
             best = current;
         }
@@ -508,8 +548,8 @@ export function startProxy({
                 at: new Date().toISOString(),
                 model: body.model ?? "unknown",
                 summary,
-                // Kept for the tool-outcome scan; never written to report.json.
-                body,
+                // The scan this used to keep `body` for, run now and kept instead of the body.
+                toolOutcome: toolOutcomeOf(body),
                 usage: null,
                 toolCalls: [],
                 forwarded: Boolean(forwardUrl),

@@ -61,7 +61,7 @@ export function loadTask(id) {
         throw new Error(`Task ${id} has a mismatched manifest id: ${manifest.id}`);
     }
 
-    if (![1, 2, 3, 4, 5].includes(manifest.tier)) {
+    if (![1, 2, 3, 4, 5, 6].includes(manifest.tier)) {
         throw new Error(`Task ${id} has an unsupported tier: ${manifest.tier}`);
     }
 
@@ -118,6 +118,13 @@ export function loadTask(id) {
                       demonstratedBy: String(manifest.effort.demonstratedBy ?? "unrecorded"),
                   }
                 : null,
+        // The window the harness tells its model it has, which is not a property of the model here
+        // -- the proxy serves whatever it is asked for. Declaring a small one is the only reliable
+        // way to make a session compact: growing the corpus does not work, because an agent with a
+        // shell chunks or scripts instead of loading it, and across three versions of tier 6 not one
+        // attempt in any harness ever compacted. The default matches what every tier below 6 has
+        // always run, so nothing published moves.
+        contextWindow: Number.isSafeInteger(manifest.contextWindow) ? manifest.contextWindow : 200000,
         timeoutMs: Number.isSafeInteger(manifest.timeoutMs) ? manifest.timeoutMs : 120000,
         turnCap: Number.isSafeInteger(manifest.turnCap) ? manifest.turnCap : 50,
         prompt,

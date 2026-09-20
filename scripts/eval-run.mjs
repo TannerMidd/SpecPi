@@ -15,7 +15,14 @@ import { createHash } from "node:crypto";
 import { compositeScore, effortBreakdown } from "./eval-effort.mjs";
 import { listTasks, prepareWorkspace, runChecker, scopeReport, workspaceFingerprint } from "./eval-tasks.mjs";
 import { loadPrices, priceAttempt } from "./eval-prices.mjs";
-import { advisorTotals, conversationSummary, proxyTotals, startProxy, summarizeToolResults } from "./eval-proxy.mjs";
+import {
+    advisorTotals,
+    conversationSummary,
+    modelRequests,
+    proxyTotals,
+    startProxy,
+    summarizeToolResults,
+} from "./eval-proxy.mjs";
 import { isolatedHome, mintOpenCodeSession, resolveHarnesses } from "./eval-harnesses.mjs";
 import { loadEnvFile } from "./eval-env.mjs";
 import { prepareFaults, readFaults } from "./eval-faults.mjs";
@@ -76,7 +83,7 @@ function usage() {
     return [
         "Usage: node scripts/eval-run.mjs [options]",
         "  --harness=fake,failing-fake   harnesses to run (default: fake,failing-fake)",
-        "  --tier=1|2|3|4|5              limit to one tier",
+        "  --tier=1|2|3|4|5|6            limit to one tier",
         "  --task=<id>                   repeatable task filter",
         "  --attempts=N                  attempts per harness/task (1-10, default 1)",
         "  --model=<id>                  model id sent to the proxy (default fake-model)",
@@ -127,7 +134,10 @@ function writeTranscript(directory, { harness, task, proxy, attempt }) {
                     task,
                     pass: attempt.pass,
                     notes: attempt.notes,
-                    requests: (proxy.requests ?? []).map((request, index) => ({
+                    // Conversation turns only, for the same reason the count above filters:
+                    // interleaving advisor posts into a numbered transcript makes the session look
+                    // like it took turns it never took. Advisor spend is reported in `advisor`.
+                    requests: modelRequests(proxy.requests ?? []).map((request, index) => ({
                         index,
                         toolCalls: request.toolCalls ?? null,
                         promptTokens: request.usage?.prompt_tokens ?? null,
@@ -232,7 +242,13 @@ async function runAttempt({ harness, task, model, timeoutMs, transcriptDir }) {
         harnessError,
         durationMs: harnessResult.durationMs,
         wallMs: Date.now() - startedAt,
-        modelRequests: native?.steps ?? proxy.requests.length,
+        // Filtered, not the raw log. The advisor posts through the same proxy so that its spend
+        // lands in the same accounting, and counting those posts as conversation turns reported the
+        // specpi-jev row as taking two to three times as many turns as plain SpecPi for identical
+        // work -- an artefact that reads as a damning efficiency result. eval-proxy exports this
+        // filter for exactly this reason and every other consumer already used it; `series` and
+        // `tokens.withUsage` were right while the count beside them was wrong.
+        modelRequests: native?.steps ?? modelRequests(proxy.requests).length,
         firstCall: firstSummary,
         tokens: native
             ? {

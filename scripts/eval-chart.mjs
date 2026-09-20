@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { attemptTurns } from "./eval-proxy.mjs";
 import { attemptModelCost, attemptToolCounts, formatCost, mean, summarizeAttempts } from "./eval-report.mjs";
 import { repriceReport } from "./eval-prices.mjs";
 import { renderSummary } from "./eval-summarize.mjs";
@@ -83,7 +84,7 @@ export function aggregateSeries(entry) {
         return {
             ...summary,
             totalCost: attempts.reduce((total, attempt) => total + attemptModelCost(attempt), 0),
-            meanSteps: mean(attempts.map((attempt) => attempt.modelRequests ?? 0)),
+            meanSteps: mean(attempts.map((attempt) => attemptTurns(attempt))),
             meanFirstTokens: mean(contexts.map((context) => context.tokens)),
             contextEstimated: estimated,
             tools: mergeToolCounts(attempts),

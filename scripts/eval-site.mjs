@@ -14,6 +14,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { attemptMintCost, attemptModelCost, attemptScore, attemptToolCounts, usageSummary } from "./eval-report.mjs";
+import { attemptTurns } from "./eval-proxy.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pageDir = path.join(root, "site", "evaluations");
@@ -70,7 +71,7 @@ function attemptSpend(attempt) {
 // plumbing. Parallel runs made this real: contention on OpenCode's shared
 // session store produced attempts with zero requests that then read as
 // losses. These are counted and reported separately, never averaged in.
-function isLaunchFailure(attempt) {
+export function isLaunchFailure(attempt) {
     return Boolean(attempt?.harnessError) && (attempt?.modelRequests ?? 0) === 0;
 }
 
@@ -139,7 +140,7 @@ export function collect(files) {
                 outputTokens: usage.meanOutputTokens,
                 cacheHitRate: usage.cacheHitRate,
                 toolCalls: usage.meanToolCalls,
-                requests: mean(plain.map((attempt) => attempt.modelRequests ?? 0)),
+                requests: mean(plain.map((attempt) => attemptTurns(attempt))),
                 seconds: mean(plain.map((attempt) => (attempt.durationMs ?? 0) / 1000)),
             };
         }
@@ -181,7 +182,7 @@ export function collect(files) {
                 toolCalls: measured.length === counts.length ? usage.meanToolCalls : null,
                 toolsOffered:
                     measured.length === 0 ? null : mean(measured.map((count) => sum(Object.values(count.offers)))),
-                requests: mean(all.map((attempt) => attempt.modelRequests ?? 0)),
+                requests: mean(all.map((attempt) => attemptTurns(attempt))),
                 seconds: mean(all.map((attempt) => (attempt.durationMs ?? 0) / 1000)),
                 cleanScope: scopeChecked.filter((attempt) => attempt.scope.clean).length,
                 scopeChecked: scopeChecked.length,
@@ -236,7 +237,7 @@ const LEFT = 150;
 const PLOT = 440;
 const VALUE_GAP = 8;
 
-function esc(text) {
+export function esc(text) {
     return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
@@ -247,7 +248,7 @@ function niceMax(value, step) {
 // One horizontal bar renderer for every figure. A group is a labelled band of
 // bars sharing the chart's scale; a bar may be split into segments so a stacked
 // breakdown uses the same axis and the same spacing as a plain one.
-function hbars({ id, title, axisLabel, groups, max, gridStep, tick, barHeight = 17, gap = 5, groupGap = 14 }) {
+export function hbars({ id, title, axisLabel, groups, max, gridStep, tick, barHeight = 17, gap = 5, groupGap = 14 }) {
     const parts = [];
     const legendY = 6;
     const axisY = legendY + 28;
@@ -318,7 +319,7 @@ function hbars({ id, title, axisLabel, groups, max, gridStep, tick, barHeight = 
     return `<svg class="chart" id="${id}" viewBox="0 0 ${WIDTH} ${height}" role="img" preserveAspectRatio="xMidYMid meet" aria-label="${esc(title)}">${parts.join("")}</svg>`;
 }
 
-const thousands = (value) => value.toLocaleString("en-US", { maximumFractionDigits: 0 });
+export const thousands = (value) => value.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
 export function renderCharts(data) {
     const charts = {};
@@ -464,7 +465,7 @@ export function renderCharts(data) {
 
 /* ---------- tables ---------- */
 
-function table(head, rows, className = "numeric") {
+export function table(head, rows, className = "numeric") {
     const header = head.map((cell) => `<th>${esc(cell)}</th>`).join("");
     const body = rows
         .map(

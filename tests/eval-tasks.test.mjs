@@ -20,7 +20,7 @@ test("eval tasks load with a valid tier, category, prompt and checker", () => {
     assert.deepEqual([...ids].sort(), ids);
     for (const task of listTasks()) {
         assert.match(task.id, /^[a-z0-9-]+$/u);
-        assert.ok([1, 2, 3, 4, 5].includes(task.tier));
+        assert.ok([1, 2, 3, 4, 5, 6].includes(task.tier));
         assert.ok(["terminal", "repair", "scoped", "multi"].includes(task.category));
         assert.ok(task.prompt.length > 0);
         assert.ok(fs.existsSync(task.checkFile));
@@ -32,6 +32,7 @@ test("eval tasks load with a valid tier, category, prompt and checker", () => {
     assert.equal(listTasks({ tier: 3 }).length, 1);
     assert.equal(listTasks({ tier: 4 }).length, 5);
     assert.equal(listTasks({ tier: 5 }).length, 6);
+    assert.equal(listTasks({ tier: 6 }).length, 2);
 
     // Tiers 1 and 2 are the cost ladder: small, cheap, and the contrast that
     // makes fixed harness overhead visible. They are deliberately easy.

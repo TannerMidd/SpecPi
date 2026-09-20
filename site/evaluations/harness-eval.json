@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-19",
+  "generatedAt": "2026-09-20",
   "model": "deepseek-v4.1-flash",
   "specpiVersion": "0.26.0",
   "piVersion": "0.84.4",
@@ -364,7 +364,7 @@
           "outputTokens": 15470,
           "cacheHitRate": 0.9450432580349063,
           "toolCalls": 23.5,
-          "requests": 24,
+          "requests": 20,
           "seconds": 118.2775
         },
         "4": {
@@ -379,7 +379,7 @@
           "outputTokens": 16555.6,
           "cacheHitRate": 0.9633441936148172,
           "toolCalls": 33.8,
-          "requests": 29.4,
+          "requests": 26,
           "seconds": 136.22379999999998
         },
         "5": {
@@ -394,7 +394,7 @@
           "outputTokens": 6757.5,
           "cacheHitRate": 0.9019224978785916,
           "toolCalls": 12.666666666666666,
-          "requests": 13,
+          "requests": 11.166666666666666,
           "seconds": 56.01266666666666
         }
       },
@@ -411,7 +411,7 @@
         "cacheHitRate": 0.9361358027437815,
         "toolCalls": 9.972972972972974,
         "toolsOffered": 72.21621621621621,
-        "requests": 10,
+        "requests": 9.027027027027026,
         "seconds": 46.58662162162162,
         "cleanScope": 37,
         "scopeChecked": 37,

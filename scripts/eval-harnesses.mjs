@@ -11,7 +11,7 @@ import path from "node:path";
 import process from "node:process";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_BUDGETS } from "../extensions/jev-advisor/config.mjs";
+import { DEFAULT_BUDGETS, defaultSettings, normalizeSettings } from "../extensions/jev-advisor/config.mjs";
 import { summarize as summarizeLedger } from "../extensions/jev-advisor/ledger.mjs";
 import { runReferenceSolution } from "./eval-tasks.mjs";
 import { prepareFaults, readFaults, withFaultPath } from "./eval-faults.mjs";
@@ -43,7 +43,17 @@ function allowlistedEnv(homeDir, extra = {}) {
     return { ...env, ...extra };
 }
 
-function providerConfig(proxyUrl, model) {
+/**
+ * The window a task asked for, or null when it takes the suite default.
+ *
+ * Null means "write no window setting at all", which is what keeps tiers 1 to 5 producing the exact
+ * config files their published runs used. Only tier 6 declares anything else.
+ */
+function declaredWindow(task) {
+    return task?.contextWindow === 200000 ? null : (task?.contextWindow ?? null);
+}
+
+function providerConfig(proxyUrl, model, contextWindow) {
     return JSON.stringify({
         providers: {
             eval: {
@@ -56,7 +66,7 @@ function providerConfig(proxyUrl, model) {
                         name: "Eval model",
                         reasoning: false,
                         input: ["text"],
-                        contextWindow: 200000,
+                        contextWindow,
                         maxTokens: 8192,
                         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
                     },
@@ -71,7 +81,7 @@ function providerConfig(proxyUrl, model) {
 // Pi family: its tool schema and offered-tool counts become visible, and its
 // token accounting arrives in the same shape as everyone else's instead of
 // being self-reported with cache read out separately.
-function openCodeProxyConfig(proxyUrl, model) {
+function openCodeProxyConfig(proxyUrl, model, contextWindow = null) {
     return JSON.stringify(
         {
             $schema: "https://opencode.ai/config.json",
@@ -80,7 +90,16 @@ function openCodeProxyConfig(proxyUrl, model) {
                     npm: "@ai-sdk/openai-compatible",
                     name: "Eval proxy",
                     options: { baseURL: proxyUrl, apiKey: "synthetic-only" },
-                    models: { [model]: { name: "Eval model" } },
+                    // `limit` is added only for a task that asks for a non-default window, for the
+                    // same reason Codex's is: the published OpenCode rows ran without one, and
+                    // writing this suite's default into it would be a behaviour change disguised as
+                    // a no-op.
+                    models: {
+                        [model]: {
+                            name: "Eval model",
+                            ...(contextWindow === null ? {} : { limit: { context: contextWindow, output: 8192 } }),
+                        },
+                    },
                 },
             },
         },
@@ -111,7 +130,7 @@ function waitForExit(child, timeoutMs) {
 // registered the same way scripts/measure-context.mjs does it, and local
 // rules and extensions are switched off so the bar measured is the harness
 // as published rather than this machine's configuration.
-function ohMyPiExtension(proxyUrl, model) {
+function ohMyPiExtension(proxyUrl, model, contextWindow) {
     const spec = {
         baseUrl: proxyUrl,
         api: "openai-completions",
@@ -122,7 +141,7 @@ function ohMyPiExtension(proxyUrl, model) {
                 name: "Eval model",
                 reasoning: false,
                 input: ["text"],
-                contextWindow: 200000,
+                contextWindow,
                 maxTokens: 8192,
                 cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
             },
@@ -162,7 +181,7 @@ async function runPiRpc({
     if (typeof buildArgs === "function") {
         args = await buildArgs({ cli, agentDir, homeDir, proxyUrl, model });
     } else {
-        fs.writeFileSync(path.join(agentDir, "models.json"), providerConfig(proxyUrl, model));
+        fs.writeFileSync(path.join(agentDir, "models.json"), providerConfig(proxyUrl, model, task.contextWindow));
         const settingsFile = path.join(agentDir, "settings.json");
         const settings = fs.existsSync(settingsFile) ? JSON.parse(fs.readFileSync(settingsFile, "utf8")) : {};
         fs.writeFileSync(settingsFile, JSON.stringify({ ...settings, defaultProvider: "eval", defaultModel: model }));
@@ -303,11 +322,17 @@ export function resolveCodexModel(model) {
 // credential is written into the disposable home. `wire_api = "responses"`
 // is the only protocol this Codex version speaks to a custom provider, which
 // is why the eval proxy accepts the responses path.
-export function codexConfig({ baseUrl, model, provider = "eval" }) {
+export function codexConfig({ baseUrl, model, provider = "eval", contextWindow = null }) {
     return [
         `model = ${JSON.stringify(model)}`,
         `model_provider = ${JSON.stringify(provider)}`,
         'approval_policy = "never"',
+        // Emitted only when a task asks for a window other than the default, so every tier below 6
+        // writes the same config.toml it always has. Declaring 200000 explicitly here would be a
+        // silent change to the published Codex rows -- Codex has its own idea of the window for a
+        // model, and overriding it with a number that merely matches this suite's default would
+        // change behaviour while looking like a no-op.
+        ...(contextWindow === null ? [] : [`model_context_window = ${contextWindow}`]),
         "",
         `[model_providers.${provider}]`,
         'name = "Eval proxy"',
@@ -349,7 +374,7 @@ async function runCodex({ task, workspaceDir, homeDir, proxyUrl, model, timeoutM
     fs.mkdirSync(codexHome, { recursive: true });
     fs.writeFileSync(
         path.join(codexHome, "config.toml"),
-        codexConfig({ baseUrl: proxyUrl, model: resolveCodexModel(model) }),
+        codexConfig({ baseUrl: proxyUrl, model: resolveCodexModel(model), contextWindow: declaredWindow(task) }),
     );
     // Codex's own sandbox denies every command on Windows, so the run uses
     // its full-access mode inside the attempt's disposable workspace: an
@@ -529,7 +554,7 @@ async function runOpenCode({ task, workspaceDir, homeDir, proxyUrl, model, timeo
         const configDir = homeDir ?? workspaceDir;
         fs.mkdirSync(configDir, { recursive: true });
         const configFile = path.join(configDir, "opencode.json");
-        fs.writeFileSync(configFile, openCodeProxyConfig(proxyUrl, model));
+        fs.writeFileSync(configFile, openCodeProxyConfig(proxyUrl, model, declaredWindow(task)));
         childEnv.OPENCODE_CONFIG = configFile;
     }
 
@@ -637,7 +662,7 @@ async function runOpenCode({ task, workspaceDir, homeDir, proxyUrl, model, timeo
 // scripts/measure-context.mjs. Its auxiliary session-title request carries
 // no tool schema, so reporting selects the conversation request (see
 // conversationSummary in eval-proxy.mjs).
-function dshPatch(proxyUrl, model) {
+function dshPatch(proxyUrl, model, contextWindow) {
     return [
         "- id: llm-pi-ai",
         "  config:",
@@ -650,7 +675,7 @@ function dshPatch(proxyUrl, model) {
         "        models:",
         `          - id: ${model}`,
         "            name: Eval model",
-        "            contextWindow: 200000",
+        `            contextWindow: ${contextWindow}`,
         "- id: agent-default-model",
         "  config:",
         "    provider: eval",
@@ -668,7 +693,7 @@ async function runDeepSeek({ task, workspaceDir, homeDir, proxyUrl, model, timeo
 
     const dshHome = path.join(homeDir, "dsh-home");
     fs.mkdirSync(dshHome, { recursive: true });
-    fs.writeFileSync(path.join(dshHome, "cordis.patch.yml"), dshPatch(proxyUrl, model));
+    fs.writeFileSync(path.join(dshHome, "cordis.patch.yml"), dshPatch(proxyUrl, model, task.contextWindow));
     // Ambient environment plus the harness home redirect: DSH reads its own
     // state under DSH_HOME and its key from the named variable, which the
     // runner sets to a proxy placeholder it never inspects.
@@ -762,6 +787,78 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
     fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
 
     return { agentDir };
+}
+
+/**
+ * Systems the specpi-jev row measures, and the one it deliberately does not.
+ *
+ * `capability` is off on purpose rather than by omission: turn-zero capability arming needs an
+ * interactive human to confirm and refuses without one, exactly as `request_capability` does, so a
+ * headless run that enabled it would spend nothing, do nothing, and still publish a row implying it
+ * had been exercised.
+ *
+ * `guard` is on, and its absence here was a real defect rather than a choice. The permission system
+ * runs yoloMode in these homes, which leaves the guard as the only component that can refuse a call
+ * -- the arrangement it exists for -- and every published tier ran with it off.
+ */
+const JEV_EVAL_SYSTEMS = Object.freeze({
+    retention: true,
+    compaction: true,
+    gap: true,
+    sources: false,
+    progress: true,
+    untrusted: true,
+    capability: false,
+    guard: true,
+});
+
+/**
+ * The advisor settings for a disposable eval home, built from the advisor's own current default and
+ * checked against what the advisor will actually read back.
+ *
+ * Composed rather than written as a literal, and then verified. A literal is how this file came to
+ * run every published tier with the command guard off: it carried `schema: 2` under a comment
+ * saying it had to track config.mjs, config.mjs moved to schema 3, and the 2-to-3 migration reads
+ * the guard preference from a `guard.startup` key that this shape has never had. Nothing compared
+ * the result to the ask, so the row kept reporting a layer with one of its eight systems disabled.
+ *
+ * The throw is the point. A settings file that silently resolves to less than it asked for measures
+ * plain SpecPi in the specpi-jev row, and a run that does that should stop rather than publish.
+ */
+function jevSettings() {
+    const settings = {
+        ...defaultSettings(),
+        master: true,
+        startup: true,
+        systems: { ...JEV_EVAL_SYSTEMS },
+        // The shipped defaults, imported rather than copied. This row is meant to measure the
+        // configuration a user actually gets, so a budget invented for the eval would measure
+        // something nobody runs -- and a copy that drifted would do the same thing while still
+        // looking correct.
+        budgets: { ...DEFAULT_BUDGETS },
+        // Ships on "notify" for users, because the calibration corpus does not yet support steering
+        // a model on a mid-session verdict. The eval runs headless, where a notification reaches
+        // nobody, so measuring the notify path would measure the cost of the system and none of its
+        // effect. Set to "message" here and disclosed in the report method, exactly as yoloMode is:
+        // this run is how the default earns the right to change.
+        progressNudge: "message",
+    };
+
+    const resolved = normalizeSettings(settings);
+    if (!resolved.master) {
+        throw new Error("jev settings resolved with the master switch off");
+    }
+
+    for (const [name, wanted] of Object.entries(JEV_EVAL_SYSTEMS)) {
+        if (resolved.systems[name] !== wanted) {
+            throw new Error(
+                `jev settings asked for ${name}=${wanted} but the advisor reads it as ` +
+                    `${resolved.systems[name]} -- schema drift in extensions/jev-advisor/config.mjs`,
+            );
+        }
+    }
+
+    return resolved;
 }
 
 // Proxy harnesses (Pi family, DeepSeek Harness) reach the OpenCode Go
@@ -1028,47 +1125,7 @@ export const harnessAdapters = {
             // method, exactly as yoloMode is, so the gate is never silently measured away.
             const jevDir = path.join(agentDir, "specpi", "jev");
             fs.mkdirSync(jevDir, { recursive: true });
-            fs.writeFileSync(
-                path.join(jevDir, "settings.json"),
-                JSON.stringify(
-                    {
-                        // Must track extensions/jev-advisor/config.mjs. The advisor reads any other
-                        // schema as all-off, so a stale marker here would silently measure plain
-                        // SpecPi in the specpi-jev row and report it as the layer.
-                        schema: 2,
-                        master: true,
-                        startup: true,
-                        systems: {
-                            retention: true,
-                            compaction: true,
-                            gap: true,
-                            sources: false,
-                            progress: true,
-                            untrusted: true,
-                            // Off deliberately, not by omission. Turn-zero capability arming needs
-                            // an interactive human to confirm and refuses without one, exactly as
-                            // request_capability does, so a headless run would spend nothing and
-                            // measure nothing. Leaving it on would publish a row implying it had
-                            // been exercised.
-                            capability: false,
-                        },
-                        // The shipped defaults, imported rather than copied. This row is meant to
-                        // measure the configuration a user actually gets, so a budget invented for
-                        // the eval would measure something nobody runs -- and a copy that drifted
-                        // would do the same thing while still looking correct.
-                        budgets: { ...DEFAULT_BUDGETS },
-                        // Ships on "notify" for users, because the calibration corpus does not yet
-                        // support steering a model on a mid-session verdict. The eval runs headless,
-                        // where a notification reaches nobody, so measuring the notify path would
-                        // measure the cost of the system and none of its effect. Set to "message"
-                        // here and disclosed in the report method, exactly as yoloMode is: this run
-                        // is how the default earns the right to change.
-                        progressNudge: "message",
-                    },
-                    null,
-                    4,
-                ),
-            );
+            fs.writeFileSync(path.join(jevDir, "settings.json"), `${JSON.stringify(jevSettings(), null, 4)}\n`);
             fs.writeFileSync(
                 path.join(jevDir, "consent.json"),
                 JSON.stringify(
@@ -1208,7 +1265,7 @@ export const harnessAdapters = {
                 // rather than whatever this machine happens to have installed.
                 buildArgs: async ({ agentDir }) => {
                     const helper = path.join(agentDir, "eval-provider.ts");
-                    fs.writeFileSync(helper, ohMyPiExtension(proxyUrl, model));
+                    fs.writeFileSync(helper, ohMyPiExtension(proxyUrl, model, task.contextWindow));
 
                     return [cli, "--mode", "rpc", "--no-session", "--no-rules", "--no-extensions", "-e", helper];
                 },

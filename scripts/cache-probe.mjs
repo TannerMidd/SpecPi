@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { attemptTurns } from "./eval-proxy.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -147,7 +148,7 @@ export function armSummary(cells, price) {
         attempts: attempts.length,
         passed: attempts.filter((attempt) => attempt.pass).length,
         score: attempts.length ? attempts.reduce((t, a) => t + (a.score ?? 0), 0) / attempts.length : 0,
-        requests: attempts.length ? attempts.reduce((t, a) => t + (a.modelRequests ?? 0), 0) / attempts.length : 0,
+        requests: attempts.length ? attempts.reduce((t, a) => t + attemptTurns(a), 0) / attempts.length : 0,
         modelCost: attempts.length ? attempts.reduce((t, a) => t + (a.modelCost ?? 0), 0) / attempts.length : 0,
         freshTokens: attempts.length ? (prompt - cached) / attempts.length : 0,
         cacheHitRate: prompt > 0 ? cached / prompt : 0,

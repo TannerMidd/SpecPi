@@ -206,6 +206,19 @@ function migrateToThree(raw) {
     return { ...rest, schema: 3, systems };
 }
 
+/**
+ * What the advisor will read, given a settings object, without writing it anywhere.
+ *
+ * Exported for callers that compose a settings file for somewhere other than this process's own
+ * agent directory -- the eval harness writes one into a disposable home -- and need to check what
+ * they composed. Building a literal and trusting it is how the harness came to run every published
+ * tier with the command guard off: it hardcoded `schema: 2`, the 2-to-3 migration reads the guard
+ * preference from a key that shape does not have, and nothing ever compared the result to the ask.
+ */
+export function normalizeSettings(raw) {
+    return normalize(raw);
+}
+
 function normalize(raw) {
     const one = raw?.schema === 1 ? migrate(raw) : raw;
     const source = one?.schema === 2 ? migrateToThree(one) : one;

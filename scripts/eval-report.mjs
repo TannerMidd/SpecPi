@@ -5,6 +5,7 @@
 // lower bounds (≥), never zeroes.
 
 import { compositeScore } from "./eval-effort.mjs";
+import { attemptTurns } from "./eval-proxy.mjs";
 import { loadTask } from "./eval-tasks.mjs";
 
 // Manifests are read once per process: rescoring walks every attempt in every report and the
@@ -181,7 +182,7 @@ export function usageSummary(attempts) {
         promptTotal += attempt.native ? input + cached : input;
         cachedTotal += cached;
         outputTotal += tokens.outputTokens ?? 0;
-        requestTotal += attempt.modelRequests ?? 0;
+        requestTotal += attemptTurns(attempt);
         callTotal += Object.values(attemptToolCounts(attempt).calls).reduce((sum, count) => sum + count, 0);
     }
 

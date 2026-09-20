@@ -50,7 +50,8 @@
                     ><a href="#tools"><span>06</span>Tool surface</a
                     ><a href="#terminal-bench"><span>07</span>Terminal-Bench</a
                     ><a href="#jev-scope"><span>08</span>Jev, out of scope</a
-                    ><a href="#limits"><span>09</span>What this is not</a>
+                    ><a href="#long-sessions"><span>09</span>Long sessions</a
+                    ><a href="#limits"><span>10</span>What this is not</a>
                 </nav>
                 <div class="index-meta">SpecPi 0.28.0<br />Pi 0.84.4<br /><span id="meta-generated"></span></div>
             </aside>
@@ -282,7 +283,7 @@
                         the prefix each turn matters more than the request total.
                     </p>
                     <div class="table-scroll" id="table-efficiency">
-                        <!-- table-efficiency --><table class="numeric"><thead><tr><th>Harness</th><th>Score</th><th>Tool calls</th><th>Turns</th><th>Tool errors</th><th>Repeated calls</th><th>Cache hit</th><th>Context growth / turn</th><th>Compactions</th><th>Score per 100 calls</th></tr></thead><tbody><tr><th>Pi</th><td>0.864</td><td>8.7</td><td>7.2</td><td>7.6%</td><td>3</td><td>92%</td><td>709</td><td>0</td><td>10.0</td></tr><tr><th>SpecPi</th><td>0.878</td><td>9.6</td><td>8.6</td><td>6.8%</td><td>4</td><td>93%</td><td>628</td><td>0</td><td>9.2</td></tr><tr><th>SpecPi + Jev</th><td>0.895</td><td>10.0</td><td>10.0</td><td>6.0%</td><td>9</td><td>94%</td><td>590</td><td>0</td><td>9.0</td></tr><tr><th>OpenCode</th><td>0.804</td><td>9.5</td><td>6.8</td><td>1.4%</td><td>2</td><td>90%</td><td>785</td><td>0</td><td>8.4</td></tr><tr><th>Codex CLI</th><td>0.742</td><td>10.8</td><td>9.5</td><td>12.3%</td><td>10</td><td>97%</td><td>714</td><td>0</td><td>6.9</td></tr><tr><th>Oh My Pi</th><td>0.891</td><td>11.0</td><td>8.7</td><td>3.7%</td><td>2</td><td>91%</td><td>615</td><td>0</td><td>8.1</td></tr><tr><th>DeepSeek Harness</th><td>0.833</td><td>14.4</td><td>10.9</td><td>2.2%</td><td>11</td><td>93%</td><td>804</td><td>37</td><td>5.8</td></tr></tbody></table><!-- /table-efficiency -->
+                        <!-- table-efficiency --><table class="numeric"><thead><tr><th>Harness</th><th>Score</th><th>Tool calls</th><th>Turns</th><th>Tool errors</th><th>Repeated calls</th><th>Cache hit</th><th>Context growth / turn</th><th>Compactions</th><th>Score per 100 calls</th></tr></thead><tbody><tr><th>Pi</th><td>0.864</td><td>8.7</td><td>7.2</td><td>7.6%</td><td>3</td><td>92%</td><td>709</td><td>0</td><td>10.0</td></tr><tr><th>SpecPi</th><td>0.878</td><td>9.6</td><td>8.6</td><td>6.8%</td><td>4</td><td>93%</td><td>628</td><td>0</td><td>9.2</td></tr><tr><th>SpecPi + Jev</th><td>0.895</td><td>10.0</td><td>9.0</td><td>6.0%</td><td>9</td><td>94%</td><td>590</td><td>0</td><td>9.0</td></tr><tr><th>OpenCode</th><td>0.804</td><td>9.5</td><td>6.8</td><td>1.4%</td><td>2</td><td>90%</td><td>785</td><td>0</td><td>8.4</td></tr><tr><th>Codex CLI</th><td>0.742</td><td>10.8</td><td>9.5</td><td>12.3%</td><td>10</td><td>97%</td><td>714</td><td>0</td><td>6.9</td></tr><tr><th>Oh My Pi</th><td>0.891</td><td>11.0</td><td>8.7</td><td>3.7%</td><td>2</td><td>91%</td><td>615</td><td>0</td><td>8.1</td></tr><tr><th>DeepSeek Harness</th><td>0.833</td><td>14.4</td><td>10.9</td><td>2.2%</td><td>11</td><td>93%</td><td>804</td><td>37</td><td>5.8</td></tr></tbody></table><!-- /table-efficiency -->
                     </div>
                     <p>
                         Every harness here was measured through the logging proxy, so context figures cover all of
@@ -523,10 +524,131 @@
                     </p>
                 </section>
 
+                <section class="doc-section" id="long-sessions">
+                    <header>
+                        <h2>Long sessions, where the layer was supposed to earn its keep</h2>
+                        <span>09</span>
+                    </header>
+                    <p>
+                        The section above ends by saying that measuring an advisory layer over long sessions would
+                        need a suite built to contain those cases. Tier&nbsp;6 is that suite, and the useful part of
+                        building it was finding out that the obvious approach does not work.
+                    </p>
+                    <p>
+                        Three versions of it failed. The first was batchable &mdash; every task collapsed into a
+                        shell one&#8209;liner. The second was greppable: one <code>grep</code> with four alternations
+                        returned the answer set exactly, on both tasks, with no false positives, while the prompt
+                        asserting that no keyword separated them was simply false. The third fixed both and still
+                        measured nothing, because a 254,000&#8209;token corpus against a 200,000&#8209;token window
+                        never reached the model at all. <b>An agent with a shell does not load a large corpus.</b> It
+                        chunks it, greps it, or writes a script, and peak context sat near 50,000 tokens however
+                        large the corpus got.
+                    </p>
+                    <div class="callout">
+                        <p>
+                            <strong>What worked was shrinking the window, not growing the corpus.</strong>
+                            Tier&nbsp;6 declares a 24,000&#8209;token context window where every other tier runs at
+                            200,000. A small window overruns on the transcript itself, which no shortcut avoids. It
+                            is the first configuration in this project&rsquo;s history in which any session compacted
+                            at all.
+                        </p>
+                    </div>
+                    <div class="chart-block">
+                        <!-- tier6-chart-compaction --><svg class="chart" id="tier6-chart-compaction" viewBox="0 0 720 235" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Compactions per attempt"><text x="0" y="18" class="ct-lb">Compactions per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="199" stroke="var(--line)" opacity=".85" /><text x="150.0" y="216" text-anchor="middle" class="ct-ax">0</text><line x1="260.0" y1="34" x2="260.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="260.0" y="216" text-anchor="middle" class="ct-ax">20</text><line x1="370.0" y1="34" x2="370.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="370.0" y="216" text-anchor="middle" class="ct-ax">40</text><line x1="480.0" y1="34" x2="480.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="480.0" y="216" text-anchor="middle" class="ct-ax">60</text><line x1="590.0" y1="34" x2="590.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="590.0" y="216" text-anchor="middle" class="ct-ax">80</text><rect x="150.0" y="46" width="38.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="59" text-anchor="end" class="ct-sub">Pi (base)</text><text x="196.5" y="59" class="ct-val">7.0</text><rect x="150.0" y="68" width="39.5" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="81" text-anchor="end" class="ct-sub">SpecPi</text><text x="197.5" y="81" class="ct-val">7.2</text><rect x="150.0" y="90" width="39.2" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="103" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="197.2" y="103" class="ct-val">7.1</text><rect x="150.0" y="112" width="291.5" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="125" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="449.5" y="125" class="ct-val">53.0</text><rect x="150.0" y="134" width="418.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="147" text-anchor="end" class="ct-sub">Codex CLI</text><text x="576.0" y="147" class="ct-val">76.0</text><rect x="150.0" y="156" width="59.7" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="169" text-anchor="end" class="ct-sub">OpenCode</text><text x="217.7" y="169" class="ct-val">10.9</text><rect x="150.0" y="178" width="14.1" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="191" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="172.1" y="191" class="ct-val">2.6</text><text x="0" y="229" class="ct-ax">How often a session had to make room, at a 24,000-token window. Every other tier reports zero.</text></svg><!-- /tier6-chart-compaction -->
+                    </div>
+                    <p>
+                        The control is clean. Codex and OpenCode reach their providers through their own
+                        configuration rather than this runner&rsquo;s, so before window support was added for them
+                        they ran the same tasks at the provider default: peak 51,000&ndash;82,000 tokens and zero
+                        compactions, while every windowed harness compacted repeatedly. Declaring the window moved
+                        Codex from 0 compactions to 49 in a single attempt. Nothing else changed.
+                    </p>
+                    <div class="table-scroll">
+                        <!-- tier6-table-overall --><table class="numeric"><thead><tr><th>Harness</th><th>Attempts</th><th>Solved</th><th>Turns</th><th>Compactions</th><th>Reclaimed</th><th>Peak prompt</th><th>Cost/attempt</th></tr></thead><tbody><tr><th>Pi (base)</th><td>16</td><td>14/16</td><td>24.7</td><td>7.0</td><td>108,778</td><td>22,570</td><td>$0.0622</td></tr><tr><th>SpecPi</th><td>16</td><td>15/16</td><td>28.4</td><td>7.2</td><td>128,281</td><td>26,118</td><td>$0.0658</td></tr><tr><th>SpecPi + Jev</th><td>16</td><td>12/16</td><td>27.1</td><td>7.1</td><td>125,925</td><td>26,632</td><td>$0.0624</td></tr><tr><th>Oh My Pi</th><td>2</td><td>0/2</td><td>117.0</td><td>53.0</td><td>645,162</td><td>26,814</td><td>$0.2793</td></tr><tr><th>Codex CLI</th><td>2</td><td>1/2</td><td>413.0</td><td>76.0</td><td>392,975</td><td>21,982</td><td>$0.5077</td></tr><tr><th>OpenCode</th><td>7</td><td>6/7</td><td>43.6</td><td>10.9</td><td>143,752</td><td>24,129</td><td>$0.0623</td></tr><tr><th>DeepSeek Harness</th><td>16</td><td>14/16</td><td>30.8</td><td>2.6</td><td>15,110</td><td>19,043</td><td>$0.0403</td></tr></tbody></table><!-- /tier6-table-overall -->
+                    </div>
+                    <p>
+                        Two things about how to read this table. <b>Turns are conversation turns.</b> The advisor
+                        posts through the same proxy as the agent so that its spend lands in one place, and counting
+                        those posts as turns reported the SpecPi&nbsp;+&nbsp;Jev arm as taking two to three times the
+                        turns it actually took &mdash; a figure this page carried until it was corrected. And every
+                        failure in this tier so far is a session that ended without recording its answer, never a
+                        session that read the corpus and misjudged it.
+                    </p>
+
+                    <h3>Did the layer do anything?</h3>
+                    <p>
+                        For the first time, yes. Every previously published Jev run recorded <b>zero applied
+                        verdicts</b> &mdash; not because the layer was broken, but because no session had ever
+                        compacted, so the system that guides a compaction cut was never asked anything.
+                    </p>
+                    <div class="table-scroll">
+                        <!-- tier6-table-advisor --><table class="numeric"><thead><tr><th>System</th><th>Question it answers</th><th>Calls</th><th>Applied</th><th>Outcomes</th></tr></thead><tbody><tr><th>compaction</th><td>Where should a compaction cut, given the cache is discarded anyway?</td><td>108</td><td>70</td><td>unrecorded 107, failed 1</td></tr><tr><th>retention</th><td>Is this large tool result worth carrying for the rest of the session?</td><td>144</td><td>0</td><td>relevance-low-confidence 144</td></tr><tr><th>guard</th><td>Should this shell or file call run, where local rules could not settle it?</td><td>266</td><td>0</td><td>unrecorded 266</td></tr><tr><th>progress</th><td>Has the session stopped making progress?</td><td>15</td><td>1</td><td>not-stuck 14, tool-error-loop 1</td></tr><tr><th>gap</th><td>Is this capability-gap report worth writing?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>sources</th><td>Which files should a delegation batch snapshot?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>untrusted</th><td>Is this fetched content addressing the agent rather than a reader?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>capability</th><td>Will this session need a withdrawn tool group?</td><td>0</td><td>0</td><td>never invoked</td></tr></tbody></table><!-- /tier6-table-advisor -->
+                    </div>
+                    <p>
+                        <code>compaction</code> is the row that changed. It was consulted on nearly every compaction
+                        that occurred, and its verdict was acted on the majority of those times.
+                        <code>progress</code> also returned a <code>tool-error-loop</code> verdict &mdash; the one
+                        situation a purpose-built task had entirely failed to produce, which appeared on its own once
+                        sessions got long enough.
+                    </p>
+                    <p>
+                        <code>guard</code> still applies nothing. Headless, its middle band has no human to ask, so
+                        every &ldquo;ask&rdquo; verdict degrades to a defer and only an outright block is reachable.
+                        Four of the eight systems are still never invoked: <code>gap</code>, <code>sources</code> and
+                        <code>capability</code> need delegation and capability situations this tier does not create,
+                        and <code>untrusted</code> needs externally fetched content.
+                    </p>
+
+                    <h3>Does it help?</h3>
+                    <p>
+                        On this evidence, no &mdash; and the honest answer is that the sample cannot yet carry a
+                        verdict either way.
+                    </p>
+                    <div class="table-scroll">
+                        <!-- tier6-table-compare --><table class="numeric"><thead><tr><th>Task</th><th>SpecPi</th><th>SpecPi + Jev</th><th>Fisher exact p</th><th>Reading</th></tr></thead><tbody><tr><th>marathon</th><td>8/8</td><td>5/8</td><td>0.200</td><td>cannot be told from chance</td></tr><tr><th>haystack</th><td>7/8</td><td>7/8</td><td>1.000</td><td>cannot be told from chance</td></tr></tbody></table><!-- /tier6-table-compare -->
+                    </div>
+                    <div class="table-scroll">
+                        <!-- tier6-table-cost --><table class="numeric"><thead><tr><th>Harness</th><th>Task</th><th>Mean cost</th><th>Median cost</th><th>Turns</th><th>Compactions</th><th>No usable output</th></tr></thead><tbody><tr><th>Pi (base)</th><td>marathon</td><td>$0.1051</td><td>$0.0655</td><td>35.5</td><td>11.5</td><td>1</td></tr><tr><th>Pi (base)</th><td>haystack</td><td>$0.0193</td><td>$0.0134</td><td>13.9</td><td>2.5</td><td>1</td></tr><tr><th>SpecPi</th><td>marathon</td><td>$0.1089</td><td>$0.0982</td><td>40.1</td><td>11.4</td><td>0</td></tr><tr><th>SpecPi</th><td>haystack</td><td>$0.0227</td><td>$0.0222</td><td>16.6</td><td>3.0</td><td>0</td></tr><tr><th>SpecPi + Jev</th><td>marathon</td><td>$0.0781</td><td>$0.0792</td><td>31.1</td><td>8.9</td><td>3</td></tr><tr><th>SpecPi + Jev</th><td>haystack</td><td>$0.0467</td><td>$0.0247</td><td>23.1</td><td>5.4</td><td>0</td></tr><tr><th>Oh My Pi</th><td>marathon</td><td>$0.2793</td><td>$0.2793</td><td>117.0</td><td>53.0</td><td>1</td></tr><tr><th>Codex CLI</th><td>marathon</td><td>$0.5077</td><td>$0.5077</td><td>413.0</td><td>76.0</td><td>1</td></tr><tr><th>OpenCode</th><td>marathon</td><td>$0.0865</td><td>$0.0628</td><td>56.8</td><td>15.0</td><td>0</td></tr><tr><th>OpenCode</th><td>haystack</td><td>$0.0300</td><td>$0.0308</td><td>26.0</td><td>5.3</td><td>1</td></tr><tr><th>DeepSeek Harness</th><td>marathon</td><td>$0.0567</td><td>$0.0500</td><td>39.5</td><td>3.1</td><td>2</td></tr><tr><th>DeepSeek Harness</th><td>haystack</td><td>$0.0239</td><td>$0.0194</td><td>22.1</td><td>2.0</td><td>0</td></tr></tbody></table><!-- /tier6-table-cost -->
+                    </div>
+                    <p>
+                        The direction is not consistent, which is itself the finding. On the marathon the layer
+                        compacts <em>less</em> than plain SpecPi (8.9 against 11.4) and costs less
+                        ($0.078 against $0.109) while passing less often (5/8 against 8/8). On the haystack it
+                        compacts more (5.4 against 3.0) and passes identically (7/8 each), and its apparent cost
+                        penalty is mostly one expensive attempt: the means are $0.047 against $0.023, the medians
+                        $0.025 against $0.022.
+                    </p>
+                    <p>
+                        So the layer is not idle and it is not obviously paying either. Its spend buys applied
+                        compaction verdicts and several hundred guard consultations, and on the longer task it buys
+                        a cheaper session that finishes correctly less often. Which of those matters more is not a
+                        question sixteen attempts an arm can answer.
+                    </p>
+                    <div class="callout">
+                        <p>
+                            <strong>Read the p&#8209;value column before the pass column.</strong> At six attempts
+                            an arm this comparison produced two confident readings in opposite directions, and
+                            widening it to sixteen changed both: a fourfold compaction advantage shrank to a modest
+                            one, and a threefold cost penalty on the haystack turned out to be a single expensive
+                            attempt moving a mean. Neither pass-rate difference can be told from chance at this
+                            sample, and that is what the table says rather than what a ratio would imply.
+                        </p>
+                    </div>
+                    <p class="figure-note">
+                        Sixteen attempts an arm, pooled across several runs on one model and one machine.
+                        Attempts that never reached a model call are excluded and counted rather than scored as
+                        losses &mdash; running many harnesses at once contends on a shared session store, and
+                        scoring a launch failure as a task failure blames a harness for this suite&rsquo;s own
+                        plumbing. Oh&nbsp;My&nbsp;Pi and Codex report two valid attempts each and should be read as
+                        observations rather than rows: both thrash badly at this window, at 117 and 413 turns per
+                        attempt against 24 to 31 for the Pi family.
+                    </p>
+                </section>
+
                 <section class="doc-section" id="limits">
                     <header>
                         <h2>What this does not establish</h2>
-                        <span>09</span>
+                        <span>10</span>
                     </header>
                     <p>
                         This is a starting point. It is a small suite, on one model, on one machine, and it should be
