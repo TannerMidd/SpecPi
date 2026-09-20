@@ -60,7 +60,6 @@ const resourcePaths = [
     "extensions/jev-advisor/broker.mjs",
     "extensions/jev-advisor/gate.mjs",
     "extensions/jev-advisor/questions/retention.mjs",
-    "extensions/jev-advisor/questions/compaction.mjs",
     "extensions/jev-advisor/questions/gap.mjs",
     "extensions/jev-advisor/questions/sources.mjs",
     "extensions/jev-advisor/questions/progress.mjs",

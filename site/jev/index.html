@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
-            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, seven systems that use it, the pinned command guard beside them, and what it has actually measured."
+            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, six systems that use it, the pinned command guard beside them, and what it has actually measured."
         />
         <meta property="og:title" content="The Jev layer · SpecPi" />
         <meta
@@ -45,7 +45,7 @@
                 <p>SPECPI / JEV</p>
                 <nav>
                     <a href="#what"><span>01</span>What it is</a><a href="#where"><span>02</span>Where it sits</a
-                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Seven systems</a
+                    ><a href="#gates"><span>03</span>The gates</a><a href="#systems"><span>04</span>Six systems</a
                     ><a href="#economics"><span>05</span>Why on arrival</a
                     ><a href="#cache-probe"><span>06</span>Pricing the cache rule</a
                     ><a href="#calibration"><span>07</span>Calibrating the gate</a
@@ -273,7 +273,7 @@
                 </section>
 
                 <section class="doc-section" id="systems">
-                    <header><h2>Seven systems</h2><span>04</span></header>
+                    <header><h2>Six systems</h2><span>04</span></header>
                     <p>
                         One rule covers all seven: <em>check local state first. Spend a Jev call only on a
                         question local state cannot answer.</em> That rule removed the largest measured waste here.
@@ -286,10 +286,6 @@
                             <strong>Retention</strong> decides whether a large read-only tool result is still worth
                             keeping, before it is saved. Jev answers yes or no. Code does the shortening, so
                             the replacement is a fixed head-and-tail digest. No model-written text enters the transcript.
-                        </li>
-                        <li>
-                            <strong>Compaction</strong> adds guidance at the one point where the prompt cache is
-                            dropped anyway. The advice causes no extra cache loss.
                         </li>
                         <li>
                             <strong>Gap</strong> groups capability-gap reports about the same problem and
@@ -491,7 +487,7 @@
                 <section class="doc-section" id="guard">
                     <header><h2>The guard, and why it fails closed</h2><span>08</span></header>
                     <p>
-                        The command guard is not one of the seven systems above. It is
+                        The command guard is not one of the six systems above. It is
                         <code>specpi-jev-guard</code>, a separate pinned package with its own gate, its own
                         configuration file and its own commands, and it is the only thing SpecPi installs that can
                         take a tool call away. SpecPi pins it and ships it <strong>inert</strong>: the package's own
@@ -688,10 +684,10 @@
                                 <tr><th>System</th><th>Asked</th><th>Changed something</th><th>Outcome</th></tr>
                             </thead>
                             <tbody>
-                                <tr><th>Compaction</th><td>108</td><td>70</td><td>consulted on nearly every compaction that occurred</td></tr>
-                                <tr><th>Tool-result retention</th><td>144</td><td>0</td><td>confidence below the gate, every time</td></tr>
+                                <tr><th>Compaction (since withdrawn)</th><td>238</td><td>139</td><td>consulted on nearly every compaction that occurred</td></tr>
+                                <tr><th>Tool-result retention</th><td>287</td><td>0</td><td>confidence below the gate, every time</td></tr>
                                 <tr><th>Command guard (native)</th><td>266</td><td>0</td><td>headless, so every ask degrades to a defer</td></tr>
-                                <tr><th>Progress detection</th><td>15</td><td>1</td><td>fourteen healthy, one tool-error loop</td></tr>
+                                <tr><th>Progress detection</th><td>41</td><td>3</td><td>healthy in all but three, which were tool-error loops</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -702,19 +698,39 @@
                         describe systems the layer still ships.
                     </p>
                     <p>
-                        <strong>Seventy applied verdicts, against zero in every run before it.</strong> The layer
-                        does act; it had simply never been placed in a situation where it could. Progress also
-                        returned a <code>tool-error-loop</code> verdict &mdash; the one situation a purpose-built
+                        <strong>A hundred and thirty-nine applied verdicts, against zero in every run before it.</strong>
+                        The layer does act; it had simply never been placed in a situation where it could. Progress
+                        also returned <code>tool-error-loop</code> verdicts &mdash; the one situation a purpose-built
                         task had entirely failed to produce, which appeared unprompted once sessions ran long.
                     </p>
+                    <h3>Where it did not fit: compaction guidance, withdrawn</h3>
                     <p>
-                        Whether that work pays is a separate question, and sixteen attempts an arm cannot settle it.
-                        The direction is not even consistent: on the longer task the layer compacts less than plain
-                        SpecPi and costs less, while finishing correctly less often; on the shorter one it compacts
-                        more and finishes the same. Neither pass-rate difference can be told from chance. The
+                        Then the same tier that finally exercised compaction guidance is the tier that took it out
+                        of the layer. On the long task, the arm carrying it solved <b>8 of 16</b> against plain
+                        SpecPi&rsquo;s <b>14 of 16</b> &mdash; and it did so twice, in two runs months apart on two
+                        versions, 5/8 against 8/8 and then 3/8 against 6/8. The shorter task showed nothing either
+                        time.
+                    </p>
+                    <p>
+                        Attribution was never in question: <code>compaction</code> was 139 of the 142 verdicts the
+                        layer applied over those attempts, with retention applying none and progress three. The
+                        mechanism was. The system could not delete anything &mdash; it appended one sentence to the
+                        summariser&rsquo;s prompt, with Pi&rsquo;s own cut point and token budget untouched &mdash; so
+                        any harm ran through a summary that kept the wrong material. The likeliest explanation is
+                        that the sentence told the summariser to <em>prioritise</em> one kind of content, which on a
+                        task built so that a fact from the first turn must survive is an instruction to rank that
+                        fact below something else. That was never isolated.
+                    </p>
+                    <p>
+                        It was removed anyway. The difference sits at p&nbsp;=&nbsp;0.054, which is not significance,
+                        and no single test here clears that bar. What decided it was three weak signals agreeing, a
+                        clean line of attribution, and the asymmetry of the bet: a system that steers a summary has
+                        to earn the risk it takes, and one whose only measurement says it costs solve rate has not.
+                        The
                         <a class="text-link" href="../evaluations/#long-sessions">evaluations page</a> carries the
-                        comparison with its p&#8209;value. What can be said is narrower and worth saying: the
-                        situation the layer was built for finally exists, and in it the layer is no longer inert.
+                        full comparison, the p&#8209;values and what the removal does not establish. The runs that
+                        carried the system are kept there rather than deleted, because a measurement that led to a
+                        removal is the reason the removal can be defended.
                     </p>
                     <p class="figure-note">
                         Both Jev columns cover one harness on one model. The re-run happened separately from the

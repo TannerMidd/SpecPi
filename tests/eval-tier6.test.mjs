@@ -25,7 +25,6 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 test("the eval harness advisor settings resolve to the systems they ask for", () => {
     const wanted = {
         retention: true,
-        compaction: true,
         gap: true,
         sources: false,
         progress: true,

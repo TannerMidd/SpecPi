@@ -887,10 +887,15 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
  * The command guard is absent because it is no longer part of the layer: it is the separate
  * `specpi-jev-guard` package, which these disposable homes do not install and which this row
  * therefore does not measure.
+ *
+ * Compaction guidance is absent because it was withdrawn. Two tier-6 runs measured the arm carrying
+ * it solving fewer long-session tasks than plain SpecPi -- 14/16 against 8/16 pooled, Fisher exact
+ * p = 0.054 -- while accounting for 55 of the 56 verdicts the layer applied over those attempts.
+ * The runs that carried it are kept in the published tier-6 record rather than deleted, because a
+ * measurement that led to a removal is the reason the removal can be defended.
  */
 const JEV_EVAL_SYSTEMS = Object.freeze({
     retention: true,
-    compaction: true,
     gap: true,
     sources: false,
     progress: true,

@@ -6,8 +6,8 @@
 // inside sanitize.
 //
 // AWAIT ONLY THE SYSTEMS THAT MUTATE WHAT THEY INSPECT. Retention must be awaited, because its
-// answer replaces the tool result it was asked about; so must compaction, the branch hook and the
-// two tool_call systems, which return a patch or edit `event.input` in place. A system that acts on
+// answer replaces the tool result it was asked about; so must the two tool_call systems, which
+// return a patch or edit `event.input` in place. A system that acts on
 // a later turn must not be awaited: at roughly 300ms a call, a turn-level system firing thirty
 // times would add nine seconds to an attempt that takes a hundred and thirty, to deliver advice
 // that was never going to change the turn it was asked during.
@@ -22,7 +22,6 @@ import { writeUsage } from "./usage.mjs";
 
 export const SYSTEM_LABELS = Object.freeze({
     retention: "Tool-result retention",
-    compaction: "Compaction guidance",
     gap: "Capability-gap triage",
     sources: "Delegation source ranking",
     progress: "Progress and thrash detection",

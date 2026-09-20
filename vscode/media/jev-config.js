@@ -1,5 +1,5 @@
 ((root) => {
-    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 4).
+    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 5).
     //
     // The Jev layer ships entirely off, and every switch here is a way to turn part of it on, so
     // this file is the one place Chat can start sending session summaries to a third party. It
@@ -12,12 +12,17 @@
     // directions are total so a round trip cannot silently drop a key.
     //
     // The command guard is not here, and not in the file either. It is a separate pinned package
-    // that keeps its own configuration and its own switch, so schema 4 carries no trace of it: the
+    // that keeps its own configuration and its own switch, so schema 4 carried no trace of it: the
     // `guard` pair schema 2 held and the `systems.guard` entry schema 3 held are both read past and
     // not written back. Neither was ever the authority -- the package's own file is -- so dropping
     // them changes nothing about whether anyone's guard is on.
+    //
+    // Compaction guidance is not here either. Schema 5 removed it after two tier-6 runs measured the
+    // arm carrying it solving fewer long-session tasks than plain SpecPi, and a stored
+    // `systems.compaction` is read past for the same reason the guard keys are: the hooks it gated
+    // no longer exist, so the preference could only describe a system that cannot run.
 
-    const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability"];
+    const SYSTEMS = ["retention", "gap", "sources", "progress", "untrusted", "capability"];
     const MAX_CALL_BUDGET = 1024;
     const MAX_TOTAL_BUDGET = 2048;
     const NUDGE_MODES = ["notify", "message"];
@@ -26,7 +31,6 @@
     const DEFAULT_BUDGETS = {
         total: 2048,
         retention: 832,
-        compaction: 48,
         gap: 192,
         sources: 128,
         progress: 704,
@@ -37,7 +41,6 @@
     // person reading both does not have to work out that two words mean one system.
     const SYSTEM_LABELS = {
         retention: "Tool-result retention",
-        compaction: "Compaction guidance",
         gap: "Capability-gap triage",
         sources: "Delegation source ranking",
         progress: "Progress and thrash detection",
@@ -62,12 +65,6 @@
             "System: shorten spent tool results",
             "boolean",
             "Decides whether a large read-only result is still worth carrying, before it is appended. Covers reads, searches, shell output, fetched pages, browser snapshots and delegation reports. Code does the shortening, so no model-written text enters the transcript.",
-        ],
-        [
-            "compaction",
-            "System: steer compaction and branch summaries",
-            "boolean",
-            "Adds guidance at the two boundaries where the prompt cache is discarded anyway, so it costs no extra cache invalidation, and labels abandoned branches from a fixed list so the session tree stays navigable.",
         ],
         [
             "gap",
@@ -176,7 +173,7 @@
         const enabled = source.enabled === true;
 
         return {
-            schema: 4,
+            schema: 5,
             // Always written together; see `fromStored`. Keeping them in step is what makes the
             // checkbox mean what it says in the next session rather than only in this file.
             master: enabled,

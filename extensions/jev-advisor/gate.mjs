@@ -50,12 +50,11 @@
 //    was unreachable, and running the layer could never have revealed it, because a system that
 //    never fires looks exactly like a system whose advice was always to do nothing.
 //
-//    compaction's `unresolved_thread` had the same problem at high 0.85: the clearest open
-//    investigation the fixture can express scores 0.63-0.65. It is lowered to 0.60, which is
-//    defensible only because of what that branch does -- add one sentence to a summariser prompt
-//    that is being rebuilt from scratch anyway. It is the cheapest action in the layer, so it can
-//    afford the loosest gate. gap keeps 0.85 because its Noul reaches 0.96 on the case that matters
-//    and because a firing there blocks a write.
+//    Compaction guidance had the same problem and was lowered to 0.60 to clear it. That system has
+//    since been withdrawn -- two tier-6 runs measured the arm carrying it solving fewer long-session
+//    tasks than plain SpecPi -- so the loosest gate in the layer is gone with it. gap keeps 0.85
+//    because its Noul reaches 0.96 on the case that matters and because a firing there blocks a
+//    write.
 
 /**
  * The figures the comment above cites, in a form a test can check against the artifact. A citation
@@ -90,16 +89,6 @@ export const THRESHOLDS = Object.freeze({
         high: 0.9,
         // Measured 0.06-0.07 on the spent case, so this clears with room.
         low: 0.1,
-    }),
-    compaction: Object.freeze({
-        scoreConfidence: 0.6,
-        boundary: 0.3,
-        choiceConfidence: 0.75,
-        margin: 0.25,
-        // Lowered from 0.85: the clearest open investigation scores 0.63-0.65, and the action is
-        // one sentence added to a prompt that is being rebuilt regardless.
-        high: 0.6,
-        low: 0.15,
     }),
     gap: Object.freeze({
         scoreConfidence: 0.6,

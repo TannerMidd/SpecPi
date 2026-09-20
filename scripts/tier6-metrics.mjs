@@ -239,7 +239,7 @@ function collect(runDirs, window) {
         }
     }
 
-    return { attempts, runs, launchFailures, unwindowed };
+    return { attempts, runs, launchFailures, unwindowed, models };
 }
 
 function summarise(list) {
@@ -310,7 +310,7 @@ function main() {
     }
 
     const WINDOW = 24000;
-    const { attempts, runs, launchFailures, unwindowed } = collect(runDirs, WINDOW);
+    const { attempts, runs, launchFailures, unwindowed, models } = collect(runDirs, WINDOW);
     const harnesses = [];
     for (const arm of ORDER) {
         const perTask = {};

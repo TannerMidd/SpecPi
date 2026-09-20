@@ -112,7 +112,7 @@ test("the nested disk shape survives a round trip through the flat form", () => 
     // one place instead of a test that fails for the wrong reason.
     const on = new Set(["retention", "gap"]);
     const stored = {
-        schema: 4,
+        schema: 5,
         master: true,
         startup: true,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, on.has(name)])),
@@ -129,7 +129,7 @@ test("a file that is on but not at startup is read as off, because that is what 
     // showing it as enabled would be describing behaviour no session will ever have. The round
     // trip is deliberately not the identity here: it resolves the pair to what the advisor does.
     const stored = {
-        schema: 4,
+        schema: 5,
         master: true,
         startup: false,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, true])),
@@ -166,7 +166,7 @@ test("saving writes the nested shape the extension expects, not the flat one", (
         // load-bearing: a panel still writing schema 1 would produce a file the advisor migrates
         // rather than reads, and a panel writing a schema the advisor retired would switch the
         // whole layer off.
-        assert.equal(written.schema, 4);
+        assert.equal(written.schema, 5);
         assert.equal(written.master, true);
         assert.equal(written.startup, true, "the panel writes a preference, so on means on next session too");
         assert.deepEqual(
@@ -231,7 +231,7 @@ test("a schema 1 file is migrated rather than read as the layer switched off", a
                     schema: 1,
                     master: true,
                     startup: true,
-                    systems: { retention: true, compaction: false, gap: false, sources: false },
+                    systems: { retention: true, gap: false, sources: false },
                     callBudgetPerSession: budget,
                     guard: { enabled: false, startup: false },
                 })}\n`,
@@ -247,25 +247,26 @@ test("a schema 1 file is migrated rather than read as the layer switched off", a
 
 test("both older guard shapes are dropped, by the panel and the advisor alike", async () => {
     // Schema 2 kept a `guard` pair and schema 3 kept `systems.guard`. Neither decided whether the
-    // guard actually ran -- the package's own file does -- so schema 4 keeps neither, and the
+    // guard actually ran -- the package's own file does -- so schema 4 kept neither, and the
     // panel has to agree with the advisor about that or a save would reintroduce a key the
-    // advisor no longer reads.
+    // advisor no longer reads. Schema 5 drops compaction on the same terms, so the shapes below
+    // carry it and assert it is gone too.
     const { loadSettings } = await import("../extensions/jev-advisor/config.mjs");
     const shapes = [
         {
             schema: 2,
             master: true,
             startup: true,
-            systems: { retention: true },
-            budgets: { total: 6 },
+            systems: { retention: true, compaction: true },
+            budgets: { total: 6, compaction: 48 },
             guard: { enabled: true, startup: true },
         },
         {
             schema: 3,
             master: true,
             startup: true,
-            systems: { retention: true, guard: true },
-            budgets: { total: 6 },
+            systems: { retention: true, guard: true, compaction: true },
+            budgets: { total: 6, compaction: 48 },
         },
     ];
 
@@ -284,9 +285,17 @@ test("both older guard shapes are dropped, by the panel and the advisor alike", 
 
             savePackageSettings(loaded, `${JSON.stringify(flat)}\n`);
             const written = JSON.parse(fs.readFileSync(file, "utf8"));
-            assert.equal(written.schema, 4);
+            assert.equal(written.schema, 5);
             assert.ok(!("guard" in written), `schema ${stored.schema}: the panel wrote a guard key back`);
             assert.ok(!("guard" in written.systems), `schema ${stored.schema}: the retired system key lingers`);
+            assert.ok(
+                !("compaction" in written.systems),
+                `schema ${stored.schema}: the withdrawn compaction switch lingers`,
+            );
+            assert.ok(
+                !("compaction" in written.budgets),
+                `schema ${stored.schema}: the withdrawn compaction budget lingers`,
+            );
             assert.equal(written.budgets.total, 6, "the rest of the file is still the user's");
         });
     }

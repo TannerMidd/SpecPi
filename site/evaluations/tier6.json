@@ -1,12 +1,14 @@
 {
-    "generatedAt": "2026-09-20T21:50:45.411Z",
+    "generatedAt": "2026-09-21T06:34:41.058Z",
+    "model": "deepseek-v4.1-flash",
     "note": "Tier 6 declares a 24,000-token context window. Every other tier runs at 200,000.",
     "contextWindow": 24000,
     "runs": [
         "tier6-n6-000843",
         "tier6-n3-cx-003134",
         "tier6-w24k-234106",
-        "t6-winprobe-000932"
+        "t6-winprobe-000932",
+        "tier6-rerun-20260920"
     ],
     "tasks": [
         "t6-context-marathon",
@@ -65,97 +67,97 @@
         {
             "id": "specpi-default",
             "label": "SpecPi",
-            "attempts": 16,
-            "solved": 15,
-            "turns": 28.375,
-            "compactions": 7.1875,
-            "reclaimed": 128280.625,
-            "peakPromptTokens": 26117.6875,
-            "cost": 0.06578285437499999,
-            "costMedian": 0.039275361,
-            "promptTokens": 424964.8125,
-            "cacheHitRate": 0.5130777739392247,
-            "seconds": 237.80043750000002,
+            "attempts": 32,
+            "solved": 28,
+            "turns": 33.5,
+            "compactions": 7.9375,
+            "reclaimed": 143562.09375,
+            "peakPromptTokens": 28120.96875,
+            "cost": 0.08190417740625004,
+            "costMedian": 0.048382704,
+            "promptTokens": 509161.15625,
+            "cacheHitRate": 0.51388806969699,
+            "seconds": 309.10603125,
             "advisorCalls": 0,
-            "noOutput": 0,
+            "noOutput": 3,
             "perTask": {
                 "t6-context-marathon": {
-                    "attempts": 8,
-                    "solved": 8,
-                    "turns": 40.125,
-                    "compactions": 11.375,
-                    "reclaimed": 201843.375,
-                    "peakPromptTokens": 29535.125,
-                    "cost": 0.10888884674999999,
-                    "costMedian": 0.09819684599999998,
-                    "promptTokens": 645410.375,
-                    "cacheHitRate": 0.48306629716015953,
-                    "seconds": 376.81837500000006,
+                    "attempts": 16,
+                    "solved": 14,
+                    "turns": 44.8125,
+                    "compactions": 12.1875,
+                    "reclaimed": 215969.6875,
+                    "peakPromptTokens": 31389.5,
+                    "cost": 0.1344589935,
+                    "costMedian": 0.14046906,
+                    "promptTokens": 741759.875,
+                    "cacheHitRate": 0.47205573097358494,
+                    "seconds": 499.14093750000006,
                     "advisorCalls": 0,
-                    "noOutput": 0
+                    "noOutput": 2
                 },
                 "t6-retention-haystack": {
-                    "attempts": 8,
-                    "solved": 7,
-                    "turns": 16.625,
-                    "compactions": 3,
-                    "reclaimed": 54717.875,
-                    "peakPromptTokens": 22700.25,
-                    "cost": 0.022676862,
-                    "costMedian": 0.022155252,
-                    "promptTokens": 204519.25,
-                    "cacheHitRate": 0.6077863086237604,
-                    "seconds": 98.78250000000001,
+                    "attempts": 16,
+                    "solved": 14,
+                    "turns": 22.1875,
+                    "compactions": 3.6875,
+                    "reclaimed": 71154.5,
+                    "peakPromptTokens": 24852.4375,
+                    "cost": 0.029349361312500002,
+                    "costMedian": 0.029677208999999996,
+                    "promptTokens": 276562.4375,
+                    "cacheHitRate": 0.6260853392283252,
+                    "seconds": 119.071125,
                     "advisorCalls": 0,
-                    "noOutput": 0
+                    "noOutput": 1
                 }
             }
         },
         {
             "id": "specpi-jev",
             "label": "SpecPi + Jev",
-            "attempts": 16,
-            "solved": 12,
-            "turns": 27.125,
-            "compactions": 7.125,
-            "reclaimed": 125924.875,
-            "peakPromptTokens": 26632.3125,
-            "cost": 0.06235844025000001,
-            "costMedian": 0.054693645,
-            "promptTokens": 392128.5,
-            "cacheHitRate": 0.4963270968572802,
-            "seconds": 233.51237499999996,
-            "advisorCalls": 33.6875,
-            "noOutput": 3,
+            "attempts": 32,
+            "solved": 23,
+            "turns": 28.625,
+            "compactions": 7.625,
+            "reclaimed": 138961.6875,
+            "peakPromptTokens": 26713.96875,
+            "cost": 0.0679985998125,
+            "costMedian": 0.055657581000000005,
+            "promptTokens": 420991.6875,
+            "cacheHitRate": 0.48668894442244776,
+            "seconds": 261.72781249999997,
+            "advisorCalls": 26.40625,
+            "noOutput": 6,
             "perTask": {
                 "t6-context-marathon": {
-                    "attempts": 8,
-                    "solved": 5,
-                    "turns": 31.125,
-                    "compactions": 8.875,
-                    "reclaimed": 158650.875,
-                    "peakPromptTokens": 28693.75,
-                    "cost": 0.07805803125000002,
-                    "costMedian": 0.07915609499999998,
-                    "promptTokens": 467679.75,
-                    "cacheHitRate": 0.46674674282989587,
-                    "seconds": 287.032,
-                    "advisorCalls": 39.625,
-                    "noOutput": 3
+                    "attempts": 16,
+                    "solved": 8,
+                    "turns": 37.125,
+                    "compactions": 10.75,
+                    "reclaimed": 198248.75,
+                    "peakPromptTokens": 29201.1875,
+                    "cost": 0.09807694837500001,
+                    "costMedian": 0.096325365,
+                    "promptTokens": 580523.3125,
+                    "cacheHitRate": 0.46578663453760955,
+                    "seconds": 370.917875,
+                    "advisorCalls": 33.1875,
+                    "noOutput": 6
                 },
                 "t6-retention-haystack": {
-                    "attempts": 8,
-                    "solved": 7,
-                    "turns": 23.125,
-                    "compactions": 5.375,
-                    "reclaimed": 93198.875,
-                    "peakPromptTokens": 24570.875,
-                    "cost": 0.04665884925,
-                    "costMedian": 0.024707801999999997,
-                    "promptTokens": 316577.25,
-                    "cacheHitRate": 0.5400261705476309,
-                    "seconds": 179.99275,
-                    "advisorCalls": 27.75,
+                    "attempts": 16,
+                    "solved": 15,
+                    "turns": 20.125,
+                    "compactions": 4.5,
+                    "reclaimed": 79674.625,
+                    "peakPromptTokens": 24226.75,
+                    "cost": 0.03792025125000001,
+                    "costMedian": 0.023082408,
+                    "promptTokens": 261460.0625,
+                    "cacheHitRate": 0.5330986257222362,
+                    "seconds": 152.53775000000002,
+                    "advisorCalls": 19.625,
                     "noOutput": 0
                 }
             }
@@ -330,28 +332,28 @@
     "comparison": {
         "t6-context-marathon": {
             "base": {
-                "n": 8,
-                "solved": 8
+                "n": 16,
+                "solved": 14
             },
             "jev": {
-                "n": 8,
-                "solved": 5
+                "n": 16,
+                "solved": 8
             },
-            "p": 0.2
+            "p": 0.05380213119246829
         },
         "t6-retention-haystack": {
             "base": {
-                "n": 8,
-                "solved": 7
+                "n": 16,
+                "solved": 14
             },
             "jev": {
-                "n": 8,
-                "solved": 7
+                "n": 16,
+                "solved": 15
             },
             "p": 1
         }
     },
-    "totalCompactions": 716,
+    "totalCompactions": 985,
     "launchFailures": {
         "count": 7,
         "reasons": {
@@ -376,8 +378,8 @@
         "guard": "Should this shell or file call run, where local rules could not settle it? (native guard, since retired)"
     },
     "advisor": {
-        "calls": 533,
-        "applied": 71,
+        "calls": 832,
+        "applied": 142,
         "bySystem": {
             "guard": {
                 "calls": 266,
@@ -387,26 +389,26 @@
                 }
             },
             "retention": {
-                "calls": 144,
+                "calls": 287,
                 "applied": 0,
                 "outcomes": {
-                    "relevance-low-confidence": 144
+                    "relevance-low-confidence": 287
                 }
             },
             "compaction": {
-                "calls": 108,
-                "applied": 70,
+                "calls": 238,
+                "applied": 139,
                 "outcomes": {
-                    "unrecorded": 107,
-                    "failed": 1
+                    "unrecorded": 236,
+                    "failed": 2
                 }
             },
             "progress": {
-                "calls": 15,
-                "applied": 1,
+                "calls": 41,
+                "applied": 3,
                 "outcomes": {
-                    "not-stuck": 14,
-                    "tool-error-loop": 1
+                    "not-stuck": 38,
+                    "tool-error-loop": 3
                 }
             }
         }

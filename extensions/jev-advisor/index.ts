@@ -8,7 +8,6 @@ import { createBroker } from "./broker.mjs";
 import { ledgerPath, read as readLedger } from "./ledger.mjs";
 import { usagePath } from "./usage.mjs";
 import * as retention from "./questions/retention.mjs";
-import * as compaction from "./questions/compaction.mjs";
 import * as gap from "./questions/gap.mjs";
 import * as sources from "./questions/sources.mjs";
 import * as progress from "./questions/progress.mjs";
@@ -334,115 +333,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         }
     });
 
-    // System 1b: steer the summary at the one boundary where the prompt cache is discarded anyway.
-    // Only customInstructions is supplied; the preparation's own cut and budget are left alone.
-    pi.on("session_before_compact", async (event: any, ctx: ExtensionContext) => {
-        if (!enabled("compaction")) {
-            return;
-        }
-
-        try {
-            const result = await broker.request({
-                system: "compaction",
-                state: compaction.buildInput({ preparation: event.preparation, objective }),
-                questions: compaction.questions(),
-                ctx,
-                root: ctx.cwd,
-                signal: event.signal,
-                decide: (answers: any) => {
-                    const built = compaction.decide(answers);
-
-                    // Nothing is shortened here, so savedBytes stays 0 and `applied` is the whole
-                    // record: either a sentence reached the summariser or Pi's own prompt ran.
-                    return { applied: Boolean(built.customInstructions), decision: built };
-                },
-            });
-            if (!result.ok) {
-                return;
-            }
-
-            const advice = result.decision;
-            if (!advice.customInstructions) {
-                return;
-            }
-
-            const existing = typeof event.customInstructions === "string" ? event.customInstructions.trim() : "";
-
-            return {
-                customInstructions: existing
-                    ? `${existing}\n\n${advice.customInstructions}`
-                    : advice.customInstructions,
-            };
-        } catch {
-            return;
-        }
-    });
-
-    // System 1b, second hook. Branch summarisation is the same problem at the same boundary --
-    // something is about to be reduced to a summary and the prefix is being rebuilt regardless --
-    // and it was simply unserved. It shares the compaction switch rather than adding a fifth
-    // system, because a user who has decided the advisor may steer a summary has decided that once.
-    //
-    // `label` is the part worth having. Pi's `/tree` can filter to labelled entries, so a branch
-    // that says what it was is the difference between a navigable tree and a list of timestamps,
-    // and the enum is fixed so no model-written text reaches the session file.
-    pi.on("session_before_tree", async (event: any, ctx: ExtensionContext) => {
-        if (!enabled("compaction")) {
-            return;
-        }
-
-        try {
-            const entries = event?.preparation?.entriesToSummarize ?? [];
-            if (entries.length === 0) {
-                return;
-            }
-
-            const result = await broker.request({
-                system: "compaction",
-                state: compaction.buildBranchInput({ preparation: event.preparation, objective }),
-                questions: compaction.questions({ branch: true }),
-                ctx,
-                root: ctx.cwd,
-                signal: event.signal,
-                decide: (answers: any) => {
-                    const built = compaction.decide(answers);
-                    const branchLabel = compaction.label(answers);
-
-                    return {
-                        applied: Boolean(branchLabel || built.customInstructions),
-                        decision: { ...built, label: branchLabel },
-                    };
-                },
-            });
-            if (!result.ok) {
-                return;
-            }
-
-            const advice = result.decision;
-            const patch: Record<string, unknown> = {};
-            if (advice.label) {
-                patch.label = advice.label;
-            }
-
-            // Only when a summary is actually going to be generated. Instructions for a summariser
-            // that will not run are bytes nobody reads, and `replaceInstructions` is left alone so
-            // Pi's own branch prompt still frames the result.
-            if (advice.customInstructions && event.preparation?.userWantsSummary === true) {
-                const existing =
-                    typeof event.preparation?.customInstructions === "string"
-                        ? event.preparation.customInstructions.trim()
-                        : "";
-                patch.customInstructions = existing
-                    ? `${existing}\n\n${advice.customInstructions}`
-                    : advice.customInstructions;
-            }
-
-            return Object.keys(patch).length > 0 ? patch : undefined;
-        } catch {
-            return;
-        }
-    });
-
     pi.on("tool_call", async (event: any, ctx: ExtensionContext) => {
         history.signatures.push(progress.signature(event.toolName, event.input));
         history.tools.push(event.toolName);
@@ -568,7 +458,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     // System 5: notice a session that has stopped making progress, while it can still be helped.
     //
     // THE ONE HANDLER THAT IS NOT AWAITED. Everything else in this file mutates what it inspects --
-    // a tool result, a compaction patch, a tool's input -- so the session has to wait for the
+    // a tool result, a tool's input -- so the session has to wait for the
     // answer. This one acts on the next turn, and at roughly 300ms a call, awaiting it on a
     // thrashing session would add seconds to an attempt to deliver advice that could not have
     // changed the turn it was asked during.
