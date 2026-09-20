@@ -1,0 +1,12 @@
+{
+    "id": "t6-context-marathon",
+    "tier": 6,
+    "category": "terminal",
+    "title": "Sixty reports past the context window, with a fact from the start",
+    "timeoutMs": 3600000,
+    "turnCap": 400,
+    "contextWindow": 24000,
+    "writable": [
+        "work"
+    ]
+}

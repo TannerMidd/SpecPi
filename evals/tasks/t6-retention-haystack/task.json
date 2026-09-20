@@ -1,0 +1,12 @@
+{
+    "id": "t6-retention-haystack",
+    "tier": 6,
+    "category": "terminal",
+    "title": "Classify twenty-eight incident reports by reading them",
+    "timeoutMs": 2700000,
+    "turnCap": 300,
+    "contextWindow": 24000,
+    "writable": [
+        "work"
+    ]
+}
