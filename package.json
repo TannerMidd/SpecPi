@@ -28,6 +28,7 @@
     "scripts/lib.mjs",
     "scripts/lock.mjs",
     "scripts/packages.mjs",
+        "scripts/jev-guard.mjs",
     "templates",
     "extensions",
     "skills",

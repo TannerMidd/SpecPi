@@ -48,7 +48,9 @@ function withinWorkspace(root, candidate) {
 }
 
 const ACTIVE_STATUSES = new Set(["busy", "retrying", "compacting"]);
-const USAGE_STATUS_KEYS = new Set(["aa-codex-usage", "provider-usage"]);
+// Status keys Chat renders as first-class readouts rather than generic rows, so a session
+// full of other widgets cannot crowd them out of the bounded map below.
+const USAGE_STATUS_KEYS = new Set(["aa-codex-usage", "provider-usage", "jev-guard"]);
 
 class ChatController {
     constructor(context, options = {}) {
@@ -1477,8 +1479,8 @@ class ChatController {
         } else if (request.method === "setStatus" || request.method === "setWidget") {
             this.state.runtimeStatus = this.state.runtimeStatus || {};
             const key = String(request.statusKey || request.widgetKey || "Pi").slice(0, 80);
-            // Reserve the two known usage keys so generic widgets cannot crowd
-            // them out. The total remains bounded to 24 generic + 2 usage keys.
+            // Reserve the known first-class keys so generic widgets cannot crowd
+            // them out. The total remains bounded to 24 generic + 3 reserved keys.
             const genericCount = Object.keys(this.state.runtimeStatus).filter(
                 (name) => !USAGE_STATUS_KEYS.has(name),
             ).length;

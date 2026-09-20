@@ -28,7 +28,6 @@ export const SYSTEM_LABELS = Object.freeze({
     progress: "Progress and thrash detection",
     untrusted: "Untrusted-content classification",
     capability: "Turn-zero capability arming",
-    guard: "Command guard",
 });
 
 export function createBroker(options = {}) {

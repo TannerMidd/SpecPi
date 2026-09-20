@@ -370,6 +370,34 @@
             .trim();
     }
 
+    // specpi-jev-guard publishes one status line per session: `jev 12`, then `jev 12 · 1 blocked`
+    // once it has stopped something, and the last verdict after that. It is the package's own
+    // string and is rendered as such -- Chat neither recounts it from the session records nor
+    // reformats it, because a second reader of that contract is a second thing to keep in step.
+    //
+    // The key is absent whenever the guard is off or its audit display is, so presence alone is the
+    // right condition for showing the chip: nothing here has to ask whether the guard is running.
+    const GUARD_STATUS_KEY = "jev-guard";
+
+    /**
+     * The count for the chip and the whole line for the tooltip.
+     *
+     * The split is on the separator the package documents, not a parse of the count: the first
+     * segment is the running total and the rest is detail that does not fit in a footer chip. A
+     * format this does not recognise degrades to showing the whole string, which is the right way
+     * round for a display of someone else's text.
+     */
+    function guardStatusEntry(status) {
+        const full = runtimeText(status?.[GUARD_STATUS_KEY]);
+        if (!full) {
+            return undefined;
+        }
+
+        const [summary] = full.split(" \u00b7 ");
+
+        return { full, summary: summary || full, blocked: /\u00b7 \d+ blocked\b/u.test(full) };
+    }
+
     function providerUsageEntries(status) {
         return USAGE_PLUGINS.flatMap((plugin) => {
             const text = status && Object.hasOwn(status, plugin.key) ? runtimeText(status[plugin.key]) : "";
@@ -398,6 +426,8 @@
             imageSource,
             runtimeText,
             providerUsageEntries,
+            guardStatusEntry,
+            GUARD_STATUS_KEY,
             cacheHitRate,
         };
     }
@@ -1533,11 +1563,37 @@
         container.hidden = !container.childElementCount;
     }
 
+    /**
+     * The command guard's own counter, in the session footer beside the token and cache readouts.
+     *
+     * It belongs there rather than beside the Permissions chip: this is what the session has spent,
+     * not how it is configured. It is also deliberately not a button. The guard is a separate
+     * package that owns its own switch, and Chat has no settings panel for it -- showing a number
+     * that cannot be clicked is the honest shape of that.
+     */
+    function renderGuardStatus(connected) {
+        const chip = byId("guard-status");
+        const entry = connected ? guardStatusEntry(state.runtimeStatus) : undefined;
+        chip.hidden = !entry;
+        if (!entry) {
+            return;
+        }
+
+        byId("guard-value").textContent = entry.summary;
+        chip.dataset.blocked = String(entry.blocked);
+        const detail = `specpi-jev-guard: ${entry.full}. Classifier calls this session, and blocked calls once there are any.`;
+        chip.title = detail;
+        chip.setAttribute("aria-label", detail);
+    }
+
     function renderRuntimeStatus() {
         const connected = ["connecting", "ready", "busy", "retrying", "compacting"].includes(state.status);
         const usage = connected ? providerUsageEntries(state.runtimeStatus) : [];
         const entries = Object.entries(state.runtimeStatus || {}).filter(
-            ([key, value]) => typeof value === "string" && !USAGE_PLUGINS.some((plugin) => plugin.key === key),
+            ([key, value]) =>
+                typeof value === "string" &&
+                key !== GUARD_STATUS_KEY &&
+                !USAGE_PLUGINS.some((plugin) => plugin.key === key),
         );
         const signature = JSON.stringify([entries, usage]);
         if (signature === runtimeSignature) {
@@ -1993,6 +2049,7 @@
         byId("cache-value").textContent = cacheLabel;
         byId("cache-status").title = cacheDetails;
         byId("cache-status").setAttribute("aria-label", cacheDetails);
+        renderGuardStatus(connected);
         const contextLabel =
             typeof percent === "number" && Number.isFinite(percent)
                 ? `Context ${Math.round(percent)}%`

@@ -18,8 +18,9 @@ import { SYSTEM_NAMES } from "./config.mjs";
  * Decide what a layer switch means, and report it honestly.
  *
  * `state` is `{ settings }` and is never mutated -- the next state comes back in the result. `deps`
- * supplies the outside world, which is now only `keySources`: the command guard used to need a
- * package's global configuration file arbitrated here, and as the eighth system it needs nothing.
+ * supplies the outside world, which is only `keySources`. The command guard is not arbitrated here
+ * and is not arbitrated anywhere in this extension: it is a separate package with its own switch,
+ * and nothing SpecPi does at session time touches it.
  *
  * Scope belongs to `layerScopeLine`, not here, so this takes `{ on }` and nothing else. It used to
  * be handed `sessionOnly` and `interactive` as well and read neither, which reads as a decision
@@ -40,33 +41,15 @@ export function applyLayer({ on }, state, deps) {
 }
 
 /**
- * What arming the command guard means, in the words every path that arms it has to use.
- *
- * Seven of the eight systems only ever add advice; this one can refuse a tool call. Saying so is a
- * rule rather than a nicety, and it lives here because it was a rule `/jev on` honoured alone while
- * `/jev enable guard` and `/jev startup on` armed the same system in silence.
- */
-export function guardWarning() {
-    return (
-        "guard is the only system that can refuse a tool call: it blocks a call it reads as " +
-        "destructive and not what was asked for, asks you about the uncertain ones, and hands " +
-        "everything else to the permission system unchanged. Turn it off with /jev disable guard."
-    );
-}
-
-/**
  * Enabling the layer enables its systems, because a layer with none on runs and does nothing -- the
- * state people kept arriving at, with the notification cheerfully reporting "0 of 8".
+ * state people kept arriving at, with the notification cheerfully reporting "0 of 7".
  *
  * Only when none are on. Someone deliberately running retention alone has expressed a preference,
- * and `/jev off` then `/jev on` must not hand back the seven they turned off.
+ * and `/jev off` then `/jev on` must not hand back the six they turned off.
  *
- * The command guard is one of the eight, and it is the only system that can refuse a tool call. That
- * is a deliberate answer to a question this file and `config.mjs` resolve differently on purpose:
- * `/jev on` is a person acting now, so it arms everything and `onLines` says in as many words that
- * one of them can refuse a command; `migrateToThree` runs without anyone present, so it arms
- * nothing new. Silence is the difference -- an unattended migration must not change what a session
- * is allowed to run, and an explicit command that reports what it did may.
+ * Every system it arms only ever adds advice, which is what makes arming all of them a reasonable
+ * default and why this switch needs no warning attached. Nothing the layer can turn on is able to
+ * refuse a tool call; the one component that can is a separate package with a separate switch.
  */
 export function enableSystems(settings) {
     const chosen = SYSTEM_NAMES.filter((name) => settings.systems[name]);
@@ -84,12 +67,6 @@ function onLines(before, after, activeSource) {
     const lines = [`Jev layer on with ${active.length} of ${SYSTEM_NAMES.length} systems: ${active.join(", ")}.`];
     if (chosen.length === 0) {
         lines.push("No system was enabled, so all of them were. Turn any back off with /jev disable <system>.");
-    }
-
-    // Said out loud every time, because seven of the eight only ever add advice and this one can
-    // take a command away. Nobody should discover that from a blocked call.
-    if (after.systems.guard) {
-        lines.push(guardWarning());
     }
 
     lines.push(keyLine(activeSource));

@@ -133,7 +133,10 @@ const SYSTEMS = {
     progress: "Has the session stopped making progress?",
     capabilities: "Will this session need a withdrawn tool group?",
     untrusted: "Is this fetched content addressing the agent rather than a reader?",
-    guard: "Should this shell or file call run, where local rules could not settle it?",
+    // Kept although the guard is no longer part of the layer: these tables render recorded runs,
+    // and the runs that carried a guard row used the short-lived native guard. Dropping the label
+    // would silently delete a measurement rather than correct it.
+    guard: "Should this shell or file call run, where local rules could not settle it? (native guard, since retired)",
 };
 
 function renderAdvisor(advisor) {

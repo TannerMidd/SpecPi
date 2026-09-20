@@ -5,6 +5,10 @@
 // name and never by value, because "how do I configure this" is a question asked before enabling
 // anything -- see key-source.mjs.
 //
+// The command guard is not here at all. It is a separate pinned package that keeps its own
+// configuration and its own switch, and nothing in this file tracks it -- see scripts/jev-guard.mjs
+// for the one place SpecPi touches it, which is install time.
+//
 // The file is SpecPi's own, hardened the same way as web-access and capability-policy: atomic
 // write, mode 0600, symlinks refused, and a missing or unreadable file read as off.
 
@@ -22,14 +26,6 @@ export const SYSTEM_NAMES = Object.freeze([
     "progress",
     "untrusted",
     "capability",
-    // The command guard, native since schema 3. It used to be a separate pinned package with its own
-    // global configuration file, which is why it used to carry its own switch here: a second switch,
-    // outside the master, with its own startup preference and its own persistence rules. Those rules
-    // disagreed with the layer's often enough to be their own source of defects -- a preference
-    // erased by a command that had decided nothing about the guard, a state written by one command
-    // and reverted by the next session. As a system it is gated, budgeted, reported and toggled by
-    // exactly the same code as the other seven.
-    "guard",
 ]);
 
 /**
@@ -52,8 +48,8 @@ export const SYSTEM_NAMES = Object.freeze([
 export const NUDGE_MODES = Object.freeze(["notify", "message"]);
 
 const MAX_SETTINGS_BYTES = 4096;
-const MAX_CALL_BUDGET = 256;
-const MAX_TOTAL_BUDGET = 512;
+const MAX_CALL_BUDGET = 1024;
+const MAX_TOTAL_BUDGET = 2048;
 
 /**
  * One shared budget could not survive a turn-level system. A system that fires once per turn would
@@ -61,8 +57,11 @@ const MAX_TOTAL_BUDGET = 512;
  * session, and which one won would be decided by event ordering rather than by anyone's policy.
  *
  * So the ceiling is two-level: each system gets its own, and the total is a real constraint because
- * it is deliberately less than their sum. Running out of one system's budget stops that system and
- * nothing else.
+ * it is deliberately less than their sum -- 2048 against 2322. That relationship is the invariant,
+ * not either number: raising the total without raising the per-system ceilings would leave a total
+ * no combination of systems could ever reach, which is a limit that reads as a limit and is not
+ * one. `tests/jev-advisor.test.mjs` pins the inequality so a future change to one has to consider
+ * the other. Running out of one system's budget stops that system and nothing else.
  *
  * The per-system numbers follow how often each one can fire: retention on every large read-only
  * result, compaction once or twice in a long session, gap per report, sources per delegation batch.
@@ -70,7 +69,7 @@ const MAX_TOTAL_BUDGET = 512;
 export const DEFAULT_BUDGETS = Object.freeze({
     // A backstop, not a working limit, and the number says which. Measured, a full tier-3 task -- a
     // 120-step repair chain over about 25 model requests -- spends 4 to 7 calls, and the busiest
-    // attempt ever recorded spent 12. A session would have to run for days before 512 bound
+    // attempt ever recorded spent 12. A session would have to run for days before 2048 bound
     // anything a person was actually doing, which is the point: the ceiling should only ever be hit
     // by a loop, and hitting it should therefore be information rather than an inconvenience.
     //
@@ -78,35 +77,37 @@ export const DEFAULT_BUDGETS = Object.freeze({
     // runs for two minutes; an interactive session runs for a day, and a turn-level system at one
     // call every four turns reaches 120 somewhere in the afternoon and then goes quiet without
     // having found anything wrong. A ceiling that a normal long session reaches is not protecting
-    // anyone, it is just failing later than it looks.
+    // anyone, it is just failing later than it looks. 512 was the same mistake one order of
+    // magnitude further out, and the long-session evals are what showed it: a session long enough
+    // to compact several times spends in the hundreds, so the backstop sat close enough to real
+    // use to be reachable by a session that was working correctly.
     //
-    // Cost is not what these are for. A call is about $0.00003, so the whole total is about a cent
-    // and a half. They bound two things that do not get cheaper with scale: how much digest leaves
-    // the machine for a third party, at up to 1 KB a call, and how much awaited latency a runaway
-    // loop can add before something stops it. Half a megabyte of digest and an announced stop is
-    // the shape of the trade.
-    total: 512,
-    retention: 208,
-    compaction: 12,
-    gap: 48,
-    sources: 32,
+    // Cost is not what these are for. A call is about $0.00003, so the whole total is about six
+    // cents. They bound two things that do not get cheaper with scale: how much digest leaves the
+    // machine for a third party, at up to 1 KB a call, and how much awaited latency a runaway loop
+    // can add before something stops it. Two megabytes of digest and an announced stop is the shape
+    // of the trade.
+    total: 2048,
+    // The per-system numbers move with the total, because a total the per-system ceilings can never
+    // add up to is not a constraint at all -- see below. They are scaled rather than re-derived:
+    // each one's rationale is a firing frequency, and none of those frequencies changed.
+    retention: 832,
+    compaction: 48,
+    gap: 192,
+    sources: 128,
     // Turn-level, but gated behind local signals and a four-turn cooldown, so it only spends on
     // sessions that already look wrong. The ceiling is what stops a genuinely thrashing session
     // from spending the total on being told it is thrashing.
-    progress: 176,
+    progress: 704,
     // Usually free: when retention is on, system 7's question rides the call retention was already
     // making against the same state. This ceiling only binds when retention is off, or when the
     // fetched result is too small for retention to be interested in it.
-    untrusted: 104,
+    untrusted: 416,
     // Once per session by construction, and only when local signals already suggest it. Two rather
-    // than one so a retried first turn is not silently un-served.
+    // than one so a retried first turn is not silently un-served. The one number here that does not
+    // scale with the total, because it is not sized by a frequency: the system asks once and then
+    // never again, so a larger ceiling would buy nothing and would only misdescribe what it does.
     capability: 2,
-    // Per gated tool call that local rules could not settle, so its frequency is retention's rather
-    // than compaction's -- and like retention, most calls never reach it: read-only commands and
-    // ordinary project writes are answered locally for nothing. Running out means the guard defers
-    // to the permission system for the rest of the session, which is what it does for every other
-    // kind of unavailability.
-    guard: 208,
 });
 
 /** 0 is a real budget meaning no calls. Switching a system off is what `systems[name] = false` is for. */
@@ -143,7 +144,7 @@ export function regularFile(file, label) {
 /** Every unknown shape collapses to the same all-off default rather than a partial enable. */
 export function defaultSettings() {
     return {
-        schema: 3,
+        schema: 4,
         master: false,
         startup: false,
         systems: Object.fromEntries(SYSTEM_NAMES.map((name) => [name, false])),
@@ -187,23 +188,22 @@ function migrate(raw) {
 }
 
 /**
- * Schema 2 carried the command guard as a separate `guard: { enabled, startup }` pair, because it
- * was a separate package with its own global configuration file. Schema 3 makes it the eighth
- * system, so the stored preference becomes `systems.guard`.
+ * Schema 4 removes every trace of the command guard from this file, from either shape it took.
  *
- * `guard.startup` is what migrates, not `guard.enabled`: the former is what the user chose for new
- * sessions, and the latter was a session flag that happened to be written to disk. A file where the
- * guard was wanted at startup but the layer itself was not produces a system that is on inside a
- * layer that is off, which is inactive -- the guard used to sit outside the master switch and now
- * does not. That direction is deliberate: a gate quietly becoming inactive is recoverable in one
- * command, and a gate quietly becoming active is how a session stops being able to run anything.
+ * Schema 2 kept a `guard: { enabled, startup }` pair, from when SpecPi re-asserted the package's
+ * switch at every session start; schema 3 made the guard the layer's eighth system under
+ * `systems.guard`. Both keys go, because neither answer is SpecPi's to hold any more: the package
+ * owns its switch in its own file, and a stale copy here could only ever disagree with it.
+ *
+ * Dropping them changes nothing about whether anyone's guard is on. A schema-2 file's preference
+ * had already been written through to the package's own configuration by the last session that
+ * read it, and schema 3 shipped with no guard package installed at all.
  */
-function migrateToThree(raw) {
-    const systems = { ...(raw?.systems ?? {}), guard: raw?.guard?.startup === true };
+function migrateToFour(raw) {
+    const { guard: _pair, ...rest } = raw ?? {};
+    const { guard: _system, ...systems } = rest.systems ?? {};
 
-    const { guard: _guard, ...rest } = raw ?? {};
-
-    return { ...rest, schema: 3, systems };
+    return { ...rest, schema: 4, systems };
 }
 
 /**
@@ -212,8 +212,9 @@ function migrateToThree(raw) {
  * Exported for callers that compose a settings file for somewhere other than this process's own
  * agent directory -- the eval harness writes one into a disposable home -- and need to check what
  * they composed. Building a literal and trusting it is how the harness came to run every published
- * tier with the command guard off: it hardcoded `schema: 2`, the 2-to-3 migration reads the guard
- * preference from a key that shape does not have, and nothing ever compared the result to the ask.
+ * tier with a system it believed it had enabled switched off: it hardcoded a schema number, the
+ * migration for that number read a preference from a key that shape does not have, and nothing ever
+ * compared the result to the ask. Compose, then normalize, then assert -- not compose and trust.
  */
 export function normalizeSettings(raw) {
     return normalize(raw);
@@ -221,15 +222,15 @@ export function normalizeSettings(raw) {
 
 function normalize(raw) {
     const one = raw?.schema === 1 ? migrate(raw) : raw;
-    const source = one?.schema === 2 ? migrateToThree(one) : one;
-    if (source?.schema !== 3) {
+    const source = one?.schema === 2 || one?.schema === 3 ? migrateToFour(one) : one;
+    if (source?.schema !== 4) {
         return defaultSettings();
     }
 
     const systems = Object.fromEntries(SYSTEM_NAMES.map((name) => [name, source.systems?.[name] === true]));
 
     return {
-        schema: 3,
+        schema: 4,
         master: source.master === true,
         startup: source.startup === true,
         systems,
@@ -265,9 +266,9 @@ export function writeFileAtomic(file, contents) {
 }
 
 export function saveSettings(settings) {
-    // A caller handing back a schema-1 shape is migrated rather than reset, so a round trip through
+    // A caller handing back an older shape is migrated rather than reset, so a round trip through
     // an old reader cannot quietly disable the layer.
-    const next = normalize(settings?.schema === 1 || settings?.schema === 2 ? settings : { ...settings, schema: 3 });
+    const next = normalize([1, 2, 3].includes(settings?.schema) ? settings : { ...settings, schema: 4 });
     const file = settingsFile();
     if (fs.existsSync(file)) {
         regularFile(file, "Jev settings");

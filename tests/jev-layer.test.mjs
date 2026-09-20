@@ -14,7 +14,6 @@ import { SYSTEM_NAMES, defaultSettings } from "../extensions/jev-advisor/config.
 import {
     applyLayer,
     enableSystems,
-    guardWarning,
     layerScopeLine,
     layerToPersist,
     startupToPersist,
@@ -43,21 +42,18 @@ test("turning the layer on turns its systems on, and only when none are chosen",
     assert.deepEqual(enableSystems(chosen).systems, chosen.systems);
 });
 
-test("arming the guard is said out loud, because it is the one system that can refuse a call", () => {
-    // Seven of the eight only ever add advice; this one can take a tool call away. `/jev on` arms it
-    // deliberately -- a person acting now, told what they armed -- which is why the line has to be
-    // there. An unattended schema migration takes the opposite decision for the same reason.
+test("the layer switch never reaches the command guard", () => {
+    // Every system `/jev on` arms only ever adds advice, which is what makes arming all of them a
+    // reasonable default and why the switch carries no warning. The one component that can refuse
+    // a tool call is a separate package with a separate switch, and the layer neither names it nor
+    // records anything about it in either direction.
     const armed = applyLayer({ on: true }, { settings: stored() }, deps());
-    assert.equal(armed.settings.systems.guard, true);
-    const said = armed.lines.join(" ");
-    assert.match(said, /guard is the only system that can refuse a tool call/);
-    assert.match(said, /jev disable guard/);
+    assert.ok(!("guard" in armed.settings.systems), "the guard is not one of the systems");
+    assert.ok(!("guard" in armed.settings), "and the layer stores no preference about it");
+    assert.ok(!/guard/iu.test(armed.lines.join(" ")), "turning the layer on says nothing about it");
 
-    // And not said when it is not armed, so the warning keeps meaning something.
-    const partial = stored({ systems: { ...allSystems(false), retention: true } });
-    const quiet = applyLayer({ on: true }, { settings: partial }, deps());
-    assert.equal(quiet.settings.systems.guard, false);
-    assert.ok(!/refuse a tool call/.test(quiet.lines.join(" ")));
+    const off = applyLayer({ on: false }, { settings: stored({ master: true }) }, deps());
+    assert.ok(!/guard/iu.test(off.lines.join(" ")), "and neither does turning it off");
 });
 
 test("switching the layer off never touches the credential store", () => {
@@ -77,21 +73,11 @@ test("switching the layer off never touches the credential store", () => {
     assert.throws(() => applyLayer({ on: true }, { settings: stored() }, explode));
 });
 
-test("the guard warning is one sentence, shared by every path that arms the guard", () => {
-    // `/jev on`, `/jev enable guard` and `/jev startup on` all arm the same system. The rule is that
-    // arming it is said out loud; keeping the words in one exported function is what stopped that
-    // being a rule `/jev on` honoured alone while the other two armed it in silence.
-    const warning = guardWarning();
-    assert.match(warning, /refuse a tool call/);
-    assert.match(warning, /\/jev disable guard/);
-    assert.equal(applyLayer({ on: true }, { settings: stored() }, deps()).lines.includes(warning), true);
-});
-
 test("what is persisted keeps master and startup together and preserves unrelated settings", () => {
     // Storing them apart is what made the Chat panel's checkbox do nothing on its own: session_start
     // zeroes a stored master whenever startup is false.
     const existing = stored({ budgets: { ...defaultSettings().budgets, total: 16 }, progressNudge: "message" });
-    const on = applyLayer({ on: true }, { settings: stored(), guardEnabled: false }, deps());
+    const on = applyLayer({ on: true }, { settings: stored() }, deps());
     const written = layerToPersist(on, existing);
 
     assert.equal(written.master, true);
@@ -99,7 +85,7 @@ test("what is persisted keeps master and startup together and preserves unrelate
     assert.equal(written.budgets.total, 16, "a budget written elsewhere must survive");
     assert.equal(written.progressNudge, "message");
 
-    const off = applyLayer({ on: false }, { settings: stored({ master: true }), guardEnabled: true }, deps());
+    const off = applyLayer({ on: false }, { settings: stored({ master: true }) }, deps());
     const cleared = layerToPersist(off, existing);
     assert.equal(cleared.master, false);
     assert.equal(cleared.startup, false);
@@ -171,14 +157,14 @@ test("the key line names its source and never carries a value", () => {
     const fixtureKey = "openrouter-fixture-value";
     const onWithStore = applyLayer(
         { on: true },
-        { settings: stored(), guardEnabled: false },
+        { settings: stored() },
         deps({ env: { OPENROUTER_API_KEY: fixtureKey }, sources: [{ name: "auth.json", present: true }] }),
     );
     const text = onWithStore.lines.join("\n");
     assert.match(text, /Pi's credential store/u);
     assert.ok(!text.includes(fixtureKey), "a key must never reach a notification");
 
-    const none = applyLayer({ on: true }, { settings: stored(), guardEnabled: false }, deps({ sources: [] }));
+    const none = applyLayer({ on: true }, { settings: stored() }, deps({ sources: [] }));
     assert.match(none.lines.join("\n"), /Run \/login openrouter to store one/u);
 });
 

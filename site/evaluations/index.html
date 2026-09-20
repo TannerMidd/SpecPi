@@ -491,7 +491,10 @@
                         <code>untrusted</code> watches fetched content, and these tasks fetch almost nothing.
                     </p>
                     <p>
-                        Of the three that did run, <code>guard</code> accounts for 431 of the 464 calls. It examined
+                        Of the three that did run, <code>guard</code> accounts for 431 of the 464 calls. That row
+                        measured the short-lived native command guard; gating has since returned to the pinned
+                        <code>specpi-jev-guard</code> package, which these homes do not install, so the numbers are
+                        kept as recorded rather than restated. It examined
                         every shell and file call that local rules could not settle, and escalated none of them. On
                         ordinary development work that is the outcome you want from a command guard &mdash; 431
                         chances to interrupt work that did not need interrupting, taken none of them &mdash; but it

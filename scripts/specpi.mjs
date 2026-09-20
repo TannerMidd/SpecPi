@@ -22,14 +22,8 @@ import {
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
-import {
-    basePackages,
-    checkBasePackages,
-    installBasePackages,
-    packageChanges,
-    removeRetiredPackages,
-    runBrowserQA,
-} from "./packages.mjs";
+import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
+import { applyInertConfig as applyGuardConfig, configPath as guardConfigPath } from "./jev-guard.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VERSION = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
@@ -63,8 +57,6 @@ const resourcePaths = [
     "extensions/jev-advisor/client.mjs",
     "extensions/jev-advisor/key-source.mjs",
     "extensions/jev-advisor/layer.mjs",
-    "extensions/jev-advisor/risk.mjs",
-    "extensions/jev-advisor/questions/guard.mjs",
     "extensions/jev-advisor/broker.mjs",
     "extensions/jev-advisor/gate.mjs",
     "extensions/jev-advisor/questions/retention.mjs",
@@ -87,7 +79,7 @@ Usage:
   specpi doctor
   specpi uninstall [--yes]
 
-Installs /scope, the harness improvement loop, and seven pinned packages.
+Installs /scope, the harness improvement loop, and eight pinned packages.
 The base is tested with Pi 0.84.4. Run specpi plan to see package versions.
 --skip-package-install installs only the core, or preserves an existing base on update.
 --skip-browser-install skips Chromium setup, not package acquisition or doctor checks.
@@ -260,32 +252,6 @@ function restoreLegacySettings(manifest, warnings) {
     writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
 }
 
-/**
- * Unpin a package a past version installed and this one has retired.
- *
- * Deliberately outside the `--skip-packages` guard. Skipping package acquisition means not
- * downloading or re-pinning anything, and it has never meant leaving an entry SpecPi itself wrote
- * pointing at code SpecPi has since removed the controls for -- `specpi-jev-guard` is fail-closed,
- * so the machine that skipped packages is exactly the machine that would keep it armed forever.
- *
- * `settingsPath` is in the transaction's watched set for every non-uninstall operation, so this
- * write is snapshotted, backed up and rolled back with everything else.
- */
-function retireBasePackages(warnings) {
-    const settings = readJson(settingsPath, {});
-    const removed = removeRetiredPackages(settings);
-    if (removed.length === 0) {
-        return;
-    }
-
-    writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
-    for (const source of removed) {
-        warnings.push(
-            `Unpinned retired package: ${source}. Its downloaded files stay in the agent npm directory, Pi no longer loads it, and any settings of your own on that entry are in this run's backup.`,
-        );
-    }
-}
-
 function removeLegacyShell(manifest) {
     if (manifest?.shellRc && fs.existsSync(manifest.shellRc)) {
         const result = removeManagedBlock(fs.readFileSync(manifest.shellRc, "utf8"), SHELL_START, SHELL_END);
@@ -340,16 +306,7 @@ async function mutate(options, operation) {
             ...files.map(([, target]) => target),
             ...Object.keys(previous?.files || {}),
         ];
-        // Watched whenever anything in this run can write it. `retireBasePackages` runs on every
-        // non-uninstall operation, including under `--skip-package-install`, so the narrower
-        // condition that used to guard this left that write outside the snapshot -- unbacked up, and
-        // not rolled back by a later failure in the same transaction.
-        if (
-            operation !== "uninstall" ||
-            !options.skipPackages ||
-            previous?.settingsChanges?.length ||
-            previous?.packageChanges?.length
-        ) {
+        if (!options.skipPackages || previous?.settingsChanges?.length || previous?.packageChanges?.length) {
             watched.push(settingsPath);
         }
 
@@ -370,10 +327,6 @@ async function mutate(options, operation) {
         const warnings = [];
         const preserveBase = operation !== "uninstall" && options.skipPackages && previous?.basePackages?.length;
         restoreLegacySettings(preserveBase ? { ...previous, packageChanges: [] } : previous, warnings);
-        if (operation !== "uninstall") {
-            retireBasePackages(warnings);
-        }
-
         removeLegacyShell(previous);
         let packageState = preserveBase
             ? {
@@ -400,6 +353,26 @@ async function mutate(options, operation) {
 
             if (!options.skipBrowser) {
                 runBrowserQA(agentDir, "setup");
+            }
+
+            // specpi-jev-guard's own default is enabled:true, so a freshly installed base would
+            // start gating shell and file calls through a third-party service before anyone asked
+            // for it — and with no key it fails closed, which means a first install that refuses to
+            // run commands. This is the only place SpecPi touches that package's configuration:
+            // between installer runs the guard's own /jev-guard commands own it, so the write does
+            // not repeat at session start and a saved `--global` choice survives every restart.
+            try {
+                const guard = applyGuardConfig();
+                if (guard.disarmed) {
+                    // The one case where establishing the default takes something away. An
+                    // installer run that silently switched off a gate the user had switched on is
+                    // exactly the kind of quiet security change this file refuses to make.
+                    warnings.push(
+                        `Switched the Jev command guard off in ${guardConfigPath()}. SpecPi installs it inert and asserts that on every install and update; run /jev-guard on --global in Pi to turn it back on.`,
+                    );
+                }
+            } catch (error) {
+                console.log(`SpecPi: could not write the Jev guard's inert settings: ${error.message}`);
             }
 
             packageState = {
