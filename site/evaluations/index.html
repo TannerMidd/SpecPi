@@ -48,7 +48,9 @@
                     ><a href="#overhead"><span>04</span>Fixed cost</a
                     ><a href="#converge"><span>05</span>Where it lands</a
                     ><a href="#tools"><span>06</span>Tool surface</a
-                    ><a href="#limits"><span>07</span>What this is not</a>
+                    ><a href="#terminal-bench"><span>07</span>Terminal-Bench</a
+                    ><a href="#jev-scope"><span>08</span>Jev, out of scope</a
+                    ><a href="#limits"><span>09</span>What this is not</a>
                 </nav>
                 <div class="index-meta">SpecPi 0.28.0<br />Pi 0.84.4<br /><span id="meta-generated"></span></div>
             </aside>
@@ -77,10 +79,10 @@
                         <span>01</span>
                     </header>
                     <p>
-                        The suite was built to find out which harness solves more. For a long time it could not answer
-                        that, because nearly everything passed. Three rounds of harder tasks changed nothing. What
-                        finally produced a difference was adding more harnesses rather than harder work, and the more
-                        useful question turned out to be what each harness costs you before the model does anything.
+                        The suite was built to find which harness solves more. For a long time it could not answer
+                        that, because nearly everything passed. Three rounds of harder tasks changed nothing.
+                        Adding more harnesses finally produced a difference. The more useful question turned out
+                        to be simpler: what each harness costs before the model does anything.
                     </p>
                     <dl class="verdict">
                         <div>
@@ -113,17 +115,16 @@
                         <div>
                             <dt>Measured</dt>
                             <dd>
-                                <strong>Solve rate finally separates, but only just.</strong>
-                                Most harnesses pass nearly everything, so one of them failing is worth reading as an
-                                observation about that harness rather than a ranking of the rest.
+                                <strong>Solve rate separates slightly.</strong>
+                                Most harnesses pass nearly everything. One of them fails more often. Treat that as a
+                                note about that harness.
                             </dd>
                         </div>
                     </dl>
                     <div class="metric-row" id="metric-row"></div>
                     <p>
-                        The practical reading: harness overhead is charged on every model call, and a longer task means
-                        more calls rather than cheaper ones. Picking a lighter harness is not a saving that fades once
-                        the work gets real.
+                        Harness overhead is charged on every model call. A longer task means more calls, not cheaper
+                        ones. A lighter harness stays cheaper as work grows.
                     </p>
                 </section>
 
@@ -135,7 +136,7 @@
                     <p>
                         Each attempt runs one harness against one task in a disposable home directory, with a fresh copy
                         of the task's workspace and the model pointed at a logging proxy. The proxy records every
-                        request and response, so token counts and tool calls are observed rather than self-reported. A
+                        request and response, so token counts and tool calls are observed directly. A
                         task checker then grades the resulting workspace.
                     </p>
                     <ul>
@@ -152,15 +153,12 @@
                             verdict throws away the difference between a near miss and no attempt.
                         </li>
                         <li>
-                            <b>Tiers 1 to 3 are scored on effort as well as correctness.</b> Those tasks are small, and
-                            a two-line deliverable is genuinely binary: across 182 attempts every score was exactly 0 or
-                            1, so thirteen tasks carried about one bit between them. What did vary, at identical
-                            results, was the work taken to get there &mdash; 2 tool calls against 9 on the same task. So
-                            the score is correctness multiplied by an effort term, and the reference is the fewest calls
-                            any harness here actually used on a passing attempt, not a theoretical floor. A wrong answer
-                            scores zero however cheap it was. Beating the reference caps at 1.000, so a better harness
-                            never lowers anyone else's recorded score. Because the reference is the best result in this
-                            field, it is a measure of distance from the best demonstrated here, not an absolute.
+                            <b>Tiers 1 to 3 are scored on effort as well as correctness.</b> Those tasks are small.
+                            Across 182 attempts every score was 0 or 1, so the score alone showed almost nothing.
+                            What varied was the work to get there: 2 tool calls on one attempt, 9 on another for the
+                            same result. The score is correctness times an effort term. The reference is the fewest
+                            calls any harness used on a passing attempt. A wrong answer scores zero. Beating the
+                            reference caps at 1.000.
                         </li>
                         <li>
                             <b>Scope is checked separately.</b> Every workspace is content-hashed before and after. A
@@ -171,11 +169,10 @@
                     <div class="callout">
                         <p>
                             <strong>Attempts that never started are excluded.</strong> Harnesses run side by side, and
-                            that contention can occasionally stop one launching before it makes a single model call.
-                            Such an attempt never ran the task, so counting it as a loss would blame a harness for the
-                            evaluation's own plumbing. They are dropped from every average and counted separately as
-                            <code>launchFailures</code> in the data file, so the exclusion is visible rather than
-                            quietly applied.
+                            that can stop one launching before its first model call.
+                            Such an attempt never ran the task, so it is not counted as a loss. Dropped attempts
+                            are left out of every average and counted separately as
+                            <code>launchFailures</code> in the data file.
                         </p>
                     </div>
                     <div class="table-scroll" id="table-overall">
@@ -189,37 +186,36 @@
                         <span>03</span>
                     </header>
                     <p>
-                        This is the figure the suite was built to produce, and for most of its life it was the least
-                        informative one in the set. Every harness passed almost everything. It is published partly
-                        because that flatness is itself a result, and partly because it has finally started to move.
+                        This is the figure the suite was built for. For most of its life it showed almost nothing.
+                        Every harness passed almost everything. It is still worth publishing. The flat result is
+                        itself a finding, and it has finally started to move.
                     </p>
                     <figure class="chart-figure">
                         <!-- chart-solve --><svg class="chart" id="chart-solve" viewBox="0 0 720 1002" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Tasks solved"><text x="0" y="18" class="ct-lb">Tasks solved</text><line x1="150.0" y1="34" x2="150.0" y2="966" stroke="var(--line)" opacity=".85" /><text x="150.0" y="983" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="260.0" y="983" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="370.0" y="983" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="480.0" y="983" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="590.0" y="983" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Tier 1 · smoke</text><rect x="150.0" y="65" width="440.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi</text><text x="598.0" y="78" class="ct-val">100%  8/8</text><rect x="150.0" y="87" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="100" class="ct-val">100%  8/8</text><rect x="150.0" y="109" width="440.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="598.0" y="122" class="ct-val">100%  8/8</text><rect x="150.0" y="131" width="440.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">OpenCode</text><text x="598.0" y="144" class="ct-val">100%  8/8</text><rect x="150.0" y="153" width="330.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="166" text-anchor="end" class="ct-sub">Codex CLI</text><text x="488.0" y="166" class="ct-val">75%  6/8</text><rect x="150.0" y="175" width="440.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="188" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="598.0" y="188" class="ct-val">100%  8/8</text><rect x="150.0" y="197" width="440.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="210" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="598.0" y="210" class="ct-val">100%  8/8</text><text x="0" y="245" class="ct-row">Tier 2 · edits</text><rect x="150.0" y="252" width="440.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">Pi</text><text x="598.0" y="265" class="ct-val">100%  16/16</text><rect x="150.0" y="274" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="287" class="ct-val">100%  16/16</text><rect x="150.0" y="296" width="440.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="598.0" y="309" class="ct-val">100%  16/16</text><rect x="150.0" y="318" width="440.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">OpenCode</text><text x="598.0" y="331" class="ct-val">100%  16/16</text><rect x="150.0" y="340" width="330.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="353" text-anchor="end" class="ct-sub">Codex CLI</text><text x="488.0" y="353" class="ct-val">75%  12/16</text><rect x="150.0" y="362" width="440.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="375" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="598.0" y="375" class="ct-val">100%  16/16</text><rect x="150.0" y="384" width="440.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="397" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="598.0" y="397" class="ct-val">100%  16/16</text><text x="0" y="432" class="ct-row">Tier 3 · repair</text><rect x="150.0" y="439" width="440.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="452" text-anchor="end" class="ct-sub">Pi</text><text x="598.0" y="452" class="ct-val">100%  2/2</text><rect x="150.0" y="461" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="474" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="474" class="ct-val">100%  2/2</text><rect x="150.0" y="483" width="440.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="496" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="598.0" y="496" class="ct-val">100%  2/2</text><text x="140" y="518" text-anchor="end" class="ct-sub">OpenCode</text><text x="158.0" y="518" class="ct-val">0%  0/2</text><rect x="150.0" y="527" width="440.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="540" text-anchor="end" class="ct-sub">Codex CLI</text><text x="598.0" y="540" class="ct-val">100%  2/2</text><rect x="150.0" y="549" width="440.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="562" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="598.0" y="562" class="ct-val">100%  2/2</text><rect x="150.0" y="571" width="440.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="584" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="598.0" y="584" class="ct-val">100%  2/2</text><text x="0" y="619" class="ct-row">Tier 4 · ultimate</text><rect x="150.0" y="626" width="176.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="639" text-anchor="end" class="ct-sub">Pi</text><text x="334.0" y="639" class="ct-val">40%  2/5</text><rect x="150.0" y="648" width="264.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="661" text-anchor="end" class="ct-sub">SpecPi</text><text x="422.0" y="661" class="ct-val">60%  3/5</text><rect x="150.0" y="670" width="264.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="683" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="422.0" y="683" class="ct-val">60%  3/5</text><rect x="150.0" y="692" width="88.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="705" text-anchor="end" class="ct-sub">OpenCode</text><text x="246.0" y="705" class="ct-val">20%  1/5</text><rect x="150.0" y="714" width="352.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="727" text-anchor="end" class="ct-sub">Codex CLI</text><text x="510.0" y="727" class="ct-val">80%  4/5</text><rect x="150.0" y="736" width="264.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="749" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="422.0" y="749" class="ct-val">60%  3/5</text><rect x="150.0" y="758" width="352.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="771" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="510.0" y="771" class="ct-val">80%  4/5</text><text x="0" y="806" class="ct-row">Tier 5 · discipline</text><rect x="150.0" y="813" width="440.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="826" text-anchor="end" class="ct-sub">Pi</text><text x="598.0" y="826" class="ct-val">100%  6/6</text><rect x="150.0" y="835" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="848" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="848" class="ct-val">100%  6/6</text><rect x="150.0" y="857" width="440.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="870" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="598.0" y="870" class="ct-val">100%  6/6</text><rect x="150.0" y="879" width="440.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="892" text-anchor="end" class="ct-sub">OpenCode</text><text x="598.0" y="892" class="ct-val">100%  6/6</text><rect x="150.0" y="901" width="440.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="914" text-anchor="end" class="ct-sub">Codex CLI</text><text x="598.0" y="914" class="ct-val">100%  6/6</text><rect x="150.0" y="923" width="440.0" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="936" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="598.0" y="936" class="ct-val">100%  6/6</text><rect x="150.0" y="945" width="366.7" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="958" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="524.7" y="958" class="ct-val">83%  5/6</text><text x="0" y="996" class="ct-ax">Share of attempts passing the task checker</text></svg><!-- /chart-solve -->
                         <figcaption class="figure-note">
-                            Share of attempts passing the checker, by tier. Attempts that failed to start are excluded
-                            rather than scored as losses, because they never ran the task.
+                            Share of attempts passing the checker, by tier. Attempts that failed to start are left out,
+                            because they never ran the task.
                         </figcaption>
                     </figure>
                     <p>
-                        Three rounds of harder tasks were written to try to force a difference. The puzzles seemed
-                        demanding: a wire format inferred from fixtures, an interlocking cache policy, a log far larger
-                        than the context window. Every harness solved them on the first or second turn, because a
-                        capable model solves that kind of problem and the scaffolding around it barely participates.
-                        Harder puzzles were never the answer.
+                        Three rounds of harder tasks were written to force a difference. The puzzles looked hard: a wire
+                        format inferred from fixtures, an interlocking cache policy, a log far larger
+                        than the context window. Every harness solved them on the first or second turn. A capable
+                        model solves that kind of problem on its own. The surrounding harness barely matters there.
+                        Harder puzzles did not help.
                     </p>
                     <p>
-                        What did produce separation was adding harnesses. One of the six now fails a meaningful share of
-                        even the smallest tasks, and it does so consistently across tiers rather than in one unlucky
-                        run. That is a fact about that harness on this model, not a ranking of the others, which remain
-                        bunched near the top where the metric cannot tell them apart.
+                        Adding harnesses did. One of the six now fails a clear share of
+                        even the smallest tasks, and it does so across tiers. That says something about that harness
+                        on this model. The others stay bunched near the top, where this metric cannot tell them apart.
                     </p>
                     <div class="callout callout-warn">
                         <p>
-                            <strong>Read a failure as an observation, not a score.</strong> With a handful of attempts
-                            per task, one loss and a genuine weakness look identical. The number of attempts behind
+                            <strong>Treat a failure as one observation.</strong> With a handful of attempts
+                            per task, one loss and a real weakness look the same. The number of attempts behind
                             every figure is in
-                            <a class="text-link" href="./harness-eval.json">the data file</a>, and where a harness fails
-                            it is worth reading that attempt rather than the rate.
+                            <a class="text-link" href="./harness-eval.json">the data file</a>. Where a harness fails,
+                            read that attempt itself instead of the rate.
                         </p>
                     </div>
                 </section>
@@ -262,10 +258,9 @@
                         <span>05</span>
                     </header>
                     <p>
-                        The obvious guess is that a fixed cost per call is a large share of a small task and a rounding
-                        error on a large one. That is not what the per-tier spend shows. A longer task means more calls,
-                        and the overhead rides every one of them, so the premium travels with the work rather than being
-                        diluted by it.
+                        You might expect a fixed per-call cost to matter less on large tasks. The per-tier spend
+                        shows otherwise. A longer task means more calls, and the overhead is charged on each one.
+                        The extra cost grows with the work instead of fading into it.
                     </p>
                     <figure class="chart-figure">
                         <!-- chart-cost --><svg class="chart" id="chart-cost" viewBox="0 0 720 1002" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Model spend per attempt"><text x="0" y="18" class="ct-lb">Model spend per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="966" stroke="var(--line)" opacity=".85" /><text x="150.0" y="983" text-anchor="middle" class="ct-ax">$0.000</text><line x1="260.0" y1="34" x2="260.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="260.0" y="983" text-anchor="middle" class="ct-ax">$0.007</text><line x1="370.0" y1="34" x2="370.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="370.0" y="983" text-anchor="middle" class="ct-ax">$0.015</text><line x1="480.0" y1="34" x2="480.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="480.0" y="983" text-anchor="middle" class="ct-ax">$0.022</text><line x1="590.0" y1="34" x2="590.0" y2="966" stroke="var(--line)" opacity=".45" /><text x="590.0" y="983" text-anchor="middle" class="ct-ax">$0.030</text><text x="0" y="58" class="ct-row">Tier 1 · smoke</text><rect x="150.0" y="65" width="6.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi</text><text x="164.9" y="78" class="ct-val">$0.0005</text><rect x="150.0" y="87" width="12.6" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi</text><text x="170.6" y="100" class="ct-val">$0.0009</text><rect x="150.0" y="109" width="11.4" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="169.4" y="122" class="ct-val">$0.0008</text><rect x="150.0" y="131" width="20.7" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">OpenCode</text><text x="178.7" y="144" class="ct-val">$0.0014</text><rect x="150.0" y="153" width="8.3" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="166" text-anchor="end" class="ct-sub">Codex CLI</text><text x="166.3" y="166" class="ct-val">$0.0006</text><rect x="150.0" y="175" width="43.2" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="188" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="201.2" y="188" class="ct-val">$0.0029</text><rect x="150.0" y="197" width="24.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="210" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="182.0" y="210" class="ct-val">$0.0016</text><text x="0" y="245" class="ct-row">Tier 2 · edits</text><rect x="150.0" y="252" width="7.3" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">Pi</text><text x="165.3" y="265" class="ct-val">$0.0005</text><rect x="150.0" y="274" width="13.4" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">SpecPi</text><text x="171.4" y="287" class="ct-val">$0.0009</text><rect x="150.0" y="296" width="13.1" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="171.1" y="309" class="ct-val">$0.0009</text><rect x="150.0" y="318" width="22.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">OpenCode</text><text x="180.0" y="331" class="ct-val">$0.0015</text><rect x="150.0" y="340" width="12.4" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="353" text-anchor="end" class="ct-sub">Codex CLI</text><text x="170.4" y="353" class="ct-val">$0.0008</text><rect x="150.0" y="362" width="45.8" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="375" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="203.8" y="375" class="ct-val">$0.0031</text><rect x="150.0" y="384" width="27.8" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="397" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="185.8" y="397" class="ct-val">$0.0019</text><text x="0" y="432" class="ct-row">Tier 3 · repair</text><rect x="150.0" y="439" width="216.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="452" text-anchor="end" class="ct-sub">Pi</text><text x="374.6" y="452" class="ct-val">$0.0148</text><rect x="150.0" y="461" width="181.3" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="474" text-anchor="end" class="ct-sub">SpecPi</text><text x="339.3" y="474" class="ct-val">$0.0124</text><rect x="150.0" y="483" width="213.2" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="496" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="371.2" y="496" class="ct-val">$0.0145</text><rect x="150.0" y="505" width="174.7" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="518" text-anchor="end" class="ct-sub">OpenCode</text><text x="332.7" y="518" class="ct-val">$0.0119</text><rect x="150.0" y="527" width="331.4" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="540" text-anchor="end" class="ct-sub">Codex CLI</text><text x="489.4" y="540" class="ct-val">$0.0226</text><rect x="150.0" y="549" width="240.9" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="562" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="398.9" y="562" class="ct-val">$0.0164</text><rect x="150.0" y="571" width="338.4" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="584" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="496.4" y="584" class="ct-val">$0.0231</text><text x="0" y="619" class="ct-row">Tier 4 · ultimate</text><rect x="150.0" y="626" width="171.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="639" text-anchor="end" class="ct-sub">Pi</text><text x="329.5" y="639" class="ct-val">$0.0117</text><rect x="150.0" y="648" width="222.9" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="661" text-anchor="end" class="ct-sub">SpecPi</text><text x="380.9" y="661" class="ct-val">$0.0152</text><rect x="150.0" y="670" width="233.2" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="683" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="391.2" y="683" class="ct-val">$0.0159</text><rect x="150.0" y="692" width="184.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="705" text-anchor="end" class="ct-sub">OpenCode</text><text x="342.0" y="705" class="ct-val">$0.0125</text><rect x="150.0" y="714" width="404.8" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="727" text-anchor="end" class="ct-sub">Codex CLI</text><text x="562.8" y="727" class="ct-val">$0.0276</text><rect x="150.0" y="736" width="270.8" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="749" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="428.8" y="749" class="ct-val">$0.0185</text><rect x="150.0" y="758" width="365.0" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="771" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="523.0" y="771" class="ct-val">$0.0249</text><text x="0" y="806" class="ct-row">Tier 5 · discipline</text><rect x="150.0" y="813" width="100.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="826" text-anchor="end" class="ct-sub">Pi</text><text x="258.6" y="826" class="ct-val">$0.0069</text><rect x="150.0" y="835" width="78.2" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="848" text-anchor="end" class="ct-sub">SpecPi</text><text x="236.2" y="848" class="ct-val">$0.0053</text><rect x="150.0" y="857" width="97.6" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="870" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="255.6" y="870" class="ct-val">$0.0067</text><rect x="150.0" y="879" width="94.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="892" text-anchor="end" class="ct-sub">OpenCode</text><text x="252.0" y="892" class="ct-val">$0.0064</text><rect x="150.0" y="901" width="115.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="914" text-anchor="end" class="ct-sub">Codex CLI</text><text x="273.0" y="914" class="ct-val">$0.0078</text><rect x="150.0" y="923" width="144.8" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="936" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="302.8" y="936" class="ct-val">$0.0099</text><rect x="150.0" y="945" width="181.8" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="958" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="339.8" y="958" class="ct-val">$0.0124</text><text x="0" y="996" class="ct-ax">US dollars per attempt · same model, same tasks, same frozen price list</text></svg><!-- /chart-cost -->
@@ -275,48 +270,46 @@
                             itself incurs is excluded and reported separately in the data file.
                         </figcaption>
                     </figure>
-                    <h3>Efficiency is more than spend</h3>
+                    <h3>Cost and the parts that make it up</h3>
                     <p>
-                        Cost is the sum of everything else, which makes it the least diagnostic number here. These
-                        are the components, kept apart because they say different things. <b>Tool calls</b> and
-                        <b>turns</b> are how much work a harness took to reach a result the checker already accepted.
-                        <b>Tool errors</b> and <b>repeated calls</b> are whether it recovered from a failure or
-                        spiralled on it. <b>Cache hit rate</b> and <b>context growth</b> are what it carries on every
-                        request from then on, and fresh tokens are most of the bill: across these runs about 94% of
-                        prompt tokens are cache reads priced at a fiftieth of fresh input, so what a harness adds to
-                        the prefix each turn matters more than how much it sends in total.
+                        Cost alone does not say much. The parts below are kept separate because each answers a
+                        different question. <b>Tool calls</b> and
+                        <b>turns</b> show how much work it took to reach a result the checker accepted.
+                        <b>Tool errors</b> and <b>repeated calls</b> show whether the harness recovered or kept
+                        repeating the failure. <b>Cache hit rate</b> and <b>context growth</b> show what it carries on every
+                        request after that. Fresh tokens drive most of the bill: about 94% of
+                        prompt tokens here are cache reads priced at a fiftieth of fresh input. What a harness adds to
+                        the prefix each turn matters more than the request total.
                     </p>
                     <div class="table-scroll" id="table-efficiency">
                         <!-- table-efficiency --><table class="numeric"><thead><tr><th>Harness</th><th>Score</th><th>Tool calls</th><th>Turns</th><th>Tool errors</th><th>Repeated calls</th><th>Cache hit</th><th>Context growth / turn</th><th>Compactions</th><th>Score per 100 calls</th></tr></thead><tbody><tr><th>Pi</th><td>0.864</td><td>8.7</td><td>7.2</td><td>7.6%</td><td>3</td><td>92%</td><td>709</td><td>0</td><td>10.0</td></tr><tr><th>SpecPi</th><td>0.878</td><td>9.6</td><td>8.6</td><td>6.8%</td><td>4</td><td>93%</td><td>628</td><td>0</td><td>9.2</td></tr><tr><th>SpecPi + Jev</th><td>0.895</td><td>10.0</td><td>10.0</td><td>6.0%</td><td>9</td><td>94%</td><td>590</td><td>0</td><td>9.0</td></tr><tr><th>OpenCode</th><td>0.804</td><td>9.5</td><td>6.8</td><td>1.4%</td><td>2</td><td>90%</td><td>785</td><td>0</td><td>8.4</td></tr><tr><th>Codex CLI</th><td>0.742</td><td>10.8</td><td>9.5</td><td>12.3%</td><td>10</td><td>97%</td><td>714</td><td>0</td><td>6.9</td></tr><tr><th>Oh My Pi</th><td>0.891</td><td>11.0</td><td>8.7</td><td>3.7%</td><td>2</td><td>91%</td><td>615</td><td>0</td><td>8.1</td></tr><tr><th>DeepSeek Harness</th><td>0.833</td><td>14.4</td><td>10.9</td><td>2.2%</td><td>11</td><td>93%</td><td>804</td><td>37</td><td>5.8</td></tr></tbody></table><!-- /table-efficiency -->
                     </div>
                     <p>
-                        Every harness in this run was measured through the logging proxy, so context is observed for
-                        all of them; a harness measured natively would report its own token counts, never cross the
-                        proxy, and show context growth as not measured rather than as zero. Repeated calls count a
-                        tool invoked again with identical arguments after it had already answered. Compactions are
-                        the harness discarding context to make room, and only one harness here ever needed to.
+                        Every harness here was measured through the logging proxy, so context figures cover all of
+                        them. A harness measured natively would report its own token counts and skip the proxy.
+                        Its context growth would show as not measured. Repeated calls count a
+                        tool run again with identical arguments after it already answered. Compactions are
+                        the harness dropping context to make room. Only one harness here needed to.
                     </p>
                     <h3>Why the failures failed</h3>
                     <p>
-                        A pass rate says how often a harness finished. It does not say whether the ones that did not
-                        ran out of clock, solved the wrong problem, or repeated a failing call until the budget ran
-                        out &mdash; and those call for different fixes. The table below classifies every failed
+                        A pass rate shows how often a harness finished. It does not show what went wrong in the rest:
+                        a timeout, a wrong solution, or a failing call repeated until the budget ran out. Each points
+                        to a different fix. The table below groups every failed
                         attempt in this run, using
                         <a href="https://github.com/TannerMidd/SpecPi/blob/main/scripts/jev-triage.mjs">a typed
-                        classifier</a> over the metadata each attempt already recorded: checker notes, exit code,
+                        classifier</a> over data each attempt already recorded: checker notes, exit code,
                         stderr tail, duration, the most repeated tool, and which injected faults were met.
                     </p>
                     <p>
-                        Every verdict went through the same confidence gate a live session would apply, and answers
-                        that did not clear it are published as <b>ungated</b> rather than folded into the nearest
-                        category. More than half of them did not clear it. That is the honest shape of this
-                        evidence: a report file records what a harness did, not what it was trying to do, and for
-                        most failures that is not enough to say why. It is also the argument for
-                        <code>--keep-transcripts</code>, which records the per-request shape of an attempt beside
-                        its report and makes a richer classification possible without re-running anything.
-                        <b>Ungated</b> and <b>unknown</b> are different statements: the first is the classifier
-                        declining to commit, the second is it committing to "not determinable from what was
-                        recorded".
+                        Every verdict went through the same confidence gate a live session would use. Answers
+                        below that bar are published as <b>ungated</b> instead of being forced into the nearest
+                        category. More than half landed there. A report file records what a harness did, not what it
+                        meant to do. For most failures that is not enough to name the cause. That gap is why
+                        <code>--keep-transcripts</code> exists: it saves the per-request shape of an attempt beside
+                        its report, so classification can improve without re-running anything.
+                        <b>Ungated</b> means the classifier did not commit. <b>Unknown</b> means it committed to
+                        "cannot tell from what was recorded".
                     </p>
                     <div class="table-scroll" id="table-failure-modes">
                         <!-- table-failure-modes --><table class="numeric triage"><thead><tr><th>Failure mode</th><th>Attempts</th><th>Share</th><th>Harnesses</th><th>Meaning</th></tr></thead><tbody><tr><th>ungated</th><td>14</td><td>58%</td><td>codex, dsh, omp, opencode, pi, specpi-default, specpi-jev</td><td>No verdict cleared the gate</td></tr><tr><th>misread-requirement</th><td>5</td><td>21%</td><td>codex</td><td>Produced output that misses a stated requirement</td></tr><tr><th>unknown</th><td>3</td><td>13%</td><td>dsh, omp, specpi-default</td><td>Not determinable from what was recorded</td></tr><tr><th>timeout</th><td>2</td><td>8%</td><td>pi</td><td>Exceeded the wall-clock limit</td></tr></tbody></table><!-- /table-failure-modes -->
@@ -326,21 +319,18 @@
                     </div>
                     <p>
                         Every figure is relative to the cheapest harness in that tier. Read across a row and most stay
-                        roughly where they started: a harness costing twice the lightest on smoke tasks still costs
-                        about twice as much on the long one. The ratios move by a little, not by an order of magnitude,
-                        and nothing converges.
+                        close to where they started: a harness costing twice the lightest on smoke tasks still costs
+                        about twice as much on the long one. The ratios shift a little. Nothing converges.
                     </p>
                     <p>
-                        Two rows do move sharply, and both get more expensive rather than less. That is worth reading as
-                        a property of the long task, where a harness that takes more turns pays its per-call overhead
-                        more times, rather than as a fixed trait of those harnesses.
+                        Two rows move more. Both get more expensive on the long task. That fits the task: a harness
+                        that takes more turns pays its per-call overhead more times there.
                     </p>
                     <div class="callout">
                         <p>
-                            <strong>This is the number to carry away.</strong> A lighter harness is cheaper on small
-                            work and stays cheaper on large work. The saving does not evaporate once the task gets
-                            serious, which is the opposite of what an earlier version of this page concluded from a
-                            smaller set of harnesses and shorter tasks.
+                            <strong>Bottom line.</strong> A lighter harness costs less on small
+                            work and still costs less on large work. An earlier version of this page reached the
+                            opposite conclusion from fewer harnesses and shorter tasks. The larger run overturns it.
                         </p>
                     </div>
                 </section>
@@ -370,10 +360,173 @@
                     </p>
                 </section>
 
+                <section class="doc-section" id="terminal-bench">
+                    <header>
+                        <h2>A second opinion</h2>
+                        <span>07</span>
+                    </header>
+                    <p>
+                        Everything above is this repository grading its own suite, and a suite cannot mark its own
+                        homework. So the same harnesses were run against
+                        <a class="text-link" href="https://www.tbench.ai/">Terminal-Bench 2.0</a> &mdash; somebody
+                        else's tasks, written without reference to anything here. Seven tasks, four attempts each, one
+                        model, through the same endpoint. Pi with no harness at all is included as the floor, because
+                        SpecPi, SpecPi&nbsp;+&nbsp;Jev and Oh&nbsp;My&nbsp;Pi are all Pi underneath, and without it
+                        there is nothing to measure what they add against.
+                    </p>
+                    <p>
+                        Solve rate separates here in a way it never did on the tier suite: Codex passes 26 of 28 and
+                        the DeepSeek Harness passes 19. But the finding worth the section is the one that survives the
+                        small sample, and it is about overhead rather than skill.
+                    </p>
+                    <p class="figure-note">
+                        * Cache hit and cost come from a separate clean-session run of the same
+                        harnesses, six attempts each; the callout below says why. Every other column
+                        is the full run, twenty-eight attempts per harness.
+                    </p>
+                    <div class="table-scroll">
+                        <!-- tb-table-overall --><table class="numeric"><thead><tr><th>Harness</th><th>Solved</th><th>Prompt tok</th><th>Output tok</th><th>Cache hit *</th><th>Cost/attempt *</th><th>Tool calls</th><th>Requests</th><th>Tok/request</th><th>Agent sec</th></tr></thead><tbody><tr><th>Pi (base)</th><td>22/28</td><td>304,223</td><td>8,886</td><td>97%</td><td>$0.0118</td><td>16.9</td><td>15.4</td><td>19,718</td><td>141</td></tr><tr><th>SpecPi</th><td>22/28</td><td>283,246</td><td>5,934</td><td>95%</td><td>$0.0126</td><td>16.9</td><td>16.5</td><td>17,129</td><td>133</td></tr><tr><th>SpecPi + Jev</th><td>22/28</td><td>209,201</td><td>6,055</td><td>97%</td><td>$0.0095</td><td>16.0</td><td>15.5</td><td>13,528</td><td>150</td></tr><tr><th>Oh My Pi</th><td>23/28</td><td>555,530</td><td>11,247</td><td>97%</td><td>$0.0080</td><td>20.0</td><td>17.4</td><td>31,875</td><td>204</td></tr><tr><th>Codex</th><td>26/28</td><td>334,704</td><td>10,104</td><td>98%</td><td>$0.0071</td><td>17.3</td><td>15.8</td><td>21,155</td><td>119</td></tr><tr><th>OpenCode</th><td>22/28</td><td>260,729</td><td>2,206</td><td>94%</td><td>$0.0062</td><td>15.6</td><td>14.7</td><td>17,763</td><td>327</td></tr><tr><th>DeepSeek Harness</th><td>19/28</td><td>505,221</td><td>14,495</td><td>95%</td><td>$0.0145</td><td>not recoverable</td><td>22.4</td><td>22,526</td><td>190</td></tr></tbody></table><!-- /tb-table-overall -->
+                    </div>
+                    <p>
+                        <b>The harnesses agree almost exactly on how much work a task takes.</b> Tool calls per attempt
+                        run from 15.6 to 20.0 across the six that can be counted &mdash; a spread of under a third, on
+                        tasks where prompt tokens differ by nearly three to one. Whatever separates these rows, it is
+                        not that one harness does more.
+                    </p>
+                    <figure class="chart-figure">
+                        <!-- tb-chart-calls --><svg class="chart" id="tb-chart-calls" viewBox="0 0 720 606" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Tool calls and model requests per attempt"><text x="0" y="18" class="ct-lb">Tool calls and model requests per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="570" stroke="var(--line)" opacity=".85" /><text x="150.0" y="587" text-anchor="middle" class="ct-ax">0</text><line x1="260.0" y1="34" x2="260.0" y2="570" stroke="var(--line)" opacity=".45" /><text x="260.0" y="587" text-anchor="middle" class="ct-ax">6</text><line x1="370.0" y1="34" x2="370.0" y2="570" stroke="var(--line)" opacity=".45" /><text x="370.0" y="587" text-anchor="middle" class="ct-ax">13</text><line x1="480.0" y1="34" x2="480.0" y2="570" stroke="var(--line)" opacity=".45" /><text x="480.0" y="587" text-anchor="middle" class="ct-ax">19</text><line x1="590.0" y1="34" x2="590.0" y2="570" stroke="var(--line)" opacity=".45" /><text x="590.0" y="587" text-anchor="middle" class="ct-ax">25</text><text x="0" y="58" class="ct-row">Pi (base)</text><rect x="150.0" y="65" width="297.3" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">tool calls</text><text x="455.3" y="78" class="ct-val">16.9</text><rect x="150.0" y="87" width="271.5" height="17" rx="2" fill="var(--ct-pi)" opacity=".42" /><text x="140" y="100" text-anchor="end" class="ct-sub">requests</text><text x="429.5" y="100" class="ct-val">15.4</text><text x="0" y="135" class="ct-row">SpecPi</text><rect x="150.0" y="142" width="297.9" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="155" text-anchor="end" class="ct-sub">tool calls</text><text x="455.9" y="155" class="ct-val">16.9</text><rect x="150.0" y="164" width="291.0" height="17" rx="2" fill="var(--ct-specpi)" opacity=".42" /><text x="140" y="177" text-anchor="end" class="ct-sub">requests</text><text x="449.0" y="177" class="ct-val">16.5</text><text x="0" y="212" class="ct-row">SpecPi + Jev</text><rect x="150.0" y="219" width="281.6" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="232" text-anchor="end" class="ct-sub">tool calls</text><text x="439.6" y="232" class="ct-val">16.0</text><rect x="150.0" y="241" width="272.2" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity=".42" /><text x="140" y="254" text-anchor="end" class="ct-sub">requests</text><text x="430.2" y="254" class="ct-val">15.5</text><text x="0" y="289" class="ct-row">Oh My Pi</text><rect x="150.0" y="296" width="352.6" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">tool calls</text><text x="510.6" y="309" class="ct-val">20.0</text><rect x="150.0" y="318" width="306.7" height="17" rx="2" fill="var(--ct-omp)" opacity=".42" /><text x="140" y="331" text-anchor="end" class="ct-sub">requests</text><text x="464.7" y="331" class="ct-val">17.4</text><text x="0" y="366" class="ct-row">Codex</text><rect x="150.0" y="373" width="304.2" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="386" text-anchor="end" class="ct-sub">tool calls</text><text x="462.2" y="386" class="ct-val">17.3</text><rect x="150.0" y="395" width="278.5" height="17" rx="2" fill="var(--ct-codex)" opacity=".42" /><text x="140" y="408" text-anchor="end" class="ct-sub">requests</text><text x="436.5" y="408" class="ct-val">15.8</text><text x="0" y="443" class="ct-row">OpenCode</text><rect x="150.0" y="450" width="274.1" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="463" text-anchor="end" class="ct-sub">tool calls</text><text x="432.1" y="463" class="ct-val">15.6</text><rect x="150.0" y="472" width="258.3" height="17" rx="2" fill="var(--ct-opencode)" opacity=".42" /><text x="140" y="485" text-anchor="end" class="ct-sub">requests</text><text x="416.3" y="485" class="ct-val">14.7</text><text x="0" y="520" class="ct-row">DeepSeek Harness</text><text x="140" y="540" text-anchor="end" class="ct-sub">tool calls</text><text x="158.0" y="540" class="ct-val">not recoverable</text><rect x="150.0" y="549" width="394.7" height="17" rx="2" fill="var(--ct-deepseek)" opacity=".42" /><text x="140" y="562" text-anchor="end" class="ct-sub">requests</text><text x="552.7" y="562" class="ct-val">22.4</text><text x="0" y="600" class="ct-ax">Solid is tool calls, pale is model requests. DSH prints prose, so its calls cannot be counted.</text></svg><!-- /tb-chart-calls -->
+                        <figcaption class="figure-note">
+                            Tool calls against model requests, per attempt. The DeepSeek Harness prints prose rather
+                            than a structured trajectory, so its calls cannot be recovered; its requests were counted
+                            at a proxy and are real.
+                        </figcaption>
+                    </figure>
+                    <p>
+                        What differs is the size of each call. Dividing the requests out leaves the context a harness
+                        spends to ask one question, and that is where the rows come apart: the heaviest sends more
+                        than twice what the lightest does, on every call, for the same number of calls.
+                    </p>
+                    <figure class="chart-figure">
+                        <!-- tb-chart-overhead --><svg class="chart" id="tb-chart-overhead" viewBox="0 0 720 235" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt tokens per model request"><text x="0" y="18" class="ct-lb">Prompt tokens per model request</text><line x1="150.0" y1="34" x2="150.0" y2="199" stroke="var(--line)" opacity=".85" /><text x="150.0" y="216" text-anchor="middle" class="ct-ax">0k</text><line x1="260.0" y1="34" x2="260.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="260.0" y="216" text-anchor="middle" class="ct-ax">9k</text><line x1="370.0" y1="34" x2="370.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="370.0" y="216" text-anchor="middle" class="ct-ax">18k</text><line x1="480.0" y1="34" x2="480.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="480.0" y="216" text-anchor="middle" class="ct-ax">26k</text><line x1="590.0" y1="34" x2="590.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="590.0" y="216" text-anchor="middle" class="ct-ax">35k</text><rect x="150.0" y="46" width="247.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="59" text-anchor="end" class="ct-sub">Pi (base)</text><text x="405.9" y="59" class="ct-val">19,718</text><rect x="150.0" y="68" width="215.3" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="81" text-anchor="end" class="ct-sub">SpecPi</text><text x="373.3" y="81" class="ct-val">17,129</text><rect x="150.0" y="90" width="170.1" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="103" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="328.1" y="103" class="ct-val">13,528</text><rect x="150.0" y="112" width="400.7" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="125" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="558.7" y="125" class="ct-val">31,875</text><rect x="150.0" y="134" width="266.0" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="147" text-anchor="end" class="ct-sub">Codex</text><text x="424.0" y="147" class="ct-val">21,155</text><rect x="150.0" y="156" width="223.3" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="169" text-anchor="end" class="ct-sub">OpenCode</text><text x="381.3" y="169" class="ct-val">17,763</text><rect x="150.0" y="178" width="283.2" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="191" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="441.2" y="191" class="ct-val">22,526</text><text x="0" y="229" class="ct-ax">Context sent per request, with the number of requests divided out.</text></svg><!-- /tb-chart-overhead -->
+                        <figcaption class="figure-note">
+                            Prompt tokens per model request, cache reads included.
+                        </figcaption>
+                    </figure>
+                    <figure class="chart-figure">
+                        <!-- tb-chart-context --><svg class="chart" id="tb-chart-context" viewBox="0 0 720 235" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt tokens per attempt"><text x="0" y="18" class="ct-lb">Prompt tokens per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="199" stroke="var(--line)" opacity=".85" /><text x="150.0" y="216" text-anchor="middle" class="ct-ax">0k</text><line x1="260.0" y1="34" x2="260.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="260.0" y="216" text-anchor="middle" class="ct-ax">150k</text><line x1="370.0" y1="34" x2="370.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="370.0" y="216" text-anchor="middle" class="ct-ax">300k</text><line x1="480.0" y1="34" x2="480.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="480.0" y="216" text-anchor="middle" class="ct-ax">450k</text><line x1="590.0" y1="34" x2="590.0" y2="199" stroke="var(--line)" opacity=".45" /><text x="590.0" y="216" text-anchor="middle" class="ct-ax">600k</text><rect x="150.0" y="46" width="223.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="59" text-anchor="end" class="ct-sub">Pi (base)</text><text x="381.1" y="59" class="ct-val">304,223</text><rect x="150.0" y="68" width="207.7" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="81" text-anchor="end" class="ct-sub">SpecPi</text><text x="365.7" y="81" class="ct-val">283,246</text><rect x="150.0" y="90" width="153.4" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="103" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="311.4" y="103" class="ct-val">209,201</text><rect x="150.0" y="112" width="407.4" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="125" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="565.4" y="125" class="ct-val">555,530</text><rect x="150.0" y="134" width="245.4" height="17" rx="2" fill="var(--ct-codex)" opacity="1" /><text x="140" y="147" text-anchor="end" class="ct-sub">Codex</text><text x="403.4" y="147" class="ct-val">334,704</text><rect x="150.0" y="156" width="191.2" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="169" text-anchor="end" class="ct-sub">OpenCode</text><text x="349.2" y="169" class="ct-val">260,729</text><rect x="150.0" y="178" width="370.5" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="191" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="528.5" y="191" class="ct-val">505,221</text><text x="0" y="229" class="ct-ax">Mean prompt tokens per attempt, cache reads included. Lower is lighter.</text></svg><!-- /tb-chart-context -->
+                        <figcaption class="figure-note">The same overhead compounded over a whole attempt.</figcaption>
+                    </figure>
+                    <p>
+                        The tool mix says where the difference comes from. Codex routes nearly everything through a
+                        single command tool; Oh My Pi spreads the same work across five, and pays for all five on
+                        every call.
+                    </p>
+                    <div class="table-scroll">
+                        <!-- tb-table-mix --><table class="numeric"><thead><tr><th>Harness</th><th>Distinct tools</th><th>Share of calls</th></tr></thead><tbody><tr><th>Pi (base)</th><td>4</td><td>bash 90%, write 6%, read 3%, edit 1%</td></tr><tr><th>SpecPi</th><td>5</td><td>bash 88%, write 7%, edit 3%, read 2%, request_capability 0%</td></tr><tr><th>SpecPi + Jev</th><td>5</td><td>bash 85%, write 9%, edit 4%, read 2%, request_capability 1%</td></tr><tr><th>Oh My Pi</th><td>10</td><td>bash 64%, read 11%, write 7%, eval 5%, edit 5%, hub 4%, +4 more</td></tr><tr><th>Codex</th><td>2</td><td>exec_command 95%, write_stdin 5%</td></tr><tr><th>OpenCode</th><td>6</td><td>bash 75%, write 10%, webfetch 7%, todowrite 3%, edit 3%, read 2%</td></tr><tr><th>DeepSeek Harness</th><td>not recoverable</td><td>&mdash;</td></tr></tbody></table><!-- /tb-table-mix -->
+                    </div>
+                    <div class="callout">
+                        <p>
+                            <strong>The cache and cost columns come from a second run, because the first measured
+                            them wrongly.</strong> Every trial in the first run was pointed at one OpenCode session
+                            id, and that endpoint caches prompt prefixes per session. As distinct conversations
+                            piled into a single id the earlier prefixes were evicted: across both sittings the
+                            median share of requests whose cached prefix failed to grow was 0% for the first
+                            twenty-five trials on a session, then 24%, 30% and 38% as the count climbed. Every
+                            harness degraded, and the ones that looked worst were the ones that ran latest. Those
+                            two columns were measuring run position.
+                        </p>
+                        <p>
+                            Re-measured with a freshly minted session per arm and nothing else changed, the stall
+                            rate fell to between 0% and 3% and cache hit landed between 94% and 98% for all seven.
+                            The earlier reading that SpecPi was the worst of the group at 83% does not survive:
+                            it reads 95%, and SpecPi&nbsp;+&nbsp;Jev ties bare Pi at 97%. The rest of the table is
+                            unaffected, because caching changes how a prompt is billed and not what is sent.
+                        </p>
+                    </div>
+                    <div class="table-scroll">
+                        <!-- tb-table-task --><table class="numeric"><thead><tr><th>Task</th><th>Pi (base)</th><th>SpecPi</th><th>SpecPi + Jev</th><th>Oh My Pi</th><th>Codex</th><th>OpenCode</th><th>DeepSeek Harness</th></tr></thead><tbody><tr><th>count-dataset-tokens</th><td>2/4 · 1,522,206</td><td>4/4 · 323,113</td><td>3/4 · 242,948</td><td>4/4 · 823,837</td><td>4/4 · 676,216</td><td>4/4 · 747,288</td><td>4/4 · 443,433</td></tr><tr><th>crack-7z-hash</th><td>4/4 · 309,221</td><td>4/4 · 1,266,374</td><td>4/4 · 786,194</td><td>2/4 · 1,700,944</td><td>4/4 · 901,667</td><td>2/4 · 486,079</td><td>4/4 · 1,534,884</td></tr><tr><th>git-leak-recovery</th><td>4/4 · 36,449</td><td>4/4 · 52,881</td><td>4/4 · 62,648</td><td>4/4 · 185,123</td><td>4/4 · 122,736</td><td>4/4 · 61,513</td><td>4/4 · 104,511</td></tr><tr><th>kv-store-grpc</th><td>4/4 · 39,635</td><td>4/4 · 53,875</td><td>4/4 · 46,073</td><td>3/4 · 219,642</td><td>4/4 · 145,392</td><td>4/4 · 146,130</td><td>1/4 · 294,444</td></tr><tr><th>nginx-request-logging</th><td>4/4 · 35,056</td><td>4/4 · 50,721</td><td>3/4 · 56,810</td><td>3/4 · 235,802</td><td>4/4 · 173,538</td><td>3/4 · 117,400</td><td>0/4 · 562,993</td></tr><tr><th>openssl-selfsigned-cert</th><td>4/4 · 37,462</td><td>2/4 · 49,846</td><td>4/4 · 54,771</td><td>4/4 · 297,781</td><td>4/4 · 82,407</td><td>4/4 · 104,650</td><td>4/4 · 114,618</td></tr><tr><th>polyglot-c-py</th><td>0/4 · 149,530</td><td>0/4 · 185,912</td><td>0/4 · 214,966</td><td>3/4 · 425,578</td><td>2/4 · 240,975</td><td>1/4 · 162,043</td><td>2/4 · 481,663</td></tr></tbody></table><!-- /tb-table-task -->
+                    </div>
+                    <p>
+                        Per task, as solved over attempts and mean prompt tokens. One task,
+                        <code>polyglot-c-py</code>, is the only one that defeats the Pi family outright &mdash; Pi,
+                        SpecPi and SpecPi&nbsp;+&nbsp;Jev all go 0 for 4 where Oh&nbsp;My&nbsp;Pi goes 3 for 4. That is
+                        the clearest capability signal in the run, and it points the opposite way from the overhead
+                        columns.
+                    </p>
+                    <p>
+                        One caveat belongs next to the numbers before anything else: three of these arms ran in an
+                        earlier sitting than the other four, under different machine load.
+                    </p>
+                </section>
+
+                <section class="doc-section" id="jev-scope">
+                    <header>
+                        <h2>What this does not test about Jev</h2>
+                        <span>08</span>
+                    </header>
+                    <p>
+                        The SpecPi&nbsp;+&nbsp;Jev row spends 26% less context than SpecPi at an identical solve
+                        rate. That reads like the advisor working, and it is not: the layer's own ledger records
+                        <b>464 calls and zero applied</b> across the arm. Nothing it decided ever changed what
+                        happened, so the token difference has a cause this run does not identify.
+                    </p>
+                    <p>
+                        That is a weaker result than it sounds, because <b>solve rate was never the thing the layer
+                        was built to move.</b> Jev is eight systems, and each targets a situation rather than a
+                        score &mdash; a session long enough to accumulate dead tool results, a command that should
+                        not run unexamined, a loop that has stopped making progress, fetched text addressing the
+                        agent rather than the reader. A benchmark made of short, single-session, non-adversarial
+                        tasks does not contain those situations, so it cannot answer whether handling them helps.
+                    </p>
+                    <div class="table-scroll">
+                        <!-- tb-table-advisor --><table class="numeric"><thead><tr><th>System</th><th>Question it answers</th><th>Calls</th><th>Applied</th><th>Outcomes</th></tr></thead><tbody><tr><th>retention</th><td>Is this large tool result worth carrying for the rest of the session?</td><td>18</td><td>0</td><td>relevance-low-confidence 18</td></tr><tr><th>compaction</th><td>Where should a compaction cut, given the cache is discarded anyway?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>gap</th><td>Is this capability-gap report worth writing?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>sources</th><td>Which files should a delegation batch snapshot?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>progress</th><td>Has the session stopped making progress?</td><td>15</td><td>0</td><td>not-stuck 12, session-changed 3</td></tr><tr><th>capabilities</th><td>Will this session need a withdrawn tool group?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>untrusted</th><td>Is this fetched content addressing the agent rather than a reader?</td><td>0</td><td>0</td><td>never invoked</td></tr><tr><th>guard</th><td>Should this shell or file call run, where local rules could not settle it?</td><td>431</td><td>0</td><td>unrecorded 431</td></tr></tbody></table><!-- /tb-table-advisor -->
+                    </div>
+                    <p>
+                        Read down the calls column and the run describes itself. Five of the eight systems were
+                        never invoked at all. <code>compaction</code> is the clearest case: it guides the cut point
+                        when a session compacts, and <b>no attempt in this run ever compacted</b> &mdash; the largest
+                        single prompt anywhere in the arm was 72,117 tokens against a 200,000-token window.
+                        <code>sources</code> ranks files for a delegation snapshot, and nothing delegated;
+                        <code>untrusted</code> watches fetched content, and these tasks fetch almost nothing.
+                    </p>
+                    <p>
+                        Of the three that did run, <code>guard</code> accounts for 431 of the 464 calls. It examined
+                        every shell and file call that local rules could not settle, and escalated none of them. On
+                        ordinary development work that is the outcome you want from a command guard &mdash; 431
+                        chances to interrupt work that did not need interrupting, taken none of them &mdash; but it
+                        is a measurement of restraint, not of protection. This run contained nothing genuinely
+                        destructive for it to catch. One detail makes the claim narrower still: the guard's middle
+                        band asks a human, and headless there is no human, so it degrades to deferring. Only an
+                        outright block was reachable here, and the ask path went untested.
+                    </p>
+                    <p>
+                        <code>retention</code> was asked 18 times and declined every time, all 18 at
+                        <code>relevance-low-confidence</code> &mdash; it would not drop a tool result it was not
+                        sure was dead, which is the safe direction to fail but means it shortened nothing.
+                        <code>progress</code> was asked 15 times and found the session healthy in 12.
+                    </p>
+                    <div class="callout">
+                        <p>
+                            <strong>The honest summary is that this benchmark is the wrong shape for this layer.</strong>
+                            It is a fair test of harness overhead, which is why the rest of the section stands. It is
+                            not a test of whether an advisory layer earns its keep over a long session, because no
+                            session here was long, and it is not a test of a command guard, because nothing here was
+                            dangerous. Both would need a suite built to contain those cases.
+                        </p>
+                    </div>
+                    <p>
+                    <p>
+                        The machine-readable record is
+                        <a class="text-link" href="./terminal-bench.json">terminal-bench.json</a>. Benchmark task
+                        content is deliberately absent from this repository: Terminal-Bench ships canary strings that
+                        are not meant to enter a training corpus, so only aggregates and task names cross over.
+                    </p>
+                </section>
+
                 <section class="doc-section" id="limits">
                     <header>
                         <h2>What this does not establish</h2>
-                        <span>07</span>
+                        <span>09</span>
                     </header>
                     <p>
                         This is a starting point. It is a small suite, on one model, on one machine, and it should be
@@ -390,15 +543,15 @@
                         </li>
                         <li>
                             <b>Two attempts per cell on tiers 1 to 3, one on tier 4.</b> Enough to notice flakiness,
-                            not enough to put an interval around a solve rate. Where a harness failed, treat it as an
-                            observation and not a rate. A single attempt supports even less than that.
+                            not enough for a solve-rate interval. Where a harness failed, treat it as one
+                            observation. A single attempt supports even less than that.
                         </li>
                         <li>
                             <b>One tier 4 cell is a known artifact.</b> Pi&rsquo;s browser-triage attempt is recorded
                             as a 600-second timeout, and it is not one: a stray process from an abandoned run was
                             competing for the same provider while that tier ran. The same cell completes in 155
-                            seconds with nothing else running. Contention distorts wall clock, and wall clock only
-                            becomes a score when it causes a timeout, so no other row is affected &mdash; token,
+                            seconds with nothing else running. Contention distorts wall clock. Wall clock only
+                            becomes a score when it causes a timeout, so no other row is affected. Token,
                             cost, tool-call and context figures are per-request accounting throughout. Pi&rsquo;s
                             tier 4 figure should be read as a lower bound.
                         </li>
@@ -424,8 +577,8 @@
                             separates nothing on quality and should be read for cost and effort only. Tier 4 is the
                             opposite: four of its five tasks show real spread, and only the research dossier is a
                             ceiling. The one tier 5 task that moved was the authority boundary, and it moved because
-                            a harness failed to produce a valid artifact at all, not because an embedded instruction
-                            was followed &mdash; no harness produced a forbidden output on any attempt.
+                            a harness failed to produce a valid artifact at all. No embedded instruction
+                            was followed. No harness produced a forbidden output on any attempt.
                         </li>
                         <li>
                             <b>Synthetic tasks.</b> They are self-contained and deterministic by design, which is what
@@ -437,9 +590,9 @@
                         </li>
                     </ul>
                     <p>
-                        The suite will grow. Harder puzzles mostly measure the model, so the promising direction is
-                        tasks where the scaffolding has to participate: long sessions where context management decides
-                        the outcome, and situations where tools fail and the harness has to recover.
+                        The suite will grow. Harder puzzles mostly measure the model. The next step is
+                        tasks where the harness has to help: long sessions where context handling decides
+                        the outcome, and cases where tools fail and the harness has to recover.
                     </p>
                 </section>
             </div>
