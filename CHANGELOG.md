@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.29.0 - 2026-09-20
 
 - Return the command guard to `specpi-jev-guard`, and leave it there. 0.28.0 built the guard into the layer as its eighth system, for three stated reasons that were properties of the package as it stood: a global configuration file with no session scope, a key read from the environment only, and a fail-closed posture. Two of the three are fixed upstream. Guard 0.3.0 ships `/jev-guard setup | on | off [--global] | check | model | backend`, so it has a session scope and a switch of its own, and it resolves Pi's saved login before the environment, so `/login openrouter` serves it exactly as it serves the advisor. What remains is fail-closed, which is a disclosed trade rather than a defect. `extensions/jev-advisor/risk.mjs` and `questions/guard.mjs` are gone, the package is pinned again, and the base is eight.
 - Keep the guard out of the Jev layer entirely, rather than half in it. There is no `/jev guard` command, no `systems.guard`, no `guard` pair in the layer's settings, no guard row in the Chat panel and no guard line in `/jev status`; the advisor imports nothing from it, and a test walks `extensions/jev-advisor/` to keep it that way. Two switches over one gate is what made the package's own shape a problem the first time, and adding a second one back would have reintroduced it with the roles swapped. The package owns its switch; SpecPi owns whether the package is installed and that it arrives off.
