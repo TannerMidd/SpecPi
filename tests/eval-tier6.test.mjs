@@ -137,6 +137,6 @@ test("advisor calls are excluded from the model request count", () => {
     assert.equal(
         modelRequests(log).length + advisorTotals(log).calls,
         log.length,
-        "every logged request is one or the other, so the two counts must partition the log",
+        "in a log of turns and advisor posts the two counts must partition it",
     );
 });

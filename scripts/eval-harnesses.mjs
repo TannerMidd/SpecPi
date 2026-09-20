@@ -347,6 +347,93 @@ export function codexConfig({ baseUrl, model, provider = "eval", contextWindow =
 // shell. Only the prompt would need quoting through cmd.exe, and it travels
 // on stdin, so the shim path keeps a fixed command line with no user content
 // in it.
+export function findClaudeCli() {
+    const configured = process.env.SPECPI_CLAUDE_CLI;
+    if (configured && fs.existsSync(configured)) {
+        return resolveWindowsBinary(configured);
+    }
+
+    const found = findOnPath("claude");
+
+    return found ? resolveWindowsBinary(found) : undefined;
+}
+
+/**
+ * Claude Code, headless, pointed at the proxy.
+ *
+ * NO ANTHROPIC CREDENTIAL IS INVOLVED, and the disposable config directory is what guarantees it.
+ * Claude Code normally authenticates against a stored subscription login, so a run against the
+ * user's real configuration could fall back to it and bill a subscription for an eval. A fresh
+ * `CLAUDE_CONFIG_DIR` has no stored login to fall back to, `ANTHROPIC_BASE_URL` points at the
+ * proxy, and the proxy builds its own outbound headers and discards whatever the client sent -- so
+ * the token below is a placeholder that never reaches anything. This is the same discipline the
+ * Codex row uses with a disposable CODEX_HOME.
+ *
+ * `--dangerously-skip-permissions` is the equivalent of the SpecPi rows' yoloMode opt-in: headless
+ * there is nobody to answer a prompt, and the report method discloses it rather than measuring it
+ * away.
+ *
+ * The declared context window is absent on purpose. Claude Code exposes no setting for it -- its
+ * compaction triggers off the model's own window -- so a tier that declares one cannot hold this
+ * harness to it, and tier 6 reads the row as unwindowed rather than pretending otherwise.
+ */
+async function runClaudeCode({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) {
+    const startedAt = Date.now();
+    const cli = findClaudeCli();
+    if (!cli) {
+        throw new Error("Claude Code CLI not found: set SPECPI_CLAUDE_CLI or put claude on PATH");
+    }
+
+    const configDir = path.join(homeDir, "claude-config");
+    fs.mkdirSync(configDir, { recursive: true });
+    const args = [
+        "--print",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--dangerously-skip-permissions",
+        "--model",
+        model,
+    ];
+    if (Number.isSafeInteger(task.turnCap) && task.turnCap > 0) {
+        args.push("--max-turns", String(task.turnCap));
+    }
+
+    const child = spawnCodex(cli, args, {
+        cwd: workspaceDir,
+        env: withFaultPath(
+            allowlistedEnv(homeDir, {
+                CLAUDE_CONFIG_DIR: configDir,
+                ANTHROPIC_BASE_URL: proxyUrl.replace(/\/v1$/u, ""),
+                ANTHROPIC_AUTH_TOKEN: "eval-proxy",
+                // Telemetry is not billing, but a disposable home has nowhere to put it and an
+                // eval should not be measuring a network call it did not ask for.
+                DISABLE_TELEMETRY: "1",
+                DISABLE_ERROR_REPORTING: "1",
+                DISABLE_AUTOUPDATER: "1",
+            }),
+            faults,
+        ),
+    });
+    // Same reason as Codex: eval prompts are multi-line markdown and no Windows shell carries a
+    // newline inside a quoted argument, so the prompt travels on stdin.
+    child.stdin.end(task.prompt);
+    let errors = "";
+    child.stdout.resume();
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const outcome = await waitForExit(child, timeoutMs);
+
+    return {
+        exitCode: outcome.timedOut ? 1 : (child.exitCode ?? 1),
+        timedOut: outcome.timedOut,
+        durationMs: Date.now() - startedAt,
+        stderrTail: errors.slice(-2000),
+    };
+}
+
 function spawnCodex(cli, args, { cwd, env }) {
     if (process.platform === "win32" && /\.(cmd|bat)$/iu.test(cli)) {
         const comspec = process.env.ComSpec ?? process.env.COMSPEC ?? "cmd.exe";
@@ -1315,6 +1402,20 @@ export const harnessAdapters = {
             return { available: true, detail: cli };
         },
         run: runCodex,
+    },
+    "claude-code": {
+        id: "claude-code",
+        label: "Claude Code",
+        needsProxySession: true,
+        isAvailable: () => {
+            const cli = findClaudeCli();
+            if (!cli) {
+                return { available: false, detail: "set SPECPI_CLAUDE_CLI or put claude on PATH" };
+            }
+
+            return { available: true, detail: cli };
+        },
+        run: runClaudeCode,
     },
     dsh: {
         id: "dsh",

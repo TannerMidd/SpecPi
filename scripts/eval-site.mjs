@@ -40,6 +40,7 @@ const HARNESSES = [
     { id: "specpi-jev", label: "SpecPi + Jev", colour: "var(--ct-specpi-jev)" },
     { id: "opencode", label: "OpenCode", colour: "var(--ct-opencode)" },
     { id: "codex", label: "Codex CLI", colour: "var(--ct-codex)" },
+    { id: "claude-code", label: "Claude Code", colour: "var(--ct-claudecode)" },
     { id: "omp", label: "Oh My Pi", colour: "var(--ct-omp)" },
     { id: "dsh", label: "DeepSeek Harness", colour: "var(--ct-deepseek)" },
 ];

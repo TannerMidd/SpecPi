@@ -6,6 +6,13 @@
 
 import http from "node:http";
 import { createHash } from "node:crypto";
+import {
+    collectChatReply,
+    syntheticMessagesStream,
+    toChatCompletions,
+    toMessagesBody,
+    toMessagesStream,
+} from "./eval-anthropic.mjs";
 
 function readBody(request) {
     return new Promise((resolve, reject) => {
@@ -120,12 +127,17 @@ export function summarizeRequest(body) {
 // harnesses without auxiliaries are unaffected because their first request
 // already carries the schema.
 /**
- * Model traffic only. Advisor calls share the log so their spend is visible, but they are not
- * turns of the conversation: counting them would inflate the request count and put null-token
- * entries into the per-request series that describes context growth.
+ * Model traffic only. Advisor calls and harness auxiliaries share the log so their spend is
+ * visible, but neither is a turn of the conversation: counting them would inflate the request count
+ * and put entries into the per-request series that describes context growth.
+ *
+ * `auxiliary` is the session-title call the rule above describes. Claude Code is the first proxy
+ * harness that makes one -- OpenCode makes one too, but reports its own per-step usage rather than
+ * going through this log -- so a filter that had only ever needed to know about the advisor now
+ * needs to know about it as well.
  */
 export function modelRequests(requests) {
-    return (requests ?? []).filter((record) => record.kind !== "advisor");
+    return (requests ?? []).filter((record) => record.kind !== "advisor" && record.kind !== "auxiliary");
 }
 
 /**
@@ -531,9 +543,19 @@ export function startProxy({
     const server = http.createServer(async (request, response) => {
         try {
             const raw = await readBody(request);
-            const body = raw.length > 0 ? JSON.parse(raw) : {};
+            const rawBody = raw.length > 0 ? JSON.parse(raw) : {};
             const routePath = (request.url ?? "").split("?")[0];
             const responsesRequest = routePath.endsWith("/responses");
+            // Claude Code checks the endpoint is reachable before it starts. It is not a model
+            // call: it carries no body, names no model, and forwarding it would send an empty
+            // payload to the provider's completions endpoint and record the reply as a turn.
+            if (routePath.endsWith("/api/hello")) {
+                response.writeHead(200, { "Content-Type": "application/json" });
+                response.end("{}");
+
+                return;
+            }
+
             // The Jev advisor is part of what a SpecPi + Jev session spends, so its calls come
             // through the same log as everything else. Routing them here is what lets the cost
             // column include the advisor instead of quietly excluding it.
@@ -543,10 +565,23 @@ export function startProxy({
                 return;
             }
 
+            // Claude Code speaks the Messages API and the provider does not, so the request is
+            // converted here, before anything is recorded. Everything downstream -- the summary,
+            // the tool-outcome scan, usage, tool calls, cost -- then reads the one shape it has
+            // always read. See scripts/eval-anthropic.mjs for why the seam is at this line.
+            const messagesRequest = routePath.endsWith("/messages");
+            const body = messagesRequest ? toChatCompletions(rawBody) : rawBody;
+
             const summary = summarizeRequest(body);
             const record = {
                 at: new Date().toISOString(),
                 model: body.model ?? "unknown",
+                // A Messages request carrying no tool schema is the harness titling its own
+                // session, not a turn of the conversation -- the rule `conversationSummary` has
+                // always used to find the real first call. Tagging it keeps its spend in the cost
+                // column while keeping it out of the turn count, exactly as advisor posts are
+                // handled. Scoped to this route so no other harness's recorded rows can move.
+                ...(messagesRequest && summary.toolCount === 0 ? { kind: "auxiliary" } : {}),
                 summary,
                 // The scan this used to keep `body` for, run now and kept instead of the body.
                 toolOutcome: toolOutcomeOf(body),
@@ -558,9 +593,11 @@ export function startProxy({
             if (!forwardUrl) {
                 response.writeHead(200, { "Content-Type": "text/event-stream" });
                 response.end(
-                    responsesRequest
-                        ? syntheticResponsesStream(body.model ?? "measure-model")
-                        : syntheticStream(body.model ?? "measure-model"),
+                    messagesRequest
+                        ? syntheticMessagesStream(body.model ?? "measure-model")
+                        : responsesRequest
+                          ? syntheticResponsesStream(body.model ?? "measure-model")
+                          : syntheticStream(body.model ?? "measure-model"),
                 );
 
                 return;
@@ -568,7 +605,8 @@ export function startProxy({
 
             const upstreamUrl = responsesRequest ? (responsesForwardUrl ?? deriveResponsesUrl(forwardUrl)) : forwardUrl;
 
-            let payload = raw;
+            // A translated request has no original bytes to forward, so it is always re-serialised.
+            let payload = messagesRequest ? JSON.stringify(body) : raw;
             if (forwardModel) {
                 payload = JSON.stringify({ ...body, model: forwardModel });
             }
@@ -586,6 +624,22 @@ export function startProxy({
             const text = await upstream.text();
             record.usage = extractUsage(text);
             record.toolCalls = extractToolCalls(text);
+            // Accounting is done, so the reply can now be converted back for the one client that
+            // needs it. Everything above ran on the chat-completions shape either way.
+            if (messagesRequest) {
+                const reply = collectChatReply(text);
+                const model = rawBody.model ?? "unknown";
+                const streamed = rawBody.stream !== false;
+                response.writeHead(upstream.status, {
+                    "Content-Type": streamed ? "text/event-stream" : "application/json",
+                });
+                response.end(
+                    streamed ? toMessagesStream(reply, { model }) : JSON.stringify(toMessagesBody(reply, { model })),
+                );
+
+                return;
+            }
+
             // Pass the upstream encoding through untouched: Pi parses event
             // streams itself, and relabelling them breaks its reader.
             response.writeHead(upstream.status, {

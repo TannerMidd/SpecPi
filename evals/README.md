@@ -176,6 +176,27 @@ Live harnesses:
   as it does for the SpecPi permission opt-in. Model ids are sent through
   unchanged, except that an `opencode-go/<id>` qualifier is reduced to the
   provider's own id.
+- `claude-code`: the installed Claude Code CLI (found via `SPECPI_CLAUDE_CLI`
+  or PATH), run headless with `--print --output-format stream-json` inside a
+  disposable `CLAUDE_CONFIG_DIR`. It is the only harness that speaks the
+  Anthropic Messages API, so the proxy accepts `/v1/messages` and translates
+  it: the request becomes a chat-completions request *before* anything is
+  recorded, and the provider's reply is converted back on the way out. Every
+  accounting path therefore reads the one shape it has always read
+  (`scripts/eval-anthropic.mjs`, covered by `tests/eval-anthropic.test.mjs`).
+  Approval prompts cannot be answered headless, so runs pass
+  `--dangerously-skip-permissions`, disclosed the same way as the SpecPi
+  `yoloMode` opt-in.
+
+  **No Anthropic credential is read or spent.** The disposable config
+  directory holds no stored login to fall back on, `ANTHROPIC_BASE_URL` points
+  at the proxy, and the proxy discards the client's token and sends
+  `EVAL_FORWARD_KEY` upstream. Runs bill the same OpenCode Go subscription as
+  every other harness.
+
+  Claude Code exposes no context-window setting, so it cannot be held to a
+  tier's declared window and tier 6 reads its attempts as unwindowed, the way
+  it did for Codex and OpenCode before those learned to read one.
 - `dsh`: set `SPECPI_DSH_CLI` to the installed bin. Routes through the
   logging proxy via a home-level patch layer, like the other proxy harnesses.
 

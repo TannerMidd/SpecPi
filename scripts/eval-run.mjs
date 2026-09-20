@@ -154,6 +154,24 @@ function writeTranscript(directory, { harness, task, proxy, attempt }) {
     }
 }
 
+/**
+ * Remove an attempt's disposable directory, and never lose the attempt if it cannot be removed.
+ *
+ * On Windows a directory stays locked while any process still holds it as a working directory, and
+ * a harness that leaves a helper alive for a moment after its own exit keeps the attempt's
+ * workspace locked with it -- Claude Code does, which is how this was found. The attempt's result
+ * is already computed by this point, so throwing here discarded a finished measurement to report a
+ * temporary file that the operating system will clean up anyway. It retries for longer than the
+ * old three attempts, then says so and moves on.
+ */
+function discardRunDir(runDir) {
+    try {
+        fs.rmSync(runDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 });
+    } catch (error) {
+        process.stderr.write(`eval: could not remove ${runDir} (${String(error?.message ?? error)})\n`);
+    }
+}
+
 async function runAttempt({ harness, task, model, timeoutMs, transcriptDir }) {
     const runDir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-eval-run-")));
     const workspaceDir = path.join(runDir, "workspace");
@@ -299,7 +317,7 @@ async function runAttempt({ harness, task, model, timeoutMs, transcriptDir }) {
     }
 
     await proxy.close();
-    fs.rmSync(runDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    discardRunDir(runDir);
 
     return attempt;
 }

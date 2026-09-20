@@ -31,13 +31,14 @@ import { isLaunchFailure } from "./eval-site.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outFile = path.join(root, "site", "evaluations", "tier6.json");
 
-const ORDER = ["pi", "specpi-default", "specpi-jev", "omp", "codex", "opencode", "dsh"];
+const ORDER = ["pi", "specpi-default", "specpi-jev", "omp", "codex", "claude-code", "opencode", "dsh"];
 const LABELS = {
     pi: "Pi (base)",
     "specpi-default": "SpecPi",
     "specpi-jev": "SpecPi + Jev",
     omp: "Oh My Pi",
     codex: "Codex CLI",
+    "claude-code": "Claude Code",
     opencode: "OpenCode",
     dsh: "DeepSeek Harness",
 };
