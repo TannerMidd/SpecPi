@@ -797,9 +797,9 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
  * headless run that enabled it would spend nothing, do nothing, and still publish a row implying it
  * had been exercised.
  *
- * `guard` is on, and its absence here was a real defect rather than a choice. The permission system
- * runs yoloMode in these homes, which leaves the guard as the only component that can refuse a call
- * -- the arrangement it exists for -- and every published tier ran with it off.
+ * The command guard is absent because it is no longer part of the layer: it is the separate
+ * `specpi-jev-guard` package, which these disposable homes do not install and which this row
+ * therefore does not measure.
  */
 const JEV_EVAL_SYSTEMS = Object.freeze({
     retention: true,
@@ -809,7 +809,6 @@ const JEV_EVAL_SYSTEMS = Object.freeze({
     progress: true,
     untrusted: true,
     capability: false,
-    guard: true,
 });
 
 /**
@@ -817,10 +816,10 @@ const JEV_EVAL_SYSTEMS = Object.freeze({
  * checked against what the advisor will actually read back.
  *
  * Composed rather than written as a literal, and then verified. A literal is how this file came to
- * run every published tier with the command guard off: it carried `schema: 2` under a comment
- * saying it had to track config.mjs, config.mjs moved to schema 3, and the 2-to-3 migration reads
- * the guard preference from a `guard.startup` key that this shape has never had. Nothing compared
- * the result to the ask, so the row kept reporting a layer with one of its eight systems disabled.
+ * run every published tier with a system it believed it had enabled switched off: it carried a
+ * hardcoded `schema: 2` under a comment saying it had to track config.mjs, config.mjs moved on, and
+ * the migration for that number read a preference from a key this shape has never had. Nothing
+ * compared the result to the ask, so the row kept reporting a layer larger than the one it ran.
  *
  * The throw is the point. A settings file that silently resolves to less than it asked for measures
  * plain SpecPi in the specpi-jev row, and a run that does that should stop rather than publish.

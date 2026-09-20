@@ -1,6 +1,6 @@
 {
   "name": "specpi",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "description": "Scope control and a human-selected harness improvement loop for Pi",
   "author": "Tanner Middleton",
   "repository": {
@@ -28,6 +28,7 @@
     "scripts/lib.mjs",
     "scripts/lock.mjs",
     "scripts/packages.mjs",
+        "scripts/jev-guard.mjs",
     "templates",
     "extensions",
     "skills",

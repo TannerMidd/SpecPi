@@ -177,6 +177,7 @@ function getWebviewHtml({
                     <select id="send-mode" class="compact-select send-mode" title="When to send your next message" hidden><option value="steer">Steer now</option><option value="followUp">Follow up</option></select>
                 </div>
                 <span id="cache-status" title="Cache hit rate: no reported input token usage yet." aria-label="Cache hit rate: unavailable"><span class="cache-label">Cache hit</span> <strong id="cache-value">—</strong></span>
+                <span id="guard-status" title="Command guard" hidden><span class="cache-label">Guard</span> <strong id="guard-value">—</strong></span>
                 <span id="token-status" title="Session usage"></span>
                 <button id="stop-button" class="stop-button" type="button" title="Stop response" aria-label="Stop response" hidden>${icon("stop")}<span>Stop</span></button>
             </div>
@@ -233,7 +234,7 @@ function getWebviewHtml({
             <label for="package-target">Configuration</label>
             <select id="package-target">
                 <option value="webAccess">Web access &middot; providers and keys</option>
-                <option value="jevLayer">Jev layer &middot; systems, budgets and the guard</option>
+                <option value="jevLayer">Jev layer &middot; systems and budgets</option>
             </select>
             <button id="package-reload" type="button">Load / discard draft</button>
         </div>
@@ -243,7 +244,7 @@ function getWebviewHtml({
             <h3 id="package-key-title">Jev API key</h3>
             <p id="package-key-summary"></p>
             <ul id="package-key-list"></ul>
-            <p>The Jev layer resolves its key the way every other Pi provider does: the <code>openrouter</code> entry that <code>/login openrouter</code> writes to Pi's <code>auth.json</code>, then <code>OPENROUTER_API_KEY</code> from the environment Pi was started with. The first one present is the one in force. Chat checks whether each holds a key and never reads, stores, displays or sends the value &mdash; to add or change one, use <code>/login openrouter</code> in Pi rather than this panel. The command guard is one of the systems above rather than a separate package, so this one key serves all eight; with no key it asks nothing and every tool call goes to the permission system exactly as it did before.</p>
+            <p>The Jev layer resolves its key the way every other Pi provider does: the <code>openrouter</code> entry that <code>/login openrouter</code> writes to Pi's <code>auth.json</code>, then <code>OPENROUTER_API_KEY</code> from the environment Pi was started with. The first one present is the one in force. Chat checks whether each holds a key and never reads, stores, displays or sends the value &mdash; to add or change one, use <code>/login openrouter</code> in Pi rather than this panel. The pinned <code>specpi-jev-guard</code> package resolves the same credential in the same order since its 0.3.0, so this one key serves the layer and the guard together. It is not one of the systems above and is not configured here or by <code>/jev</code>: SpecPi installs it switched off, and <code>/jev-guard setup</code> in Pi is what turns it on. With no key the layer asks nothing and every tool call goes to the permission system exactly as it did before.</p>
         </section>
         <section id="package-usage" class="package-credentials package-usage" aria-labelledby="package-usage-title" hidden>
             <h3 id="package-usage-title">Advisor calls against their budgets</h3>

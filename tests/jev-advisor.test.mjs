@@ -6,6 +6,8 @@ import test from "node:test";
 
 import { SYSTEM_LABELS, createBroker } from "../extensions/jev-advisor/broker.mjs";
 import {
+    DEFAULT_BUDGETS,
+    MAX_BUDGETS,
     NUDGE_MODES,
     SYSTEM_NAMES,
     defaultSettings,
@@ -37,6 +39,7 @@ import * as sources from "../extensions/jev-advisor/questions/sources.mjs";
 import * as progress from "../extensions/jev-advisor/questions/progress.mjs";
 import * as untrusted from "../extensions/jev-advisor/questions/untrusted.mjs";
 import * as capabilities from "../extensions/jev-advisor/questions/capabilities.mjs";
+import { GUARD_PIN, applyInertConfig, configPath, desiredConfig, readConfig } from "../scripts/jev-guard.mjs";
 import { basePackages } from "../scripts/packages.mjs";
 import { AUTHORING_TOOL_NAMES, syncAuthoringTools } from "../extensions/tool-wishlist/authoring-tools.mjs";
 
@@ -131,6 +134,19 @@ function withAgentDir(run) {
     );
 }
 
+/**
+ * The pinned guard, as far as the seam can see it: a manifest under the agent's npm directory. The
+ * seam identifies the package by name from that file and nothing else, so a real install is not
+ * needed to exercise what SpecPi asserts into its configuration.
+ */
+function installFakeGuard(dir, version = "0.4.0") {
+    const root = path.join(dir, "npm", "node_modules", "specpi-jev-guard");
+    fs.mkdirSync(root, { recursive: true });
+    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "specpi-jev-guard", version }));
+
+    return root;
+}
+
 const enabledSettings = (overrides = {}) => ({
     ...defaultSettings(),
     master: true,
@@ -221,6 +237,26 @@ function countingBroker(settings) {
 }
 
 const ask1 = (system) => ({ system, state: {}, questions: { q: noul("x") } });
+
+test("the session total stays below what the per-system ceilings can add up to", () => {
+    // The two-level ceiling only means anything while this holds. A total the per-system ceilings
+    // could never reach between them is a limit that reads as a limit and can never fire -- the
+    // failure mode of raising one number without the other, which is the likeliest way this
+    // changes. Pinned as an inequality rather than as two literals so the numbers stay free to
+    // move together.
+    const sum = SYSTEM_NAMES.reduce((total, name) => total + DEFAULT_BUDGETS[name], 0);
+    assert.ok(
+        DEFAULT_BUDGETS.total < sum,
+        `the session total ${DEFAULT_BUDGETS.total} is not below the per-system sum ${sum}, so it can never bind`,
+    );
+
+    // And every shipped default has to be configurable, or the panel and the advisor would clamp
+    // the value we ship the moment anyone opened the settings and saved them again.
+    assert.ok(DEFAULT_BUDGETS.total <= MAX_BUDGETS.total);
+    for (const name of SYSTEM_NAMES) {
+        assert.ok(DEFAULT_BUDGETS[name] <= MAX_BUDGETS.system, `${name} ships above its own ceiling`);
+    }
+});
 
 test("the session call budget stops at its cap", async () => {
     await withAgentDir(async () => {
@@ -1394,10 +1430,10 @@ test("nothing in the Jev layer is on by default", () => {
             assert.equal(fresh.systems[name], false, `${name} must ship off`);
         }
 
-        // The command guard is one of those systems since schema 3, so "nothing is on" covers it
-        // without a second switch outside the master to check separately.
-        assert.ok(SYSTEM_NAMES.includes("guard"));
-        assert.ok(!("guard" in fresh), "schema 3 has no separate guard object");
+        // The command guard is a separate package with its own switch, so the layer holds nothing
+        // about it at all -- not a system, and not a preference beside them.
+        assert.ok(!SYSTEM_NAMES.includes("guard"), "the guard is a package, not one of the systems");
+        assert.ok(!("guard" in fresh), "and the layer keeps no record of it");
     });
 });
 
@@ -1418,6 +1454,110 @@ test("a user can default the layer on without a session toggle writing that pref
         assert.equal(saved.startup, true);
 
         // The stored preference is what a new session reads; enabling in-session must not reach it.
+    });
+});
+
+test("the guard and the permission system are both pinned", () => {
+    assert.ok(basePackages.includes(GUARD_PIN), `${GUARD_PIN} must be in the pinned base set`);
+    assert.ok(
+        basePackages.some((entry) => entry.startsWith("npm:@gotgenes/pi-permission-system@")),
+        "the permission system must stay pinned: it is what decides every call while the guard is off",
+    );
+});
+
+test("the installer seam only ever writes the guard off, and never arms it", () => {
+    withAgentDir(() => {
+        // The real specpi-jev-guard schema, not an invented one: applyPatch only reads these names.
+        const config = desiredConfig();
+        assert.equal(config.enabled, false, "the guard's own default is enabled:true, so SpecPi must override it");
+        assert.equal(config.backend, "openrouter", "one OpenRouter credential must serve the advisor and the guard");
+        assert.equal(config.uncertain, "ask");
+        assert.equal(Object.hasOwn(config, "askThreshold"), false, "thresholds stay the package's business");
+
+        // There is no armed form of it. SpecPi has no command that turns the guard on, so a seam
+        // that could produce `enabled: true` would have no caller and one obvious wrong use.
+        assert.equal(desiredConfig(true).enabled, false, "the seam takes no argument that arms the guard");
+        assert.equal(applyInertConfig().reason, "not-installed", "an absent guard is never configured into existence");
+    });
+});
+
+test("a fresh install writes the guard's inert posture, and says so when that disarms one", () => {
+    withAgentDir((dir) => {
+        installFakeGuard(dir);
+
+        // The guard's own DEFAULT_SETTINGS.enabled is true and it reads its file per tool call, so
+        // an absent file means an active guard. With no key that fails closed on every gated call,
+        // which is a first install that will not run commands.
+        assert.equal(readConfig(), undefined, "no settings file yet");
+        const created = applyInertConfig();
+        assert.equal(created.reason, "created");
+        assert.equal(created.disarmed, false, "nothing was taken away; there was nothing there");
+        assert.equal(readConfig().enabled, false);
+
+        assert.equal(applyInertConfig().applied, false, "an unchanged config must not be rewritten");
+        assert.equal(applyInertConfig().reason, "already-current");
+
+        // A user's own thresholds and globs survive; only SpecPi's three fields are asserted. And
+        // switching off a gate the user switched on is the one change the run has to announce --
+        // writing only when the file is absent would instead leave a stale `enabled: true` from
+        // before the package was last unpinned to arm the gate the moment it came back.
+        fs.writeFileSync(
+            configPath(),
+            JSON.stringify({ enabled: true, backend: "typesafe", askThreshold: 0.6, safeCommands: ["ls *"] }),
+        );
+        const disarmed = applyInertConfig();
+        assert.equal(disarmed.reason, "updated");
+        assert.equal(disarmed.disarmed, true, "the run has to be able to report this one");
+        const merged = readConfig();
+        assert.equal(merged.enabled, false);
+        assert.equal(merged.backend, "openrouter", "the backend is re-pinned so one credential still serves both");
+        assert.equal(merged.askThreshold, 0.6, "a user threshold must not be clobbered");
+        assert.deepEqual(merged.safeCommands, ["ls *"]);
+    });
+});
+
+test("nothing in the advisor reaches the command guard", () => {
+    // The separation is the point, so it is asserted rather than described. The extension is
+    // loaded by Pi every session; the seam is an installer script that runs once. If an import
+    // ever crosses that line again, the guard is back inside the layer whatever the comments say.
+    const dir = path.resolve("extensions/jev-advisor");
+    for (const entry of fs.readdirSync(dir, { recursive: true })) {
+        const file = path.join(dir, entry);
+        if (!fs.statSync(file).isFile()) {
+            continue;
+        }
+
+        const imports = [...fs.readFileSync(file, "utf8").matchAll(/from\s+"([^"]+)"/gu)].map((match) => match[1]);
+        assert.ok(!imports.some((source) => /guard/u.test(source)), `${entry} imports the command guard`);
+    }
+});
+
+test("schema 4 drops every trace of the guard, from either shape it took", () => {
+    withAgentDir(() => {
+        // Schema 2 kept a `guard` pair and schema 3 kept `systems.guard`. Neither was ever the
+        // authority over whether the guard runs -- the package's own file is -- so both are read
+        // past rather than migrated, and no answer about the guard survives in the layer's file.
+        const shapes = [
+            {
+                schema: 2,
+                master: true,
+                startup: true,
+                systems: { retention: true },
+                guard: { enabled: true, startup: true },
+            },
+            { schema: 3, master: true, startup: true, systems: { retention: true, guard: true } },
+        ];
+        for (const stored of shapes) {
+            fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
+            fs.writeFileSync(settingsPath(), JSON.stringify(stored));
+
+            const loaded = loadSettings();
+            assert.equal(loaded.schema, 4, `schema ${stored.schema} must migrate forward`);
+            assert.ok(!("guard" in loaded), `schema ${stored.schema} left a guard key behind`);
+            assert.ok(!("guard" in loaded.systems), `schema ${stored.schema} left a guard system behind`);
+            assert.equal(loaded.systems.retention, true, "every other preference survives the bump");
+            assert.equal(loaded.master, true);
+        }
     });
 });
 

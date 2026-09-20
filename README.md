@@ -44,7 +44,7 @@ Everything it touches is written down, versioned, and easy to undo.
 
 ## Measured context
 
-This chart shows first-call context from a clean install: all seven pinned packages, the working agreement, and the skills Pi finds. It has not been re-measured since the command guard became a native system rather than an eighth pinned package. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
+This chart shows first-call context from a clean install: all eight pinned packages, the working agreement, and the skills Pi finds. It has not been re-measured since the command guard returned to a pinned package rather than a native system. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
 
 The solid rows are measured by us, from the request each setup actually sends through one local test provider. That includes OpenCode, the DeepSeek Harness, and Oh My Pi, all measured as installed. The faded Codex CLI and Claude Code rows come from HarnessTax's published numbers, measured under their own setup. Treat those as a rough reference, not a head-to-head test. These are character counts. They say nothing about tokens, cost, or how well each tool does the job. The research page [breaks down the enabled setup by feature](https://tannermidd.github.io/SpecPi/research/#specpi), so you can see what each switch costs on its own.
 

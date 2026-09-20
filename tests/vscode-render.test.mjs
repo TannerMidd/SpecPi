@@ -874,6 +874,61 @@ test(
                 },
             );
 
+            await t.test(
+                "the command guard's counter shows while it is gating and goes away when it stops",
+                async () => {
+                    await withPage(browser, fixtures, { name: "guard-counter", width: 280 }, async (page) => {
+                        const guard = page.locator("#guard-status");
+                        const value = page.locator("#guard-value");
+
+                        // No key means the guard is not gating -- switched off, or its audit display
+                        // is. Either way there is nothing to report and nothing should be shown.
+                        await setState(page, { status: "ready", runtimeStatus: {} });
+                        assert.equal(await guard.isVisible(), false);
+
+                        await setState(page, { status: "ready", runtimeStatus: { "jev-guard": "jev 12" } });
+                        assert.equal(await guard.isVisible(), true);
+                        assert.equal(await value.textContent(), "jev 12");
+                        assert.equal(await guard.getAttribute("data-blocked"), "false");
+
+                        // The chip keeps the count; the whole line lives in the tooltip, where a long
+                        // one cannot push the footer around.
+                        await setState(page, {
+                            status: "ready",
+                            runtimeStatus: { "jev-guard": "jev 12 · 1 blocked · bash 0.91 blocked" },
+                        });
+                        assert.equal(await value.textContent(), "jev 12");
+                        assert.equal(await guard.getAttribute("data-blocked"), "true");
+                        assert.match(await guard.getAttribute("title"), /1 blocked · bash 0\.91 blocked/u);
+                        assert.match(await guard.getAttribute("aria-label"), /specpi-jev-guard/u);
+
+                        // It is a readout, not a control: the guard is configured in Pi, not here.
+                        assert.equal(await guard.evaluate((element) => element.tagName), "SPAN");
+
+                        // Inside the viewport at the narrowest sidebar, beside the other readouts.
+                        assert.equal(
+                            await guard.evaluate((element) => {
+                                const bounds = element.getBoundingClientRect();
+
+                                return bounds.left >= 0 && bounds.right <= innerWidth && bounds.bottom <= innerHeight;
+                            }),
+                            true,
+                        );
+                        await page.screenshot({ path: path.join(screenshots, "guard-counter-280.png") });
+
+                        // A disconnected session is not reporting anything, whatever the last line said.
+                        await setState(page, { status: "disconnected" });
+                        assert.equal(await guard.isVisible(), false);
+
+                        // And the guard clearing its own line clears the chip.
+                        await setState(page, { status: "ready", runtimeStatus: { "jev-guard": "jev 3" } });
+                        assert.equal(await guard.isVisible(), true);
+                        await setState(page, { status: "ready", runtimeStatus: {} });
+                        assert.equal(await guard.isVisible(), false);
+                    });
+                },
+            );
+
             await t.test("conversation cost reflects Pi's aggregate and keeps usage details accessible", async () => {
                 await withPage(browser, fixtures, { name: "conversation-cost", width: 280 }, async (page) => {
                     const usage = page.locator("#token-status");

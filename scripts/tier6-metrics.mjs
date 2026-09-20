@@ -49,12 +49,15 @@ const TASKS = ["t6-context-marathon", "t6-retention-haystack"];
 const SYSTEMS = {
     compaction: "Where should a compaction cut, given the cache is discarded anyway?",
     retention: "Is this large tool result worth carrying for the rest of the session?",
-    guard: "Should this shell or file call run, where local rules could not settle it?",
     progress: "Has the session stopped making progress?",
     gap: "Is this capability-gap report worth writing?",
     sources: "Which files should a delegation batch snapshot?",
     untrusted: "Is this fetched content addressing the agent rather than a reader?",
     capability: "Will this session need a withdrawn tool group?",
+    // Kept although the guard is no longer part of the layer: these tables render recorded runs,
+    // and the runs that carried a guard row used the short-lived native guard. Dropping the label
+    // would silently delete a measurement rather than correct it.
+    guard: "Should this shell or file call run, where local rules could not settle it? (native guard, since retired)",
 };
 
 /**

@@ -161,8 +161,13 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .footer-status { flex: 1 1 auto; display: flex; align-items: center; min-width: 0; }
 #runtime-status { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #token-status { flex: 0 1 auto; font-family: var(--mono); font-size: var(--chat-small-font-size); }
+#guard-status { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 1 auto; min-width: 0; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
+#guard-status #guard-value { overflow: hidden; text-overflow: ellipsis; }
 #cache-status { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 0 auto; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
-#cache-value { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+#cache-value, #guard-value { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* The guard's own line, shown as the package formats it. Blocks are the one thing worth
+   colouring: a running count is routine, and a call that was stopped is not. */
+#guard-status[data-blocked="true"] #guard-value { color: var(--vscode-editorWarning-foreground, #d7a64b); }
 .cache-label { color: var(--muted); }
 .attachments { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px 9px 0; }
 .selection-chip { display: flex; align-items: center; gap: 4px; padding: 9px 9px 0; }

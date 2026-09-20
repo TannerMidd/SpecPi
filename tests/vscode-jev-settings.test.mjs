@@ -112,7 +112,7 @@ test("the nested disk shape survives a round trip through the flat form", () => 
     // one place instead of a test that fails for the wrong reason.
     const on = new Set(["retention", "gap"]);
     const stored = {
-        schema: 3,
+        schema: 4,
         master: true,
         startup: true,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, on.has(name)])),
@@ -129,7 +129,7 @@ test("a file that is on but not at startup is read as off, because that is what 
     // showing it as enabled would be describing behaviour no session will ever have. The round
     // trip is deliberately not the identity here: it resolves the pair to what the advisor does.
     const stored = {
-        schema: 3,
+        schema: 4,
         master: true,
         startup: false,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, true])),
@@ -159,21 +159,23 @@ test("a file that is on but not at startup is read as off, because that is what 
 test("saving writes the nested shape the extension expects, not the flat one", () => {
     withAgentDir((dir) => {
         const loaded = loadPackageSettings("jevLayer", { workspace: dir });
-        const draft = { ...JSON.parse(loaded.text), enabled: true, retention: true, guard: true };
+        const draft = { ...JSON.parse(loaded.text), enabled: true, retention: true };
         savePackageSettings(loaded, `${JSON.stringify(draft)}\n`);
         const written = JSON.parse(fs.readFileSync(jevPath({ workspace: dir }), "utf8"));
         // The advisor collapses any shape it does not recognise to all-off, so the marker is
         // load-bearing: a panel still writing schema 1 would produce a file the advisor migrates
-        // rather than reads, and a panel writing schema 3 would switch the whole layer off.
-        assert.equal(written.schema, 3);
+        // rather than reads, and a panel writing a schema the advisor retired would switch the
+        // whole layer off.
+        assert.equal(written.schema, 4);
         assert.equal(written.master, true);
         assert.equal(written.startup, true, "the panel writes a preference, so on means on next session too");
         assert.deepEqual(
             written.systems,
-            Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, name === "retention" || name === "guard"])),
+            Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, name === "retention"])),
         );
         assert.equal(written.progressNudge, "notify", "the layer must not default to steering the model");
-        assert.ok(!("guard" in written), "schema 3 has no guard object beside the systems");
+        assert.ok(!("guard" in written.systems), "the guard is a package, not one of the systems");
+        assert.ok(!("guard" in written), "and the layer's file records nothing about it");
         assert.deepEqual(written.budgets, jevConfig.DEFAULT_BUDGETS);
         for (const key of ["enabled", "retention", "budgetTotal", "budgetRetention"]) {
             assert.ok(!(key in written), `the flat key ${key} must not leak onto disk`);
@@ -243,37 +245,50 @@ test("a schema 1 file is migrated rather than read as the layer switched off", a
     }
 });
 
-test("the guard preference survives from either older schema, in both readers", async () => {
-    // Schema 1 and schema 2 both carried the command guard in a `guard` pair of its own. The
-    // advisor's 1-to-2 step preserves the whole file and only its 2-to-3 step folds that pair into
-    // `systems`, so both schemas arrive at the panel still carrying it -- and a panel that read it
-    // from schema 2 alone showed an enabled guard as off on a schema 1 file, so the first save would
-    // have written the user's own choice away. That is the reader drift this pairing exists to stop.
+test("both older guard shapes are dropped, by the panel and the advisor alike", async () => {
+    // Schema 2 kept a `guard` pair and schema 3 kept `systems.guard`. Neither decided whether the
+    // guard actually ran -- the package's own file does -- so schema 4 keeps neither, and the
+    // panel has to agree with the advisor about that or a save would reintroduce a key the
+    // advisor no longer reads.
     const { loadSettings } = await import("../extensions/jev-advisor/config.mjs");
-    for (const schema of [1, 2]) {
-        for (const wanted of [true, false]) {
-            withAgentDir((dir) => {
-                const file = jevPath({ workspace: dir });
-                fs.mkdirSync(path.dirname(file), { recursive: true });
-                fs.writeFileSync(
-                    file,
-                    `${JSON.stringify({
-                        schema,
-                        master: true,
-                        startup: true,
-                        systems: { retention: true },
-                        ...(schema === 1 ? { callBudgetPerSession: 6 } : { budgets: { total: 6 } }),
-                        // `guard.startup` is the preference; `guard.enabled` was a session flag.
-                        guard: { enabled: !wanted, startup: wanted },
-                    })}
-`,
-                );
-                const flat = JSON.parse(loadPackageSettings("jevLayer", { workspace: dir }).text);
-                assert.equal(flat.guard, wanted, `schema ${schema}: the panel lost the guard preference`);
-                assert.equal(loadSettings().systems.guard, wanted, `schema ${schema}: the advisor disagrees`);
-                assert.deepEqual(jevConfig.toStored(flat), loadSettings(), "the two readers must migrate alike");
-            });
-        }
+    const shapes = [
+        {
+            schema: 2,
+            master: true,
+            startup: true,
+            systems: { retention: true },
+            budgets: { total: 6 },
+            guard: { enabled: true, startup: true },
+        },
+        {
+            schema: 3,
+            master: true,
+            startup: true,
+            systems: { retention: true, guard: true },
+            budgets: { total: 6 },
+        },
+    ];
+
+    for (const stored of shapes) {
+        withAgentDir((dir) => {
+            const file = jevPath({ workspace: dir });
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, `${JSON.stringify(stored)}\n`);
+
+            const advisor = loadSettings();
+            assert.ok(!("guard" in advisor), `schema ${stored.schema}: the advisor kept a guard key`);
+
+            const loaded = loadPackageSettings("jevLayer", { workspace: dir });
+            const flat = JSON.parse(loaded.text);
+            assert.ok(!("guard" in flat), `schema ${stored.schema}: the guard is not a panel field`);
+
+            savePackageSettings(loaded, `${JSON.stringify(flat)}\n`);
+            const written = JSON.parse(fs.readFileSync(file, "utf8"));
+            assert.equal(written.schema, 4);
+            assert.ok(!("guard" in written), `schema ${stored.schema}: the panel wrote a guard key back`);
+            assert.ok(!("guard" in written.systems), `schema ${stored.schema}: the retired system key lingers`);
+            assert.equal(written.budgets.total, 6, "the rest of the file is still the user's");
+        });
     }
 });
 
@@ -434,10 +449,10 @@ test("the panel never learns a key, only whether there is one", () => {
 });
 
 test("no source is singled out for the command guard, because it reads all of them", () => {
-    // While the guard was a separate package reading OPENROUTER_API_KEY alone, one row was marked as
-    // the only one it could see. As the layer's eighth system it resolves its key the same way every
-    // other system does, so a mark on any row would now be telling someone with a stored credential
-    // that the guard cannot use it.
+    // Before guard 0.3.0 the package read OPENROUTER_API_KEY alone, so one row was marked as the
+    // only one it could see. It resolves the same credential in the same order as the advisor now,
+    // so a mark on any row would be telling someone with a stored credential that the guard cannot
+    // use it.
     withAgentDir((dir) => {
         const { sources } = jevKeyStatus({ settingsFile: jevPath({ workspace: dir }), env: {} });
         assert.ok(sources.length > 1);
@@ -486,9 +501,9 @@ test("switching the layer on in the form switches its systems on with it", () =>
     assert.deepEqual(jevConfig.couple({ ...off, enabled: false }, off).config, { ...off, enabled: false });
 
     // Unticking the last system in a working file is a decision, not a broken file, and this test
-    // used to assert the opposite -- that all eight were switched back on, the blocking command
-    // guard among them, with a note describing a file that never existed. `/jev disable` reads the
-    // same situation as "switch the layer off", so the panel does too.
+    // used to assert the opposite -- that every system was switched back on, with a note describing
+    // a file that never existed. `/jev disable` reads the same situation as "switch the layer off",
+    // so the panel does too.
     const alreadyOn = { ...off, enabled: true, gap: true };
     const emptied = jevConfig.couple({ ...alreadyOn, gap: false }, alreadyOn);
     assert.ok(emptied.note);

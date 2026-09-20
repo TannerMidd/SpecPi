@@ -2,12 +2,11 @@ import fs from "node:fs";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { SYSTEM_NAMES, loadSettings, saveSettings, settingsPath } from "./config.mjs";
 import { keySources } from "./key-source.mjs";
-import { applyLayer, guardWarning, layerScopeLine, layerToPersist, startupToPersist } from "./layer.mjs";
+import { applyLayer, layerScopeLine, layerToPersist, startupToPersist } from "./layer.mjs";
 import { consentPath, granted, revokeConsent } from "./consent.mjs";
 import { createBroker } from "./broker.mjs";
 import { ledgerPath, read as readLedger } from "./ledger.mjs";
 import { usagePath } from "./usage.mjs";
-import { GATED_TOOLS, SHELL_TOOLS, callTargets, classifyCall, commandText } from "./risk.mjs";
 import * as retention from "./questions/retention.mjs";
 import * as compaction from "./questions/compaction.mjs";
 import * as gap from "./questions/gap.mjs";
@@ -15,40 +14,11 @@ import * as sources from "./questions/sources.mjs";
 import * as progress from "./questions/progress.mjs";
 import * as untrusted from "./questions/untrusted.mjs";
 import * as capabilities from "./questions/capabilities.mjs";
-import * as guard from "./questions/guard.mjs";
 
 const MAX_RECENT = 8;
 
-/** One line of a call, for a notification or a block reason. Never a digest; never sent anywhere. */
-function short(value: string, limit: number) {
-    const text = String(value ?? "")
-        .replace(/\s+/gu, " ")
-        .trim();
-
-    return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
-}
-
 function safeMessage(error: unknown) {
     return String((error as any)?.message ?? error ?? "unknown error").slice(0, 200);
-}
-
-/**
- * Tell the person something, and never let the telling change what happens.
- *
- * `ctx.ui.notify` reaches the host over RPC and can throw -- a disconnected client, a torn-down UI,
- * a host without the method. Called inline inside the guard's fail-open catch, one such throw
- * unwound a decided refusal into an allow, so the announcement is isolated from the decision here.
- */
-function announce(ctx: ExtensionContext, message: string) {
-    if (!ctx.hasUI) {
-        return;
-    }
-
-    try {
-        ctx.ui.notify(message, "error");
-    } catch {
-        // A failed notification is not a reason to run a command, or not to.
-    }
 }
 
 export default function jevAdvisor(pi: ExtensionAPI) {
@@ -254,111 +224,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         }
     });
 
-    // System 8: the command guard, before a shell or file call runs.
-    //
-    // Fail open at every step. Local triage settles most calls for nothing; anything else is asked
-    // about, and a call is blocked only on a confident verdict that the request does not account
-    // for. Every other outcome -- no key, no budget, a timeout, an unconfident answer, no human to
-    // ask -- returns the call to @gotgenes/pi-permission-system, which decides it exactly as it did
-    // before this layer existed. The package this replaced was fail-closed, so an outage or a
-    // missing key stopped work; that is the single behaviour most worth not reproducing.
-    pi.on("tool_call", async (event: any, ctx: ExtensionContext) => {
-        if (!enabled("guard") || !GATED_TOOLS.includes(event?.toolName)) {
-            return undefined;
-        }
-
-        const shell = SHELL_TOOLS.includes(event.toolName);
-        // Not `input.command`: `write_stdin` types into a live shell under another name, so reading
-        // one key classified every such call as the empty string -- spending a guard call on nothing
-        // while the text actually being run went unexamined.
-        const command = shell ? commandText(event?.input) : "";
-        // Every file the call names, because `multi_edit` and `apply_patch` do not carry one `path`
-        // and a target the guard cannot see is a target it never asks the credential question about.
-        const targets = callTargets(event?.input);
-        const local = classifyCall({ tool: event.toolName, command, targets, cwd: ctx.cwd });
-        const subject = shell
-            ? command || "(command unknown)"
-            : `${event.toolName} ${targets.join(", ") || "(target unknown)"}`;
-
-        // Built once, and nothing inside it may throw. A refusal that has already been decided must
-        // reach the harness: an exception raised while announcing it would unwind into the fail-open
-        // catch below and turn the layer's only blocking action into an allow.
-        const refuse = (reason: string) => {
-            announce(ctx, `Jev guard blocked ${event.toolName}: ${reason}.`);
-
-            return { block: true, reason: `Jev guard: ${reason}. Call: ${short(subject, 160)}` };
-        };
-
-        if (local.decision === "safe") {
-            return undefined;
-        }
-
-        if (local.decision === "dangerous") {
-            // Catastrophic and unambiguous, so it needs neither a network call nor a human. This is
-            // the one path that blocks without asking Jev, which is why its rule list is tiny.
-            return refuse(local.reason);
-        }
-
-        let verdict;
-        try {
-            const result = await broker.request({
-                system: "guard",
-                state: guard.buildInput({
-                    tool: event.toolName,
-                    subject,
-                    protectedTarget: local.reason === "writes to a protected path",
-                    objective,
-                    recent,
-                    cwd: ctx.cwd,
-                }),
-                questions: guard.questions({ protected: local.reason === "writes to a protected path" }),
-                ctx,
-                root: ctx.cwd,
-                decide: (answers: any) => {
-                    const verdict = guard.decide(answers, { hasUI: ctx.hasUI });
-
-                    return { applied: verdict.action !== "defer", decision: verdict };
-                },
-            });
-            if (!result.ok) {
-                return undefined;
-            }
-
-            verdict = result.decision;
-        } catch {
-            // An advisor must never be the reason a tool call fails. Anything unexpected while
-            // asking hands the call back to the permission system unchanged. The catch ends here, so
-            // that everything the verdict then decides is outside it.
-            return undefined;
-        }
-
-        if (verdict.action === "block") {
-            return refuse(verdict.reason);
-        }
-
-        if (verdict.action === "ask" && ctx.hasUI) {
-            let choice;
-            try {
-                choice = await ctx.ui.select({
-                    title: "Jev guard",
-                    message: `This looks ${verdict.reason}: ${short(subject, 300)}`,
-                    options: [guard.CHOICES.run, guard.CHOICES.block],
-                });
-            } catch {
-                // The one failure in this file that does not fail open, and deliberately. Reaching
-                // here means the verdict already said this call needs a person's approval; a host
-                // that cannot ask has not obtained it, and an unanswerable question resolved as yes
-                // is the failure mode a confirmation dialog exists to rule out.
-                return refuse("this needs your approval and you could not be asked");
-            }
-
-            // `guard.approved` owns the rule; see it for why every non-answer is a refusal.
-            return guard.approved(choice) ? undefined : refuse("not approved by you");
-        }
-
-        return undefined;
-    });
-
     // System 1: condense a spent tool result before it is appended. Doing this after the fact would
     // rewrite a cached prefix; on arrival it never touches one.
     pi.on("tool_result", async (event: any, ctx: ExtensionContext) => {
@@ -379,11 +244,10 @@ export default function jevAdvisor(pi: ExtensionAPI) {
             }
         }
 
-        // Every result, not only the ones retention asked about. This history is what lets the
-        // command guard tell a cleanup step from a first move, and it was written in one place --
-        // inside retention's success path -- so a session running the guard with retention off, or
-        // with retention's budget spent, evaluated the block rule against an empty history for its
-        // whole length while the question set said history was what the intent answer weighed.
+        // Every result, not only the ones retention asked about. It was written in one place --
+        // inside retention's success path -- so a session with retention off, or with retention's
+        // budget spent, handed every other system an empty history for its whole length while
+        // their question sets said history was what they weighed.
         recent.push({ tool: String(event?.toolName ?? ""), outcome: event?.isError === true ? "error" : "ok" });
         if (recent.length > MAX_RECENT) {
             recent.shift();
@@ -868,16 +732,11 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                               }
                           })()
                         : undefined;
-                    // The same disclosure `/jev on` makes, on the path that arms the guard by name.
-                    // Learning from a blocked call that calls can be blocked is the outcome that
-                    // rule exists to prevent, and which command did the arming does not change it.
-                    const armedGuard = action === "enable" && names.includes("guard") && settings.master;
                     ctx.ui.notify(
                         `${action === "enable" ? "Enabled" : "Disabled"}: ${names.join(", ")}.` +
                             `${kept ? " Remembered for new sessions." : " This session only."}` +
                             `${emptied ? " That was the last system, so the layer was switched off; it would otherwise run and do nothing." : ""}` +
-                            `${!emptied && !settings.master ? " The layer is still off; run /jev on." : ""}` +
-                            `${armedGuard ? `\n${guardWarning()}` : ""}`,
+                            `${!emptied && !settings.master ? " The layer is still off; run /jev on." : ""}`,
                         "info",
                     );
 
@@ -916,8 +775,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     const enabled = SYSTEM_NAMES.filter((name) => saved.systems[name]);
                     ctx.ui.notify(
                         saved.startup && saved.master
-                            ? `New Pi sessions will start with the Jev layer on, with ${enabled.length} of ${SYSTEM_NAMES.length} systems: ${enabled.join(", ")}. This session is unchanged; run /jev on to switch it on now.` +
-                                  `${saved.systems.guard ? `\n${guardWarning()}` : ""}`
+                            ? `New Pi sessions will start with the Jev layer on, with ${enabled.length} of ${SYSTEM_NAMES.length} systems: ${enabled.join(", ")}. This session is unchanged; run /jev on to switch it on now.`
                             : "New Pi sessions will start with the Jev layer off. This session is unchanged.",
                         "info",
                     );

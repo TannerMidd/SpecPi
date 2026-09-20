@@ -173,11 +173,11 @@ function environmentPresent(name, env) {
  * The sources a Jev key can come from, in the order the advisor consults them, each with whether it
  * holds one. The first present source is the one in force.
  *
- * Each row used to carry a `guard` flag, because the separate specpi-jev-guard package read
- * `OPENROUTER_API_KEY` and nothing else: "there is a key" and "the guard has a key" were different
- * facts, and the difference decided whether shell calls still worked. The guard is now the layer's
- * eighth system and resolves its key exactly as the other seven do, so the flag is gone rather than
- * kept as a column that would now mark the wrong row.
+ * Each row used to carry a `guard` flag, because specpi-jev-guard read `OPENROUTER_API_KEY` and
+ * nothing else: "there is a key" and "the guard has a key" were different facts, and the difference
+ * decided whether shell calls still worked. Guard 0.3.0 resolves the same credential in the same
+ * order as the advisor, so the flag is gone rather than kept as a column that would now mark the
+ * wrong row.
  */
 function jevKeyStatus({ env, settingsFile } = {}) {
     env = env ?? process.env;
@@ -275,9 +275,9 @@ function loadWebAccess(options) {
 
 // The Jev layer holds no credential, so unlike web access its file is shown as it is. The panel
 // still sees the flattened form shape rather than the nested one on disk, because the systems
-// nested under `systems`, the budgets under `budgets` and two switches under `guard` would render
-// as JSON textareas otherwise, and the
-// point of the panel is that they are toggles.
+// nested under `systems` and the budgets under `budgets` would render as JSON textareas otherwise,
+// and the point of the panel is that they are toggles. The command guard appears nowhere: it is a
+// separate package with its own configuration file, which this panel neither reads nor writes.
 function loadJev(options) {
     const filename = targetPath("jevLayer", options);
     inspect(filename, JEV_MESSAGES);

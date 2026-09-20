@@ -1,5 +1,5 @@
 ((root) => {
-    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 3).
+    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 4).
     //
     // The Jev layer ships entirely off, and every switch here is a way to turn part of it on, so
     // this file is the one place Chat can start sending session summaries to a third party. It
@@ -9,26 +9,29 @@
     // Two shapes, deliberately. On disk the systems are nested under `systems` and the budgets under
     // `budgets`; in the form they are flat, because a nested object renders as a JSON textarea and
     // the point of this panel is a toggle. `fromStored`/`toStored` are the only translation, and both
-    // directions are total so a round trip cannot silently drop a key. Schemas 1 and 2 kept the
-    // command guard in a `guard` pair of its own, from when it was a separate package; schema 3 makes
-    // it the eighth system and `fromStored` migrates the old pair rather than reading past it.
+    // directions are total so a round trip cannot silently drop a key.
+    //
+    // The command guard is not here, and not in the file either. It is a separate pinned package
+    // that keeps its own configuration and its own switch, so schema 4 carries no trace of it: the
+    // `guard` pair schema 2 held and the `systems.guard` entry schema 3 held are both read past and
+    // not written back. Neither was ever the authority -- the package's own file is -- so dropping
+    // them changes nothing about whether anyone's guard is on.
 
-    const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability", "guard"];
-    const MAX_CALL_BUDGET = 256;
-    const MAX_TOTAL_BUDGET = 512;
+    const SYSTEMS = ["retention", "compaction", "gap", "sources", "progress", "untrusted", "capability"];
+    const MAX_CALL_BUDGET = 1024;
+    const MAX_TOTAL_BUDGET = 2048;
     const NUDGE_MODES = ["notify", "message"];
     // Must equal DEFAULT_BUDGETS in extensions/jev-advisor/config.mjs; a test pins them together,
     // because a panel whose defaults differ from the advisor's writes a change on every save.
     const DEFAULT_BUDGETS = {
-        total: 512,
-        retention: 208,
-        compaction: 12,
-        gap: 48,
-        sources: 32,
-        progress: 176,
-        untrusted: 104,
+        total: 2048,
+        retention: 832,
+        compaction: 48,
+        gap: 192,
+        sources: 128,
+        progress: 704,
+        untrusted: 416,
         capability: 2,
-        guard: 208,
     };
     // The label a row gets in the usage table. Same names the advisor prints in /jev status, so a
     // person reading both does not have to work out that two words mean one system.
@@ -40,7 +43,6 @@
         progress: "Progress and thrash detection",
         untrusted: "Untrusted-content classification",
         capability: "Turn-zero capability arming",
-        guard: "Command guard",
     };
     const BUDGET_KEYS = { total: "budgetTotal" };
     for (const name of SYSTEMS) {
@@ -92,12 +94,6 @@
             "Asks whether a fetched page or browser snapshot contains instructions aimed at an AI reading it, and prepends a fixed warning line when it confidently does. Defence in depth: it never blocks, never touches the agent's own output, and costs no extra call while the retention system is also on.",
         ],
         [
-            "guard",
-            "System: score shell and file calls before they run",
-            "boolean",
-            "The command guard, native since schema 3. Read-only commands and ordinary project writes are settled locally for nothing; anything else is scored, and a call is blocked only on a confident destructive verdict the request does not account for. It fails open: no key, no budget, a timeout or an unconfident answer all hand the call to @gotgenes/pi-permission-system, which decides it exactly as it did before.",
-        ],
-        [
             "capability",
             "System: arm a withdrawn tool group before the first request",
             "boolean",
@@ -142,14 +138,6 @@
     function fromStored(stored) {
         const source = object(stored) ? stored : {};
         const systems = object(source.systems) ? source.systems : {};
-        // Schema 2 carried the guard as its own pair outside the systems map, and so did schema 1 --
-        // the advisor's 1-to-2 step preserves the whole file and only its 2-to-3 step folds the pair
-        // into `systems`, so both older schemas arrive here carrying it. Reading it from schema 2
-        // alone made the panel show an enabled guard as off on a schema-1 file, and saving from that
-        // panel would then have written the user's own preference away. What migrates is
-        // `guard.startup` -- the preference the user chose -- not the session flag beside it.
-        const guard = object(source.guard) ? source.guard : {};
-        const pairedGuard = source.schema === 1 || source.schema === 2;
         const budgets = object(source.budgets) ? source.budgets : {};
         // Schema 1 read 0 as "no ceiling"; schema 2 reads it as "no calls".
         const legacy = source.schema === 1;
@@ -168,7 +156,7 @@
             [BUDGET_KEYS.total]: total,
         };
         for (const name of SYSTEMS) {
-            flat[name] = name === "guard" && pairedGuard ? guard.startup === true : systems[name] === true;
+            flat[name] = systems[name] === true;
             flat[BUDGET_KEYS[name]] = legacy
                 ? Math.min(DEFAULT_BUDGETS[name], total)
                 : budget(budgets[name], DEFAULT_BUDGETS[name], MAX_CALL_BUDGET);
@@ -188,7 +176,7 @@
         const enabled = source.enabled === true;
 
         return {
-            schema: 3,
+            schema: 4,
             // Always written together; see `fromStored`. Keeping them in step is what makes the
             // checkbox mean what it says in the next session rather than only in this file.
             master: enabled,
@@ -204,7 +192,7 @@
      *
      * Every system ships off, so a fresh file with the layer switched on describes a layer that
      * runs and does nothing -- which is exactly the state people kept arriving at, because nothing
-     * in the panel said that seven more boxes were load-bearing. This fills them in on the
+     * in the panel said that six more boxes were load-bearing. This fills them in on the
      * transition from off to on, and only when none are already on: a person running retention
      * alone has chosen that, and toggling the layer must not quietly hand back the other six.
      *
@@ -217,9 +205,9 @@
         // systems in; a file that arrives already on with nothing running is the broken state this
         // panel exists to repair, and it is repaired the same way. But a person unticking the last
         // system in a working file has not arrived at either: they have said "none of these", and
-        // re-ticking all eight -- the blocking command guard among them -- answered a deliberate act
-        // by undoing it, with a note describing a file that never existed. The advisor's own
-        // `/jev disable` reads the same situation as "switch the layer off", so this does too.
+        // re-ticking all seven answered a deliberate act by undoing it, with a note describing a
+        // file that never existed. The advisor's own `/jev disable` reads the same situation as
+        // "switch the layer off", so this does too.
         if (!deadLayer(config)) {
             return { config, note: "" };
         }

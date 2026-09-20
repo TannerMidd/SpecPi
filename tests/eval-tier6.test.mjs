@@ -13,12 +13,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 /**
  * The bug this covers ran in every published eval.
  *
- * eval-harnesses.mjs composed the advisor settings as a literal carrying `schema: 2`, under a
- * comment saying it had to track config.mjs. config.mjs moved to schema 3, where the command guard
- * became the eighth system and the 2-to-3 migration reads the old preference from a `guard.startup`
- * key the literal never had. So the guard resolved to false, the specpi-jev row measured seven
- * systems while reporting eight, and the tier 6 task built around a destructive command recorded
- * zero guard calls -- which read as "the guard declined to fire" rather than "the guard was off".
+ * eval-harnesses.mjs composed the advisor settings as a literal carrying a hardcoded schema
+ * number, under a comment saying it had to track config.mjs. config.mjs moved on, and the migration
+ * for that number read the old preference from a key the literal never had. So a system resolved to
+ * false, the specpi-jev row measured fewer systems than it reported, and the tier 6 task built
+ * around it recorded zero calls -- which read as "the system declined to fire" rather than "the
+ * system was off".
  *
  * Nothing compared the settings to what the advisor read back. This does.
  */
@@ -31,7 +31,6 @@ test("the eval harness advisor settings resolve to the systems they ask for", ()
         progress: true,
         untrusted: true,
         capability: false,
-        guard: true,
     };
 
     const resolved = normalizeSettings({
@@ -48,10 +47,26 @@ test("the eval harness advisor settings resolve to the systems they ask for", ()
         assert.equal(resolved.systems[name], on, `${name} asked for ${on} and resolved to ${resolved.systems[name]}`);
     }
 
-    // The literal that caused the defect, kept as the thing that must keep failing. If a future
-    // schema bump makes this pass again it has quietly restored the old shape.
-    const stale = normalizeSettings({ schema: 2, master: true, startup: true, systems: { ...wanted } });
-    assert.equal(stale.systems.guard, false, "a schema-2 literal cannot carry the guard; do not write one");
+    // Every system the advisor knows about is asked for or deliberately declined, so a system
+    // added to config.mjs without a decision here fails rather than being measured as off.
+    assert.deepEqual(
+        Object.keys(resolved.systems).sort(),
+        Object.keys(wanted).sort(),
+        "a system exists that the eval row neither enables nor declines",
+    );
+
+    // The command guard is not one of them: it is a separate package these homes do not install,
+    // and it keeps its own switch in its own file. No settings literal can reach it, whichever of
+    // the two keys older schemas used it spells.
+    const stale = normalizeSettings({
+        schema: 2,
+        master: true,
+        startup: true,
+        systems: { ...wanted, guard: true },
+        guard: { enabled: true, startup: true },
+    });
+    assert.ok(!("guard" in stale.systems), "the guard is not a system; do not add one");
+    assert.ok(!("guard" in stale), "and the layer's settings carry no answer about it at all");
 });
 
 /**

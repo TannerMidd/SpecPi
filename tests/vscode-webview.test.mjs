@@ -14,6 +14,8 @@ const {
     inlineTokens,
     runtimeText,
     providerUsageEntries,
+    guardStatusEntry,
+    GUARD_STATUS_KEY,
     cacheHitRate,
 } = require("../vscode/media/chat.js");
 
@@ -480,4 +482,43 @@ test("webview rendering contains no executable string or HTML insertion sinks", 
         assert.doesNotMatch(script, /\blocalStorage\b|\bsessionStorage\b/u, name);
         assert.doesNotMatch(script, /\bfetch\s*\(|\bnew\s+(?:XMLHttpRequest|WebSocket|EventSource)\s*\(/u, name);
     }
+});
+
+test("the command guard's counter is read as the package writes it", () => {
+    // specpi-jev-guard 0.4.0 publishes one status line per session and Chat renders it rather than
+    // recounting anything: the four shapes below are the ones its README documents. The chip shows
+    // the leading count and the tooltip shows the whole line, so a format this does not recognise
+    // degrades to showing all of it rather than to showing nothing.
+    const entry = (text) => guardStatusEntry({ [GUARD_STATUS_KEY]: text });
+
+    assert.deepEqual(entry("jev 12"), { full: "jev 12", summary: "jev 12", blocked: false });
+    assert.deepEqual(entry("jev 12 · 1 blocked"), {
+        full: "jev 12 · 1 blocked",
+        summary: "jev 12",
+        blocked: true,
+    });
+    assert.equal(entry("jev 12 · bash 0.04").summary, "jev 12");
+    assert.equal(entry("jev 12 · bash 0.04").blocked, false, "a verdict is not a block");
+    assert.equal(entry("jev 12 · 3 blocked · bash 0.91 blocked").blocked, true);
+
+    // A line with no separator is shown whole rather than dropped.
+    assert.equal(entry("jev 4000").summary, "jev 4000");
+
+    // Absent, empty and non-string all mean "the guard is not reporting", which is exactly the
+    // state the package leaves behind when it is switched off or its audit display is. Nothing
+    // here has to ask separately whether the guard is running.
+    assert.equal(guardStatusEntry({}), undefined);
+    assert.equal(entry(""), undefined);
+    assert.equal(entry("   "), undefined);
+    assert.equal(entry(undefined), undefined);
+    assert.equal(entry(42), undefined);
+    assert.equal(guardStatusEntry(undefined), undefined);
+
+    // Control sequences in a third party's status string never reach the DOM, the same way every
+    // other runtime status is cleaned.
+    assert.equal(entry("\u001b[31mjev 7\u001b[0m · 1 blocked").summary, "jev 7");
+
+    // And it is not left in the generic runtime list as well, which would show it twice under a
+    // raw key beside whatever else a session happens to publish.
+    assert.equal(providerUsageEntries({ [GUARD_STATUS_KEY]: "jev 12" }).length, 0, "the guard is not provider usage");
 });

@@ -24,7 +24,7 @@
 // `t6-destructive-guard` was dropped too, after it passed eight attempts out of eight with the
 // guard consulted forty-six times and acting zero times. Headless, the guard's middle band has
 // nobody to ask, so every "ask" verdict degrades to a defer and only a confident destructive
-// reading can block -- which ordinary cleanup does not produce. tests/jev-guard.test.mjs already
+// reading can block -- which ordinary cleanup does not produce. The guard package's own suite already
 // covers block, ask and defer directly and deterministically, so the task was paying model money
 // to re-derive what a unit test proves for free.
 //

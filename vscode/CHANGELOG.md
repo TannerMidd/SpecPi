@@ -1,5 +1,11 @@
 # SpecPi Chat changelog
 
+## 0.14.0
+
+- Drop the command guard from the panel entirely. It is the pinned `specpi-jev-guard` package again rather than the layer's eighth system, and it keeps its own configuration file and its own switch, so it has no row, no budget, no toggle and no trace in the file this panel writes. Schema 4 carries neither the `guard` pair schema 2 held nor the `systems.guard` entry schema 3 held, and a test loads both older shapes through the panel and the advisor to check they agree about dropping them.
+- Show the command guard's per-session counter in the session footer. specpi-jev-guard 0.4.0 publishes it as a Pi status item, which Chat was already storing and rendering as a raw `jev-guard` row inside the collapsed generic runtime list. It is a labelled chip now, beside the token and cache readouts: the leading count, amber once something has been blocked, the package's full line in the tooltip and the aria-label. It is a readout rather than a button, because the guard keeps its own switch and Chat has no settings panel for it. The key is reserved alongside the two usage plugins so a session full of other widgets cannot push it out.
+- Follow the advisor to schema 4. The panel writes the schema the extension reads; writing a retired one would leave a file the advisor collapses to all-off.
+
 ## 0.13.1
 
 - Rebuild the VSIX under a new version number. Nothing in the extension changed from 0.13.0: VS Code will not install an extension over a build carrying the same version, so a corrected or re-issued artifact needs a number of its own to be installable at all.

@@ -1089,7 +1089,10 @@ test("usage plugin status updates remain per-connection, clear on disconnect, an
     assert.deepEqual(controller.state.runtimeStatus, {});
 });
 
-test("usage plugins retain two bounded slots when generic runtime status is full", async (t) => {
+test("first-class status keys retain bounded slots when generic runtime status is full", async (t) => {
+    // Three reserved keys now: the two usage plugins and the command guard's own counter. A
+    // session that publishes forty generic widgets must not be able to push any of them out,
+    // because a readout that vanishes under load is worse than one that was never shown.
     const { controller, client } = await connected(t);
     const update = (key, value) =>
         client.emit("event", { type: "extension_ui_request", method: "setStatus", statusKey: key, statusText: value });
@@ -1100,17 +1103,25 @@ test("usage plugins retain two bounded slots when generic runtime status is full
     assert.equal(Object.keys(controller.state.runtimeStatus).length, 24);
     update("aa-codex-usage", "codex 75%");
     update("provider-usage", "claude 25% 5h");
+    update("jev-guard", "jev 12 \u00b7 1 blocked");
     assert.equal(controller.state.runtimeStatus["aa-codex-usage"], "codex 75%");
     assert.equal(controller.state.runtimeStatus["provider-usage"], "claude 25% 5h");
-    assert.equal(Object.keys(controller.state.runtimeStatus).length, 26);
+    assert.equal(controller.state.runtimeStatus["jev-guard"], "jev 12 \u00b7 1 blocked");
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 27);
     update("generic-overflow", "Not admitted");
     update("provider-usage", "checking");
-    assert.equal(Object.keys(controller.state.runtimeStatus).length, 26);
+    update("jev-guard", "jev 13 \u00b7 1 blocked");
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 27);
     assert.equal(controller.state.runtimeStatus["provider-usage"], "checking");
+    assert.equal(controller.state.runtimeStatus["jev-guard"], "jev 13 \u00b7 1 blocked");
     update("aa-codex-usage", undefined);
     update("provider-usage", undefined);
+    // The guard clears its own line when it is switched off, and that has to free the slot like
+    // any other: a stale count beside a guard that is no longer gating is a lie about the session.
+    update("jev-guard", undefined);
     update("generic-overflow", "Still not admitted");
     assert.equal(Object.keys(controller.state.runtimeStatus).length, 24);
+    assert.equal(Object.hasOwn(controller.state.runtimeStatus, "jev-guard"), false);
     assert.equal(Object.hasOwn(controller.state.runtimeStatus, "generic-overflow"), false);
 });
 
