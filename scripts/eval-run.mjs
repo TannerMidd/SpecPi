@@ -155,6 +155,22 @@ function writeTranscript(directory, { harness, task, proxy, attempt }) {
 }
 
 /**
+ * Whether the configured provider is the OpenCode Go endpoint, which routes on a session id.
+ *
+ * Matched on host rather than on the whole URL so a path or version change does not silently turn
+ * minting off, and so any other provider -- OpenRouter, a local gateway -- is recognised as not
+ * needing one without having to be listed.
+ */
+export function needsOpenCodeSession(forwardUrl) {
+    try {
+        return new URL(forwardUrl).hostname.endsWith("opencode.ai");
+    } catch {
+        // An unparseable URL is not something to guess about: keep the old behaviour.
+        return true;
+    }
+}
+
+/**
  * Remove an attempt's disposable directory, and never lose the attempt if it cannot be removed.
  *
  * On Windows a directory stays locked while any process still holds it as a working directory, and
@@ -184,9 +200,15 @@ async function runAttempt({ harness, task, model, timeoutMs, transcriptDir }) {
     // to route their calls. Minting happens before the proxy starts so the
     // id is fixed for the attempt; failures here fail the attempt closed
     // instead of burning task budget on unroutable calls.
+    //
+    // Only that endpoint needs one. The session id is an OpenCode routing
+    // requirement, not a property of forwarding, so against any other provider
+    // minting spends an OpenCode call per attempt, charges its tokens to the
+    // run as mintCost, and requires an OpenCode login the run is not otherwise
+    // using -- to produce an id the provider ignores.
     let sessionMint = null;
     let mintError = "";
-    if (forwardUrl && harness.needsProxySession) {
+    if (forwardUrl && needsOpenCodeSession(forwardUrl) && harness.needsProxySession) {
         try {
             sessionMint = await mintOpenCodeSession({ workspaceDir, model });
         } catch (error) {
@@ -322,6 +344,25 @@ async function runAttempt({ harness, task, model, timeoutMs, transcriptDir }) {
     return attempt;
 }
 
+// A model that serves only the Responses API is reached by translating for the seven harnesses
+// that speak chat-completions, which is a material fact about how those rows were measured and
+// belongs in the method rather than in a commit message. Nothing is said when nothing was
+// translated, so a report of a chat-completions run reads exactly as it always has.
+function wireMethod() {
+    if (String(process.env.EVAL_FORWARD_WIRE || "chat").toLowerCase() !== "responses") {
+        return "";
+    }
+
+    return (
+        "The model under test serves only the Responses API, so the proxy translated each " +
+        "chat-completions request to that shape on the way out and the reply back on the way in. " +
+        "Codex CLI speaks Responses natively and was passed through untranslated; Claude Code " +
+        "speaks the Messages API and was translated twice. Reasoning items carry no " +
+        "chat-completions equivalent and do not survive the crossing, but their tokens are " +
+        "counted and billed at the output rate. "
+    );
+}
+
 async function main() {
     const options = parseArgs(process.argv.slice(2));
     if (options.help) {
@@ -438,9 +479,14 @@ async function main() {
         // or "ran out of clock". Recorded so a report can say which it was.
         timeoutOverrideMs: options.timeoutMs ?? null,
         forwarded: Boolean(process.env.EVAL_FORWARD_URL),
+        // Which wire the provider was spoken to on. A run against a Responses-only model is not
+        // measuring quite the same thing as a run against a chat-completions one -- seven of the
+        // eight harnesses had their requests and replies translated -- and a report that does not
+        // record it cannot be told apart from one that did no such thing.
+        forwardWire: String(process.env.EVAL_FORWARD_WIRE || "chat").toLowerCase(),
         pricesSha256: shaFile(path.join(root, "evals", "prices.json")),
         pricesDated: prices.pricedAt,
-        method: "Disposable workspace per attempt. Proxy harnesses (pi family, Codex CLI, DeepSeek Harness) send model traffic through a logging proxy; native harnesses (OpenCode) report per-step tokens, cost and tool calls from their own transcript. Codex CLI reads only the Responses API now, so the proxy accepts that path and forwards it to the provider's responses endpoint inside a disposable CODEX_HOME; Codex's own sandbox rejects every command on Windows, so Codex runs use its full-access sandbox mode inside the attempt's disposable workspace, and that gate is not measured either. Costs are split: modelCost is the harness's own spend and is the comparable figure, mintCost is eval plumbing, and cost is their sum. Forwarded proxy traffic mints one OpenCode session per attempt for endpoint routing; only proxy harnesses need one and the mint carries OpenCode's own system prompt, so charging it to the harness would bill the Pi family for OpenCode's context. Proxy prompt_tokens arrive inclusive of cache rereads, so only the fresh portion carries the input price; reasoning tokens are billed at the output rate. Tool calls are counted from the tools the model invoked, never from the tools it was offered, which are reported separately as per-request schema weight. Approval dialogs cannot be answered headless, so SpecPi runs set the permission package's explicit yoloMode opt-in inside the disposable home; the gate itself is not measured. Files are judged by the task checker; costs come from logged usage times evals/prices.json. Unknown models and unpriced cache writes are lower bounds. Synthetic offline runs make zero model calls and cost zero.",
+        method: `${wireMethod()}Disposable workspace per attempt. Proxy harnesses (pi family, Codex CLI, DeepSeek Harness) send model traffic through a logging proxy; native harnesses (OpenCode) report per-step tokens, cost and tool calls from their own transcript. Codex CLI reads only the Responses API now, so the proxy accepts that path and forwards it to the provider's responses endpoint inside a disposable CODEX_HOME; Codex's own sandbox rejects every command on Windows, so Codex runs use its full-access sandbox mode inside the attempt's disposable workspace, and that gate is not measured either. Costs are split: modelCost is the harness's own spend and is the comparable figure, mintCost is eval plumbing, and cost is their sum. Proxy traffic forwarded to the OpenCode endpoint mints one OpenCode session per attempt, because that endpoint routes on a session id; the mint carries OpenCode's own system prompt, so charging it to the harness would bill the Pi family for OpenCode's context, and it is reported separately as mintCost. Any other provider is sent to directly and mints nothing. Proxy prompt_tokens arrive inclusive of cache rereads, so only the fresh portion carries the input price; reasoning tokens are billed at the output rate. Tool calls are counted from the tools the model invoked, never from the tools it was offered, which are reported separately as per-request schema weight. Approval dialogs cannot be answered headless, so SpecPi runs set the permission package's explicit yoloMode opt-in inside the disposable home; the gate itself is not measured. Files are judged by the task checker; costs come from logged usage times evals/prices.json. Unknown models and unpriced cache writes are lower bounds. Synthetic offline runs make zero model calls and cost zero.`,
         results,
     };
     // isolatedHome is exercised here so the helper stays covered even though

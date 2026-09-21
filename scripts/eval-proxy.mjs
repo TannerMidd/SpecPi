@@ -13,6 +13,13 @@ import {
     toMessagesBody,
     toMessagesStream,
 } from "./eval-anthropic.mjs";
+import {
+    collectResponsesReply,
+    normalizeUsage,
+    toChatBody,
+    toChatStream,
+    toResponsesRequest,
+} from "./eval-responses.mjs";
 
 function readBody(request) {
     return new Promise((resolve, reject) => {
@@ -208,27 +215,6 @@ export function normalizeToolName(name) {
     };
 
     return aliases[lower] ?? lower;
-}
-
-// Responses API usage names the same quantities differently: input_tokens
-// include cache rereads (like prompt_tokens), output_tokens EXCLUDE
-// reasoning, and the cached portion sits under input_tokens_details. It is
-// folded into the chat-completions field names here so every downstream
-// rule — fresh input priced as input, reasoning billed at the output rate —
-// applies unchanged to both wire shapes.
-function normalizeUsage(usage) {
-    if (!usage || typeof usage !== "object" || !Number.isFinite(usage.input_tokens)) {
-        return usage;
-    }
-
-    const reasoning = usage.output_tokens_details?.reasoning_tokens ?? 0;
-
-    return {
-        prompt_tokens: usage.input_tokens,
-        completion_tokens: (usage.output_tokens ?? 0) + reasoning,
-        prompt_tokens_details: { cached_tokens: usage.input_tokens_details?.cached_tokens ?? 0 },
-        reasoning_tokens: reasoning,
-    };
 }
 
 // Usage arrives either as a top-level field on a JSON completion or in
@@ -539,6 +525,14 @@ export function startProxy({
     // minted per attempt and fixed for that attempt's proxy.
     const forwardKey = process.env.EVAL_FORWARD_KEY || undefined;
     const forwardModel = process.env.EVAL_FORWARD_MODEL || undefined;
+    // Which wire the provider speaks for the model under test. Most of the catalogue answers on
+    // chat-completions, which is what every harness but Codex sends, so nothing is translated by
+    // default. A few models -- muse-spark-*, gpt-5.6-luna, grok-4.6 -- answer only on /responses
+    // and return 503 to a chat-completions request, and setting this to `responses` bridges the
+    // gap rather than leaving seven of the eight harnesses unable to reach them at all. It is a
+    // declared setting and not a probe: falling back after a failed call would double the latency
+    // of every request and make the wire a property of the network rather than of the run.
+    const forwardWire = String(process.env.EVAL_FORWARD_WIRE || "chat").toLowerCase();
     const requests = [];
     const server = http.createServer(async (request, response) => {
         try {
@@ -603,14 +597,18 @@ export function startProxy({
                 return;
             }
 
-            const upstreamUrl = responsesRequest ? (responsesForwardUrl ?? deriveResponsesUrl(forwardUrl)) : forwardUrl;
+            // A chat-completions request on its way to a Responses-only endpoint. Codex is
+            // excluded because it already speaks that wire and needs no help.
+            const bridged = forwardWire === "responses" && !responsesRequest;
+            const upstreamUrl =
+                responsesRequest || bridged ? (responsesForwardUrl ?? deriveResponsesUrl(forwardUrl)) : forwardUrl;
 
-            // A translated request has no original bytes to forward, so it is always re-serialised.
-            let payload = messagesRequest ? JSON.stringify(body) : raw;
-            if (forwardModel) {
-                payload = JSON.stringify({ ...body, model: forwardModel });
-            }
-
+            // The body as it goes upstream: the shape that was recorded, retargeted at the
+            // provider's own model id, then translated if the endpoint speaks the other wire. A
+            // request that is none of those things still forwards its original bytes.
+            const retargeted = forwardModel ? { ...body, model: forwardModel } : body;
+            const outbound = bridged ? toResponsesRequest(retargeted) : retargeted;
+            const payload = outbound === rawBody ? raw : JSON.stringify(outbound);
             const headers = { "Content-Type": "application/json" };
             if (forwardKey) {
                 headers.Authorization = `Bearer ${forwardKey}`;
@@ -624,10 +622,15 @@ export function startProxy({
             const text = await upstream.text();
             record.usage = extractUsage(text);
             record.toolCalls = extractToolCalls(text);
-            // Accounting is done, so the reply can now be converted back for the one client that
-            // needs it. Everything above ran on the chat-completions shape either way.
+            // Accounting is done, so the reply can now be converted back for the clients that need
+            // it. Everything above ran on either wire already: `extractUsage` normalises Responses
+            // usage and `extractToolCalls` reads `function_call` items, both for Codex's sake.
+            //
+            // An upstream error is passed through untouched. Folding one into a finished message
+            // would hand the harness an empty assistant turn and lose the status that says why.
+            const bridgedReply = bridged && upstream.ok ? collectResponsesReply(text) : null;
             if (messagesRequest) {
-                const reply = collectChatReply(text);
+                const reply = bridgedReply ?? collectChatReply(text);
                 const model = rawBody.model ?? "unknown";
                 const streamed = rawBody.stream !== false;
                 response.writeHead(upstream.status, {
@@ -635,6 +638,23 @@ export function startProxy({
                 });
                 response.end(
                     streamed ? toMessagesStream(reply, { model }) : JSON.stringify(toMessagesBody(reply, { model })),
+                );
+
+                return;
+            }
+
+            if (bridgedReply) {
+                // Unlike the Messages clients, a chat-completions client that did not ask to
+                // stream gets a whole body: `stream` defaults to false on this wire.
+                const streamed = rawBody.stream === true;
+                const model = rawBody.model ?? "unknown";
+                response.writeHead(upstream.status, {
+                    "Content-Type": streamed ? "text/event-stream" : "application/json",
+                });
+                response.end(
+                    streamed
+                        ? toChatStream(bridgedReply, { model })
+                        : JSON.stringify(toChatBody(bridgedReply, { model })),
                 );
 
                 return;
