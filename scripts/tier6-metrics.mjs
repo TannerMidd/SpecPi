@@ -82,6 +82,11 @@ function mean(values) {
     return found.length === 0 ? null : found.reduce((total, value) => total + value, 0) / found.length;
 }
 
+/** A share, or null when the denominator is zero -- which is not the same number as 0%. */
+function rate(part, whole) {
+    return whole > 0 ? part / whole : null;
+}
+
 /**
  * The median alongside the mean, because one of these numbers is skewed and it matters which.
  *
@@ -172,6 +177,10 @@ function collect(runDirs, window) {
     const launchFailures = { count: 0, reasons: {} };
     const unwindowed = { count: 0, arms: {} };
     const runs = [];
+    // Which model produced these numbers is part of the result, not trivia. The page now runs
+    // different suites on different models, so a surface that cannot name its own model cannot be
+    // read beside one that can. Uniform or refuse, the same rule collect() applies.
+    const models = new Set();
     for (const dir of runDirs) {
         if (!fs.existsSync(dir)) {
             throw new Error(`no such run directory: ${dir}`);
@@ -191,6 +200,10 @@ function collect(runDirs, window) {
 
             used = true;
             const data = JSON.parse(fs.readFileSync(report, "utf8"));
+            if (data.model) {
+                models.add(data.model);
+            }
+
             for (const result of data.results ?? []) {
                 const key = `${arm}\u0000${result.task}`;
                 const list = attempts.get(key) ?? [];
@@ -241,6 +254,14 @@ function summarise(list) {
         peakPromptTokens: mean(context.map((entry) => entry.peakPromptTokens ?? 0)),
         cost: mean(list.map((attempt) => attempt.cost)),
         costMedian: median(list.map((attempt) => attempt.cost)),
+        // Summed rather than averaged per attempt, because a ratio of means is the rate over the
+        // whole tier while a mean of ratios lets a two-request attempt weigh as much as a
+        // two-hundred-request one. `scripts/eval-overall.mjs` pools this with the other suites.
+        promptTokens: mean(list.map((attempt) => attempt.tokens?.inputTokens ?? 0)),
+        cacheHitRate: rate(
+            list.reduce((total, attempt) => total + (attempt.tokens?.cachedTokens ?? 0), 0),
+            list.reduce((total, attempt) => total + (attempt.tokens?.inputTokens ?? 0), 0),
+        ),
         seconds: mean(list.map((attempt) => attempt.durationMs / 1000)),
         advisorCalls: mean(list.map((attempt) => attempt.advisor?.calls ?? 0)),
         // Split by kind because they are not the same failure, and only one of them is evidence
@@ -331,8 +352,16 @@ function main() {
         0,
     );
 
+    if (models.size > 1) {
+        throw new Error(
+            `tier 6 reports span ${models.size} models (${[...models].sort().join(", ")}); ` +
+                "one model at a time, because the page prices and labels this surface as one",
+        );
+    }
+
     const payload = {
         generatedAt: new Date().toISOString(),
+        model: [...models][0] ?? null,
         note: "Tier 6 declares a 24,000-token context window. Every other tier runs at 200,000.",
         contextWindow: WINDOW,
         runs,

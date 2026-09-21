@@ -1,5 +1,5 @@
 {
-    "generatedAt": "2026-09-20T06:37:30.090Z",
+    "generatedAt": "2026-09-20T21:50:45.411Z",
     "note": "Tier 6 declares a 24,000-token context window. Every other tier runs at 200,000.",
     "contextWindow": 24000,
     "runs": [
@@ -24,6 +24,8 @@
             "peakPromptTokens": 22569.9375,
             "cost": 0.06223270424999999,
             "costMedian": 0.041081853,
+            "promptTokens": 323836.8125,
+            "cacheHitRate": 0.4021037602079288,
             "seconds": 216.43406250000007,
             "advisorCalls": 0,
             "noOutput": 2,
@@ -37,6 +39,8 @@
                     "peakPromptTokens": 26336.625,
                     "cost": 0.10513196624999999,
                     "costMedian": 0.065484114,
+                    "promptTokens": 511969,
+                    "cacheHitRate": 0.367053473940805,
                     "seconds": 360.69387500000005,
                     "advisorCalls": 0,
                     "noOutput": 1
@@ -50,6 +54,8 @@
                     "peakPromptTokens": 18803.25,
                     "cost": 0.01933344225,
                     "costMedian": 0.01342353,
+                    "promptTokens": 135704.625,
+                    "cacheHitRate": 0.5343369837247625,
                     "seconds": 72.17425,
                     "advisorCalls": 0,
                     "noOutput": 1
@@ -67,6 +73,8 @@
             "peakPromptTokens": 26117.6875,
             "cost": 0.06578285437499999,
             "costMedian": 0.039275361,
+            "promptTokens": 424964.8125,
+            "cacheHitRate": 0.5130777739392247,
             "seconds": 237.80043750000002,
             "advisorCalls": 0,
             "noOutput": 0,
@@ -80,6 +88,8 @@
                     "peakPromptTokens": 29535.125,
                     "cost": 0.10888884674999999,
                     "costMedian": 0.09819684599999998,
+                    "promptTokens": 645410.375,
+                    "cacheHitRate": 0.48306629716015953,
                     "seconds": 376.81837500000006,
                     "advisorCalls": 0,
                     "noOutput": 0
@@ -93,6 +103,8 @@
                     "peakPromptTokens": 22700.25,
                     "cost": 0.022676862,
                     "costMedian": 0.022155252,
+                    "promptTokens": 204519.25,
+                    "cacheHitRate": 0.6077863086237604,
                     "seconds": 98.78250000000001,
                     "advisorCalls": 0,
                     "noOutput": 0
@@ -110,6 +122,8 @@
             "peakPromptTokens": 26632.3125,
             "cost": 0.06235844025000001,
             "costMedian": 0.054693645,
+            "promptTokens": 392128.5,
+            "cacheHitRate": 0.4963270968572802,
             "seconds": 233.51237499999996,
             "advisorCalls": 33.6875,
             "noOutput": 3,
@@ -123,6 +137,8 @@
                     "peakPromptTokens": 28693.75,
                     "cost": 0.07805803125000002,
                     "costMedian": 0.07915609499999998,
+                    "promptTokens": 467679.75,
+                    "cacheHitRate": 0.46674674282989587,
                     "seconds": 287.032,
                     "advisorCalls": 39.625,
                     "noOutput": 3
@@ -136,6 +152,8 @@
                     "peakPromptTokens": 24570.875,
                     "cost": 0.04665884925,
                     "costMedian": 0.024707801999999997,
+                    "promptTokens": 316577.25,
+                    "cacheHitRate": 0.5400261705476309,
                     "seconds": 179.99275,
                     "advisorCalls": 27.75,
                     "noOutput": 0
@@ -153,6 +171,8 @@
             "peakPromptTokens": 26814,
             "cost": 0.279274716,
             "costMedian": 0.279274716,
+            "promptTokens": 1868457,
+            "cacheHitRate": 0.6370347297261858,
             "seconds": 2206.9629999999997,
             "advisorCalls": 0,
             "noOutput": 1,
@@ -166,6 +186,8 @@
                     "peakPromptTokens": 26814,
                     "cost": 0.279274716,
                     "costMedian": 0.279274716,
+                    "promptTokens": 1868457,
+                    "cacheHitRate": 0.6370347297261858,
                     "seconds": 2206.9629999999997,
                     "advisorCalls": 0,
                     "noOutput": 1
@@ -183,6 +205,8 @@
             "peakPromptTokens": 21981.5,
             "cost": 0.5076640800000001,
             "costMedian": 0.5076640800000001,
+            "promptTokens": 6464775,
+            "cacheHitRate": 0.8082199303146668,
             "seconds": 2064.39,
             "advisorCalls": 0,
             "noOutput": 1,
@@ -196,6 +220,8 @@
                     "peakPromptTokens": 21981.5,
                     "cost": 0.5076640800000001,
                     "costMedian": 0.5076640800000001,
+                    "promptTokens": 6464775,
+                    "cacheHitRate": 0.8082199303146668,
                     "seconds": 2064.39,
                     "advisorCalls": 0,
                     "noOutput": 1
@@ -213,6 +239,8 @@
             "peakPromptTokens": 24129.14285714286,
             "cost": 0.06225961285714286,
             "costMedian": 0.052623456000000006,
+            "promptTokens": 554408.5714285715,
+            "cacheHitRate": 0.6718840669336178,
             "seconds": 278.46999999999997,
             "advisorCalls": 0,
             "noOutput": 1,
@@ -226,6 +254,8 @@
                     "peakPromptTokens": 25945.75,
                     "cost": 0.086451591,
                     "costMedian": 0.06283462199999999,
+                    "promptTokens": 731166.25,
+                    "cacheHitRate": 0.6524152338814873,
                     "seconds": 385.90475,
                     "advisorCalls": 0,
                     "noOutput": 0
@@ -239,6 +269,8 @@
                     "peakPromptTokens": 21707,
                     "cost": 0.030003641999999997,
                     "costMedian": 0.030764945999999998,
+                    "promptTokens": 318731.6666666667,
+                    "cacheHitRate": 0.7314323961116718,
                     "seconds": 135.22366666666665,
                     "advisorCalls": 0,
                     "noOutput": 1
@@ -256,6 +288,8 @@
             "peakPromptTokens": 19043.125,
             "cost": 0.04030055025,
             "costMedian": 0.03371055,
+            "promptTokens": 460230.3125,
+            "cacheHitRate": 0.8070915580989682,
             "seconds": 188.89637500000006,
             "advisorCalls": 0,
             "noOutput": 2,
@@ -269,6 +303,8 @@
                     "peakPromptTokens": 19682.375,
                     "cost": 0.05673785099999999,
                     "costMedian": 0.049976964,
+                    "promptTokens": 608067.75,
+                    "cacheHitRate": 0.794306226567681,
                     "seconds": 262.85825000000006,
                     "advisorCalls": 0,
                     "noOutput": 2
@@ -282,6 +318,8 @@
                     "peakPromptTokens": 18403.875,
                     "cost": 0.023863249499999996,
                     "costMedian": 0.019366137,
+                    "promptTokens": 312392.875,
+                    "cacheHitRate": 0.8319780020591059,
                     "seconds": 114.9345,
                     "advisorCalls": 0,
                     "noOutput": 0
@@ -330,12 +368,12 @@
     "systems": {
         "compaction": "Where should a compaction cut, given the cache is discarded anyway?",
         "retention": "Is this large tool result worth carrying for the rest of the session?",
-        "guard": "Should this shell or file call run, where local rules could not settle it?",
         "progress": "Has the session stopped making progress?",
         "gap": "Is this capability-gap report worth writing?",
         "sources": "Which files should a delegation batch snapshot?",
         "untrusted": "Is this fetched content addressing the agent rather than a reader?",
-        "capability": "Will this session need a withdrawn tool group?"
+        "capability": "Will this session need a withdrawn tool group?",
+        "guard": "Should this shell or file call run, where local rules could not settle it? (native guard, since retired)"
     },
     "advisor": {
         "calls": 533,

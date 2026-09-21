@@ -76,9 +76,40 @@ export function isLaunchFailure(attempt) {
     return Boolean(attempt?.harnessError) && (attempt?.modelRequests ?? 0) === 0;
 }
 
+/**
+ * One cell per harness, task and tier, taking the last report that measured it.
+ *
+ * A cell sometimes has to be measured again: a checker is found to be wrong, and the attempts it
+ * graded have to be re-run, because the workspaces are discarded so they cannot be re-graded.
+ * Flat-mapping every report would then average the old cell with its replacement and publish
+ * both standards at once. Later wins, and what it replaced is named on stdout rather than
+ * dropped quietly -- a superseded cell is a thing the operator should see, not a detail.
+ */
+function supersede(reports) {
+    const byCell = new Map();
+    const replaced = [];
+    for (const report of reports) {
+        for (const cell of report.results) {
+            const key = `${cell.harness}	${cell.task}	${cell.tier}`;
+            if (byCell.has(key)) {
+                replaced.push(`${cell.harness}/${cell.task}`);
+            }
+
+            byCell.set(key, cell);
+        }
+    }
+
+    if (replaced.length > 0) {
+        process.stdout.write(`eval site: ${replaced.length} cell(s) superseded by a later report: ${replaced.join(", ")}
+`);
+    }
+
+    return [...byCell.values()];
+}
+
 export function collect(files) {
     const reports = files.map((file) => JSON.parse(fs.readFileSync(file, "utf8")));
-    const cells = reports.flatMap((report) => report.results);
+    const cells = supersede(reports);
     const meta = reports[reports.length - 1];
     // The page states one model and prices every row against it, so a set spanning two models
     // would publish one label over both. The comment below records this being caught once for
@@ -322,6 +353,111 @@ export function hbars({ id, title, axisLabel, groups, max, gridStep, tick, barHe
 
 export const thousands = (value) => value.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
+/**
+ * Eight series over five tiers, as one small panel each: the highlighted harness in its own colour,
+ * the other seven behind it in the grid colour.
+ *
+ * WHY THIS FORM. Eight lines on one pair of axes is unreadable at this spread -- four of them sit
+ * on top of each other near the floor -- and it would put the whole weight of identity on telling
+ * eight hues apart, which this palette does not reliably support. Emphasis panels ask the reader to
+ * tell one colour from grey, eight times, which is a judgement nobody fails. Every panel is titled,
+ * so identity never rests on colour at all, and the same figures are in the table beside it.
+ *
+ * The scale is shared across panels and starts at 1.00x, which is a real floor rather than an axis
+ * choice: the ratio is against the cheapest harness in that tier, so nothing can fall below it.
+ */
+function panels({ id, title, axisLabel, series, xLabels, yTicks, yMin, yMax, format, tick }) {
+    const cols = 4;
+    const panelWidth = 224;
+    const panelHeight = 168;
+    const gapX = 18;
+    const gapY = 36;
+    const originX = 44;
+    const originY = 26;
+    const plotWidth = panelWidth - 34;
+    const plotHeight = panelHeight - 52;
+    const rows = Math.ceil(series.length / cols);
+    const width = originX + cols * panelWidth + (cols - 1) * gapX + 10;
+    const height = originY + rows * (panelHeight + gapY) + 34;
+    const parts = [`<text x="0" y="12" class="ct-lb">${esc(title)}</text>`];
+    const xAt = (index, left) => left + (index / (xLabels.length - 1)) * plotWidth;
+    const yAt = (value, top) => top + plotHeight - ((value - yMin) / (yMax - yMin)) * plotHeight;
+    const points = (values, left, top) =>
+        values.map((value, index) => `${xAt(index, left).toFixed(1)},${yAt(value, top).toFixed(1)}`).join(" ");
+
+    series.forEach((entry, index) => {
+        const col = index % cols;
+        const left = originX + col * (panelWidth + gapX);
+        const top = originY + Math.floor(index / cols) * (panelHeight + gapY) + 22;
+        parts.push(`<text x="${left - 6}" y="${top - 8}" class="ct-row">${esc(entry.label)}</text>`);
+
+        for (const value of yTicks) {
+            const y = yAt(value, top).toFixed(1);
+            parts.push(
+                `<line x1="${left}" y1="${y}" x2="${left + plotWidth}" y2="${y}" stroke="var(--line)" opacity=".55" />`,
+            );
+            if (col === 0) {
+                parts.push(
+                    `<text x="${left - 9}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end" class="ct-ax">${esc(tick(value))}</text>`,
+                );
+            }
+        }
+
+        for (const other of series) {
+            if (other === entry) {
+                continue;
+            }
+
+            parts.push(
+                `<polyline points="${points(other.values, left, top)}" fill="none" stroke="var(--line)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />`,
+            );
+        }
+
+        parts.push(
+            `<polyline points="${points(entry.values, left, top)}" fill="none" stroke="${entry.colour}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`,
+        );
+        entry.values.forEach((value, position) => {
+            // A 2px surface ring keeps a marker readable where it sits on one of the grey lines.
+            parts.push(
+                `<circle cx="${xAt(position, left).toFixed(1)}" cy="${yAt(value, top).toFixed(1)}" r="4" fill="${entry.colour}" stroke="var(--surface)" stroke-width="2" />`,
+            );
+        });
+
+        // Only the two ends are labelled. They are what answers "did it hold or fall", and a number
+        // on all five points would bury that in forty numbers per figure.
+        for (const position of [0, entry.values.length - 1]) {
+            const value = entry.values[position];
+            const y = yAt(value, top);
+            // Both labels sit beside their point on the inside, which is where the line runs, so
+            // the side is chosen from the neighbouring point: the label goes opposite the way the
+            // line leaves, then flips back if that side is off the panel.
+            const neighbour = entry.values[position === 0 ? 1 : position - 1];
+            const wantAbove = neighbour <= value;
+            const above = wantAbove ? y - 9 >= top + 4 : y + 16 > top + plotHeight;
+            // A flipped label is on the same side as the line, so it gets extra clearance.
+            const clearance = above === wantAbove ? 0 : 5;
+            const x = xAt(position, left) + (position === 0 ? 7 : -7);
+            parts.push(
+                `<text x="${x.toFixed(1)}" y="${(above ? y - 9 - clearance : y + 16 + clearance).toFixed(1)}" text-anchor="${position === 0 ? "start" : "end"}" class="ct-val">${esc(format(value))}</text>`,
+            );
+        }
+
+        const baseline = (top + plotHeight).toFixed(1);
+        parts.push(
+            `<line x1="${left}" y1="${baseline}" x2="${left + plotWidth}" y2="${baseline}" stroke="var(--line)" opacity=".85" />`,
+        );
+        xLabels.forEach((label, position) => {
+            parts.push(
+                `<text x="${xAt(position, left).toFixed(1)}" y="${(Number(baseline) + 16).toFixed(1)}" text-anchor="middle" class="ct-ax">${esc(label)}</text>`,
+            );
+        });
+    });
+
+    parts.push(`<text x="0" y="${height - 6}" class="ct-ax">${esc(axisLabel)}</text>`);
+
+    return `<svg class="chart" id="${id}" viewBox="0 0 ${width} ${height}" role="img" preserveAspectRatio="xMidYMid meet" aria-label="${esc(title)}">${parts.join("")}</svg>`;
+}
+
 export function renderCharts(data) {
     const charts = {};
     const byTier = (tier) => data.harnesses.filter((harness) => harness.perTier[tier]);
@@ -459,6 +595,36 @@ export function renderCharts(data) {
                 },
             ],
         })),
+    });
+
+    // The same figures as the ratio table, as a shape. The table answers "what did this harness
+    // cost relative to the floor"; the panels answer "did that hold as the tasks got longer",
+    // which is a question about direction and is much harder to read off forty cells.
+    const ratioSeries = data.harnesses
+        .filter((harness) => data.tiers.every((tier) => harness.perTier[tier]))
+        .map((harness) => ({
+            label: harness.label,
+            colour: harness.colour,
+            values: data.tiers.map((tier) => {
+                const cheapest = Math.min(
+                    ...data.harnesses.map((entry) => entry.perTier[tier]?.cost ?? Number.POSITIVE_INFINITY),
+                );
+
+                return harness.perTier[tier].cost / cheapest;
+            }),
+        }));
+    const ratioMax = Math.max(...ratioSeries.flatMap((entry) => entry.values));
+    charts["chart-ratio"] = panels({
+        id: "chart-ratio",
+        title: "Cost per attempt, against the cheapest harness in each tier",
+        axisLabel: "Multiple of the cheapest harness in that tier. Tier 1 is smoke work, tier 5 the longest.",
+        series: ratioSeries,
+        xLabels: data.tiers.map(String),
+        yTicks: [1, 2, 4, 6].filter((tick) => tick <= ratioMax),
+        yMin: 1,
+        yMax: Math.ceil(ratioMax * 2) / 2,
+        format: (value) => `${value.toFixed(2)}×`,
+        tick: (value) => `${value}×`,
     });
 
     return charts;

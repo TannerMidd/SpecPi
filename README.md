@@ -79,7 +79,7 @@ harness changing.
 
 <!-- eval-summary -->
 
-**259 attempts across 7 harnesses and 24 tasks**, all on `deepseek-v4.1-flash`.
+**296 attempts across 8 harnesses and 24 tasks**, all on `deepseek-v4.1-flash`.
 
 | Harness | Solved | Cost/attempt | Prompt tokens | Sent before any work |
 | --- | --- | --- | --- | --- |
@@ -87,9 +87,10 @@ harness changing.
 | SpecPi | 35/37 | $0.0042 | 134,859 | 13,799 |
 | OpenCode | 31/37 | $0.0043 | 143,830 | 38,097 |
 | SpecPi + Jev | 35/37 | $0.0046 | 153,077 | 13,799 |
-| Codex CLI | 30/37 | $0.0067 | 242,031 | 38,148 |
+| Codex CLI | 35/37 | $0.0067 | 242,401 | 38,148 |
 | Oh My Pi | 35/37 | $0.0070 | 257,783 | 62,612 |
 | DeepSeek Harness | 35/37 | $0.0078 | 281,676 | 31,750 |
+| Claude Code | 35/37 | $0.0094 | 292,043 | 74,768 |
 
 Cost is the harness's own model spend, priced from recorded usage against a
 dated price file. The last column is the tool schema plus system instructions

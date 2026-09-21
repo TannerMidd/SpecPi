@@ -1,0 +1,1489 @@
+{
+    "schema": 1,
+    "createdAt": "2026-09-20T22:26:59.996Z",
+    "specpiVersion": "0.29.0",
+    "piVersion": "0.84.4",
+    "nodeVersion": "v24.18.0",
+    "platform": "win32",
+    "model": "deepseek-v4.1-flash",
+    "attemptsPerCell": 2,
+    "timeoutOverrideMs": null,
+    "forwarded": true,
+    "pricesSha256": "fa8661b46d8a4497bbcb8aaa3c83ef566bf0628211e40bbb01515d0901141d41",
+    "pricesDated": "2026-09-17",
+    "method": "Disposable workspace per attempt. Proxy harnesses (pi family, Codex CLI, DeepSeek Harness) send model traffic through a logging proxy; native harnesses (OpenCode) report per-step tokens, cost and tool calls from their own transcript. Codex CLI reads only the Responses API now, so the proxy accepts that path and forwards it to the provider's responses endpoint inside a disposable CODEX_HOME; Codex's own sandbox rejects every command on Windows, so Codex runs use its full-access sandbox mode inside the attempt's disposable workspace, and that gate is not measured either. Costs are split: modelCost is the harness's own spend and is the comparable figure, mintCost is eval plumbing, and cost is their sum. Proxy traffic forwarded to the OpenCode endpoint mints one OpenCode session per attempt, because that endpoint routes on a session id; the mint carries OpenCode's own system prompt, so charging it to the harness would bill the Pi family for OpenCode's context, and it is reported separately as mintCost. Any other provider is sent to directly and mints nothing. Proxy prompt_tokens arrive inclusive of cache rereads, so only the fresh portion carries the input price; reasoning tokens are billed at the output rate. Tool calls are counted from the tools the model invoked, never from the tools it was offered, which are reported separately as per-request schema weight. Approval dialogs cannot be answered headless, so SpecPi runs set the permission package's explicit yoloMode opt-in inside the disposable home; the gate itself is not measured. Files are judged by the task checker; costs come from logged usage times evals/prices.json. Unknown models and unpriced cache writes are lower bounds. Synthetic offline runs make zero model calls and cost zero.",
+    "results": [
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t1-create-file",
+            "tier": 1,
+            "category": "terminal",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "hello.txt has the expected content",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 8845,
+                    "wallMs": 8848,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "8e2d1736ff0a232191a7e299a312c977618fb774ea6ead8b78bf6b7965909647"
+                    },
+                    "tokens": {
+                        "inputTokens": 28198,
+                        "outputTokens": 344,
+                        "cachedTokens": 26880,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9206,
+                                "cachedTokens": 8320,
+                                "completionTokens": 84,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9336,
+                                "cachedTokens": 9088,
+                                "completionTokens": 198,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9656,
+                                "cachedTokens": 9472,
+                                "completionTokens": 62,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9656,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 225
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f14054fffecXZ9mofy5gaol2",
+                        "durationMs": 4396,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 44,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0015162
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9206,
+                            "cachedTokens": 8320,
+                            "completionTokens": 84,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9336,
+                            "cachedTokens": 9088,
+                            "completionTokens": 198,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9656,
+                            "cachedTokens": 9472,
+                            "completionTokens": 62,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9656,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 225
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.75,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 1,
+                        "calls": 2,
+                        "efficiency": 0.5,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 2,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 1,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "hello.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00048474,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.0015162,
+                    "cost": 0.00200094,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-AUCk5h\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-AUCk5h\\\\home\\\\codex-home\"))\n"
+                },
+                {
+                    "pass": true,
+                    "notes": "hello.txt has the expected content",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 7581,
+                    "wallMs": 7584,
+                    "modelRequests": 2,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "729a6caaa3f5e242be03ac285f04e4665bed3047a1fb293e610d0736de45255d"
+                    },
+                    "tokens": {
+                        "inputTokens": 18662,
+                        "outputTokens": 145,
+                        "cachedTokens": 17536,
+                        "withUsage": 2,
+                        "toolCalls": {
+                            "bash": 1
+                        },
+                        "toolsOffered": {
+                            "create_goal": 2,
+                            "bash": 4,
+                            "get_goal": 2,
+                            "subagent": 2,
+                            "request_user_input": 2,
+                            "update_goal": 2,
+                            "read": 2,
+                            "web_search": 2
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9206,
+                                "cachedTokens": 8320,
+                                "completionTokens": 120,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9456,
+                                "cachedTokens": 9216,
+                                "completionTokens": 25,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9456,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 250
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f13cb2affe7umLZEKebS7UvT",
+                        "durationMs": 4037,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9206,
+                            "cachedTokens": 8320,
+                            "completionTokens": 120,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9456,
+                            "cachedTokens": 9216,
+                            "completionTokens": 25,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9456,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 250
+                    },
+                    "toolOutcomes": {
+                        "results": 1,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 1,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 1,
+                        "calls": 1,
+                        "efficiency": 1,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 1,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 1,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "hello.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000308508,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.0017983080000000002,
+                    "costComplete": true,
+                    "filesBefore": 1,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-XZzMN0\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-XZzMN0\\\\home\\\\codex-home\"))\n"
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t1-edit-file",
+            "tier": 1,
+            "category": "terminal",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "debug is true, other keys intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 8193,
+                    "wallMs": 8196,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "bb53f49f453364a92daf038b62ac78be2d043cb5dbc4e606a0d1c8524edfb232"
+                    },
+                    "tokens": {
+                        "inputTokens": 28153,
+                        "outputTokens": 300,
+                        "cachedTokens": 26752,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9216,
+                                "cachedTokens": 8320,
+                                "completionTokens": 90,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9366,
+                                "cachedTokens": 9088,
+                                "completionTokens": 165,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9571,
+                                "cachedTokens": 9344,
+                                "completionTokens": 45,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9571,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 178
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f1396b1ffeZxfWgfauCjpV95",
+                        "durationMs": 3983,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9216,
+                            "cachedTokens": 8320,
+                            "completionTokens": 90,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9366,
+                            "cachedTokens": 9088,
+                            "completionTokens": 165,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9571,
+                            "cachedTokens": 9344,
+                            "completionTokens": 45,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9571,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 178
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 2,
+                        "calls": 2,
+                        "efficiency": 1,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 2,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 2,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "config.json"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000470406,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.001960206,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-W6qjnN\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-W6qjnN\\\\home\\\\codex-home\"))\n"
+                },
+                {
+                    "pass": true,
+                    "notes": "debug is true, other keys intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 9894,
+                    "wallMs": 9896,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "96713405c9e473022b2d560d7dc96900b6038b56922ae72b295bd026bfaf14bf"
+                    },
+                    "tokens": {
+                        "inputTokens": 28124,
+                        "outputTokens": 493,
+                        "cachedTokens": 26752,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9213,
+                                "cachedTokens": 8320,
+                                "completionTokens": 61,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9334,
+                                "cachedTokens": 9088,
+                                "completionTokens": 257,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9577,
+                                "cachedTokens": 9344,
+                                "completionTokens": 175,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9577,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 182
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f135fa3ffesHuXhuCaCdSpQD",
+                        "durationMs": 4461,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9213,
+                            "cachedTokens": 8320,
+                            "completionTokens": 61,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9334,
+                            "cachedTokens": 9088,
+                            "completionTokens": 257,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9577,
+                            "cachedTokens": 9344,
+                            "completionTokens": 175,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9577,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 182
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 1,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 2,
+                        "calls": 2,
+                        "efficiency": 1,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 2,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 2,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "config.json"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000581856,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.002071506,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-O29QIH\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-O29QIH\\\\home\\\\codex-home\"))\n"
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t1-fix-script",
+            "tier": 1,
+            "category": "repair",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "add(2, 3) returns 5",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 21067,
+                    "wallMs": 21070,
+                    "modelRequests": 6,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "b124a8cff181ad41ac79dd2a036adf55c92754e44440c35f2fc13b85fb125b99"
+                    },
+                    "tokens": {
+                        "inputTokens": 58272,
+                        "outputTokens": 852,
+                        "cachedTokens": 56320,
+                        "withUsage": 6,
+                        "toolCalls": {
+                            "bash": 5
+                        },
+                        "toolsOffered": {
+                            "create_goal": 6,
+                            "bash": 12,
+                            "get_goal": 6,
+                            "subagent": 6,
+                            "request_user_input": 6,
+                            "update_goal": 6,
+                            "read": 6,
+                            "web_search": 6
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9220,
+                                "cachedTokens": 8320,
+                                "completionTokens": 53,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9341,
+                                "cachedTokens": 9088,
+                                "completionTokens": 95,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9600,
+                                "cachedTokens": 9344,
+                                "completionTokens": 247,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9850,
+                                "cachedTokens": 9600,
+                                "completionTokens": 112,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 5,
+                                "promptTokens": 10001,
+                                "cachedTokens": 9856,
+                                "completionTokens": 308,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 6,
+                                "promptTokens": 10260,
+                                "cachedTokens": 10112,
+                                "completionTokens": 37,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 10260,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 208
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f1322a1ffeaY1Uvv8jd1i55k",
+                        "durationMs": 4422,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9220,
+                            "cachedTokens": 8320,
+                            "completionTokens": 53,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9341,
+                            "cachedTokens": 9088,
+                            "completionTokens": 95,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9600,
+                            "cachedTokens": 9344,
+                            "completionTokens": 247,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9850,
+                            "cachedTokens": 9600,
+                            "completionTokens": 112,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 5,
+                            "promptTokens": 10001,
+                            "cachedTokens": 9856,
+                            "completionTokens": 308,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 6,
+                            "promptTokens": 10260,
+                            "cachedTokens": 10112,
+                            "completionTokens": 37,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 10260,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 208
+                    },
+                    "toolOutcomes": {
+                        "results": 5,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 5,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.7,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 2,
+                        "calls": 5,
+                        "efficiency": 0.4,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 5,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 2,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "add.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0009729599999999999,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.0024626099999999996,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-imvSGb\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-imvSGb\\\\home\\\\codex-home\"))\n"
+                },
+                {
+                    "pass": true,
+                    "notes": "add(2, 3) returns 5",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 12930,
+                    "wallMs": 12932,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "cfa7c42ec3538f6e2e333863fa10ce99da9318034df883074294b4af7e169ebf"
+                    },
+                    "tokens": {
+                        "inputTokens": 38058,
+                        "outputTokens": 518,
+                        "cachedTokens": 36480,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9226,
+                                "cachedTokens": 8320,
+                                "completionTokens": 51,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9345,
+                                "cachedTokens": 9088,
+                                "completionTokens": 86,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9594,
+                                "cachedTokens": 9344,
+                                "completionTokens": 340,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9893,
+                                "cachedTokens": 9728,
+                                "completionTokens": 41,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9893,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 222
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f12b938ffeshcW5F38UkWngy",
+                        "durationMs": 4186,
+                        "inputTokens": 9925,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148995
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9226,
+                            "cachedTokens": 8320,
+                            "completionTokens": 51,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9345,
+                            "cachedTokens": 9088,
+                            "completionTokens": 86,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9594,
+                            "cachedTokens": 9344,
+                            "completionTokens": 340,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9893,
+                            "cachedTokens": 9728,
+                            "completionTokens": 41,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9893,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 222
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 1,
+                        "signatures": {
+                            "nonzero-exit": 1
+                        },
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 1
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.8333333333333333,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 2,
+                        "calls": 3,
+                        "efficiency": 0.6666666666666666,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 3,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 2,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "add.js"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.0006569400000000001,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.0014899499999999999,
+                    "cost": 0.00214689,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-Tk1bP8\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-Tk1bP8\\\\home\\\\codex-home\"))\n"
+                }
+            ]
+        },
+        {
+            "harness": "codex",
+            "label": "Codex CLI",
+            "task": "t1-no-touch",
+            "tier": 1,
+            "category": "scoped",
+            "attempts": [
+                {
+                    "pass": true,
+                    "notes": "keep.txt updated, dont-touch.txt intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 13228,
+                    "wallMs": 13231,
+                    "modelRequests": 4,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "c3142daa989c51dcbc92026b87d8093f0c20dd4e6758f7f47555ad3cf516d2bd"
+                    },
+                    "tokens": {
+                        "inputTokens": 37814,
+                        "outputTokens": 224,
+                        "cachedTokens": 36352,
+                        "withUsage": 4,
+                        "toolCalls": {
+                            "bash": 3
+                        },
+                        "toolsOffered": {
+                            "create_goal": 4,
+                            "bash": 8,
+                            "get_goal": 4,
+                            "subagent": 4,
+                            "request_user_input": 4,
+                            "update_goal": 4,
+                            "read": 4,
+                            "web_search": 4
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9213,
+                                "cachedTokens": 8320,
+                                "completionTokens": 57,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9418,
+                                "cachedTokens": 9216,
+                                "completionTokens": 93,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9544,
+                                "cachedTokens": 9344,
+                                "completionTokens": 42,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 4,
+                                "promptTokens": 9639,
+                                "cachedTokens": 9472,
+                                "completionTokens": 32,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9639,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 142
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f127133ffe5yhLR2E2Abpnr3",
+                        "durationMs": 4084,
+                        "inputTokens": 9924,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.0014898
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9213,
+                            "cachedTokens": 8320,
+                            "completionTokens": 57,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9418,
+                            "cachedTokens": 9216,
+                            "completionTokens": 93,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9544,
+                            "cachedTokens": 9344,
+                            "completionTokens": 42,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 4,
+                            "promptTokens": 9639,
+                            "cachedTokens": 9472,
+                            "completionTokens": 32,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9639,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 142
+                    },
+                    "toolOutcomes": {
+                        "results": 3,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 3,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.6666666666666666,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 1,
+                        "calls": 3,
+                        "efficiency": 0.3333333333333333,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 3,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 1,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "keep.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.000462756,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.0014898000000000001,
+                    "cost": 0.001952556,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-4gKCsc\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-4gKCsc\\\\home\\\\codex-home\"))\n"
+                },
+                {
+                    "pass": true,
+                    "notes": "keep.txt updated, dont-touch.txt intact",
+                    "exitCode": 0,
+                    "timedOut": false,
+                    "faults": null,
+                    "harnessError": "",
+                    "durationMs": 7639,
+                    "wallMs": 7642,
+                    "modelRequests": 3,
+                    "firstCall": {
+                        "toolCount": 9,
+                        "toolNames": [
+                            "create_goal",
+                            "exec_command",
+                            "get_goal",
+                            "multi_agent_v1",
+                            "request_user_input",
+                            "update_goal",
+                            "view_image",
+                            "web_search",
+                            "write_stdin"
+                        ],
+                        "toolSchemaChars": 18102,
+                        "instructionChars": 20046,
+                        "requestSha256": "070dc7fce455d709455d848b2bd370b98396d25d2bd344f04734b5da05215bbb"
+                    },
+                    "tokens": {
+                        "inputTokens": 28075,
+                        "outputTokens": 247,
+                        "cachedTokens": 26880,
+                        "withUsage": 3,
+                        "toolCalls": {
+                            "bash": 2
+                        },
+                        "toolsOffered": {
+                            "create_goal": 3,
+                            "bash": 6,
+                            "get_goal": 3,
+                            "subagent": 3,
+                            "request_user_input": 3,
+                            "update_goal": 3,
+                            "read": 3,
+                            "web_search": 3
+                        },
+                        "series": [
+                            {
+                                "request": 1,
+                                "promptTokens": 9210,
+                                "cachedTokens": 8320,
+                                "completionTokens": 100,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 2,
+                                "promptTokens": 9357,
+                                "cachedTokens": 9216,
+                                "completionTokens": 115,
+                                "toolCalls": 1
+                            },
+                            {
+                                "request": 3,
+                                "promptTokens": 9508,
+                                "cachedTokens": 9344,
+                                "completionTokens": 32,
+                                "toolCalls": 0
+                            }
+                        ],
+                        "context": {
+                            "peakPromptTokens": 9508,
+                            "compactions": 0,
+                            "reclaimedTokens": 0,
+                            "growthPerRequest": 149
+                        }
+                    },
+                    "native": null,
+                    "sessionMint": {
+                        "sessionId": "ses_f3f1227f4ffe2h6vnXXHl0ajWC",
+                        "durationMs": 4304,
+                        "inputTokens": 9923,
+                        "outputTokens": 2,
+                        "reasoningTokens": 0,
+                        "cachedTokens": 0,
+                        "cacheWriteTokens": 0,
+                        "nativeCost": 0.00148965
+                    },
+                    "rpcEvents": null,
+                    "series": [
+                        {
+                            "request": 1,
+                            "promptTokens": 9210,
+                            "cachedTokens": 8320,
+                            "completionTokens": 100,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 2,
+                            "promptTokens": 9357,
+                            "cachedTokens": 9216,
+                            "completionTokens": 115,
+                            "toolCalls": 1
+                        },
+                        {
+                            "request": 3,
+                            "promptTokens": 9508,
+                            "cachedTokens": 9344,
+                            "completionTokens": 32,
+                            "toolCalls": 0
+                        }
+                    ],
+                    "context": {
+                        "peakPromptTokens": 9508,
+                        "compactions": 0,
+                        "reclaimedTokens": 0,
+                        "growthPerRequest": 149
+                    },
+                    "toolOutcomes": {
+                        "results": 2,
+                        "errors": 0,
+                        "signatures": {},
+                        "byTool": {
+                            "exec_command": {
+                                "results": 2,
+                                "errors": 0
+                            }
+                        },
+                        "repeatedCalls": 0
+                    },
+                    "score": 0.75,
+                    "correctness": 1,
+                    "effort": {
+                        "measured": true,
+                        "reference": 1,
+                        "calls": 2,
+                        "efficiency": 0.5,
+                        "weight": 0.5
+                    },
+                    "breakdown": [
+                        {
+                            "check": "tool calls used",
+                            "got": 2,
+                            "of": 0
+                        },
+                        {
+                            "check": "tool calls, demonstrated floor",
+                            "got": 1,
+                            "of": 0
+                        }
+                    ],
+                    "scope": {
+                        "writable": [
+                            "keep.txt"
+                        ],
+                        "violations": [],
+                        "clean": true
+                    },
+                    "modelCost": 0.00040809,
+                    "advisorCost": 0,
+                    "advisor": {
+                        "calls": 0,
+                        "failed": 0,
+                        "inputTokens": 0,
+                        "estimated": false,
+                        "ledger": null
+                    },
+                    "mintCost": 0.00148965,
+                    "cost": 0.00189774,
+                    "costComplete": true,
+                    "filesBefore": 2,
+                    "filesAfter": 2,
+                    "stderrTail": "WARNING: proceeding, even though we could not create PATH aliases: Refusing to create helper binaries under temporary dir \"F:\\\\Temp\\\\specpi-eval-run-TVql8W\\\\home\\\\\" (codex_home: AbsolutePathBuf(\"F:\\\\Temp\\\\specpi-eval-run-TVql8W\\\\home\\\\codex-home\"))\n"
+                }
+            ]
+        }
+    ]
+}
