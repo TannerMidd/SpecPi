@@ -838,6 +838,45 @@ function ensureSpecpiBase() {
  * that have to agree on the install for their comparison to mean anything. Returns the agent
  * directory, or a finished attempt result when the install itself failed.
  */
+/**
+ * Remove one named part of the installed SpecPi layer, so a result can be attributed to it.
+ *
+ * Off unless SPECPI_EVAL_ABLATE names something, so every ordinary run prepares the home exactly as
+ * it always has. This exists because a SpecPi row and a plain Pi row differ by a whole installed
+ * layer at once -- extensions, packages and a working agreement -- so a row that scores differently
+ * cannot say which of those did it. Ablating one part and re-running can.
+ *
+ * `agents` drops the installed global AGENTS.md, the layer's working agreement and the larger half
+ * of what SpecPi adds to a prompt. It is the only target here, and the reason there is no `scope`
+ * target is worth recording: /scope cannot be ablated this way. It activates only when a human
+ * types the command and is not exposed as a tool, so it is already inert in an unattended run --
+ * there is no on state to remove. Deleting its extension directory does not simulate one either,
+ * because `tool-wishlist` imports `workflow-controls/task-contract.mjs`, so the whole extension
+ * load fails and the session makes no model calls at all. That reads as a harness scoring zero
+ * rather than as an ablation, which is exactly the kind of result this function must not produce.
+ */
+function ablateSpecpi(agentDir) {
+    const part = process.env.SPECPI_EVAL_ABLATE;
+    if (!part) {
+        return;
+    }
+
+    const targets = { agents: [path.join(agentDir, "AGENTS.md")] }[part];
+    if (!targets) {
+        throw new Error(`Unknown SPECPI_EVAL_ABLATE: ${part}. Use one of: agents`);
+    }
+
+    for (const target of targets) {
+        if (!fs.existsSync(target)) {
+            // Refuse rather than report an ablation that removed nothing: a row labelled "without
+            // the working agreement" that still has it is worse than no row.
+            throw new Error(`SPECPI_EVAL_ABLATE=${part} found nothing to remove at ${target}`);
+        }
+
+        fs.rmSync(target, { recursive: true, force: true });
+    }
+}
+
 async function prepareSpecpiHome({ workspaceDir, homeDir }) {
     const { runPiFixture } = await import("./pi-test-harness.mjs");
     const base = ensureSpecpiBase();
@@ -869,6 +908,7 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
     const agentDir = path.join(homeDir, "agent");
     fs.rmSync(agentDir, { recursive: true, force: true });
     fs.cpSync(base.agentDir, agentDir, { recursive: true });
+    ablateSpecpi(agentDir);
     const permissionDir = path.join(agentDir, "extensions", "pi-permission-system");
     fs.mkdirSync(permissionDir, { recursive: true });
     fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
