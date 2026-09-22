@@ -125,19 +125,6 @@ test("gap's sanitization gate separates a planted secret from a clean report", (
     }
 });
 
-test("compaction's open-thread gate is reachable at the threshold it now carries", () => {
-    const thread = fixture("compaction/debugging with an open thread/unresolved_thread");
-    for (const value of thread.values) {
-        assert.equal(nounTrue({ kind: "noul", value }, "compaction"), true, `an open investigation scored ${value}`);
-    }
-
-    // The genuinely uncertain question in the same batch must stay silent, otherwise the lowered
-    // threshold is just a switch that is always on.
-    for (const value of fixture("compaction/debugging with an open thread/discarded_span_was_dead_ends").values) {
-        assert.equal(nounTrue({ kind: "noul", value }, "compaction"), false, `an uncertain answer scored ${value}`);
-    }
-});
-
 test("source ranking gates the obvious file through and the noise out", () => {
     const relevant = fixture("sources/one plainly relevant file among noise/source_1");
     for (const [index, value] of relevant.values.entries()) {

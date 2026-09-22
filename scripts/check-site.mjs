@@ -52,7 +52,7 @@ const routes = new Map([
     ["/SpecPi/wiki.css", ["wiki.css", "text/css"]],
     ["/SpecPi/research.css", ["research.css", "text/css"]],
     ["/SpecPi/research/context-measurement.json", ["research/context-measurement.json", "application/json"]],
-    ["/SpecPi/evaluations/harness-eval.json", ["evaluations/harness-eval.json", "application/json"]],
+    ["/SpecPi/evaluations/terminal-bench-2.json", ["evaluations/terminal-bench-2.json", "application/json"]],
     ["/SpecPi/theme.js", ["theme.js", "text/javascript"]],
     ["/SpecPi/page.js", ["page.js", "text/javascript"]],
     ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
@@ -197,10 +197,10 @@ try {
         const measurement = await page.request.get(`${origin}/SpecPi/research/context-measurement.json`);
         assert.equal(measurement.status(), 200);
 
-        // The evaluations page draws itself from harness-eval.json: every figure is
-        // injected by scripts/eval-site.mjs and the headline metrics are read at load.
-        // An empty slot means a run was published without regenerating the page, which
-        // would leave prose asserting numbers no chart supports.
+        // The evaluations page draws itself from terminal-bench-2.json: every figure is
+        // injected by scripts/tb2-site.mjs and the headline metrics are read at load. An
+        // empty slot means a run was published without regenerating the page, which would
+        // leave prose asserting numbers no chart supports.
         await page.getByRole("link", { name: "Evals", exact: true }).click();
         await page.waitForURL(`${origin}/SpecPi/evaluations/`);
         assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
@@ -223,9 +223,9 @@ try {
         assert.equal(evaluations.overflow, false, `${name} evaluations overflows`);
         assert.deepEqual(evaluations.missingAnchors, []);
         assert.equal(evaluations.sections, evaluations.navLinks);
-        assert.equal(evaluations.charts, 9, "every chart slot must hold a rendered figure");
+        assert.equal(evaluations.charts, 4, "every chart slot must hold a rendered figure");
         assert.ok(evaluations.tableRows > 0, "the summary table was not generated");
-        assert.equal(evaluations.metrics, 4, "headline metrics did not load from harness-eval.json");
+        assert.equal(evaluations.metrics, 4, "headline metrics did not load from terminal-bench-2.json");
         assert.equal(evaluations.unfilled, 0, "a figure quoted in the prose was not filled from the dataset");
         assert.match(evaluations.generated, /^Run \d{4}-\d{2}-\d{2}$/u);
         await page.screenshot({ path: path.join(screenshots, `evaluations-${name}.png`), fullPage: true });

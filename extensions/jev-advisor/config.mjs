@@ -18,15 +18,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 /** Systems that may run inside a session. Offline scripts are not gated here. */
-export const SYSTEM_NAMES = Object.freeze([
-    "retention",
-    "compaction",
-    "gap",
-    "sources",
-    "progress",
-    "untrusted",
-    "capability",
-]);
+export const SYSTEM_NAMES = Object.freeze(["retention", "gap", "sources", "progress", "untrusted", "capability"]);
 
 /**
  * What a confident stuck verdict is allowed to do. `notify` tells the person and cannot be wrong in
@@ -57,14 +49,14 @@ const MAX_TOTAL_BUDGET = 2048;
  * session, and which one won would be decided by event ordering rather than by anyone's policy.
  *
  * So the ceiling is two-level: each system gets its own, and the total is a real constraint because
- * it is deliberately less than their sum -- 2048 against 2322. That relationship is the invariant,
+ * it is deliberately less than their sum -- 2048 against 2274. That relationship is the invariant,
  * not either number: raising the total without raising the per-system ceilings would leave a total
  * no combination of systems could ever reach, which is a limit that reads as a limit and is not
  * one. `tests/jev-advisor.test.mjs` pins the inequality so a future change to one has to consider
  * the other. Running out of one system's budget stops that system and nothing else.
  *
  * The per-system numbers follow how often each one can fire: retention on every large read-only
- * result, compaction once or twice in a long session, gap per report, sources per delegation batch.
+ * result, gap per report, sources per delegation batch.
  */
 export const DEFAULT_BUDGETS = Object.freeze({
     // A backstop, not a working limit, and the number says which. Measured, a full tier-3 task -- a
@@ -92,7 +84,6 @@ export const DEFAULT_BUDGETS = Object.freeze({
     // add up to is not a constraint at all -- see below. They are scaled rather than re-derived:
     // each one's rationale is a firing frequency, and none of those frequencies changed.
     retention: 832,
-    compaction: 48,
     gap: 192,
     sources: 128,
     // Turn-level, but gated behind local signals and a four-turn cooldown, so it only spends on
@@ -144,7 +135,7 @@ export function regularFile(file, label) {
 /** Every unknown shape collapses to the same all-off default rather than a partial enable. */
 export function defaultSettings() {
     return {
-        schema: 4,
+        schema: 5,
         master: false,
         startup: false,
         systems: Object.fromEntries(SYSTEM_NAMES.map((name) => [name, false])),
@@ -207,6 +198,29 @@ function migrateToFour(raw) {
 }
 
 /**
+ * Schema 5 removes compaction guidance, which was withdrawn rather than fixed.
+ *
+ * Two tier-6 runs, on SpecPi 0.28.0 and 0.29.0, both measured the arm carrying it solving fewer
+ * long-session tasks than plain SpecPi: 14/16 against 8/16 pooled, Fisher exact p = 0.054. Over the
+ * same attempts compaction was 55 of 56 applied verdicts, so the arm's behaviour was almost entirely
+ * this system's, and no other system in the layer applied enough to be a candidate.
+ *
+ * The evidence never reached significance and the mechanism was never isolated. The system was
+ * removed anyway, because a system that steers a summary has to earn the risk it takes, and one
+ * whose only measurement says it costs solve rate has not.
+ *
+ * Both the `systems.compaction` switch and the per-system `budgets.compaction` ceiling go. Dropping
+ * them turns nothing off that a user had on in any meaningful sense: the hooks they gated no longer
+ * exist, so a retained preference could only describe a system that cannot run.
+ */
+function migrateToFive(raw) {
+    const { compaction: _system, ...systems } = raw?.systems ?? {};
+    const { compaction: _budget, ...budgets } = raw?.budgets ?? {};
+
+    return { ...raw, schema: 5, systems, budgets };
+}
+
+/**
  * What the advisor will read, given a settings object, without writing it anywhere.
  *
  * Exported for callers that compose a settings file for somewhere other than this process's own
@@ -222,15 +236,16 @@ export function normalizeSettings(raw) {
 
 function normalize(raw) {
     const one = raw?.schema === 1 ? migrate(raw) : raw;
-    const source = one?.schema === 2 || one?.schema === 3 ? migrateToFour(one) : one;
-    if (source?.schema !== 4) {
+    const four = one?.schema === 2 || one?.schema === 3 ? migrateToFour(one) : one;
+    const source = four?.schema === 4 ? migrateToFive(four) : four;
+    if (source?.schema !== 5) {
         return defaultSettings();
     }
 
     const systems = Object.fromEntries(SYSTEM_NAMES.map((name) => [name, source.systems?.[name] === true]));
 
     return {
-        schema: 4,
+        schema: 5,
         master: source.master === true,
         startup: source.startup === true,
         systems,
@@ -268,7 +283,7 @@ export function writeFileAtomic(file, contents) {
 export function saveSettings(settings) {
     // A caller handing back an older shape is migrated rather than reset, so a round trip through
     // an old reader cannot quietly disable the layer.
-    const next = normalize([1, 2, 3].includes(settings?.schema) ? settings : { ...settings, schema: 4 });
+    const next = normalize([1, 2, 3, 4].includes(settings?.schema) ? settings : { ...settings, schema: 5 });
     const file = settingsFile();
     if (fs.existsSync(file)) {
         regularFile(file, "Jev settings");

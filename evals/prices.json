@@ -49,6 +49,12 @@
             "inputPerMTok": 2.5,
             "outputPerMTok": 20,
             "cacheReadPerMTok": 0.25
+        },
+        "glm-5.3-flash": {
+            "inputPerMTok": 0.09,
+            "outputPerMTok": 0.3,
+            "cacheReadPerMTok": 0.018,
+            "note": "Z.ai GLM 5.3 Flash via OpenRouter (z-ai/glm-5.3-flash); rates read from OpenRouter's own models API"
         }
     }
 }

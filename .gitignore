@@ -31,6 +31,23 @@ missions/
 # they are not worth carrying in the repository.
 evals/archive/
 
+# Eval run output. A report.json is the machine-written record of one run -- every
+# attempt, every token count, every tool call -- and they run to tens of thousands
+# of lines each. The repository was carrying 146k lines of them, more than the rest
+# of the source put together, for files nothing reads.
+#
+# What is published is the derived matrix under site/evaluations/, which is committed
+# and reviewable. The raw reports stay on disk so a result can still be inspected, and
+# a run that backs a published claim is archived outside the repository.
+#
+# The two exceptions are inputs, not output: gate.mjs pins the Jev thresholds to
+# jev-calibration.json and a test fails when they drift, and eval-site.mjs reads
+# jev-triage.json when it builds the page. The pattern is `runs/*` rather than `runs/`
+# because git cannot re-include a file whose parent directory is excluded.
+evals/runs/*
+!evals/runs/jev-calibration.json
+!evals/runs/jev-triage.json
+
 # SpecPi development/install state
 .specpi-test/
 *.log

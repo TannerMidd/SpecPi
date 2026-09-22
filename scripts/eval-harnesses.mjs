@@ -347,6 +347,93 @@ export function codexConfig({ baseUrl, model, provider = "eval", contextWindow =
 // shell. Only the prompt would need quoting through cmd.exe, and it travels
 // on stdin, so the shim path keeps a fixed command line with no user content
 // in it.
+export function findClaudeCli() {
+    const configured = process.env.SPECPI_CLAUDE_CLI;
+    if (configured && fs.existsSync(configured)) {
+        return resolveWindowsBinary(configured);
+    }
+
+    const found = findOnPath("claude");
+
+    return found ? resolveWindowsBinary(found) : undefined;
+}
+
+/**
+ * Claude Code, headless, pointed at the proxy.
+ *
+ * NO ANTHROPIC CREDENTIAL IS INVOLVED, and the disposable config directory is what guarantees it.
+ * Claude Code normally authenticates against a stored subscription login, so a run against the
+ * user's real configuration could fall back to it and bill a subscription for an eval. A fresh
+ * `CLAUDE_CONFIG_DIR` has no stored login to fall back to, `ANTHROPIC_BASE_URL` points at the
+ * proxy, and the proxy builds its own outbound headers and discards whatever the client sent -- so
+ * the token below is a placeholder that never reaches anything. This is the same discipline the
+ * Codex row uses with a disposable CODEX_HOME.
+ *
+ * `--dangerously-skip-permissions` is the equivalent of the SpecPi rows' yoloMode opt-in: headless
+ * there is nobody to answer a prompt, and the report method discloses it rather than measuring it
+ * away.
+ *
+ * The declared context window is absent on purpose. Claude Code exposes no setting for it -- its
+ * compaction triggers off the model's own window -- so a tier that declares one cannot hold this
+ * harness to it, and tier 6 reads the row as unwindowed rather than pretending otherwise.
+ */
+async function runClaudeCode({ task, workspaceDir, homeDir, proxyUrl, model, timeoutMs, faults }) {
+    const startedAt = Date.now();
+    const cli = findClaudeCli();
+    if (!cli) {
+        throw new Error("Claude Code CLI not found: set SPECPI_CLAUDE_CLI or put claude on PATH");
+    }
+
+    const configDir = path.join(homeDir, "claude-config");
+    fs.mkdirSync(configDir, { recursive: true });
+    const args = [
+        "--print",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--dangerously-skip-permissions",
+        "--model",
+        model,
+    ];
+    if (Number.isSafeInteger(task.turnCap) && task.turnCap > 0) {
+        args.push("--max-turns", String(task.turnCap));
+    }
+
+    const child = spawnCodex(cli, args, {
+        cwd: workspaceDir,
+        env: withFaultPath(
+            allowlistedEnv(homeDir, {
+                CLAUDE_CONFIG_DIR: configDir,
+                ANTHROPIC_BASE_URL: proxyUrl.replace(/\/v1$/u, ""),
+                ANTHROPIC_AUTH_TOKEN: "eval-proxy",
+                // Telemetry is not billing, but a disposable home has nowhere to put it and an
+                // eval should not be measuring a network call it did not ask for.
+                DISABLE_TELEMETRY: "1",
+                DISABLE_ERROR_REPORTING: "1",
+                DISABLE_AUTOUPDATER: "1",
+            }),
+            faults,
+        ),
+    });
+    // Same reason as Codex: eval prompts are multi-line markdown and no Windows shell carries a
+    // newline inside a quoted argument, so the prompt travels on stdin.
+    child.stdin.end(task.prompt);
+    let errors = "";
+    child.stdout.resume();
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (text) => {
+        errors += text;
+    });
+    const outcome = await waitForExit(child, timeoutMs);
+
+    return {
+        exitCode: outcome.timedOut ? 1 : (child.exitCode ?? 1),
+        timedOut: outcome.timedOut,
+        durationMs: Date.now() - startedAt,
+        stderrTail: errors.slice(-2000),
+    };
+}
+
 function spawnCodex(cli, args, { cwd, env }) {
     if (process.platform === "win32" && /\.(cmd|bat)$/iu.test(cli)) {
         const comspec = process.env.ComSpec ?? process.env.COMSPEC ?? "cmd.exe";
@@ -751,6 +838,145 @@ function ensureSpecpiBase() {
  * that have to agree on the install for their comparison to mean anything. Returns the agent
  * directory, or a finished attempt result when the install itself failed.
  */
+/**
+ * The two tools SpecPi's own extensions add over plain Pi, as a captured first request lists them.
+ *
+ * The install adds four. The other two, `create_goal` and `get_goal`, belong to pi-goal-x and are
+ * not withdrawable this way: that package owns a tool profile and re-asserts it from its own hooks,
+ * so anything taken out of the active set comes straight back. The `goal` target removes the
+ * package instead.
+ */
+const SPECPI_ADDED_TOOLS = Object.freeze(["report_capability_gap", "request_capability"]);
+
+const GOAL_PACKAGE_PREFIX = "npm:pi-goal-x@";
+
+const ABLATION_EXTENSION = "specpi-eval-ablation";
+
+/**
+ * Withdraw the added tools by writing one extension into the disposable home.
+ *
+ * Withdrawn on `before_agent_start` as well as `session_start`, because workflow-controls sets the
+ * active set at session_start for its own groups and extension load order is not ours to depend
+ * on. The last hook before a request is built is the one that decides what ships.
+ */
+function writeToolWithdrawal(agentDir) {
+    const source = [
+        "// Written by the eval runner for SPECPI_EVAL_ABLATE=tools. Not part of any install.",
+        `const WITHHELD = new Set(${JSON.stringify([...SPECPI_ADDED_TOOLS])});`,
+        "",
+        "export default function specpiEvalAblation(pi) {",
+        "    const withdraw = () => {",
+        '        if (typeof pi.getActiveTools !== "function" || typeof pi.setActiveTools !== "function") {',
+        "            return;",
+        "        }",
+        "",
+        "        const active = pi.getActiveTools();",
+        "        pi.setActiveTools(active.filter((name) => !WITHHELD.has(name)));",
+        "    };",
+        "",
+        '    pi.on("session_start", withdraw);',
+        '    pi.on("before_agent_start", withdraw);',
+        "}",
+        "",
+    ].join("\n");
+
+    const dir = path.join(agentDir, "extensions", ABLATION_EXTENSION);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "index.ts"), source);
+}
+
+/**
+ * Remove one or more named parts of the installed SpecPi layer, so a result can be attributed to
+ * them.
+ *
+ * Off unless SPECPI_EVAL_ABLATE names something, so every ordinary run prepares the home exactly as
+ * it always has. This exists because a SpecPi row and a plain Pi row differ by a whole installed
+ * layer at once -- extensions, packages and a working agreement -- so a row that scores differently
+ * cannot say which of those did it. Ablating one part and re-running can. Parts combine with
+ * commas, because halves are only separately meaningful if they can also be removed together.
+ *
+ * `agents` drops the installed global AGENTS.md: the layer's working agreement, and on one captured
+ * request 4.2 KB of the 8.5 KB SpecPi adds to a plain Pi request.
+ *
+ * `tools` withdraws the two tools SpecPi's own extensions add. Neither can act in an unattended run:
+ * `request_capability` answers that restoring a group needs an interactive user, and
+ * `report_capability_gap` that collection is undecided. Both register unconditionally, so a headless
+ * session ships their schema and prompt guidance for nothing -- 3.7 KB of one captured request.
+ *
+ * It withdraws rather than deletes, and that is the whole reason this target can exist. Deleting
+ * the extension directories does not work: `tool-wishlist` imports
+ * `workflow-controls/task-contract.mjs`, so removing either fails the entire extension load and the
+ * session makes no model calls -- a harness scoring zero, which reads like an ablation and is not
+ * one. Withdrawing uses the same `setActiveTools` seam `/webaccess` and `/browser` already use, so
+ * every extension still loads and only the tools leave the request.
+ *
+ * `goal` drops pi-goal-x from the home's package list, taking `create_goal` and `get_goal` with it.
+ * A package rather than a withdrawal because that one re-asserts its own tool profile; see
+ * SPECPI_ADDED_TOOLS. Together with `tools` it leaves exactly plain Pi's four-tool surface, which is
+ * what makes a tool-surface result attributable rather than merely suggestive.
+ *
+ * There is still no `scope` target. /scope activates only when a human types the command and is not
+ * exposed as a tool, so it is already inert in an unattended run: there is no on state to remove.
+ *
+ * Whether a withdrawal took effect is not taken on trust. The report's `toolsOffered` names the
+ * tools the provider was actually sent, so an ablation that quietly did nothing is visible there.
+ */
+function ablateSpecpi(agentDir) {
+    const requested = process.env.SPECPI_EVAL_ABLATE;
+    if (!requested) {
+        return;
+    }
+
+    const parts = requested
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+    const known = new Set(["agents", "tools", "goal"]);
+    for (const part of parts) {
+        if (!known.has(part)) {
+            throw new Error(`Unknown SPECPI_EVAL_ABLATE: ${part}. Use one or more of: ${[...known].join(", ")}`);
+        }
+    }
+
+    if (parts.includes("agents")) {
+        const target = path.join(agentDir, "AGENTS.md");
+        if (!fs.existsSync(target)) {
+            // Refuse rather than report an ablation that removed nothing: a row labelled "without
+            // the working agreement" that still has it is worse than no row.
+            throw new Error(`SPECPI_EVAL_ABLATE=agents found nothing to remove at ${target}`);
+        }
+
+        fs.rmSync(target, { recursive: true, force: true });
+    }
+
+    if (parts.includes("tools")) {
+        // Same refusal, at the only point this one can check: the tools are registered by these two
+        // extensions, so a home without them has nothing to withdraw and the row would be mislabelled.
+        for (const owner of ["tool-wishlist", "workflow-controls"]) {
+            const dir = path.join(agentDir, "extensions", owner);
+            if (!fs.existsSync(dir)) {
+                throw new Error(`SPECPI_EVAL_ABLATE=tools found no ${owner} extension at ${dir}`);
+            }
+        }
+
+        writeToolWithdrawal(agentDir);
+    }
+
+    if (parts.includes("goal")) {
+        const settingsFile = path.join(agentDir, "settings.json");
+        const settings = JSON.parse(fs.readFileSync(settingsFile, "utf8"));
+        const packages = Array.isArray(settings.packages) ? settings.packages : [];
+        const kept = packages.filter((entry) => !String(entry).startsWith(GOAL_PACKAGE_PREFIX));
+        if (kept.length === packages.length) {
+            // The same refusal the other targets make: a row labelled "without the goal package"
+            // that still has it is worse than no row.
+            throw new Error(`SPECPI_EVAL_ABLATE=goal found no ${GOAL_PACKAGE_PREFIX}* entry in ${settingsFile}`);
+        }
+
+        fs.writeFileSync(settingsFile, `${JSON.stringify({ ...settings, packages: kept }, null, 4)}\n`);
+    }
+}
+
 async function prepareSpecpiHome({ workspaceDir, homeDir }) {
     const { runPiFixture } = await import("./pi-test-harness.mjs");
     const base = ensureSpecpiBase();
@@ -782,6 +1008,7 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
     const agentDir = path.join(homeDir, "agent");
     fs.rmSync(agentDir, { recursive: true, force: true });
     fs.cpSync(base.agentDir, agentDir, { recursive: true });
+    ablateSpecpi(agentDir);
     const permissionDir = path.join(agentDir, "extensions", "pi-permission-system");
     fs.mkdirSync(permissionDir, { recursive: true });
     fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
@@ -800,10 +1027,15 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
  * The command guard is absent because it is no longer part of the layer: it is the separate
  * `specpi-jev-guard` package, which these disposable homes do not install and which this row
  * therefore does not measure.
+ *
+ * Compaction guidance is absent because it was withdrawn. Two tier-6 runs measured the arm carrying
+ * it solving fewer long-session tasks than plain SpecPi -- 14/16 against 8/16 pooled, Fisher exact
+ * p = 0.054 -- while accounting for 55 of the 56 verdicts the layer applied over those attempts.
+ * The runs that carried it are kept in the published tier-6 record rather than deleted, because a
+ * measurement that led to a removal is the reason the removal can be defended.
  */
 const JEV_EVAL_SYSTEMS = Object.freeze({
     retention: true,
-    compaction: true,
     gap: true,
     sources: false,
     progress: true,
@@ -1315,6 +1547,20 @@ export const harnessAdapters = {
             return { available: true, detail: cli };
         },
         run: runCodex,
+    },
+    "claude-code": {
+        id: "claude-code",
+        label: "Claude Code",
+        needsProxySession: true,
+        isAvailable: () => {
+            const cli = findClaudeCli();
+            if (!cli) {
+                return { available: false, detail: "set SPECPI_CLAUDE_CLI or put claude on PATH" };
+            }
+
+            return { available: true, detail: cli };
+        },
+        run: runClaudeCode,
     },
     dsh: {
         id: "dsh",

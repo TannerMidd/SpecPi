@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-// Derive site/evaluations/tier6.json from one or more tier 6 run directories.
+// Derive evals/runs/tier6-metrics.json from one or more tier 6 run directories.
+//
+// This used to publish to site/evaluations/. The tier suite is no longer on the site -- the
+// evaluations page carries Terminal-Bench 2.0 now -- so the summary is written beside the runs it
+// describes instead, where it stays a local analysis rather than a published claim.
 //
 // Tier 6 is the suite built to contain the situations the other tiers cannot reach, and it exists
 // because three earlier attempts at it failed in ways worth stating plainly:
@@ -29,15 +33,28 @@ import process from "node:process";
 import { isLaunchFailure } from "./eval-site.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const outFile = path.join(root, "site", "evaluations", "tier6.json");
+const outFile = path.join(root, "evals", "runs", "tier6-metrics.json");
 
-const ORDER = ["pi", "specpi-default", "specpi-jev", "omp", "codex", "opencode", "dsh"];
+/**
+ * How far above the declared window a genuinely windowed attempt may peak.
+ *
+ * Compaction is triggered by the turn that crosses the window, so the request carrying that turn
+ * is over it by design and the peak always overshoots. The size of the overshoot is what separates
+ * the two populations, and it is measured rather than guessed: across the archived tier 6 runs at
+ * a 24,000-token window, attempts that compacted peak between 17,117 and 37,974 -- at most 1.58x
+ * the window -- while attempts that ran at a provider default sit between 45,322 and 82,268, from
+ * 1.89x upward. Two is the round number between the two bands.
+ */
+const WINDOW_OVERSHOOT = 2;
+
+const ORDER = ["pi", "specpi-default", "specpi-jev", "omp", "codex", "claude-code", "opencode", "dsh"];
 const LABELS = {
     pi: "Pi (base)",
     "specpi-default": "SpecPi",
     "specpi-jev": "SpecPi + Jev",
     omp: "Oh My Pi",
     codex: "Codex CLI",
+    "claude-code": "Claude Code",
     opencode: "OpenCode",
     dsh: "DeepSeek Harness",
 };
@@ -79,6 +96,11 @@ function mean(values) {
     const found = values.filter((value) => Number.isFinite(value));
 
     return found.length === 0 ? null : found.reduce((total, value) => total + value, 0) / found.length;
+}
+
+/** A share, or null when the denominator is zero -- which is not the same number as 0%. */
+function rate(part, whole) {
+    return whole > 0 ? part / whole : null;
 }
 
 /**
@@ -160,10 +182,21 @@ function armOf(entry) {
  * Tested rather than hardcoded as a list of runs to skip, because a list goes stale silently and
  * this does not.
  */
-function ranWindowed(attempt, window) {
+export function ranWindowed(attempt, window) {
     const context = attempt.context ?? {};
+    const peak = context.peakPromptTokens ?? 0;
+    const compactions = context.compactions ?? 0;
 
-    return !((context.compactions ?? 0) === 0 && (context.peakPromptTokens ?? 0) > window);
+    // Never compacted and over the window: the window plainly was not in force.
+    if (compactions === 0 && peak > window) {
+        return false;
+    }
+
+    // Compacted, but nowhere near the window either. Having compacted once proves the harness
+    // compacts; it does not prove it compacted at *this* window, and the two are different claims.
+    // Without this an attempt peaking at 80,000 tokens joins a 24,000-token comparison on the
+    // strength of a single compaction, and the row reports a window the attempt never ran under.
+    return peak <= window * WINDOW_OVERSHOOT;
 }
 
 function collect(runDirs, window) {
@@ -171,6 +204,10 @@ function collect(runDirs, window) {
     const launchFailures = { count: 0, reasons: {} };
     const unwindowed = { count: 0, arms: {} };
     const runs = [];
+    // Which model produced these numbers is part of the result, not trivia. The page now runs
+    // different suites on different models, so a surface that cannot name its own model cannot be
+    // read beside one that can. Uniform or refuse, the same rule collect() applies.
+    const models = new Set();
     for (const dir of runDirs) {
         if (!fs.existsSync(dir)) {
             throw new Error(`no such run directory: ${dir}`);
@@ -190,6 +227,10 @@ function collect(runDirs, window) {
 
             used = true;
             const data = JSON.parse(fs.readFileSync(report, "utf8"));
+            if (data.model) {
+                models.add(data.model);
+            }
+
             for (const result of data.results ?? []) {
                 const key = `${arm}\u0000${result.task}`;
                 const list = attempts.get(key) ?? [];
@@ -225,7 +266,7 @@ function collect(runDirs, window) {
         }
     }
 
-    return { attempts, runs, launchFailures, unwindowed };
+    return { attempts, runs, launchFailures, unwindowed, models };
 }
 
 function summarise(list) {
@@ -240,6 +281,14 @@ function summarise(list) {
         peakPromptTokens: mean(context.map((entry) => entry.peakPromptTokens ?? 0)),
         cost: mean(list.map((attempt) => attempt.cost)),
         costMedian: median(list.map((attempt) => attempt.cost)),
+        // Summed rather than averaged per attempt, because a ratio of means is the rate over the
+        // whole tier while a mean of ratios lets a two-request attempt weigh as much as a
+        // two-hundred-request one. `scripts/eval-overall.mjs` pools this with the other suites.
+        promptTokens: mean(list.map((attempt) => attempt.tokens?.inputTokens ?? 0)),
+        cacheHitRate: rate(
+            list.reduce((total, attempt) => total + (attempt.tokens?.cachedTokens ?? 0), 0),
+            list.reduce((total, attempt) => total + (attempt.tokens?.inputTokens ?? 0), 0),
+        ),
         seconds: mean(list.map((attempt) => attempt.durationMs / 1000)),
         advisorCalls: mean(list.map((attempt) => attempt.advisor?.calls ?? 0)),
         // Split by kind because they are not the same failure, and only one of them is evidence
@@ -288,7 +337,7 @@ function main() {
     }
 
     const WINDOW = 24000;
-    const { attempts, runs, launchFailures, unwindowed } = collect(runDirs, WINDOW);
+    const { attempts, runs, launchFailures, unwindowed, models } = collect(runDirs, WINDOW);
     const harnesses = [];
     for (const arm of ORDER) {
         const perTask = {};
@@ -330,8 +379,16 @@ function main() {
         0,
     );
 
+    if (models.size > 1) {
+        throw new Error(
+            `tier 6 reports span ${models.size} models (${[...models].sort().join(", ")}); ` +
+                "one model at a time, because the page prices and labels this surface as one",
+        );
+    }
+
     const payload = {
         generatedAt: new Date().toISOString(),
+        model: [...models][0] ?? null,
         note: "Tier 6 declares a 24,000-token context window. Every other tier runs at 200,000.",
         contextWindow: WINDOW,
         runs,
@@ -370,4 +427,8 @@ function main() {
     }
 }
 
-main();
+// Guarded the way eval-chart and eval-site guard theirs, so the module can be imported for its
+// admission rule without the import running the CLI and throwing on missing arguments.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    main();
+}

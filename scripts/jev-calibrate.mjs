@@ -85,14 +85,12 @@ export const TIER_LEVELS = Object.freeze([
  *
  * retention elides a tool result: a wrong elision costs the task, so it buys the narrowest gate the
  * curve can support. gap can block a write to make the model rewrite its own report, so it buys the
- * same. compaction only adds a sentence to a summariser prompt that is being rebuilt anyway.
- * sources only reorders a list whose membership is unchanged either way, so a wrong answer costs
+ * same. sources only reorders a list whose membership is unchanged either way, so a wrong answer costs
  * page order and nothing else.
  */
 export const PRECISION_TARGETS = Object.freeze({
     retention: 0.95,
     gap: 0.95,
-    compaction: 0.75,
     sources: 0.6,
 });
 
@@ -550,21 +548,6 @@ export const REACH_CASES = Object.freeze([
         },
     },
     {
-        system: "compaction",
-        label: "debugging with an open thread",
-        expect: "work_kind debugging and a high unresolved_thread",
-        state: {
-            objective: "Find why the nightly build fails only on Windows",
-            discarding: 44,
-            roles: { user: 3, assistant: 21, toolResult: 20 },
-            tokensBefore: 91000,
-            splitTurn: false,
-            filesRead: ["scripts/build.mjs", "ci/windows.yml"],
-            filesWritten: [],
-            hadPreviousSummary: false,
-        },
-    },
-    {
         system: "gap",
         label: "a report quoting a machine-specific path",
         expect: "a high contains_secret_or_path",
@@ -717,7 +700,6 @@ export const REACH_CASES = Object.freeze([
 export async function reachability(repeats = 5) {
     const modules = {
         retention: await import(pathToUrl(path.join(advisor, "questions", "retention.mjs"))),
-        compaction: await import(pathToUrl(path.join(advisor, "questions", "compaction.mjs"))),
         gap: await import(pathToUrl(path.join(advisor, "questions", "gap.mjs"))),
         sources: await import(pathToUrl(path.join(advisor, "questions", "sources.mjs"))),
         progress: await import(pathToUrl(path.join(advisor, "questions", "progress.mjs"))),

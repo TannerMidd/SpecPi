@@ -1,36 +1,17 @@
-#!/usr/bin/env node
-// Publish the harness-eval findings to the site, from the run reports.
+// Shared pieces of the evaluations pipeline: reading run reports into one dataset, and the small
+// chart and table renderers the published figures are drawn with.
 //
-// One command derives the dataset and redraws every figure on the evaluations
-// page, so a new run cannot leave a chart disagreeing with the table beside it.
-// The numbers live in site/evaluations/harness-eval.json, which the page links
-// as the machine-readable record; the charts are injected into the page between
-// marker comments so the prose stays hand-written.
-//
-// Usage: node scripts/eval-site.mjs [report.json...]
+// This file used to publish the evaluations page as well. That page carried six tiers of a suite
+// written in this repository, and it was retired in favour of Terminal-Bench 2.0 for the reason it
+// kept reporting -- nearly everything passed, so it could not separate the harnesses it existed to
+// separate. What is left here is the part with other callers: scripts/tb2-site.mjs draws the
+// published figures with these renderers, and scripts/jev-effect.mjs and scripts/tier6-metrics.mjs
+// read run reports through collect() and isLaunchFailure().
 
 import fs from "node:fs";
-import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import { attemptMintCost, attemptModelCost, attemptScore, attemptToolCounts, usageSummary } from "./eval-report.mjs";
 import { attemptTurns } from "./eval-proxy.mjs";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const pageDir = path.join(root, "site", "evaluations");
-
-// Named explicitly rather than globbed. evals/runs/ also holds older runs on
-// other models and other harness sets, and a pattern like tier2-* sweeps those
-// in: it once counted a retired OpenCode run twice and inflated its attempts
-// from 25 to 57 without anything looking wrong.
-const DEFAULT_REPORTS = [
-    // One complete matrix: every harness, every tier, one model, one sitting. It replaces the
-    // patchwork of per-tier-per-harness runs this page grew from, where tier 4 covered four of
-    // seven harnesses and tier 5 had never run at all, so no two rows were guaranteed to have
-    // faced the same work. The superseded runs stay in evals/runs as history; naming this set
-    // explicitly is what stops a glob sweeping them back in.
-    ...[1, 2, 3, 4, 5].map((tier) => path.join(root, "evals", "runs", `full-tier${tier}`, "report.json")),
-];
 
 // Fixed per harness so a colour means the same thing on every surface; these
 // mirror the tokens in site/research.css.
@@ -40,17 +21,10 @@ const HARNESSES = [
     { id: "specpi-jev", label: "SpecPi + Jev", colour: "var(--ct-specpi-jev)" },
     { id: "opencode", label: "OpenCode", colour: "var(--ct-opencode)" },
     { id: "codex", label: "Codex CLI", colour: "var(--ct-codex)" },
+    { id: "claude-code", label: "Claude Code", colour: "var(--ct-claudecode)" },
     { id: "omp", label: "Oh My Pi", colour: "var(--ct-omp)" },
     { id: "dsh", label: "DeepSeek Harness", colour: "var(--ct-deepseek)" },
 ];
-
-const TIER_NAME = {
-    1: "Tier 1 · smoke",
-    2: "Tier 2 · edits",
-    3: "Tier 3 · repair",
-    4: "Tier 4 · ultimate",
-    5: "Tier 5 · discipline",
-};
 
 function mean(values) {
     return values.length === 0 ? 0 : values.reduce((total, value) => total + value, 0) / values.length;
@@ -75,9 +49,40 @@ export function isLaunchFailure(attempt) {
     return Boolean(attempt?.harnessError) && (attempt?.modelRequests ?? 0) === 0;
 }
 
+/**
+ * One cell per harness, task and tier, taking the last report that measured it.
+ *
+ * A cell sometimes has to be measured again: a checker is found to be wrong, and the attempts it
+ * graded have to be re-run, because the workspaces are discarded so they cannot be re-graded.
+ * Flat-mapping every report would then average the old cell with its replacement and publish
+ * both standards at once. Later wins, and what it replaced is named on stdout rather than
+ * dropped quietly -- a superseded cell is a thing the operator should see, not a detail.
+ */
+function supersede(reports) {
+    const byCell = new Map();
+    const replaced = [];
+    for (const report of reports) {
+        for (const cell of report.results) {
+            const key = `${cell.harness}	${cell.task}	${cell.tier}`;
+            if (byCell.has(key)) {
+                replaced.push(`${cell.harness}/${cell.task}`);
+            }
+
+            byCell.set(key, cell);
+        }
+    }
+
+    if (replaced.length > 0) {
+        process.stdout.write(`eval site: ${replaced.length} cell(s) superseded by a later report: ${replaced.join(", ")}
+`);
+    }
+
+    return [...byCell.values()];
+}
+
 export function collect(files) {
     const reports = files.map((file) => JSON.parse(fs.readFileSync(file, "utf8")));
-    const cells = reports.flatMap((report) => report.results);
+    const cells = supersede(reports);
     const meta = reports[reports.length - 1];
     // The page states one model and prices every row against it, so a set spanning two models
     // would publish one label over both. The comment below records this being caught once for
@@ -241,10 +246,6 @@ export function esc(text) {
     return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
-function niceMax(value, step) {
-    return Math.max(step, Math.ceil(value / step) * step);
-}
-
 // One horizontal bar renderer for every figure. A group is a labelled band of
 // bars sharing the chart's scale; a bar may be split into segments so a stacked
 // breakdown uses the same axis and the same spacing as a plain one.
@@ -321,150 +322,6 @@ export function hbars({ id, title, axisLabel, groups, max, gridStep, tick, barHe
 
 export const thousands = (value) => value.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
-export function renderCharts(data) {
-    const charts = {};
-    const byTier = (tier) => data.harnesses.filter((harness) => harness.perTier[tier]);
-
-    // Solve rate. The point of this figure is that it is flat: a metric that
-    // cannot separate its subjects is a finding about the metric, not a gap in
-    // the table, so it is published rather than quietly dropped.
-    charts["chart-solve"] = hbars({
-        id: "chart-solve",
-        title: "Tasks solved",
-        axisLabel: "Share of attempts passing the task checker",
-        max: 100,
-        gridStep: 25,
-        tick: (value) => `${value.toFixed(0)}%`,
-        groups: data.tiers.map((tier) => ({
-            label: TIER_NAME[tier],
-            bars: byTier(tier).map((harness) => {
-                const cell = harness.perTier[tier];
-                const rate = (cell.solved / cell.attempts) * 100;
-
-                return {
-                    label: harness.label,
-                    value: rate,
-                    colour: harness.colour,
-                    display: `${rate.toFixed(0)}%  ${cell.solved}/${cell.attempts}`,
-                };
-            }),
-        })),
-    });
-
-    const costMax = niceMax(
-        Math.max(...data.harnesses.flatMap((harness) => data.tiers.map((tier) => harness.perTier[tier]?.cost ?? 0))),
-        0.005,
-    );
-    charts["chart-cost"] = hbars({
-        id: "chart-cost",
-        title: "Model spend per attempt",
-        axisLabel: "US dollars per attempt · same model, same tasks, same frozen price list",
-        max: costMax,
-        tick: (value) => `$${value.toFixed(3)}`,
-        groups: data.tiers.map((tier) => ({
-            label: TIER_NAME[tier],
-            bars: byTier(tier).map((harness) => ({
-                label: harness.label,
-                value: harness.perTier[tier].cost,
-                colour: harness.colour,
-                display: `$${harness.perTier[tier].cost.toFixed(4)}`,
-            })),
-        })),
-    });
-
-    // Fixed overhead. OpenCode is absent by necessity, not by choice: it never
-    // sends its prompt through the proxy, so there is no character count to put
-    // on this axis and an invented one would be worse than a gap.
-    const schema = data.harnesses.filter((harness) => harness.firstCall);
-    const schemaMax = niceMax(
-        Math.max(...schema.map((harness) => harness.firstCall.toolSchemaChars + harness.firstCall.instructionChars)),
-        8000,
-    );
-    charts["chart-schema"] = hbars({
-        id: "chart-schema",
-        title: "Characters sent on every model call, before any work happens",
-        axisLabel: "Tool schemas (solid) plus system instructions (dimmed)",
-        max: schemaMax,
-        tick: (value) => thousands(value),
-        barHeight: 22,
-        gap: 9,
-        groups: [
-            {
-                bars: schema.map((harness) => ({
-                    label: `${harness.label} · ${harness.firstCall.toolCount} tools`,
-                    value: harness.firstCall.toolSchemaChars + harness.firstCall.instructionChars,
-                    colour: harness.colour,
-                    display: thousands(harness.firstCall.toolSchemaChars + harness.firstCall.instructionChars),
-                    segments: [
-                        { value: harness.firstCall.toolSchemaChars, colour: harness.colour, opacity: "1" },
-                        { value: harness.firstCall.instructionChars, colour: harness.colour, opacity: ".42" },
-                    ],
-                })),
-            },
-        ],
-    });
-
-    const tokenMax = niceMax(Math.max(...data.harnesses.map((harness) => harness.overall.promptTokens)), 20000);
-    charts["chart-tokens"] = hbars({
-        id: "chart-tokens",
-        title: "Prompt tokens per attempt, all tiers",
-        axisLabel: "Mean prompt tokens, cache rereads included",
-        max: tokenMax,
-        tick: (value) => thousands(value),
-        barHeight: 22,
-        gap: 9,
-        groups: [
-            {
-                bars: data.harnesses.map((harness) => ({
-                    label: harness.label,
-                    value: harness.overall.promptTokens,
-                    colour: harness.colour,
-                    display: thousands(harness.overall.promptTokens),
-                })),
-            },
-        ],
-    });
-
-    // Offered against invoked, excluding native harnesses for the same reason
-    // as the schema chart: the proxy never sees their tool list.
-    const offered = data.harnesses.filter(
-        (harness) => harness.overall.toolsOffered > 0 && harness.overall.toolCalls !== null,
-    );
-    const offerMax = niceMax(Math.max(...offered.map((harness) => harness.overall.toolsOffered)), 20);
-    charts["chart-tools"] = hbars({
-        id: "chart-tools",
-        title: "Tool definitions offered against tool calls actually made",
-        axisLabel: "Per attempt: definitions sent (solid) and calls invoked (dimmed)",
-        max: offerMax,
-        tick: (value) => thousands(value),
-        barHeight: 15,
-        gap: 4,
-        groupGap: 12,
-        groups: offered.map((harness) => ({
-            label: harness.label,
-            bars: [
-                {
-                    label: "offered",
-                    value: harness.overall.toolsOffered,
-                    colour: harness.colour,
-                    display: harness.overall.toolsOffered.toFixed(1),
-                },
-                {
-                    label: "invoked",
-                    value: harness.overall.toolCalls,
-                    colour: harness.colour,
-                    display: harness.overall.toolCalls.toFixed(1),
-                    segments: [{ value: harness.overall.toolCalls, colour: harness.colour, opacity: ".42" }],
-                },
-            ],
-        })),
-    });
-
-    return charts;
-}
-
-/* ---------- tables ---------- */
-
 export function table(head, rows, className = "numeric") {
     const header = head.map((cell) => `<th>${esc(cell)}</th>`).join("");
     const body = rows
@@ -477,181 +334,6 @@ export function table(head, rows, className = "numeric") {
     return `<table class="${className}"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
-export function renderTables(data) {
-    const pct = (value) => (value === null ? "not measured" : `${(value * 100).toFixed(0)}%`);
-    const overall = table(
-        ["Harness", "Solved", "Score", "Cost/attempt", "Prompt tok", "Output tok", "Cache hit", "Calls", "In scope"],
-        data.harnesses.map((harness) => {
-            const cell = harness.overall;
-
-            return [
-                esc(harness.label),
-                `${cell.solved}/${cell.attempts}`,
-                cell.score.toFixed(3),
-                `$${cell.cost.toFixed(4)}`,
-                thousands(cell.promptTokens),
-                thousands(cell.outputTokens),
-                pct(cell.cacheHitRate),
-                cell.toolCalls === null ? "not measured" : cell.toolCalls.toFixed(1),
-                `${cell.cleanScope}/${cell.scopeChecked}`,
-            ];
-        }),
-    );
-
-    // Spend relative to the cheapest harness in each tier, which is what shows
-    // the fixed overhead washing out as the tasks get bigger.
-    const ratio = table(
-        ["Harness", ...data.tiers.map((tier) => `Tier ${tier}`)],
-        data.harnesses.map((harness) => [
-            esc(harness.label),
-            ...data.tiers.map((tier) => {
-                const own = harness.perTier[tier];
-                if (!own) {
-                    return "not measured";
-                }
-
-                const cheapest = Math.min(
-                    ...data.harnesses.map((entry) => entry.perTier[tier]?.cost ?? Number.POSITIVE_INFINITY),
-                );
-
-                return `${(own.cost / cheapest).toFixed(2)}&times;`;
-            }),
-        ]),
-    );
-
-    // Cost is one way to be inefficient and the least diagnostic: it is the sum of everything
-    // else. This table keeps the components apart, because they say different things about a
-    // harness. Calls and turns are how much work it took to get there. Tool errors and repeated
-    // calls are whether it recovered or spiralled. Cache hit rate and context growth are what it
-    // carries on every request thereafter, which is what the fresh-token bill is made of.
-    const rate = (part, whole) => (whole > 0 ? `${((100 * part) / whole).toFixed(1)}%` : "&mdash;");
-    const efficiency = table(
-        [
-            "Harness",
-            "Score",
-            "Tool calls",
-            "Turns",
-            "Tool errors",
-            "Repeated calls",
-            "Cache hit",
-            "Context growth / turn",
-            "Compactions",
-            "Score per 100 calls",
-        ],
-        data.harnesses.map((harness) => {
-            const own = harness.overall;
-            const calls = own.toolCalls;
-
-            return [
-                esc(harness.label),
-                own.score.toFixed(3),
-                calls === null ? "not measured" : calls.toFixed(1),
-                own.requests.toFixed(1),
-                rate(own.toolErrors, own.toolResults),
-                String(own.repeatedCalls),
-                pct(own.cacheHitRate),
-                own.contextGrowth === null ? "not measured" : thousands(own.contextGrowth),
-                own.compactions === null ? "not measured" : String(own.compactions),
-                calls === null || calls === 0 ? "not measured" : ((100 * own.score) / calls).toFixed(1),
-            ];
-        }),
-    );
-
-    return { "table-overall": overall, "table-ratio": ratio, "table-efficiency": efficiency };
-}
-
-/**
- * The failure-mode distribution, from `node scripts/jev-triage.mjs`. "Codex fails 7 of 37" is a
- * count; this is what a page can say about why.
- *
- * Two things this table is careful about. Every verdict here went through the same gate a session
- * would use, and an answer that did not clear it is published as `ungated` rather than rounded into
- * the nearest mode -- 14 of 24 did not clear it, and a distribution that hid that would be claiming
- * a confidence the classifier never reported. And `unknown` is a real option the classifier chose,
- * which is a different statement from `ungated`: one says the evidence does not determine it, the
- * other says the model would not commit.
- */
-export function renderFailureModes(triage) {
-    const total = triage.classified.length;
-    const share = (count) => (total > 0 ? `${((100 * count) / total).toFixed(0)}%` : "&mdash;");
-    const harnessesFor = (mode) => [
-        ...new Set(triage.classified.filter((item) => item.mode === mode).map((item) => item.harness)),
-    ];
-    const rows = Object.entries(triage.byMode)
-        .sort((a, b) => b[1] - a[1])
-        .map(([mode, count]) => [
-            esc(mode),
-            String(count),
-            share(count),
-            esc(harnessesFor(mode).sort().join(", ")),
-            esc(mode === "ungated" ? "No verdict cleared the gate" : (triage.modes[mode] ?? "")),
-        ]);
-
-    return table(["Failure mode", "Attempts", "Share", "Harnesses", "Meaning"], rows, "numeric triage");
-}
-
-// The README carries the same headline figures as the page. Typing them by
-// hand guarantees they drift, so it gets the same marker treatment: one
-// command updates both, or neither.
-export function renderReadme(data) {
-    // A row may only be compared with another row when both cover the same
-    // work. Aggregating whatever tiers a harness happened to run ranks the
-    // ones that skipped the expensive tier as the cheapest: adding tier 4
-    // moved Pi from first to third on cost without Pi changing at all, purely
-    // because two harnesses had no tier 4 attempts to carry. So the headline
-    // is computed over the tiers every listed harness ran, and the rest are
-    // named rather than blended in.
-    const common = data.tiers.filter((tier) => data.harnesses.every((harness) => harness.perTier[tier]));
-    const excluded = data.tiers.filter((tier) => !common.includes(tier));
-    const combine = (harness) => {
-        const parts = common.map((tier) => harness.perTier[tier]);
-        const attempts = sum(parts.map((part) => part.attempts));
-        const weighted = (pick) =>
-            attempts === 0 ? 0 : sum(parts.map((part) => pick(part) * part.attempts)) / attempts;
-
-        return {
-            attempts,
-            solved: sum(parts.map((part) => part.solved)),
-            cost: weighted((part) => part.cost),
-            promptTokens: weighted((part) => part.promptTokens),
-        };
-    };
-
-    const row = (harness) => {
-        const cell = combine(harness);
-        const overhead = harness.firstCall
-            ? thousands(harness.firstCall.toolSchemaChars + harness.firstCall.instructionChars)
-            : "not measured";
-
-        return `| ${harness.label} | ${cell.solved}/${cell.attempts} | $${cell.cost.toFixed(4)} | ${thousands(cell.promptTokens)} | ${overhead} |`;
-    };
-
-    const ordered = [...data.harnesses].sort((a, b) => combine(a).cost - combine(b).cost);
-    const covered = sum(common.map((tier) => data.tasksByTier[tier].length));
-    const attempts = sum(data.harnesses.map((harness) => combine(harness).attempts));
-
-    return [
-        `**${attempts} attempts across ${data.harnesses.length} harnesses and ${covered} tasks**, all on \`${data.model}\`.`,
-        "",
-        "| Harness | Solved | Cost/attempt | Prompt tokens | Sent before any work |",
-        "| --- | --- | --- | --- | --- |",
-        ...ordered.map(row),
-        "",
-        "Cost is the harness's own model spend, priced from recorded usage against a",
-        "dated price file. The last column is the tool schema plus system instructions",
-        "riding every single request, which is the fixed toll a harness charges before",
-        "the model does anything.",
-        ...(excluded.length === 0
-            ? []
-            : [
-                  "",
-                  `Tier ${excluded.join(", ")} is left out of this table because not every harness has`,
-                  "attempts there, and a per-attempt cost only compares across rows when every row",
-                  "covers the same tasks. The evaluations page charts it per tier.",
-              ]),
-    ].join("\n");
-}
-
 export function inject(html, charts) {
     let output = html;
     for (const [id, svg] of Object.entries(charts)) {
@@ -660,68 +342,11 @@ export function inject(html, charts) {
         const start = output.indexOf(open);
         const end = output.indexOf(close);
         if (start < 0 || end < 0) {
-            throw new Error(`site/evaluations/index.html has no ${open} ... ${close} slot`);
+            throw new Error(`no ${open} ... ${close} slot to fill`);
         }
 
         output = `${output.slice(0, start + open.length)}${svg}${output.slice(end)}`;
     }
 
     return output;
-}
-
-function main() {
-    const files = process.argv.slice(2).filter((argument) => !argument.startsWith("--"));
-    const requested = files.length > 0 ? files.map((file) => path.resolve(file)) : DEFAULT_REPORTS;
-    // An explicitly named report must exist, because naming one and silently
-    // dropping it would publish a smaller run than the caller asked for. The
-    // default set may legitimately be incomplete while a tier is still running,
-    // so a missing one there is announced and skipped.
-    const reports = [];
-    for (const file of requested) {
-        if (fs.existsSync(file)) {
-            reports.push(file);
-        } else if (files.length > 0) {
-            throw new Error(`missing report: ${file}`);
-        } else {
-            process.stdout.write(`eval site: skipping absent ${path.relative(root, file)}\n`);
-        }
-    }
-
-    if (reports.length === 0) {
-        throw new Error("no reports found");
-    }
-
-    const data = collect(reports);
-    fs.mkdirSync(pageDir, { recursive: true });
-    const dataFile = path.join(pageDir, "harness-eval.json");
-    fs.writeFileSync(dataFile, `${JSON.stringify(data, null, 2)}\n`);
-    process.stdout.write(`eval site -> ${dataFile} (${data.totalAttempts} attempts, ${data.taskCount} tasks)\n`);
-
-    // Optional, because it is the one artifact on this page that costs a third-party call to
-    // produce. An absent file leaves the slot alone rather than publishing an empty table.
-    const triageFile = path.join(root, "evals", "runs", "jev-triage.json");
-    const triage = fs.existsSync(triageFile) ? JSON.parse(fs.readFileSync(triageFile, "utf8")) : null;
-    const pageFile = path.join(pageDir, "index.html");
-    if (fs.existsSync(pageFile)) {
-        const slots = {
-            ...renderCharts(data),
-            ...renderTables(data),
-            ...(triage ? { "table-failure-modes": renderFailureModes(triage) } : {}),
-        };
-        fs.writeFileSync(pageFile, inject(fs.readFileSync(pageFile, "utf8"), slots));
-        process.stdout.write(`eval site -> ${pageFile} (${Object.keys(slots).length} figures)\n`);
-    }
-
-    const readmeFile = path.join(root, "README.md");
-    if (fs.existsSync(readmeFile)) {
-        const readme = fs.readFileSync(readmeFile, "utf8");
-        if (readme.includes("<!-- eval-summary -->")) {
-            fs.writeFileSync(readmeFile, inject(readme, { "eval-summary": `\n\n${renderReadme(data)}\n\n` }));
-            process.stdout.write(`eval site -> ${readmeFile}\n`);
-        }
-    }
-}
-
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    main();
 }

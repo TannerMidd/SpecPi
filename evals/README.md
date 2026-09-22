@@ -176,6 +176,27 @@ Live harnesses:
   as it does for the SpecPi permission opt-in. Model ids are sent through
   unchanged, except that an `opencode-go/<id>` qualifier is reduced to the
   provider's own id.
+- `claude-code`: the installed Claude Code CLI (found via `SPECPI_CLAUDE_CLI`
+  or PATH), run headless with `--print --output-format stream-json` inside a
+  disposable `CLAUDE_CONFIG_DIR`. It is the only harness that speaks the
+  Anthropic Messages API, so the proxy accepts `/v1/messages` and translates
+  it: the request becomes a chat-completions request *before* anything is
+  recorded, and the provider's reply is converted back on the way out. Every
+  accounting path therefore reads the one shape it has always read
+  (`scripts/eval-anthropic.mjs`, covered by `tests/eval-anthropic.test.mjs`).
+  Approval prompts cannot be answered headless, so runs pass
+  `--dangerously-skip-permissions`, disclosed the same way as the SpecPi
+  `yoloMode` opt-in.
+
+  **No Anthropic credential is read or spent.** The disposable config
+  directory holds no stored login to fall back on, `ANTHROPIC_BASE_URL` points
+  at the proxy, and the proxy discards the client's token and sends
+  `EVAL_FORWARD_KEY` upstream. Runs bill the same OpenCode Go subscription as
+  every other harness.
+
+  Claude Code exposes no context-window setting, so it cannot be held to a
+  tier's declared window and tier 6 reads its attempts as unwindowed, the way
+  it did for Codex and OpenCode before those learned to read one.
 - `dsh`: set `SPECPI_DSH_CLI` to the installed bin. Routes through the
   logging proxy via a home-level patch layer, like the other proxy harnesses.
 
@@ -475,15 +496,18 @@ offer counts under the wrong label.
 
 ## Publishing to the site
 
-The GitHub Pages site carries an [evaluations page](../site/evaluations/)
-built from the run reports:
+The GitHub Pages site carries an [evaluations page](../site/evaluations/). It
+no longer publishes this suite. The tiers below could not separate the
+harnesses they were built to separate -- nearly everything passed -- so the
+page carries [Terminal-Bench 2.0](https://www.tbench.ai/) instead, and this
+suite stays here as the local instrument it always was:
 
 ```bash
-node scripts/eval-site.mjs            # defaults to evals/runs/all-tier{1..5}-deepseek
-node scripts/eval-site.mjs a/report.json b/report.json
+node scripts/tb2-metrics.mjs          # reads the Terminal-Bench runs
+node scripts/tb2-site.mjs             # redraws the page and the root README
 ```
 
-One command writes `site/evaluations/harness-eval.json` and redraws every
+One command writes `site/evaluations/terminal-bench-2.json` and redraws every
 figure on the page, so a chart cannot disagree with the table beside it. The
 page's prose reads its own quoted numbers back out of that JSON at load time,
 which means a regenerated run updates the sentences too rather than leaving
@@ -491,8 +515,9 @@ them asserting figures no bar supports.
 
 After a new run, regenerate and then run `npm run check:site`, which fails if
 a chart slot is empty, a quoted figure went unfilled, or the page overflows at
-phone width. The reports themselves are committed, so the page can always be
-rebuilt from what is in the repository.
+phone width. The Terminal-Bench runs themselves are deliberately not in this
+repository, because the task content carries canary strings; only aggregates
+and public task names cross into the data file.
 
 Two harness properties are deliberately absent for native harnesses such as
 OpenCode: tool-schema characters and offered-tool counts. Those are read from

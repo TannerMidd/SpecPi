@@ -33,7 +33,6 @@ import { ledgerPath, read as readLedger, record } from "../extensions/jev-adviso
 import { readUsage, usagePath } from "../extensions/jev-advisor/usage.mjs";
 import { MAX_STATE_BYTES, buildState, looksAbsolute, outline, redact } from "../extensions/jev-advisor/sanitize.mjs";
 import * as retention from "../extensions/jev-advisor/questions/retention.mjs";
-import * as compaction from "../extensions/jev-advisor/questions/compaction.mjs";
 import * as gap from "../extensions/jev-advisor/questions/gap.mjs";
 import * as sources from "../extensions/jev-advisor/questions/sources.mjs";
 import * as progress from "../extensions/jev-advisor/questions/progress.mjs";
@@ -178,7 +177,7 @@ test("master off reaches no transport at all", async () => {
 test("a system switched off is skipped while others still run", async () => {
     await withAgentDir(async () => {
         let calls = 0;
-        const settings = enabledSettings({ systems: { retention: false, compaction: true, gap: true, sources: true } });
+        const settings = enabledSettings({ systems: { retention: false, gap: true, sources: true } });
         const broker = createBroker({
             loadSettings: () => settings,
             ask: async () => {
@@ -260,9 +259,7 @@ test("the session total stays below what the per-system ceilings can add up to",
 
 test("the session call budget stops at its cap", async () => {
     await withAgentDir(async () => {
-        const state = countingBroker(
-            enabledSettings({ budgets: { total: 2, retention: 8, compaction: 8, gap: 8, sources: 8 } }),
-        );
+        const state = countingBroker(enabledSettings({ budgets: { total: 2, retention: 8, gap: 8, sources: 8 } }));
         assert.equal((await state.broker.request(ask1("gap"))).ok, true);
         assert.equal((await state.broker.request(ask1("gap"))).ok, true);
         assert.equal((await state.broker.request(ask1("gap"))).reason, "budget-exhausted");
@@ -279,9 +276,7 @@ test("one busy system cannot starve another, and says which budget it hit", asyn
     // reaches the ceiling within a few turns and every other system is silently dead for the rest of
     // the session, with event ordering rather than policy deciding which one won.
     await withAgentDir(async () => {
-        const state = countingBroker(
-            enabledSettings({ budgets: { total: 10, retention: 2, compaction: 4, gap: 4, sources: 4 } }),
-        );
+        const state = countingBroker(enabledSettings({ budgets: { total: 10, retention: 2, gap: 4, sources: 4 } }));
         assert.equal((await state.broker.request(ask1("retention"))).ok, true);
         assert.equal((await state.broker.request(ask1("retention"))).ok, true);
         const refused = await state.broker.request(ask1("retention"));
@@ -301,9 +296,9 @@ test("one busy system cannot starve another, and says which budget it hit", asyn
 test("the total is a real ceiling, not the sum of the per-system ones", async () => {
     await withAgentDir(async () => {
         const state = countingBroker(
-            enabledSettings({ budgets: { total: 3, retention: 4, compaction: 4, gap: 4, sources: 4 } }),
+            enabledSettings({ budgets: { total: 3, retention: 4, gap: 4, sources: 4, untrusted: 4 } }),
         );
-        for (const system of ["retention", "compaction", "gap"]) {
+        for (const system of ["retention", "gap", "untrusted"]) {
             assert.equal((await state.broker.request(ask1(system))).ok, true);
         }
 
@@ -318,9 +313,7 @@ test("running out of budget says so once, rather than going quietly dead", async
     await withAgentDir(async () => {
         const notices = [];
         const ctx = { hasUI: true, ui: { notify: (text) => notices.push(text) } };
-        const state = countingBroker(
-            enabledSettings({ budgets: { total: 10, retention: 1, compaction: 4, gap: 4, sources: 4 } }),
-        );
+        const state = countingBroker(enabledSettings({ budgets: { total: 10, retention: 1, gap: 4, sources: 4 } }));
         assert.equal((await state.broker.request({ ...ask1("retention"), ctx })).ok, true);
         assert.equal((await state.broker.request({ ...ask1("retention"), ctx })).reason, "system-budget-exhausted");
         assert.equal(notices.length, 1, "the first refusal announces itself");
@@ -343,9 +336,7 @@ test("with no human to read it, an exhausted budget stays silent", async () => {
     await withAgentDir(async () => {
         const notices = [];
         const ctx = { hasUI: false, ui: { notify: (text) => notices.push(text) } };
-        const state = countingBroker(
-            enabledSettings({ budgets: { total: 10, retention: 1, compaction: 4, gap: 4, sources: 4 } }),
-        );
+        const state = countingBroker(enabledSettings({ budgets: { total: 10, retention: 1, gap: 4, sources: 4 } }));
         await state.broker.request({ ...ask1("retention"), ctx });
         assert.equal((await state.broker.request({ ...ask1("retention"), ctx })).reason, "system-budget-exhausted");
         assert.deepEqual(notices, []);
@@ -511,9 +502,7 @@ test("a corrupt count reads as absent rather than as a session with no calls", a
 
 test("a budget of zero is zero calls, and is not read as no limit", async () => {
     await withAgentDir(async () => {
-        const state = countingBroker(
-            enabledSettings({ budgets: { total: 10, retention: 0, compaction: 4, gap: 4, sources: 4 } }),
-        );
+        const state = countingBroker(enabledSettings({ budgets: { total: 10, retention: 0, gap: 4, sources: 4 } }));
         assert.equal((await state.broker.request(ask1("retention"))).reason, "system-budget-exhausted");
         assert.equal(state.calls, 0);
     });
@@ -1079,28 +1068,6 @@ test("the retention digest keeps head and tail and says the result is recoverabl
     assert.ok(!digest.includes("row 100"));
 });
 
-test("compaction advice is built only from gated answers", () => {
-    assert.equal(compaction.decide({}).customInstructions, undefined);
-
-    const advice = compaction.decide({
-        work_kind: {
-            kind: "choice",
-            value: "debugging",
-            confidence: 0.9,
-            probabilities: { debugging: 0.9, building: 0.05 },
-        },
-        unresolved_thread: { kind: "noul", value: 0.95 },
-        discarded_span_was_dead_ends: { kind: "noul", value: 0.95 },
-    });
-    assert.ok(advice.customInstructions.includes("debugging"));
-    assert.ok(advice.unresolved);
-    assert.ok(advice.deadEnds);
-
-    // An ungated choice contributes nothing rather than guessing.
-    const partial = compaction.decide({ work_kind: { kind: "choice", value: "debugging", confidence: 0.4 } });
-    assert.equal(partial.customInstructions, undefined);
-});
-
 test("gap clustering offers every known key under the cardinality cap and falls back above it", () => {
     const few = [{ canonicalKey: "scope-drift", title: "Scope drift" }];
     const options = gap.clusterOptions(few, { capability: "scope", scenario: "drift" });
@@ -1552,9 +1519,13 @@ test("schema 4 drops every trace of the guard, from either shape it took", () =>
             fs.writeFileSync(settingsPath(), JSON.stringify(stored));
 
             const loaded = loadSettings();
-            assert.equal(loaded.schema, 4, `schema ${stored.schema} must migrate forward`);
+            assert.equal(loaded.schema, 5, `schema ${stored.schema} must migrate forward`);
             assert.ok(!("guard" in loaded), `schema ${stored.schema} left a guard key behind`);
             assert.ok(!("guard" in loaded.systems), `schema ${stored.schema} left a guard system behind`);
+            assert.ok(
+                !("compaction" in loaded.systems),
+                `schema ${stored.schema} left the withdrawn compaction system behind`,
+            );
             assert.equal(loaded.systems.retention, true, "every other preference survives the bump");
             assert.equal(loaded.master, true);
         }

@@ -48,7 +48,6 @@ const requiredFiles = [
     "extensions/jev-advisor/index.ts",
     "extensions/jev-advisor/ledger.mjs",
     "extensions/jev-advisor/questions/capabilities.mjs",
-    "extensions/jev-advisor/questions/compaction.mjs",
     "extensions/jev-advisor/questions/gap.mjs",
     "extensions/jev-advisor/questions/progress.mjs",
     "extensions/jev-advisor/questions/retention.mjs",

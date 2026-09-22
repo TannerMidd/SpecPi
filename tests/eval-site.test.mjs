@@ -71,6 +71,26 @@ test("a uniform set still renders, whichever model it is on", () => {
     });
 });
 
+// A cell sometimes has to be measured again -- a checker is found wrong, and the attempts it
+// graded have to be re-run because the workspaces are gone. Flat-mapping every report averaged
+// the stale cell with its replacement and published both grading standards as one number.
+test("a re-measured cell replaces the one it supersedes instead of averaging with it", () => {
+    withDirectory((directory) => {
+        const stale = cell("codex", "t1-no-touch", 1);
+        stale.attempts = [{ pass: false, score: 0, modelRequests: 1, tokens: { toolCalls: { bash: 1 } } }];
+        const files = [
+            report(directory, "original", "deepseek-v4.1-flash", [stale, cell("pi", "t1-no-touch", 1)]),
+            report(directory, "regrade", "deepseek-v4.1-flash", [cell("codex", "t1-no-touch", 1)]),
+        ];
+        const data = collect(files);
+        const codex = data.harnesses.find((harness) => harness.id === "codex");
+        assert.equal(codex.perTier[1].attempts, 1, "the superseded attempt was counted as well");
+        assert.equal(codex.perTier[1].solved, 1, "the stale verdict survived the re-measurement");
+        // A harness the regrade never mentions is untouched by it.
+        assert.equal(data.harnesses.find((harness) => harness.id === "pi").perTier[1].attempts, 1);
+    });
+});
+
 // A run's ledger lives per attempt, because that is where it is collected out of the disposable
 // home. Rolling it up is the only way to answer "did this system ever do anything", and the answer
 // has to survive addition: counts add, and an `outcomes` map has to merge rather than average.

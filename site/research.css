@@ -290,6 +290,17 @@
 .chart-figure { margin: 1.6rem 0; }
 .chart-figure figcaption { margin-top: 0.5rem; }
 
+/* A grid of small panels cannot shrink the way a bar chart can: scaling eight panels into a phone
+   width takes the axis labels below legible size. The figure scrolls sideways instead, keeping a
+   width its text still reads at, which is what the wide tables on this page already do. The same
+   numbers sit in the table directly beneath it, so nothing is only reachable by scrolling. */
+.chart-figure.chart-wide {
+    overflow-x: auto;
+}
+.chart-figure.chart-wide .chart {
+    min-width: 46rem;
+}
+
 /* Diagrams on the Jev layer page. Same rules as the charts above: every colour is a theme
    token so both schemes work, and no diagram carries meaning in colour alone -- every box is
    labelled, and the two postures are distinguished by a solid versus dashed stroke as well as

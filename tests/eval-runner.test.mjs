@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { harnessAdapters, resolveHarnesses } from "../scripts/eval-harnesses.mjs";
+import { needsOpenCodeSession } from "../scripts/eval-run.mjs";
 
 function runEval(args, extraEnv = {}) {
     return spawnSync(process.execPath, ["scripts/eval-run.mjs", ...args], {
@@ -22,6 +23,19 @@ test("eval runner resolves known harnesses and rejects unknown ones", () => {
     assert.throws(() => resolveHarnesses(["nope"]), /Unknown harness/u);
     assert.equal(harnessAdapters.fake.isAvailable().available, true);
     assert.equal(harnessAdapters["failing-fake"].isAvailable().available, true);
+});
+
+test("eval runner mints an OpenCode session only for the endpoint that routes on one", () => {
+    assert.equal(needsOpenCodeSession("https://opencode.ai/zen/v1/chat/completions"), true);
+    assert.equal(needsOpenCodeSession("https://api.opencode.ai/v1/chat/completions"), true);
+    // Any other provider is sent to directly; minting there spends a call per attempt for an id
+    // the provider ignores.
+    assert.equal(needsOpenCodeSession("https://openrouter.ai/api/v1/chat/completions"), false);
+    assert.equal(needsOpenCodeSession("http://127.0.0.1:8080/v1/chat/completions"), false);
+    // A look-alike host is not the endpoint.
+    assert.equal(needsOpenCodeSession("https://opencode.ai.example.com/v1"), false);
+    // An unparseable value keeps the old behaviour rather than guessing.
+    assert.equal(needsOpenCodeSession("not a url"), true);
 });
 
 test("eval runner lists and dry-runs without touching homes", () => {

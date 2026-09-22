@@ -6,6 +6,20 @@
 
 import http from "node:http";
 import { createHash } from "node:crypto";
+import {
+    collectChatReply,
+    syntheticMessagesStream,
+    toChatCompletions,
+    toMessagesBody,
+    toMessagesStream,
+} from "./eval-anthropic.mjs";
+import {
+    collectResponsesReply,
+    normalizeUsage,
+    toChatBody,
+    toChatStream,
+    toResponsesRequest,
+} from "./eval-responses.mjs";
 
 function readBody(request) {
     return new Promise((resolve, reject) => {
@@ -120,12 +134,48 @@ export function summarizeRequest(body) {
 // harnesses without auxiliaries are unaffected because their first request
 // already carries the schema.
 /**
- * Model traffic only. Advisor calls share the log so their spend is visible, but they are not
- * turns of the conversation: counting them would inflate the request count and put null-token
- * entries into the per-request series that describes context growth.
+ * Model traffic only. Advisor calls and harness auxiliaries share the log so their spend is
+ * visible, but neither is a turn of the conversation: counting them would inflate the request count
+ * and put entries into the per-request series that describes context growth.
+ *
+ * `auxiliary` is the session-title call the rule above describes. Claude Code is the first proxy
+ * harness that makes one -- OpenCode makes one too, but reports its own per-step usage rather than
+ * going through this log -- so a filter that had only ever needed to know about the advisor now
+ * needs to know about it as well.
  */
 export function modelRequests(requests) {
+    return (requests ?? []).filter((record) => record.kind !== "advisor" && record.kind !== "auxiliary");
+}
+
+/** The session-title calls, which are spend without being turns. */
+export function auxiliaryRequests(requests) {
+    return (requests ?? []).filter((record) => record.kind === "auxiliary");
+}
+
+/**
+ * Everything the harness spent on the provider: its conversation and its auxiliaries, but not the
+ * advisor.
+ *
+ * Not the same set as `modelRequests`, and the difference is the point. That filter answers "how
+ * many turns did this take", so it drops auxiliaries -- but token totals and cost were reading the
+ * same filtered list, which meant a harness that fires session-title calls had those tokens counted
+ * nowhere at all. Claude Code makes one per attempt, so its reported cost was short by a whole
+ * request every time.
+ *
+ * The advisor stays out because it is already priced on its own line from `advisorTotals`; folding
+ * it in here would bill it twice.
+ */
+export function billableRequests(requests) {
     return (requests ?? []).filter((record) => record.kind !== "advisor");
+}
+
+/** Cached prompt tokens, in whichever spelling the provider used. */
+function cachedOf(usage) {
+    if (Number.isFinite(usage?.prompt_cache_hit_tokens)) {
+        return usage.prompt_cache_hit_tokens;
+    }
+
+    return Number.isFinite(usage?.prompt_tokens_details?.cached_tokens) ? usage.prompt_tokens_details.cached_tokens : 0;
 }
 
 /**
@@ -196,27 +246,6 @@ export function normalizeToolName(name) {
     };
 
     return aliases[lower] ?? lower;
-}
-
-// Responses API usage names the same quantities differently: input_tokens
-// include cache rereads (like prompt_tokens), output_tokens EXCLUDE
-// reasoning, and the cached portion sits under input_tokens_details. It is
-// folded into the chat-completions field names here so every downstream
-// rule — fresh input priced as input, reasoning billed at the output rate —
-// applies unchanged to both wire shapes.
-function normalizeUsage(usage) {
-    if (!usage || typeof usage !== "object" || !Number.isFinite(usage.input_tokens)) {
-        return usage;
-    }
-
-    const reasoning = usage.output_tokens_details?.reasoning_tokens ?? 0;
-
-    return {
-        prompt_tokens: usage.input_tokens,
-        completion_tokens: (usage.output_tokens ?? 0) + reasoning,
-        prompt_tokens_details: { cached_tokens: usage.input_tokens_details?.cached_tokens ?? 0 },
-        reasoning_tokens: reasoning,
-    };
 }
 
 // Usage arrives either as a top-level field on a JSON completion or in
@@ -520,6 +549,13 @@ export function startProxy({
     forwardUrl,
     responsesForwardUrl = process.env.EVAL_FORWARD_RESPONSES_URL || undefined,
     sessionId,
+    // Loopback on an ephemeral port, which is what an in-process run wants and what every caller
+    // before containerised harnesses needed. A harness inside a Docker container cannot reach the
+    // host's loopback, so those runs pass a fixed port and a host the container can route to.
+    // Binding beyond loopback puts a listener that forwards with a real provider key on whatever
+    // networks the machine is attached to, so it stays opt-in and the caller states it.
+    port = 0,
+    host = "127.0.0.1",
 } = {}) {
     // Forwarding credentials travel process-local only: they are read here
     // at request time and never written to the request log or reports.
@@ -527,13 +563,31 @@ export function startProxy({
     // minted per attempt and fixed for that attempt's proxy.
     const forwardKey = process.env.EVAL_FORWARD_KEY || undefined;
     const forwardModel = process.env.EVAL_FORWARD_MODEL || undefined;
+    // Which wire the provider speaks for the model under test. Most of the catalogue answers on
+    // chat-completions, which is what every harness but Codex sends, so nothing is translated by
+    // default. A few models -- muse-spark-*, gpt-5.6-luna, grok-4.6 -- answer only on /responses
+    // and return 503 to a chat-completions request, and setting this to `responses` bridges the
+    // gap rather than leaving seven of the eight harnesses unable to reach them at all. It is a
+    // declared setting and not a probe: falling back after a failed call would double the latency
+    // of every request and make the wire a property of the network rather than of the run.
+    const forwardWire = String(process.env.EVAL_FORWARD_WIRE || "chat").toLowerCase();
     const requests = [];
     const server = http.createServer(async (request, response) => {
         try {
             const raw = await readBody(request);
-            const body = raw.length > 0 ? JSON.parse(raw) : {};
+            const rawBody = raw.length > 0 ? JSON.parse(raw) : {};
             const routePath = (request.url ?? "").split("?")[0];
             const responsesRequest = routePath.endsWith("/responses");
+            // Claude Code checks the endpoint is reachable before it starts. It is not a model
+            // call: it carries no body, names no model, and forwarding it would send an empty
+            // payload to the provider's completions endpoint and record the reply as a turn.
+            if (routePath.endsWith("/api/hello")) {
+                response.writeHead(200, { "Content-Type": "application/json" });
+                response.end("{}");
+
+                return;
+            }
+
             // The Jev advisor is part of what a SpecPi + Jev session spends, so its calls come
             // through the same log as everything else. Routing them here is what lets the cost
             // column include the advisor instead of quietly excluding it.
@@ -543,10 +597,23 @@ export function startProxy({
                 return;
             }
 
+            // Claude Code speaks the Messages API and the provider does not, so the request is
+            // converted here, before anything is recorded. Everything downstream -- the summary,
+            // the tool-outcome scan, usage, tool calls, cost -- then reads the one shape it has
+            // always read. See scripts/eval-anthropic.mjs for why the seam is at this line.
+            const messagesRequest = routePath.endsWith("/messages");
+            const body = messagesRequest ? toChatCompletions(rawBody) : rawBody;
+
             const summary = summarizeRequest(body);
             const record = {
                 at: new Date().toISOString(),
                 model: body.model ?? "unknown",
+                // A Messages request carrying no tool schema is the harness titling its own
+                // session, not a turn of the conversation -- the rule `conversationSummary` has
+                // always used to find the real first call. Tagging it keeps its spend in the cost
+                // column while keeping it out of the turn count, exactly as advisor posts are
+                // handled. Scoped to this route so no other harness's recorded rows can move.
+                ...(messagesRequest && summary.toolCount === 0 ? { kind: "auxiliary" } : {}),
                 summary,
                 // The scan this used to keep `body` for, run now and kept instead of the body.
                 toolOutcome: toolOutcomeOf(body),
@@ -558,21 +625,28 @@ export function startProxy({
             if (!forwardUrl) {
                 response.writeHead(200, { "Content-Type": "text/event-stream" });
                 response.end(
-                    responsesRequest
-                        ? syntheticResponsesStream(body.model ?? "measure-model")
-                        : syntheticStream(body.model ?? "measure-model"),
+                    messagesRequest
+                        ? syntheticMessagesStream(body.model ?? "measure-model")
+                        : responsesRequest
+                          ? syntheticResponsesStream(body.model ?? "measure-model")
+                          : syntheticStream(body.model ?? "measure-model"),
                 );
 
                 return;
             }
 
-            const upstreamUrl = responsesRequest ? (responsesForwardUrl ?? deriveResponsesUrl(forwardUrl)) : forwardUrl;
+            // A chat-completions request on its way to a Responses-only endpoint. Codex is
+            // excluded because it already speaks that wire and needs no help.
+            const bridged = forwardWire === "responses" && !responsesRequest;
+            const upstreamUrl =
+                responsesRequest || bridged ? (responsesForwardUrl ?? deriveResponsesUrl(forwardUrl)) : forwardUrl;
 
-            let payload = raw;
-            if (forwardModel) {
-                payload = JSON.stringify({ ...body, model: forwardModel });
-            }
-
+            // The body as it goes upstream: the shape that was recorded, retargeted at the
+            // provider's own model id, then translated if the endpoint speaks the other wire. A
+            // request that is none of those things still forwards its original bytes.
+            const retargeted = forwardModel ? { ...body, model: forwardModel } : body;
+            const outbound = bridged ? toResponsesRequest(retargeted) : retargeted;
+            const payload = outbound === rawBody ? raw : JSON.stringify(outbound);
             const headers = { "Content-Type": "application/json" };
             if (forwardKey) {
                 headers.Authorization = `Bearer ${forwardKey}`;
@@ -586,6 +660,58 @@ export function startProxy({
             const text = await upstream.text();
             record.usage = extractUsage(text);
             record.toolCalls = extractToolCalls(text);
+            // Accounting is done, so the reply can now be converted back for the clients that need
+            // it. Everything above ran on either wire already: `extractUsage` normalises Responses
+            // usage and `extractToolCalls` reads `function_call` items, both for Codex's sake.
+            //
+            // An upstream error is passed through untouched. Folding one into a finished message
+            // would hand the harness an empty assistant turn and lose the status that says why.
+            const bridgedReply = bridged && upstream.ok ? collectResponsesReply(text) : null;
+            // A Responses failure can arrive on a 200: the stream carries `response.failed` and the
+            // status line says nothing is wrong. Translating that into a finished message would
+            // hand the harness an empty assistant turn with `stop`, which reads downstream as the
+            // harness choosing to answer with nothing rather than as the provider failing.
+            if (bridgedReply?.error) {
+                record.error = `${bridgedReply.error.code}: ${bridgedReply.error.message}`;
+                response.writeHead(502, { "Content-Type": "application/json" });
+                response.end(
+                    JSON.stringify({ error: { type: bridgedReply.error.code, message: bridgedReply.error.message } }),
+                );
+
+                return;
+            }
+
+            if (messagesRequest) {
+                const reply = bridgedReply ?? collectChatReply(text);
+                const model = rawBody.model ?? "unknown";
+                const streamed = rawBody.stream !== false;
+                response.writeHead(upstream.status, {
+                    "Content-Type": streamed ? "text/event-stream" : "application/json",
+                });
+                response.end(
+                    streamed ? toMessagesStream(reply, { model }) : JSON.stringify(toMessagesBody(reply, { model })),
+                );
+
+                return;
+            }
+
+            if (bridgedReply) {
+                // Unlike the Messages clients, a chat-completions client that did not ask to
+                // stream gets a whole body: `stream` defaults to false on this wire.
+                const streamed = rawBody.stream === true;
+                const model = rawBody.model ?? "unknown";
+                response.writeHead(upstream.status, {
+                    "Content-Type": streamed ? "text/event-stream" : "application/json",
+                });
+                response.end(
+                    streamed
+                        ? toChatStream(bridgedReply, { model })
+                        : JSON.stringify(toChatBody(bridgedReply, { model })),
+                );
+
+                return;
+            }
+
             // Pass the upstream encoding through untouched: Pi parses event
             // streams itself, and relabelling them breaks its reader.
             response.writeHead(upstream.status, {
@@ -599,11 +725,14 @@ export function startProxy({
     });
 
     return new Promise((resolve) => {
-        server.listen(0, "127.0.0.1", () => {
+        server.listen(port, host, () => {
             const address = server.address();
             resolve({
                 requests,
+                // Always loopback, whatever it bound to: this is the address the calling process
+                // uses, and a caller that bound wider builds the outside-facing one from `port`.
                 url: `http://127.0.0.1:${address.port}/v1`,
+                port: address.port,
                 close: () => new Promise((done) => server.close(done)),
             });
         });
@@ -712,15 +841,8 @@ export function proxyTotals(requests) {
             outputTokens += usage.completion_tokens;
         }
 
-        if (usage && Number.isFinite(usage.prompt_cache_hit_tokens)) {
-            cachedTokens += usage.prompt_cache_hit_tokens;
-        } else if (Number.isFinite(usage?.prompt_tokens_details?.cached_tokens)) {
-            cachedTokens += usage.prompt_tokens_details.cached_tokens;
-        }
-
-        const usageCached = Number.isFinite(usage?.prompt_cache_hit_tokens)
-            ? usage.prompt_cache_hit_tokens
-            : (usage?.prompt_tokens_details?.cached_tokens ?? 0);
+        const usageCached = cachedOf(usage);
+        cachedTokens += usageCached;
         series.push({
             request: index + 1,
             promptTokens: Number.isFinite(usage?.prompt_tokens) ? usage.prompt_tokens : null,
@@ -743,15 +865,35 @@ export function proxyTotals(requests) {
         }
     }
 
+    // Auxiliaries are spend, not turns: their tokens join the totals, but they stay out of `series`
+    // and `withUsage`, which describe how the conversation's context grew and how many turns it
+    // took. Reported separately as well as folded in, so a row can say what the harness spent on
+    // something other than the task.
+    const auxiliary = { calls: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
+    for (const record of auxiliaryRequests(requests)) {
+        const usage = record.usage;
+        auxiliary.calls += 1;
+        if (Number.isFinite(usage?.prompt_tokens)) {
+            auxiliary.inputTokens += usage.prompt_tokens;
+        }
+
+        if (Number.isFinite(usage?.completion_tokens)) {
+            auxiliary.outputTokens += usage.completion_tokens;
+        }
+
+        auxiliary.cachedTokens += cachedOf(usage);
+    }
+
     return {
-        inputTokens,
-        outputTokens,
-        cachedTokens,
+        inputTokens: inputTokens + auxiliary.inputTokens,
+        outputTokens: outputTokens + auxiliary.outputTokens,
+        cachedTokens: cachedTokens + auxiliary.cachedTokens,
         withUsage,
         toolCalls,
         toolsOffered,
         series,
         context: contextShape(series),
+        auxiliary,
     };
 }
 
