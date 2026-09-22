@@ -230,6 +230,10 @@
    scripts/measure-context.mjs. Categorical hues are fixed per entity and validated
    against both surfaces; marker shape and row labels carry identity alongside colour. */
 :root {
+    /* The diagram surfaces below. They were named but never defined, which left every
+       .dg-box filling with the initial black in light mode. */
+    --card: var(--surface);
+    --bg: var(--background);
     --ct-pi: #1b5fd6;
     --ct-specpi: #157f4c;
     --ct-specpi-jev: #4d7c0f;
@@ -367,4 +371,134 @@
 }
 .diagram .dg-head-accent {
     fill: var(--ct-specpi-jev);
+}
+
+/* The Jev system flows, written by scripts/jev-diagrams.mjs. They extend the vocabulary above
+   with a decision shape, the rail every declined branch lands in, and the block strips the two
+   cache arguments are made of. Colours stay on the page's tokens so one copy serves both themes. */
+.diagram .dg-dec {
+    fill: color-mix(in srgb, var(--ask) 9%, var(--card));
+    stroke: color-mix(in srgb, var(--ask) 55%, var(--card));
+    stroke-width: 1.2;
+}
+.diagram .dg-bar {
+    fill: var(--surface-raised);
+    stroke: var(--line);
+    stroke-width: 1.2;
+}
+.diagram .dg-box-warn {
+    fill: color-mix(in srgb, var(--ask) 14%, var(--card));
+    stroke: var(--ask);
+    stroke-width: 1.4;
+}
+.diagram .dg-pill {
+    fill: var(--surface-raised);
+    stroke: var(--line);
+    stroke-width: 1.1;
+}
+.diagram .dg-mono,
+.diagram .dg-pill-text {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    fill: var(--muted);
+}
+.diagram .dg-edge {
+    font-size: 10px;
+    font-weight: 600;
+    fill: var(--muted);
+}
+.diagram .dg-stat {
+    font-size: 12px;
+    font-weight: 700;
+}
+.diagram .dg-turn {
+    font-size: 9.5px;
+    fill: var(--muted);
+}
+.diagram .dg-strong {
+    fill: var(--text);
+}
+.diagram .dg-accent {
+    fill: var(--ct-specpi-jev);
+}
+.diagram .dg-warn {
+    fill: var(--ask);
+}
+.diagram .dg-flow-warn {
+    stroke: var(--ask);
+    stroke-width: 1.4;
+    fill: none;
+}
+.diagram .dg-flow-stop-warn {
+    stroke: var(--ask);
+    stroke-width: 1.3;
+    stroke-dasharray: 5 4;
+    fill: none;
+}
+.diagram .dg-span {
+    stroke: var(--muted);
+    stroke-width: 1.1;
+}
+.diagram .dg-span-accent {
+    stroke: var(--ct-specpi-jev);
+    stroke-width: 1.6;
+}
+.diagram .dg-span-warn {
+    stroke: var(--ask);
+    stroke-width: 1.6;
+}
+.diagram .dg-blk {
+    fill: var(--surface-raised);
+    stroke: var(--line);
+    stroke-width: 1.1;
+}
+.diagram .dg-blk-on {
+    fill: color-mix(in srgb, var(--ct-specpi-jev) 12%, var(--card));
+    stroke: var(--ct-specpi-jev);
+    stroke-width: 1.4;
+}
+.diagram .dg-blk-warn {
+    fill: color-mix(in srgb, var(--ask) 16%, var(--card));
+    stroke: var(--ask);
+    stroke-width: 1.4;
+}
+.diagram .dg-blk-gone {
+    fill: none;
+    stroke: var(--ask);
+    stroke-width: 1.1;
+    stroke-dasharray: 4 3;
+}
+.diagram .dg-blk-pinned {
+    fill: var(--card);
+    stroke: var(--line);
+    stroke-width: 1.2;
+    stroke-dasharray: 4 3;
+}
+.diagram .dg-strike {
+    stroke: var(--ask);
+    stroke-width: 2;
+}
+.diagram .dg-break {
+    stroke: var(--ask);
+    stroke-width: 2;
+    stroke-dasharray: 3 3;
+}
+
+/* Each flow sits under the system it belongs to, closed, so the list stays readable. Narrow
+   screens scroll the figure rather than the page. */
+.system-flow {
+    margin: 0.75rem 0 0.25rem;
+    font-size: 0.85rem;
+    color: var(--accent);
+}
+.system-flow > summary {
+    cursor: pointer;
+    width: fit-content;
+}
+.system-flow > div {
+    margin-top: 0.75rem;
+    overflow-x: auto;
+}
+.system-flow .diagram {
+    min-width: 640px;
 }

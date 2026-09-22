@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.30.1 - 2026-09-22
+
 - Repair Jev's task context: read the active contract structurally, fall back to the bounded current request, and clear stale context on task, branch and session changes.
 - Allocate the existing 1 KiB state budget by field. Preserve result samples and candidate/question correspondence; abstain locally when required evidence cannot fit. Record sample coverage and local refusals separately from classifier calls.
 - Renew transmission consent with an accurate disclosure of sampled file contents, command output and request text. Redact question text as well as state, replace outside-workspace absolute paths, and use opaque source/cluster IDs. Consent now binds the transport scheme as well as the host.
@@ -10,6 +12,7 @@
 - Close review findings at asynchronous boundaries: bind reports before consent and root lookup, recheck collection before sending and advisory authority inside locked writes, and abandon stale tool-result lookups. Reject transport redirects, redact quoted credentials and multiline keys before sampling, and retain committed-effect accounting when later notifications or report rendering fail.
 - Keep all advisor systems off by default, production thresholds unchanged, compaction guidance withdrawn and the command guard separate. These repairs do not establish a task-quality or cost benefit; new controlled evaluations are still required.
 - Isolate the base-package installer tests' home directory as well as their agent directory. The old fixtures could switch off the real command guard during validation; a regression now checks that a synthetic caller's enabled guard remains byte-for-byte unchanged.
+- Trim the evaluations page to results, a short method and chart notes, without changing the published data. Add expandable diagrams for the six Jev systems, with theme-aware colors and contained scrolling on narrow screens.
 
 ## 0.30.0 - 2026-09-21
 
