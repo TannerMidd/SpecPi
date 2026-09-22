@@ -839,41 +839,141 @@ function ensureSpecpiBase() {
  * directory, or a finished attempt result when the install itself failed.
  */
 /**
- * Remove one named part of the installed SpecPi layer, so a result can be attributed to it.
+ * The two tools SpecPi's own extensions add over plain Pi, as a captured first request lists them.
+ *
+ * The install adds four. The other two, `create_goal` and `get_goal`, belong to pi-goal-x and are
+ * not withdrawable this way: that package owns a tool profile and re-asserts it from its own hooks,
+ * so anything taken out of the active set comes straight back. The `goal` target removes the
+ * package instead.
+ */
+const SPECPI_ADDED_TOOLS = Object.freeze(["report_capability_gap", "request_capability"]);
+
+const GOAL_PACKAGE_PREFIX = "npm:pi-goal-x@";
+
+const ABLATION_EXTENSION = "specpi-eval-ablation";
+
+/**
+ * Withdraw the added tools by writing one extension into the disposable home.
+ *
+ * Withdrawn on `before_agent_start` as well as `session_start`, because workflow-controls sets the
+ * active set at session_start for its own groups and extension load order is not ours to depend
+ * on. The last hook before a request is built is the one that decides what ships.
+ */
+function writeToolWithdrawal(agentDir) {
+    const source = [
+        "// Written by the eval runner for SPECPI_EVAL_ABLATE=tools. Not part of any install.",
+        `const WITHHELD = new Set(${JSON.stringify([...SPECPI_ADDED_TOOLS])});`,
+        "",
+        "export default function specpiEvalAblation(pi) {",
+        "    const withdraw = () => {",
+        '        if (typeof pi.getActiveTools !== "function" || typeof pi.setActiveTools !== "function") {',
+        "            return;",
+        "        }",
+        "",
+        "        const active = pi.getActiveTools();",
+        "        pi.setActiveTools(active.filter((name) => !WITHHELD.has(name)));",
+        "    };",
+        "",
+        '    pi.on("session_start", withdraw);',
+        '    pi.on("before_agent_start", withdraw);',
+        "}",
+        "",
+    ].join("\n");
+
+    const dir = path.join(agentDir, "extensions", ABLATION_EXTENSION);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "index.ts"), source);
+}
+
+/**
+ * Remove one or more named parts of the installed SpecPi layer, so a result can be attributed to
+ * them.
  *
  * Off unless SPECPI_EVAL_ABLATE names something, so every ordinary run prepares the home exactly as
  * it always has. This exists because a SpecPi row and a plain Pi row differ by a whole installed
  * layer at once -- extensions, packages and a working agreement -- so a row that scores differently
- * cannot say which of those did it. Ablating one part and re-running can.
+ * cannot say which of those did it. Ablating one part and re-running can. Parts combine with
+ * commas, because halves are only separately meaningful if they can also be removed together.
  *
- * `agents` drops the installed global AGENTS.md, the layer's working agreement and the larger half
- * of what SpecPi adds to a prompt. It is the only target here, and the reason there is no `scope`
- * target is worth recording: /scope cannot be ablated this way. It activates only when a human
- * types the command and is not exposed as a tool, so it is already inert in an unattended run --
- * there is no on state to remove. Deleting its extension directory does not simulate one either,
- * because `tool-wishlist` imports `workflow-controls/task-contract.mjs`, so the whole extension
- * load fails and the session makes no model calls at all. That reads as a harness scoring zero
- * rather than as an ablation, which is exactly the kind of result this function must not produce.
+ * `agents` drops the installed global AGENTS.md: the layer's working agreement, and on one captured
+ * request 4.2 KB of the 8.5 KB SpecPi adds to a plain Pi request.
+ *
+ * `tools` withdraws the two tools SpecPi's own extensions add. Neither can act in an unattended run:
+ * `request_capability` answers that restoring a group needs an interactive user, and
+ * `report_capability_gap` that collection is undecided. Both register unconditionally, so a headless
+ * session ships their schema and prompt guidance for nothing -- 3.7 KB of one captured request.
+ *
+ * It withdraws rather than deletes, and that is the whole reason this target can exist. Deleting
+ * the extension directories does not work: `tool-wishlist` imports
+ * `workflow-controls/task-contract.mjs`, so removing either fails the entire extension load and the
+ * session makes no model calls -- a harness scoring zero, which reads like an ablation and is not
+ * one. Withdrawing uses the same `setActiveTools` seam `/webaccess` and `/browser` already use, so
+ * every extension still loads and only the tools leave the request.
+ *
+ * `goal` drops pi-goal-x from the home's package list, taking `create_goal` and `get_goal` with it.
+ * A package rather than a withdrawal because that one re-asserts its own tool profile; see
+ * SPECPI_ADDED_TOOLS. Together with `tools` it leaves exactly plain Pi's four-tool surface, which is
+ * what makes a tool-surface result attributable rather than merely suggestive.
+ *
+ * There is still no `scope` target. /scope activates only when a human types the command and is not
+ * exposed as a tool, so it is already inert in an unattended run: there is no on state to remove.
+ *
+ * Whether a withdrawal took effect is not taken on trust. The report's `toolsOffered` names the
+ * tools the provider was actually sent, so an ablation that quietly did nothing is visible there.
  */
 function ablateSpecpi(agentDir) {
-    const part = process.env.SPECPI_EVAL_ABLATE;
-    if (!part) {
+    const requested = process.env.SPECPI_EVAL_ABLATE;
+    if (!requested) {
         return;
     }
 
-    const targets = { agents: [path.join(agentDir, "AGENTS.md")] }[part];
-    if (!targets) {
-        throw new Error(`Unknown SPECPI_EVAL_ABLATE: ${part}. Use one of: agents`);
+    const parts = requested
+        .split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+    const known = new Set(["agents", "tools", "goal"]);
+    for (const part of parts) {
+        if (!known.has(part)) {
+            throw new Error(`Unknown SPECPI_EVAL_ABLATE: ${part}. Use one or more of: ${[...known].join(", ")}`);
+        }
     }
 
-    for (const target of targets) {
+    if (parts.includes("agents")) {
+        const target = path.join(agentDir, "AGENTS.md");
         if (!fs.existsSync(target)) {
             // Refuse rather than report an ablation that removed nothing: a row labelled "without
             // the working agreement" that still has it is worse than no row.
-            throw new Error(`SPECPI_EVAL_ABLATE=${part} found nothing to remove at ${target}`);
+            throw new Error(`SPECPI_EVAL_ABLATE=agents found nothing to remove at ${target}`);
         }
 
         fs.rmSync(target, { recursive: true, force: true });
+    }
+
+    if (parts.includes("tools")) {
+        // Same refusal, at the only point this one can check: the tools are registered by these two
+        // extensions, so a home without them has nothing to withdraw and the row would be mislabelled.
+        for (const owner of ["tool-wishlist", "workflow-controls"]) {
+            const dir = path.join(agentDir, "extensions", owner);
+            if (!fs.existsSync(dir)) {
+                throw new Error(`SPECPI_EVAL_ABLATE=tools found no ${owner} extension at ${dir}`);
+            }
+        }
+
+        writeToolWithdrawal(agentDir);
+    }
+
+    if (parts.includes("goal")) {
+        const settingsFile = path.join(agentDir, "settings.json");
+        const settings = JSON.parse(fs.readFileSync(settingsFile, "utf8"));
+        const packages = Array.isArray(settings.packages) ? settings.packages : [];
+        const kept = packages.filter((entry) => !String(entry).startsWith(GOAL_PACKAGE_PREFIX));
+        if (kept.length === packages.length) {
+            // The same refusal the other targets make: a row labelled "without the goal package"
+            // that still has it is worse than no row.
+            throw new Error(`SPECPI_EVAL_ABLATE=goal found no ${GOAL_PACKAGE_PREFIX}* entry in ${settingsFile}`);
+        }
+
+        fs.writeFileSync(settingsFile, `${JSON.stringify({ ...settings, packages: kept }, null, 4)}\n`);
     }
 }
 

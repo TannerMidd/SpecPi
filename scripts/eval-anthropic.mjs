@@ -238,11 +238,44 @@ function frame(type, payload) {
     return `event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`;
 }
 
+/**
+ * The cached share of the prompt, in the spelling Anthropic clients read.
+ *
+ * Providers report it two ways -- DeepSeek's `prompt_cache_hit_tokens` and OpenAI's
+ * `prompt_tokens_details.cached_tokens` -- and the proxy's own accounting already reads both. This
+ * translation did not, so a harness that speaks Messages saw every reply as a total cache miss.
+ *
+ * That is not a cosmetic gap. A Terminal-Bench run of Claude Code published a cache rate of zero
+ * against the Pi family's 94% on the same endpoint, and its cost could only be given as a range
+ * spanning a factor of four, because the cached share is what separates input billed at the full
+ * rate from input billed at a fiftieth of it. Anthropic counts cache reads outside `input_tokens`,
+ * so the total is split here rather than added to.
+ */
+function cacheReadTokens(usage) {
+    if (Number.isFinite(usage?.prompt_cache_hit_tokens)) {
+        return usage.prompt_cache_hit_tokens;
+    }
+
+    if (Number.isFinite(usage?.prompt_tokens_details?.cached_tokens)) {
+        return usage.prompt_tokens_details.cached_tokens;
+    }
+
+    return 0;
+}
+
+/** Input tokens and their cached share, as Anthropic's usage object reports the pair. */
+function messagesUsage(usage) {
+    const prompt = usage?.prompt_tokens ?? 0;
+    const cached = Math.min(cacheReadTokens(usage), prompt);
+
+    return { input_tokens: prompt - cached, cache_read_input_tokens: cached };
+}
+
 /** The finished message as an Anthropic event stream. */
 export function toMessagesStream(reply, { model }) {
     const id = reply.id ? `msg_${reply.id}` : `msg_eval_${Date.now()}`;
     const stopReason = reply.calls.length > 0 ? "tool_use" : (STOP[reply.finish] ?? "end_turn");
-    const inputTokens = reply.usage?.prompt_tokens ?? 0;
+    const usage = messagesUsage(reply.usage);
     const outputTokens = reply.usage?.completion_tokens ?? 0;
     let out = frame("message_start", {
         type: "message_start",
@@ -254,7 +287,7 @@ export function toMessagesStream(reply, { model }) {
             content: [],
             stop_reason: null,
             stop_sequence: null,
-            usage: { input_tokens: inputTokens, output_tokens: 0 },
+            usage: { ...usage, output_tokens: 0 },
         },
     });
 
@@ -321,7 +354,7 @@ export function toMessagesBody(reply, { model }) {
         stop_reason: reply.calls.length > 0 ? "tool_use" : (STOP[reply.finish] ?? "end_turn"),
         stop_sequence: null,
         usage: {
-            input_tokens: reply.usage?.prompt_tokens ?? 0,
+            ...messagesUsage(reply.usage),
             output_tokens: reply.usage?.completion_tokens ?? 0,
         },
     };

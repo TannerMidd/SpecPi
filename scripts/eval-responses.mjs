@@ -179,7 +179,7 @@ export function normalizeUsage(usage) {
  * correct whether the provider sends deltas, the finished item, or both.
  */
 export function collectResponsesReply(text) {
-    const parts = { text: "", calls: new Map(), usage: null, finish: null, model: null, id: null };
+    const parts = { text: "", calls: new Map(), usage: null, finish: null, model: null, id: null, error: null };
     const noteCall = (key, { name, args }) => {
         const held = parts.calls.get(key) ?? { id: key, name: "", arguments: "" };
         if (name) {
@@ -221,8 +221,25 @@ export function collectResponsesReply(text) {
             parts.usage = response.usage;
         }
 
-        if (response?.incomplete_details?.reason === "max_output_tokens") {
+        // Running out of room is a finish reason, not a failure: the turn happened and its text is
+        // real. Every other terminal state is a failure, and the Responses API can report one on a
+        // 200 -- `response.failed` arrives as an ordinary event in an otherwise healthy stream. Read
+        // only the status line and the run looks like a harness that answered with nothing, which
+        // is how a provider outage gets published as a harness scoring zero.
+        const reason = response?.incomplete_details?.reason;
+        if (reason === "max_output_tokens") {
             parts.finish = "length";
+        }
+
+        if (response?.error) {
+            parts.error = {
+                code: String(response.error.code ?? response.status ?? "failed"),
+                message: String(response.error.message ?? "the provider reported a failed response"),
+            };
+        } else if (response?.status === "failed") {
+            parts.error = { code: "failed", message: "the provider reported a failed response" };
+        } else if (reason !== undefined && reason !== "max_output_tokens") {
+            parts.error = { code: String(reason), message: `the provider returned an incomplete response: ${reason}` };
         }
 
         for (const item of response?.output ?? []) {
@@ -328,6 +345,7 @@ export function collectResponsesReply(text) {
         finish: parts.finish,
         model: parts.model,
         id: parts.id,
+        error: parts.error,
     };
 }
 

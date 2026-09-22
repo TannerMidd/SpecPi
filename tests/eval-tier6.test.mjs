@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { advisorTotals, modelRequests } from "../scripts/eval-proxy.mjs";
+import { ranWindowed } from "../scripts/tier6-metrics.mjs";
 import { auditCorpus } from "../evals/lib/tier6/audit.mjs";
 import { isDisclosure } from "../evals/lib/tier6/key.mjs";
 import { DEFAULT_BUDGETS, defaultSettings, normalizeSettings } from "../extensions/jev-advisor/config.mjs";
@@ -138,4 +139,24 @@ test("advisor calls are excluded from the model request count", () => {
         log.length,
         "in a log of turns and advisor posts the two counts must partition it",
     );
+});
+
+test("the windowed comparison admits only attempts that ran under the window", () => {
+    const window = 24000;
+
+    // The shape the check was written for: a provider default, never compacting, far over.
+    assert.equal(ranWindowed({ context: { compactions: 0, peakPromptTokens: 82268 } }, window), false);
+
+    // The shape it missed. Compacting once proves the harness compacts, not that it compacted at
+    // this window -- and an 80,000-token attempt has plainly not run under a 24,000-token one.
+    assert.equal(ranWindowed({ context: { compactions: 1, peakPromptTokens: 80000 } }, window), false);
+
+    // Genuinely windowed attempts overshoot, because the turn that crosses the window is the one
+    // that triggers compaction. 37,974 is the largest overshoot in the archived runs.
+    assert.equal(ranWindowed({ context: { compactions: 3, peakPromptTokens: 37974 } }, window), true);
+    assert.equal(ranWindowed({ context: { compactions: 1, peakPromptTokens: 17117 } }, window), true);
+
+    // Under the window without compacting is ordinary: the session simply never filled it.
+    assert.equal(ranWindowed({ context: { compactions: 0, peakPromptTokens: 12000 } }, window), true);
+    assert.equal(ranWindowed({ context: {} }, window), true);
 });

@@ -147,6 +147,37 @@ export function modelRequests(requests) {
     return (requests ?? []).filter((record) => record.kind !== "advisor" && record.kind !== "auxiliary");
 }
 
+/** The session-title calls, which are spend without being turns. */
+export function auxiliaryRequests(requests) {
+    return (requests ?? []).filter((record) => record.kind === "auxiliary");
+}
+
+/**
+ * Everything the harness spent on the provider: its conversation and its auxiliaries, but not the
+ * advisor.
+ *
+ * Not the same set as `modelRequests`, and the difference is the point. That filter answers "how
+ * many turns did this take", so it drops auxiliaries -- but token totals and cost were reading the
+ * same filtered list, which meant a harness that fires session-title calls had those tokens counted
+ * nowhere at all. Claude Code makes one per attempt, so its reported cost was short by a whole
+ * request every time.
+ *
+ * The advisor stays out because it is already priced on its own line from `advisorTotals`; folding
+ * it in here would bill it twice.
+ */
+export function billableRequests(requests) {
+    return (requests ?? []).filter((record) => record.kind !== "advisor");
+}
+
+/** Cached prompt tokens, in whichever spelling the provider used. */
+function cachedOf(usage) {
+    if (Number.isFinite(usage?.prompt_cache_hit_tokens)) {
+        return usage.prompt_cache_hit_tokens;
+    }
+
+    return Number.isFinite(usage?.prompt_tokens_details?.cached_tokens) ? usage.prompt_tokens_details.cached_tokens : 0;
+}
+
 /**
  * Conversation turns in a recorded attempt, correct for reports written before the count was.
  *
@@ -518,6 +549,13 @@ export function startProxy({
     forwardUrl,
     responsesForwardUrl = process.env.EVAL_FORWARD_RESPONSES_URL || undefined,
     sessionId,
+    // Loopback on an ephemeral port, which is what an in-process run wants and what every caller
+    // before containerised harnesses needed. A harness inside a Docker container cannot reach the
+    // host's loopback, so those runs pass a fixed port and a host the container can route to.
+    // Binding beyond loopback puts a listener that forwards with a real provider key on whatever
+    // networks the machine is attached to, so it stays opt-in and the caller states it.
+    port = 0,
+    host = "127.0.0.1",
 } = {}) {
     // Forwarding credentials travel process-local only: they are read here
     // at request time and never written to the request log or reports.
@@ -629,6 +667,20 @@ export function startProxy({
             // An upstream error is passed through untouched. Folding one into a finished message
             // would hand the harness an empty assistant turn and lose the status that says why.
             const bridgedReply = bridged && upstream.ok ? collectResponsesReply(text) : null;
+            // A Responses failure can arrive on a 200: the stream carries `response.failed` and the
+            // status line says nothing is wrong. Translating that into a finished message would
+            // hand the harness an empty assistant turn with `stop`, which reads downstream as the
+            // harness choosing to answer with nothing rather than as the provider failing.
+            if (bridgedReply?.error) {
+                record.error = `${bridgedReply.error.code}: ${bridgedReply.error.message}`;
+                response.writeHead(502, { "Content-Type": "application/json" });
+                response.end(
+                    JSON.stringify({ error: { type: bridgedReply.error.code, message: bridgedReply.error.message } }),
+                );
+
+                return;
+            }
+
             if (messagesRequest) {
                 const reply = bridgedReply ?? collectChatReply(text);
                 const model = rawBody.model ?? "unknown";
@@ -673,11 +725,14 @@ export function startProxy({
     });
 
     return new Promise((resolve) => {
-        server.listen(0, "127.0.0.1", () => {
+        server.listen(port, host, () => {
             const address = server.address();
             resolve({
                 requests,
+                // Always loopback, whatever it bound to: this is the address the calling process
+                // uses, and a caller that bound wider builds the outside-facing one from `port`.
                 url: `http://127.0.0.1:${address.port}/v1`,
+                port: address.port,
                 close: () => new Promise((done) => server.close(done)),
             });
         });
@@ -786,15 +841,8 @@ export function proxyTotals(requests) {
             outputTokens += usage.completion_tokens;
         }
 
-        if (usage && Number.isFinite(usage.prompt_cache_hit_tokens)) {
-            cachedTokens += usage.prompt_cache_hit_tokens;
-        } else if (Number.isFinite(usage?.prompt_tokens_details?.cached_tokens)) {
-            cachedTokens += usage.prompt_tokens_details.cached_tokens;
-        }
-
-        const usageCached = Number.isFinite(usage?.prompt_cache_hit_tokens)
-            ? usage.prompt_cache_hit_tokens
-            : (usage?.prompt_tokens_details?.cached_tokens ?? 0);
+        const usageCached = cachedOf(usage);
+        cachedTokens += usageCached;
         series.push({
             request: index + 1,
             promptTokens: Number.isFinite(usage?.prompt_tokens) ? usage.prompt_tokens : null,
@@ -817,15 +865,35 @@ export function proxyTotals(requests) {
         }
     }
 
+    // Auxiliaries are spend, not turns: their tokens join the totals, but they stay out of `series`
+    // and `withUsage`, which describe how the conversation's context grew and how many turns it
+    // took. Reported separately as well as folded in, so a row can say what the harness spent on
+    // something other than the task.
+    const auxiliary = { calls: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0 };
+    for (const record of auxiliaryRequests(requests)) {
+        const usage = record.usage;
+        auxiliary.calls += 1;
+        if (Number.isFinite(usage?.prompt_tokens)) {
+            auxiliary.inputTokens += usage.prompt_tokens;
+        }
+
+        if (Number.isFinite(usage?.completion_tokens)) {
+            auxiliary.outputTokens += usage.completion_tokens;
+        }
+
+        auxiliary.cachedTokens += cachedOf(usage);
+    }
+
     return {
-        inputTokens,
-        outputTokens,
-        cachedTokens,
+        inputTokens: inputTokens + auxiliary.inputTokens,
+        outputTokens: outputTokens + auxiliary.outputTokens,
+        cachedTokens: cachedTokens + auxiliary.cachedTokens,
         withUsage,
         toolCalls,
         toolsOffered,
         series,
         context: contextShape(series),
+        auxiliary,
     };
 }
 

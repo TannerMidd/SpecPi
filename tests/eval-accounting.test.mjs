@@ -21,6 +21,9 @@ import {
     extractToolCalls,
     extractUsage,
     normalizeToolName,
+    attemptTurns,
+    billableRequests,
+    advisorTotals,
     proxyTotals,
     startProxy,
     summarizeRequest,
@@ -696,4 +699,37 @@ test("eval codex harness configures the proxy provider and resolves models", asy
     assert.equal(resolveCodexModel("deepseek-v4.1-flash"), "deepseek-v4.1-flash");
     assert.equal(resolveCodexModel("opencode-go/deepseek-v4.1-flash"), "deepseek-v4.1-flash");
     assert.equal(resolveCodexModel("opencode-go/muse-spark-1.3"), "muse-spark-1.3");
+});
+
+test("a session-title call is billed even though it is not a turn", () => {
+    // Claude Code fires one auxiliary call per attempt. Token totals and cost were read off the
+    // same filter that answers "how many turns did this take", so those tokens were counted
+    // nowhere: the harness was billed for a whole request less than it used.
+    const totals = proxyTotals([
+        { usage: { prompt_tokens: 100, completion_tokens: 10 }, toolCalls: [], summary: { toolNames: ["bash"] } },
+        { usage: { prompt_tokens: 200, completion_tokens: 20 }, toolCalls: [], summary: { toolNames: ["bash"] } },
+        { kind: "auxiliary", usage: { prompt_tokens: 40, completion_tokens: 5 }, toolCalls: [] },
+    ]);
+
+    assert.equal(totals.inputTokens, 340);
+    assert.equal(totals.outputTokens, 35);
+    assert.equal(totals.auxiliary.calls, 1);
+    assert.equal(totals.auxiliary.inputTokens, 40);
+
+    // ...but it is still not a turn: the series and the turn count describe the conversation only.
+    assert.equal(totals.series.length, 2);
+    assert.equal(totals.withUsage, 2);
+    assert.equal(attemptTurns({ series: totals.series }), 2);
+});
+
+test("the advisor is kept off the harness bill, having its own line", () => {
+    const requests = [
+        { usage: { prompt_tokens: 100, completion_tokens: 10 }, toolCalls: [] },
+        { kind: "advisor", usage: { prompt_tokens: 900, completion_tokens: 90 }, inputTokens: 900, ok: true },
+    ];
+    const totals = proxyTotals(requests);
+
+    assert.equal(totals.inputTokens, 100);
+    assert.equal(billableRequests(requests).length, 1);
+    assert.equal(advisorTotals(requests).inputTokens, 900);
 });

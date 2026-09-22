@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-// Derive site/evaluations/tier6.json from one or more tier 6 run directories.
+// Derive evals/runs/tier6-metrics.json from one or more tier 6 run directories.
+//
+// This used to publish to site/evaluations/. The tier suite is no longer on the site -- the
+// evaluations page carries Terminal-Bench 2.0 now -- so the summary is written beside the runs it
+// describes instead, where it stays a local analysis rather than a published claim.
 //
 // Tier 6 is the suite built to contain the situations the other tiers cannot reach, and it exists
 // because three earlier attempts at it failed in ways worth stating plainly:
@@ -29,7 +33,19 @@ import process from "node:process";
 import { isLaunchFailure } from "./eval-site.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const outFile = path.join(root, "site", "evaluations", "tier6.json");
+const outFile = path.join(root, "evals", "runs", "tier6-metrics.json");
+
+/**
+ * How far above the declared window a genuinely windowed attempt may peak.
+ *
+ * Compaction is triggered by the turn that crosses the window, so the request carrying that turn
+ * is over it by design and the peak always overshoots. The size of the overshoot is what separates
+ * the two populations, and it is measured rather than guessed: across the archived tier 6 runs at
+ * a 24,000-token window, attempts that compacted peak between 17,117 and 37,974 -- at most 1.58x
+ * the window -- while attempts that ran at a provider default sit between 45,322 and 82,268, from
+ * 1.89x upward. Two is the round number between the two bands.
+ */
+const WINDOW_OVERSHOOT = 2;
 
 const ORDER = ["pi", "specpi-default", "specpi-jev", "omp", "codex", "claude-code", "opencode", "dsh"];
 const LABELS = {
@@ -166,10 +182,21 @@ function armOf(entry) {
  * Tested rather than hardcoded as a list of runs to skip, because a list goes stale silently and
  * this does not.
  */
-function ranWindowed(attempt, window) {
+export function ranWindowed(attempt, window) {
     const context = attempt.context ?? {};
+    const peak = context.peakPromptTokens ?? 0;
+    const compactions = context.compactions ?? 0;
 
-    return !((context.compactions ?? 0) === 0 && (context.peakPromptTokens ?? 0) > window);
+    // Never compacted and over the window: the window plainly was not in force.
+    if (compactions === 0 && peak > window) {
+        return false;
+    }
+
+    // Compacted, but nowhere near the window either. Having compacted once proves the harness
+    // compacts; it does not prove it compacted at *this* window, and the two are different claims.
+    // Without this an attempt peaking at 80,000 tokens joins a 24,000-token comparison on the
+    // strength of a single compaction, and the row reports a window the attempt never ran under.
+    return peak <= window * WINDOW_OVERSHOOT;
 }
 
 function collect(runDirs, window) {
@@ -400,4 +427,8 @@ function main() {
     }
 }
 
-main();
+// Guarded the way eval-chart and eval-site guard theirs, so the module can be imported for its
+// admission rule without the import running the CLI and throwing on missing arguments.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+    main();
+}

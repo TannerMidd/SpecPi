@@ -355,3 +355,100 @@ test("without the switch nothing is translated and the original bytes are forwar
         await upstream.close();
     }
 });
+
+test("a failed response on a 200 is a failure, not an empty answer", () => {
+    // The Responses API reports some failures in-band: HTTP is 200, the stream is well formed, and
+    // `response.failed` carries the reason. Read only the status line and a provider outage is
+    // published as a harness that answered with nothing.
+    const stream = [
+        `data: ${JSON.stringify({ type: "response.created", response: { id: "resp_1", model: "m", status: "in_progress" } })}`,
+        `data: ${JSON.stringify({
+            type: "response.failed",
+            response: {
+                id: "resp_1",
+                model: "m",
+                status: "failed",
+                error: { code: "server_error", message: "upstream capacity exceeded" },
+                output: [],
+            },
+        })}`,
+        "data: [DONE]",
+    ].join("\n\n");
+
+    const reply = collectResponsesReply(stream);
+    assert.equal(reply.error.code, "server_error");
+    assert.equal(reply.error.message, "upstream capacity exceeded");
+});
+
+test("a status of failed is a failure even with no error object", () => {
+    const body = JSON.stringify({ id: "r", model: "m", status: "failed", output: [] });
+    assert.equal(collectResponsesReply(body).error.code, "failed");
+});
+
+test("running out of output room is a finish reason, not a failure", () => {
+    const body = JSON.stringify({
+        id: "r",
+        model: "m",
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output: [{ type: "message", content: [{ type: "output_text", text: "partial" }] }],
+    });
+    const reply = collectResponsesReply(body);
+
+    assert.equal(reply.error, null);
+    assert.equal(reply.finish, "length");
+    assert.equal(reply.text, "partial");
+});
+
+test("an ordinary completed response carries no error", () => {
+    const body = JSON.stringify({
+        id: "r",
+        model: "m",
+        status: "completed",
+        output: [{ type: "message", content: [{ type: "output_text", text: "done" }] }],
+    });
+    assert.equal(collectResponsesReply(body).error, null);
+});
+
+test("a 200 that carries response.failed reaches the harness as a failure", async () => {
+    // The sibling case to the 503 above, and the harder one: the status line says the request
+    // succeeded and the failure is inside the stream. Folded into a finished message it becomes an
+    // empty assistant turn with `stop`, which is scored as the harness answering with nothing.
+    const upstream = await stubUpstream(() => ({
+        status: 200,
+        type: "text/event-stream",
+        text: [
+            `data: ${JSON.stringify({ type: "response.created", response: { id: "r", model: "m", status: "in_progress" } })}`,
+            `data: ${JSON.stringify({
+                type: "response.failed",
+                response: {
+                    id: "r",
+                    model: "m",
+                    status: "failed",
+                    error: { code: "server_error", message: "upstream capacity exceeded" },
+                    output: [],
+                },
+            })}`,
+            "data: [DONE]",
+        ].join("\n\n"),
+    }));
+    process.env.EVAL_FORWARD_WIRE = "responses";
+    const proxy = await startProxy({ forwardUrl: upstream.url });
+    try {
+        const response = await fetch(`${proxy.url}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: "muse", messages: [{ role: "user", content: "hi" }] }),
+        });
+        const text = await response.text();
+
+        assert.equal(response.status, 502);
+        assert.match(text, /upstream capacity exceeded/u);
+        // The failure must not arrive dressed as a finished turn.
+        assert.doesNotMatch(text, /"finish_reason":\s*"stop"/u);
+    } finally {
+        delete process.env.EVAL_FORWARD_WIRE;
+        await proxy.close();
+        await upstream.close();
+    }
+});

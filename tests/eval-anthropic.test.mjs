@@ -232,7 +232,7 @@ test("the whole-body shape carries the same content as the stream", () => {
         { type: "tool_use", id: "toolu_1", name: "bash", input: { cmd: "ls" } },
     ]);
     assert.equal(body.stop_reason, "tool_use");
-    assert.deepEqual(body.usage, { input_tokens: 40, output_tokens: 9 });
+    assert.deepEqual(body.usage, { input_tokens: 40, cache_read_input_tokens: 0, output_tokens: 9 });
 });
 
 test("a round trip through both directions preserves a tool exchange", () => {
@@ -326,4 +326,44 @@ test("a Messages request is recorded in the chat-completions shape it was transl
     assert.deepEqual(summary.toolNames, ["bash"], "tools are counted by their chat-completions names");
     assert.equal(summary.instructionChars, "Be brief.".length, "the Messages system block became a system message");
     await proxy.close();
+});
+
+test("a cached prompt reaches a Messages client as a cache read, not as fresh input", () => {
+    // Both spellings, because providers disagree: DeepSeek reports prompt_cache_hit_tokens and the
+    // OpenAI-compatible endpoints report prompt_tokens_details.cached_tokens. Before this, a
+    // Terminal-Bench run of Claude Code published a 0% cache rate against the Pi family's 94% on
+    // the same endpoint, and its cost could only be stated as a fourfold range.
+    for (const usage of [
+        { prompt_tokens: 1000, completion_tokens: 20, prompt_cache_hit_tokens: 940 },
+        { prompt_tokens: 1000, completion_tokens: 20, prompt_tokens_details: { cached_tokens: 940 } },
+    ]) {
+        const reply = { text: "ok", calls: [], usage, finish: "stop", model: "m", id: "1" };
+        const body = toMessagesBody(reply, { model: "m" });
+        assert.equal(body.usage.cache_read_input_tokens, 940);
+        // Anthropic counts cache reads outside input_tokens, so the pair splits the prompt.
+        assert.equal(body.usage.input_tokens, 60);
+
+        const stream = toMessagesStream(reply, { model: "m" });
+        const start = stream
+            .split("\n")
+            .filter((line) => line.startsWith("data: "))
+            .map((line) => JSON.parse(line.slice(6)))
+            .find((event) => event.type === "message_start");
+        assert.equal(start.message.usage.cache_read_input_tokens, 940);
+        assert.equal(start.message.usage.input_tokens, 60);
+    }
+});
+
+test("a reply with no cache reporting still accounts for its whole prompt", () => {
+    const reply = {
+        text: "ok",
+        calls: [],
+        usage: { prompt_tokens: 500, completion_tokens: 10 },
+        finish: "stop",
+        model: "m",
+        id: "1",
+    };
+    const body = toMessagesBody(reply, { model: "m" });
+    assert.equal(body.usage.input_tokens, 500);
+    assert.equal(body.usage.cache_read_input_tokens, 0);
 });
