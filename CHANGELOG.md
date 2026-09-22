@@ -8,6 +8,7 @@
 - Rank delegation sources per `packet.jobs[]`, respecting the declared mode and preserving every selected source and ungated position. Store gap-triage opinions alongside the original observation, with a bounded existing-cluster shortlist. Opinions cannot change priority, canonical identity or human improvement authority.
 - Retain object-shaped Score distributions, reject malformed probabilities and require a Choice distribution before applying its margin gate. Separate warnings from real elisions and count delivered effects rather than undelivered advice. Shell results are no longer eligible for shortening because their commands may not be safe to repeat.
 - Keep all advisor systems off by default, production thresholds unchanged, compaction guidance withdrawn and the command guard separate. These repairs do not establish a task-quality or cost benefit; new controlled evaluations are still required.
+- Isolate the base-package installer tests' home directory as well as their agent directory. The old fixtures could switch off the real command guard during validation; a regression now checks that a synthetic caller's enabled guard remains byte-for-byte unchanged.
 
 ## 0.30.0 - 2026-09-21
 
