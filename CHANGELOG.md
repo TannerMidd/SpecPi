@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.30.0 - 2026-09-21
 
 - Replace the evaluations page with Terminal-Bench 2.0. The suite that filled it was written in this repository, and it was retired for the reason it kept reporting: nearly every harness passed nearly every task, so the thing it was built to measure was the thing it could not see, and three rounds of harder tasks did not move it. A suite cannot mark its own homework. The page now carries somebody else's benchmark on tasks nobody here chose -- Pi with no harness, SpecPi + Jev, Oh My Pi and Claude Code, 334 scored attempts on one model through one endpoint.
 - Report the result the outside benchmark actually gives, which is that it does not separate the harnesses either. Solve rate spans 0.767 to 0.838 across the four arms; Pi against SpecPi + Jev is Fisher p = 0.83, and exactly 30/39 each on the slice the comparison rests on. That is the second suite to find no difference in capability, and this one's tasks were not chosen here and are failed about a fifth of the time, so the usual explanation -- that the tasks are too easy -- does not cover it.
