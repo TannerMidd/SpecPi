@@ -22,21 +22,126 @@
             "note": "Thirteen tasks at three attempts, picked for spread rather than for difficulty. This is the slice the comparison rests on."
         }
     ],
+    "sittingLabels": {
+        "s1": "21 Sep",
+        "s2": "22 Sep · a",
+        "s3": "22 Sep · b",
+        "s4": "22 Sep · c",
+        "s5": "22 Sep · d",
+        "s6": "22 Sep · e"
+    },
     "harnesses": [
         {
             "id": "pi",
             "label": "Pi (base)",
             "colour": "var(--ct-pi)",
             "overall": {
-                "attempts": 74,
-                "solved": 60,
-                "rate": 0.8108108108108109,
+                "attempts": 230,
+                "solved": 165,
+                "rate": 0.717391304347826,
                 "tasks": 20,
-                "inputTokens": 512903,
-                "outputTokens": 16423,
-                "cacheHitRate": 0.9370596033260049,
-                "cost": 0.016137778459459462,
-                "costIsUpperBound": false
+                "inputTokens": 472620,
+                "outputTokens": 16242,
+                "cacheHitRate": 0.9315977327444072,
+                "cost": 0.01591517135217391,
+                "outputCostShare": 0.6123118928481447,
+                "costIsUpperBound": false,
+                "costAttempts": 230
+            },
+            "widened": {
+                "attempts": 195,
+                "solved": 135,
+                "rate": 0.6923076923076923,
+                "tasks": 13,
+                "inputTokens": 500751,
+                "outputTokens": 17178,
+                "cacheHitRate": 0.931655595594593,
+                "cost": 0.016839722107692304,
+                "outputCostShare": 0.6120418923010242,
+                "costIsUpperBound": false,
+                "costAttempts": 195
+            },
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "attempts": 39,
+                    "solved": 30,
+                    "rate": 0.7692307692307693,
+                    "tasks": 13,
+                    "inputTokens": 689706,
+                    "outputTokens": 21265,
+                    "cacheHitRate": 0.9395146951781765,
+                    "cost": 0.020960307846153846,
+                    "outputCostShare": 0.6087116997055849,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                },
+                {
+                    "id": "s3",
+                    "label": "22 Sep · b",
+                    "attempts": 39,
+                    "solved": 22,
+                    "rate": 0.5641025641025641,
+                    "tasks": 13,
+                    "inputTokens": 341575,
+                    "outputTokens": 13333,
+                    "cacheHitRate": 0.883719924683767,
+                    "cost": 0.014863420307692311,
+                    "outputCostShare": 0.5382403337912739,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                },
+                {
+                    "id": "s4",
+                    "label": "22 Sep · c",
+                    "attempts": 39,
+                    "solved": 21,
+                    "rate": 0.5384615384615384,
+                    "tasks": 13,
+                    "inputTokens": 464002,
+                    "outputTokens": 14285,
+                    "cacheHitRate": 0.9252099158369373,
+                    "cost": 0.015064011999999996,
+                    "outputCostShare": 0.5689525268771491,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                },
+                {
+                    "id": "s5",
+                    "label": "22 Sep · d",
+                    "attempts": 39,
+                    "solved": 30,
+                    "rate": 0.7692307692307693,
+                    "tasks": 13,
+                    "inputTokens": 478303,
+                    "outputTokens": 17798,
+                    "cacheHitRate": 0.9434784585210562,
+                    "cost": 0.01608798715384616,
+                    "outputCostShare": 0.6637881596059302,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                },
+                {
+                    "id": "s6",
+                    "label": "22 Sep · e",
+                    "attempts": 39,
+                    "solved": 32,
+                    "rate": 0.8205128205128205,
+                    "tasks": 13,
+                    "inputTokens": 530168,
+                    "outputTokens": 19207,
+                    "cacheHitRate": 0.947290392093762,
+                    "cost": 0.017222883230769225,
+                    "outputCostShare": 0.669137493917864,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                }
+            ],
+            "spread": {
+                "low": 0.5384615384615384,
+                "high": 0.8205128205128205,
+                "sittings": 5
             },
             "slices": {
                 "slice1": {
@@ -48,18 +153,22 @@
                     "outputTokens": 11027,
                     "cacheHitRate": 0.9310867043741828,
                     "cost": 0.010764102857142854,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6146652524422447,
+                    "costIsUpperBound": false,
+                    "costAttempts": 35
                 },
                 "widen": {
-                    "attempts": 39,
-                    "solved": 30,
-                    "rate": 0.7692307692307693,
+                    "attempts": 195,
+                    "solved": 135,
+                    "rate": 0.6923076923076923,
                     "tasks": 13,
-                    "inputTokens": 689706,
-                    "outputTokens": 21265,
-                    "cacheHitRate": 0.9395146951781765,
-                    "cost": 0.020960307846153846,
-                    "costIsUpperBound": false
+                    "inputTokens": 500751,
+                    "outputTokens": 17178,
+                    "cacheHitRate": 0.931655595594593,
+                    "cost": 0.016839722107692304,
+                    "outputCostShare": 0.6120418923010242,
+                    "costIsUpperBound": false,
+                    "costAttempts": 195
                 }
             }
         },
@@ -68,15 +177,117 @@
             "label": "SpecPi + Jev",
             "colour": "var(--ct-specpi-jev)",
             "overall": {
-                "attempts": 74,
-                "solved": 62,
-                "rate": 0.8378378378378378,
+                "attempts": 230,
+                "solved": 174,
+                "rate": 0.7565217391304347,
                 "tasks": 20,
-                "inputTokens": 381153,
-                "outputTokens": 13711,
-                "cacheHitRate": 0.9447521661070856,
-                "cost": 0.012465372567567573,
-                "costIsUpperBound": false
+                "inputTokens": 404610,
+                "outputTokens": 15324,
+                "cacheHitRate": 0.9380839402055632,
+                "cost": 0.014090668460869578,
+                "outputCostShare": 0.6525036196434388,
+                "costIsUpperBound": false,
+                "costAttempts": 230
+            },
+            "widened": {
+                "attempts": 195,
+                "solved": 142,
+                "rate": 0.7282051282051282,
+                "tasks": 13,
+                "inputTokens": 428875,
+                "outputTokens": 16555,
+                "cacheHitRate": 0.9371425835586586,
+                "cost": 0.015182618615384627,
+                "outputCostShare": 0.6542465194080582,
+                "costIsUpperBound": false,
+                "costAttempts": 195
+            },
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "attempts": 39,
+                    "solved": 30,
+                    "rate": 0.7692307692307693,
+                    "tasks": 13,
+                    "inputTokens": 481424,
+                    "outputTokens": 18421,
+                    "cacheHitRate": 0.9439081876875747,
+                    "cost": 0.016466524461538463,
+                    "outputCostShare": 0.6712209943812437,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39,
+                    "carriesCompaction": true
+                },
+                {
+                    "id": "s2",
+                    "label": "22 Sep · a",
+                    "attempts": 39,
+                    "solved": 30,
+                    "rate": 0.7692307692307693,
+                    "tasks": 13,
+                    "inputTokens": 327472,
+                    "outputTokens": 12886,
+                    "cacheHitRate": 0.9435873696982472,
+                    "cost": 0.01142959953846154,
+                    "outputCostShare": 0.6764514543796455,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39,
+                    "carriesCompaction": false
+                },
+                {
+                    "id": "s4",
+                    "label": "22 Sep · c",
+                    "attempts": 39,
+                    "solved": 26,
+                    "rate": 0.6666666666666666,
+                    "tasks": 13,
+                    "inputTokens": 432306,
+                    "outputTokens": 17185,
+                    "cacheHitRate": 0.9195235733764272,
+                    "cost": 0.016722373384615383,
+                    "outputCostShare": 0.6166147173790486,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39,
+                    "carriesCompaction": false
+                },
+                {
+                    "id": "s5",
+                    "label": "22 Sep · d",
+                    "attempts": 39,
+                    "solved": 30,
+                    "rate": 0.7692307692307693,
+                    "tasks": 13,
+                    "inputTokens": 423300,
+                    "outputTokens": 15112,
+                    "cacheHitRate": 0.9384813946429379,
+                    "cost": 0.014165013076923074,
+                    "outputCostShare": 0.6401058469250103,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39,
+                    "carriesCompaction": false
+                },
+                {
+                    "id": "s6",
+                    "label": "22 Sep · e",
+                    "attempts": 39,
+                    "solved": 26,
+                    "rate": 0.6666666666666666,
+                    "tasks": 13,
+                    "inputTokens": 479871,
+                    "outputTokens": 19172,
+                    "cacheHitRate": 0.9406486770519642,
+                    "cost": 0.017129582615384623,
+                    "outputCostShare": 0.6715435978066443,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39,
+                    "carriesCompaction": false
+                }
+            ],
+            "spread": {
+                "low": 0.6666666666666666,
+                "high": 0.7692307692307693,
+                "sittings": 5
             },
             "slices": {
                 "slice1": {
@@ -88,18 +299,22 @@
                     "outputTokens": 8462,
                     "cacheHitRate": 0.9464325974182702,
                     "cost": 0.008006946171428575,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6340908655897185,
+                    "costIsUpperBound": false,
+                    "costAttempts": 35
                 },
                 "widen": {
-                    "attempts": 39,
-                    "solved": 30,
-                    "rate": 0.7692307692307693,
+                    "attempts": 195,
+                    "solved": 142,
+                    "rate": 0.7282051282051282,
                     "tasks": 13,
-                    "inputTokens": 481424,
-                    "outputTokens": 18421,
-                    "cacheHitRate": 0.9439081876875747,
-                    "cost": 0.016466524461538463,
-                    "costIsUpperBound": false
+                    "inputTokens": 428875,
+                    "outputTokens": 16555,
+                    "cacheHitRate": 0.9371425835586586,
+                    "cost": 0.015182618615384627,
+                    "outputCostShare": 0.6542465194080582,
+                    "costIsUpperBound": false,
+                    "costAttempts": 195
                 }
             }
         },
@@ -116,8 +331,41 @@
                 "outputTokens": 23377,
                 "cacheHitRate": 0.9735697473115046,
                 "cost": 0.02162147500884955,
-                "costIsUpperBound": false
+                "outputCostShare": 0.6487119740338005,
+                "costIsUpperBound": false,
+                "costAttempts": 113
             },
+            "widened": {
+                "attempts": 78,
+                "solved": 59,
+                "rate": 0.7564102564102564,
+                "tasks": 13,
+                "inputTokens": 1320404,
+                "outputTokens": 27975,
+                "cacheHitRate": 0.9736069673375202,
+                "cost": 0.02586930876923077,
+                "outputCostShare": 0.6488469880141365,
+                "costIsUpperBound": false,
+                "costAttempts": 78
+            },
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "attempts": 78,
+                    "solved": 59,
+                    "rate": 0.7564102564102564,
+                    "tasks": 13,
+                    "inputTokens": 1320404,
+                    "outputTokens": 27975,
+                    "cacheHitRate": 0.9736069673375202,
+                    "cost": 0.02586930876923077,
+                    "outputCostShare": 0.6488469880141365,
+                    "costIsUpperBound": false,
+                    "costAttempts": 78
+                }
+            ],
+            "spread": null,
             "slices": {
                 "slice1": {
                     "attempts": 35,
@@ -128,7 +376,9 @@
                     "outputTokens": 13129,
                     "cacheHitRate": 0.9733927924171757,
                     "cost": 0.012154874057142858,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6480715912312961,
+                    "costIsUpperBound": false,
+                    "costAttempts": 35
                 },
                 "widen": {
                     "attempts": 78,
@@ -139,7 +389,9 @@
                     "outputTokens": 27975,
                     "cacheHitRate": 0.9736069673375202,
                     "cost": 0.02586930876923077,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6488469880141365,
+                    "costIsUpperBound": false,
+                    "costAttempts": 78
                 }
             }
         },
@@ -148,15 +400,67 @@
             "label": "Claude Code",
             "colour": "var(--ct-claudecode)",
             "overall": {
-                "attempts": 73,
-                "solved": 56,
-                "rate": 0.7671232876712328,
+                "attempts": 112,
+                "solved": 81,
+                "rate": 0.7232142857142857,
                 "tasks": 20,
-                "inputTokens": 630410,
-                "outputTokens": 30353,
-                "cacheHitRate": null,
-                "cost": 0.11277308835616437,
-                "costIsUpperBound": true
+                "inputTokens": 670828,
+                "outputTokens": 31401,
+                "cacheHitRate": 0.9536893639050018,
+                "cost": 0.027338930999999997,
+                "outputCostShare": 0.7322040837323495,
+                "costIsUpperBound": false,
+                "costAttempts": 39
+            },
+            "widened": {
+                "attempts": 77,
+                "solved": 50,
+                "rate": 0.6493506493506493,
+                "tasks": 13,
+                "inputTokens": 764901,
+                "outputTokens": 36413,
+                "cacheHitRate": 0.9536893639050018,
+                "cost": 0.027338930999999997,
+                "outputCostShare": 0.7322040837323495,
+                "costIsUpperBound": false,
+                "costAttempts": 39
+            },
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "attempts": 38,
+                    "solved": 25,
+                    "rate": 0.6578947368421053,
+                    "tasks": 13,
+                    "inputTokens": 783804,
+                    "outputTokens": 39543,
+                    "cacheHitRate": null,
+                    "cost": 0.14129646710526314,
+                    "outputCostShare": 0.1679152498644717,
+                    "costIsUpperBound": true,
+                    "costAttempts": 38
+                },
+                {
+                    "id": "s2",
+                    "label": "22 Sep · a",
+                    "attempts": 39,
+                    "solved": 25,
+                    "rate": 0.6410256410256411,
+                    "tasks": 13,
+                    "inputTokens": 746483,
+                    "outputTokens": 33363,
+                    "cacheHitRate": 0.9536893639050018,
+                    "cost": 0.027338930999999997,
+                    "outputCostShare": 0.7322040837323495,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                }
+            ],
+            "spread": {
+                "low": 0.6410256410256411,
+                "high": 0.6578947368421053,
+                "sittings": 2
             },
             "slices": {
                 "slice1": {
@@ -168,20 +472,414 @@
                     "outputTokens": 20374,
                     "cacheHitRate": null,
                     "cost": 0.08180484857142858,
-                    "costIsUpperBound": true
+                    "outputCostShare": 0.1494368287007228,
+                    "costIsUpperBound": true,
+                    "costAttempts": 35
                 },
                 "widen": {
-                    "attempts": 38,
-                    "solved": 25,
-                    "rate": 0.6578947368421053,
+                    "attempts": 77,
+                    "solved": 50,
+                    "rate": 0.6493506493506493,
                     "tasks": 13,
-                    "inputTokens": 783804,
-                    "outputTokens": 39543,
-                    "cacheHitRate": null,
-                    "cost": 0.14129646710526314,
-                    "costIsUpperBound": true
+                    "inputTokens": 764901,
+                    "outputTokens": 36413,
+                    "cacheHitRate": 0.9536893639050018,
+                    "cost": 0.027338930999999997,
+                    "outputCostShare": 0.7322040837323495,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
                 }
             }
+        }
+    ],
+    "piVersions": [
+        "0.87.0"
+    ],
+    "jevBuilds": {
+        "withCompaction": [
+            "21 Sep"
+        ],
+        "withoutCompaction": [
+            "22 Sep · a",
+            "22 Sep · c",
+            "22 Sep · d",
+            "22 Sep · e"
+        ]
+    },
+    "advisor": {
+        "calls": 320,
+        "attemptsWithCalls": 88,
+        "attempts": 230,
+        "stateBytes": 168682,
+        "rate": {
+            "inputPerMTok": 0.042,
+            "outputPerMTok": 0,
+            "cacheReadPerMTok": 0,
+            "note": "TypeSafe Jev 1.13, System One classifier. Output is free; the advisor's own spend is priced here so a SpecPi + Jev row never reports a cost that excludes its advisor."
+        }
+    },
+    "paired": [
+        {
+            "a": "pi",
+            "b": "jev",
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 689706,
+                        "cost": 0.020960307846153846
+                    },
+                    "b": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 481424,
+                        "cost": 0.016466524461538463
+                    },
+                    "tokenRatio": 1.4326373425504337,
+                    "costRatio": 1.2729041817604982
+                },
+                {
+                    "id": "s4",
+                    "label": "22 Sep · c",
+                    "a": {
+                        "solved": 21,
+                        "attempts": 39,
+                        "inputTokens": 464002,
+                        "cost": 0.015064011999999996
+                    },
+                    "b": {
+                        "solved": 26,
+                        "attempts": 39,
+                        "inputTokens": 432306,
+                        "cost": 0.016722373384615383
+                    },
+                    "tokenRatio": 1.0733184364778652,
+                    "costRatio": 0.9008297837589799
+                },
+                {
+                    "id": "s5",
+                    "label": "22 Sep · d",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 478303,
+                        "cost": 0.01608798715384616
+                    },
+                    "b": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 423300,
+                        "cost": 0.014165013076923074
+                    },
+                    "tokenRatio": 1.129938577840775,
+                    "costRatio": 1.135755192492967
+                },
+                {
+                    "id": "s6",
+                    "label": "22 Sep · e",
+                    "a": {
+                        "solved": 32,
+                        "attempts": 39,
+                        "inputTokens": 530168,
+                        "cost": 0.017222883230769225
+                    },
+                    "b": {
+                        "solved": 26,
+                        "attempts": 39,
+                        "inputTokens": 479871,
+                        "cost": 0.017129582615384623
+                    },
+                    "tokenRatio": 1.1048135853177208,
+                    "costRatio": 1.0054467535771014
+                }
+            ],
+            "tokens": {
+                "sittings": 4,
+                "lowerIn": 0,
+                "low": 1.0733184364778652,
+                "high": 1.4326373425504337,
+                "typical": 1.1770696848118778
+            },
+            "cost": {
+                "sittings": 4,
+                "lowerIn": 1,
+                "low": 0.9008297837589799,
+                "high": 1.2729041817604982,
+                "typical": 1.0697211049861708
+            },
+            "solved": {
+                "a": 113,
+                "b": 112,
+                "attemptsA": 156,
+                "attemptsB": 156,
+                "p": 0.9999999999990026
+            }
+        },
+        {
+            "a": "pi",
+            "b": "omp",
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 689706,
+                        "cost": 0.020960307846153846
+                    },
+                    "b": {
+                        "solved": 59,
+                        "attempts": 78,
+                        "inputTokens": 1320404,
+                        "cost": 0.02586930876923077
+                    },
+                    "tokenRatio": 0.5223446763263365,
+                    "costRatio": 0.8102384193227559
+                }
+            ],
+            "tokens": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.5223446763263365,
+                "high": 0.5223446763263365,
+                "typical": 0.5223446763263365
+            },
+            "cost": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.8102384193227559,
+                "high": 0.8102384193227559,
+                "typical": 0.8102384193227559
+            },
+            "solved": {
+                "a": 30,
+                "b": 59,
+                "attemptsA": 39,
+                "attemptsB": 78,
+                "p": 0.9999999999999329
+            }
+        },
+        {
+            "a": "pi",
+            "b": "claude-code",
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 689706,
+                        "cost": 0.020960307846153846
+                    },
+                    "b": {
+                        "solved": 25,
+                        "attempts": 38,
+                        "inputTokens": 783804,
+                        "cost": 0.14129646710526314
+                    },
+                    "tokenRatio": 0.8799470275732199,
+                    "costRatio": null
+                }
+            ],
+            "tokens": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.8799470275732199,
+                "high": 0.8799470275732199,
+                "typical": 0.8799470275732199
+            },
+            "cost": null,
+            "solved": {
+                "a": 30,
+                "b": 25,
+                "attemptsA": 39,
+                "attemptsB": 38,
+                "p": 0.32069173965389675
+            }
+        },
+        {
+            "a": "jev",
+            "b": "omp",
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 481424,
+                        "cost": 0.016466524461538463
+                    },
+                    "b": {
+                        "solved": 59,
+                        "attempts": 78,
+                        "inputTokens": 1320404,
+                        "cost": 0.02586930876923077
+                    },
+                    "tokenRatio": 0.3646035607283831,
+                    "costRatio": 0.636527423613418
+                }
+            ],
+            "tokens": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.3646035607283831,
+                "high": 0.3646035607283831,
+                "typical": 0.36460356072838307
+            },
+            "cost": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.636527423613418,
+                "high": 0.636527423613418,
+                "typical": 0.636527423613418
+            },
+            "solved": {
+                "a": 30,
+                "b": 59,
+                "attemptsA": 39,
+                "attemptsB": 78,
+                "p": 0.9999999999999329
+            }
+        },
+        {
+            "a": "jev",
+            "b": "claude-code",
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 481424,
+                        "cost": 0.016466524461538463
+                    },
+                    "b": {
+                        "solved": 25,
+                        "attempts": 38,
+                        "inputTokens": 783804,
+                        "cost": 0.14129646710526314
+                    },
+                    "tokenRatio": 0.614214778184342,
+                    "costRatio": null
+                },
+                {
+                    "id": "s2",
+                    "label": "22 Sep · a",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 327472,
+                        "cost": 0.01142959953846154
+                    },
+                    "b": {
+                        "solved": 25,
+                        "attempts": 39,
+                        "inputTokens": 746483,
+                        "cost": 0.027338930999999997
+                    },
+                    "tokenRatio": 0.43868648046907965,
+                    "costRatio": 0.4180704629036717
+                }
+            ],
+            "tokens": {
+                "sittings": 2,
+                "lowerIn": 2,
+                "low": 0.43868648046907965,
+                "high": 0.614214778184342,
+                "typical": 0.5190835378759237
+            },
+            "cost": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.4180704629036717,
+                "high": 0.4180704629036717,
+                "typical": 0.4180704629036717
+            },
+            "solved": {
+                "a": 60,
+                "b": 50,
+                "attemptsA": 78,
+                "attemptsB": 77,
+                "p": 0.11353406069740397
+            }
+        },
+        {
+            "a": "omp",
+            "b": "claude-code",
+            "sittings": [
+                {
+                    "id": "s1",
+                    "label": "21 Sep",
+                    "a": {
+                        "solved": 59,
+                        "attempts": 78,
+                        "inputTokens": 1320404,
+                        "cost": 0.02586930876923077
+                    },
+                    "b": {
+                        "solved": 25,
+                        "attempts": 38,
+                        "inputTokens": 783804,
+                        "cost": 0.14129646710526314
+                    },
+                    "tokenRatio": 1.6846099279922022,
+                    "costRatio": null
+                }
+            ],
+            "tokens": {
+                "sittings": 1,
+                "lowerIn": 0,
+                "low": 1.6846099279922022,
+                "high": 1.6846099279922022,
+                "typical": 1.6846099279922022
+            },
+            "cost": null,
+            "solved": {
+                "a": 59,
+                "b": 25,
+                "attemptsA": 78,
+                "attemptsB": 38,
+                "p": 0.27696567952789364
+            }
+        }
+    ],
+    "comparisons": [
+        {
+            "a": "pi",
+            "b": "jev",
+            "p": 0.3969495762857536
+        },
+        {
+            "a": "pi",
+            "b": "omp",
+            "p": 0.147606093473665
+        },
+        {
+            "a": "pi",
+            "b": "claude-code",
+            "p": 0.9999999999985285
+        },
+        {
+            "a": "jev",
+            "b": "omp",
+            "p": 0.4952954583180742
+        },
+        {
+            "a": "jev",
+            "b": "claude-code",
+            "p": 0.5110230854809955
+        },
+        {
+            "a": "omp",
+            "b": "claude-code",
+            "p": 0.21472242525465102
         }
     ],
     "tasks": [
@@ -189,26 +887,30 @@
             "task": "cobol-modernization",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 2,
-                    "rate": 0.6666666666666666,
+                    "attempts": 15,
+                    "solved": 9,
+                    "rate": 0.6,
                     "tasks": 1,
-                    "inputTokens": 2326462,
-                    "outputTokens": 68666,
-                    "cacheHitRate": 0.9583420435061131,
-                    "cost": 0.06242579,
-                    "costIsUpperBound": false
+                    "inputTokens": 1355672,
+                    "outputTokens": 48427,
+                    "cacheHitRate": 0.9567825776591257,
+                    "cost": 0.0417357512,
+                    "outputCostShare": 0.696194489486031,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 1734260,
-                    "outputTokens": 57368,
-                    "cacheHitRate": 0.9792674261197718,
-                    "cost": 0.044908861999999994,
-                    "costIsUpperBound": false
+                    "inputTokens": 1173608,
+                    "outputTokens": 43944,
+                    "cacheHitRate": 0.963563748387025,
+                    "cost": 0.036172977599999996,
+                    "outputCostShare": 0.7288910603809404,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -219,18 +921,22 @@
                     "outputTokens": 98820,
                     "cacheHitRate": 0.9862844735499368,
                     "cost": 0.094868733,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6249888464305725,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 1,
-                    "rate": 0.3333333333333333,
+                    "attempts": 6,
+                    "solved": 3,
+                    "rate": 0.5,
                     "tasks": 1,
-                    "inputTokens": 3143976,
-                    "outputTokens": 150240,
-                    "cacheHitRate": null,
-                    "cost": 0.5617405999999999,
-                    "costIsUpperBound": true
+                    "inputTokens": 2898326,
+                    "outputTokens": 129247,
+                    "cacheHitRate": 0.9734108784976783,
+                    "cost": 0.083278882,
+                    "outputCostShare": 0.7799408258146405,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -238,26 +944,30 @@
             "task": "configure-git-webserver",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 2,
+                    "attempts": 15,
+                    "solved": 10,
                     "rate": 0.6666666666666666,
                     "tasks": 1,
-                    "inputTokens": 213460,
-                    "outputTokens": 14448,
-                    "cacheHitRate": 0.9180549049002155,
-                    "cost": 0.011880703999999999,
-                    "costIsUpperBound": false
+                    "inputTokens": 217030,
+                    "outputTokens": 13605,
+                    "cacheHitRate": 0.9152965027876331,
+                    "cost": 0.011516140399999998,
+                    "outputCostShare": 0.7088069193737863,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 1,
-                    "rate": 0.3333333333333333,
+                    "attempts": 15,
+                    "solved": 2,
+                    "rate": 0.13333333333333333,
                     "tasks": 1,
-                    "inputTokens": 159915,
-                    "outputTokens": 10463,
-                    "cacheHitRate": 0.9599766542642445,
-                    "cost": 0.007698193999999999,
-                    "costIsUpperBound": false
+                    "inputTokens": 238074,
+                    "outputTokens": 13213,
+                    "cacheHitRate": 0.9479105206931748,
+                    "cost": 0.0104649876,
+                    "outputCostShare": 0.7575546482252878,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -268,18 +978,22 @@
                     "outputTokens": 14171,
                     "cacheHitRate": 0.9745888874601746,
                     "cost": 0.011645587999999998,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.7301219998509307,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 2,
-                    "solved": 1,
-                    "rate": 0.5,
+                    "attempts": 5,
+                    "solved": 2,
+                    "rate": 0.4,
                     "tasks": 1,
-                    "inputTokens": 770359,
-                    "outputTokens": 20107,
-                    "cacheHitRate": null,
-                    "cost": 0.12761767499999999,
-                    "costIsUpperBound": true
+                    "inputTokens": 664904,
+                    "outputTokens": 23096,
+                    "cacheHitRate": 0.9545084549647831,
+                    "cost": 0.020813656,
+                    "outputCostShare": 0.7232559238991939,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -287,26 +1001,30 @@
             "task": "extract-elf",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 3,
-                    "rate": 1,
+                    "attempts": 15,
+                    "solved": 11,
+                    "rate": 0.7333333333333333,
                     "tasks": 1,
-                    "inputTokens": 1622660,
-                    "outputTokens": 28986,
-                    "cacheHitRate": 0.9409670830543846,
-                    "cost": 0.036340757999999994,
-                    "costIsUpperBound": false
+                    "inputTokens": 1268834,
+                    "outputTokens": 31434,
+                    "cacheHitRate": 0.931949658986178,
+                    "cost": 0.035359438800000004,
+                    "outputCostShare": 0.533387424689557,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 2,
-                    "rate": 0.6666666666666666,
+                    "attempts": 15,
+                    "solved": 9,
+                    "rate": 0.6,
                     "tasks": 1,
-                    "inputTokens": 923640,
-                    "outputTokens": 26850,
-                    "cacheHitRate": 0.9184296484814977,
-                    "cost": 0.029955945999999997,
-                    "costIsUpperBound": false
+                    "inputTokens": 945483,
+                    "outputTokens": 35584,
+                    "cacheHitRate": 0.9271397697826509,
+                    "cost": 0.0343136856,
+                    "outputCostShare": 0.6222205404831245,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -317,18 +1035,22 @@
                     "outputTokens": 23732,
                     "cacheHitRate": 0.9489090042076915,
                     "cost": 0.02257811,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6306683774682647,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 2,
-                    "rate": 0.6666666666666666,
+                    "attempts": 6,
+                    "solved": 3,
+                    "rate": 0.5,
                     "tasks": 1,
-                    "inputTokens": 610341,
-                    "outputTokens": 73087,
-                    "cacheHitRate": null,
-                    "cost": 0.1354035,
-                    "costIsUpperBound": true
+                    "inputTokens": 682839,
+                    "outputTokens": 81826,
+                    "cacheHitRate": 0.9442359036367889,
+                    "cost": 0.062796748,
+                    "outputCostShare": 0.8653155096502768,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -336,26 +1058,30 @@
             "task": "fix-git",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 46023,
-                    "outputTokens": 2694,
-                    "cacheHitRate": 0.8130427539853262,
-                    "cost": 0.003019306,
-                    "costIsUpperBound": false
+                    "inputTokens": 50205,
+                    "outputTokens": 2860,
+                    "cacheHitRate": 0.8286005282328367,
+                    "cost": 0.00313153,
+                    "outputCostShare": 0.5479621782323657,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 63386,
-                    "outputTokens": 2324,
-                    "cacheHitRate": 0.8615947706918947,
-                    "cost": 0.0028743899999999997,
-                    "costIsUpperBound": false
+                    "inputTokens": 80859,
+                    "outputTokens": 3476,
+                    "cacheHitRate": 0.9069601394369425,
+                    "cost": 0.0034341063999999994,
+                    "outputCostShare": 0.607331211403351,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -366,18 +1092,22 @@
                     "outputTokens": 11648,
                     "cacheHitRate": 0.9483834999539922,
                     "cost": 0.011879086000000002,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.5883365100648315,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 3,
-                    "rate": 1,
+                    "attempts": 6,
+                    "solved": 5,
+                    "rate": 0.8333333333333334,
                     "tasks": 1,
-                    "inputTokens": 237304,
-                    "outputTokens": 4481,
-                    "cacheHitRate": null,
-                    "cost": 0.03828425,
-                    "costIsUpperBound": true
+                    "inputTokens": 235090,
+                    "outputTokens": 6660,
+                    "cacheHitRate": 0.8995930589570686,
+                    "cost": 0.00943883,
+                    "outputCostShare": 0.5618281079328687,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -385,26 +1115,30 @@
             "task": "hf-model-inference",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 3,
-                    "rate": 1,
+                    "attempts": 15,
+                    "solved": 14,
+                    "rate": 0.9333333333333333,
                     "tasks": 1,
-                    "inputTokens": 39166,
-                    "outputTokens": 2993,
-                    "cacheHitRate": 0.9194369265859844,
-                    "cost": 0.002377132,
-                    "costIsUpperBound": false
+                    "inputTokens": 32446,
+                    "outputTokens": 2621,
+                    "cacheHitRate": 0.8963132362278015,
+                    "cost": 0.0021641947999999998,
+                    "outputCostShare": 0.7265150068746121,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 79996,
-                    "outputTokens": 3618,
-                    "cacheHitRate": 0.9627107909112501,
-                    "cost": 0.0028494899999999997,
-                    "costIsUpperBound": false
+                    "inputTokens": 65629,
+                    "outputTokens": 3057,
+                    "cacheHitRate": 0.9400722241691934,
+                    "cost": 0.002608958,
+                    "outputCostShare": 0.7029319751410332,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -415,18 +1149,22 @@
                     "outputTokens": 5852,
                     "cacheHitRate": 0.9687797005290056,
                     "cost": 0.005768084,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6086769887539779,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 6,
+                    "solved": 6,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 163045,
-                    "outputTokens": 2688,
-                    "cacheHitRate": null,
-                    "cost": 0.0260697,
-                    "costIsUpperBound": true
+                    "inputTokens": 153632,
+                    "outputTokens": 2506,
+                    "cacheHitRate": 0.9419704663487873,
+                    "cost": 0.0030571020000000003,
+                    "outputCostShare": 0.4560528238835341,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -434,26 +1172,30 @@
             "task": "multi-source-data-merger",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 80133,
-                    "outputTokens": 6697,
-                    "cacheHitRate": 0.8785430827211541,
-                    "cost": 0.0056895,
-                    "costIsUpperBound": false
+                    "inputTokens": 66321,
+                    "outputTokens": 6077,
+                    "cacheHitRate": 0.8787912599352045,
+                    "cost": 0.005026578,
+                    "outputCostShare": 0.7253284441224229,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 45750,
-                    "outputTokens": 4236,
-                    "cacheHitRate": 0.874789615953486,
-                    "cost": 0.003520714,
-                    "costIsUpperBound": false
+                    "inputTokens": 62674,
+                    "outputTokens": 5953,
+                    "cacheHitRate": 0.9106056351212206,
+                    "cost": 0.0045832927999999995,
+                    "outputCostShare": 0.779282528054939,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -464,18 +1206,22 @@
                     "outputTokens": 8757,
                     "cacheHitRate": 0.966754783598744,
                     "cost": 0.006990628,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.751606293454608,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 6,
+                    "solved": 6,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 114317,
-                    "outputTokens": 5404,
-                    "cacheHitRate": null,
-                    "cost": 0.020389749999999998,
-                    "costIsUpperBound": true
+                    "inputTokens": 115628,
+                    "outputTokens": 5405,
+                    "cacheHitRate": 0.8548779271125807,
+                    "cost": 0.006089454,
+                    "outputCostShare": 0.532724280370621,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -483,26 +1229,30 @@
             "task": "prove-plus-comm",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 3,
-                    "rate": 1,
+                    "attempts": 15,
+                    "solved": 13,
+                    "rate": 0.8666666666666667,
                     "tasks": 1,
-                    "inputTokens": 15104,
-                    "outputTokens": 1357,
-                    "cacheHitRate": 0.8389645355637455,
-                    "cost": 0.001217066,
-                    "costIsUpperBound": false
+                    "inputTokens": 23193,
+                    "outputTokens": 2327,
+                    "cacheHitRate": 0.8911271314085981,
+                    "cost": 0.0018368032000000002,
+                    "outputCostShare": 0.7600378744984763,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 51874,
-                    "outputTokens": 2736,
-                    "cacheHitRate": 0.9393076769844687,
-                    "cost": 0.002260226,
-                    "costIsUpperBound": false
+                    "inputTokens": 43613,
+                    "outputTokens": 2367,
+                    "cacheHitRate": 0.9010226386829514,
+                    "cost": 0.0021857480000000004,
+                    "outputCostShare": 0.6498278850077867,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -513,18 +1263,22 @@
                     "outputTokens": 3091,
                     "cacheHitRate": 0.9224800632229326,
                     "cost": 0.003992079999999999,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.46461994749604213,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 6,
+                    "solved": 6,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 145996,
-                    "outputTokens": 3133,
-                    "cacheHitRate": null,
-                    "cost": 0.023779349999999994,
-                    "costIsUpperBound": true
+                    "inputTokens": 114925,
+                    "outputTokens": 2519,
+                    "cacheHitRate": 0.8654844531368012,
+                    "cost": 0.0030524729999999996,
+                    "outputCostShare": 0.3743849658948663,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -532,26 +1286,30 @@
             "task": "pytorch-model-cli",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 1,
-                    "rate": 0.3333333333333333,
+                    "attempts": 15,
+                    "solved": 2,
+                    "rate": 0.13333333333333333,
                     "tasks": 1,
-                    "inputTokens": 176119,
-                    "outputTokens": 9586,
-                    "cacheHitRate": 0.9065368556925418,
-                    "cost": 0.008699676000000002,
-                    "costIsUpperBound": false
+                    "inputTokens": 185077,
+                    "outputTokens": 8903,
+                    "cacheHitRate": 0.9173889488839596,
+                    "cost": 0.008144452600000001,
+                    "outputCostShare": 0.6558672832106606,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 0,
-                    "rate": 0,
+                    "attempts": 15,
+                    "solved": 1,
+                    "rate": 0.06666666666666667,
                     "tasks": 1,
-                    "inputTokens": 269196,
-                    "outputTokens": 11735,
-                    "cacheHitRate": 0.9661944380124048,
-                    "cost": 0.009186338,
-                    "costIsUpperBound": false
+                    "inputTokens": 283092,
+                    "outputTokens": 12326,
+                    "cacheHitRate": 0.955059442297652,
+                    "cost": 0.010115180399999998,
+                    "outputCostShare": 0.7311505783920573,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -562,18 +1320,22 @@
                     "outputTokens": 18327,
                     "cacheHitRate": 0.9682748970750478,
                     "cost": 0.01669194,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6587550638212214,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 1,
-                    "rate": 0.3333333333333333,
+                    "attempts": 6,
+                    "solved": 3,
+                    "rate": 0.5,
                     "tasks": 1,
-                    "inputTokens": 741123,
-                    "outputTokens": 27793,
-                    "cacheHitRate": null,
-                    "cost": 0.1278445,
-                    "costIsUpperBound": true
+                    "inputTokens": 793925,
+                    "outputTokens": 29600,
+                    "cacheHitRate": 0.969958845468553,
+                    "cost": 0.025122972000000004,
+                    "outputCostShare": 0.7500545715690005,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -581,26 +1343,30 @@
             "task": "raman-fitting",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 2,
-                    "rate": 0.6666666666666666,
-                    "tasks": 1,
-                    "inputTokens": 1895154,
-                    "outputTokens": 74911,
-                    "cacheHitRate": 0.9446467049901495,
-                    "cost": 0.066052602,
-                    "costIsUpperBound": false
-                },
-                "jev": {
-                    "attempts": 3,
-                    "solved": 1,
+                    "attempts": 15,
+                    "solved": 5,
                     "rate": 0.3333333333333333,
                     "tasks": 1,
-                    "inputTokens": 1427362,
-                    "outputTokens": 77834,
-                    "cacheHitRate": 0.9273986854534648,
-                    "cost": 0.06621605000000001,
-                    "costIsUpperBound": false
+                    "inputTokens": 1386992,
+                    "outputTokens": 57929,
+                    "cacheHitRate": 0.9491003121286629,
+                    "cost": 0.049296404,
+                    "outputCostShare": 0.7050737412814126,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
+                },
+                "jev": {
+                    "attempts": 15,
+                    "solved": 6,
+                    "rate": 0.4,
+                    "tasks": 1,
+                    "inputTokens": 1056614,
+                    "outputTokens": 49571,
+                    "cacheHitRate": 0.9427405043556103,
+                    "cost": 0.041806359200000004,
+                    "outputCostShare": 0.7114429615291636,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -611,18 +1377,22 @@
                     "outputTokens": 91715,
                     "cacheHitRate": 0.9758095282016158,
                     "cost": 0.073557219,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.7481114803973219,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
+                    "attempts": 6,
                     "solved": 0,
                     "rate": 0,
                     "tasks": 1,
-                    "inputTokens": 1163851,
-                    "outputTokens": 133137,
-                    "cacheHitRate": null,
-                    "cost": 0.25445999999999996,
-                    "costIsUpperBound": true
+                    "inputTokens": 1197889,
+                    "outputTokens": 110306,
+                    "cacheHitRate": 0.9419773834123919,
+                    "cost": 0.06668849399999999,
+                    "outputCostShare": 0.7870203216764801,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -630,26 +1400,30 @@
             "task": "sanitize-git-repo",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 0,
-                    "rate": 0,
+                    "attempts": 15,
+                    "solved": 3,
+                    "rate": 0.2,
                     "tasks": 1,
-                    "inputTokens": 2050470,
-                    "outputTokens": 36692,
-                    "cacheHitRate": 0.9247390313341219,
-                    "cost": 0.050851898000000006,
-                    "costIsUpperBound": false
+                    "inputTokens": 1427093,
+                    "outputTokens": 24449,
+                    "cacheHitRate": 0.9145797358882831,
+                    "cost": 0.0368704512,
+                    "outputCostShare": 0.39786548638710445,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
-                    "rate": 1,
+                    "attempts": 15,
+                    "solved": 11,
+                    "rate": 0.7333333333333333,
                     "tasks": 1,
-                    "inputTokens": 672892,
-                    "outputTokens": 13765,
-                    "cacheHitRate": 0.9031816382710062,
-                    "cost": 0.019854682,
-                    "costIsUpperBound": false
+                    "inputTokens": 930607,
+                    "outputTokens": 17839,
+                    "cacheHitRate": 0.9081892099060828,
+                    "cost": 0.0260551408,
+                    "outputCostShare": 0.4108087567886026,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -660,18 +1434,22 @@
                     "outputTokens": 18657,
                     "cacheHitRate": 0.9353269742434378,
                     "cost": 0.024917283999999998,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.44926244770497453,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 1,
+                    "attempts": 6,
+                    "solved": 2,
                     "rate": 0.3333333333333333,
                     "tasks": 1,
-                    "inputTokens": 900092,
-                    "outputTokens": 14077,
-                    "cacheHitRate": null,
-                    "cost": 0.1434602,
-                    "costIsUpperBound": true
+                    "inputTokens": 882447,
+                    "outputTokens": 12503,
+                    "cacheHitRate": 0.9276320455379417,
+                    "cost": 0.018351655999999997,
+                    "outputCostShare": 0.3573192522789225,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -679,26 +1457,30 @@
             "task": "sqlite-with-gcov",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 185893,
-                    "outputTokens": 7599,
-                    "cacheHitRate": 0.9463238643087947,
-                    "cost": 0.006583843999999999,
-                    "costIsUpperBound": false
+                    "inputTokens": 199928,
+                    "outputTokens": 6091,
+                    "cacheHitRate": 0.9156594687276794,
+                    "cost": 0.0067330568,
+                    "outputCostShare": 0.5427787271897068,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 140864,
-                    "outputTokens": 3949,
-                    "cacheHitRate": 0.906860517946388,
-                    "cost": 0.004720631999999999,
-                    "costIsUpperBound": false
+                    "inputTokens": 194280,
+                    "outputTokens": 4707,
+                    "cacheHitRate": 0.9145636838178927,
+                    "cost": 0.0058472231999999996,
+                    "outputCostShare": 0.4830326983242234,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -709,18 +1491,22 @@
                     "outputTokens": 10018,
                     "cacheHitRate": 0.9713258052649011,
                     "cost": 0.010469604,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.5741382386573551,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 6,
+                    "solved": 6,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 473799,
-                    "outputTokens": 8465,
-                    "cacheHitRate": null,
-                    "cost": 0.07614865,
-                    "costIsUpperBound": true
+                    "inputTokens": 689015,
+                    "outputTokens": 12837,
+                    "cacheHitRate": 0.9589990765640811,
+                    "cost": 0.018487622000000002,
+                    "outputCostShare": 0.5584817776996955,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -728,26 +1514,30 @@
             "task": "tune-mjcf",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 2,
-                    "rate": 0.6666666666666666,
+                    "attempts": 15,
+                    "solved": 8,
+                    "rate": 0.5333333333333333,
                     "tasks": 1,
-                    "inputTokens": 255898,
-                    "outputTokens": 18388,
-                    "cacheHitRate": 0.974056035420409,
-                    "cost": 0.012776626,
-                    "costIsUpperBound": false
+                    "inputTokens": 230937,
+                    "outputTokens": 15211,
+                    "cacheHitRate": 0.9050012745171341,
+                    "cost": 0.0130446852,
+                    "outputCostShare": 0.699662725475353,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 2,
-                    "rate": 0.6666666666666666,
+                    "attempts": 15,
+                    "solved": 9,
+                    "rate": 0.6,
                     "tasks": 1,
-                    "inputTokens": 596249,
-                    "outputTokens": 21950,
-                    "cacheHitRate": 0.978919333522665,
-                    "cost": 0.016806639999999998,
-                    "costIsUpperBound": false
+                    "inputTokens": 423680,
+                    "outputTokens": 20627,
+                    "cacheHitRate": 0.9511779483956607,
+                    "cost": 0.0166881256,
+                    "outputCostShare": 0.7416291258018815,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -758,18 +1548,22 @@
                     "outputTokens": 55688,
                     "cacheHitRate": 0.9743045184959854,
                     "cost": 0.048135271,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.6941375691018754,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 1,
+                    "attempts": 6,
+                    "solved": 2,
                     "rate": 0.3333333333333333,
                     "tasks": 1,
-                    "inputTokens": 1507187,
-                    "outputTokens": 61264,
-                    "cacheHitRate": null,
-                    "cost": 0.2628366,
-                    "costIsUpperBound": true
+                    "inputTokens": 1266019,
+                    "outputTokens": 50695,
+                    "cacheHitRate": 0.9699439235557169,
+                    "cost": 0.031677594,
+                    "outputCostShare": 0.760000901583624,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         },
@@ -777,26 +1571,30 @@
             "task": "vulnerable-secret",
             "byHarness": {
                 "pi": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 15,
+                    "solved": 15,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 59631,
-                    "outputTokens": 3422,
-                    "cacheHitRate": 0.7333951949198967,
-                    "cost": 0.0045690999999999996,
-                    "costIsUpperBound": false
+                    "inputTokens": 66029,
+                    "outputTokens": 3377,
+                    "cacheHitRate": 0.8112103598296112,
+                    "cost": 0.0040569012,
+                    "outputCostShare": 0.4994846805734386,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "jev": {
-                    "attempts": 3,
-                    "solved": 3,
-                    "rate": 1,
+                    "attempts": 15,
+                    "solved": 14,
+                    "rate": 0.9333333333333333,
                     "tasks": 1,
-                    "inputTokens": 93122,
-                    "outputTokens": 2646,
-                    "cacheHitRate": 0.9016956190244374,
-                    "cost": 0.003212654,
-                    "costIsUpperBound": false
+                    "inputTokens": 77159,
+                    "outputTokens": 2553,
+                    "cacheHitRate": 0.8823192953776873,
+                    "cost": 0.0030982567999999996,
+                    "outputCostShare": 0.49447160093378956,
+                    "costIsUpperBound": false,
+                    "costAttempts": 15
                 },
                 "omp": {
                     "attempts": 6,
@@ -807,18 +1605,22 @@
                     "outputTokens": 3204,
                     "cacheHitRate": 0.9343093018987809,
                     "cost": 0.004807387,
-                    "costIsUpperBound": false
+                    "outputCostShare": 0.39988459427127465,
+                    "costIsUpperBound": false,
+                    "costAttempts": 6
                 },
                 "claude-code": {
-                    "attempts": 3,
-                    "solved": 3,
+                    "attempts": 6,
+                    "solved": 6,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 213585,
-                    "outputTokens": 3703,
-                    "cacheHitRate": null,
-                    "cost": 0.0342597,
-                    "costIsUpperBound": true
+                    "inputTokens": 232411,
+                    "outputTokens": 3947,
+                    "cacheHitRate": 0.911119661408234,
+                    "cost": 0.00655062,
+                    "outputCostShare": 0.38384152950407746,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 }
             }
         }
@@ -831,6 +1633,6 @@
             "kind": "AgentSetupTimeoutError"
         }
     ],
-    "totalAttempts": 334,
+    "totalAttempts": 685,
     "taskCount": 20
 }

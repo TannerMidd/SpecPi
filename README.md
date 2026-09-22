@@ -79,21 +79,28 @@ price list, with only the harness changing.
 
 <!-- eval-summary -->
 
-**334 scored attempts across 20 tasks and 4 harnesses**,
+**685 scored attempts across 20 tasks and 4 harnesses**,
 all on `deepseek-v4.1-flash`.
 
 | Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |
 | --- | --- | --- | --- | --- | --- |
-| SpecPi + Jev | 62/74 | 0.838 | $0.0125 | 381,153 | 94.5% |
-| Pi (base) | 60/74 | 0.811 | $0.0161 | 512,903 | 93.7% |
+| SpecPi + Jev | 174/230 | 0.757 | $0.0141 | 404,610 | 93.8% |
+| Pi (base) | 165/230 | 0.717 | $0.0159 | 472,620 | 93.2% |
 | Oh My Pi | 90/113 | 0.796 | $0.0216 | 1,103,136 | 97.4% |
-| Claude Code | 56/73 | 0.767 | $0.1128 or less | 630,410 | not measured |
+| Claude Code | 81/112 | 0.723 | $0.0273 | 670,828 | 95.4% |
 
-Solve rate does not separate these harnesses -- Pi against SpecPi + Jev is Fisher
-p = 0.83 -- so the column worth reading is what each one spent reaching the same
-answers. Cost is recomputed from recorded tokens against a dated price file, never
-taken from a harness's self-report. Claude Code's cached share was not recorded on
-this run, so its cost is an upper bound.
+Solve rate does not separate them, pooled or paired: Pi against SpecPi + Jev is Fisher p = 0.40
+pooled and 1.00 paired, and the closest paired comparison of any two harnesses is
+SpecPi + Jev against Claude Code at p = 0.11. Nor can it at this
+sample size -- bare Pi, on unchanged software and the same thirteen tasks, spans
+54-82% across 5 separate sittings, a wider gap than any measured here between two
+harnesses.
+
+The rows pool different sittings, so compare them paired. In the sittings where both ran,
+SpecPi + Jev sent fewer prompt tokens than Pi in 4 of 4 (7–30% fewer),
+and cost less in 3 of 4, by about 7%: output tokens are most of the bill.
+Cost is recomputed from recorded tokens against a dated price file, never taken from a
+harness's self-report, and SpecPi + Jev's excludes the Jev advisor's own calls.
 
 <!-- /eval-summary -->
 

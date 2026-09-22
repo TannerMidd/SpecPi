@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Report Terminal-Bench 2.0 per sitting rather than per run. Bare Pi -- unchanged software, the same thirteen tasks, the same machine -- solved 21, 22, 30, 30 and 32 of 39 across five launches, so a figure from one run is not evidence about a harness. The page pools every sitting, publishes each harness's per-sitting range beside its rate, and charts the spread directly.
+- Compare harnesses only in the sittings where both ran. An earlier reading set two separate runs side by side and showed SpecPi + Jev 30/39 against Pi 22/39; three sittings running both arms in one launch went +5, level, and +6 the other way. Paired, Pi solves 113/156 and SpecPi + Jev 112/156, p = 1.00, and no pair of harnesses separates pooled or paired.
+- Apply the same rule to tokens and cost, which pooling had overstated. Pooled across unpaired sittings SpecPi + Jev looked 11% cheaper than Pi; paired, it sent fewer prompt tokens in all four sittings (7-30%) but cost less in only three, by about 7%, and more in the fourth. Output tokens are 61-73% of every harness's bill at these cache rates, which is why a consistent prompt-token saving barely reaches the cost.
+- Correct Claude Code's cost from the published $0.1128 upper bound to $0.0273 measured. Its cached share went unrecorded before the Messages translation was fixed; measured, it caches at 95.4%. Paired with SpecPi + Jev it sends 1.9x the prompt tokens and costs 2.4x as much, more than its pooled row suggests, because its one measured sitting was SpecPi + Jev's cheapest.
+- Stop plotting an upper bound as a cost. The cost chart filtered by harness, so once Claude Code's overall cost was measured its calibration slice -- which predates the cache fix -- appeared as a bar seven times the others. It filters by slice now.
+- State the builds the benchmark actually ran. The page gave Pi 0.84.4, the version this repository pins for its own tests; every trial reported 0.87.0, and the figure is now read from them. The SpecPi + Jev row spans two layer builds: the 21 Sep sitting's still carried the withdrawn compaction system, switched off for those runs.
+- Say what the SpecPi + Jev cost leaves out. Harbor records the agent's tokens, not the Jev advisor's, so the advisor's calls -- 320 across the arm by its own ledger -- are excluded rather than estimated, against the rule in `evals/prices.json` that a Jev row includes them.
+- Derive every figure the page and README quote. Counts, rates, ranges and p-values in the prose are filled from `terminal-bench-2.json` at load, and `npm run check:site` fails on any slot left empty. The README's hand-written sentence had already gone stale, quoting p = 0.83 after a rerun moved it to 0.40.
+
 ## 0.30.1 - 2026-09-22
 
 - Repair Jev's task context: read the active contract structurally, fall back to the bounded current request, and clear stale context on task, branch and session changes.

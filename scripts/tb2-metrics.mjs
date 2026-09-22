@@ -12,17 +12,21 @@
 //
 // Two numbers are not taken at face value:
 //
-//   Claude Code's cache count is zero in every trial, and that is a gap in the measurement rather
-//   than a finding. It reaches the provider through this repository's Messages/chat-completions
-//   translation, which at the time of these runs emitted input_tokens and output_tokens and never
-//   mapped the provider's cached share back to cache_read_input_tokens. The provider did cache --
-//   Pi and SpecPi see 94% on the same endpoint in the same sitting -- so the figure is published as
-//   null. A zero would read as "Claude Code destroys cache efficiency", which the run does not show.
+//   Claude Code's cache count is zero in every 21 Sep trial, and that is a gap in the measurement
+//   rather than a finding. Its traffic crosses this repository's Messages/chat-completions
+//   translation, which at the time never mapped the provider's cached share back to
+//   cache_read_input_tokens. Those runs are marked noCache below: their cached share is null rather
+//   than zero, and they are left out of Claude Code's cache and cost, which come from the 22 Sep
+//   sitting that ran after the fix. Their tokens and rewards were recorded correctly and still count.
 //
 //   Claude Code's own cost_usd is computed at Anthropic's prices for a model that was DeepSeek, so
 //   it overstates by about two orders of magnitude. Every arm's cost here is recomputed from logged
-//   tokens at the frozen rate instead, and Claude Code's is an upper bound because the cached share
-//   that would discount it is the number above.
+//   tokens at the frozen rate instead.
+//
+// And one cost is left out. Harbor records the agent's tokens, not the Jev advisor's, so the
+// SpecPi + Jev figure is the agent's spend alone. evals/prices.json prices the advisor so that a Jev
+// row never excludes it; this one has to, so the advisor's own ledger is counted instead and the page
+// says what is missing rather than folding in a guess.
 //
 // Usage: node scripts/tb2-metrics.mjs [runs-root]
 
@@ -41,16 +45,47 @@ const DEFAULT_RUNS = "F:/Development/tb-bench/runs";
 // Named explicitly rather than globbed, for the reason the tier suite learned the hard way: the
 // runs directory also holds earlier sittings on other models and other task sets, and a pattern
 // wide enough to catch this experiment catches those too.
+//
+// One entry per sitting, not per arm. A sitting is one launch: the arms inside it faced the same
+// provider state, the same container churn and the same hour, and only a comparison within one is
+// attributable to the harness.
+//
+// Recording them separately is the point. Bare Pi -- unchanged software, identical tasks, same
+// machine -- scored 30, 22, 21, 30 and 32 of 39 across the five sittings below. An eleven-solve
+// spread from one harness against itself is wider than any gap measured between harnesses here, so
+// a single sitting cannot support a claim about either.
 const SOURCES = [
-    { slice: "slice1", arm: "pi", dir: "tb2-pair-20260921-131712/pi" },
-    { slice: "slice1", arm: "jev", dir: "tb2-pair-20260921-131712/jev" },
-    { slice: "slice1", arm: "omp", dir: "tb2-omp-slice1-20260921-180429" },
-    { slice: "slice1", arm: "claude-code", dir: "tb2-cc-slice1-20260921-150054" },
-    { slice: "widen", arm: "pi", dir: "tb2-widen-20260921-142615/pi" },
-    { slice: "widen", arm: "jev", dir: "tb2-widen-20260921-142615/jev" },
-    { slice: "widen", arm: "omp", dir: "tb2-omp-widen-20260921-184339" },
-    { slice: "widen", arm: "claude-code", dir: "tb2-cc-widen-20260921-165619" },
+    // 2026-09-21
+    { sitting: "s1", slice: "slice1", arm: "pi", dir: "tb2-pair-20260921-131712/pi" },
+    { sitting: "s1", slice: "slice1", arm: "jev", dir: "tb2-pair-20260921-131712/jev" },
+    { sitting: "s1", slice: "slice1", arm: "omp", dir: "tb2-omp-slice1-20260921-180429" },
+    // Both 21 Sep Claude Code runs predate the cache-mapping fix; noCache keeps them out of its cost.
+    { sitting: "s1", slice: "slice1", arm: "claude-code", dir: "tb2-cc-slice1-20260921-150054", noCache: true },
+    { sitting: "s1", slice: "widen", arm: "pi", dir: "tb2-widen-20260921-142615/pi" },
+    { sitting: "s1", slice: "widen", arm: "jev", dir: "tb2-widen-20260921-142615/jev" },
+    { sitting: "s1", slice: "widen", arm: "omp", dir: "tb2-omp-widen-20260921-184339" },
+    { sitting: "s1", slice: "widen", arm: "claude-code", dir: "tb2-cc-widen-20260921-165619", noCache: true },
+
+    // 2026-09-22
+    { sitting: "s2", slice: "widen", arm: "jev", dir: "tb2-jevcc-20260922-002420/jev" },
+    { sitting: "s2", slice: "widen", arm: "claude-code", dir: "tb2-jevcc-20260922-002420/claude-code" },
+    { sitting: "s3", slice: "widen", arm: "pi", dir: "tb2-picontrol-20260922-075714/pi" },
+    { sitting: "s4", slice: "widen", arm: "pi", dir: "tb2-rep1-20260922-084504/pi" },
+    { sitting: "s4", slice: "widen", arm: "jev", dir: "tb2-rep1-20260922-084504/jev" },
+    { sitting: "s5", slice: "widen", arm: "pi", dir: "tb2-rep2-20260922-094001/pi" },
+    { sitting: "s5", slice: "widen", arm: "jev", dir: "tb2-rep2-20260922-094001/jev" },
+    { sitting: "s6", slice: "widen", arm: "pi", dir: "tb2-rep3-20260922-103224/pi" },
+    { sitting: "s6", slice: "widen", arm: "jev", dir: "tb2-rep3-20260922-103224/jev" },
 ];
+
+const SITTINGS = {
+    s1: "21 Sep",
+    s2: "22 Sep · a",
+    s3: "22 Sep · b",
+    s4: "22 Sep · c",
+    s5: "22 Sep · d",
+    s6: "22 Sep · e",
+};
 
 const SLICES = [
     {
@@ -86,7 +121,6 @@ const DROP_TASKS = new Set(["pytorch-model-recovery"]);
 // the 39 belonging to whichever launch finished last, which is why its mean and this one differ.
 // One caveat travels with them: the two launches were in flight together at concurrency six each,
 // so that slice was measured at twelve-way concurrency, and its timeouts may owe something to that.
-const CACHE_UNMEASURED = new Set(["claude-code"]);
 
 function trials(runsRoot, dir) {
     const found = [];
@@ -116,6 +150,38 @@ function costOf(rate, inputTokens, cacheTokens, outputTokens) {
     const fresh = Math.max(0, inputTokens - cacheTokens);
 
     return (fresh * rate.inputPerMTok + cacheTokens * rate.cacheReadPerMTok + outputTokens * rate.outputPerMTok) / 1e6;
+}
+
+// The Jev arm's per-trial records. jev-setup.json shows which layer build was installed: 0.30.0 dropped
+// the compaction budget along with the system, so a setup that still lists one ran an earlier build
+// with the withdrawn system present, switched off for these runs. The transmission ledger is the only
+// record of the advisor's own calls, which Harbor's token counts do not include.
+function readLayer(agentDir) {
+    let carriesCompaction = null;
+    try {
+        const setup = JSON.parse(fs.readFileSync(path.join(agentDir, "jev-setup.json"), "utf8"));
+        carriesCompaction = Object.hasOwn(setup.budgets ?? {}, "compaction");
+    } catch {
+        // No setup record: the build is unknown rather than assumed.
+    }
+
+    let calls = 0;
+    let stateBytes = 0;
+    try {
+        for (const line of fs.readFileSync(path.join(agentDir, "jev-transmissions.jsonl"), "utf8").split(/\r?\n/u)) {
+            if (!line.trim()) {
+                continue;
+            }
+
+            const entry = JSON.parse(line);
+            calls += 1;
+            stateBytes += entry.stateBytes ?? 0;
+        }
+    } catch {
+        // An attempt the advisor never called writes no ledger.
+    }
+
+    return { carriesCompaction, calls, stateBytes };
 }
 
 function readTrials(runsRoot, rate) {
@@ -149,8 +215,10 @@ function readTrials(runsRoot, rate) {
             const agent = trial.agent_result ?? {};
             const inputTokens = agent.n_input_tokens ?? 0;
             const outputTokens = agent.n_output_tokens ?? 0;
-            const cacheTokens = CACHE_UNMEASURED.has(source.arm) ? null : (agent.n_cache_tokens ?? 0);
+            const cacheTokens = source.noCache ? null : (agent.n_cache_tokens ?? 0);
+            const layer = source.arm === "jev" ? readLayer(path.join(path.dirname(file), "agent")) : null;
             rows.push({
+                sitting: source.sitting,
                 slice: source.slice,
                 arm: source.arm,
                 task,
@@ -159,12 +227,64 @@ function readTrials(runsRoot, rate) {
                 outputTokens,
                 cacheTokens,
                 cost: costOf(rate, inputTokens, cacheTokens ?? 0, outputTokens),
+                outputCost: (outputTokens * rate.outputPerMTok) / 1e6,
                 costIsUpperBound: cacheTokens === null,
+                // What the trial reports it ran, so the page can say which Pi it measured rather
+                // than restating the version this repository happens to pin for its own tests.
+                agentVersion: trial.agent_info?.version ?? null,
+                layer,
             });
         }
     }
 
     return { rows, errors };
+}
+
+// Fisher's exact test, two-tailed. The page and the README both quote these, and a quoted p-value
+// that is not recomputed from the run it describes is the fastest thing on a page to go stale --
+// this one already did, surviving a rerun that moved it from 0.83 to 0.40.
+function logFactorial(n) {
+    let total = 0;
+    for (let i = 2; i <= n; i += 1) {
+        total += Math.log(i);
+    }
+
+    return total;
+}
+
+function hypergeometric(a, b, c, d) {
+    return Math.exp(
+        logFactorial(a + b) +
+            logFactorial(c + d) +
+            logFactorial(a + c) +
+            logFactorial(b + d) -
+            logFactorial(a + b + c + d) -
+            logFactorial(a) -
+            logFactorial(b) -
+            logFactorial(c) -
+            logFactorial(d),
+    );
+}
+
+function fisherExact(a, b, c, d) {
+    const total = a + b + c + d;
+    const observed = hypergeometric(a, b, c, d);
+    let p = 0;
+    for (let i = 0; i <= Math.min(a + b, a + c); i += 1) {
+        const j = a + b - i;
+        const k = a + c - i;
+        const l = total - i - j - k;
+        if (j < 0 || k < 0 || l < 0) {
+            continue;
+        }
+
+        const q = hypergeometric(i, j, k, l);
+        if (q <= observed * 1.0000001) {
+            p += q;
+        }
+    }
+
+    return p;
 }
 
 function summarize(rows) {
@@ -180,6 +300,10 @@ function summarize(rows) {
     const cacheTokens = cached.reduce((total, row) => total + row.cacheTokens, 0);
     const cachedInput = cached.reduce((total, row) => total + row.inputTokens, 0);
 
+    // Price the attempts whose cached share was recorded. Where none were, every prompt token bills
+    // fresh and the result is an upper bound rather than a cost -- said so, rather than averaged in.
+    const priced = cached.length > 0 ? cached : rows;
+
     return {
         attempts,
         solved,
@@ -187,11 +311,89 @@ function summarize(rows) {
         tasks: new Set(rows.map((row) => row.task)).size,
         inputTokens: Math.round(inputTokens / attempts),
         outputTokens: Math.round(outputTokens / attempts),
-        // Null rather than zero: see the header. A cached share of nothing and a cached share
-        // nobody recorded are different claims, and only one of them is supported.
+        // Null rather than zero: a cached share of nothing and a cached share nobody recorded are
+        // different claims, and only one of them is supported.
         cacheHitRate: cachedInput > 0 ? cacheTokens / cachedInput : null,
-        cost: rows.reduce((total, row) => total + row.cost, 0) / attempts,
-        costIsUpperBound: rows.some((row) => row.costIsUpperBound),
+        cost: priced.reduce((total, row) => total + row.cost, 0) / priced.length,
+        // At a 93% cache rate most prompt tokens bill at the cache-read price, so output is most of
+        // the spend. This is why a consistent prompt-token saving shows up so faintly in cost.
+        outputCostShare:
+            priced.reduce((total, row) => total + row.outputCost, 0) /
+            priced.reduce((total, row) => total + row.cost, 0),
+        costIsUpperBound: cached.length === 0,
+        // How much of the row the cost covers, so a figure drawn from a subset says so.
+        costAttempts: priced.length,
+    };
+}
+
+// Two harnesses compared only in the sittings where both ran in the same launch. This is the page's
+// own rule -- a sitting moves bare Pi by eleven solves, so a gap between rows drawn from different
+// sittings is partly the hour -- and it has to govern cost and tokens as much as solve rate. Pooling
+// every sitting had SpecPi + Jev 11% cheaper than Pi; paired, it is cheaper in three of four sittings,
+// by about half that, and dearer in the fourth.
+//
+// Ratios are summarised by their geometric mean, the average that treats "half as much" and "twice
+// as much" as equal and opposite. Cost is compared only where both sides recorded a cached share.
+function geometricMean(values) {
+    return Math.exp(values.reduce((total, value) => total + Math.log(value), 0) / values.length);
+}
+
+function pairOf(a, b) {
+    const shared = a.sittings.filter((entry) => b.sittings.some((other) => other.id === entry.id));
+    if (shared.length === 0) {
+        return null;
+    }
+
+    const sittings = shared.map((entry) => {
+        const other = b.sittings.find((candidate) => candidate.id === entry.id);
+        const costComparable = !entry.costIsUpperBound && !other.costIsUpperBound;
+
+        return {
+            id: entry.id,
+            label: entry.label,
+            a: { solved: entry.solved, attempts: entry.attempts, inputTokens: entry.inputTokens, cost: entry.cost },
+            b: { solved: other.solved, attempts: other.attempts, inputTokens: other.inputTokens, cost: other.cost },
+            tokenRatio: entry.inputTokens / other.inputTokens,
+            costRatio: costComparable ? entry.cost / other.cost : null,
+        };
+    });
+    const tokenRatios = sittings.map((entry) => entry.tokenRatio);
+    const costRatios = sittings.map((entry) => entry.costRatio).filter((ratio) => ratio !== null);
+    const sum = (side, key) => sittings.reduce((total, entry) => total + entry[side][key], 0);
+
+    return {
+        a: a.id,
+        b: b.id,
+        sittings,
+        tokens: {
+            sittings: tokenRatios.length,
+            lowerIn: tokenRatios.filter((ratio) => ratio < 1).length,
+            low: Math.min(...tokenRatios),
+            high: Math.max(...tokenRatios),
+            typical: geometricMean(tokenRatios),
+        },
+        cost:
+            costRatios.length > 0
+                ? {
+                      sittings: costRatios.length,
+                      lowerIn: costRatios.filter((ratio) => ratio < 1).length,
+                      low: Math.min(...costRatios),
+                      high: Math.max(...costRatios),
+                      typical: geometricMean(costRatios),
+                  }
+                : null,
+        solved: {
+            a: sum("a", "solved"),
+            b: sum("b", "solved"),
+            attemptsA: sum("a", "attempts"),
+            attemptsB: sum("b", "attempts"),
+            p: fisherExact(
+                sum("a", "solved"),
+                sum("a", "attempts") - sum("a", "solved"),
+                sum("b", "solved"),
+                sum("b", "attempts") - sum("b", "solved"),
+            ),
+        },
     };
 }
 
@@ -210,10 +412,36 @@ function main() {
 
     const harnesses = HARNESSES.map((harness) => {
         const mine = rows.filter((row) => row.arm === harness.id);
+        const widened = mine.filter((row) => row.slice === "widen");
+
+        // One row per sitting on the widened slice. This is the spread the page is about: the same
+        // harness, the same tasks, a different hour.
+        const sittings = Object.keys(SITTINGS)
+            .map((id) => {
+                const inSitting = widened.filter((row) => row.sitting === id);
+                const layers = inSitting.map((row) => row.layer).filter(Boolean);
+
+                return {
+                    id,
+                    label: SITTINGS[id],
+                    ...(summarize(inSitting) ?? {}),
+                    ...(layers.length > 0
+                        ? { carriesCompaction: layers.some((layer) => layer.carriesCompaction === true) }
+                        : {}),
+                };
+            })
+            .filter((entry) => entry.attempts > 0);
+        const rates = sittings.map((entry) => entry.rate);
 
         return {
             ...harness,
             overall: summarize(mine),
+            widened: summarize(widened),
+            sittings,
+            // Named as a range rather than a deviation: with three to five sittings the spread is
+            // the honest summary and a standard deviation would dress it up as more than it is.
+            spread:
+                rates.length > 1 ? { low: Math.min(...rates), high: Math.max(...rates), sittings: rates.length } : null,
             slices: Object.fromEntries(
                 SLICES.map((slice) => [slice.id, summarize(mine.filter((row) => row.slice === slice.id))]).filter(
                     ([, summary]) => summary !== null,
@@ -246,7 +474,57 @@ function main() {
         rate,
         pricedAt: prices.pricedAt,
         slices: SLICES,
+        sittingLabels: SITTINGS,
         harnesses,
+        // The Pi build every Pi-derived trial reported. The page used to state the version this
+        // repository pins for its own tests, which is not the one the benchmark installed.
+        piVersions: [
+            ...new Set(
+                rows
+                    .filter((row) => row.arm === "pi" || row.arm === "jev")
+                    .map((row) => row.agentVersion)
+                    .filter(Boolean),
+            ),
+        ].sort(),
+        // Which Jev sittings ran a layer build that still carried the withdrawn compaction system.
+        jevBuilds: (() => {
+            const jev = harnesses.find((harness) => harness.id === "jev");
+            const sittings = jev?.sittings ?? [];
+
+            return {
+                withCompaction: sittings.filter((entry) => entry.carriesCompaction).map((entry) => entry.label),
+                withoutCompaction: sittings
+                    .filter((entry) => entry.carriesCompaction === false)
+                    .map((entry) => entry.label),
+            };
+        })(),
+        // The advisor's own calls, which the SpecPi + Jev cost cannot include. Counted from its ledger,
+        // with its listed price, so the page can say what is missing without estimating it.
+        advisor: (() => {
+            const layers = rows.filter((row) => row.layer).map((row) => row.layer);
+
+            return {
+                calls: layers.reduce((total, layer) => total + layer.calls, 0),
+                attemptsWithCalls: layers.filter((layer) => layer.calls > 0).length,
+                attempts: layers.length,
+                stateBytes: layers.reduce((total, layer) => total + layer.stateBytes, 0),
+                rate: prices.models["jev-1.13.0"] ?? null,
+            };
+        })(),
+        paired: harnesses.flatMap((a, index) => harnesses.slice(index + 1).map((b) => pairOf(a, b))).filter(Boolean),
+        // Every pair, so no quoted comparison has to be maintained by hand.
+        comparisons: harnesses.flatMap((a, index) =>
+            harnesses.slice(index + 1).map((b) => ({
+                a: a.id,
+                b: b.id,
+                p: fisherExact(
+                    a.overall.solved,
+                    a.overall.attempts - a.overall.solved,
+                    b.overall.solved,
+                    b.overall.attempts - b.overall.solved,
+                ),
+            })),
+        ),
         tasks,
         errors,
         totalAttempts: rows.length,
@@ -260,10 +538,14 @@ function main() {
     );
     for (const harness of harnesses) {
         const cache = harness.overall.cacheHitRate;
+        const spread = harness.spread
+            ? `  sittings ${harness.spread.sittings}: ${(harness.spread.low * 100).toFixed(0)}-${(harness.spread.high * 100).toFixed(0)}%`
+            : "";
         process.stdout.write(
             `  ${harness.label.padEnd(14)} ${String(harness.overall.solved).padStart(3)}/${String(harness.overall.attempts).padEnd(3)}` +
                 ` ${harness.overall.rate.toFixed(3)}  cache ${cache === null ? "  n/m" : `${(cache * 100).toFixed(1)}%`}` +
-                `  $${harness.overall.cost.toFixed(4)}/attempt${harness.overall.costIsUpperBound ? " (upper bound)" : ""}\n`,
+                `  $${harness.overall.cost.toFixed(4)}/attempt${harness.overall.costIsUpperBound ? " (upper bound)" : ""}${spread}
+`,
         );
     }
 }
