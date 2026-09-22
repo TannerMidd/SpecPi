@@ -81,6 +81,7 @@ const pi: any = {
         messages.push({ message, options });
     },
     events: {
+        on() {},
         emit(name: string, data: any) {
             emitted.push({ name, data });
         },

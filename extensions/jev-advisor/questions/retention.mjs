@@ -19,12 +19,10 @@
 // ungated, and specifically `relevance-low-confidence` -- Jev answered, and reported a confidence
 // below the calibrated 0.60.
 //
-// That is not a threshold to lower. On a deliberately clear-cut case -- a listing of vendor icons
-// during a changelog edit -- confidence is 0.75 to 0.85, so the gate is reachable. On the real
-// reads of a 120-step repair chain, where each result feeds the next step, the model is genuinely
-// unsure whether the output is spent, and it says so. Moving the threshold under a confidence the
-// model did not have would be fitting the gate to make it fire, and this system's asymmetry is the
-// reason not to: carrying a result costs tokens, dropping the wrong one costs the task.
+// Those historical calls did not reliably include the objective or result samples: the old
+// integration could lose both. They establish no benefit, but cannot isolate classifier quality.
+// The repaired inputs need new controlled measurements; the thresholds remain unchanged.
+// Carrying a result costs tokens, while dropping the wrong evidence can cost the task.
 //
 // So the honest statement is that retention does not pay off on this workload, and it is now
 // possible to say that from a report rather than infer it from a cost delta. Whether it pays off on
@@ -39,6 +37,7 @@ import { compact, outline } from "../sanitize.mjs";
 /** Results below this never justify a call: the saving cannot exceed the overhead. */
 export const MIN_RESULT_BYTES = 4096;
 
+// Shell commands are excluded: success does not prove read-only execution or safe re-running.
 // Only tools that observe. A write or edit result is a record of a mutation, and eliding it would
 // hide what the session did to the worktree from every later turn.
 //
@@ -57,8 +56,6 @@ export const ELIGIBLE_TOOLS = Object.freeze(
         "grep",
         "find",
         "ls",
-        "bash",
-        "powershell",
         "web_search",
         "fetch_content",
         "get_search_content",

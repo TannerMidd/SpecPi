@@ -167,14 +167,14 @@ export function thresholdsFor(system) {
 export function nounTrue(answer, system) {
     const limits = thresholdsFor(system);
 
-    return answer?.kind === "noul" && answer.value >= limits.high;
+    return answer?.kind === "noul" && Number.isFinite(answer.value) && answer.value >= limits.high && answer.value <= 1;
 }
 
 /** True when the Noul is confidently no. Not the negation of nounTrue: the middle band is silence. */
 export function nounFalse(answer, system) {
     const limits = thresholdsFor(system);
 
-    return answer?.kind === "noul" && answer.value <= limits.low;
+    return answer?.kind === "noul" && Number.isFinite(answer.value) && answer.value >= 0 && answer.value <= limits.low;
 }
 
 function topTwo(probabilities) {
@@ -193,7 +193,15 @@ function topTwo(probabilities) {
  * the margin is a live test rather than a branch that silently never runs.
  */
 export function choiceValue(answer, system) {
-    if (answer?.kind !== "choice" || typeof answer.confidence !== "number") {
+    if (
+        answer?.kind !== "choice" ||
+        !Number.isFinite(answer.confidence) ||
+        answer.confidence > 1 ||
+        !answer.probabilities ||
+        Array.isArray(answer.probabilities) ||
+        !Object.hasOwn(answer.probabilities, answer.value) ||
+        !Object.values(answer.probabilities).every((value) => Number.isFinite(value) && value >= 0 && value <= 1)
+    ) {
         return undefined;
     }
 
@@ -203,7 +211,7 @@ export function choiceValue(answer, system) {
     }
 
     const { first, second } = topTwo(answer.probabilities);
-    if (answer.probabilities && first - second < limits.margin) {
+    if (answer.probabilities[answer.value] !== first || first - second < limits.margin) {
         return undefined;
     }
 
@@ -215,7 +223,14 @@ export function choiceValue(answer, system) {
  * returned level is the rounded band; callers compare against their own rubric.
  */
 export function scoreLevel(answer, system) {
-    if (answer?.kind !== "score" || typeof answer.confidence !== "number") {
+    if (
+        answer?.kind !== "score" ||
+        !Number.isFinite(answer.confidence) ||
+        answer.confidence > 1 ||
+        !Number.isFinite(answer.value) ||
+        answer.value < 0 ||
+        answer.value > 9
+    ) {
         return undefined;
     }
 

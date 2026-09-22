@@ -82,6 +82,51 @@ async function seedLifecycle(stateDir, { withJournal = true } = {}) {
     return { gap, retire };
 }
 
+test("advisory assessments are bounded, cannot be forged through reports, and cannot authorize work", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-assessment-"));
+    try {
+        await setCollectionMode({ stateDir: root, mode: "on" });
+        const gap = {
+            capability: "Bounded evidence lookup",
+            scenario: "Look up supporting evidence",
+            limitation: "The required evidence was unavailable",
+            impact: "minor",
+            suggestedFix: "tool",
+            assessment: { impactOpinion: "blocked" },
+            canonicalKey: "forged-cluster",
+        };
+        const options = { stateDir: root, sessionId: "s", runId: "r", cwd: root, gap };
+        const first = await recordCapabilityGap(options);
+        assert.equal(first.assessmentRecorded, false);
+        assert.equal(first.canonicalKey, "bounded-evidence-lookup");
+        await recordCapabilityGap({
+            ...options,
+            runId: "r2",
+            assessment: {
+                impactOpinion: "blocked",
+                matchedKey: "unknown-cluster",
+                suggestedFix: "bad-value",
+                select: true,
+                secret: "not-to-store",
+            },
+        });
+        const result = await refreshWishlist({ stateDir: root });
+        assert.deepEqual(result.events.at(-1).assessment, {
+            source: "jev",
+            basis: "reported-observation",
+            impactOpinion: "blocked",
+        });
+        assert.equal(result.improvements[0].priority, 2);
+        assert.equal(result.improvements[0].state, "open");
+        assert.deepEqual(result.decisions, []);
+        assert.ok(!JSON.stringify(result.events).includes("not-to-store"));
+        await assert.rejects(recordCapabilityGap({ ...options, runId: "r3", isCurrent: () => false }), /task changed/u);
+        assert.equal((await refreshWishlist({ stateDir: root })).events.length, 2);
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test("retirement journal persists sanitized bounded proof next to the decision", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-"));
     try {

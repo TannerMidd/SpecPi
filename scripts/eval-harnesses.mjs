@@ -13,6 +13,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_BUDGETS, defaultSettings, normalizeSettings } from "../extensions/jev-advisor/config.mjs";
 import { summarize as summarizeLedger } from "../extensions/jev-advisor/ledger.mjs";
+import { CONSENT_SCHEMA } from "../extensions/jev-advisor/consent.mjs";
 import { runReferenceSolution } from "./eval-tasks.mjs";
 import { prepareFaults, readFaults, withFaultPath } from "./eval-faults.mjs";
 
@@ -1361,8 +1362,9 @@ export const harnessAdapters = {
                 path.join(jevDir, "consent.json"),
                 JSON.stringify(
                     {
-                        schema: 1,
+                        schema: CONSENT_SCHEMA,
                         granted: true,
+                        origin: new URL(proxyUrl).origin,
                         // Must equal endpointLabel() in the advisor, which is the host of the base
                         // URL the advisor will actually post to. Here that is the eval proxy, not
                         // openrouter.ai. A mismatch makes the grant unreadable and the advisor

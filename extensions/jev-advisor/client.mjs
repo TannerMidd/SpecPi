@@ -74,30 +74,51 @@ function unavailable(reason) {
  * A Noul has no confidence, and inventing one would let a caller gate on a number the model never
  * reported, so it stays undefined.
  */
-function normalizeAnswer(raw) {
-    if (!raw || typeof raw !== "object") {
+function normalizeAnswer(raw, question) {
+    if (!raw || typeof raw !== "object" || !question) {
         return undefined;
     }
 
-    if (typeof raw.noul === "number") {
+    const probability = (value) => Number.isFinite(value) && value >= 0 && value <= 1;
+    const confidence = probability(raw.confidence) ? raw.confidence : undefined;
+    const distribution = raw.probabilities;
+    const validDistribution =
+        distribution &&
+        typeof distribution === "object" &&
+        Object.keys(distribution).length > 0 &&
+        Object.values(distribution).every(probability);
+
+    if (question.type === "noul" && probability(raw.noul)) {
         return { kind: "noul", value: raw.noul, probabilities: undefined, confidence: undefined };
     }
 
-    if (typeof raw.choice === "string") {
+    if (question.type === "choice" && typeof raw.choice === "string" && Object.hasOwn(question.criteria, raw.choice)) {
         return {
             kind: "choice",
             value: raw.choice,
-            probabilities: raw.probabilities && typeof raw.probabilities === "object" ? raw.probabilities : undefined,
-            confidence: typeof raw.confidence === "number" ? raw.confidence : undefined,
+            probabilities:
+                validDistribution &&
+                !Array.isArray(distribution) &&
+                Object.keys(distribution).length === Object.keys(question.criteria).length &&
+                Object.keys(distribution).every((key) => Object.hasOwn(question.criteria, key))
+                    ? distribution
+                    : undefined,
+            confidence,
         };
     }
 
-    if (typeof raw.score === "number") {
+    if (
+        question.type === "score" &&
+        Number.isFinite(raw.score) &&
+        raw.score >= 0 &&
+        raw.score <= question.criteria.length - 1
+    ) {
         return {
             kind: "score",
             value: raw.score,
-            probabilities: Array.isArray(raw.probabilities) ? raw.probabilities : undefined,
-            confidence: typeof raw.confidence === "number" ? raw.confidence : undefined,
+            // The documented Score distribution is an object; older routes also return arrays.
+            probabilities: validDistribution ? distribution : undefined,
+            confidence,
         };
     }
 
@@ -143,7 +164,7 @@ export async function ask(state, questions, options = {}) {
         const body = await response.json();
         const answers = {};
         for (const [name, raw] of Object.entries(body?.answers ?? {})) {
-            const normalized = normalizeAnswer(raw);
+            const normalized = normalizeAnswer(raw, Object.hasOwn(questions, name) ? questions[name] : undefined);
             if (normalized) {
                 answers[name] = normalized;
             }

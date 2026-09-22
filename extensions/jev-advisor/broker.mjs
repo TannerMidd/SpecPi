@@ -15,7 +15,7 @@
 import { randomUUID } from "node:crypto";
 import { SYSTEM_NAMES, loadSettings } from "./config.mjs";
 import { ensureConsent } from "./consent.mjs";
-import { buildState } from "./sanitize.mjs";
+import { buildQuestions, buildState } from "./sanitize.mjs";
 import { ask } from "./client.mjs";
 import { payloadDigest, record } from "./ledger.mjs";
 import { writeUsage } from "./usage.mjs";
@@ -164,7 +164,22 @@ export function createBroker(options = {}) {
      * is the only point where the answers and the audit line exist together; its `decision` is
      * handed back so the caller does not gate the same answers twice.
      */
-    const request = async ({ system, state, questions, ctx, root, maxBytes, timeoutMs, signal, decide }) => {
+    const request = async ({
+        system,
+        state,
+        questions,
+        ctx,
+        root,
+        profile,
+        maxBytes,
+        timeoutMs,
+        signal = ctx?.signal,
+        decide,
+        apply,
+        isCurrent = () => true,
+    }) => {
+        const startedGeneration = generation;
+        const currentRequest = () => startedGeneration === generation && !signal?.aborted && isCurrent();
         const settings = readSettings();
         if (!settings.master) {
             return { ok: false, reason: "master-off", answers: {} };
@@ -188,6 +203,25 @@ export function createBroker(options = {}) {
             return { ok: false, reason: "budget-exhausted", answers: {} };
         }
 
+        const built = buildState(state, { root, maxBytes, profile });
+        const wireQuestions = buildQuestions(questions, root);
+        if (!built.ok || !wireQuestions) {
+            const reason = !built.ok ? built.reason : "invalid-questions";
+            // A local abstention is not a transmission and consumes no call budget. Counts and
+            // coverage only: never record the material that could not safely be sent.
+            write({
+                system,
+                sent: false,
+                ok: false,
+                reason,
+                outcome: reason,
+                applied: false,
+                coverage: built.coverage,
+            });
+
+            return { ok: false, reason, answers: {} };
+        }
+
         const consented = await resolveConsent(ctx, SYSTEM_LABELS[system] ?? system);
         if (!consented) {
             return { ok: false, reason: "no-consent", answers: {} };
@@ -195,22 +229,39 @@ export function createBroker(options = {}) {
 
         // Settings can change while the dialog is open, and a session can end under it.
         const current = readSettings();
+        if (!currentRequest()) {
+            return { ok: false, reason: "context-changed", answers: {} };
+        }
+
         if (!current.master || current.systems[system] !== true) {
             return { ok: false, reason: "master-off", answers: {} };
         }
 
-        const built = buildState(state, { root, maxBytes });
-        const questionKeys = Object.keys(questions);
+        // Parallel result hooks can wait on the same consent prompt. Reserve only after rechecking.
+        if ((usedBySystem.get(system) ?? 0) >= current.budgets[system]) {
+            return { ok: false, reason: "system-budget-exhausted", answers: {} };
+        }
+
+        if (callsUsed >= current.budgets.total) {
+            return { ok: false, reason: "budget-exhausted", answers: {} };
+        }
+
+        const questionKeys = Object.keys(wireQuestions);
         callsUsed += 1;
         usedBySystem.set(system, (usedBySystem.get(system) ?? 0) + 1);
-        const startedGeneration = generation;
-        const result = await transport(built.state, questions, { timeoutMs, signal });
+        let result;
+        try {
+            result = await transport(built.state, wireQuestions, { timeoutMs, signal });
+        } catch {
+            result = { ok: false, reason: "transport-error", answers: {} };
+        }
+
         // The session can end under a call that was never awaited, which is the normal shape of a
         // turn-level system: the payload has already left the machine, and the answer now belongs
         // to a session that no longer exists. It must not be acted on. It must still be recorded --
         // the ledger's whole claim is that every transmission appears in it, and a run that sent 44
         // and logged 43 is how this was found. So the line is written either way and says which.
-        const stale = startedGeneration !== generation;
+        let stale = !currentRequest() || !readSettings().master || readSettings().systems[system] !== true;
 
         // A gate that throws must not turn into a failed call: the caller's own catch would have
         // swallowed it anyway, and recording it as unapplied is the truthful line.
@@ -218,17 +269,26 @@ export function createBroker(options = {}) {
         if (!stale && result.ok && typeof decide === "function") {
             try {
                 outcome = decide(result.answers) ?? { applied: false };
+                if (typeof apply === "function") {
+                    const delivered = await apply(outcome.decision);
+                    outcome = { ...outcome, applied: false, ...delivered };
+                }
             } catch {
                 outcome = { applied: false, gateThrew: true };
             }
         }
 
+        // An application may await a dialog or a locked wishlist write. Do not attribute its
+        // delivered effects to a different session if that session changed while awaiting it.
+        stale ||= !currentRequest() || !readSettings().master || readSettings().systems[system] !== true;
         write({
             system,
+            sent: true,
             questionKeys,
+            coverage: built.coverage,
             stateBytes: built.bytes,
             stateTruncated: built.truncated,
-            payloadSha256: payloadDigest({ state: built.state, questions }),
+            payloadSha256: payloadDigest({ state: built.state, questions: wireQuestions }),
             ok: result.ok,
             reason: result.ok ? undefined : result.reason,
             // A sent payload whose answer arrived too late to use. Distinguished from a refusal,
@@ -237,6 +297,7 @@ export function createBroker(options = {}) {
             // Whether the advice changed anything, and what it saved when the change was a
             // shortening. Zero is a real answer here and means "asked, and kept the result whole".
             applied: outcome.applied === true,
+            effects: Array.isArray(outcome.effects) ? outcome.effects : [],
             // And why not, when nothing changed. Without this a system that asks and never acts is
             // indistinguishable from one whose gate can never be satisfied, which is the exact
             // failure the calibration pass had to go looking for by hand.

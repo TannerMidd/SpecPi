@@ -147,9 +147,12 @@ test("system 5 separates a thrashing session from a working one", () => {
     }
 
     for (const [index, value] of mode.values.entries()) {
+        assert.equal(value, "tool-error-loop");
+        // The historical artifact counted distributions but did not retain them. It establishes
+        // the returned label, not whether today's margin gate would admit that response.
         assert.equal(
             choiceValue({ kind: "choice", value, confidence: mode.confidences[index] }, "progress"),
-            "tool-error-loop",
+            undefined,
         );
     }
 

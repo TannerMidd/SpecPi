@@ -15,7 +15,15 @@ import {
     saveSettings,
     settingsPath,
 } from "../extensions/jev-advisor/config.mjs";
-import { consentPath, endpointLabel, granted, revokeConsent, saveConsent } from "../extensions/jev-advisor/consent.mjs";
+import {
+    consentBody,
+    consentPath,
+    endpointLabel,
+    ensureConsent,
+    granted,
+    revokeConsent,
+    saveConsent,
+} from "../extensions/jev-advisor/consent.mjs";
 import {
     apiKey,
     ask,
@@ -29,7 +37,7 @@ import {
 } from "../extensions/jev-advisor/client.mjs";
 import { choiceValue, nounFalse, nounTrue, scoreLevel } from "../extensions/jev-advisor/gate.mjs";
 import { authPath, keyPresent, keySource, keySources, resolveKey } from "../extensions/jev-advisor/key-source.mjs";
-import { ledgerPath, read as readLedger, record } from "../extensions/jev-advisor/ledger.mjs";
+import { ledgerPath, payloadDigest, read as readLedger, record, summarize } from "../extensions/jev-advisor/ledger.mjs";
 import { readUsage, usagePath } from "../extensions/jev-advisor/usage.mjs";
 import { MAX_STATE_BYTES, buildState, looksAbsolute, outline, redact } from "../extensions/jev-advisor/sanitize.mjs";
 import * as retention from "../extensions/jev-advisor/questions/retention.mjs";
@@ -586,6 +594,7 @@ test("answers normalize to one shape and a Noul never gains a confidence it did 
             assert.equal(result.answers.b.value, "billing");
             assert.equal(result.answers.c.kind, "score");
             assert.equal(result.answers.c.value, 1.04);
+            assert.deepEqual(result.answers.c.probabilities, [0.1, 0.8, 0.1]);
         } finally {
             await server.close();
         }
@@ -1060,7 +1069,7 @@ test("retention elides only when both answers are confident and agree", () => {
 
 test("the retention digest keeps head and tail and says the result is recoverable", () => {
     const body = Array.from({ length: 200 }, (_, index) => `row ${index}`).join("\n");
-    const digest = retention.digest(body, { tool: "bash", bytes: Buffer.byteLength(body) });
+    const digest = retention.digest(body, { tool: "read", bytes: Buffer.byteLength(body) });
     assert.ok(digest.includes("row 0"));
     assert.ok(digest.includes("row 199"));
     assert.ok(digest.includes("Re-run"));
@@ -1068,44 +1077,49 @@ test("the retention digest keeps head and tail and says the result is recoverabl
     assert.ok(!digest.includes("row 100"));
 });
 
-test("gap clustering offers every known key under the cardinality cap and falls back above it", () => {
+test("gap clustering shortlists locally and sends only opaque IDs in questions", () => {
     const few = [{ canonicalKey: "scope-drift", title: "Scope drift" }];
-    const options = gap.clusterOptions(few, { capability: "scope", scenario: "drift" });
+    const options = gap.clusterOptions(few);
     assert.ok(Object.hasOwn(options, gap.NEW_CLUSTER));
-    assert.ok(Object.hasOwn(options, "scope-drift"));
+    assert.ok(Object.hasOwn(options, "cluster_0"));
+    assert.ok(!JSON.stringify(options).includes("scope-drift"));
 
     const many = Array.from({ length: 400 }, (_, index) => ({
         canonicalKey: `key-${index}`,
         title: `Problem ${index}`,
     }));
     many.push({ canonicalKey: "browser-screenshot-diff", title: "Browser screenshot diff" });
-    const capped = gap.clusterOptions(many, { capability: "browser screenshot", scenario: "diff" });
-    assert.ok(Object.keys(capped).length <= gap.MAX_CLUSTER_OPTIONS + 1);
-    assert.ok(Object.hasOwn(capped, "browser-screenshot-diff"), "similarity must keep the plausible match in range");
+    const shortlist = gap.shortlist(many, { capability: "browser screenshot", scenario: "diff" });
+    assert.ok(shortlist.length <= gap.MAX_CLUSTER_OPTIONS);
+    assert.ok(shortlist.some((item) => item.canonicalKey === "browser-screenshot-diff"));
+    assert.equal(Object.keys(gap.clusterOptions(shortlist)).length, shortlist.length + 1);
 });
 
-test("gap advice records an independent impact without overwriting the claim", () => {
-    const advice = gap.decide({
-        cluster: {
-            kind: "choice",
-            value: "scope-drift",
-            confidence: 0.9,
-            probabilities: { "scope-drift": 0.9, __new__: 0.05 },
+test("gap advice is a separate opinion and cluster matches are bounded to the shortlist", () => {
+    const advice = gap.decide(
+        {
+            cluster: {
+                kind: "choice",
+                value: "cluster_0",
+                confidence: 0.9,
+                probabilities: { cluster_0: 0.9, __new__: 0.05 },
+            },
+            independent_impact: { kind: "score", value: 0.02, confidence: 0.9 },
+            suggested_fix: { kind: "choice", value: "tool", confidence: 0.9, probabilities: { tool: 0.9, bug: 0.05 } },
+            contains_secret_or_path: { kind: "noul", value: 0.02 },
+            is_transient_or_user_error: { kind: "noul", value: 0.02 },
         },
-        independent_impact: { kind: "score", value: 0.02, confidence: 0.9 },
-        suggested_fix: { kind: "choice", value: "tool", confidence: 0.9, probabilities: { tool: 0.9, bug: 0.05 } },
-        contains_secret_or_path: { kind: "noul", value: 0.02 },
-        is_transient_or_user_error: { kind: "noul", value: 0.02 },
-    });
-    assert.equal(advice.canonicalKey, "scope-drift");
-    assert.equal(advice.independentImpact, "minor");
+        [{ canonicalKey: "scope-drift", title: "Scope drift" }],
+    );
+    assert.equal(advice.matchedKey, "scope-drift");
+    assert.equal(advice.impactOpinion, "minor");
     assert.equal(advice.suggestedFix, "tool");
     assert.equal(advice.blockForSanitization, false);
     assert.equal(advice.transient, false);
 
     const leaking = gap.decide({ contains_secret_or_path: { kind: "noul", value: 0.97 } });
     assert.equal(leaking.blockForSanitization, true);
-    assert.equal(leaking.canonicalKey, undefined);
+    assert.equal(leaking.matchedKey, undefined);
 
     // A "new" cluster must not be written back as a canonical key.
     const fresh = gap.decide({
@@ -1116,7 +1130,7 @@ test("gap advice records an independent impact without overwriting the claim", (
             probabilities: { [gap.NEW_CLUSTER]: 0.95 },
         },
     });
-    assert.equal(fresh.canonicalKey, undefined);
+    assert.equal(fresh.matchedKey, undefined);
 });
 
 test("source ranking orders without dropping and keeps ungated items in place", () => {
@@ -1556,6 +1570,300 @@ test("authoring tools follow the selection, and the observation tool is never wi
 
     assert.equal(syncAuthoringTools(pi, true), false);
     assert.equal(syncAuthoringTools({}, true), false, "an API without the tool accessors is a no-op");
+});
+
+test("required evidence survives budgeting, or the broker abstains without spending a call", async () => {
+    await withAgentDir(async () => {
+        const event = {
+            toolName: "read",
+            input: { path: "src/reader.mjs" },
+            content: [
+                {
+                    type: "text",
+                    text: Array.from({ length: 400 }, (_, i) => `Evidence ${i}: ${"多字节 data ".repeat(25)}`).join(
+                        "\n",
+                    ),
+                },
+            ],
+        };
+        const state = retention.buildInput({
+            event,
+            objective: "Repair the reader",
+            recent: Array.from({ length: 8 }, () => ({ tool: "read", outcome: "kept" })),
+        });
+        const built = buildState(state, { profile: "retention" });
+        assert.equal(built.ok, true);
+        assert.ok(built.bytes <= MAX_STATE_BYTES);
+        assert.equal(built.state.objective, "Repair the reader");
+        for (const field of ["head", "middle", "tail"]) {
+            assert.ok(built.state.result[field].length > 0, field);
+        }
+
+        assert.equal(built.coverage.totalLines, 400);
+        assert.ok(built.coverage.sampledLines > 0);
+        assert.equal(buildState(state, { profile: "retention", maxBytes: 64 }).ok, false);
+        assert.equal(buildState({ ...state, objective: "" }, { profile: "retention" }).ok, false);
+        const longPaths = ["one", "two"].map((name) => ({ path: `${"nested/".repeat(28)}${name}.js` }));
+        const sourceState = buildState(
+            sources.buildInput({ question: "Which file is relevant?", mode: "review", candidates: longPaths }),
+            { profile: "sources" },
+        );
+        assert.equal(sourceState.ok, true);
+        assert.deepEqual(
+            sourceState.state.candidates.map((item) => item.path),
+            longPaths.map((item) => item.path),
+            "candidate filenames are never shortened into identical prefixes",
+        );
+
+        let calls = 0;
+        const records = [];
+        const broker = createBroker({
+            loadSettings: () => enabledSettings(),
+            ensureConsent: async () => true,
+            ask: async () => {
+                calls += 1;
+
+                return { ok: true, answers: {} };
+            },
+            record: (entry) => records.push(entry),
+        });
+        const candidates = Array.from({ length: 40 }, (_, i) => ({ path: `src/module-${i}/a-long-component-file.ts` }));
+        const result = await broker.request({
+            system: "sources",
+            profile: "sources",
+            state: sources.buildInput({ question: "Where is the reader?", mode: "scout", candidates }),
+            questions: sources.questions({ candidates }),
+        });
+        assert.equal(result.reason, "incomplete-evidence");
+        assert.equal(calls, 0);
+        assert.equal(broker.status().callsUsed, 0);
+        assert.equal(records[0].sent, false);
+        assert.equal(records[0].coverage.complete, false);
+        assert.equal(summarize(records).calls, 0);
+        assert.equal(summarize(records).abstentions, 1);
+    });
+});
+
+test("state and question text share the redaction boundary, and hashes describe the wire", async () => {
+    await withAgentDir(async () => {
+        let wire;
+        let entry;
+        const broker = createBroker({
+            loadSettings: () => enabledSettings(),
+            ensureConsent: async () => true,
+            ask: async (state, questions) => {
+                wire = { state, questions };
+
+                return { ok: true, answers: {} };
+            },
+            record: (line) => {
+                entry = line;
+            },
+        });
+        const sensitive =
+            "C:/Users/private/file.txt /outside/file.txt \\\\server\\share\\private.txt https://private.example/x token=abc123";
+        await broker.request({
+            system: "gap",
+            state: { note: sensitive },
+            questions: { q: choice(sensitive, { yes: sensitive, no: "No" }) },
+            root: "F:/workspace",
+        });
+        const body = JSON.stringify(wire);
+        for (const secret of ["private", "outside", "abc123", "server", "share"]) {
+            assert.ok(!body.includes(secret), body);
+        }
+
+        assert.equal(entry.payloadSha256, payloadDigest(wire));
+        assert.equal(redact("F:/workspace/src/a.js", "f:/workspace"), "src/a.js");
+        assert.equal(redact("/workspace/src/a.js", "/workspace"), "src/a.js");
+        assert.equal(redact("/workspace/../private", "/workspace"), "[path]");
+        assert.equal(redact("/workspace-other/private", "/workspace"), "[path]");
+        assert.ok(!redact("ｔｏｋｅｎ＝abc123").includes("abc123"));
+        const qs = sources.questions({ candidates: [{ path: sensitive }] });
+        assert.ok(!JSON.stringify(qs).includes(sensitive));
+        assert.equal(qs.job_mode, undefined, "the job already declares its mode");
+    });
+});
+
+test("old disclosure grants are refused and the renewed dialog names samples and transport", async () => {
+    await withAgentDir(async () => {
+        saveConsent();
+        const old = JSON.parse(fs.readFileSync(consentPath(), "utf8"));
+        fs.writeFileSync(consentPath(), JSON.stringify({ ...old, schema: 1 }));
+        assert.equal(granted(), false);
+        assert.equal(await ensureConsent({ hasUI: false }, "Retention"), false);
+        let prompts = 0;
+        assert.equal(
+            await ensureConsent(
+                {
+                    hasUI: true,
+                    ui: {
+                        confirm: async (_title, body) => {
+                            prompts += 1;
+                            assert.match(body, /file contents, command output/u);
+                            assert.match(body, /best effort/u);
+
+                            return false;
+                        },
+                    },
+                },
+                "Retention",
+            ),
+            false,
+        );
+        assert.equal(prompts, 1);
+        assert.equal(granted(), false);
+        process.env.TYPESAFE_BASE_URL = "http://127.0.0.1:12345";
+        assert.match(consentBody("Retention"), /not HTTPS/u);
+        saveConsent();
+        assert.equal(granted(), true);
+        process.env.TYPESAFE_BASE_URL = "https://127.0.0.1:12345";
+        assert.equal(granted(), false, "a change of transport requires renewed consent even at the same host");
+    });
+});
+
+test("malformed probabilities never pass gates and Score object distributions survive transport", async () => {
+    for (const value of [NaN, Infinity, -Infinity, -1, 2]) {
+        assert.equal(nounTrue({ kind: "noul", value }, "gap"), false);
+        assert.equal(nounFalse({ kind: "noul", value }, "gap"), false);
+    }
+
+    for (const probabilities of [undefined, {}, [], { a: NaN }, { a: 2 }, { a: 0.1, b: 0.9 }]) {
+        assert.equal(choiceValue({ kind: "choice", value: "a", confidence: 0.99, probabilities }, "gap"), undefined);
+    }
+
+    assert.equal(scoreLevel({ kind: "score", value: NaN, confidence: 0.99 }, "gap"), undefined);
+    assert.equal(scoreLevel({ kind: "score", value: 0, confidence: NaN }, "gap"), undefined);
+    await withAgentDir(async () => {
+        process.env.TYPESAFE_API_KEY = "test-key";
+        const server = await startStub((_req, res) => {
+            res.end(
+                JSON.stringify({
+                    answers: {
+                        score: { score: 1.01, confidence: 0.9, probabilities: { 0: 0.01, 1: 0.97, 2: 0.02 } },
+                        wrong: { choice: "unrequested", confidence: 1, probabilities: { unrequested: 1 } },
+                        partial: { choice: "a", confidence: 1, probabilities: { a: 0.51 } },
+                        extra: { noul: 1 },
+                        invalid: { noul: 5 },
+                        mismatch: { score: 1, confidence: 1 },
+                    },
+                }),
+            );
+        });
+        try {
+            process.env.TYPESAFE_BASE_URL = server.url;
+            const result = await ask(
+                {},
+                {
+                    score: score("Level", ["a", "b", "c"]),
+                    wrong: choice("Choose", { a: "a", b: "b" }),
+                    partial: choice("Choose", { a: "a", b: "b" }),
+                    invalid: noul("x"),
+                    mismatch: noul("x"),
+                },
+            );
+            assert.deepEqual(Object.keys(result.answers), ["score", "partial"]);
+            assert.equal(choiceValue(result.answers.partial, "gap"), undefined);
+            assert.deepEqual(result.answers.score.probabilities, { 0: 0.01, 1: 0.97, 2: 0.02 });
+        } finally {
+            await server.close();
+        }
+    });
+});
+
+test("accounting distinguishes a delivered warning from an actual shortening", () => {
+    const summary = summarize([
+        { system: "retention", applied: true, savedBytes: 0, ok: true, effects: ["warning"] },
+        { system: "retention", applied: true, savedBytes: 100, ok: true, effects: ["elision", "warning"] },
+        { system: "retention", applied: true, savedBytes: 0, ok: true },
+    ]);
+    assert.equal(summary.calls, 3);
+    assert.equal(summary.applied, 3);
+    assert.equal(summary.elisions, 1);
+    assert.equal(summary.bytesDropped, 100);
+    for (const toolName of ["bash", "powershell"]) {
+        assert.equal(retention.eligible({ toolName, content: [{ type: "text", text: "x".repeat(5000) }] }), false);
+    }
+
+    const candidates = ["a", "b", "c", "d"].map((path) => ({ path }));
+    const ranked = sources.decide(
+        { source_0: { kind: "score", value: 0, confidence: 1 }, source_3: { kind: "score", value: 2, confidence: 1 } },
+        candidates,
+    );
+    assert.deepEqual(
+        ranked.ordered.map((item) => item.path),
+        ["d", "b", "c", "a"],
+    );
+});
+
+test("concurrent consent cannot overspend budgets or send after the session ends", async () => {
+    await withAgentDir(async () => {
+        let release;
+        const wait = new Promise((resolve) => {
+            release = resolve;
+        });
+        let calls = 0;
+        const broker = createBroker({
+            loadSettings: () => enabledSettings({ budgets: { total: 1, gap: 1 } }),
+            ensureConsent: async () => wait,
+            record: () => {},
+            ask: async () => {
+                calls += 1;
+
+                return { ok: true, answers: {} };
+            },
+        });
+        const first = broker.request(ask1("gap"));
+        const second = broker.request(ask1("gap"));
+        release(true);
+        await Promise.all([first, second]);
+        assert.equal(calls, 1);
+        broker.reset();
+        const stale = broker.request(ask1("gap"));
+        broker.finish();
+        assert.equal((await stale).reason, "context-changed");
+        assert.equal(calls, 1);
+    });
+});
+
+test("effects finishing after an awaited application are not charged to a replacement session", async () => {
+    await withAgentDir(async () => {
+        let started;
+        let release;
+        const entered = new Promise((resolve) => {
+            started = resolve;
+        });
+        const waiting = new Promise((resolve) => {
+            release = resolve;
+        });
+        const records = [];
+        const broker = createBroker({
+            loadSettings: () => enabledSettings(),
+            ensureConsent: async () => true,
+            record: (entry) => records.push(entry),
+            ask: async () => ({ ok: true, answers: {} }),
+        });
+        broker.reset();
+        const pending = broker.request({
+            ...ask1("gap"),
+            decide: () => ({ decision: {} }),
+            apply: async () => {
+                started();
+                await waiting;
+
+                return { applied: true, effects: ["assessment-recorded"] };
+            },
+        });
+        await entered;
+        broker.finish();
+        broker.reset();
+        release();
+        assert.equal((await pending).reason, "session-changed");
+        assert.equal(records[0].discarded, true);
+        assert.equal(records[0].applied, true, "an actual completed write remains an observed effect");
+        assert.equal(readUsage().calls, 0);
+        assert.equal(readUsage().systems.gap.applied, 0);
+    });
 });
 
 async function startStub(handler) {

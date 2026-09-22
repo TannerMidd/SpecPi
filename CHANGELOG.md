@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Repair Jev's task context: read the active contract structurally, fall back to the bounded current request, and clear stale context on task, branch and session changes.
+- Allocate the existing 1 KiB state budget by field. Preserve result samples and candidate/question correspondence; abstain locally when required evidence cannot fit. Record sample coverage and local refusals separately from classifier calls.
+- Renew transmission consent with an accurate disclosure of sampled file contents, command output and request text. Redact question text as well as state, replace outside-workspace absolute paths, and use opaque source/cluster IDs. Consent now binds the transport scheme as well as the host.
+- Rank delegation sources per `packet.jobs[]`, respecting the declared mode and preserving every selected source and ungated position. Store gap-triage opinions alongside the original observation, with a bounded existing-cluster shortlist. Opinions cannot change priority, canonical identity or human improvement authority.
+- Retain object-shaped Score distributions, reject malformed probabilities and require a Choice distribution before applying its margin gate. Separate warnings from real elisions and count delivered effects rather than undelivered advice. Shell results are no longer eligible for shortening because their commands may not be safe to repeat.
+- Keep all advisor systems off by default, production thresholds unchanged, compaction guidance withdrawn and the command guard separate. These repairs do not establish a task-quality or cost benefit; new controlled evaluations are still required.
+
 ## 0.30.0 - 2026-09-21
 
 - Replace the evaluations page with Terminal-Bench 2.0. The suite that filled it was written in this repository, and it was retired for the reason it kept reporting: nearly every harness passed nearly every task, so the thing it was built to measure was the thing it could not see, and three rounds of harder tasks did not move it. A suite cannot mark its own homework. The page now carries somebody else's benchmark on tasks nobody here chose -- Pi with no harness, SpecPi + Jev, Oh My Pi and Claude Code, 334 scored attempts on one model through one endpoint.
