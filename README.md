@@ -73,37 +73,35 @@ The gap between the two SpecPi bars comes from a few separate switches, so the e
 ## Harness evaluations
 
 The chart above counts characters. It says nothing about what a harness costs to
-actually use, or whether it finishes the job. That is what the eval suite is for:
-the same tasks, the same model and the same frozen price list, with only the
-harness changing.
+actually use, or whether it finishes the job. That is what the evals are for:
+[Terminal-Bench 2.0](https://www.tbench.ai/), the same model and the same frozen
+price list, with only the harness changing.
 
 <!-- eval-summary -->
 
-**296 attempts across 8 harnesses and 24 tasks**, all on `deepseek-v4.1-flash`.
+**334 scored attempts across 20 tasks and 4 harnesses**,
+all on `deepseek-v4.1-flash`.
 
-| Harness | Solved | Cost/attempt | Prompt tokens | Sent before any work |
-| --- | --- | --- | --- | --- |
-| Pi | 34/37 | $0.0038 | 112,681 | 5,522 |
-| SpecPi | 35/37 | $0.0042 | 134,859 | 13,799 |
-| OpenCode | 31/37 | $0.0043 | 143,830 | 38,097 |
-| SpecPi + Jev | 35/37 | $0.0046 | 153,077 | 13,799 |
-| Codex CLI | 35/37 | $0.0067 | 242,401 | 38,148 |
-| Oh My Pi | 35/37 | $0.0070 | 257,783 | 62,612 |
-| DeepSeek Harness | 35/37 | $0.0078 | 281,676 | 31,750 |
-| Claude Code | 35/37 | $0.0094 | 292,043 | 74,768 |
+| Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |
+| --- | --- | --- | --- | --- | --- |
+| SpecPi + Jev | 62/74 | 0.838 | $0.0125 | 381,153 | 94.5% |
+| Pi (base) | 60/74 | 0.811 | $0.0161 | 512,903 | 93.7% |
+| Oh My Pi | 90/113 | 0.796 | $0.0216 | 1,103,136 | 97.4% |
+| Claude Code | 56/73 | 0.767 | $0.1128 or less | 630,410 | not measured |
 
-Cost is the harness's own model spend, priced from recorded usage against a
-dated price file. The last column is the tool schema plus system instructions
-riding every single request, which is the fixed toll a harness charges before
-the model does anything.
+Solve rate does not separate these harnesses -- Pi against SpecPi + Jev is Fisher
+p = 0.83 -- so the column worth reading is what each one spent reaching the same
+answers. Cost is recomputed from recorded tokens against a dated price file, never
+taken from a harness's self-report. Claude Code's cached share was not recorded on
+this run, so its cost is an upper bound.
 
 <!-- /eval-summary -->
 
-Read the method, the charts and the caveats on the
-[evaluations page](https://tannermidd.github.io/SpecPi/evaluations/). The runner,
-the tasks and the recorded results are in [evals/](evals/), and this table is
-regenerated from those reports by `node scripts/eval-site.mjs`, so it cannot
-drift from the published figures.
+This run is still in progress. Read the method, the charts and the caveats on the
+[evaluations page](https://tannermidd.github.io/SpecPi/evaluations/), which lists
+what is missing and what is known to be wrong. The table above is regenerated
+from the run data by `node scripts/tb2-site.mjs`, so it cannot drift from the
+published figures.
 
 ## Install
 

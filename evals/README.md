@@ -496,15 +496,18 @@ offer counts under the wrong label.
 
 ## Publishing to the site
 
-The GitHub Pages site carries an [evaluations page](../site/evaluations/)
-built from the run reports:
+The GitHub Pages site carries an [evaluations page](../site/evaluations/). It
+no longer publishes this suite. The tiers below could not separate the
+harnesses they were built to separate -- nearly everything passed -- so the
+page carries [Terminal-Bench 2.0](https://www.tbench.ai/) instead, and this
+suite stays here as the local instrument it always was:
 
 ```bash
-node scripts/eval-site.mjs            # defaults to evals/runs/all-tier{1..5}-deepseek
-node scripts/eval-site.mjs a/report.json b/report.json
+node scripts/tb2-metrics.mjs          # reads the Terminal-Bench runs
+node scripts/tb2-site.mjs             # redraws the page and the root README
 ```
 
-One command writes `site/evaluations/harness-eval.json` and redraws every
+One command writes `site/evaluations/terminal-bench-2.json` and redraws every
 figure on the page, so a chart cannot disagree with the table beside it. The
 page's prose reads its own quoted numbers back out of that JSON at load time,
 which means a regenerated run updates the sentences too rather than leaving
@@ -512,8 +515,9 @@ them asserting figures no bar supports.
 
 After a new run, regenerate and then run `npm run check:site`, which fails if
 a chart slot is empty, a quoted figure went unfilled, or the page overflows at
-phone width. The reports themselves are committed, so the page can always be
-rebuilt from what is in the repository.
+phone width. The Terminal-Bench runs themselves are deliberately not in this
+repository, because the task content carries canary strings; only aggregates
+and public task names cross into the data file.
 
 Two harness properties are deliberately absent for native harnesses such as
 OpenCode: tool-schema characters and offered-tool counts. Those are read from
