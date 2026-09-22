@@ -31,6 +31,7 @@ import {
     setCollectionMode,
     wishlistSourceRootIdentity,
     wishlistSourceRootSalt,
+    wishlistTriageCandidates,
 } from "./core.mjs";
 import { VALIDATOR_CATALOG } from "./validators.mjs";
 import { isValidValidatorName, validateCapabilityRegistry } from "./registry.mjs";
@@ -608,8 +609,18 @@ export default function toolWishlist(pi: ExtensionAPI) {
         }
     };
 
+    // Earlier hooks may await objective lookup before our input/start hook runs. Invalidate
+    // pending reports synchronously when that lookup's owner observes the task change.
+    pi.events?.on?.("specpi:task-changing", () => {
+        activeRunId = randomUUID();
+    });
     pi.on("before_agent_start", async () => {
         activeRunId = randomUUID();
+    });
+    pi.on("input", (event: any) => {
+        if (event.streamingBehavior === "steer" && event.source !== "extension") {
+            activeRunId = randomUUID();
+        }
     });
 
     const displayMarkdown = async (markdown: string, reportPath: string, ctx: any) => {
@@ -642,7 +653,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
         name: "report_capability_gap",
         label: "Report Capability Gap",
         description:
-            "Privately record a material, reusable capability gap in SpecPi's local wishlist. Report only after reasonable existing tools or workarounds proved insufficient. Do not use for transient failures, command mistakes, credentials or permissions the user must supply, ordinary project-specific work, or speculative nice-to-haves. Never include secrets, source code, full commands, file paths, URLs with private data, or user prompt text. Report a gap at most once per user task. Collection requires an explicit local on/off decision and never uploads data.",
+            "Privately record a material, reusable capability gap in SpecPi's local wishlist. Report only after reasonable existing tools or workarounds proved insufficient. Do not use for transient failures, command mistakes, credentials or permissions the user must supply, ordinary project-specific work, or speculative nice-to-haves. Never include secrets, source code, full commands, file paths, URLs with private data, or user prompt text. Report a gap at most once per user task. Collection requires an explicit local on/off decision. Only a separately enabled and consented Jev advisor may transmit redacted report samples.",
         promptSnippet: "Record recurring, generalizable capability friction without interrupting the user task",
         promptGuidelines: [
             "Use report_capability_gap only for a material and generalizable missing capability after reasonable existing tools or workarounds have proved insufficient.",
@@ -685,6 +696,27 @@ export default function toolWishlist(pi: ExtensionAPI) {
             { additionalProperties: false },
         ),
         async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+            // Bind before consent or root discovery can yield to another task or branch.
+            const sessionId = ctx.sessionManager.getSessionId();
+            const generation = improvementLifecycleGeneration;
+            const reportRun = activeRunId;
+            const contractIdentity = () =>
+                JSON.stringify(
+                    branchEntries(ctx).findLast((entry: any) => entry.customType === TASK_CONTRACT_ENTRY)?.data ?? null,
+                );
+            const originalContract = contractIdentity();
+            const isCurrent = () =>
+                !signal?.aborted &&
+                generation === improvementLifecycleGeneration &&
+                sessionId === ctx.sessionManager.getSessionId() &&
+                reportRun === activeRunId &&
+                originalContract === contractIdentity();
+            const assertCurrent = () => {
+                if (!isCurrent()) {
+                    throw new Error("The task or session changed before the report could be recorded");
+                }
+            };
+
             let mode = readCollectionMode(stateDir);
             if (mode === "undecided") {
                 if (!ctx.hasUI) {
@@ -701,8 +733,9 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
                 const enabled = await ctx.ui.confirm(
                     "Enable local capability-gap collection?",
-                    "SpecPi stores sanitized summaries and salted task, session, and project hashes locally. It never uploads them. You can change this later with /wishlist on or /wishlist off.",
+                    "SpecPi stores sanitized summaries and salted task, session, and project hashes locally. Collection itself never uploads them; the optional Jev advisor requires separate transmission consent. Change collection with /wishlist on or /wishlist off.",
                 );
+                assertCurrent();
                 mode = enabled ? "on" : "off";
                 await setCollectionMode({ stateDir, mode, signal });
             }
@@ -720,15 +753,52 @@ export default function toolWishlist(pi: ExtensionAPI) {
             }
 
             const contractRoot = await resolveTaskContractRoot(pi, ctx.cwd, signal);
+            assertCurrent();
             const contract = branchTaskContract(ctx, contractRoot, { tolerateMalformed: true });
-            const result = await recordCapabilityGap({
-                stateDir,
-                sessionId: ctx.sessionManager.getSessionId(),
-                runId: contract?.id ?? activeRunId,
-                cwd: ctx.cwd,
+            const runId = contract?.id ?? reportRun;
+            const record = (assessment?: any, authority: any = {}) => {
+                assertCurrent();
+
+                return recordCapabilityGap({
+                    stateDir,
+                    sessionId,
+                    runId,
+                    cwd: ctx.cwd,
+                    gap: params,
+                    assessment,
+                    signal,
+                    isCurrent,
+                    assessmentIsCurrent: authority.isCurrent,
+                    onRecorded: authority.onRecorded,
+                });
+            };
+
+            // A trusted extension callback, not a field in model-authored arguments. No advisor
+            // is required, and the original report is never overwritten by its second opinion.
+            const pending: Promise<any>[] = [];
+            pi.events?.emit("specpi:gap-triage", {
                 gap: params,
+                ctx,
                 signal,
+                record,
+                isCurrent: () => isCurrent() && readCollectionMode(stateDir) === "on",
+                existing: () => wishlistTriageCandidates(stateDir),
+                reply: (value: Promise<any>) => pending.push(value),
             });
+            // Classifier failures leave normal collection available; `record` still checks its
+            // task binding and the collection switch before any write.
+            const triage = pending.length === 1 ? await pending[0].catch(() => undefined) : undefined;
+            if (triage?.blocked) {
+                throw new Error(
+                    "This report appears to contain sensitive or machine-specific details. Remove the specifics and report it again.",
+                );
+            }
+
+            if (triage?.cancelled) {
+                throw new Error("The session changed before the report could be recorded");
+            }
+
+            const result = triage?.stored ?? (await record());
             const disposition = result.duplicate
                 ? "Already recorded for this task"
                 : result.regression
@@ -1380,7 +1450,10 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
             if (action === "on" || action === "off") {
                 await setCollectionMode({ stateDir, mode: action });
-                ctx.ui.notify(`Local wishlist collection is ${action}. No data is uploaded.`, "info");
+                ctx.ui.notify(
+                    `Local wishlist collection is ${action}. Jev transmission requires its own switch and consent.`,
+                    "info",
+                );
 
                 return;
             }

@@ -82,6 +82,87 @@ async function seedLifecycle(stateDir, { withJournal = true } = {}) {
     return { gap, retire };
 }
 
+test("advisory assessments are bounded, cannot be forged through reports, and cannot authorize work", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-assessment-"));
+    try {
+        await setCollectionMode({ stateDir: root, mode: "on" });
+        const gap = {
+            capability: "Bounded evidence lookup",
+            scenario: "Look up supporting evidence",
+            limitation: "The required evidence was unavailable",
+            impact: "minor",
+            suggestedFix: "tool",
+            assessment: { impactOpinion: "blocked" },
+            canonicalKey: "forged-cluster",
+        };
+        const options = { stateDir: root, sessionId: "s", runId: "r", cwd: root, gap };
+        const first = await recordCapabilityGap(options);
+        assert.equal(first.assessmentRecorded, false);
+        assert.equal(first.canonicalKey, "bounded-evidence-lookup");
+        await recordCapabilityGap({
+            ...options,
+            runId: "r2",
+            assessment: {
+                impactOpinion: "blocked",
+                matchedKey: "unknown-cluster",
+                suggestedFix: "bad-value",
+                select: true,
+                secret: "not-to-store",
+            },
+        });
+        const result = await refreshWishlist({ stateDir: root });
+        assert.deepEqual(result.events.at(-1).assessment, {
+            source: "jev",
+            basis: "reported-observation",
+            impactOpinion: "blocked",
+        });
+        assert.equal(result.improvements[0].priority, 2);
+        assert.equal(result.improvements[0].state, "open");
+        assert.deepEqual(result.decisions, []);
+        assert.ok(!JSON.stringify(result.events).includes("not-to-store"));
+        await assert.rejects(recordCapabilityGap({ ...options, runId: "r3", isCurrent: () => false }), /task changed/u);
+        assert.equal((await refreshWishlist({ stateDir: root })).events.length, 2);
+
+        const lock = path.join(root, ".tool-wishlist.lock");
+        fs.mkdirSync(lock);
+        let advisoryAllowed = true;
+        const waiting = recordCapabilityGap({
+            ...options,
+            runId: "revoked",
+            assessment: { impactOpinion: "blocked" },
+            assessmentIsCurrent: () => advisoryAllowed,
+        });
+        advisoryAllowed = false;
+        fs.rmdirSync(lock);
+        assert.equal((await waiting).assessmentRecorded, false, "revocation during lock wait strips only the opinion");
+        assert.equal((await refreshWishlist({ stateDir: root })).events.at(-1).assessment, undefined);
+
+        const reportPath = path.join(root, "TOOL_WISHLIST.md");
+        fs.unlinkSync(reportPath);
+        fs.mkdirSync(reportPath);
+        let committed;
+        await assert.rejects(
+            recordCapabilityGap({
+                ...options,
+                runId: "render-failure",
+                assessment: { impactOpinion: "blocked" },
+                onRecorded: (result) => {
+                    committed = result;
+                },
+            }),
+        );
+        assert.equal(committed.assessmentRecorded, true, "the event commit precedes report rendering failure");
+        const events = fs
+            .readFileSync(path.join(root, "tool-wishlist-events.jsonl"), "utf8")
+            .trim()
+            .split("\n")
+            .map(JSON.parse);
+        assert.equal(events.at(-1).assessment.impactOpinion, "blocked");
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
 test("retirement journal persists sanitized bounded proof next to the decision", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "specpi-journal-"));
     try {

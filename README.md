@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.30.1 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
@@ -97,9 +97,8 @@ this run, so its cost is an upper bound.
 
 <!-- /eval-summary -->
 
-This run is still in progress. Read the method, the charts and the caveats on the
-[evaluations page](https://tannermidd.github.io/SpecPi/evaluations/), which lists
-what is missing and what is known to be wrong. The table above is regenerated
+This run is still in progress. See the results and brief method on the
+[evaluations page](https://tannermidd.github.io/SpecPi/evaluations/). The table above is regenerated
 from the run data by `node scripts/tb2-site.mjs`, so it cannot drift from the
 published figures.
 
@@ -122,7 +121,7 @@ Full setup options, package details, and requirements: [website](https://tannerm
 
 | | |
 | --- | --- |
-| [Packages](https://tannermidd.github.io/SpecPi/#packages) | The seven pinned packages and what each provides |
+| [Packages](https://tannermidd.github.io/SpecPi/#packages) | The eight pinned packages and what each provides |
 | [Scope control](https://tannermidd.github.io/SpecPi/wiki/#scope) | `/scope` commands and drift monitoring |
 | [Improvement loop](https://tannermidd.github.io/SpecPi/#loop) | Local wishlist, `/harness-improvement`, and retirement with evidence |
 | [SpecPi Chat](https://tannermidd.github.io/SpecPi/#vscode-chat) | VS Code frontend and VSIX install · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) |

@@ -66,7 +66,20 @@ function rotate(file) {
 export function summarize(entries) {
     const lines = Array.isArray(entries) ? entries : [];
     const bySystem = {};
+    let abstentions = 0;
+    let elisions = 0;
     for (const entry of lines) {
+        if (entry?.sent === false) {
+            abstentions += 1;
+            continue;
+        }
+
+        // Older lines have no effect tags. Positive savings, not `applied`, distinguish a
+        // real shortening from an untrusted-content banner sharing a retention request.
+        if (entry?.effects?.includes("elision") || (entry?.system === "retention" && entry?.savedBytes > 0)) {
+            elisions += 1;
+        }
+
         const name = typeof entry?.system === "string" ? entry.system : "unknown";
         const bucket = (bySystem[name] ??= {
             calls: 0,
@@ -91,14 +104,15 @@ export function summarize(entries) {
     const totals = Object.values(bySystem);
 
     return {
-        calls: lines.length,
+        calls: lines.length - abstentions,
+        abstentions,
         failed: totals.reduce((sum, item) => sum + item.failed, 0),
         applied: totals.reduce((sum, item) => sum + item.applied, 0),
         savedBytes: totals.reduce((sum, item) => sum + item.savedBytes, 0),
         stateBytes: totals.reduce((sum, item) => sum + item.stateBytes, 0),
         // Named for what retention does, because it is the only system that shortens anything and
         // the number is meaningless averaged with systems that cannot.
-        elisions: bySystem.retention?.applied ?? 0,
+        elisions,
         bytesDropped: bySystem.retention?.savedBytes ?? 0,
         bySystem,
     };

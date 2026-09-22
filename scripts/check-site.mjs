@@ -229,6 +229,52 @@ try {
         assert.equal(evaluations.unfilled, 0, "a figure quoted in the prose was not filled from the dataset");
         assert.match(evaluations.generated, /^Run \d{4}-\d{2}-\d{2}$/u);
         await page.screenshot({ path: path.join(screenshots, `evaluations-${name}.png`), fullPage: true });
+
+        await page.getByRole("link", { name: "Jev", exact: true }).click();
+        await page.waitForURL(`${origin}/SpecPi/jev/`);
+        assert.ok((await page.locator(".index-meta").innerText()).includes(manifest.version));
+        assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
+        const flows = page.locator("details.system-flow");
+        assert.equal(await flows.count(), 6);
+        assert.equal(await page.locator("details.system-flow[open]").count(), 0);
+        await page.screenshot({ path: path.join(screenshots, `jev-${name}.png`), fullPage: true });
+        for (const flow of await flows.all()) {
+            await flow.locator("summary").click();
+            assert.notEqual(await flow.getAttribute("open"), null);
+            const id = await flow.locator("svg").getAttribute("id");
+            assert.ok(await flow.locator("svg").getAttribute("aria-label"));
+            const frame = flow.locator("div");
+            await frame.screenshot({ path: path.join(screenshots, `${id}-${name}.png`) });
+            const scroll = await frame.evaluate((element) => {
+                element.scrollLeft = element.scrollWidth;
+
+                return { overflow: element.scrollWidth > element.clientWidth, left: element.scrollLeft };
+            });
+            if (scroll.overflow) {
+                assert.ok(scroll.left > 0, `${id} must scroll inside its container`);
+                await frame.screenshot({ path: path.join(screenshots, `${id}-${name}-right.png`) });
+            }
+
+            await flow.locator("summary").focus();
+            await page.keyboard.press("Enter");
+            assert.equal(await flow.getAttribute("open"), null);
+            await page.keyboard.press("Enter");
+            assert.notEqual(await flow.getAttribute("open"), null);
+        }
+
+        const jev = await page.evaluate(() => ({
+            overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            missingAnchors: [...document.querySelectorAll('a[href^="#"]')]
+                .map((link) => link.getAttribute("href").slice(1))
+                .filter((id) => !document.getElementById(id)),
+            boxes: [...document.querySelectorAll(".system-flow .dg-box")].map((box) => getComputedStyle(box).fill),
+        }));
+        assert.equal(jev.overflow, false, `${name} expanded Jev diagrams overflow the page`);
+        assert.deepEqual(jev.missingAnchors, []);
+        assert.ok(
+            jev.boxes.length > 0 && jev.boxes.every((fill) => !["rgb(0, 0, 0)", "none"].includes(fill)),
+            "diagram surfaces must resolve their theme tokens",
+        );
         process.stdout.write(`Site ${name}: PASS\n`);
     }
 

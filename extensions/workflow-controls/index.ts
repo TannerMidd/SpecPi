@@ -366,6 +366,29 @@ export default function workflowControls(pi: ExtensionAPI) {
         sessionRestore = restoreSession(ctx).catch(() => {});
     };
 
+    // Serve the active contract structurally, independent of before_agent_start load order.
+    // The advisor receives only the objective, never a branch transcript or rendered headings.
+    pi.events.on("specpi:task-objective", (request: any) => {
+        request.reply(
+            (async () => {
+                const ctx = request.ctx as ExtensionContext;
+                const origin = captureSession(ctx);
+                await sessionRestore;
+                if (!sessionIsCurrent(origin, ctx)) {
+                    return undefined;
+                }
+
+                try {
+                    const contract = readCurrentTaskContract(ctx, scope.root);
+
+                    return contract ? { objective: contract.objective, digest: contract.digest } : undefined;
+                } catch {
+                    return undefined;
+                }
+            })(),
+        );
+    });
+
     // Web access ships hidden. A missing or unreadable preference means off, and the
     // gate only ever touches its own four tool names.
     let webAccessEnabled = loadStartupActivation();

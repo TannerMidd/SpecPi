@@ -471,6 +471,53 @@ function sanitizeGap(gap) {
     };
 }
 
+// This is a second opinion on the same report, not corroborating evidence. It cannot affect
+// identity, priority, qualification, human selection, or retirement.
+function sanitizeAssessment(value, knownKeys) {
+    if (!value || typeof value !== "object") {
+        return undefined;
+    }
+
+    const result = { source: "jev", basis: "reported-observation" };
+    if (["minor", "degraded", "blocked"].includes(value.impactOpinion)) {
+        result.impactOpinion = value.impactOpinion;
+    }
+
+    if (["tool", "skill", "prompt", "config", "bug", "unknown"].includes(value.suggestedFix)) {
+        result.suggestedFix = value.suggestedFix;
+    }
+
+    if (
+        typeof value.matchedKey === "string" &&
+        /^[a-z0-9][a-z0-9-]{0,119}$/u.test(value.matchedKey) &&
+        (!knownKeys || knownKeys.has(value.matchedKey))
+    ) {
+        result.matchedKey = value.matchedKey;
+    }
+
+    if (value.transient === true) {
+        result.transient = true;
+    }
+
+    return Object.keys(result).length > 2 ? result : undefined;
+}
+
+/** Read only bounded, sanitized local improvement records; never Pi state or private evidence. */
+export function wishlistTriageCandidates(stateDir) {
+    if (readCollectionMode(stateDir) !== "on") {
+        return [];
+    }
+
+    const files = pathsFor(stateDir);
+    const { events } = readEventsFile(files.events);
+    const { decisions } = readDecisionsFile(files.decisions);
+
+    return aggregateEvents(events, { decisions }).map((item) => ({
+        canonicalKey: item.canonicalKey,
+        title: sanitizeReportText(item.title, 80),
+    }));
+}
+
 function sanitizeEvidenceList(value, maxItems, label) {
     if (!isValidEvidenceList(value, maxItems)) {
         throw new Error(`${label} must contain 1 to ${maxItems} strings of at most 240 characters`);
@@ -654,6 +701,10 @@ export function aggregateEvents(events, options = {}) {
                 scenarios: recentUnique("scenario"),
                 limitations: recentUnique("limitation"),
                 workarounds: recentUnique("workaround"),
+                assessment: [...ordered]
+                    .reverse()
+                    .map((event) => sanitizeAssessment(event.assessment))
+                    .find(Boolean),
             };
         })
         .sort(
@@ -882,6 +933,26 @@ function renderGroup(lines, group) {
     );
     if (group.reviewNeeded) {
         lines.push(`- Review needed: yes`, `- Unresolved post-retirement signals: ${group.reviewSignalCount}`);
+    }
+
+    if (group.assessment) {
+        const opinion = group.assessment;
+        lines.push("", "**Jev advisory opinion** (based on the reported account, not independent evidence)");
+        if (opinion.impactOpinion) {
+            lines.push(`- Impact opinion: ${opinion.impactOpinion}`);
+        }
+
+        if (opinion.suggestedFix) {
+            lines.push(`- Suggested fix opinion: ${opinion.suggestedFix}`);
+        }
+
+        if (opinion.matchedKey) {
+            lines.push(`- Possible existing cluster: \`${opinion.matchedKey}\` (human merge decision required)`);
+        }
+
+        if (opinion.transient) {
+            lines.push("- May be transient or user error; review the original observation.");
+        }
     }
 
     if (group.scenarios.length) {
@@ -1338,12 +1409,20 @@ export async function recordCapabilityGap(options) {
         runId,
         cwd,
         gap,
+        assessment,
         signal,
         now = new Date().toISOString(),
         maxEventFileBytes = MAX_EVENT_FILE_BYTES,
+        isCurrent = () => true,
+        assessmentIsCurrent = () => true,
+        onRecorded = () => {},
     } = options;
 
     return withStateLock(stateDir, signal, async () => {
+        if (signal?.aborted || !isCurrent()) {
+            throw new Error("The task changed before the report could be recorded");
+        }
+
         if (readCollectionMode(stateDir) !== "on") {
             throw new Error("Local wishlist collection must be explicitly on before recording observations");
         }
@@ -1371,6 +1450,10 @@ export async function recordCapabilityGap(options) {
                 resolveAlias(event.observedKey ?? event.canonicalKey, aliases) === canonicalKey &&
                 event.runHash === runHash,
         );
+        const advisory = sanitizeAssessment(
+            assessmentIsCurrent() ? assessment : undefined,
+            new Set(canonicalizeEvents(parsed.events, decisionData.decisions).map((event) => event.canonicalKey)),
+        );
         if (!duplicate) {
             const event = {
                 schema: 1,
@@ -1381,6 +1464,7 @@ export async function recordCapabilityGap(options) {
                 runHash,
                 projectHash,
                 ...sanitized,
+                ...(advisory ? { assessment: advisory } : {}),
                 ...(regression ? { regression: true } : {}),
             };
             parsed.bytes = appendBounded(
@@ -1391,6 +1475,7 @@ export async function recordCapabilityGap(options) {
                 "Tool wishlist event log",
             );
             parsed.events.push(event);
+            onRecorded({ assessmentRecorded: advisory !== undefined });
         }
 
         writeReport(
@@ -1407,6 +1492,7 @@ export async function recordCapabilityGap(options) {
 
         return {
             duplicate,
+            assessmentRecorded: !duplicate && advisory !== undefined,
             regression,
             resolved: priorState === "retired",
             canonicalKey,

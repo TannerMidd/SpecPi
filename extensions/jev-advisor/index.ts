@@ -7,6 +7,7 @@ import { consentPath, granted, revokeConsent } from "./consent.mjs";
 import { createBroker } from "./broker.mjs";
 import { ledgerPath, read as readLedger } from "./ledger.mjs";
 import { usagePath } from "./usage.mjs";
+import { compact } from "./sanitize.mjs";
 import * as retention from "./questions/retention.mjs";
 import * as gap from "./questions/gap.mjs";
 import * as sources from "./questions/sources.mjs";
@@ -27,6 +28,48 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     const broker = createBroker({ loadSettings: () => settings });
     const recent: { tool: string; outcome: string }[] = [];
     let objective = "";
+    let currentRequest = "";
+    let taskIdentity = "";
+    let taskGeneration = 0;
+    let sessionActive = false;
+
+    const refreshObjective = async (ctx: ExtensionContext) => {
+        if (!sessionActive) {
+            return false;
+        }
+
+        const generation = taskGeneration;
+        const replies: Promise<{ objective: string; digest: string } | undefined>[] = [];
+        let contract;
+        try {
+            if (settings.master) {
+                pi.events.emit("specpi:task-objective", {
+                    ctx,
+                    reply: (value: Promise<{ objective: string; digest: string } | undefined>) => replies.push(value),
+                });
+            }
+
+            contract = replies.length === 1 ? await replies[0] : undefined;
+        } catch {
+            // A missing or unavailable workflow owner must not fail an otherwise valid tool.
+        }
+
+        if (generation !== taskGeneration) {
+            return false;
+        }
+
+        const next = compact(contract?.objective || currentRequest, 180);
+        const identity = contract?.digest ?? currentRequest;
+        if (objective !== next || taskIdentity !== identity) {
+            objective = next;
+            taskIdentity = identity;
+            taskGeneration += 1;
+            recent.length = 0;
+            resetTaskHistory();
+        }
+
+        return true;
+    };
 
     // System 5's local state. Every field here is something the session already knows; it exists so
     // that "ask local state first" has something to ask. Local state cannot answer whether a session
@@ -57,7 +100,14 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         history.askedAtTurn = undefined;
     };
 
-    const enabled = (system: string) => settings.master && settings.systems[system] === true;
+    const resetTaskHistory = () => {
+        const nudged = history.nudged;
+        resetHistory();
+        // Changing task context must not reset the existing once-per-session steering bound.
+        history.nudged = nudged;
+    };
+
+    const enabled = (system: string) => sessionActive && settings.master && settings.systems[system] === true;
 
     // System 6: decide once, before the first provider request, whether this session will need a
     // withdrawn tool group -- and offer it now rather than at turn 6.
@@ -80,12 +130,16 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     };
 
     pi.on("session_start", () => {
+        sessionActive = true;
         settings = loadSettings();
         if (!settings.startup) {
             settings = { ...settings, master: false };
         }
 
         broker.reset();
+        objective = "";
+        currentRequest = "";
+        taskGeneration += 1;
         recent.length = 0;
         resetHistory();
         capabilityAsked = false;
@@ -96,7 +150,11 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         // finish, not reset: the counts are published once more as an ended session so anything
         // reading them from outside -- SpecPi Chat's panel, most of all -- shows what the session
         // actually spent rather than a zeroed live one.
+        sessionActive = false;
         broker.finish();
+        objective = "";
+        currentRequest = "";
+        taskGeneration += 1;
         recent.length = 0;
         resetHistory();
     });
@@ -106,13 +164,28 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         history.changedThisTurn = false;
     });
 
-    // The task objective is the one piece of context every system wants, and it is already in the
-    // system prompt, so reading it here costs nothing extra.
-    pi.on("before_agent_start", (event: any) => {
-        const match = /\[SPECPI TASK CONTRACT\]\n([^\n]{0,200})/u.exec(event?.systemPrompt ?? "");
-        if (match) {
-            objective = match[1];
+    // The workflow owner reads its active contract, not rendered Markdown. Without one, use only
+    // the bounded current request; never recover an objective by searching stored conversations.
+    pi.on("before_agent_start", async (event: any, ctx: ExtensionContext) => {
+        currentRequest = compact(event?.prompt ?? "", 180);
+        taskGeneration += 1;
+        pi.events.emit("specpi:task-changing");
+        await refreshObjective(ctx);
+    });
+    pi.on("input", async (event: any, ctx: ExtensionContext) => {
+        if (event.streamingBehavior === "steer" && event.source !== "extension") {
+            currentRequest = compact(event.text ?? "", 180);
+            taskGeneration += 1;
+            pi.events.emit("specpi:task-changing");
+            await refreshObjective(ctx);
         }
+    });
+    pi.on("session_tree", () => {
+        objective = "";
+        currentRequest = "";
+        taskGeneration += 1;
+        recent.length = 0;
+        resetTaskHistory();
     });
 
     // Once per session, whatever the answer: asking later would be the mid-session flip the probe
@@ -166,8 +239,11 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 return;
             }
 
-            const result = await broker.request({
+            const generation = taskGeneration;
+            await broker.request({
                 system: "capability",
+                isCurrent: () => generation === taskGeneration,
+                profile: "capability",
                 state: capabilities.buildInput({
                     prompt: event?.prompt,
                     reasons: local.reasons,
@@ -180,44 +256,51 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 decide: (answers: any) => {
                     const advice = capabilities.decide(answers, available);
 
-                    return { applied: advice.propose.length > 0, decision: advice };
+                    return { decision: advice };
+                },
+                apply: async (advice: any) => {
+                    const effects: string[] = [];
+                    if (advice.suggestDelegation) {
+                        // A suggestion, never an activation: delegation binds a model and a host and has
+                        // its own command, which is why the capability table deliberately omits it.
+                        ctx.ui.notify(
+                            "Jev: this looks like a question a delegated read-only session could answer over many files. Run /delegate on if you want it.",
+                            "info",
+                        );
+                        effects.push("notification");
+                    }
+
+                    for (const id of advice.propose) {
+                        const capability = table.findCapability(id);
+                        if (!capability || capabilityDeclined.has(id)) {
+                            continue;
+                        }
+
+                        const pending = table.missingTools(pi.getActiveTools(), capability);
+                        // The same confirmation `request_capability` shows, pre-filled and moved to turn 0.
+                        // Authority is unchanged: the human still decides, and declining is remembered so
+                        // nothing asks twice in one session.
+                        const accepted = await ctx.ui.confirm(
+                            `Allow ${capability.label} for this session?`,
+                            `Jev expects this request to ${capability.summary}, from the request itself rather than from anything it has done yet.\n\nThis offers ${pending.length} tool${pending.length === 1 ? "" : "s"} for the rest of this session and adds ${capability.schemaCost}. Accepting now is materially cheaper than accepting later: activating it mid-session also discards the cached prompt prefix, which measured about 20% of a mid-length attempt's cost. Withdraw it with ${capability.command} off.`,
+                        );
+                        effects.push("capability-proposal");
+                        if (generation !== taskGeneration || !enabled("capability") || ctx.signal?.aborted) {
+                            break;
+                        }
+
+                        if (!accepted) {
+                            capabilityDeclined.add(id);
+                            continue;
+                        }
+
+                        syncActiveTools(pi, capability.tools, true);
+                        effects.push("capability-activated");
+                    }
+
+                    return { applied: effects.length > 0, effects };
                 },
             });
-            if (!result.ok) {
-                return;
-            }
-
-            const advice = result.decision;
-            if (advice.suggestDelegation) {
-                // A suggestion, never an activation: delegation binds a model and a host and has
-                // its own command, which is why the capability table deliberately omits it.
-                ctx.ui.notify(
-                    "Jev: this looks like a question a delegated read-only session could answer over many files. Run /delegate on if you want it.",
-                    "info",
-                );
-            }
-
-            for (const id of advice.propose) {
-                const capability = table.findCapability(id);
-                if (!capability || capabilityDeclined.has(id)) {
-                    continue;
-                }
-
-                const pending = table.missingTools(pi.getActiveTools(), capability);
-                // The same confirmation `request_capability` shows, pre-filled and moved to turn 0.
-                // Authority is unchanged: the human still decides, and declining is remembered so
-                // nothing asks twice in one session.
-                const accepted = await ctx.ui.confirm(
-                    `Allow ${capability.label} for this session?`,
-                    `Jev expects this request to ${capability.summary}, from the request itself rather than from anything it has done yet.\n\nThis offers ${pending.length} tool${pending.length === 1 ? "" : "s"} for the rest of this session and adds ${capability.schemaCost}. Accepting now is materially cheaper than accepting later: activating it mid-session also discards the cached prompt prefix, which measured about 20% of a mid-length attempt's cost. Withdraw it with ${capability.command} off.`,
-                );
-                if (!accepted) {
-                    capabilityDeclined.add(id);
-                    continue;
-                }
-
-                syncActiveTools(pi, capability.tools, true);
-            }
         } catch {
             // Nothing here may prevent a session from starting.
         }
@@ -226,6 +309,11 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     // System 1: condense a spent tool result before it is appended. Doing this after the fact would
     // rewrite a cached prefix; on arrival it never touches one.
     pi.on("tool_result", async (event: any, ctx: ExtensionContext) => {
+        if (!(await refreshObjective(ctx))) {
+            return;
+        }
+
+        const generation = taskGeneration;
         // Bookkeeping first, and unconditionally. Retention's own eligibility gate returns early on
         // most results, and a history that only recorded the large read-only ones would be blind to
         // exactly the short repeated failures system 5 exists to notice.
@@ -271,6 +359,8 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 // interested. System 7's own budget therefore only binds when retention is off or
                 // the result was too small for it.
                 system: wantRetention ? "retention" : "untrusted",
+                profile: wantRetention ? "retention" : "untrusted",
+                isCurrent: () => generation === taskGeneration,
                 state: retention.buildInput({ event, objective, recent }),
                 questions: {
                     ...(wantRetention ? retention.questions() : {}),
@@ -283,17 +373,22 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 // because its length is the saving: computing it a second time to measure it would
                 // be the measurement inventing its own number.
                 decide: (answers: any) => {
-                    const verdict = wantRetention
-                        ? retention.decide(answers)
-                        : { elide: false, reason: "retention-off" };
+                    let verdict = wantRetention ? retention.decide(answers) : { elide: false, reason: "retention-off" };
                     const flagged = wantUntrusted && untrusted.decide(answers).banner;
                     // Order matters: shorten first, then mark. A banner belongs at the top of
                     // whatever the model is actually going to read.
                     const body = verdict.elide ? retention.digest(text, { tool: event.toolName, bytes }) : text;
-                    const replacement = flagged ? untrusted.mark(body) : body;
+                    let replacement = flagged ? untrusted.mark(body) : body;
+                    if (verdict.elide && Buffer.byteLength(replacement, "utf8") >= bytes) {
+                        verdict = { elide: false, reason: "no-byte-saving" };
+                        replacement = flagged ? untrusted.mark(text) : text;
+                    }
+
+                    const marked = flagged && replacement !== body;
 
                     return {
-                        applied: verdict.elide || flagged,
+                        applied: verdict.elide || marked,
+                        effects: [...(verdict.elide ? ["elision"] : []), ...(marked ? ["warning"] : [])],
                         savedBytes: verdict.elide ? bytes - Buffer.byteLength(replacement, "utf8") : 0,
                         // retention.decide already names why it declined; carrying that into the
                         // ledger is what makes "asked and did nothing" diagnosable later.
@@ -334,6 +429,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     });
 
     pi.on("tool_call", async (event: any, ctx: ExtensionContext) => {
+        const generation = taskGeneration;
         history.signatures.push(progress.signature(event.toolName, event.input));
         history.tools.push(event.toolName);
         if (history.signatures.length > HISTORY_WINDOW) {
@@ -344,115 +440,132 @@ export default function jevAdvisor(pi: ExtensionAPI) {
             history.tools.shift();
         }
 
-        // System 2: triage a capability gap before tool-wishlist writes it. `event.input` is
-        // documented as mutable, so this patches the report in place rather than duplicating any
-        // of the wishlist's authority logic. Nothing here records a decision.
-        if (event.toolName === "report_capability_gap" && enabled("gap")) {
-            try {
-                const result = await broker.request({
-                    system: "gap",
-                    state: gap.buildInput({ gap: event.input, existing: [] }),
-                    questions: gap.questions({ gap: event.input, existing: [] }),
-                    ctx,
-                    root: ctx.cwd,
-                    decide: (answers: any) => {
-                        const built = gap.decide(answers);
-                        // Exactly the conditions the caller applies below, so the ledger line says
-                        // what happened rather than what was available. A gated answer that
-                        // duplicates a field the model already filled in changed nothing.
-                        const changes =
-                            (built.blockForSanitization ? 1 : 0) +
-                            (built.canonicalKey && typeof event.input?.canonicalKey !== "string" ? 1 : 0) +
-                            (built.suggestedFix && !event.input?.suggestedFix ? 1 : 0) +
-                            (built.independentImpact ? 1 : 0);
+        // System 4: order the sources a delegation batch will snapshot. Ordering only — the same
+        // set is frozen either way, but a child pages through `list_sources` in this order.
+        if (
+            event.toolName === "delegate" &&
+            enabled("sources") &&
+            event.input?.operation === "run" &&
+            Array.isArray(event.input?.packet?.jobs)
+        ) {
+            for (const job of event.input.packet.jobs) {
+                try {
+                    if (
+                        !Array.isArray(job.sources) ||
+                        job.sources.length < 2 ||
+                        !job.sources.every((item: unknown) => typeof item === "string")
+                    ) {
+                        continue;
+                    }
 
-                        return { applied: changes > 0, decision: built };
-                    },
-                });
-                if (!result.ok) {
-                    return;
-                }
+                    const original = [...job.sources];
+                    const candidates = original.map((item: string) => ({ path: item }));
+                    await broker.request({
+                        system: "sources",
+                        profile: "sources",
+                        isCurrent: () => generation === taskGeneration && sessionActive,
+                        state: sources.buildInput({ question: job.question, mode: job.mode, candidates }),
+                        questions: sources.questions({ candidates }),
+                        ctx,
+                        root: ctx.cwd,
+                        decide: (answers: any) => ({ decision: sources.decide(answers, candidates) }),
+                        apply: (ranked: any, { recordEffect }: any) => {
+                            const ordered = ranked.ordered.map((item: any) => item.path);
+                            const moved = ordered.some((item: string, index: number) => item !== original[index]);
+                            // No deduplication: even multiplicity and ungated positions are preserved.
+                            job.sources = ordered;
+                            const effects = moved ? ["sources-reordered"] : [];
+                            if (moved) {
+                                recordEffect("sources-reordered");
+                            }
 
-                const advice = result.decision;
-                if (advice.blockForSanitization) {
-                    return {
-                        block: true,
-                        reason: "This report appears to contain a credential, an absolute path or other machine-specific detail. Rewrite it with the specifics removed and report it again.",
-                    };
-                }
+                            if (ranked.notWorthDelegating && ctx.hasUI) {
+                                ctx.ui.notify(
+                                    `Jev rates this ${job.mode} job a poor fit for delegation. Running anyway; ${ordered.length} sources remain selected.`,
+                                    "warning",
+                                );
+                                effects.push("warning");
+                            }
 
-                if (advice.canonicalKey && typeof event.input?.canonicalKey !== "string") {
-                    event.input.canonicalKey = advice.canonicalKey;
+                            return { applied: effects.length > 0, effects };
+                        },
+                    });
+                } catch {
+                    // One unavailable job must not prevent the next job or the delegation call.
                 }
-
-                if (advice.suggestedFix && !event.input?.suggestedFix) {
-                    event.input.suggestedFix = advice.suggestedFix;
-                }
-
-                // Recorded alongside the model's own claim, never over it: a human reading the
-                // wishlist should still see what was originally reported.
-                if (advice.independentImpact) {
-                    event.input.independentImpact = advice.independentImpact;
-                }
-            } catch {
-                return;
             }
+        }
+    });
 
+    // Wishlist owns collection and persistence. This handshake runs only after its local consent
+    // gate; advisory fields never enter model-authored tool arguments or its authority decisions.
+    pi.events.on("specpi:gap-triage", (request: any) => {
+        if (!enabled("gap")) {
             return;
         }
 
-        // System 4: order the sources a delegation batch will snapshot. Ordering only — the same
-        // set is frozen either way, but a child pages through `list_sources` in this order.
-        if (event.toolName === "delegate" && enabled("sources") && Array.isArray(event.input?.sources)) {
-            try {
-                const candidates = event.input.sources
-                    .filter((item: unknown) => typeof item === "string")
-                    .map((item: string) => ({ path: item }));
-                if (candidates.length < 2) {
-                    return;
-                }
-
+        request.reply(
+            (async () => {
+                const existing = gap.shortlist(request.existing(), request.gap);
+                let stored: any;
+                let blocked = false;
+                let storageError: unknown;
                 const result = await broker.request({
-                    system: "sources",
-                    state: sources.buildInput({ question: event.input?.question ?? objective, candidates }),
-                    questions: sources.questions({ candidates }),
-                    ctx,
-                    root: ctx.cwd,
-                    decide: (answers: any) => {
-                        const built = sources.decide(answers, candidates);
-                        const order = built.ordered.map((item: any) => item.path);
-                        // An ungated run returns the caller's own order, which is not a change and
-                        // must not be recorded as one.
-                        const moved = order.some((item: string, index: number) => item !== candidates[index]?.path);
+                    system: "gap",
+                    profile: "gap",
+                    state: gap.buildInput({ gap: request.gap, existing }),
+                    questions: gap.questions({ existing }),
+                    ctx: request.ctx,
+                    root: request.ctx.cwd,
+                    signal: request.signal,
+                    isCurrent: request.isCurrent,
+                    decide: (answers: any) => ({ decision: gap.decide(answers, existing) }),
+                    apply: async (advice: any, { isCurrent, recordEffect }: any) => {
+                        if (advice.blockForSanitization) {
+                            blocked = true;
 
-                        return { applied: moved, decision: { ranked: built, ordered: order } };
+                            return { applied: true, effects: ["report-blocked"] };
+                        }
+
+                        try {
+                            stored = await request.record(advice, {
+                                isCurrent,
+                                onRecorded: ({ assessmentRecorded }: any) => {
+                                    if (assessmentRecorded) {
+                                        recordEffect("assessment-recorded");
+                                    }
+                                },
+                            });
+                        } catch (error) {
+                            storageError = error;
+                            throw error;
+                        }
+
+                        return {
+                            applied: stored.assessmentRecorded,
+                            effects: stored.assessmentRecorded ? ["assessment-recorded"] : [],
+                        };
                     },
                 });
-                if (!result.ok) {
-                    return;
+                if (storageError) {
+                    throw storageError;
                 }
 
-                const { ranked, ordered } = result.decision;
-                const missing = event.input.sources.filter((item: string) => !ordered.includes(item));
-                event.input.sources = [...ordered, ...missing];
-
-                // Two answers the same batch already computed and nothing read. Output is free, so
-                // they were paid for whether or not anyone looked. A confident "this is not a
-                // self-contained evidence question" is worth surfacing before specpi-delegation
-                // freezes up to 200 files and 8 MiB for a child that then cannot answer it.
-                //
-                // Advisory only, and deliberately so: the batch still runs, the ceilings are
-                // unchanged, and with no UI this says nothing rather than blocking.
-                if (ranked.notWorthDelegating && ctx.hasUI) {
-                    ctx.ui.notify(
-                        `Jev rates this a poor fit for delegation${ranked.jobMode ? ` (it reads as ${ranked.jobMode} work)` : ""}. Running anyway; ${ordered.length + missing.length} sources will be frozen for the child.`,
-                        "warning",
-                    );
+                if (blocked) {
+                    return { blocked: true };
                 }
-            } catch {
-                return;
-            }
-        }
+
+                if (stored) {
+                    return { stored };
+                }
+
+                if (["session-changed", "context-changed"].includes(result.reason)) {
+                    return { cancelled: true };
+                }
+
+                return undefined;
+            })(),
+        );
     });
 
     // System 5: notice a session that has stopped making progress, while it can still be helped.
@@ -478,10 +591,13 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         // Recorded before the call rather than after, so a slow answer cannot let the next turn ask
         // again while this one is still in flight.
         history.askedAtTurn = history.turn;
+        const generation = taskGeneration;
         void (async () => {
             try {
-                const result = await broker.request({
+                await broker.request({
                     system: "progress",
+                    profile: "progress",
+                    isCurrent: () => generation === taskGeneration,
                     state: progress.buildInput({ history, objective, reasons: local.reasons }),
                     questions: progress.questions(),
                     ctx,
@@ -490,53 +606,54 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                         const advice = progress.decide(answers);
 
                         return {
-                            applied: Boolean(advice.nudge),
                             reason: advice.nudge ? advice.mode : advice.stuck ? "stuck-but-mode-ungated" : "not-stuck",
                             decision: advice,
                         };
                     },
+                    apply: (advice: any) => {
+                        const effects = [];
+                        if (!advice.nudge || history.nudged) {
+                            return { applied: false };
+                        }
+
+                        if (ctx.hasUI) {
+                            ctx.ui.notify(
+                                advice.needsHuman
+                                    ? `Jev progress check: this session looks blocked on something only you can answer. ${advice.nudge}`
+                                    : `Jev progress check: ${advice.nudge}`,
+                                "warning",
+                            );
+                            effects.push("notification");
+                        }
+
+                        // Queue one fixed instruction, never trigger an extra turn. Queueing is
+                        // observable; eventual consumption by the model is not claimed here.
+                        if (
+                            settings.progressNudge === "message" &&
+                            !advice.needsHuman &&
+                            typeof pi.sendMessage === "function"
+                        ) {
+                            pi.sendMessage(
+                                {
+                                    customType: "specpi-jev-progress",
+                                    content: advice.nudge,
+                                    display: true,
+                                    details: { mode: advice.mode, reasons: local.reasons },
+                                },
+                                { deliverAs: "steer" },
+                            );
+                            effects.push("steering-queued");
+                        }
+
+                        history.nudged = effects.length > 0;
+
+                        return {
+                            applied: effects.length > 0,
+                            effects,
+                            reason: effects.length > 0 ? advice.mode : "no-delivery-channel",
+                        };
+                    },
                 });
-                if (!result.ok || !result.decision?.nudge) {
-                    return;
-                }
-
-                // Write-once, per the standing rule. A second nudge would either repeat a line the
-                // model already has or contradict it, and neither can be withdrawn: it was appended
-                // to a prefix that is cached behind it by the time anyone regrets it.
-                history.nudged = true;
-                if (ctx.hasUI) {
-                    ctx.ui.notify(
-                        result.decision.needsHuman
-                            ? `Jev progress check: this session looks blocked on something only you can answer. ${result.decision.nudge}`
-                            : `Jev progress check: ${result.decision.nudge}`,
-                        "warning",
-                    );
-                }
-
-                // The plan specified `deliverAs: "nextTurn"`, which is documented as "queued for
-                // next user prompt, does not interrupt or trigger anything". An unattended session
-                // has exactly one user prompt, so a nextTurn message would never be delivered -- in
-                // precisely the case the argument for this system rests on, a headless attempt
-                // burning its wall clock. "steer" is delivered after the current tool calls finish
-                // and before the next model request, which is the same append at the same boundary
-                // and is actually read. triggerTurn is left off so this can never add a turn.
-                // Suppressed when the session is blocked on something only a person can answer:
-                // steering a model past a missing credential costs a turn to say nothing.
-                if (
-                    settings.progressNudge === "message" &&
-                    !result.decision.needsHuman &&
-                    typeof pi.sendMessage === "function"
-                ) {
-                    pi.sendMessage(
-                        {
-                            customType: "specpi-jev-progress",
-                            content: result.decision.nudge,
-                            display: true,
-                            details: { mode: result.decision.mode, reasons: local.reasons },
-                        },
-                        { deliverAs: "steer" },
-                    );
-                }
             } catch {
                 // The turn has already ended. An advisor must not be able to fail it retroactively.
             }
@@ -696,9 +813,10 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                         return;
                     }
 
-                    const lines = entries.map(
-                        (entry: any) =>
-                            `${entry.at} ${entry.system} ${entry.stateBytes}B ${entry.ok ? `${entry.latencyMs}ms` : entry.reason} ${String(entry.payloadSha256 ?? "").slice(0, 12)} [${(entry.questionKeys ?? []).join(", ")}]`,
+                    const lines = entries.map((entry: any) =>
+                        entry.sent === false
+                            ? `${entry.at} ${entry.system} local abstention: ${entry.reason}`
+                            : `${entry.at} ${entry.system} ${entry.stateBytes}B ${entry.ok ? `${entry.latencyMs}ms` : entry.reason} ${String(entry.payloadSha256 ?? "").slice(0, 12)} [${(entry.questionKeys ?? []).join(", ")}]`,
                     );
                     ctx.ui.notify(`${lines.join("\n")}\n\nLedger: ${ledgerPath()}`, "info");
 

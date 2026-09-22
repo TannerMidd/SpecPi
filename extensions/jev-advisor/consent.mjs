@@ -20,6 +20,12 @@ import { MAX_STATE_BYTES } from "./sanitize.mjs";
  * and a TYPESAFE_BASE_URL override) names itself, and so the rule below is true rather than
  * aspirational: a grant is keyed on this string, so repointing the client really does ask again.
  */
+export const CONSENT_SCHEMA = 2;
+
+export function endpointOrigin() {
+    return new URL(baseUrl()).origin;
+}
+
 export function endpointLabel() {
     const base = baseUrl();
     try {
@@ -43,12 +49,12 @@ export function loadConsent() {
         }
 
         const stored = JSON.parse(fs.readFileSync(file, "utf8"));
-        if (stored?.schema !== 1 || stored.granted !== true || typeof stored.endpoint !== "string") {
+        if (stored?.schema !== CONSENT_SCHEMA || stored.granted !== true || typeof stored.endpoint !== "string") {
             return undefined;
         }
 
         // A grant is for the endpoint it was given for. Repointing the client asks again.
-        return stored.endpoint === endpointLabel() ? stored : undefined;
+        return stored.endpoint === endpointLabel() && stored.origin === endpointOrigin() ? stored : undefined;
     } catch {
         return undefined;
     }
@@ -65,9 +71,11 @@ export function saveConsent() {
     }
 
     const stored = {
-        schema: 1,
+        // Earlier consent incorrectly excluded file/command samples. It cannot authorize them.
+        schema: CONSENT_SCHEMA,
         granted: true,
         endpoint: endpointLabel(),
+        origin: endpointOrigin(),
         maxStateBytes: MAX_STATE_BYTES,
         grantedAt: new Date().toISOString(),
     };
@@ -89,15 +97,19 @@ export function consentPath() {
     return consentFile();
 }
 
-export const CONSENT_TITLE = "Allow SpecPi to send task summaries to Jev?";
+export const CONSENT_TITLE = "Allow SpecPi to send task summaries and text samples to Jev?";
 
 export function consentBody(systemLabel) {
     return [
         `${systemLabel} wants to ask TypeSafe's Jev classifier a question about this session.`,
         "",
-        `What is sent: a summary object of at most ${MAX_STATE_BYTES} bytes to ${endpointLabel()}, over HTTPS.`,
-        "It carries tool names, byte counts, relative paths and short descriptions.",
-        "It never carries file contents, command output, credentials, URLs or session history.",
+        `What is sent: a state object of at most ${MAX_STATE_BYTES} bytes to ${endpointLabel()}, with classifier questions.`,
+        `Transport: ${new URL(baseUrl()).protocol === "https:" ? "HTTPS" : "not HTTPS (configured endpoint override)"}.`,
+        "It may include the current request or objective, relative paths, capability-gap summaries,",
+        "and short sampled lines from file contents, command output and fetched content.",
+        "Known credential, email, URL and outside-workspace path patterns are redacted before sending.",
+        "Redaction is best effort, not a guarantee that every sensitive detail is removed. No session history is read.",
+        "Collection stays local unless you separately allow this advisor transmission.",
         "",
         "Every call is recorded locally in transmissions.jsonl with a hash of exactly what was sent,",
         "which you can read with /jev ledger. Turn this off at any time with /jev off.",

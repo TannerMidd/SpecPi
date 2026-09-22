@@ -1,13 +1,7 @@
-// System 4: pre-rank the sources a delegation batch is about to snapshot.
-//
-// specpi-delegation freezes up to 200 files / 8 MiB for a child that can read the selection and
-// nothing else. A wrong selection costs twice: the snapshot itself, and a child that cannot answer
-// the question it was given. Ranking is advisory — the parent still chooses, the ceilings are
-// unchanged, and this lives in SpecPi's advisor rather than in the published package, so
-// specpi-delegation keeps its one-sentence boundary and gains no network dependency.
-
-import { choice, noul, score } from "../client.mjs";
-import { choiceValue, nounFalse, nounTrue, scoreLevel } from "../gate.mjs";
+// Rank each delegation job's selected sources, never select or remove sources. Paths are state,
+// not question instructions. The 1 KiB evidence budget may cause a large job to abstain locally.
+import { noul, score } from "../client.mjs";
+import { nounFalse, nounTrue, scoreLevel } from "../gate.mjs";
 import { compact } from "../sanitize.mjs";
 
 export const RELEVANCE_LEVELS = Object.freeze([
@@ -15,35 +9,29 @@ export const RELEVANCE_LEVELS = Object.freeze([
     "Possibly relevant background",
     "Very likely to contain the answer",
 ]);
+export const MAX_CANDIDATES = 40;
 
-/** Paths and shape only. File contents are exactly what the child is being given access to read. */
-export function buildInput({ question, candidates }) {
+export function buildInput({ question, mode, candidates }) {
     return {
-        question: compact(question ?? "", 200),
-        candidates: candidates.slice(0, 40).map((item) => ({
-            path: compact(item.path, 80),
-            bytes: item.bytes ?? 0,
-        })),
+        question: compact(question ?? "", 220),
+        mode,
+        candidates: candidates.map((item, index) => ({ id: `source_${index}`, path: item.path })),
     };
 }
 
-/**
- * One Score per candidate in a single call. Questions are evaluated in parallel against one state,
- * so forty scores cost one state rather than forty, and output is free.
- */
 export function questions({ candidates }) {
+    if (candidates.length > MAX_CANDIDATES) {
+        return {};
+    }
+
     const asked = {
-        job_mode: choice("What is being asked of the child session?", {
-            review: "Check finished work against stated requirements",
-            scout: "Answer one evidence question over the sources",
-        }),
         worth_delegating: noul(
-            "This is a self-contained evidence question that a child session with read-only access could answer",
+            "Given its declared mode, can a read-only child answer this job's question from the selected sources?",
         ),
     };
-    for (const [index, item] of candidates.slice(0, 40).entries()) {
+    for (let index = 0; index < candidates.length; index += 1) {
         asked[`source_${index}`] = score(
-            `How likely is ${compact(item.path, 80)} to contain what the question needs?`,
+            `How likely is candidate source_${index} in the state to contain what the question needs?`,
             RELEVANCE_LEVELS,
         );
     }
@@ -51,41 +39,24 @@ export function questions({ candidates }) {
     return asked;
 }
 
-/**
- * Ordering only. Ungated scores keep their original position rather than being dropped, so a
- * low-confidence run degrades to the caller's own ordering instead of a truncated selection.
- */
+/** Only gated slots are reordered. Ungated sources stay at their original indices. */
 export function decide(answers, candidates) {
-    const ranked = candidates.slice(0, 40).map((item, index) => ({
-        ...item,
+    const ranked = candidates.map((item, index) => ({
+        item,
         level: scoreLevel(answers?.[`source_${index}`], "sources"),
         position: index,
     }));
-    ranked.sort((a, b) => {
-        if (a.level === b.level) {
-            return a.position - b.position;
-        }
-
-        if (a.level === undefined) {
-            return 1;
-        }
-
-        if (b.level === undefined) {
-            return -1;
-        }
-
-        return b.level - a.level;
-    });
+    const gated = ranked.filter((item) => item.level !== undefined && item.level <= 2);
+    const sorted = [...gated].sort((a, b) => b.level - a.level || a.position - b.position);
+    const ordered = [...candidates];
+    for (const [index, slot] of gated.entries()) {
+        ordered[slot.position] = sorted[index].item;
+    }
 
     return {
-        ordered: ranked.map(({ level, position, ...item }) => item),
-        unrelated: ranked.filter((item) => item.level === 0).map((item) => item.path),
-        jobMode: choiceValue(answers?.job_mode, "sources"),
+        ordered,
+        unrelated: gated.filter((item) => item.level === 0).map((item) => item.item.path),
         worthDelegating: nounTrue(answers?.worth_delegating, "sources"),
-        // The useful half. A confident yes tells the caller what it already decided by calling
-        // delegate; a confident no is a warning worth having before up to 200 files and 8 MiB are
-        // frozen for a child that cannot answer the question anyway. Both were computed and thrown
-        // away, and output is free, so they were already paid for.
         notWorthDelegating: nounFalse(answers?.worth_delegating, "sources"),
     };
 }

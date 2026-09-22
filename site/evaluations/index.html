@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
-            content="Four coding harnesses on Terminal-Bench 2.0, one model, one frozen price list. Solve rate barely separates them; what they spend to get there differs severalfold."
+            content="Four coding harnesses on Terminal-Bench 2.0: solve rates, token use, caching and cost."
         />
         <meta property="og:title" content="Evaluations · SpecPi" />
         <meta
@@ -44,30 +44,27 @@
             <aside class="wiki-sidebar" aria-label="Evaluation contents">
                 <p>SPECPI / EVALUATIONS</p>
                 <nav>
-                    <a href="#summary"><span>01</span>Summary</a><a href="#method"><span>02</span>Method</a
-                    ><a href="#solved"><span>03</span>Did it solve it?</a
-                    ><a href="#spend"><span>04</span>What it spent</a><a href="#cache"><span>05</span>Cache</a
-                    ><a href="#tasks"><span>06</span>Task by task</a
-                    ><a href="#limits"><span>07</span>What this is not</a>
+                    <a href="#summary"><span>01</span>Summary</a>
+                    <a href="#method"><span>02</span>Method</a>
+                    <a href="#solved"><span>03</span>Solve rate</a>
+                    <a href="#spend"><span>04</span>Tokens and cost</a>
+                    <a href="#cache"><span>05</span>Cache</a>
+                    <a href="#tasks"><span>06</span>Task by task</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.30.0<br />Pi 0.84.4<br /><span id="meta-generated"></span><br /><span id="meta-status"></span></div>
+                <div class="index-meta">SpecPi 0.30.1<br />Pi 0.84.4<br /><span id="meta-generated"></span><br /><span id="meta-status"></span></div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
                     <p class="eyebrow">Evaluations</p>
-                    <h1>Same answers.<br />Different bills.</h1>
+                    <h1>Four harnesses.<br />One benchmark.</h1>
                     <p class="wiki-summary">
-                        Four coding harnesses on <a class="text-link" href="https://www.tbench.ai/">Terminal-Bench
-                        2.0</a>, one model, one frozen price list. Nothing separates them on whether the task gets
-                        solved. What it costs to get there differs by more than two to one among the rows that could
-                        be measured.
+                        Pi, SpecPi&nbsp;+&nbsp;Jev, Oh My Pi and Claude Code on
+                        <a class="text-link" href="https://www.tbench.ai/">Terminal-Bench 2.0</a>.
+                        Same model and endpoint.
                     </p>
                     <p class="wiki-release-note">
-                        This run is <b>still in progress</b>, and the page is published as it stands rather than when
-                        it is finished. Every figure is redrawn from
-                        <a class="text-link" href="./terminal-bench-2.json">terminal-bench-2.json</a> by one command,
-                        so nothing here is typed in by hand. Section 07 lists what is missing and what is known to be
-                        wrong.
+                        <b>Run in progress.</b> SpecPi without Jev was not tested.
+                        <a class="text-link" href="./terminal-bench-2.json">View the data.</a>
                     </p>
                 </div>
 
@@ -76,71 +73,11 @@
                         <h2>Summary</h2>
                         <span>01</span>
                     </header>
-                    <div class="callout callout-warn">
-                        <p>
-                            <strong>These runs are in progress. Nothing on this page is a final figure.</strong>
-                            The benchmark was stopped part way and this is what had completed when it was. Arms are
-                            missing, one harness's spend columns are placeholders rather than measurements, and one
-                            slice is not the same shape as the others. Every number here can still move.
-                            <a class="text-link" href="#limits">Section 07</a> is the list.
-                        </p>
-                    </div>
                     <p>
-                        This page used to carry a suite written in this repository, six tiers of it. It was retired
-                        because of what it kept reporting: nearly every harness passed nearly every task, so the
-                        thing it was built to measure was the thing it could not see. A suite cannot mark its own
-                        homework, and after three rounds of harder tasks the honest move was to stop grading and go
-                        and find tasks nobody here had chosen.
+                        No statistically significant solve-rate difference. SpecPi&nbsp;+&nbsp;Jev cost
+                        <b data-eval="cost-cut"></b> less per attempt than bare Pi in these runs.
                     </p>
-                    <p>
-                        Terminal-Bench 2.0 is those tasks. The runs below put Pi with no harness at all beside
-                        SpecPi&nbsp;+&nbsp;Jev, Oh&nbsp;My&nbsp;Pi and Claude&nbsp;Code, on the same model through the
-                        same endpoint, and the first thing they establish is that the outside benchmark does not
-                        separate them either.
-                    </p>
-                    <dl class="verdict">
-                        <div>
-                            <dt>Measured</dt>
-                            <dd>
-                                <strong>Solve rate does not separate the harnesses.</strong>
-                                The four rows span <b data-eval="solve-low"></b> to <b data-eval="solve-high"></b>
-                                over <b data-eval="attempts"></b> attempts. Pi against SpecPi&nbsp;+&nbsp;Jev is
-                                Fisher <i>p</i>&nbsp;=&nbsp;0.83, which is no difference at all.
-                            </dd>
-                        </div>
-                        <div>
-                            <dt>Measured</dt>
-                            <dd>
-                                <strong>The same work costs severalfold more depending on the harness.</strong>
-                                Among the three rows whose cache could be measured, cost per attempt spans
-                                <b data-eval="cost-spread"></b>. That is the finding the score column hides.
-                            </dd>
-                        </div>
-                        <div>
-                            <dt>Measured</dt>
-                            <dd>
-                                <strong>The layer pays for itself in tokens, not in answers.</strong>
-                                SpecPi&nbsp;+&nbsp;Jev reaches the same solve rate as bare Pi on
-                                <b data-eval="token-cut"></b> fewer prompt tokens and
-                                <b data-eval="cost-cut"></b> less spend per attempt.
-                            </dd>
-                        </div>
-                        <div>
-                            <dt>Not measured</dt>
-                            <dd>
-                                <strong>Claude Code's cache and cost.</strong>
-                                Its rows reached the provider through a translation that did not map the cached share
-                                back, so its cache is absent rather than zero and its cost is an upper bound. The
-                                mapping is fixed; these runs predate the fix.
-                            </dd>
-                        </div>
-                    </dl>
                     <div class="metric-row" id="metric-row"></div>
-                    <p>
-                        The shape of the result is the same one the retired suite found and could not defend: harness
-                        overhead is charged on every model call, so it scales with the length of the work rather than
-                        amortising over it. What is new is that the tasks are somebody else's.
-                    </p>
                 </section>
 
                 <section class="doc-section" id="method">
@@ -148,75 +85,41 @@
                         <h2>How it is measured</h2>
                         <span>02</span>
                     </header>
-                    <p>
-                        Every arm runs the same tasks through
-                        <a class="text-link" href="https://github.com/laude-institute/harbor">Harbor</a> on Docker,
-                        against <code>deepseek-v4.1-flash</code> on one endpoint and one key. Nothing about the model,
-                        the provider or the task set differs between rows, so what differs is the harness.
-                    </p>
-                    <p>
-                        Two slices ran. The first was calibration and is reported as such: seven tasks at five
-                        attempts, of which six went the same way for every arm. A task that every harness solves, or
-                        that none does, carries no information about harnesses, so the second slice widened to
-                        thirteen tasks picked for spread rather than for difficulty. The comparison rests on the
-                        widened slice; the calibration slice is here because leaving out the run that shaped the
-                        design would misrepresent how the design was arrived at.
-                    </p>
-                    <p>
-                        Reward and token counts are read from Harbor's own per-trial record rather than from each
-                        harness's trajectory, because Harbor reports them in one shape for every agent and reward and
-                        tokens are the whole of what this section claims. Cost is recomputed from those tokens at the
-                        <a class="text-link" href="https://github.com/TannerMidd/SpecPi/blob/main/evals/prices.json"
-                            >frozen price list</a
-                        >, never taken from a harness's self-report: Claude Code prices its own run at Anthropic's
-                        rates for a model that was DeepSeek, which overstates by about two orders of magnitude.
-                    </p>
-                    <p>
-                        The runs themselves are deliberately not in this repository. Terminal-Bench task content
-                        carries canary strings that are not meant to enter a training corpus, so only aggregates and
-                        public task names cross into the data file.
-                    </p>
-                    <div class="callout">
-                        <p>
-                            <strong>One task is dropped and one trial is unscored.</strong>
-                            Every arm's trials on <code>pytorch-model-recovery</code> produce zero tokens in about two
-                            seconds, which is the task's environment failing to build rather than four harnesses
-                            failing to solve it; counting those cells would put unmeasured work in the denominator.
-                            One Claude Code trial ended in a setup timeout and is reported as unscored rather than as
-                            a loss.
-                        </p>
-                    </div>
+                    <ul>
+                        <li>
+                            <b>Setup:</b> <code>deepseek-v4.1-flash</code>, one endpoint,
+                            <a class="text-link" href="https://github.com/laude-institute/harbor">Harbor</a> on Docker.
+                        </li>
+                        <li>
+                            <b>Trials:</b> 7 calibration tasks &times; 5 attempts; 13 widened tasks &times; 3
+                            (Oh My Pi &times; 6).
+                        </li>
+                        <li>
+                            <b>Scoring:</b> Harbor rewards and token counts. Costs use the
+                            <a class="text-link" href="https://github.com/TannerMidd/SpecPi/blob/main/evals/prices.json"
+                                >frozen price list</a
+                            >.
+                            One broken task excluded; one setup timeout unscored.
+                        </li>
+                    </ul>
                 </section>
 
                 <section class="doc-section" id="solved">
                     <header>
-                        <h2>Did it solve the task?</h2>
+                        <h2>Solve rate</h2>
                         <span>03</span>
                     </header>
                     <p>
-                        This is the column the benchmark exists for, and it is the one that answers least. The
-                        harnesses finish within a few points of each other on both slices, and the gaps that do appear
-                        are inside what a few dozen attempts can tell apart.
+                        Pi and SpecPi&nbsp;+&nbsp;Jev both solved 30/39 widened attempts.
+                        Their pooled difference is not significant (Fisher <i>p</i>&nbsp;=&nbsp;0.83).
                     </p>
                     <figure class="chart-figure">
                         <!-- chart-solve --><svg class="chart" id="chart-solve" viewBox="0 0 720 309" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Solved, per attempt"><text x="0" y="18" class="ct-lb">Solved, per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="273" stroke="var(--line)" opacity=".85" /><text x="150.0" y="290" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="260.0" y="290" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="370.0" y="290" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="480.0" y="290" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="590.0" y="290" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="377.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="535.1" y="78" class="ct-val">30/35</text><rect x="150.0" y="87" width="402.3" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="560.3" y="100" class="ct-val">32/35</text><rect x="150.0" y="109" width="389.7" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="547.7" y="122" class="ct-val">31/35</text><rect x="150.0" y="131" width="389.7" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">Claude Code</text><text x="547.7" y="144" class="ct-val">31/35</text><text x="0" y="179" class="ct-row">Widened · 13 tasks × 3 and 6</text><rect x="150.0" y="186" width="338.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">Pi (base)</text><text x="496.5" y="199" class="ct-val">30/39</text><rect x="150.0" y="208" width="338.5" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="496.5" y="221" class="ct-val">30/39</text><rect x="150.0" y="230" width="332.8" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="490.8" y="243" class="ct-val">59/78</text><rect x="150.0" y="252" width="289.5" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">Claude Code</text><text x="447.5" y="265" class="ct-val">25/38</text><text x="0" y="303" class="ct-ax">share of attempts reaching reward 1</text></svg><!-- /chart-solve -->
                         <figcaption class="figure-note">
-                            Share of attempts reaching reward 1, by slice. Bands are labelled with the shape of the
-                            work; Oh My Pi's widened slice ran twice, which section 07 explains.
+                            Reward 1 counts as solved. A duplicate launch gave Oh My Pi six widened attempts per
+                            task and 12-way concurrency, versus three attempts and six-way concurrency for the others.
                         </figcaption>
                     </figure>
-                    <p>
-                        <b>No pair of rows separates.</b> Pi against SpecPi&nbsp;+&nbsp;Jev is Fisher
-                        <i>p</i>&nbsp;=&nbsp;0.83 pooled, and exactly 30/39 each on the widened slice. Pi against
-                        Claude Code is <i>p</i>&nbsp;=&nbsp;0.55. Reporting any of these orderings as a ranking would
-                        be reading noise.
-                    </p>
-                    <p>
-                        That is worth stating plainly because it is the second suite to find it. The retired tier
-                        suite could not separate harnesses on solve rate, and the usual explanation was that its tasks
-                        were too easy. These tasks are not this repository's, were not chosen to be passed, and about
-                        a fifth of the attempts fail &mdash; and the arms still land together.
-                    </p>
                     <div class="table-scroll" id="table-overall">
                         <!-- table-overall --><table class="numeric"><thead><tr><th>Harness</th><th>Solved</th><th>Rate</th><th>Prompt tok</th><th>Output tok</th><th>Cache hit</th><th>Cost/attempt</th></tr></thead><tbody><tr><th>Pi (base)</th><td>60/74</td><td>0.811</td><td>512,903</td><td>16,423</td><td>93.7%</td><td>$0.0161</td></tr><tr><th>SpecPi + Jev</th><td>62/74</td><td>0.838</td><td>381,153</td><td>13,711</td><td>94.5%</td><td>$0.0125</td></tr><tr><th>Oh My Pi</th><td>90/113</td><td>0.796</td><td>1,103,136</td><td>23,377</td><td>97.4%</td><td>$0.0216</td></tr><tr><th>Claude Code</th><td>56/73</td><td>0.767</td><td>630,410</td><td>30,353</td><td>not measured</td><td>$0.1128 or less</td></tr></tbody></table><!-- /table-overall -->
                     </div>
@@ -224,41 +127,26 @@
 
                 <section class="doc-section" id="spend">
                     <header>
-                        <h2>What it spent to get there</h2>
+                        <h2>Tokens and cost</h2>
                         <span>04</span>
                     </header>
                     <p>
-                        With the answers held level, the interesting variable is what each harness burned reaching
-                        them. Here the rows are not close.
+                        SpecPi&nbsp;+&nbsp;Jev used <b data-eval="token-cut"></b> fewer prompt tokens per attempt
+                        than bare Pi.
                     </p>
                     <figure class="chart-figure">
                         <!-- chart-tokens --><svg class="chart" id="chart-tokens" viewBox="0 0 720 309" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt tokens per attempt"><text x="0" y="18" class="ct-lb">Prompt tokens per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="273" stroke="var(--line)" opacity=".85" /><text x="150.0" y="290" text-anchor="middle" class="ct-ax">0k</text><line x1="260.0" y1="34" x2="260.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="260.0" y="290" text-anchor="middle" class="ct-ax">375k</text><line x1="370.0" y1="34" x2="370.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="370.0" y="290" text-anchor="middle" class="ct-ax">750k</text><line x1="480.0" y1="34" x2="480.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="480.0" y="290" text-anchor="middle" class="ct-ax">1125k</text><line x1="590.0" y1="34" x2="590.0" y2="273" stroke="var(--line)" opacity=".45" /><text x="590.0" y="290" text-anchor="middle" class="ct-ax">1500k</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="92.7" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="250.7" y="78" class="ct-val">315,895</text><rect x="150.0" y="87" width="79.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="237.0" y="100" class="ct-val">269,423</text><rect x="150.0" y="109" width="181.6" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="339.6" y="122" class="ct-val">618,939</text><rect x="150.0" y="131" width="136.1" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">Claude Code</text><text x="294.1" y="144" class="ct-val">463,868</text><text x="0" y="179" class="ct-row">Widened · 13 tasks × 3 and 6</text><rect x="150.0" y="186" width="202.3" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">Pi (base)</text><text x="360.3" y="199" class="ct-val">689,706</text><rect x="150.0" y="208" width="141.2" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="299.2" y="221" class="ct-val">481,424</text><rect x="150.0" y="230" width="387.3" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="545.3" y="243" class="ct-val">1,320,404</text><rect x="150.0" y="252" width="229.9" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">Claude Code</text><text x="387.9" y="265" class="ct-val">783,804</text><text x="0" y="303" class="ct-ax">tokens sent, summed over the attempt's model calls</text></svg><!-- /chart-tokens -->
                         <figcaption class="figure-note">
-                            Mean prompt tokens per attempt, summed over the attempt's model calls. Cache rereads are
-                            included, because they are sent whether or not they are billed in full.
+                            Mean prompt tokens per attempt, including cache rereads.
                         </figcaption>
                     </figure>
-                    <p>
-                        <b>SpecPi&nbsp;+&nbsp;Jev does the same work on
-                        <span data-eval="token-cut"></span> fewer prompt tokens than bare Pi.</b>
-                        Same model, same tasks, same solve rate, a quarter less context. The layer's cost is a longer
-                        system prompt and an advisor call; what it buys back is fewer turns spent rediscovering the
-                        state of the workspace, and on this evidence the trade clears.
-                    </p>
                     <figure class="chart-figure">
                         <!-- chart-cost --><svg class="chart" id="chart-cost" viewBox="0 0 720 265" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Cost per attempt"><text x="0" y="18" class="ct-lb">Cost per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="229" stroke="var(--line)" opacity=".85" /><text x="150.0" y="246" text-anchor="middle" class="ct-ax">$0.000</text><line x1="260.0" y1="34" x2="260.0" y2="229" stroke="var(--line)" opacity=".45" /><text x="260.0" y="246" text-anchor="middle" class="ct-ax">$0.007</text><line x1="370.0" y1="34" x2="370.0" y2="229" stroke="var(--line)" opacity=".45" /><text x="370.0" y="246" text-anchor="middle" class="ct-ax">$0.015</text><line x1="480.0" y1="34" x2="480.0" y2="229" stroke="var(--line)" opacity=".45" /><text x="480.0" y="246" text-anchor="middle" class="ct-ax">$0.022</text><line x1="590.0" y1="34" x2="590.0" y2="229" stroke="var(--line)" opacity=".45" /><text x="590.0" y="246" text-anchor="middle" class="ct-ax">$0.030</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="157.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="315.9" y="78" class="ct-val">$0.0108</text><rect x="150.0" y="87" width="117.4" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="275.4" y="100" class="ct-val">$0.0080</text><rect x="150.0" y="109" width="178.3" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="336.3" y="122" class="ct-val">$0.0122</text><text x="0" y="157" class="ct-row">Widened · 13 tasks × 3 and 6</text><rect x="150.0" y="164" width="307.4" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">Pi (base)</text><text x="465.4" y="177" class="ct-val">$0.0210</text><rect x="150.0" y="186" width="241.5" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="399.5" y="199" class="ct-val">$0.0165</text><rect x="150.0" y="208" width="379.4" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="537.4" y="221" class="ct-val">$0.0259</text><text x="0" y="259" class="ct-ax">USD at the frozen price list, for the rows whose cached share was recorded</text></svg><!-- /chart-cost -->
                         <figcaption class="figure-note">
-                            Mean cost per attempt at the frozen price list. Claude Code is absent: its cached share
-                            was not recorded, so its cost is a bound rather than a measurement and sits at six times
-                            the largest bar here. The table in section 03 carries it.
+                            Mean cost per attempt. Claude Code's cache was not recorded, so its cost is an upper bound
+                            in the table, not a bar here.
                         </figcaption>
                     </figure>
-                    <p>
-                        Cost follows tokens, discounted by whatever the provider cached. Among the three rows where
-                        that discount could be measured, the spread is
-                        <span data-eval="cost-spread"></span> &mdash; and the cheapest row is not the one that solves
-                        least.
-                    </p>
                 </section>
 
                 <section class="doc-section" id="cache">
@@ -266,34 +154,13 @@
                         <h2>Cache</h2>
                         <span>05</span>
                     </header>
-                    <p>
-                        Prompt caching is what makes a long agent session affordable, so the cached share is the
-                        single number that most changes what a harness costs. All three measurable rows sit above 93%,
-                        which says the endpoint caches well for every one of them and that the token differences above
-                        are real work rather than cache misses.
-                    </p>
                     <figure class="chart-figure">
                         <!-- chart-cache --><svg class="chart" id="chart-cache" viewBox="0 0 720 147" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt cache hit rate"><text x="0" y="18" class="ct-lb">Prompt cache hit rate</text><line x1="150.0" y1="34" x2="150.0" y2="111" stroke="var(--line)" opacity=".85" /><text x="150.0" y="128" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="111" stroke="var(--line)" opacity=".45" /><text x="260.0" y="128" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="111" stroke="var(--line)" opacity=".45" /><text x="370.0" y="128" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="111" stroke="var(--line)" opacity=".45" /><text x="480.0" y="128" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="111" stroke="var(--line)" opacity=".45" /><text x="590.0" y="128" text-anchor="middle" class="ct-ax">100%</text><rect x="150.0" y="46" width="412.3" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="59" text-anchor="end" class="ct-sub">Pi (base)</text><text x="570.3" y="59" class="ct-val">93.7%</text><rect x="150.0" y="68" width="415.7" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="81" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="573.7" y="81" class="ct-val">94.5%</text><rect x="150.0" y="90" width="428.4" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="103" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="586.4" y="103" class="ct-val">97.4%</text><text x="0" y="141" class="ct-ax">cached share of prompt tokens, both slices pooled</text></svg><!-- /chart-cache -->
                         <figcaption class="figure-note">
-                            Cached share of prompt tokens, both slices pooled. Claude Code has no bar because its
-                            cached share was not recorded, not because it was zero.
+                            Both slices pooled. A reporting bug left Claude Code's cached share unrecorded; missing
+                            does not mean zero.
                         </figcaption>
                     </figure>
-                    <div class="callout callout-warn">
-                        <p>
-                            <strong>Claude Code's missing bar is this run's own bug, not a result.</strong>
-                            Claude Code speaks the Anthropic Messages API and the provider speaks chat completions, so
-                            its traffic crosses a translation in this repository. That translation reported prompt
-                            tokens but never mapped the provider's cached share onto
-                            <code>cache_read_input_tokens</code>, so every trial recorded zero.
-                        </p>
-                        <p>
-                            Publishing that zero would have said Claude Code destroys cache efficiency, which the run
-                            does not show: Pi and SpecPi see 94% on the same endpoint in the same sitting. The value
-                            is published as absent, and its cost is published as an upper bound. The mapping is fixed
-                            now; the row will be replaced when the re-run finishes.
-                        </p>
-                    </div>
                 </section>
 
                 <section class="doc-section" id="tasks">
@@ -301,71 +168,17 @@
                         <h2>Task by task</h2>
                         <span>06</span>
                     </header>
-                    <p>
-                        The widened slice, broken out. Most rows are unanimous, which is the same difficulty problem
-                        the calibration slice had, in smaller form. The rows that are not unanimous are where any
-                        future signal will come from.
-                    </p>
+                    <p>Solved / scored attempts in the widened slice.</p>
                     <div class="table-scroll" id="table-tasks">
                         <!-- table-tasks --><table class="numeric"><thead><tr><th>Task</th><th>Pi (base)</th><th>SpecPi + Jev</th><th>Oh My Pi</th><th>Claude Code</th></tr></thead><tbody><tr><th><code>cobol-modernization</code></th><td>2/3</td><td>3/3</td><td>5/6</td><td>1/3</td></tr><tr><th><code>configure-git-webserver</code></th><td>2/3</td><td>1/3</td><td>2/6</td><td>1/2</td></tr><tr><th><code>extract-elf</code></th><td>3/3</td><td>2/3</td><td>5/6</td><td>2/3</td></tr><tr><th><code>fix-git</code></th><td>3/3</td><td>3/3</td><td>6/6</td><td>3/3</td></tr><tr><th><code>hf-model-inference</code></th><td>3/3</td><td>3/3</td><td>4/6</td><td>3/3</td></tr><tr><th><code>multi-source-data-merger</code></th><td>3/3</td><td>3/3</td><td>6/6</td><td>3/3</td></tr><tr><th><code>prove-plus-comm</code></th><td>3/3</td><td>3/3</td><td>6/6</td><td>3/3</td></tr><tr><th><code>pytorch-model-cli</code></th><td>1/3</td><td><strong>0/3</strong></td><td>1/6</td><td>1/3</td></tr><tr><th><code>raman-fitting</code></th><td>2/3</td><td>1/3</td><td>3/6</td><td><strong>0/3</strong></td></tr><tr><th><code>sanitize-git-repo</code></th><td><strong>0/3</strong></td><td>3/3</td><td>5/6</td><td>1/3</td></tr><tr><th><code>sqlite-with-gcov</code></th><td>3/3</td><td>3/3</td><td>4/6</td><td>3/3</td></tr><tr><th><code>tune-mjcf</code></th><td>2/3</td><td>2/3</td><td>6/6</td><td>1/3</td></tr><tr><th><code>vulnerable-secret</code></th><td>3/3</td><td>3/3</td><td>6/6</td><td>3/3</td></tr></tbody></table><!-- /table-tasks -->
                     </div>
-                    <p>
-                        <b>The sharpest single case is <code>sanitize-git-repo</code>.</b> Bare Pi solved it 0 times
-                        in 3, spending about 2.05M prompt tokens an attempt. SpecPi&nbsp;+&nbsp;Jev solved it 3 times
-                        in 3 on about 673k. One task at three attempts establishes nothing on its own, and it is
-                        listed as the extreme of a distribution rather than as a result.
-                    </p>
-                    <p>
-                        The opposite case is <code>pytorch-model-cli</code>, where every arm mostly failed and
-                        SpecPi&nbsp;+&nbsp;Jev failed outright. Both are in the table for the same reason: a page that
-                        prints only its best cell is not reporting a measurement.
-                    </p>
                 </section>
 
-                <section class="doc-section" id="limits">
-                    <header>
-                        <h2>What this does not establish</h2>
-                        <span>07</span>
-                    </header>
-                    <p>
-                        <b>It is unfinished.</b> The runs were stopped part way, and this page is what had completed
-                        when they were. Terminal-Bench 2.0's hard split and a SWE-Gym slice are planned and have not
-                        run.
-                    </p>
-                    <p>
-                        <b>Plain SpecPi is missing.</b> The arms are Pi, SpecPi&nbsp;+&nbsp;Jev, Oh&nbsp;My&nbsp;Pi and
-                        Claude Code. SpecPi without the Jev layer did not run, so nothing here separates what the
-                        harness does from what the advisory layer does.
-                    </p>
-                    <p>
-                        <b>Claude Code's cache and cost are not measurements.</b> Section 05 says why. Its solve rate
-                        is unaffected &mdash; the fault was in what the proxy reported, not in what the harness
-                        received &mdash; but its two spend columns should be read as placeholders.
-                    </p>
-                    <p>
-                        <b>Oh My Pi's widened slice is not the same shape as the others.</b> Two launches of the same
-                        script raced and wrote into one output directory, so that slice holds six attempts per task
-                        rather than three. The trials are independent and all of them count, but they ran at twelve-way
-                        concurrency instead of six, and its timeouts may owe something to that.
-                    </p>
-                    <p>
-                        <b>One model, one provider, one machine.</b> Every figure is
-                        <code>deepseek-v4.1-flash</code> through one endpoint on one Windows host. Token counts and
-                        cache behaviour are properties of that combination as much as of the harnesses, and a
-                        different model would redraw the spend charts.
-                    </p>
-                    <p>
-                        <b>Nothing here is significant.</b> At a few dozen attempts per arm, the solve-rate column is
-                        consistent with the four harnesses being equally capable, and that is how it should be read.
-                        The spend columns separate cleanly, and they are what the page is for.
-                    </p>
-                </section>
             </div>
         </main>
         <footer class="site-footer wrap">
             <p>
-                Figures generated by <code>node scripts/tb2-metrics.mjs &amp;&amp; node scripts/tb2-site.mjs</code>
-                from the Terminal-Bench 2.0 runs.
+                Source: <a href="./terminal-bench-2.json">Terminal-Bench 2.0 run data</a>.
             </p>
         </footer>
         <script src="../page.js"></script>
@@ -402,14 +215,14 @@
                     const metrics = [
                         [
                             data.totalAttempts.toLocaleString(),
-                            `scored attempts across ${data.taskCount} tasks and ${data.harnesses.length} harnesses`,
+                            `attempts · ${data.taskCount} tasks · ${data.harnesses.length} harnesses`,
                         ],
                         [
                             `${((Math.max(...rates) - Math.min(...rates)) * 100).toFixed(1)} pts`,
-                            "between the best and worst solve rate, which is not a significant gap",
+                            "solve-rate spread",
                         ],
-                        [spread, "spread in cost per attempt, among the rows that could be priced"],
-                        [tokenCut, "fewer prompt tokens for the same solve rate, SpecPi + Jev against Pi"],
+                        [spread, "cost range, excluding Claude Code"],
+                        [tokenCut, "fewer prompt tokens: SpecPi + Jev vs Pi"],
                     ];
                     const row = document.getElementById("metric-row");
                     if (row) {

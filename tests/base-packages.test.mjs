@@ -3,10 +3,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { basePackages } from "../scripts/packages.mjs";
+import { runPiFixture } from "../scripts/pi-test-harness.mjs";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const cli = path.join(repoRoot, "scripts/specpi.mjs");
@@ -67,11 +67,12 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
 `,
     );
     const invoke = (args, extraEnv = {}) =>
-        spawnSync(process.execPath, [cli, ...args], {
+        runPiFixture(cli, {
+            piCommand: cli,
             cwd: root,
+            agentDir: agent,
+            args,
             env: {
-                ...process.env,
-                PI_CODING_AGENT_DIR: agent,
                 SPECPI_PI: fake,
                 FAKE_LOG: log,
                 FAKE_BROWSER_LOG: browserLog,
@@ -79,8 +80,6 @@ if (source === process.env.FAKE_FAIL) { process.exit(1); }
                 NPM_CONFIG_SAVE_EXACT: "false",
                 ...extraEnv,
             },
-            encoding: "utf8",
-            windowsHide: true,
         });
     const run = (...args) => {
         const result = invoke(args);
@@ -148,6 +147,29 @@ test("default lifecycle installs each pin through Pi, preserves filters, and res
         ["setup", "doctor", "setup"],
     );
     assert.ok(calls.every((call) => call.node === process.execPath && call.args.length === 1));
+});
+
+test("base-package tests isolate the calling home's enabled guard", (t) => {
+    const f = fixture(t);
+    const guard = path.join(f.root, ".pi", "jev-guard.json");
+    const before = '{"enabled":true,"backend":"openrouter","uncertain":"ask"}\n';
+    fs.mkdirSync(path.dirname(guard), { recursive: true });
+    fs.writeFileSync(guard, before);
+    const result = runPiFixture(cli, {
+        piCommand: process.execPath,
+        cwd: repoRoot,
+        agentDir: f.agent,
+        args: [
+            "--test",
+            "--test-reporter=tap",
+            "--test-name-pattern=^default lifecycle installs each pin",
+            fileURLToPath(import.meta.url),
+        ],
+        env: { NODE_TEST_CONTEXT: undefined },
+    });
+    assert.equal(result.status, 0, `${result.error?.message || ""}\n${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /^ok \d+ - default lifecycle installs each pin/mu);
+    assert.equal(fs.readFileSync(guard, "utf8"), before, "nested installer fixtures changed the calling home's guard");
 });
 
 test("updates retire only unchanged SpecPi-added retired package entries", async (t) => {
