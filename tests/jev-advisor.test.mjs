@@ -1866,6 +1866,97 @@ test("effects finishing after an awaited application are not charged to a replac
     });
 });
 
+test("quoted credentials and multiline keys are redacted before outbound sampling", () => {
+    const report = gap.buildInput({
+        gap: {
+            capability: "Structured evidence lookup",
+            scenario: 'Inspect {"password":"swordfish-value with spaces"}',
+            limitation: "Evidence needs interpretation",
+        },
+    });
+    const built = buildState(report, { profile: "gap" });
+    assert.equal(built.ok, true);
+    assert.doesNotMatch(JSON.stringify(built.state), /swordfish/);
+    const keyBody = "SyntheticPrivateMaterialThatIsNotAnActualKey123456";
+    const event = {
+        toolName: "read",
+        input: {},
+        content: [
+            {
+                type: "text",
+                text: `Public context\n-----BEGIN PRIVATE KEY-----\n${keyBody}\n-----END PRIVATE KEY-----\nPublic conclusion`,
+            },
+        ],
+    };
+    const sampled = buildState(retention.buildInput({ event, objective: "Review public context" }), {
+        profile: "retention",
+    });
+    assert.equal(sampled.ok, true);
+    assert.doesNotMatch(JSON.stringify(sampled.state), new RegExp(keyBody));
+    assert.equal(sampled.coverage.totalLines, 5);
+    for (const text of [
+        '{"password":"alpha bravo Bearer charlie"}',
+        'db_password="alpha bravo charlie"',
+        '{"password":"alpha bravo truncated',
+        'password="alpha bravo' + "\\",
+        "password='alpha bravo" + "\\",
+        "Authorization: Bearer charlie",
+    ]) {
+        const sampled = outline(text);
+        assert.doesNotMatch(JSON.stringify(sampled), /alpha|bravo|charlie|truncated/u);
+    }
+});
+
+test("redirects cannot forward consented evidence to another endpoint", async () => {
+    await withAgentDir(async () => {
+        process.env.TYPESAFE_API_KEY = "fixture-only";
+        let forwarded = 0;
+        const target = await startStub((_request, response) => {
+            forwarded += 1;
+            response.end(JSON.stringify({ answers: { q: { noul: 1 } } }));
+        });
+        const origin = await startStub((_request, response) => {
+            response.writeHead(307, { location: target.url });
+            response.end();
+        });
+        try {
+            process.env.TYPESAFE_BASE_URL = origin.url;
+            assert.equal((await ask({ sample: "private fixture evidence" }, { q: noul("x") })).ok, false);
+            assert.equal(forwarded, 0);
+        } finally {
+            await origin.close();
+            await target.close();
+        }
+    });
+});
+
+test("committed effects survive later application failures and authority is rechecked", async () => {
+    await withAgentDir(async () => {
+        const settings = enabledSettings();
+        const records = [];
+        const broker = createBroker({
+            loadSettings: () => settings,
+            ensureConsent: async () => true,
+            record: (entry) => records.push(entry),
+            ask: async () => ({ ok: true, answers: {} }),
+        });
+        await broker.request({
+            ...ask1("sources"),
+            decide: () => ({ decision: {} }),
+            apply: (_decision, { isCurrent, recordEffect }) => {
+                assert.equal(isCurrent(), true);
+                recordEffect("sources-reordered");
+                settings.master = false;
+                assert.equal(isCurrent(), false);
+                throw new Error("Notification failed after reordering");
+            },
+        });
+        assert.equal(records[0].applied, true);
+        assert.deepEqual(records[0].effects, ["sources-reordered"]);
+        assert.equal(records[0].gateThrew, true);
+    });
+});
+
 async function startStub(handler) {
     const http = await import("node:http");
     const server = http.createServer(handler);

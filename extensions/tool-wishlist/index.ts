@@ -609,8 +609,18 @@ export default function toolWishlist(pi: ExtensionAPI) {
         }
     };
 
+    // Earlier hooks may await objective lookup before our input/start hook runs. Invalidate
+    // pending reports synchronously when that lookup's owner observes the task change.
+    pi.events?.on?.("specpi:task-changing", () => {
+        activeRunId = randomUUID();
+    });
     pi.on("before_agent_start", async () => {
         activeRunId = randomUUID();
+    });
+    pi.on("input", (event: any) => {
+        if (event.streamingBehavior === "steer" && event.source !== "extension") {
+            activeRunId = randomUUID();
+        }
     });
 
     const displayMarkdown = async (markdown: string, reportPath: string, ctx: any) => {
@@ -686,6 +696,27 @@ export default function toolWishlist(pi: ExtensionAPI) {
             { additionalProperties: false },
         ),
         async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+            // Bind before consent or root discovery can yield to another task or branch.
+            const sessionId = ctx.sessionManager.getSessionId();
+            const generation = improvementLifecycleGeneration;
+            const reportRun = activeRunId;
+            const contractIdentity = () =>
+                JSON.stringify(
+                    branchEntries(ctx).findLast((entry: any) => entry.customType === TASK_CONTRACT_ENTRY)?.data ?? null,
+                );
+            const originalContract = contractIdentity();
+            const isCurrent = () =>
+                !signal?.aborted &&
+                generation === improvementLifecycleGeneration &&
+                sessionId === ctx.sessionManager.getSessionId() &&
+                reportRun === activeRunId &&
+                originalContract === contractIdentity();
+            const assertCurrent = () => {
+                if (!isCurrent()) {
+                    throw new Error("The task or session changed before the report could be recorded");
+                }
+            };
+
             let mode = readCollectionMode(stateDir);
             if (mode === "undecided") {
                 if (!ctx.hasUI) {
@@ -704,6 +735,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
                     "Enable local capability-gap collection?",
                     "SpecPi stores sanitized summaries and salted task, session, and project hashes locally. Collection itself never uploads them; the optional Jev advisor requires separate transmission consent. Change collection with /wishlist on or /wishlist off.",
                 );
+                assertCurrent();
                 mode = enabled ? "on" : "off";
                 await setCollectionMode({ stateDir, mode, signal });
             }
@@ -721,20 +753,11 @@ export default function toolWishlist(pi: ExtensionAPI) {
             }
 
             const contractRoot = await resolveTaskContractRoot(pi, ctx.cwd, signal);
+            assertCurrent();
             const contract = branchTaskContract(ctx, contractRoot, { tolerateMalformed: true });
-            const sessionId = ctx.sessionManager.getSessionId();
-            const generation = improvementLifecycleGeneration;
-            const reportRun = activeRunId;
             const runId = contract?.id ?? reportRun;
-            const isCurrent = () =>
-                !signal?.aborted &&
-                generation === improvementLifecycleGeneration &&
-                sessionId === ctx.sessionManager.getSessionId() &&
-                reportRun === activeRunId;
-            const record = (assessment?: any) => {
-                if (!isCurrent()) {
-                    throw new Error("The session changed before the report could be recorded");
-                }
+            const record = (assessment?: any, authority: any = {}) => {
+                assertCurrent();
 
                 return recordCapabilityGap({
                     stateDir,
@@ -745,6 +768,8 @@ export default function toolWishlist(pi: ExtensionAPI) {
                     assessment,
                     signal,
                     isCurrent,
+                    assessmentIsCurrent: authority.isCurrent,
+                    onRecorded: authority.onRecorded,
                 });
             };
 
@@ -756,7 +781,7 @@ export default function toolWishlist(pi: ExtensionAPI) {
                 ctx,
                 signal,
                 record,
-                isCurrent,
+                isCurrent: () => isCurrent() && readCollectionMode(stateDir) === "on",
                 existing: () => wishlistTriageCandidates(stateDir),
                 reply: (value: Promise<any>) => pending.push(value),
             });

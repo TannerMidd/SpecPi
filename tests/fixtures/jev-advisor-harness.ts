@@ -7,9 +7,14 @@ import registerAdvisor from "../../extensions/jev-advisor/index.ts";
 import registerWorkflow from "../../extensions/workflow-controls/index.ts";
 import registerWishlist from "../../extensions/tool-wishlist/index.ts";
 import { defaultSettings, saveSettings } from "../../extensions/jev-advisor/config.mjs";
-import { saveConsent } from "../../extensions/jev-advisor/consent.mjs";
+import { saveConsent, revokeConsent } from "../../extensions/jev-advisor/consent.mjs";
 import { readAll, summarize } from "../../extensions/jev-advisor/ledger.mjs";
-import { setCollectionMode, recordCapabilityGap, refreshWishlist } from "../../extensions/tool-wishlist/core.mjs";
+import {
+    setCollectionMode,
+    recordCapabilityGap,
+    refreshWishlist,
+    WISHLIST_FILENAMES,
+} from "../../extensions/tool-wishlist/core.mjs";
 import {
     createTaskContract,
     TASK_CONTRACT_ENTRY,
@@ -24,6 +29,16 @@ export default async function advisorHarness() {
     process.env.JEV_BACKEND = "typesafe";
     process.env.TYPESAFE_API_KEY = "fixture-only";
     const payloads: any[] = [];
+    const deferred = () => {
+        let resolve: any;
+        const promise = new Promise<any>((done) => {
+            resolve = done;
+        });
+
+        return { promise, resolve };
+    };
+
+    let pauseExec: any;
     let responseMode = "keep";
     const server = http.createServer(async (request, response) => {
         let raw = "";
@@ -130,7 +145,16 @@ export default async function advisorHarness() {
         getActiveTools: () => ["read", "edit", "report_capability_gap"],
         getAllTools: () => [],
         setActiveTools() {},
-        exec: async () => ({ code: 0, stdout: root, stderr: "" }),
+        exec: async () => {
+            const pause = pauseExec;
+            pauseExec = undefined;
+            if (pause) {
+                pause.entered.resolve();
+                await pause.release.promise;
+            }
+
+            return { code: 0, stdout: root, stderr: "" };
+        },
         appendEntry: (customType: string, data: any) => branch.push({ type: "custom", customType, data }),
         sendMessage: () => {
             throw new Error("notify-only must not steer");
@@ -227,6 +251,27 @@ export default async function advisorHarness() {
             "queued follow-ups are not active requests",
         );
 
+        // A result suspended in objective lookup still belongs to its original task/session.
+        for (const boundary of ["session_tree", "session_shutdown"]) {
+            const saved = bus.get("specpi:task-objective");
+            const reply = deferred();
+            bus.set("specpi:task-objective", [(request: any) => request.reply(reply.promise)]);
+            const before = payloads.length;
+            const pending = emit("tool_result", resultEvent("fetch_content"));
+            await emit(boundary);
+            reply.resolve({ objective: "Stale evidence", digest: "stale" });
+            await pending;
+            assert.equal(payloads.length, before, `${boundary} invalidates pending objective lookup`);
+            bus.set("specpi:task-objective", saved!);
+            if (boundary === "session_shutdown") {
+                await emit("tool_result", resultEvent("fetch_content"));
+                assert.equal(payloads.length, before, "shutdown also prevents newly arriving results");
+                await emit("session_start");
+            }
+
+            await emit("before_agent_start", { prompt: "Current task after lifecycle change" });
+        }
+
         const job = (id: string, mode: string, selected: string[]) => ({
             id,
             mode,
@@ -267,6 +312,18 @@ export default async function advisorHarness() {
         assert.deepEqual(input, original, "no job/packet field except source order changed");
         await emit("tool_call", { toolName: "delegate", input: { operation: "status" } });
         assert.equal(payloads.length - start, 2);
+        const notify = ctx.ui.notify;
+        ctx.ui.notify = () => {
+            throw new Error("Synthetic notification failure");
+        };
+
+        const failedWarning = structuredClone(original);
+        await emit("tool_call", { toolName: "delegate", input: failedWarning });
+        ctx.ui.notify = notify;
+        assert.deepEqual(failedWarning.packet.jobs[1].sources, ["tests/b.js", "tests/a.js"]);
+        assert.equal(readAll().at(-1).applied, true);
+        assert.deepEqual(readAll().at(-1).effects, ["sources-reordered"]);
+        assert.equal(readAll().at(-1).gateThrew, true);
 
         const report = {
             capability: "Raster image comparison",
@@ -337,6 +394,141 @@ export default async function advisorHarness() {
         );
         assert.equal(offline.details.recorded, true);
         assert.equal(offline.details.assessmentRecorded, false, "classifier failure preserves normal local collection");
+
+        responseMode = "keep";
+        // Binding starts before local consent, not after its awaited answer.
+        fs.unlinkSync(path.join(stateDir, WISHLIST_FILENAMES.config));
+        const confirm = ctx.ui.confirm;
+        const localConsent = deferred();
+        ctx.ui.confirm = () => localConsent.promise;
+        const oldLocal = reportTool.execute("local-consent-race", report, undefined, undefined, ctx);
+        const rejectedLocal = assert.rejects(oldLocal, /changed/u);
+        await emit("session_tree");
+        localConsent.resolve(true);
+        await rejectedLocal;
+        ctx.ui.confirm = confirm;
+        await setCollectionMode({ stateDir, mode: "on" });
+
+        // Root discovery cannot adopt an old report into a new task, even on the same branch.
+        for (const change of ["run", "steer", "contract"]) {
+            const before = payloads.length;
+            const pause = { entered: deferred(), release: deferred() };
+            pauseExec = pause;
+            const pending = reportTool.execute(`root-${change}`, report, undefined, undefined, ctx);
+            const rejected = assert.rejects(pending, /changed/u);
+            await pause.entered.promise;
+            if (change === "contract") {
+                branch.push({
+                    type: "custom",
+                    customType: TASK_CONTRACT_ENTRY,
+                    data: { kind: "set", contract: contract("Replacement contract") },
+                });
+            } else if (change === "steer") {
+                await emit("input", {
+                    text: "Replacement steering",
+                    source: "interactive",
+                    streamingBehavior: "steer",
+                });
+            } else {
+                await emit("before_agent_start", { prompt: "Replacement request" });
+            }
+
+            pause.release.resolve();
+            await rejected;
+            assert.equal(payloads.length, before);
+        }
+
+        // Turning collection off during the separate transmission dialog prevents the send.
+        revokeConsent();
+        const consent = deferred();
+        const consentOpened = deferred();
+        ctx.ui.confirm = () => {
+            consentOpened.resolve();
+
+            return consent.promise;
+        };
+
+        const beforeConsent = payloads.length;
+        const pendingConsent = reportTool.execute("transmission-race", report, undefined, undefined, ctx);
+        const rejectedConsent = assert.rejects(pendingConsent, /changed|collection/u);
+        await consentOpened.promise;
+        await setCollectionMode({ stateDir, mode: "off" });
+        consent.resolve(true);
+        await rejectedConsent;
+        assert.equal(payloads.length, beforeConsent);
+        ctx.ui.confirm = confirm;
+        await setCollectionMode({ stateDir, mode: "on" });
+        saveConsent();
+
+        // Later wishlist hooks must not lag behind the advisor's awaited objective lookup.
+        for (const boundary of ["input", "before_agent_start"]) {
+            revokeConsent();
+            const consent = deferred();
+            const opened = deferred();
+            ctx.ui.confirm = () => {
+                opened.resolve();
+
+                return consent.promise;
+            };
+
+            const pending = reportTool.execute(`delayed-${boundary}`, report, undefined, undefined, ctx);
+            await opened.promise;
+            const saved = bus.get("specpi:task-objective");
+            const objectiveReply = deferred();
+            bus.set("specpi:task-objective", [(request: any) => request.reply(objectiveReply.promise)]);
+            const before = payloads.length;
+            const changing = emit(boundary, {
+                prompt: "New task",
+                text: "New task",
+                source: "interactive",
+                streamingBehavior: "steer",
+            });
+            consent.resolve(true);
+            try {
+                await assert.rejects(pending, /changed/u);
+                assert.equal(payloads.length, before, "old report cannot send during objective lookup");
+            } finally {
+                objectiveReply.resolve(undefined);
+                await changing;
+                bus.set("specpi:task-objective", saved!);
+                ctx.ui.confirm = confirm;
+            }
+
+            saveConsent();
+        }
+
+        // Disable advisory authority while its write is waiting on the wishlist lock.
+        const recording = deferred();
+        const listeners = bus.get("specpi:gap-triage")!;
+        bus.set("specpi:gap-triage", [
+            ...listeners,
+            (request: any) => {
+                const record = request.record;
+                request.record = (...args: any[]) => {
+                    recording.resolve();
+
+                    return record(...args);
+                };
+            },
+        ]);
+        const lock = path.join(stateDir, WISHLIST_FILENAMES.lock);
+        fs.mkdirSync(lock);
+        const pendingWrite = reportTool.execute(
+            "write-race",
+            { ...report, capability: "Revoked advisory write" },
+            undefined,
+            undefined,
+            ctx,
+        );
+        await recording.promise;
+        await commands.get("jev").handler("disable gap", ctx);
+        fs.rmdirSync(lock);
+        const localOnly = await pendingWrite;
+        assert.equal(localOnly.details.recorded, true);
+        assert.equal(localOnly.details.assessmentRecorded, false);
+        assert.equal(readAll().at(-1).applied, false);
+        bus.set("specpi:gap-triage", listeners);
+        await commands.get("jev").handler("enable gap", ctx);
 
         responseMode = "warn";
         const warned = await emit("tool_result", resultEvent("fetch_content"));

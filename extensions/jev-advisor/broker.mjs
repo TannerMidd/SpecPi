@@ -181,6 +181,10 @@ export function createBroker(options = {}) {
         const startedGeneration = generation;
         const currentRequest = () => startedGeneration === generation && !signal?.aborted && isCurrent();
         const settings = readSettings();
+        if (!currentRequest()) {
+            return { ok: false, reason: "context-changed", answers: {} };
+        }
+
         if (!settings.master) {
             return { ok: false, reason: "master-off", answers: {} };
         }
@@ -261,7 +265,9 @@ export function createBroker(options = {}) {
         // to a session that no longer exists. It must not be acted on. It must still be recorded --
         // the ledger's whole claim is that every transmission appears in it, and a run that sent 44
         // and logged 43 is how this was found. So the line is written either way and says which.
-        let stale = !currentRequest() || !readSettings().master || readSettings().systems[system] !== true;
+        const mayApply = () => currentRequest() && readSettings().master && readSettings().systems[system] === true;
+        let stale = !mayApply();
+        const committedEffects = new Set();
 
         // A gate that throws must not turn into a failed call: the caller's own catch would have
         // swallowed it anyway, and recording it as unapplied is the truthful line.
@@ -270,12 +276,24 @@ export function createBroker(options = {}) {
             try {
                 outcome = decide(result.answers) ?? { applied: false };
                 if (typeof apply === "function") {
-                    const delivered = await apply(outcome.decision);
+                    const delivered = await apply(outcome.decision, {
+                        isCurrent: mayApply,
+                        recordEffect: (effect) => committedEffects.add(effect),
+                    });
                     outcome = { ...outcome, applied: false, ...delivered };
                 }
             } catch {
                 outcome = { applied: false, gateThrew: true };
             }
+        }
+
+        // A later notification or report-rendering failure cannot undo an already committed effect.
+        if (committedEffects.size > 0) {
+            outcome = {
+                ...outcome,
+                applied: true,
+                effects: [...new Set([...(outcome.effects ?? []), ...committedEffects])],
+            };
         }
 
         // An application may await a dialog or a locked wishlist write. Do not attribute its

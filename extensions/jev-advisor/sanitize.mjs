@@ -6,12 +6,16 @@ export const MAX_STATE_BYTES = 1024;
 
 const REDACTIONS = Object.freeze([
     [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/gi, "[key]"],
+    // Assignment redaction comes first: later token redactors may consume its closing quote.
+    [
+        /(?:password|passwd|secret|token|api[_-]?key|authorization)["']?\s*[=:]\s*(?:"(?:\\[\s\S]?|[^"\\])*(?:"|$)|'(?:\\[\s\S]?|[^'\\])*(?:'|$)|(?:bearer\s+)?[^\s,;}]+)/gi,
+        "[credential]",
+    ],
     [/\b(?:authorization\s*:\s*)?bearer\s+\S+/gi, "[credential]"],
     [/\b[A-Za-z0-9_-]*sk-[A-Za-z0-9_-]{8,}\b/g, "[key]"],
     [/\b(?:gh[pousr]_|github_pat_|xox[baprs]-|AKIA)[A-Za-z0-9_-]{8,}\b/g, "[key]"],
     [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/g, "[jwt]"],
     [/\b[A-Fa-f0-9]{32,}\b/g, "[hex]"],
-    [/(?:password|passwd|secret|token|api[_-]?key|authorization)\s*[=:]\s*\S+/gi, "[credential]"],
     [/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, "[email]"],
     [/\b(?:https?|ftp|ssh|file):\/\/\S+/gi, "[url]"],
 ]);
@@ -328,7 +332,8 @@ export function buildQuestions(questions, root) {
 /** At most twelve short lines from across the result, not a complete copy or a detector. */
 export function outline(text, maxLines = 6, samples = 4) {
     const raw = String(text ?? "");
-    const lines = raw.split(/\r?\n/u);
+    // Redact multiline spans before sampling can detach a key body from its BEGIN/END markers.
+    const lines = redact(raw).split(/\r?\n/u);
     const head = lines.slice(0, maxLines).map((line) => compact(line, 80));
     const tail = lines.length > maxLines * 2 ? lines.slice(-2).map((line) => compact(line, 80)) : [];
     const from = head.length;
@@ -344,5 +349,5 @@ export function outline(text, maxLines = 6, samples = 4) {
         }
     }
 
-    return { bytes: Buffer.byteLength(raw, "utf8"), lines: lines.length, head, middle, tail };
+    return { bytes: Buffer.byteLength(raw, "utf8"), lines: raw.split(/\r?\n/u).length, head, middle, tail };
 }

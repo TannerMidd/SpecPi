@@ -1414,6 +1414,8 @@ export async function recordCapabilityGap(options) {
         now = new Date().toISOString(),
         maxEventFileBytes = MAX_EVENT_FILE_BYTES,
         isCurrent = () => true,
+        assessmentIsCurrent = () => true,
+        onRecorded = () => {},
     } = options;
 
     return withStateLock(stateDir, signal, async () => {
@@ -1449,7 +1451,7 @@ export async function recordCapabilityGap(options) {
                 event.runHash === runHash,
         );
         const advisory = sanitizeAssessment(
-            assessment,
+            assessmentIsCurrent() ? assessment : undefined,
             new Set(canonicalizeEvents(parsed.events, decisionData.decisions).map((event) => event.canonicalKey)),
         );
         if (!duplicate) {
@@ -1473,6 +1475,7 @@ export async function recordCapabilityGap(options) {
                 "Tool wishlist event log",
             );
             parsed.events.push(event);
+            onRecorded({ assessmentRecorded: advisory !== undefined });
         }
 
         writeReport(

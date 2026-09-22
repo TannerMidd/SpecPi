@@ -122,6 +122,42 @@ test("advisory assessments are bounded, cannot be forged through reports, and ca
         assert.ok(!JSON.stringify(result.events).includes("not-to-store"));
         await assert.rejects(recordCapabilityGap({ ...options, runId: "r3", isCurrent: () => false }), /task changed/u);
         assert.equal((await refreshWishlist({ stateDir: root })).events.length, 2);
+
+        const lock = path.join(root, ".tool-wishlist.lock");
+        fs.mkdirSync(lock);
+        let advisoryAllowed = true;
+        const waiting = recordCapabilityGap({
+            ...options,
+            runId: "revoked",
+            assessment: { impactOpinion: "blocked" },
+            assessmentIsCurrent: () => advisoryAllowed,
+        });
+        advisoryAllowed = false;
+        fs.rmdirSync(lock);
+        assert.equal((await waiting).assessmentRecorded, false, "revocation during lock wait strips only the opinion");
+        assert.equal((await refreshWishlist({ stateDir: root })).events.at(-1).assessment, undefined);
+
+        const reportPath = path.join(root, "TOOL_WISHLIST.md");
+        fs.unlinkSync(reportPath);
+        fs.mkdirSync(reportPath);
+        let committed;
+        await assert.rejects(
+            recordCapabilityGap({
+                ...options,
+                runId: "render-failure",
+                assessment: { impactOpinion: "blocked" },
+                onRecorded: (result) => {
+                    committed = result;
+                },
+            }),
+        );
+        assert.equal(committed.assessmentRecorded, true, "the event commit precedes report rendering failure");
+        const events = fs
+            .readFileSync(path.join(root, "tool-wishlist-events.jsonl"), "utf8")
+            .trim()
+            .split("\n")
+            .map(JSON.parse);
+        assert.equal(events.at(-1).assessment.impactOpinion, "blocked");
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }

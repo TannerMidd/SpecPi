@@ -147,6 +147,8 @@ export async function ask(state, questions, options = {}) {
     try {
         const response = await fetch(endpoint(), {
             method: "POST",
+            // Consent covers this origin, not a redirect target that could receive the same body.
+            redirect: "error",
             headers: {
                 "content-type": "application/json",
                 authorization: `Bearer ${key}`,

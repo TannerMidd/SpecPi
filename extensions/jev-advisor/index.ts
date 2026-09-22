@@ -31,8 +31,13 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     let currentRequest = "";
     let taskIdentity = "";
     let taskGeneration = 0;
+    let sessionActive = false;
 
     const refreshObjective = async (ctx: ExtensionContext) => {
+        if (!sessionActive) {
+            return false;
+        }
+
         const generation = taskGeneration;
         const replies: Promise<{ objective: string; digest: string } | undefined>[] = [];
         let contract;
@@ -50,7 +55,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         }
 
         if (generation !== taskGeneration) {
-            return;
+            return false;
         }
 
         const next = compact(contract?.objective || currentRequest, 180);
@@ -62,6 +67,8 @@ export default function jevAdvisor(pi: ExtensionAPI) {
             recent.length = 0;
             resetTaskHistory();
         }
+
+        return true;
     };
 
     // System 5's local state. Every field here is something the session already knows; it exists so
@@ -100,7 +107,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         history.nudged = nudged;
     };
 
-    const enabled = (system: string) => settings.master && settings.systems[system] === true;
+    const enabled = (system: string) => sessionActive && settings.master && settings.systems[system] === true;
 
     // System 6: decide once, before the first provider request, whether this session will need a
     // withdrawn tool group -- and offer it now rather than at turn 6.
@@ -123,6 +130,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     };
 
     pi.on("session_start", () => {
+        sessionActive = true;
         settings = loadSettings();
         if (!settings.startup) {
             settings = { ...settings, master: false };
@@ -142,6 +150,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         // finish, not reset: the counts are published once more as an ended session so anything
         // reading them from outside -- SpecPi Chat's panel, most of all -- shows what the session
         // actually spent rather than a zeroed live one.
+        sessionActive = false;
         broker.finish();
         objective = "";
         currentRequest = "";
@@ -160,12 +169,14 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     pi.on("before_agent_start", async (event: any, ctx: ExtensionContext) => {
         currentRequest = compact(event?.prompt ?? "", 180);
         taskGeneration += 1;
+        pi.events.emit("specpi:task-changing");
         await refreshObjective(ctx);
     });
     pi.on("input", async (event: any, ctx: ExtensionContext) => {
         if (event.streamingBehavior === "steer" && event.source !== "extension") {
             currentRequest = compact(event.text ?? "", 180);
             taskGeneration += 1;
+            pi.events.emit("specpi:task-changing");
             await refreshObjective(ctx);
         }
     });
@@ -298,7 +309,10 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     // System 1: condense a spent tool result before it is appended. Doing this after the fact would
     // rewrite a cached prefix; on arrival it never touches one.
     pi.on("tool_result", async (event: any, ctx: ExtensionContext) => {
-        await refreshObjective(ctx);
+        if (!(await refreshObjective(ctx))) {
+            return;
+        }
+
         const generation = taskGeneration;
         // Bookkeeping first, and unconditionally. Retention's own eligibility gate returns early on
         // most results, and a history that only recorded the large read-only ones would be blind to
@@ -415,6 +429,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
     });
 
     pi.on("tool_call", async (event: any, ctx: ExtensionContext) => {
+        const generation = taskGeneration;
         history.signatures.push(progress.signature(event.toolName, event.input));
         history.tools.push(event.toolName);
         if (history.signatures.length > HISTORY_WINDOW) {
@@ -448,17 +463,22 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     await broker.request({
                         system: "sources",
                         profile: "sources",
+                        isCurrent: () => generation === taskGeneration && sessionActive,
                         state: sources.buildInput({ question: job.question, mode: job.mode, candidates }),
                         questions: sources.questions({ candidates }),
                         ctx,
                         root: ctx.cwd,
                         decide: (answers: any) => ({ decision: sources.decide(answers, candidates) }),
-                        apply: (ranked: any) => {
+                        apply: (ranked: any, { recordEffect }: any) => {
                             const ordered = ranked.ordered.map((item: any) => item.path);
                             const moved = ordered.some((item: string, index: number) => item !== original[index]);
                             // No deduplication: even multiplicity and ungated positions are preserved.
                             job.sources = ordered;
                             const effects = moved ? ["sources-reordered"] : [];
+                            if (moved) {
+                                recordEffect("sources-reordered");
+                            }
+
                             if (ranked.notWorthDelegating && ctx.hasUI) {
                                 ctx.ui.notify(
                                     `Jev rates this ${job.mode} job a poor fit for delegation. Running anyway; ${ordered.length} sources remain selected.`,
@@ -500,7 +520,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     signal: request.signal,
                     isCurrent: request.isCurrent,
                     decide: (answers: any) => ({ decision: gap.decide(answers, existing) }),
-                    apply: async (advice: any) => {
+                    apply: async (advice: any, { isCurrent, recordEffect }: any) => {
                         if (advice.blockForSanitization) {
                             blocked = true;
 
@@ -508,7 +528,14 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                         }
 
                         try {
-                            stored = await request.record(advice);
+                            stored = await request.record(advice, {
+                                isCurrent,
+                                onRecorded: ({ assessmentRecorded }: any) => {
+                                    if (assessmentRecorded) {
+                                        recordEffect("assessment-recorded");
+                                    }
+                                },
+                            });
                         } catch (error) {
                             storageError = error;
                             throw error;
@@ -528,11 +555,15 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                     return { blocked: true };
                 }
 
+                if (stored) {
+                    return { stored };
+                }
+
                 if (["session-changed", "context-changed"].includes(result.reason)) {
                     return { cancelled: true };
                 }
 
-                return stored ? { stored } : undefined;
+                return undefined;
             })(),
         );
     });
