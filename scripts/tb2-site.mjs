@@ -291,11 +291,38 @@ function renderReadme(data) {
     const piSpread = data.harnesses.find((entry) => entry.id === "pi").spread;
     const pair = orientedPair(data, "jev", "pi");
     const pct = (ratio) => `${Math.round(Math.abs(1 - ratio) * 100)}%`;
+    // The range quoted as "fewer" is taken from the sittings where it was fewer. Across all of them it
+    // printed "27-30% fewer" once a sitting went the other way, which is neither.
+    const ratios = pair.sittings.map((entry) => entry.tokenRatio);
+    const lower = ratios.filter((ratio) => ratio < 1);
+    const higher = ratios.filter((ratio) => ratio >= 1);
+    const tokenRange = `${pct(Math.max(...lower)).slice(0, -1)}–${pct(Math.min(...lower))} fewer`;
+    const tokenException =
+        higher.length === 0
+            ? ""
+            : higher.length === 1
+              ? `, ${pct(higher[0])} more in the other`
+              : `, ${pct(Math.min(...higher)).slice(0, -1)}–${pct(Math.max(...higher))} more in the others`;
     // The pair nearest to separating, named rather than asserted, and paired rather than pooled. Pooled,
     // Pi against Oh My Pi looks closest at p = 0.15; paired, in the one sitting both ran, it is p = 1.00,
     // because the pooled gap was Pi's weak sittings rather than anything Oh My Pi did.
     const labelOf = (id) => data.harnesses.find((entry) => entry.id === id).label;
     const closest = [...data.paired].sort((x, y) => x.solved.p - y.solved.p)[0];
+    // Pooled pairs that clear p < 0.05, leader first. Named rather than left out, because "pooled or
+    // paired" stopped being true once a one-sitting harness joined rows pooled over six.
+    const rateOf = (id) => data.harnesses.find((entry) => entry.id === id).overall.rate;
+    const pooledSeparated = data.comparisons
+        .filter((entry) => entry.p < 0.05)
+        .sort((x, y) => x.p - y.p)
+        .map((entry) => {
+            const [lead, trail] = rateOf(entry.a) >= rateOf(entry.b) ? [entry.a, entry.b] : [entry.b, entry.a];
+
+            return `${labelOf(lead)} leads ${labelOf(trail)} (p = ${entry.p.toFixed(3)})`;
+        });
+    const pooledNote =
+        pooledSeparated.length === 0
+            ? ""
+            : ` Pooled across sittings, ${pooledSeparated.join(" and ")}, but pooling sets one harness's sittings against another's.`;
     const cell = (harness) => [
         harness.label,
         `${harness.overall.solved}/${harness.overall.attempts}`,
@@ -313,15 +340,15 @@ function renderReadme(data) {
         "| --- | --- | --- | --- | --- | --- |",
         ...rows.map((harness) => `| ${cell(harness).join(" | ")} |`),
         "",
-        `Solve rate does not separate them, pooled or paired: Pi against SpecPi + Jev is Fisher p = ${pValue.toFixed(2)}`,
+        `Solve rate does not separate them in the sittings where both ran: Pi against SpecPi + Jev is Fisher p = ${pValue.toFixed(2)}`,
         `pooled and ${pair.solved.p.toFixed(2)} paired, and the closest paired comparison of any two harnesses is`,
         `${labelOf(closest.a)} against ${labelOf(closest.b)} at p = ${closest.solved.p.toFixed(2)}. Nor can it at this`,
         "sample size -- bare Pi, on unchanged software and the same thirteen tasks, spans",
         `${(piSpread.low * 100).toFixed(0)}-${(piSpread.high * 100).toFixed(0)}% across ${piSpread.sittings} separate sittings, a wider gap than any measured here between two`,
-        "harnesses.",
+        `harnesses.${pooledNote}`,
         "",
         "The rows pool different sittings, so compare them paired. In the sittings where both ran,",
-        `SpecPi + Jev sent fewer prompt tokens than Pi in ${pair.tokens.lowerIn} of ${pair.tokens.sittings} (${pct(pair.tokens.high).slice(0, -1)}–${pct(pair.tokens.low)} fewer),`,
+        `SpecPi + Jev sent fewer prompt tokens than Pi in ${pair.tokens.lowerIn} of ${pair.tokens.sittings} (${tokenRange}${tokenException}),`,
         `and cost less in ${pair.cost.lowerIn} of ${pair.cost.sittings}, by about ${pct(pair.cost.typical)}: output tokens are most of the bill.`,
         "Cost is recomputed from recorded tokens against a dated price file, never taken from a",
         "harness's self-report, and SpecPi + Jev's excludes the Jev advisor's own calls.",

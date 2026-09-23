@@ -10,7 +10,13 @@
 // strings that are not meant to enter a training corpus, so only aggregates and public task names
 // cross into the data file.
 //
-// Two numbers are not taken at face value:
+// Three numbers are not taken at face value:
+//
+//   OpenCode's output count leaves out its reasoning. Harbor's OpenCode agent records tokens.output
+//   as n_output_tokens and files tokens.reasoning away in each step's metrics, while every other arm's
+//   count comes from completion_tokens, which already includes reasoning. Reasoning bills at the
+//   output rate and was 2.6 times OpenCode's recorded output on 22 Sep, so its trials are marked
+//   reasoningApart below and the reasoning is read back out of trajectory.json.
 //
 //   Claude Code's cache count is zero in every 21 Sep trial, and that is a gap in the measurement
 //   rather than a finding. Its traffic crosses this repository's Messages/chat-completions
@@ -51,7 +57,7 @@ const DEFAULT_RUNS = "F:/Development/tb-bench/runs";
 // attributable to the harness.
 //
 // Recording them separately is the point. Bare Pi -- unchanged software, identical tasks, same
-// machine -- scored 30, 22, 21, 30 and 32 of 39 across the five sittings below. An eleven-solve
+// machine -- scored 30, 22, 21, 30, 32 and 27 of 39 across the six sittings below. An eleven-solve
 // spread from one harness against itself is wider than any gap measured between harnesses here, so
 // a single sitting cannot support a claim about either.
 const SOURCES = [
@@ -76,6 +82,14 @@ const SOURCES = [
     { sitting: "s5", slice: "widen", arm: "jev", dir: "tb2-rep2-20260922-094001/jev" },
     { sitting: "s6", slice: "widen", arm: "pi", dir: "tb2-rep3-20260922-103224/pi" },
     { sitting: "s6", slice: "widen", arm: "jev", dir: "tb2-rep3-20260922-103224/jev" },
+    // OpenCode and the DeepSeek Harness joined in a four-arm sitting with Pi and SpecPi + Jev, so each
+    // has partners to be compared against. DSH reports no usage of its own; its tokens are what a
+    // counting proxy inside the container saw leave. It is pinned to 0.1.5-rc.3, because rc.2 -- npm's
+    // `latest` -- now resolves rc.3 sub-packages and fails to boot.
+    { sitting: "s7", slice: "widen", arm: "pi", dir: "tb2-four-20260922-132056/pi" },
+    { sitting: "s7", slice: "widen", arm: "jev", dir: "tb2-four-20260922-132056/jev" },
+    { sitting: "s7", slice: "widen", arm: "opencode", dir: "tb2-four-20260922-132056/opencode", reasoningApart: true },
+    { sitting: "s7", slice: "widen", arm: "dsh", dir: "tb2-four-20260922-132056/dsh" },
 ];
 
 const SITTINGS = {
@@ -85,6 +99,7 @@ const SITTINGS = {
     s4: "22 Sep · c",
     s5: "22 Sep · d",
     s6: "22 Sep · e",
+    s7: "22 Sep · f",
 };
 
 const SLICES = [
@@ -106,6 +121,8 @@ const HARNESSES = [
     { id: "jev", label: "SpecPi + Jev", colour: "var(--ct-specpi-jev)" },
     { id: "omp", label: "Oh My Pi", colour: "var(--ct-omp)" },
     { id: "claude-code", label: "Claude Code", colour: "var(--ct-claudecode)" },
+    { id: "opencode", label: "OpenCode", colour: "var(--ct-opencode)" },
+    { id: "dsh", label: "DeepSeek Harness", colour: "var(--ct-deepseek)" },
 ];
 
 // Every arm's trials on this task produce zero tokens in about two seconds, which is the task's
@@ -184,6 +201,20 @@ function readLayer(agentDir) {
     return { carriesCompaction, calls, stateBytes };
 }
 
+// Reasoning tokens an OpenCode trial recorded outside n_output_tokens, summed from the per-step
+// metrics in its trajectory. Null when the trajectory is missing, so the caller can tell an attempt
+// that reasoned nothing from one whose reasoning went unrecorded.
+function readReasoning(agentDir) {
+    let trajectory;
+    try {
+        trajectory = JSON.parse(fs.readFileSync(path.join(agentDir, "trajectory.json"), "utf8"));
+    } catch {
+        return null;
+    }
+
+    return (trajectory.steps ?? []).reduce((total, step) => total + (step.metrics?.extra?.reasoning_tokens ?? 0), 0);
+}
+
 function readTrials(runsRoot, rate) {
     const rows = [];
     const errors = [];
@@ -214,7 +245,12 @@ function readTrials(runsRoot, rate) {
 
             const agent = trial.agent_result ?? {};
             const inputTokens = agent.n_input_tokens ?? 0;
-            const outputTokens = agent.n_output_tokens ?? 0;
+            const reasoningTokens = source.reasoningApart ? readReasoning(path.join(path.dirname(file), "agent")) : 0;
+            if (reasoningTokens === null) {
+                throw new Error(`${file}: reasoning is recorded apart for this arm but its trajectory is missing`);
+            }
+
+            const outputTokens = (agent.n_output_tokens ?? 0) + reasoningTokens;
             const cacheTokens = source.noCache ? null : (agent.n_cache_tokens ?? 0);
             const layer = source.arm === "jev" ? readLayer(path.join(path.dirname(file), "agent")) : null;
             rows.push({

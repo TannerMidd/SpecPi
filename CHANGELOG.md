@@ -10,6 +10,8 @@
 - State the builds the benchmark actually ran. The page gave Pi 0.84.4, the version this repository pins for its own tests; every trial reported 0.87.0, and the figure is now read from them. The SpecPi + Jev row spans two layer builds: the 21 Sep sitting's still carried the withdrawn compaction system, switched off for those runs.
 - Say what the SpecPi + Jev cost leaves out. Harbor records the agent's tokens, not the Jev advisor's, so the advisor's calls -- 320 across the arm by its own ledger -- are excluded rather than estimated, against the rule in `evals/prices.json` that a Jev row includes them.
 - Derive every figure the page and README quote. Counts, rates, ranges and p-values in the prose are filled from `terminal-bench-2.json` at load, and `npm run check:site` fails on any slot left empty. The README's hand-written sentence had already gone stale, quoting p = 0.83 after a rerun moved it to 0.40.
+- Add OpenCode and the DeepSeek Harness to Terminal-Bench 2.0, in one sitting beside Pi and SpecPi + Jev. OpenCode solved 29/39 and the DeepSeek Harness 21/38, and neither separates from a harness it ran beside. OpenCode's reasoning tokens are now counted: Harbor records them apart from its output, they were 2.6 times that output, and they put its cost at $0.0124 an attempt rather than $0.0064.
+- Limit the solve-rate claim to paired comparisons. Pooled, Oh My Pi and SpecPi + Jev now lead the DeepSeek Harness at p = 0.005 and 0.034, and the page names them. The one paired sitting where SpecPi + Jev sent more prompt tokens than Pi (27% more) is stated beside the "fewer" range instead of being folded into it.
 
 ## 0.30.1 - 2026-09-22
 
