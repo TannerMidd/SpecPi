@@ -1,5 +1,5 @@
 ((root) => {
-    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 5).
+    // Configuration shape reviewed against extensions/jev-advisor/config.mjs (schema 6).
     //
     // The Jev layer ships entirely off, and every switch here is a way to turn part of it on, so
     // this file is the one place Chat can start sending session summaries to a third party. It
@@ -21,19 +21,20 @@
     // arm carrying it solving fewer long-session tasks than plain SpecPi, and a stored
     // `systems.compaction` is read past for the same reason the guard keys are: the hooks it gated
     // no longer exist, so the preference could only describe a system that cannot run.
+    //
+    // Progress detection went the same way in schema 6, with its `progressNudge` setting: replayed
+    // over recorded runs, its stuck verdict did not predict failure.
 
-    const SYSTEMS = ["retention", "gap", "sources", "progress", "untrusted", "capability"];
+    const SYSTEMS = ["retention", "gap", "sources", "untrusted", "capability"];
     const MAX_CALL_BUDGET = 1024;
     const MAX_TOTAL_BUDGET = 2048;
-    const NUDGE_MODES = ["notify", "message"];
     // Must equal DEFAULT_BUDGETS in extensions/jev-advisor/config.mjs; a test pins them together,
     // because a panel whose defaults differ from the advisor's writes a change on every save.
     const DEFAULT_BUDGETS = {
-        total: 2048,
+        total: 1536,
         retention: 832,
         gap: 192,
         sources: 128,
-        progress: 704,
         untrusted: 416,
         capability: 2,
     };
@@ -43,7 +44,6 @@
         retention: "Tool-result retention",
         gap: "Capability-gap triage",
         sources: "Delegation source ranking",
-        progress: "Progress and thrash detection",
         untrusted: "Untrusted-content classification",
         capability: "Turn-zero capability arming",
     };
@@ -64,13 +64,13 @@
             "retention",
             "System: shorten spent tool results",
             "boolean",
-            "Decides whether a large read-only result is still worth carrying, before it is appended. Covers reads, searches, shell output, fetched pages, browser snapshots and delegation reports. Code does the shortening, so no model-written text enters the transcript.",
+            "Decides whether a large listing, search, fetched page, browser snapshot or delegation report is still worth carrying, before it is appended. File reads and shell output are never shortened. Code does the shortening, so no model-written text enters the transcript.",
         ],
         [
             "gap",
             "System: cluster capability gaps",
             "boolean",
-            "Groups capability-gap reports that describe the same friction and scores their impact independently of what the report claimed.",
+            "Groups capability-gap reports that describe the same friction and scores their impact independently of what the report claimed. It refuses a report that confidently contains a secret value or names a specific person or machine, and asks for it to be rewritten.",
         ],
         [
             "sources",
@@ -79,28 +79,16 @@
             "Orders the sources a delegation batch will freeze, and warns when the question does not look like one a read-only child could answer. It only ever reorders; it never drops one.",
         ],
         [
-            "progress",
-            "System: notice a stuck session",
-            "boolean",
-            "Watches for a session that has stopped making progress -- a repeated tool call, a run of errors, or several turns with no file changed -- and asks Jev whether it is stuck. It only ever asks after local signals already say something is wrong.",
-        ],
-        [
             "untrusted",
             "System: flag fetched content that talks to the agent",
             "boolean",
-            "Asks whether a fetched page or browser snapshot contains instructions aimed at an AI reading it, and prepends a fixed warning line when it confidently does. Defence in depth: it never blocks, never touches the agent's own output, and costs no extra call while the retention system is also on.",
+            "Asks whether a fetched page, a browser snapshot or a page fetched through the shell with curl or wget contains instructions aimed at an AI reading it, and prepends a fixed warning line when it confidently does. Defence in depth: it never blocks, never looks at other shell output or file reads, and costs no extra call while the retention system is also on.",
         ],
         [
             "capability",
             "System: arm a withdrawn tool group before the first request",
             "boolean",
             "Reads the request itself, once, before anything is sent to the model, and offers a withdrawn tool group when it is confident the task will need one. It activates nothing: you still confirm, and declining is remembered for the session. Accepting at turn 0 is measurably cheaper than accepting later, because a mid-session activation also discards the cached prompt prefix.",
-        ],
-        [
-            "progressNudge",
-            "What a stuck verdict may do",
-            "string",
-            'Either "notify" (tell the person, which cannot change what the model does) or "message" (append a fixed line the model reads before its next request). It ships on "notify" because the calibration corpus does not yet show a mid-session verdict is reliable enough to steer a model with.',
         ],
         [
             BUDGET_KEYS.total,
@@ -149,7 +137,6 @@
             // combination -- on, but not at startup -- that describes a layer which is never on at
             // all. The panel shows the effective state and writes both together.
             enabled: source.master === true && source.startup === true,
-            progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
             [BUDGET_KEYS.total]: total,
         };
         for (const name of SYSTEMS) {
@@ -173,14 +160,13 @@
         const enabled = source.enabled === true;
 
         return {
-            schema: 5,
+            schema: 6,
             // Always written together; see `fromStored`. Keeping them in step is what makes the
             // checkbox mean what it says in the next session rather than only in this file.
             master: enabled,
             startup: enabled,
             systems: Object.fromEntries(SYSTEMS.map((name) => [name, source[name] === true])),
             budgets,
-            progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
         };
     }
 
@@ -337,13 +323,6 @@
                     throw new Error(`${key} must be a whole number from 0 to ${ceiling}.`);
                 }
             }
-
-            // The advisor falls back to "notify" for anything it does not recognise, so an
-            // unchecked typo here would read as a quieter setting than the person chose and never
-            // say so. Refusing it is the difference between a default and a silent downgrade.
-            if (type === "string" && !NUDGE_MODES.includes(config[key])) {
-                throw new Error(`${key} must be one of: ${NUDGE_MODES.join(", ")}.`);
-            }
         }
 
         return { config, unknown };
@@ -367,7 +346,6 @@
         SYSTEM_LABELS,
         MAX_CALL_BUDGET,
         MAX_TOTAL_BUDGET,
-        NUDGE_MODES,
         DEFAULT_BUDGETS,
         BUDGET_KEYS,
         fields,

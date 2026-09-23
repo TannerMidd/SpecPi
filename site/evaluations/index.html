@@ -396,6 +396,9 @@
                         builds.withCompaction.length > 0
                             ? `SpecPi + Jev ran two layer builds: the one in the ${builds.withCompaction.join(", ")} sitting still carried the withdrawn compaction system, switched off for these runs, and later sittings ran one without it.`
                             : "SpecPi + Jev ran one layer build throughout.";
+                    // Fixed text rather than data: every sitting's recorded jev-setup.json lists it among the systems on.
+                    const withdrawnNote =
+                        " Every sitting also ran progress detection, since withdrawn: replayed over these runs, its verdict did not predict which attempts would fail.";
                     const advisor = data.advisor;
 
                     const metrics = [
@@ -445,7 +448,7 @@
                         "paired-solved-p": jevPi.p.toFixed(2),
                         "pi-range": `${pct(pi.spread.low)} to ${pct(pi.spread.high)}`,
                         "pooled-gap": String(Math.round(Math.abs(jev.overall.rate - pi.overall.rate) * 100)),
-                        "jev-build-note": buildNote,
+                        "jev-build-note": buildNote + withdrawnNote,
                         "advisor-calls": `${advisor.calls} calls across ${advisor.attemptsWithCalls} of ${advisor.attempts} attempts`,
                         "advisor-price": advisor.rate ? `$${advisor.rate.inputPerMTok}` : "unpriced",
                         "cc-jev-tokens": `${ccJev.tokens.typical.toFixed(1)}×`,

@@ -112,12 +112,11 @@ test("the nested disk shape survives a round trip through the flat form", () => 
     // one place instead of a test that fails for the wrong reason.
     const on = new Set(["retention", "gap"]);
     const stored = {
-        schema: 5,
+        schema: 6,
         master: true,
         startup: true,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, on.has(name)])),
         budgets: { ...jevConfig.DEFAULT_BUDGETS, total: 16, retention: 8 },
-        progressNudge: "message",
     };
     assert.deepEqual(jevConfig.toStored(jevConfig.fromStored(stored)), stored);
 });
@@ -129,12 +128,11 @@ test("a file that is on but not at startup is read as off, because that is what 
     // showing it as enabled would be describing behaviour no session will ever have. The round
     // trip is deliberately not the identity here: it resolves the pair to what the advisor does.
     const stored = {
-        schema: 5,
+        schema: 6,
         master: true,
         startup: false,
         systems: Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, true])),
         budgets: { ...jevConfig.DEFAULT_BUDGETS },
-        progressNudge: "notify",
     };
     const flat = jevConfig.fromStored(stored);
     assert.equal(flat.enabled, false);
@@ -166,14 +164,14 @@ test("saving writes the nested shape the extension expects, not the flat one", (
         // load-bearing: a panel still writing schema 1 would produce a file the advisor migrates
         // rather than reads, and a panel writing a schema the advisor retired would switch the
         // whole layer off.
-        assert.equal(written.schema, 5);
+        assert.equal(written.schema, 6);
         assert.equal(written.master, true);
         assert.equal(written.startup, true, "the panel writes a preference, so on means on next session too");
         assert.deepEqual(
             written.systems,
             Object.fromEntries(jevConfig.SYSTEMS.map((name) => [name, name === "retention"])),
         );
-        assert.equal(written.progressNudge, "notify", "the layer must not default to steering the model");
+        assert.ok(!("progressNudge" in written), "the withdrawn progress system leaves no setting behind");
         assert.ok(!("guard" in written.systems), "the guard is a package, not one of the systems");
         assert.ok(!("guard" in written), "and the layer's file records nothing about it");
         assert.deepEqual(written.budgets, jevConfig.DEFAULT_BUDGETS);
@@ -194,10 +192,6 @@ test("a draft the advisor would reject is refused before it reaches disk", () =>
             { budgetTotal: -1 },
             { budgetRetention: jevConfig.MAX_CALL_BUDGET + 1 },
             { budgetRetention: 1.5 },
-            // An unrecognised nudge mode reads as "notify" in the advisor, so accepting it here
-            // would quietly give the person a weaker setting than the one they typed.
-            { progressNudge: "shout" },
-            { progressNudge: true },
         ];
         for (const draft of bad) {
             assert.throws(() => savePackageSettings(loaded, `${JSON.stringify(draft)}\n`));
@@ -285,7 +279,7 @@ test("both older guard shapes are dropped, by the panel and the advisor alike", 
 
             savePackageSettings(loaded, `${JSON.stringify(flat)}\n`);
             const written = JSON.parse(fs.readFileSync(file, "utf8"));
-            assert.equal(written.schema, 5);
+            assert.equal(written.schema, 6);
             assert.ok(!("guard" in written), `schema ${stored.schema}: the panel wrote a guard key back`);
             assert.ok(!("guard" in written.systems), `schema ${stored.schema}: the retired system key lingers`);
             assert.ok(
@@ -343,7 +337,7 @@ test("Chat reports the advisor's own call counts, and never writes them", () => 
         assert.equal(loaded.usage.active, true);
         assert.equal(loaded.usage.systems.retention.calls, 5);
         // A system that never ran is still a row, so "is retention doing anything" has an answer.
-        assert.deepEqual(loaded.usage.systems.progress, { calls: 0, applied: 0, failed: 0, savedBytes: 0 });
+        assert.deepEqual(loaded.usage.systems.gap, { calls: 0, applied: 0, failed: 0, savedBytes: 0 });
 
         const rows = jevConfig.usageRows(loaded.usage);
         assert.equal(rows.length, jevConfig.SYSTEMS.length + 1);

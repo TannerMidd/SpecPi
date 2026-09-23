@@ -76,14 +76,14 @@ test("switching the layer off never touches the credential store", () => {
 test("what is persisted keeps master and startup together and preserves unrelated settings", () => {
     // Storing them apart is what made the Chat panel's checkbox do nothing on its own: session_start
     // zeroes a stored master whenever startup is false.
-    const existing = stored({ budgets: { ...defaultSettings().budgets, total: 16 }, progressNudge: "message" });
+    const existing = stored({ budgets: { ...defaultSettings().budgets, total: 16 }, retentionNote: "kept" });
     const on = applyLayer({ on: true }, { settings: stored() }, deps());
     const written = layerToPersist(on, existing);
 
     assert.equal(written.master, true);
     assert.equal(written.startup, true);
     assert.equal(written.budgets.total, 16, "a budget written elsewhere must survive");
-    assert.equal(written.progressNudge, "message");
+    assert.equal(written.retentionNote, "kept", "an unrelated key written elsewhere survives too");
 
     const off = applyLayer({ on: false }, { settings: stored({ master: true }) }, deps());
     const cleared = layerToPersist(off, existing);

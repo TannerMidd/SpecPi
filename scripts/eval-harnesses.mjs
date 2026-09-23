@@ -1034,12 +1034,15 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
  * p = 0.054 -- while accounting for 55 of the 56 verdicts the layer applied over those attempts.
  * The runs that carried it are kept in the published tier-6 record rather than deleted, because a
  * measurement that led to a removal is the reason the removal can be defended.
+ *
+ * Progress detection is absent for the same reason. Replayed over the recorded Terminal-Bench 2 runs
+ * where it would have asked, its stuck verdict did not predict failure (within-task AUC 0.46), so it
+ * was withdrawn; `scripts/jev-progress-replay.mjs` reproduces the measurement.
  */
 const JEV_EVAL_SYSTEMS = Object.freeze({
     retention: true,
     gap: true,
     sources: false,
-    progress: true,
     untrusted: true,
     capability: false,
 });
@@ -1068,12 +1071,6 @@ function jevSettings() {
         // something nobody runs -- and a copy that drifted would do the same thing while still
         // looking correct.
         budgets: { ...DEFAULT_BUDGETS },
-        // Ships on "notify" for users, because the calibration corpus does not yet support steering
-        // a model on a mid-session verdict. The eval runs headless, where a notification reaches
-        // nobody, so measuring the notify path would measure the cost of the system and none of its
-        // effect. Set to "message" here and disclosed in the report method, exactly as yoloMode is:
-        // this run is how the default earns the right to change.
-        progressNudge: "message",
     };
 
     const resolved = normalizeSettings(settings);

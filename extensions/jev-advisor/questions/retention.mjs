@@ -30,7 +30,7 @@
 // one that fetches pages it reads once -- is untested, and widening the eligible tool set to cover
 // fetched content was done partly to find out.
 
-import { choice, noul, score } from "../client.mjs";
+import { noul, score } from "../client.mjs";
 import { nounFalse, scoreLevel, thresholdsFor } from "../gate.mjs";
 import { compact, outline } from "../sanitize.mjs";
 
@@ -38,7 +38,11 @@ import { compact, outline } from "../sanitize.mjs";
 export const MIN_RESULT_BYTES = 4096;
 
 // Shell commands are excluded: success does not prove read-only execution or safe re-running.
-// Only tools that observe. A write or edit result is a record of a mutation, and eliding it would
+// Only tools that observe, and not `read`: the agent asked for that file's contents, so on arrival
+// it is load-bearing by construction. Measured over the 22 Sep Terminal-Bench 2 sittings, every
+// one of retention's 39 calls was a `read`, none shortened anything, and half came back with
+// confidence 0 -- calls spent on a question whose answer was fixed before it was asked.
+// A write or edit result is a record of a mutation, and eliding it would
 // hide what the session did to the worktree from every later turn.
 //
 // The second group is the one this system was always described as covering and did not. Fetched
@@ -52,7 +56,6 @@ export const MIN_RESULT_BYTES = 4096;
 // on a page rather than on files, so the rule above is intact rather than bent.
 export const ELIGIBLE_TOOLS = Object.freeze(
     new Set([
-        "read",
         "grep",
         "find",
         "ls",
@@ -114,14 +117,6 @@ export function questions() {
             RELEVANCE_LEVELS,
         ),
         contains_the_answer: noul("This output contains the specific fact the task was looking for"),
-        result_kind: choice("What kind of output is this?", {
-            listing: "A directory listing or file enumeration",
-            search: "Search or grep matches",
-            file: "The contents of a file",
-            log: "Build, test or command output",
-            error: "A failure report or stack trace",
-            other: "Anything else",
-        }),
     };
 }
 

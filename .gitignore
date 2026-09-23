@@ -47,6 +47,10 @@ evals/archive/
 evals/runs/*
 !evals/runs/jev-calibration.json
 !evals/runs/jev-triage.json
+!evals/runs/jev-completion-replay.json
+!evals/runs/jev-progress-replay.json
+!evals/runs/jev-reach-hard.json
+!evals/runs/jev-untrusted-replay.json
 
 # SpecPi development/install state
 .specpi-test/

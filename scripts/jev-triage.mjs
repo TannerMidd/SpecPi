@@ -40,11 +40,9 @@ const { buildState, compact } = await import(pathToUrl(path.join(advisor, "sanit
 const { choiceValue, nounTrue } = await import(pathToUrl(path.join(advisor, "gate.mjs")));
 const { PUBLISHED_REPORTS } = await import(pathToUrl(path.join(root, "scripts", "jev-calibrate.mjs")));
 
-// One taxonomy, defined in the shipped extension and re-exported here. This script's output is
-// what calibrates the online classifier in questions/progress.mjs, so the two have to ask against
-// the same enum: two copies that drifted would publish a distribution over categories no session
-// ever actually considers.
-export const { FAILURE_MODES } = await import(pathToUrl(path.join(advisor, "questions", "progress.mjs")));
+// The taxonomy the withdrawn progress system asked against, kept with it in scripts/ so this
+// script's published distribution still names the categories that system used.
+export const { FAILURE_MODES } = await import(pathToUrl(path.join(root, "scripts", "jev-progress-system.mjs")));
 
 function parseArgs(argv) {
     const options = {

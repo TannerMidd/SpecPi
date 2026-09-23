@@ -100,7 +100,7 @@ export function keyLine(source) {
  * "enabled" checkbox do nothing on its own: `session_start` zeroes a stored master whenever
  * `startup` is false, so `master: true, startup: false` describes a layer that is on and never runs.
  *
- * The stored file is the base, so budgets and the nudge mode written by Chat while this session was
+ * The stored file is the base, so budgets written by Chat while this session was
  * running survive -- including any system the panel enabled since this session started, which is why
  * `systems` is merged rather than written over.
  */

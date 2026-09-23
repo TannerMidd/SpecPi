@@ -117,17 +117,6 @@ const PROFILES = Object.freeze({
     untrusted: { tool: 48, objective: 192, arguments: 112, result: 480, recent: 96 },
     sources: { question: 224, mode: 16, candidates: 700 },
     gap: { capability: 122, scenario: 182, limitation: 162, workaround: 82, claimedImpact: 20, knownProblems: 300 },
-    progress: {
-        objective: 192,
-        turn: 12,
-        reasons: 100,
-        turnsSinceFileChange: 12,
-        consecutiveErrors: 12,
-        distinctTools: 120,
-        repeatedCalls: 12,
-        recentErrors: 300,
-        filesChanged: 12,
-    },
     capability: { request: 402, reasons: 100, withdrawnGroups: 32, workspaceFiles: 360 },
 });
 
@@ -201,10 +190,6 @@ function complete(state, input, profile) {
             state.knownProblems.length === input?.knownProblems?.length &&
             state.knownProblems.every((item) => text(item.id) && text(item.title))
         );
-    }
-
-    if (profile === "progress") {
-        return text(state.objective) && state.reasons?.length > 0;
     }
 
     if (profile === "capability") {

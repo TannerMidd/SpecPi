@@ -95,19 +95,12 @@ export const THRESHOLDS = Object.freeze({
         boundary: 0.3,
         choiceConfidence: 0.75,
         margin: 0.2,
-        // Measured 0.96 on a report carrying a machine-specific path and 0.04 on a clean one.
-        high: 0.85,
-        low: 0.15,
-    }),
-    progress: Object.freeze({
-        scoreConfidence: 0.6,
-        boundary: 0.3,
-        // The strictest Choice gate in the layer, because it is the only system whose action can
-        // change what the model does next. Running the same taxonomy over the 24 recorded failures
-        // left 14 of them below this bar, which is the intended behaviour: silence is the correct
-        // answer to a session whose trouble is not yet legible.
-        choiceConfidence: 0.8,
-        margin: 0.25,
+        // The first measurement (0.96 on a machine-specific path) sent the path unredacted, which
+        // production never does. Built as a session builds it, the old single question scored a
+        // password written as prose 0.60-0.65 -- under this bar, on the case it existed for. The bar
+        // stayed; the question was split in two (`questions/gap.mjs`), and each written secret or
+        // identity now scores 0.87-0.98 against 0.07 or less for a report that only mentions one
+        // (`evals/runs/jev-reach-hard.json`).
         high: 0.85,
         low: 0.15,
     }),

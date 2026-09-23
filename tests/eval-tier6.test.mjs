@@ -28,7 +28,6 @@ test("the eval harness advisor settings resolve to the systems they ask for", ()
         retention: true,
         gap: true,
         sources: false,
-        progress: true,
         untrusted: true,
         capability: false,
     };
@@ -39,7 +38,6 @@ test("the eval harness advisor settings resolve to the systems they ask for", ()
         startup: true,
         systems: { ...wanted },
         budgets: { ...DEFAULT_BUDGETS },
-        progressNudge: "message",
     });
 
     assert.equal(resolved.master, true, "the master switch must survive normalisation");
