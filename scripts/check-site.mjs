@@ -216,8 +216,10 @@ try {
             charts: document.querySelectorAll(".chart").length,
             tableRows: document.querySelectorAll("#table-overall tbody tr").length,
             metrics: document.querySelectorAll("#metric-row div").length,
-            unfilled: [...document.querySelectorAll("[data-eval]")].filter((node) => node.textContent.trim() === "")
-                .length,
+            // data-eval-optional marks a clause that is empty when there is nothing to qualify.
+            unfilled: [...document.querySelectorAll("[data-eval]:not([data-eval-optional])")].filter(
+                (node) => node.textContent.trim() === "",
+            ).length,
             generated: document.getElementById("meta-generated").textContent,
         }));
         assert.equal(evaluations.overflow, false, `${name} evaluations overflows`);

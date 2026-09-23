@@ -79,26 +79,28 @@ price list, with only the harness changing.
 
 <!-- eval-summary -->
 
-**685 scored attempts across 20 tasks and 4 harnesses**,
+**840 scored attempts across 20 tasks and 6 harnesses**,
 all on `deepseek-v4.1-flash`.
 
 | Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |
 | --- | --- | --- | --- | --- | --- |
-| SpecPi + Jev | 174/230 | 0.757 | $0.0141 | 404,610 | 93.8% |
-| Pi (base) | 165/230 | 0.717 | $0.0159 | 472,620 | 93.2% |
+| OpenCode | 29/39 | 0.744 | $0.0124 | 494,173 | 96.5% |
+| SpecPi + Jev | 197/269 | 0.732 | $0.0142 | 405,712 | 93.6% |
+| Pi (base) | 192/269 | 0.714 | $0.0158 | 451,229 | 92.9% |
 | Oh My Pi | 90/113 | 0.796 | $0.0216 | 1,103,136 | 97.4% |
+| DeepSeek Harness | 21/38 | 0.553 | $0.0226 | 1,126,586 | 95.4% |
 | Claude Code | 81/112 | 0.723 | $0.0273 | 670,828 | 95.4% |
 
-Solve rate does not separate them, pooled or paired: Pi against SpecPi + Jev is Fisher p = 0.40
-pooled and 1.00 paired, and the closest paired comparison of any two harnesses is
-SpecPi + Jev against Claude Code at p = 0.11. Nor can it at this
+Solve rate does not separate them in the sittings where both ran: Pi against SpecPi + Jev is Fisher p = 0.70
+pooled and 0.66 paired, and the closest paired comparison of any two harnesses is
+OpenCode against DeepSeek Harness at p = 0.10. Nor can it at this
 sample size -- bare Pi, on unchanged software and the same thirteen tasks, spans
-54-82% across 5 separate sittings, a wider gap than any measured here between two
-harnesses.
+54-82% across 6 separate sittings, a wider gap than any measured here between two
+harnesses. Pooled across sittings, Oh My Pi leads DeepSeek Harness (p = 0.005) and SpecPi + Jev leads DeepSeek Harness (p = 0.034), but pooling sets one harness's sittings against another's.
 
 The rows pool different sittings, so compare them paired. In the sittings where both ran,
-SpecPi + Jev sent fewer prompt tokens than Pi in 4 of 4 (7–30% fewer),
-and cost less in 3 of 4, by about 7%: output tokens are most of the bill.
+SpecPi + Jev sent fewer prompt tokens than Pi in 4 of 5 (7–30% fewer, 27% more in the other),
+and cost less in 4 of 5, by about 5%: output tokens are most of the bill.
 Cost is recomputed from recorded tokens against a dated price file, never taken from a
 harness's self-report, and SpecPi + Jev's excludes the Jev advisor's own calls.
 
