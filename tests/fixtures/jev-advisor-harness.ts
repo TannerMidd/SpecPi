@@ -78,13 +78,7 @@ export default async function advisorHarness() {
 
                 if (q.type === "choice") {
                     const value =
-                        key === "cluster"
-                            ? "cluster_0"
-                            : key === "suggested_fix"
-                              ? "bug"
-                              : key === "failure_mode"
-                                ? "tool-error-loop"
-                                : Object.keys(q.criteria)[0];
+                        key === "cluster" ? "cluster_0" : key === "suggested_fix" ? "bug" : Object.keys(q.criteria)[0];
 
                     return [
                         key,
@@ -102,9 +96,8 @@ export default async function advisorHarness() {
                     key,
                     {
                         noul:
-                            key === "is_stuck" ||
                             (key === "contains_instructions_to_agent" && responseMode === "warn") ||
-                            (key === "contains_secret_or_path" && responseMode === "block")
+                            (key === "contains_secret" && responseMode === "block")
                                 ? 1
                                 : 0,
                     },
@@ -120,7 +113,7 @@ export default async function advisorHarness() {
         ...settings,
         master: true,
         startup: true,
-        systems: { ...settings.systems, retention: true, sources: true, gap: true, progress: true, untrusted: true },
+        systems: { ...settings.systems, retention: true, sources: true, gap: true, untrusted: true },
     });
     saveConsent();
     const handlers = new Map<string, any[]>();
@@ -199,7 +192,7 @@ export default async function advisorHarness() {
     const first = contract("Repair the real objective, not the Markdown heading");
     branch.push({ type: "custom", customType: TASK_CONTRACT_ENTRY, data: { kind: "set", contract: first } });
     const big = Array.from({ length: 300 }, (_, i) => `result ${i} ${"readable evidence ".repeat(10)}`).join("\n");
-    const resultEvent = (toolName = "read", text = big) => ({
+    const resultEvent = (toolName = "grep", text = big) => ({
         toolName,
         input: { path: "src/module.ts" },
         content: [{ type: "text", text }],
@@ -535,47 +528,39 @@ export default async function advisorHarness() {
         assert.match(warned.content[0].text, /SpecPi: the content below/u);
         assert.equal(readAll().at(-1).savedBytes, 0);
         assert.deepEqual(readAll().at(-1).effects, ["warning"]);
+        // A page fetched through the shell is external content too; the agent's own shell output is not.
+        const fetched = await emit("tool_result", {
+            ...resultEvent("bash", "<html>page</html>"),
+            input: { command: "curl -sL https://example.com/docs" },
+        });
+        assert.match(fetched.content[0].text, /SpecPi: the content below/u);
+        assert.equal(readAll().at(-1).system, "untrusted");
+        const beforeLocal = readAll().length;
+        const local = await emit("tool_result", {
+            ...resultEvent("bash", "<html>page</html>"),
+            input: { command: "cat index.html" },
+        });
+        assert.equal(local, undefined, "a local command's output is never marked");
+        assert.equal(readAll().length, beforeLocal, "and never asked about");
         responseMode = "elide";
         const shortened = await emit("tool_result", resultEvent());
         assert.ok(Buffer.byteLength(shortened.content[0].text) < Buffer.byteLength(big));
         assert.equal(summarize(readAll()).elisions, 1);
-        await emit("tool_result", resultEvent("read", "x".repeat(5000)));
+        await emit("tool_result", resultEvent("grep", "x".repeat(5000)));
         assert.equal(readAll().at(-1).applied, false, "a one-line result cannot claim shortening");
 
         responseMode = "keep";
-        ctx.hasUI = false;
+        // Progress detection is withdrawn: a run of failures and a turn boundary send nothing, and
+        // nothing is queued for the model.
         for (let i = 0; i < 3; i += 1) {
             await emit("tool_result", { ...resultEvent("bash", "Command failed"), isError: true });
         }
 
-        const progressBefore = readAll().length;
-        await emit("turn_end");
-        for (let i = 0; i < 200 && readAll().length === progressBefore; i += 1) {
-            await new Promise((resolve) => setTimeout(resolve, 10));
-        }
-
-        const progress = readAll().at(-1);
-        assert.equal(progress.system, "progress");
-        assert.equal(progress.applied, false);
-        assert.equal(progress.outcome, "no-delivery-channel");
-        ctx.hasUI = true;
-        await emit("turn_start", { turnIndex: 5 });
-        const notifyBefore = readAll().length;
-        await emit("turn_end");
-        for (let i = 0; i < 200 && readAll().length === notifyBefore; i += 1) {
-            await new Promise((resolve) => setTimeout(resolve, 10));
-        }
-
-        assert.deepEqual(readAll().at(-1).effects, ["notification"]);
-        await emit("before_agent_start", { prompt: "A new task must not rearm steering", systemPrompt: "" });
-        for (let i = 0; i < 3; i += 1) {
-            await emit("tool_result", { ...resultEvent("bash", "Command failed"), isError: true });
-        }
-
-        const afterNudge = payloads.length;
+        const beforeTurn = payloads.length;
         await emit("turn_end");
         await new Promise((resolve) => setTimeout(resolve, 30));
-        assert.equal(payloads.length, afterNudge, "the once-per-session nudge bound survives task changes");
+        assert.equal(payloads.length, beforeTurn, "a turn boundary asks nothing");
+        assert.ok(!readAll().some((line: any) => line.system === "progress"));
         await commands.get("jev").handler("off --session", ctx);
         const offCount = payloads.length;
         await emit("before_agent_start", { prompt: "Do not send this", systemPrompt: "" });

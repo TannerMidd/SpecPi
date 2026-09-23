@@ -1,0 +1,1474 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-09-23T01:50:00.498Z",
+  "reach": {
+    "repeats": 5,
+    "cases": 24,
+    "failures": [],
+    "questions": {
+      "retention/obviously spent listing/future_relevance": {
+        "system": "retention",
+        "case": "obviously spent listing",
+        "question": "future_relevance",
+        "kind": "score",
+        "values": [
+          0.12,
+          0.11,
+          0.16,
+          0.13,
+          0.15
+        ],
+        "confidences": [
+          0.83,
+          0.84,
+          0.76,
+          0.8,
+          0.78
+        ],
+        "distributions": 5
+      },
+      "retention/obviously spent listing/contains_the_answer": {
+        "system": "retention",
+        "case": "obviously spent listing",
+        "question": "contains_the_answer",
+        "kind": "noul",
+        "values": [
+          0.06,
+          0.06,
+          0.07,
+          0.07,
+          0.07
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "retention/obviously load-bearing read/future_relevance": {
+        "system": "retention",
+        "case": "obviously load-bearing read",
+        "question": "future_relevance",
+        "kind": "score",
+        "values": [
+          1.86,
+          1.86,
+          1.86,
+          1.85,
+          1.85
+        ],
+        "confidences": [
+          0.79,
+          0.79,
+          0.79,
+          0.78,
+          0.78
+        ],
+        "distributions": 5
+      },
+      "retention/obviously load-bearing read/contains_the_answer": {
+        "system": "retention",
+        "case": "obviously load-bearing read",
+        "question": "contains_the_answer",
+        "kind": "noul",
+        "values": [
+          0.62,
+          0.64,
+          0.67,
+          0.7,
+          0.64
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report quoting a machine-specific path/cluster": {
+        "system": "gap",
+        "case": "a report quoting a machine-specific path",
+        "question": "cluster",
+        "kind": "choice",
+        "values": [
+          "cluster_0",
+          "cluster_0",
+          "cluster_0",
+          "cluster_0",
+          "cluster_0"
+        ],
+        "confidences": [
+          0.98,
+          0.98,
+          0.97,
+          0.98,
+          0.97
+        ],
+        "distributions": 5
+      },
+      "gap/a report quoting a machine-specific path/independent_impact": {
+        "system": "gap",
+        "case": "a report quoting a machine-specific path",
+        "question": "independent_impact",
+        "kind": "score",
+        "values": [
+          1.13,
+          1.13,
+          1.15,
+          1.1,
+          1.14
+        ],
+        "confidences": [
+          0.38,
+          0.39,
+          0.34,
+          0.37,
+          0.33
+        ],
+        "distributions": 5
+      },
+      "gap/a report quoting a machine-specific path/suggested_fix": {
+        "system": "gap",
+        "case": "a report quoting a machine-specific path",
+        "question": "suggested_fix",
+        "kind": "choice",
+        "values": [
+          "tool",
+          "tool",
+          "tool",
+          "tool",
+          "tool"
+        ],
+        "confidences": [
+          0.58,
+          0.58,
+          0.58,
+          0.61,
+          0.56
+        ],
+        "distributions": 5
+      },
+      "gap/a report quoting a machine-specific path/contains_secret": {
+        "system": "gap",
+        "case": "a report quoting a machine-specific path",
+        "question": "contains_secret",
+        "kind": "noul",
+        "values": [
+          0.09,
+          0.09,
+          0.09,
+          0.09,
+          0.09
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report quoting a machine-specific path/names_person_or_machine": {
+        "system": "gap",
+        "case": "a report quoting a machine-specific path",
+        "question": "names_person_or_machine",
+        "kind": "noul",
+        "values": [
+          0.07,
+          0.08,
+          0.07,
+          0.07,
+          0.07
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report quoting a machine-specific path/is_transient_or_user_error": {
+        "system": "gap",
+        "case": "a report quoting a machine-specific path",
+        "question": "is_transient_or_user_error",
+        "kind": "noul",
+        "values": [
+          0.13,
+          0.13,
+          0.13,
+          0.13,
+          0.12
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a clean, reusable report/cluster": {
+        "system": "gap",
+        "case": "a clean, reusable report",
+        "question": "cluster",
+        "kind": "choice",
+        "values": [
+          "cluster_0",
+          "cluster_0",
+          "cluster_0",
+          "cluster_0",
+          "cluster_0"
+        ],
+        "confidences": [
+          0.93,
+          0.93,
+          0.94,
+          0.93,
+          0.92
+        ],
+        "distributions": 5
+      },
+      "gap/a clean, reusable report/independent_impact": {
+        "system": "gap",
+        "case": "a clean, reusable report",
+        "question": "independent_impact",
+        "kind": "score",
+        "values": [
+          1,
+          1,
+          0.99,
+          1,
+          1
+        ],
+        "confidences": [
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99
+        ],
+        "distributions": 5
+      },
+      "gap/a clean, reusable report/suggested_fix": {
+        "system": "gap",
+        "case": "a clean, reusable report",
+        "question": "suggested_fix",
+        "kind": "choice",
+        "values": [
+          "tool",
+          "tool",
+          "tool",
+          "tool",
+          "tool"
+        ],
+        "confidences": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "distributions": 5
+      },
+      "gap/a clean, reusable report/contains_secret": {
+        "system": "gap",
+        "case": "a clean, reusable report",
+        "question": "contains_secret",
+        "kind": "noul",
+        "values": [
+          0.03,
+          0.03,
+          0.03,
+          0.03,
+          0.03
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a clean, reusable report/names_person_or_machine": {
+        "system": "gap",
+        "case": "a clean, reusable report",
+        "question": "names_person_or_machine",
+        "kind": "noul",
+        "values": [
+          0.03,
+          0.03,
+          0.03,
+          0.03,
+          0.04
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a clean, reusable report/is_transient_or_user_error": {
+        "system": "gap",
+        "case": "a clean, reusable report",
+        "question": "is_transient_or_user_error",
+        "kind": "noul",
+        "values": [
+          0.16,
+          0.16,
+          0.16,
+          0.16,
+          0.16
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "untrusted/a fetched page addressing the agent/contains_instructions_to_agent": {
+        "system": "untrusted",
+        "case": "a fetched page addressing the agent",
+        "question": "contains_instructions_to_agent",
+        "kind": "noul",
+        "values": [
+          0.97,
+          0.97,
+          0.97,
+          0.97,
+          0.96
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "untrusted/an ordinary fetched page/contains_instructions_to_agent": {
+        "system": "untrusted",
+        "case": "an ordinary fetched page",
+        "question": "contains_instructions_to_agent",
+        "kind": "noul",
+        "values": [
+          0.05,
+          0.04,
+          0.05,
+          0.04,
+          0.04
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a request that plainly needs a browser/needs_web": {
+        "system": "capability",
+        "case": "a request that plainly needs a browser",
+        "question": "needs_web",
+        "kind": "noul",
+        "values": [
+          0.18,
+          0.17,
+          0.18,
+          0.18,
+          0.17
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a request that plainly needs a browser/needs_browser": {
+        "system": "capability",
+        "case": "a request that plainly needs a browser",
+        "question": "needs_browser",
+        "kind": "noul",
+        "values": [
+          0.86,
+          0.85,
+          0.86,
+          0.87,
+          0.87
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a request that plainly needs a browser/needs_delegation": {
+        "system": "capability",
+        "case": "a request that plainly needs a browser",
+        "question": "needs_delegation",
+        "kind": "noul",
+        "values": [
+          0.24,
+          0.22,
+          0.22,
+          0.22,
+          0.23
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a request that needs neither/needs_web": {
+        "system": "capability",
+        "case": "a request that needs neither",
+        "question": "needs_web",
+        "kind": "noul",
+        "values": [
+          0.05,
+          0.05,
+          0.05,
+          0.05,
+          0.05
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a request that needs neither/needs_browser": {
+        "system": "capability",
+        "case": "a request that needs neither",
+        "question": "needs_browser",
+        "kind": "noul",
+        "values": [
+          0.09,
+          0.09,
+          0.09,
+          0.09,
+          0.09
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a request that needs neither/needs_delegation": {
+        "system": "capability",
+        "case": "a request that needs neither",
+        "question": "needs_delegation",
+        "kind": "noul",
+        "values": [
+          0.74,
+          0.73,
+          0.74,
+          0.72,
+          0.72
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "untrusted/a page documenting how to prompt agents/contains_instructions_to_agent": {
+        "system": "untrusted",
+        "case": "a page documenting how to prompt agents",
+        "question": "contains_instructions_to_agent",
+        "kind": "noul",
+        "values": [
+          0.11,
+          0.09,
+          0.1,
+          0.09,
+          0.1
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "untrusted/a README full of setup instructions/contains_instructions_to_agent": {
+        "system": "untrusted",
+        "case": "a README full of setup instructions",
+        "question": "contains_instructions_to_agent",
+        "kind": "noul",
+        "values": [
+          0.08,
+          0.08,
+          0.09,
+          0.08,
+          0.09
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "untrusted/an injection phrased as a quiet note/contains_instructions_to_agent": {
+        "system": "untrusted",
+        "case": "an injection phrased as a quiet note",
+        "question": "contains_instructions_to_agent",
+        "kind": "noul",
+        "values": [
+          0.83,
+          0.85,
+          0.83,
+          0.84,
+          0.85
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "untrusted/a page fetched with curl that addresses the agent/contains_instructions_to_agent": {
+        "system": "untrusted",
+        "case": "a page fetched with curl that addresses the agent",
+        "question": "contains_instructions_to_agent",
+        "kind": "noul",
+        "values": [
+          0.9,
+          0.91,
+          0.9,
+          0.91,
+          0.91
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "untrusted/a JSON API response fetched with curl/contains_instructions_to_agent": {
+        "system": "untrusted",
+        "case": "a JSON API response fetched with curl",
+        "question": "contains_instructions_to_agent",
+        "kind": "noul",
+        "values": [
+          0.06,
+          0.07,
+          0.07,
+          0.07,
+          0.06
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a CSS rename that needs no browser/needs_web": {
+        "system": "capability",
+        "case": "a CSS rename that needs no browser",
+        "question": "needs_web",
+        "kind": "noul",
+        "values": [
+          0.04,
+          0.04,
+          0.04,
+          0.04,
+          0.04
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a CSS rename that needs no browser/needs_browser": {
+        "system": "capability",
+        "case": "a CSS rename that needs no browser",
+        "question": "needs_browser",
+        "kind": "noul",
+        "values": [
+          0.14,
+          0.14,
+          0.14,
+          0.14,
+          0.13
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a CSS rename that needs no browser/needs_delegation": {
+        "system": "capability",
+        "case": "a CSS rename that needs no browser",
+        "question": "needs_delegation",
+        "kind": "noul",
+        "values": [
+          0.46,
+          0.46,
+          0.46,
+          0.46,
+          0.44
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a question that needs the web/needs_web": {
+        "system": "capability",
+        "case": "a question that needs the web",
+        "question": "needs_web",
+        "kind": "noul",
+        "values": [
+          0.91,
+          0.9,
+          0.9,
+          0.89,
+          0.91
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a question that needs the web/needs_browser": {
+        "system": "capability",
+        "case": "a question that needs the web",
+        "question": "needs_browser",
+        "kind": "noul",
+        "values": [
+          0.26,
+          0.27,
+          0.26,
+          0.27,
+          0.26
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a question that needs the web/needs_delegation": {
+        "system": "capability",
+        "case": "a question that needs the web",
+        "question": "needs_delegation",
+        "kind": "noul",
+        "values": [
+          0.1,
+          0.11,
+          0.1,
+          0.11,
+          0.11
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a repository-wide survey/needs_web": {
+        "system": "capability",
+        "case": "a repository-wide survey",
+        "question": "needs_web",
+        "kind": "noul",
+        "values": [
+          0.06,
+          0.07,
+          0.06,
+          0.07,
+          0.07
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a repository-wide survey/needs_browser": {
+        "system": "capability",
+        "case": "a repository-wide survey",
+        "question": "needs_browser",
+        "kind": "noul",
+        "values": [
+          0.06,
+          0.06,
+          0.06,
+          0.07,
+          0.06
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "capability/a repository-wide survey/needs_delegation": {
+        "system": "capability",
+        "case": "a repository-wide survey",
+        "question": "needs_delegation",
+        "kind": "noul",
+        "values": [
+          0.88,
+          0.88,
+          0.89,
+          0.89,
+          0.89
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a transient network failure/cluster": {
+        "system": "gap",
+        "case": "a transient network failure",
+        "question": "cluster",
+        "kind": "choice",
+        "values": [
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__"
+        ],
+        "confidences": [
+          0.85,
+          0.82,
+          0.82,
+          0.87,
+          0.84
+        ],
+        "distributions": 5
+      },
+      "gap/a transient network failure/independent_impact": {
+        "system": "gap",
+        "case": "a transient network failure",
+        "question": "independent_impact",
+        "kind": "score",
+        "values": [
+          0.09,
+          0.12,
+          0.11,
+          0.1,
+          0.1
+        ],
+        "confidences": [
+          0.86,
+          0.83,
+          0.84,
+          0.85,
+          0.85
+        ],
+        "distributions": 5
+      },
+      "gap/a transient network failure/suggested_fix": {
+        "system": "gap",
+        "case": "a transient network failure",
+        "question": "suggested_fix",
+        "kind": "choice",
+        "values": [
+          "config",
+          "config",
+          "config",
+          "config",
+          "config"
+        ],
+        "confidences": [
+          0.67,
+          0.68,
+          0.71,
+          0.64,
+          0.67
+        ],
+        "distributions": 5
+      },
+      "gap/a transient network failure/contains_secret": {
+        "system": "gap",
+        "case": "a transient network failure",
+        "question": "contains_secret",
+        "kind": "noul",
+        "values": [
+          0.04,
+          0.04,
+          0.04,
+          0.03,
+          0.04
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a transient network failure/names_person_or_machine": {
+        "system": "gap",
+        "case": "a transient network failure",
+        "question": "names_person_or_machine",
+        "kind": "noul",
+        "values": [
+          0.03,
+          0.03,
+          0.03,
+          0.04,
+          0.04
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a transient network failure/is_transient_or_user_error": {
+        "system": "gap",
+        "case": "a transient network failure",
+        "question": "is_transient_or_user_error",
+        "kind": "noul",
+        "values": [
+          0.66,
+          0.65,
+          0.66,
+          0.65,
+          0.64
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a secret the redaction patterns miss/cluster": {
+        "system": "gap",
+        "case": "a secret the redaction patterns miss",
+        "question": "cluster",
+        "kind": "choice",
+        "values": [
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__"
+        ],
+        "confidences": [
+          0.92,
+          0.88,
+          0.89,
+          0.89,
+          0.89
+        ],
+        "distributions": 5
+      },
+      "gap/a secret the redaction patterns miss/independent_impact": {
+        "system": "gap",
+        "case": "a secret the redaction patterns miss",
+        "question": "independent_impact",
+        "kind": "score",
+        "values": [
+          0.96,
+          1.04,
+          1.02,
+          1.06,
+          0.97
+        ],
+        "confidences": [
+          0.35,
+          0.3,
+          0.34,
+          0.31,
+          0.36
+        ],
+        "distributions": 5
+      },
+      "gap/a secret the redaction patterns miss/suggested_fix": {
+        "system": "gap",
+        "case": "a secret the redaction patterns miss",
+        "question": "suggested_fix",
+        "kind": "choice",
+        "values": [
+          "tool",
+          "tool",
+          "tool",
+          "tool",
+          "tool"
+        ],
+        "confidences": [
+          0.73,
+          0.76,
+          0.73,
+          0.71,
+          0.73
+        ],
+        "distributions": 5
+      },
+      "gap/a secret the redaction patterns miss/contains_secret": {
+        "system": "gap",
+        "case": "a secret the redaction patterns miss",
+        "question": "contains_secret",
+        "kind": "noul",
+        "values": [
+          0.96,
+          0.96,
+          0.96,
+          0.96,
+          0.96
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a secret the redaction patterns miss/names_person_or_machine": {
+        "system": "gap",
+        "case": "a secret the redaction patterns miss",
+        "question": "names_person_or_machine",
+        "kind": "noul",
+        "values": [
+          0.88,
+          0.88,
+          0.88,
+          0.87,
+          0.89
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a secret the redaction patterns miss/is_transient_or_user_error": {
+        "system": "gap",
+        "case": "a secret the redaction patterns miss",
+        "question": "is_transient_or_user_error",
+        "kind": "noul",
+        "values": [
+          0.33,
+          0.28,
+          0.29,
+          0.3,
+          0.31
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report carrying redaction markers/cluster": {
+        "system": "gap",
+        "case": "a report carrying redaction markers",
+        "question": "cluster",
+        "kind": "choice",
+        "values": [
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__"
+        ],
+        "confidences": [
+          0.89,
+          0.88,
+          0.87,
+          0.89,
+          0.84
+        ],
+        "distributions": 5
+      },
+      "gap/a report carrying redaction markers/independent_impact": {
+        "system": "gap",
+        "case": "a report carrying redaction markers",
+        "question": "independent_impact",
+        "kind": "score",
+        "values": [
+          0.91,
+          1.09,
+          1.04,
+          1.05,
+          1.05
+        ],
+        "confidences": [
+          0,
+          0,
+          0,
+          0.03,
+          0
+        ],
+        "distributions": 5
+      },
+      "gap/a report carrying redaction markers/suggested_fix": {
+        "system": "gap",
+        "case": "a report carrying redaction markers",
+        "question": "suggested_fix",
+        "kind": "choice",
+        "values": [
+          "config",
+          "config",
+          "config",
+          "config",
+          "config"
+        ],
+        "confidences": [
+          0.47,
+          0.49,
+          0.47,
+          0.42,
+          0.49
+        ],
+        "distributions": 5
+      },
+      "gap/a report carrying redaction markers/contains_secret": {
+        "system": "gap",
+        "case": "a report carrying redaction markers",
+        "question": "contains_secret",
+        "kind": "noul",
+        "values": [
+          0.91,
+          0.91,
+          0.9,
+          0.91,
+          0.9
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report carrying redaction markers/names_person_or_machine": {
+        "system": "gap",
+        "case": "a report carrying redaction markers",
+        "question": "names_person_or_machine",
+        "kind": "noul",
+        "values": [
+          0.09,
+          0.1,
+          0.1,
+          0.11,
+          0.09
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report carrying redaction markers/is_transient_or_user_error": {
+        "system": "gap",
+        "case": "a report carrying redaction markers",
+        "question": "is_transient_or_user_error",
+        "kind": "noul",
+        "values": [
+          0.51,
+          0.51,
+          0.51,
+          0.52,
+          0.5
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report naming a user and a host/cluster": {
+        "system": "gap",
+        "case": "a report naming a user and a host",
+        "question": "cluster",
+        "kind": "choice",
+        "values": [
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__"
+        ],
+        "confidences": [
+          0.91,
+          0.91,
+          0.92,
+          0.89,
+          0.9
+        ],
+        "distributions": 5
+      },
+      "gap/a report naming a user and a host/independent_impact": {
+        "system": "gap",
+        "case": "a report naming a user and a host",
+        "question": "independent_impact",
+        "kind": "score",
+        "values": [
+          1.22,
+          1.25,
+          1.21,
+          1.25,
+          1.26
+        ],
+        "confidences": [
+          0.39,
+          0.34,
+          0.42,
+          0.36,
+          0.35
+        ],
+        "distributions": 5
+      },
+      "gap/a report naming a user and a host/suggested_fix": {
+        "system": "gap",
+        "case": "a report naming a user and a host",
+        "question": "suggested_fix",
+        "kind": "choice",
+        "values": [
+          "config",
+          "config",
+          "config",
+          "config",
+          "config"
+        ],
+        "confidences": [
+          0.95,
+          0.94,
+          0.94,
+          0.94,
+          0.95
+        ],
+        "distributions": 5
+      },
+      "gap/a report naming a user and a host/contains_secret": {
+        "system": "gap",
+        "case": "a report naming a user and a host",
+        "question": "contains_secret",
+        "kind": "noul",
+        "values": [
+          0.05,
+          0.05,
+          0.05,
+          0.05,
+          0.05
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report naming a user and a host/names_person_or_machine": {
+        "system": "gap",
+        "case": "a report naming a user and a host",
+        "question": "names_person_or_machine",
+        "kind": "noul",
+        "values": [
+          0.98,
+          0.98,
+          0.98,
+          0.98,
+          0.98
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report naming a user and a host/is_transient_or_user_error": {
+        "system": "gap",
+        "case": "a report naming a user and a host",
+        "question": "is_transient_or_user_error",
+        "kind": "noul",
+        "values": [
+          0.32,
+          0.29,
+          0.3,
+          0.32,
+          0.29
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report that only mentions passwords/cluster": {
+        "system": "gap",
+        "case": "a report that only mentions passwords",
+        "question": "cluster",
+        "kind": "choice",
+        "values": [
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__",
+          "__new__"
+        ],
+        "confidences": [
+          0.73,
+          0.68,
+          0.73,
+          0.69,
+          0.75
+        ],
+        "distributions": 5
+      },
+      "gap/a report that only mentions passwords/independent_impact": {
+        "system": "gap",
+        "case": "a report that only mentions passwords",
+        "question": "independent_impact",
+        "kind": "score",
+        "values": [
+          1.45,
+          1.42,
+          1.44,
+          1.5,
+          1.47
+        ],
+        "confidences": [
+          0.32,
+          0.36,
+          0.33,
+          0.25,
+          0.28
+        ],
+        "distributions": 5
+      },
+      "gap/a report that only mentions passwords/suggested_fix": {
+        "system": "gap",
+        "case": "a report that only mentions passwords",
+        "question": "suggested_fix",
+        "kind": "choice",
+        "values": [
+          "tool",
+          "tool",
+          "tool",
+          "tool",
+          "tool"
+        ],
+        "confidences": [
+          0.39,
+          0.39,
+          0.38,
+          0.38,
+          0.4
+        ],
+        "distributions": 5
+      },
+      "gap/a report that only mentions passwords/contains_secret": {
+        "system": "gap",
+        "case": "a report that only mentions passwords",
+        "question": "contains_secret",
+        "kind": "noul",
+        "values": [
+          0.07,
+          0.07,
+          0.07,
+          0.07,
+          0.07
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report that only mentions passwords/names_person_or_machine": {
+        "system": "gap",
+        "case": "a report that only mentions passwords",
+        "question": "names_person_or_machine",
+        "kind": "noul",
+        "values": [
+          0.05,
+          0.05,
+          0.04,
+          0.05,
+          0.04
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "gap/a report that only mentions passwords/is_transient_or_user_error": {
+        "system": "gap",
+        "case": "a report that only mentions passwords",
+        "question": "is_transient_or_user_error",
+        "kind": "noul",
+        "values": [
+          0.25,
+          0.26,
+          0.26,
+          0.24,
+          0.24
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "sources/two relevant files among five/worth_delegating": {
+        "system": "sources",
+        "case": "two relevant files among five",
+        "question": "worth_delegating",
+        "kind": "noul",
+        "values": [
+          0.75,
+          0.76,
+          0.74,
+          0.74,
+          0.75
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "sources/two relevant files among five/source_0": {
+        "system": "sources",
+        "case": "two relevant files among five",
+        "question": "source_0",
+        "kind": "score",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confidences": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "distributions": 5
+      },
+      "sources/two relevant files among five/source_1": {
+        "system": "sources",
+        "case": "two relevant files among five",
+        "question": "source_1",
+        "kind": "score",
+        "values": [
+          1.95,
+          1.92,
+          1.94,
+          1.92,
+          1.93
+        ],
+        "confidences": [
+          0.92,
+          0.87,
+          0.91,
+          0.88,
+          0.9
+        ],
+        "distributions": 5
+      },
+      "sources/two relevant files among five/source_2": {
+        "system": "sources",
+        "case": "two relevant files among five",
+        "question": "source_2",
+        "kind": "score",
+        "values": [
+          0.47,
+          0.44,
+          0.48,
+          0.51,
+          0.53
+        ],
+        "confidences": [
+          0.29,
+          0.34,
+          0.27,
+          0.25,
+          0.29
+        ],
+        "distributions": 5
+      },
+      "sources/two relevant files among five/source_3": {
+        "system": "sources",
+        "case": "two relevant files among five",
+        "question": "source_3",
+        "kind": "score",
+        "values": [
+          1.97,
+          1.98,
+          1.97,
+          1.98,
+          1.96
+        ],
+        "confidences": [
+          0.95,
+          0.97,
+          0.96,
+          0.97,
+          0.94
+        ],
+        "distributions": 5
+      },
+      "sources/two relevant files among five/source_4": {
+        "system": "sources",
+        "case": "two relevant files among five",
+        "question": "source_4",
+        "kind": "score",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confidences": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "distributions": 5
+      },
+      "sources/sources that cannot answer the question/worth_delegating": {
+        "system": "sources",
+        "case": "sources that cannot answer the question",
+        "question": "worth_delegating",
+        "kind": "noul",
+        "values": [
+          0.08,
+          0.08,
+          0.09,
+          0.08,
+          0.09
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "sources/sources that cannot answer the question/source_0": {
+        "system": "sources",
+        "case": "sources that cannot answer the question",
+        "question": "source_0",
+        "kind": "score",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confidences": [
+          1,
+          1,
+          1,
+          0.99,
+          1
+        ],
+        "distributions": 5
+      },
+      "sources/sources that cannot answer the question/source_1": {
+        "system": "sources",
+        "case": "sources that cannot answer the question",
+        "question": "source_1",
+        "kind": "score",
+        "values": [
+          0.01,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confidences": [
+          0.99,
+          1,
+          0.99,
+          0.99,
+          1
+        ],
+        "distributions": 5
+      },
+      "sources/sources that cannot answer the question/source_2": {
+        "system": "sources",
+        "case": "sources that cannot answer the question",
+        "question": "source_2",
+        "kind": "score",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confidences": [
+          0.99,
+          1,
+          1,
+          1,
+          1
+        ],
+        "distributions": 5
+      },
+      "sources/one plainly relevant file among noise/worth_delegating": {
+        "system": "sources",
+        "case": "one plainly relevant file among noise",
+        "question": "worth_delegating",
+        "kind": "noul",
+        "values": [
+          0.53,
+          0.53,
+          0.51,
+          0.56,
+          0.52
+        ],
+        "confidences": [],
+        "distributions": 0
+      },
+      "sources/one plainly relevant file among noise/source_0": {
+        "system": "sources",
+        "case": "one plainly relevant file among noise",
+        "question": "source_0",
+        "kind": "score",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confidences": [
+          1,
+          1,
+          1,
+          0.99,
+          1
+        ],
+        "distributions": 5
+      },
+      "sources/one plainly relevant file among noise/source_1": {
+        "system": "sources",
+        "case": "one plainly relevant file among noise",
+        "question": "source_1",
+        "kind": "score",
+        "values": [
+          1.99,
+          1.99,
+          1.98,
+          1.99,
+          1.99
+        ],
+        "confidences": [
+          0.99,
+          0.98,
+          0.98,
+          0.98,
+          0.98
+        ],
+        "distributions": 5
+      },
+      "sources/one plainly relevant file among noise/source_2": {
+        "system": "sources",
+        "case": "one plainly relevant file among noise",
+        "question": "source_2",
+        "kind": "score",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confidences": [
+          0.99,
+          0.99,
+          0.99,
+          0.99,
+          0.99
+        ],
+        "distributions": 5
+      }
+    },
+    "byKind": {
+      "score": {
+        "n": 100,
+        "valueMin": 0,
+        "valueMax": 1.99,
+        "confidenceMin": 0,
+        "confidenceMax": 1,
+        "withConfidence": 100,
+        "withDistribution": 100
+      },
+      "noul": {
+        "n": 240,
+        "valueMin": 0.03,
+        "valueMax": 0.98,
+        "confidenceMin": null,
+        "confidenceMax": null,
+        "withConfidence": 0,
+        "withDistribution": 0
+      },
+      "choice": {
+        "n": 70,
+        "valueMin": null,
+        "valueMax": null,
+        "confidenceMin": 0.38,
+        "confidenceMax": 1,
+        "withConfidence": 70,
+        "withDistribution": 70
+      }
+    }
+  }
+}

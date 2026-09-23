@@ -158,14 +158,14 @@ function retention() {
         {
             title: "A read-only tool returns output",
             lines: [
-                { s: `read ${DOT} grep ${DOT} find ${DOT} ls ${DOT} web_search`, cls: "dg-mono" },
+                { s: `grep ${DOT} find ${DOT} ls ${DOT} web_search`, cls: "dg-mono" },
                 { s: `fetch_content ${DOT} browser_snapshot ${DOT} delegate`, cls: "dg-mono" },
             ],
         },
         {
             kind: "dg-dec",
             title: "Worth asking about?",
-            lines: [`read-only tool ${DOT} at least 4 KB ${DOT} not an error`],
+            lines: [`observing tool, not read ${DOT} at least 4 KB ${DOT} not an error`],
             out: "dg-flow-accent",
             outTag: "yes",
         },
@@ -269,7 +269,7 @@ function retention() {
     return figure(
         "retention",
         p2 + 206,
-        "A large read-only tool result is judged as it arrives. Unless Jev is confident the result is spent and does not hold the answer, it is appended whole; when both answers clear the gate, code replaces the body with a fixed head-and-tail digest. Simulation over recorded token history estimates 61 percent lower cost on arrival versus 12 percent for a later rewrite; these are not observed advisor savings or task-quality results.",
+        "A large listing, search or fetched result is judged as it arrives; file reads and shell output are never asked about. Unless Jev is confident the result is spent and does not hold the answer, it is appended whole; when both answers clear the gate, code replaces the body with a fixed head-and-tail digest. Simulation over recorded token history estimates 61 percent lower cost on arrival versus 12 percent for a later rewrite; these are not observed advisor savings or task-quality results.",
         content,
     );
 }
@@ -290,12 +290,12 @@ function gap() {
             lines: ["shortlist at most four known problems by token overlap"],
         },
         {
-            title: "One call, five questions",
+            title: "One call, six questions",
             lines: [
                 "Which known problem is this the same problem as?",
                 "How badly did the limitation obstruct the task?",
                 { s: "What would fix it? tool / skill / prompt / config", cls: "dg-mono" },
-                "Does it carry a secret or a machine-specific path?",
+                "Does it carry a secret? Does it name a person or machine?",
                 "Was this a one-off, or a mistake in how it was asked?",
             ],
         },
@@ -323,7 +323,7 @@ function gap() {
         label(19, "WHEN A GAP REPORT ARRIVES") +
         f.svg +
         arrow(COL.cx, f.bottom, fan - 22) +
-        text(COL.cx, fan + 2, "five answers, four of them advisory", { cls: "dg-title" }) +
+        text(COL.cx, fan + 2, "six answers, four of them advisory", { cls: "dg-title" }) +
         `<line class="dg-flow" x1="${tagX(0) + tagW / 2}" y1="${fan + 14}" x2="${tagX(2) + tagW / 2}" y2="${fan + 14}"/>` +
         `<line class="dg-flow-warn" x1="${tagX(2) + tagW / 2}" y1="${fan + 14}" x2="${tagX(3) + tagW / 2}" y2="${fan + 14}"/>` +
         leg(0, "dg-flow") +
@@ -334,7 +334,7 @@ function gap() {
         tag(1, "impact and fix kind", "a second opinion") +
         tag(2, "a one-off, not a gap", "advisory flag only") +
         tag(3, "sanitize first", "this one holds the write", "dg-box-warn") +
-        text(tagX(3) + tagW / 2, tags + 70, "0.96 on a report carrying a path", { cls: "dg-note dg-warn" }) +
+        text(tagX(3) + tagW / 2, tags + 70, "0.87–0.98 written, ≤ 0.07 mentioned", { cls: "dg-note dg-warn" }) +
         box(EDGE, bar, W - EDGE * 2, {
             h: 46,
             kind: "dg-bar",
@@ -355,7 +355,7 @@ function gap() {
     return figure(
         "gap",
         p2 + 160,
-        "A gap report filed by the improvement loop is compared against a locally shortlisted set of known problems. Five questions produce a merge suggestion, an impact opinion, a fix kind and a one-off flag, all advisory, plus a sanitization flag that holds the write. Nothing here moves a canonical key: only an exact human selection authorizes a change.",
+        "A gap report filed by the improvement loop is compared against a locally shortlisted set of known problems. Six questions produce a merge suggestion, an impact opinion, a fix kind and a one-off flag, all advisory, plus two sanitization flags -- a secret value, or a named person or machine -- either of which holds the write. Nothing here moves a canonical key: only an exact human selection authorizes a change.",
         content,
     );
 }
@@ -461,104 +461,7 @@ function sources() {
     );
 }
 
-// ------------------------------------------------------------------ 4. progress
-
-function progress() {
-    const f = flow(38, [
-        {
-            title: "A turn ends",
-            lines: [
-                "local counters only: repeated tool signatures, runs of",
-                "errors, turns since a file last changed",
-            ],
-        },
-        {
-            kind: "dg-dec",
-            title: "Does local state already look wrong?",
-            lines: [
-                "three errors in a row on its own, or any two weaker",
-                "signals, and not inside the 4-turn cooldown",
-            ],
-            out: "dg-flow-accent",
-            outTag: "yes",
-        },
-        {
-            title: "One call, three questions",
-            lines: [
-                "Has this session stopped making progress?",
-                { s: "If it is going to fail, why? (9 failure modes)", cls: "dg-mono" },
-                "Would a person have to answer something first?",
-            ],
-            out: "dg-flow-accent",
-            outTag: "yes",
-        },
-        {
-            kind: "dg-dec",
-            title: "Confidently stuck, with an actionable mode?",
-            lines: [`stuck ${GE} 0.85 ${DOT} mode confidence ${GE} 0.80`, `Choice margin ${GE} 0.25`],
-            out: "dg-flow-accent",
-            outTag: "yes",
-        },
-        {
-            kind: "dg-box-accent",
-            title: "One fixed remedy, at most once per session",
-            lines: [
-                { s: `${LDQ}the same tool call has failed repeatedly${ELL}${RDQ}`, cls: "dg-mono" },
-                "a notification by default; steering only if enabled,",
-                "after current tool calls and before the next request",
-            ],
-        },
-    ]);
-
-    const side = rail(f.at[1].mid, f.at[3].mid, {
-        title: "Silence",
-        lines: [
-            "A confident verdict of stuck with",
-            "no idea why would say only that",
-            "something is wrong, which is the",
-            "unfalsifiable hint this project rejects.",
-        ],
-    });
-    const bar = f.bottom + 30;
-    const p2 = bar + 46 + 40;
-
-    const content =
-        pill("turn_end") +
-        label(19, "AT A TURN BOUNDARY") +
-        f.svg +
-        arrow(COL.cx, f.bottom, bar - 4, { cls: "dg-flow-accent" }) +
-        side.svg +
-        decline(f.at[1].mid) +
-        decline(f.at[3].mid) +
-        arrow(RAIL.cx, side.bottom, bar - 4) +
-        box(EDGE, bar, W - EDGE * 2, {
-            h: 46,
-            kind: "dg-bar",
-            title: "Notify the human, or queue steering when explicitly enabled",
-            lines: ["steering appends at the tip; a question requiring human input stays a notification"],
-        }) +
-        label(p2, "WHY ASKING IS CHEAP AND A WASTED TURN IS NOT") +
-        text(EDGE, p2 + 28, "one agent turn", { cls: "dg-title", anchor: "start" }) +
-        `<rect class="dg-blk dg-blk-warn" x="8" y="${p2 + 36}" width="500" height="24" rx="4"/>` +
-        text(258, p2 + 52, `4${MINUS}7 seconds ${DOT} $0.0005${MINUS}$0.0011`, { cls: "dg-note dg-warn" }) +
-        text(EDGE, p2 + 86, "one Jev call", { cls: "dg-title", anchor: "start" }) +
-        `<rect class="dg-blk dg-blk-on" x="8" y="${p2 + 94}" width="10" height="24" rx="3"/>` +
-        text(26, p2 + 110, `${APPROX} 300 ms ${DOT} $0.0000105, drawn to the same scale`, {
-            cls: "dg-note dg-accent",
-            anchor: "start",
-        }) +
-        text(526, p2 + 52, "preventing one timeout", { anchor: "start" }) +
-        text(526, p2 + 68, `pays for ${APPROX} two thousand calls`, { anchor: "start" });
-
-    return figure(
-        "progress",
-        p2 + 134,
-        "At a turn boundary, local counters decide whether a session looks stuck enough to ask about: three consecutive errors alone, or any two weaker signals, outside a four-turn cooldown. A confident stuck verdict with an actionable failure mode produces one code-written remedy, at most once per session. The default is a human notification; explicitly enabled steering appends at the tip.",
-        content,
-    );
-}
-
-// ------------------------------------------------------------------ 5. untrusted
+// ------------------------------------------------------------------ 4. untrusted
 
 function untrusted() {
     const f = flow(38, [
@@ -567,12 +470,13 @@ function untrusted() {
             lines: [
                 { s: `web_search ${DOT} fetch_content ${DOT} source_check`, cls: "dg-mono" },
                 { s: `browser_snapshot ${DOT} browser_accessibility`, cls: "dg-mono" },
+                { s: `a shell fetch: curl ${DOT} wget ${DOT} gh api ${DOT} Invoke-WebRequest`, cls: "dg-mono" },
             ],
         },
         {
             kind: "dg-dec",
             title: "Did it come from outside?",
-            lines: ["the agent&#8217;s own output, file reads and searches are not"],
+            lines: ["other shell output, file reads and searches are not"],
             out: "dg-flow-accent",
             outTag: "yes",
         },
@@ -652,7 +556,7 @@ function untrusted() {
     );
 }
 
-// ------------------------------------------------------------------ 6. capability
+// ------------------------------------------------------------------ 5. capability
 
 function capability() {
     const f = flow(38, [
@@ -673,8 +577,8 @@ function capability() {
         {
             title: "One call, before this agent request is sent",
             lines: [
-                { s: "What kind of work is this? (6 kinds)", cls: "dg-mono" },
-                "Will it need the web? A browser? A large read?",
+                "Will it need the web? A browser?",
+                "Would a large read over many files answer it better?",
                 "the request is bounded to 400 characters",
             ],
             out: "dg-flow-accent",
@@ -786,7 +690,6 @@ const FIGURES = [
     ["retention", retention],
     ["gap", gap],
     ["sources", sources],
-    ["progress", progress],
     ["untrusted", untrusted],
     ["capability", capability],
 ];

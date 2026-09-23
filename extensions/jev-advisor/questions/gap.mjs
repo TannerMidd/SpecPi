@@ -78,8 +78,17 @@ export function questions({ existing = [] } = {}) {
             IMPACT_LEVELS,
         ),
         suggested_fix: choice("What kind of change would address this?", FIX_KINDS),
-        contains_secret_or_path: noul(
-            "This report contains sensitive or machine-specific details, including details replaced by redaction markers",
+        // Two narrow questions rather than one broad one. The broad `contains_secret_or_path`
+        // scored a password written as prose 0.59-0.64 and a username and hostname 0.56-0.58, both
+        // under the 0.85 bar, because Jev only ever sees redacted text and "sensitive details" reads
+        // as satisfied by a redaction marker alone. Asked separately, each positive scored 0.91-0.98
+        // and every negative -- including reports that mention passwords, tokens, OAuth or user
+        // accounts as concepts -- 0.08 or less (`--reach`, 2026-09-23).
+        contains_secret: noul(
+            "This report includes an actual secret value -- a password, token, API key or private key -- written out or replaced by a redaction marker, not just a mention of one",
+        ),
+        names_person_or_machine: noul(
+            "This report names a specific person or machine -- a username, hostname, email address or home directory -- written out, not just a mention that such things exist",
         ),
         is_transient_or_user_error: noul(
             "This was a one-off failure or a mistake in how the task was asked, not a reusable gap in the harness",
@@ -97,7 +106,8 @@ export function decide(answers, existing = []) {
         matchedKey: match?.canonicalKey,
         impactOpinion: ["minor", "degraded", "blocked"][level],
         suggestedFix: Object.hasOwn(FIX_KINDS, suggestedFix ?? "") ? suggestedFix : undefined,
-        blockForSanitization: nounTrue(answers?.contains_secret_or_path, "gap"),
+        blockForSanitization:
+            nounTrue(answers?.contains_secret, "gap") || nounTrue(answers?.names_person_or_machine, "gap"),
         transient: nounTrue(answers?.is_transient_or_user_error, "gap"),
     };
 }

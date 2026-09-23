@@ -1,4 +1,16 @@
-// System 5: notice that a session has stopped making progress, while it can still be helped.
+// System 5, WITHDRAWN. Kept here, outside the shipped extension, so the replays that justified the
+// withdrawal stay reproducible and the offline triage keeps its taxonomy.
+//
+// Replayed over 174 recorded Terminal-Bench 2 runs where its local gate fired
+// (`scripts/jev-progress-replay.mjs`), the stuck verdict did not predict failure: within-task AUC
+// 0.46, with the shipped state and with one that added the recent commands. Its failure-mode answer
+// echoed the local reasons in its own state, 624 times out of 624. The only signal was the local gate
+// itself, which needs no classifier. A system that can steer a model has to show it can tell when to,
+// and this one could not, so it was removed from the advisor.
+//
+// What follows is the system as it last shipped.
+//
+// Notice that a session has stopped making progress, while it can still be helped.
 //
 // This is the only system aimed at turns rather than at input tokens, and turns are where the money
 // is on the hard tiers. Splitting recorded cost three ways: at tier 3 output is 59% of spend, at
@@ -29,15 +41,13 @@
 // finish and before the next model request, which is the same append at the same boundary and is
 // actually read. `triggerTurn` stays off, so this can never add a turn of its own.
 
-import { choice, noul } from "../client.mjs";
-import { choiceValue, nounTrue } from "../gate.mjs";
-import { compact } from "../sanitize.mjs";
+import { noul } from "../extensions/jev-advisor/client.mjs";
+import { nounTrue } from "../extensions/jev-advisor/gate.mjs";
+import { compact } from "../extensions/jev-advisor/sanitize.mjs";
 
 /**
- * The same taxonomy `scripts/jev-triage.mjs` uses offline. It lives here, in the shipped extension,
- * and the script imports it: the corpus that calibrates this system and the enum this system asks
- * against have to be the same object, or the published failure-mode distribution is measuring
- * something the session never asks.
+ * The taxonomy `scripts/jev-triage.mjs` classifies recorded failures against. A live session no
+ * longer asks it: see `decide` for why the remedy is chosen from local state instead.
  */
 export const FAILURE_MODES = Object.freeze({
     "gave-up-on-fault": "Met an injected command failure and stopped instead of retrying",
@@ -50,11 +60,6 @@ export const FAILURE_MODES = Object.freeze({
     "harness-error": "The harness itself crashed or could not start",
     unknown: "Not determinable from what was recorded",
 });
-
-/** Modes a session can still act on. A timeout or a crashed harness is not advice, it is an epitaph. */
-export const ACTIONABLE_MODES = Object.freeze(
-    new Set(["wrong-approach", "misread-requirement", "tool-error-loop", "gave-up-on-fault", "scope-violation"]),
-);
 
 /** Tools whose success means the worktree changed. Used only to decide whether anything happened. */
 export const MUTATING_TOOLS = Object.freeze(
@@ -151,43 +156,51 @@ export function buildInput({ history, objective, reasons }) {
 
 export function questions() {
     return {
-        // Deliberately two questions rather than one. "Is it stuck" is the decision; "which mode"
-        // is what makes a fixed remedy line possible without any model-written prose.
         is_stuck: noul("This session has stopped making progress and will not finish without changing approach"),
-        failure_mode: choice("If this session is going to fail, why?", FAILURE_MODES),
         needs_human: noul("A person would have to answer something before this session could continue"),
     };
 }
 
-/** One fixed line per mode. Code-written, so nothing the model produced reaches the transcript. */
-const REMEDIES = Object.freeze({
-    "wrong-approach":
-        "Progress check: the last few turns have not moved the task forward. Re-read the objective and state, in one line, what the current approach is meant to achieve before continuing.",
-    "misread-requirement":
-        "Progress check: the work so far may not match what was asked. Re-read the requirements and list which ones are satisfied and which are not, before making further changes.",
+/**
+ * One fixed line per locally observed condition. Code-written, so nothing the model produced reaches
+ * the transcript, and each line claims only what local state actually saw.
+ */
+export const REMEDIES = Object.freeze({
     "tool-error-loop":
-        "Progress check: the same tool call has failed repeatedly. Stop retrying it and either fix the cause or use a different approach.",
-    "gave-up-on-fault":
-        "Progress check: a command failed and was not retried. Transient failures are expected here; retry it before concluding the task cannot be done.",
-    "scope-violation":
-        "Progress check: files outside the permitted scope may have been changed. Check what has been modified against what the task allows.",
+        "Progress check: several tool calls in a row have failed. Stop retrying the same call and either fix the cause or use a different approach.",
+    stalled:
+        "Progress check: the last few turns have repeated calls without moving the task forward. Re-read the objective and state, in one line, what the current approach is meant to achieve before continuing.",
 });
 
 /**
- * The nudge, or nothing. Requires a confident stuck verdict AND a gated mode with a remedy: a
- * confident "stuck" with no idea why would produce a message that says only that something is
- * wrong, which is the kind of unfalsifiable hint the standing rule against risk hints rejects.
+ * Which remedy fits what local state saw. Errors in a row are their own condition; anything else
+ * that reached the gate is two weak signals together -- a repeated call, a quiet stretch -- which
+ * is a stall, not an error loop.
+ */
+export function localMode(reasons) {
+    return (reasons ?? []).includes("consecutive-errors") ? "tool-error-loop" : "stalled";
+}
+
+/**
+ * The nudge, or nothing. Requires a confident stuck verdict; the line itself comes from local state.
+ *
+ * The remedy used to come from a Jev `failure_mode` question. Replayed over 174 recorded runs where
+ * the local gate fired (`scripts/jev-progress-replay.mjs`), it answered `tool-error-loop` 624 times
+ * out of 624 -- it was echoing the local reasons in its own state -- and with those reasons removed
+ * it answered `unknown`. So every nudge said calls had failed, including on sessions where none
+ * had. Local state knows which condition it saw; asking a classifier to restate it only made the
+ * line wrong.
  *
  * `needsHuman` decides who the nudge is for. If the session is blocked on something only a person
  * can answer -- a missing credential, an ambiguous requirement -- then telling the model to try
  * harder is the wrong recipient and costs a turn to say nothing. The caller reads it to suppress
  * the message path while still surfacing the notification.
  */
-export function decide(answers) {
+export function decide(answers, reasons) {
     const stuck = nounTrue(answers?.is_stuck, "progress");
-    const mode = choiceValue(answers?.failure_mode, "progress");
+    const mode = localMode(reasons);
     const needsHuman = nounTrue(answers?.needs_human, "progress");
-    if (!stuck || !mode || !ACTIONABLE_MODES.has(mode) || !REMEDIES[mode]) {
+    if (!stuck) {
         return { nudge: undefined, stuck, mode, needsHuman };
     }
 

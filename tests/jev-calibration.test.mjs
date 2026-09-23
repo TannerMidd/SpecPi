@@ -17,6 +17,18 @@ const artifactPath = path.join(root, "evals", "runs", "jev-calibration.json");
 // without re-running `node scripts/jev-calibrate.mjs`, and these fail.
 const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
 
+// The reach-only pass, built as a session builds its state. The calibration artifact's own reach
+// section predates the production builders and the current gap questions, so questions asked only
+// since then are pinned here instead.
+const current = JSON.parse(fs.readFileSync(path.join(root, "evals", "runs", "jev-reach-hard.json"), "utf8"));
+
+function currentFixture(key) {
+    const bucket = current.reach.questions[key];
+    assert.ok(bucket, `the reach artifact has no answers for ${key}`);
+
+    return bucket.values;
+}
+
 /** Every recorded answer for one fixture question, across the repeats. */
 function fixture(key) {
     const bucket = artifact.reach.questions[key];
@@ -115,13 +127,44 @@ test("retention can actually reach the verdict that does something", () => {
     }
 });
 
-test("gap's sanitization gate separates a planted secret from a clean report", () => {
-    for (const value of fixture("gap/a report quoting a machine-specific path/contains_secret_or_path").values) {
-        assert.equal(nounTrue({ kind: "noul", value }, "gap"), true, `a planted path scored ${value}`);
+test("gap's sanitization gate blocks a written secret or identity and passes a mention of one", () => {
+    const blocks = (label) =>
+        currentFixture(`gap/${label}/contains_secret`).map((value, index) => {
+            const identity = currentFixture(`gap/${label}/names_person_or_machine`)[index];
+
+            return nounTrue({ kind: "noul", value }, "gap") || nounTrue({ kind: "noul", value: identity }, "gap");
+        });
+
+    for (const label of [
+        "a secret the redaction patterns miss",
+        "a report carrying redaction markers",
+        "a report naming a user and a host",
+    ]) {
+        assert.ok(blocks(label).every(Boolean), `${label} was not blocked every time`);
     }
 
-    for (const value of fixture("gap/a clean, reusable report/contains_secret_or_path").values) {
-        assert.equal(nounTrue({ kind: "noul", value }, "gap"), false, `a clean report scored ${value}`);
+    for (const label of [
+        "a clean, reusable report",
+        "a report that only mentions passwords",
+        "a transient network failure",
+        // Redacted before Jev sees it, and again before the wishlist stores it.
+        "a report quoting a machine-specific path",
+    ]) {
+        assert.ok(!blocks(label).some(Boolean), `${label} was blocked`);
+    }
+});
+
+test("system 7 flags a page fetched through the shell that addresses the agent, and not a JSON response", () => {
+    for (const value of currentFixture(
+        "untrusted/a page fetched with curl that addresses the agent/contains_instructions_to_agent",
+    )) {
+        assert.equal(nounTrue({ kind: "noul", value }, "untrusted"), true, `the planted page scored ${value}`);
+    }
+
+    for (const value of currentFixture(
+        "untrusted/a JSON API response fetched with curl/contains_instructions_to_agent",
+    )) {
+        assert.equal(nounTrue({ kind: "noul", value }, "untrusted"), false, `a JSON response scored ${value}`);
     }
 });
 
@@ -136,31 +179,6 @@ test("source ranking gates the obvious file through and the noise out", () => {
         for (const [index, value] of noise.values.entries()) {
             assert.equal(scoreLevel({ kind: "score", value, confidence: noise.confidences[index] }, "sources"), 0);
         }
-    }
-});
-
-test("system 5 separates a thrashing session from a working one", () => {
-    const stuck = fixture("progress/a session repeating one failing call/is_stuck");
-    const mode = fixture("progress/a session repeating one failing call/failure_mode");
-    for (const value of stuck.values) {
-        assert.equal(nounTrue({ kind: "noul", value }, "progress"), true, `a thrashing session scored ${value}`);
-    }
-
-    for (const [index, value] of mode.values.entries()) {
-        assert.equal(value, "tool-error-loop");
-        // The historical artifact counted distributions but did not retain them. It establishes
-        // the returned label, not whether today's margin gate would admit that response.
-        assert.equal(
-            choiceValue({ kind: "choice", value, confidence: mode.confidences[index] }, "progress"),
-            undefined,
-        );
-    }
-
-    // And the control. A system that fires on a healthy session costs a turn to say nothing, which
-    // is the exact quantity it exists to save.
-    const healthy = fixture("progress/a session working steadily/is_stuck");
-    for (const value of healthy.values) {
-        assert.equal(nounTrue({ kind: "noul", value }, "progress"), false, `a working session scored ${value}`);
     }
 });
 

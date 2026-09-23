@@ -11,7 +11,6 @@ import { compact } from "./sanitize.mjs";
 import * as retention from "./questions/retention.mjs";
 import * as gap from "./questions/gap.mjs";
 import * as sources from "./questions/sources.mjs";
-import * as progress from "./questions/progress.mjs";
 import * as untrusted from "./questions/untrusted.mjs";
 import * as capabilities from "./questions/capabilities.mjs";
 
@@ -65,46 +64,9 @@ export default function jevAdvisor(pi: ExtensionAPI) {
             taskIdentity = identity;
             taskGeneration += 1;
             recent.length = 0;
-            resetTaskHistory();
         }
 
         return true;
-    };
-
-    // System 5's local state. Every field here is something the session already knows; it exists so
-    // that "ask local state first" has something to ask. Local state cannot answer whether a session
-    // is stuck, but it answers cheaply whether that question is worth 300ms and a call.
-    const HISTORY_WINDOW = 12;
-    const history = {
-        turn: 0,
-        signatures: [] as string[],
-        tools: [] as string[],
-        errors: [] as string[],
-        consecutiveErrors: 0,
-        turnsSinceChange: 0,
-        filesChanged: 0,
-        changedThisTurn: false,
-        nudged: false,
-        askedAtTurn: undefined as number | undefined,
-    };
-    const resetHistory = () => {
-        history.turn = 0;
-        history.signatures.length = 0;
-        history.tools.length = 0;
-        history.errors.length = 0;
-        history.consecutiveErrors = 0;
-        history.turnsSinceChange = 0;
-        history.filesChanged = 0;
-        history.changedThisTurn = false;
-        history.nudged = false;
-        history.askedAtTurn = undefined;
-    };
-
-    const resetTaskHistory = () => {
-        const nudged = history.nudged;
-        resetHistory();
-        // Changing task context must not reset the existing once-per-session steering bound.
-        history.nudged = nudged;
     };
 
     const enabled = (system: string) => sessionActive && settings.master && settings.systems[system] === true;
@@ -141,7 +103,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         currentRequest = "";
         taskGeneration += 1;
         recent.length = 0;
-        resetHistory();
         capabilityAsked = false;
         capabilityDeclined.clear();
     });
@@ -156,12 +117,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         currentRequest = "";
         taskGeneration += 1;
         recent.length = 0;
-        resetHistory();
-    });
-
-    pi.on("turn_start", (event: any) => {
-        history.turn = typeof event?.turnIndex === "number" ? event.turnIndex : history.turn + 1;
-        history.changedThisTurn = false;
     });
 
     // The workflow owner reads its active contract, not rendered Markdown. Without one, use only
@@ -185,7 +140,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         currentRequest = "";
         taskGeneration += 1;
         recent.length = 0;
-        resetTaskHistory();
     });
 
     // Once per session, whatever the answer: asking later would be the mid-session flip the probe
@@ -244,6 +198,7 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 system: "capability",
                 isCurrent: () => generation === taskGeneration,
                 profile: "capability",
+                trigger: local.reasons,
                 state: capabilities.buildInput({
                     prompt: event?.prompt,
                     reasons: local.reasons,
@@ -314,27 +269,8 @@ export default function jevAdvisor(pi: ExtensionAPI) {
         }
 
         const generation = taskGeneration;
-        // Bookkeeping first, and unconditionally. Retention's own eligibility gate returns early on
-        // most results, and a history that only recorded the large read-only ones would be blind to
-        // exactly the short repeated failures system 5 exists to notice.
-        if (event?.isError === true) {
-            history.consecutiveErrors += 1;
-            history.errors.push(retention.resultText(event).slice(0, 200));
-            if (history.errors.length > HISTORY_WINDOW) {
-                history.errors.shift();
-            }
-        } else {
-            history.consecutiveErrors = 0;
-            if (progress.MUTATING_TOOLS.has(event?.toolName)) {
-                history.filesChanged += 1;
-                history.changedThisTurn = true;
-            }
-        }
-
-        // Every result, not only the ones retention asked about. It was written in one place --
-        // inside retention's success path -- so a session with retention off, or with retention's
-        // budget spent, handed every other system an empty history for its whole length while
-        // their question sets said history was what they weighed.
+        // Every result, not only the ones retention asked about, so retention's own view of recent
+        // work does not depend on which results it happened to be interested in.
         recent.push({ tool: String(event?.toolName ?? ""), outcome: event?.isError === true ? "error" : "ok" });
         if (recent.length > MAX_RECENT) {
             recent.shift();
@@ -430,15 +366,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
 
     pi.on("tool_call", async (event: any, ctx: ExtensionContext) => {
         const generation = taskGeneration;
-        history.signatures.push(progress.signature(event.toolName, event.input));
-        history.tools.push(event.toolName);
-        if (history.signatures.length > HISTORY_WINDOW) {
-            history.signatures.shift();
-        }
-
-        if (history.tools.length > HISTORY_WINDOW) {
-            history.tools.shift();
-        }
 
         // System 4: order the sources a delegation batch will snapshot. Ordering only — the same
         // set is frozen either way, but a child pages through `list_sources` in this order.
@@ -566,98 +493,6 @@ export default function jevAdvisor(pi: ExtensionAPI) {
                 return undefined;
             })(),
         );
-    });
-
-    // System 5: notice a session that has stopped making progress, while it can still be helped.
-    //
-    // THE ONE HANDLER THAT IS NOT AWAITED. Everything else in this file mutates what it inspects --
-    // a tool result, a tool's input -- so the session has to wait for the
-    // answer. This one acts on the next turn, and at roughly 300ms a call, awaiting it on a
-    // thrashing session would add seconds to an attempt to deliver advice that could not have
-    // changed the turn it was asked during.
-    pi.on("turn_end", (event: any, ctx: ExtensionContext) => {
-        // Kept whether or not the system is on, so switching it on mid-session does not start from
-        // a blank history and immediately look healthy.
-        history.turnsSinceChange = history.changedThisTurn ? 0 : history.turnsSinceChange + 1;
-        if (!enabled("progress") || history.nudged) {
-            return;
-        }
-
-        const local = progress.suspicious(history);
-        if (!local.ask) {
-            return;
-        }
-
-        // Recorded before the call rather than after, so a slow answer cannot let the next turn ask
-        // again while this one is still in flight.
-        history.askedAtTurn = history.turn;
-        const generation = taskGeneration;
-        void (async () => {
-            try {
-                await broker.request({
-                    system: "progress",
-                    profile: "progress",
-                    isCurrent: () => generation === taskGeneration,
-                    state: progress.buildInput({ history, objective, reasons: local.reasons }),
-                    questions: progress.questions(),
-                    ctx,
-                    root: ctx.cwd,
-                    decide: (answers: any) => {
-                        const advice = progress.decide(answers);
-
-                        return {
-                            reason: advice.nudge ? advice.mode : advice.stuck ? "stuck-but-mode-ungated" : "not-stuck",
-                            decision: advice,
-                        };
-                    },
-                    apply: (advice: any) => {
-                        const effects = [];
-                        if (!advice.nudge || history.nudged) {
-                            return { applied: false };
-                        }
-
-                        if (ctx.hasUI) {
-                            ctx.ui.notify(
-                                advice.needsHuman
-                                    ? `Jev progress check: this session looks blocked on something only you can answer. ${advice.nudge}`
-                                    : `Jev progress check: ${advice.nudge}`,
-                                "warning",
-                            );
-                            effects.push("notification");
-                        }
-
-                        // Queue one fixed instruction, never trigger an extra turn. Queueing is
-                        // observable; eventual consumption by the model is not claimed here.
-                        if (
-                            settings.progressNudge === "message" &&
-                            !advice.needsHuman &&
-                            typeof pi.sendMessage === "function"
-                        ) {
-                            pi.sendMessage(
-                                {
-                                    customType: "specpi-jev-progress",
-                                    content: advice.nudge,
-                                    display: true,
-                                    details: { mode: advice.mode, reasons: local.reasons },
-                                },
-                                { deliverAs: "steer" },
-                            );
-                            effects.push("steering-queued");
-                        }
-
-                        history.nudged = effects.length > 0;
-
-                        return {
-                            applied: effects.length > 0,
-                            effects,
-                            reason: effects.length > 0 ? advice.mode : "no-delivery-channel",
-                        };
-                    },
-                });
-            } catch {
-                // The turn has already ended. An advisor must not be able to fail it retroactively.
-            }
-        })();
     });
 
     pi.registerCommand("jev", {

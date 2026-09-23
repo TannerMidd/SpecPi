@@ -8,7 +8,6 @@ import { SYSTEM_LABELS, createBroker } from "../extensions/jev-advisor/broker.mj
 import {
     DEFAULT_BUDGETS,
     MAX_BUDGETS,
-    NUDGE_MODES,
     SYSTEM_NAMES,
     defaultSettings,
     loadSettings,
@@ -43,7 +42,6 @@ import { MAX_STATE_BYTES, buildState, looksAbsolute, outline, redact } from "../
 import * as retention from "../extensions/jev-advisor/questions/retention.mjs";
 import * as gap from "../extensions/jev-advisor/questions/gap.mjs";
 import * as sources from "../extensions/jev-advisor/questions/sources.mjs";
-import * as progress from "../extensions/jev-advisor/questions/progress.mjs";
 import * as untrusted from "../extensions/jev-advisor/questions/untrusted.mjs";
 import * as capabilities from "../extensions/jev-advisor/questions/capabilities.mjs";
 import { GUARD_PIN, applyInertConfig, configPath, desiredConfig, readConfig } from "../scripts/jev-guard.mjs";
@@ -433,7 +431,7 @@ test("a payload that outlives its session is still in the ledger", async () => {
         broker.reset();
         let applied = false;
         const inFlight = broker.request({
-            ...ask1("progress"),
+            ...ask1("retention"),
             decide: () => {
                 applied = true;
 
@@ -1034,12 +1032,14 @@ test("a grant is keyed to the endpoint it was actually given for", () => {
 
 test("retention only considers large read-only results", () => {
     const big = "x".repeat(5000);
-    assert.equal(retention.eligible({ toolName: "read", content: [{ type: "text", text: big }] }), true);
+    assert.equal(retention.eligible({ toolName: "grep", content: [{ type: "text", text: big }] }), true);
     assert.equal(retention.eligible({ toolName: "write", content: [{ type: "text", text: big }] }), false);
     assert.equal(retention.eligible({ toolName: "edit", content: [{ type: "text", text: big }] }), false);
-    assert.equal(retention.eligible({ toolName: "read", content: [{ type: "text", text: "short" }] }), false);
+    // A file the agent just asked for is load-bearing on arrival; asking about it only spends a call.
+    assert.equal(retention.eligible({ toolName: "read", content: [{ type: "text", text: big }] }), false);
+    assert.equal(retention.eligible({ toolName: "grep", content: [{ type: "text", text: "short" }] }), false);
     assert.equal(
-        retention.eligible({ toolName: "read", isError: true, content: [{ type: "text", text: big }] }),
+        retention.eligible({ toolName: "grep", isError: true, content: [{ type: "text", text: big }] }),
         false,
     );
 });
@@ -1106,7 +1106,8 @@ test("gap advice is a separate opinion and cluster matches are bounded to the sh
             },
             independent_impact: { kind: "score", value: 0.02, confidence: 0.9 },
             suggested_fix: { kind: "choice", value: "tool", confidence: 0.9, probabilities: { tool: 0.9, bug: 0.05 } },
-            contains_secret_or_path: { kind: "noul", value: 0.02 },
+            contains_secret: { kind: "noul", value: 0.02 },
+            names_person_or_machine: { kind: "noul", value: 0.02 },
             is_transient_or_user_error: { kind: "noul", value: 0.02 },
         },
         [{ canonicalKey: "scope-drift", title: "Scope drift" }],
@@ -1117,9 +1118,12 @@ test("gap advice is a separate opinion and cluster matches are bounded to the sh
     assert.equal(advice.blockForSanitization, false);
     assert.equal(advice.transient, false);
 
-    const leaking = gap.decide({ contains_secret_or_path: { kind: "noul", value: 0.97 } });
+    const leaking = gap.decide({ contains_secret: { kind: "noul", value: 0.97 } });
     assert.equal(leaking.blockForSanitization, true);
     assert.equal(leaking.matchedKey, undefined);
+    // Either question alone is enough: a hostname is not a secret, and still does not belong in a report.
+    assert.equal(gap.decide({ names_person_or_machine: { kind: "noul", value: 0.97 } }).blockForSanitization, true);
+    assert.equal(gap.decide({ contains_secret: { kind: "noul", value: 0.6 } }).blockForSanitization, false);
 
     // A "new" cluster must not be written back as a canonical key.
     const fresh = gap.decide({
@@ -1149,154 +1153,44 @@ test("source ranking orders without dropping and keeps ungated items in place", 
     assert.equal(ranked.ordered.at(-1).path, "c.js", "an ungated score sorts last, not out");
 });
 
-const healthy = {
-    turn: 6,
-    signatures: ["read:a", "grep:b", "write:c", "bash:d"],
-    tools: ["read", "grep", "write", "bash"],
-    errors: [],
-    consecutiveErrors: 0,
-    turnsSinceChange: 1,
-    filesChanged: 3,
-};
-
-test("system 5 asks local state first, and stays quiet when local state is calm", () => {
-    // The standing rule, and the only reason a turn-level system is affordable. A call costs about
-    // 300ms and a turn costs 4-7 seconds, so firing every turn regardless would spend a measurable
-    // share of an attempt asking whether anything is wrong.
-    assert.equal(progress.suspicious(healthy).ask, false);
-    assert.deepEqual(progress.suspicious(healthy).reasons, []);
-    assert.equal(progress.suspicious({}).ask, false);
-});
-
-test("one weak local signal is not enough to spend a call on", () => {
-    // Measured, not assumed. The first version asked on any single signal, and a live run of
-    // t3-cascade-ledger spent all twelve calls of its budget on a session that scored 0.978: a
-    // 120-step repair chain re-runs its verification command constantly, so a repeated signature is
-    // that task's normal condition rather than a symptom.
-    const repeated = progress.suspicious({ ...healthy, signatures: ["read:a", "grep:b", "read:a"] });
-    assert.deepEqual(repeated.reasons, ["repeated-tool-call"]);
-    assert.equal(repeated.repeatedSignatures, 1);
-    assert.equal(repeated.ask, false, "a repeated call alone is what a long repair chain looks like");
-
-    // The same is true of a quiet stretch: a research task reads for many turns without writing and
-    // is indistinguishable from a stuck one on that signal alone.
-    const quiet = progress.suspicious({ ...healthy, turnsSinceChange: progress.STALE_TURNS });
-    assert.deepEqual(quiet.reasons, ["no-file-change"]);
-    assert.equal(quiet.ask, false);
-
-    // A run of errors stands alone, because nothing healthy produces three failures in a row.
-    const failing = progress.suspicious({ ...healthy, consecutiveErrors: 3 });
-    assert.deepEqual(failing.reasons, ["consecutive-errors"]);
-    assert.equal(failing.ask, true);
-
-    // Two weak signals together are worth asking about.
-    const both = progress.suspicious({
-        ...healthy,
-        signatures: ["read:a", "grep:b", "read:a"],
-        turnsSinceChange: progress.STALE_TURNS,
+test("progress detection is withdrawn, and a stored preference for it is dropped", () => {
+    // Replayed over recorded runs its stuck verdict did not predict failure, so it was removed rather
+    // than kept switched off. A stored switch, budget or nudge mode could only describe a system that
+    // cannot run, exactly as the compaction keys could in schema 5.
+    assert.ok(!SYSTEM_NAMES.includes("progress"));
+    assert.ok(!("progress" in DEFAULT_BUDGETS));
+    assert.ok(!("progressNudge" in defaultSettings()));
+    assert.ok(!fs.existsSync(path.resolve("extensions/jev-advisor/questions/progress.mjs")));
+    withAgentDir(() => {
+        fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
+        fs.writeFileSync(
+            settingsPath(),
+            JSON.stringify({
+                schema: 5,
+                master: true,
+                startup: true,
+                systems: { retention: true, progress: true },
+                budgets: { total: 900, retention: 300, progress: 704 },
+                progressNudge: "message",
+            }),
+        );
+        const loaded = loadSettings();
+        assert.equal(loaded.schema, 6);
+        assert.ok(!("progress" in loaded.systems));
+        assert.ok(!("progress" in loaded.budgets));
+        assert.ok(!("progressNudge" in loaded));
+        assert.equal(loaded.systems.retention, true, "every other preference survives the bump");
+        assert.equal(loaded.budgets.total, 900);
+        assert.equal(loaded.budgets.retention, 300);
     });
-    assert.deepEqual(both.reasons, ["repeated-tool-call", "no-file-change"]);
-    assert.equal(both.ask, true);
-
-    // Short of each threshold is silence, not a half-measure.
-    assert.equal(progress.suspicious({ ...healthy, consecutiveErrors: 2 }).ask, false);
-    assert.equal(progress.suspicious({ ...healthy, turnsSinceChange: progress.STALE_TURNS - 1 }).ask, false);
 });
 
-test("the same unchanged situation is not charged for every turn", () => {
-    // Conditions persist for many turns at a time. Without a cooldown, one stuck-looking stretch is
-    // re-asked until the budget is gone, and the session that genuinely needs the call later gets
-    // nothing.
-    const stuck = { ...healthy, consecutiveErrors: 4, turn: 10 };
-    assert.equal(progress.suspicious(stuck).ask, true);
-    assert.equal(progress.suspicious({ ...stuck, askedAtTurn: 10 }).ask, false);
-    assert.equal(progress.suspicious({ ...stuck, askedAtTurn: 10, turn: 12 }).ask, false);
-    assert.equal(progress.suspicious({ ...stuck, askedAtTurn: 10, turn: 10 + progress.ASK_COOLDOWN_TURNS }).ask, true);
-    // The reasons are still reported while cooling, so a ledger line can say why it stayed quiet.
-    assert.deepEqual(progress.suspicious({ ...stuck, askedAtTurn: 10 }).reasons, ["consecutive-errors"]);
-    assert.equal(progress.suspicious({ ...stuck, askedAtTurn: 10 }).cooling, true);
-});
-
-test("a tool signature separates a loop from ordinary work", () => {
-    // Reading two different files twice is work; reading one file twice is a loop. The arguments
-    // are what tells them apart, so they are in the signature -- normalized, never their contents.
-    assert.notEqual(progress.signature("read", { path: "a.js" }), progress.signature("read", { path: "b.js" }));
-    assert.equal(progress.signature("read", { path: "a.js" }), progress.signature("read", { path: "a.js" }));
-});
-
-test("system 5 sends shape and counts, never tool output or file contents", () => {
-    const state = progress.buildInput({
-        history: { ...healthy, errors: ["ENOENT: no such file or directory, open 'C:/Users/sample/secret.txt'"] },
-        objective: "Fix the failing test",
-        reasons: ["consecutive-errors"],
-    });
-    const serialized = JSON.stringify(state);
-    assert.ok(!serialized.includes("secret.txt") || serialized.includes("ENOENT"), "errors are carried as kinds");
-    assert.equal(state.turn, 6);
-    assert.deepEqual(state.reasons, ["consecutive-errors"]);
-    // buildState is what actually redacts; this only has to not invent new channels for content.
-    const built = buildState(state, { maxBytes: MAX_STATE_BYTES });
-    assert.ok(built.bytes <= MAX_STATE_BYTES);
-});
-
-test("a nudge needs a confident stuck verdict and a mode with a remedy", () => {
-    const stuck = { kind: "noul", value: 0.92 };
-    const mode = (value, confidence = 0.95) => ({
-        kind: "choice",
-        value,
-        confidence,
-        probabilities: { [value]: 0.9, unknown: 0.02 },
-    });
-
-    const good = progress.decide({ is_stuck: stuck, failure_mode: mode("tool-error-loop") });
-    assert.ok(good.nudge);
-    assert.equal(good.mode, "tool-error-loop");
-
-    // Not stuck: silence, whatever the mode says.
-    assert.equal(
-        progress.decide({ is_stuck: { kind: "noul", value: 0.5 }, failure_mode: mode("wrong-approach") }).nudge,
-        undefined,
-    );
-    // Stuck but ungated on the mode: a message saying only that something is wrong is the kind of
-    // unfalsifiable hint this layer refuses to add to a transcript.
-    assert.equal(progress.decide({ is_stuck: stuck, failure_mode: mode("wrong-approach", 0.6) }).nudge, undefined);
-    // Stuck with a mode nothing can be done about. An epitaph is not advice.
-    for (const dead of ["timeout", "harness-error", "turn-cap", "unknown"]) {
-        assert.equal(progress.decide({ is_stuck: stuck, failure_mode: mode(dead) }).nudge, undefined, dead);
-    }
-});
-
-test("every nudge is code-written text chosen from a fixed table", () => {
-    const seen = new Set();
-    for (const name of progress.ACTIONABLE_MODES) {
-        const advice = progress.decide({
-            is_stuck: { kind: "noul", value: 0.95 },
-            failure_mode: { kind: "choice", value: name, confidence: 0.95, probabilities: { [name]: 0.9 } },
-        });
-        assert.equal(typeof advice.nudge, "string", name);
-        assert.ok(advice.nudge.startsWith("Progress check:"), name);
-        seen.add(advice.nudge);
-    }
-
-    assert.equal(seen.size, progress.ACTIONABLE_MODES.size, "each mode needs its own line, not a shared one");
-});
-
-test("the online and offline classifiers share one taxonomy object", async () => {
-    // scripts/jev-triage.mjs produces the distribution that calibrates this system. Two copies of
-    // the enum that drifted would publish a distribution over categories no session ever asks.
+test("the offline triage keeps the withdrawn system's taxonomy object", async () => {
+    // Two copies of the enum that drifted would publish a distribution over categories that no
+    // longer mean what the recorded runs meant by them.
     const triage = await import("../scripts/jev-triage.mjs");
-    assert.equal(triage.FAILURE_MODES, progress.FAILURE_MODES);
-    for (const mode of progress.ACTIONABLE_MODES) {
-        assert.ok(Object.hasOwn(progress.FAILURE_MODES, mode), `${mode} is not in the taxonomy`);
-    }
-});
-
-test("the layer ships unable to steer the model", () => {
-    // "notify" tells a person and cannot change what the model does; "message" appends a line the
-    // model reads. The plan's own condition was notify first, message once the curve supports it,
-    // and Phase 1 recorded that it does not.
-    assert.equal(defaultSettings().progressNudge, "notify");
-    assert.deepEqual([...NUDGE_MODES], ["notify", "message"]);
+    const withdrawn = await import("../scripts/jev-progress-system.mjs");
+    assert.equal(triage.FAILURE_MODES, withdrawn.FAILURE_MODES);
 });
 
 test("system 7 applies only to content that came from outside", () => {
@@ -1313,6 +1207,37 @@ test("system 7 applies only to content that came from outside", () => {
     // An error is not content, and a banner on a stack trace is noise.
     assert.equal(untrusted.applies({ toolName: "fetch_content", isError: true }), false);
     assert.equal(untrusted.applies(undefined), false);
+});
+
+test("system 7 covers a shell command whose output is a fetched document, and no other shell output", () => {
+    const bash = (command, extra = {}) => ({ toolName: "bash", input: { command }, ...extra });
+    for (const command of [
+        "curl -sL https://example.com/docs | head -100",
+        "cd /app && timeout 20 curl -s https://example.com/a.json",
+        "wget -qO- https://example.com/page",
+        "gh api repos/owner/repo/readme",
+        "http GET https://example.com/items",
+        "Invoke-WebRequest https://example.com -UseBasicParsing",
+        "x=$(curl -s https://example.com)",
+    ]) {
+        assert.equal(untrusted.applies(bash(command)), true, command);
+    }
+
+    // A URL in a command is not a fetch whose body comes back, and package logs are the agent's own work.
+    for (const command of [
+        "git clone https://github.com/owner/repo",
+        "pip install requests",
+        "npm install",
+        "ls -la",
+        "echo curlew",
+        "cat curl-notes.md",
+        "grep -r https: src",
+    ]) {
+        assert.equal(untrusted.applies(bash(command)), false, command);
+    }
+
+    assert.equal(untrusted.applies(bash("curl -sf https://example.com", { isError: true })), false);
+    assert.equal(untrusted.applies({ toolName: "read", input: { command: "curl x" } }), false);
 });
 
 test("system 7 marks only on a confident yes, and the banner is code-written", () => {
@@ -1533,7 +1458,7 @@ test("schema 4 drops every trace of the guard, from either shape it took", () =>
             fs.writeFileSync(settingsPath(), JSON.stringify(stored));
 
             const loaded = loadSettings();
-            assert.equal(loaded.schema, 5, `schema ${stored.schema} must migrate forward`);
+            assert.equal(loaded.schema, 6, `schema ${stored.schema} must migrate forward`);
             assert.ok(!("guard" in loaded), `schema ${stored.schema} left a guard key behind`);
             assert.ok(!("guard" in loaded.systems), `schema ${stored.schema} left a guard system behind`);
             assert.ok(
@@ -1641,6 +1566,41 @@ test("required evidence survives budgeting, or the broker abstains without spend
         assert.equal(records[0].coverage.complete, false);
         assert.equal(summarize(records).calls, 0);
         assert.equal(summarize(records).abstentions, 1);
+    });
+});
+
+test("the ledger records why a call was made and the distribution behind each answer", async () => {
+    await withAgentDir(async () => {
+        let entry;
+        const broker = createBroker({
+            loadSettings: () => enabledSettings(),
+            ensureConsent: async () => true,
+            ask: async () => ({
+                ok: true,
+                answers: {
+                    mode: {
+                        kind: "choice",
+                        value: "a",
+                        confidence: 0.9,
+                        probabilities: { a: 0.81234, b: 0.1, "bad key!": 0.09 },
+                    },
+                    stuck: { kind: "noul", value: 0.4 },
+                },
+            }),
+            record: (line) => {
+                entry = line;
+            },
+        });
+        await broker.request({
+            system: "capability",
+            state: { objective: "Fix the build" },
+            questions: { mode: choice("Which?", { a: "A", b: "B" }), stuck: noul("Stuck?") },
+            trigger: ["prompt-mentions-web", "Free text from a result", 7],
+        });
+        // Labels only: anything that is not a code-defined identifier stays out of the ledger.
+        assert.deepEqual(entry.trigger, ["prompt-mentions-web"]);
+        assert.deepEqual(entry.answers.mode.probabilities, { a: 0.812, b: 0.1 });
+        assert.equal(entry.answers.stuck.probabilities, undefined);
     });
 });
 

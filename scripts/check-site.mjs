@@ -237,7 +237,7 @@ try {
         assert.ok((await page.locator(".index-meta").innerText()).includes(manifest.version));
         assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
         const flows = page.locator("details.system-flow");
-        assert.equal(await flows.count(), 6);
+        assert.equal(await flows.count(), 5);
         assert.equal(await page.locator("details.system-flow[open]").count(), 0);
         await page.screenshot({ path: path.join(screenshots, `jev-${name}.png`), fullPage: true });
         for (const flow of await flows.all()) {

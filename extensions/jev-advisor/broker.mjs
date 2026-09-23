@@ -24,10 +24,23 @@ export const SYSTEM_LABELS = Object.freeze({
     retention: "Tool-result retention",
     gap: "Capability-gap triage",
     sources: "Delegation source ranking",
-    progress: "Progress and thrash detection",
     untrusted: "Untrusted-content classification",
     capability: "Turn-zero capability arming",
 });
+
+/** A Choice or Score distribution reduced to rounded numbers under safe keys, or nothing. */
+export function distribution(probabilities) {
+    if (!probabilities || typeof probabilities !== "object") {
+        return undefined;
+    }
+
+    const entries = Object.entries(probabilities)
+        .slice(0, 16)
+        .filter(([key, value]) => /^[A-Za-z0-9_-]{1,64}$/u.test(key) && Number.isFinite(value))
+        .map(([key, value]) => [key, Math.round(value * 1000) / 1000]);
+
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
 
 export function createBroker(options = {}) {
     // Injected in tests so master-off can be proven as "the transport was never reached" rather
@@ -177,7 +190,13 @@ export function createBroker(options = {}) {
         decide,
         apply,
         isCurrent = () => true,
+        trigger,
     }) => {
+        // Which local signals led here. Code-defined labels only, so the ledger can say why a call
+        // was made without carrying anything from the material itself.
+        const triggers = Array.isArray(trigger)
+            ? trigger.filter((item) => typeof item === "string" && /^[a-z][a-z0-9-]{0,39}$/u.test(item)).slice(0, 8)
+            : [];
         const startedGeneration = generation;
         const currentRequest = () => startedGeneration === generation && !signal?.aborted && isCurrent();
         const settings = readSettings();
@@ -216,6 +235,7 @@ export function createBroker(options = {}) {
             write({
                 system,
                 sent: false,
+                ...(triggers.length > 0 ? { trigger: triggers } : {}),
                 ok: false,
                 reason,
                 outcome: reason,
@@ -302,6 +322,7 @@ export function createBroker(options = {}) {
         write({
             system,
             sent: true,
+            ...(triggers.length > 0 ? { trigger: triggers } : {}),
             questionKeys,
             coverage: built.coverage,
             stateBytes: built.bytes,
@@ -328,7 +349,14 @@ export function createBroker(options = {}) {
             answers: Object.fromEntries(
                 Object.entries(result.answers ?? {}).map(([name, answer]) => [
                     name,
-                    { kind: answer.kind, value: answer.value, confidence: answer.confidence },
+                    {
+                        kind: answer.kind,
+                        value: answer.value,
+                        confidence: answer.confidence,
+                        // Without the distribution a Choice's margin gate cannot be re-checked
+                        // afterwards. Keys are code-defined option IDs; values are numbers.
+                        probabilities: distribution(answer.probabilities),
+                    },
                 ]),
             ),
         });

@@ -62,7 +62,6 @@ const resourcePaths = [
     "extensions/jev-advisor/questions/retention.mjs",
     "extensions/jev-advisor/questions/gap.mjs",
     "extensions/jev-advisor/questions/sources.mjs",
-    "extensions/jev-advisor/questions/progress.mjs",
     "extensions/jev-advisor/questions/untrusted.mjs",
     "extensions/jev-advisor/questions/capabilities.mjs",
     "skills/specpi-improve/SKILL.md",

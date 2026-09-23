@@ -19,18 +19,9 @@
 // human would have seen from `request_capability`, at turn 0 instead of turn 6. A decline is
 // remembered for the session, and with no interactive human it proposes nothing at all.
 
-import { choice, noul } from "../client.mjs";
-import { choiceValue, nounTrue } from "../gate.mjs";
+import { noul } from "../client.mjs";
+import { nounTrue } from "../gate.mjs";
 import { compact } from "../sanitize.mjs";
-
-export const TASK_KINDS = Object.freeze({
-    code: "Reading or changing source code in this repository",
-    web: "Looking something up online, or reading external pages",
-    ui: "Checking how a page renders or behaves in a browser",
-    ops: "Builds, releases, configuration or tooling",
-    docs: "Writing or editing prose",
-    other: "Anything else",
-});
 
 /**
  * Cheap, local, and checked before anything is sent. The rule is ask local state first, and while
@@ -80,7 +71,7 @@ export function buildInput({ prompt, reasons, available, cwdEntries = [] }) {
 }
 
 export function questions({ available = [] } = {}) {
-    const asked = { task_kind: choice("What kind of work is this request asking for?", TASK_KINDS) };
+    const asked = {};
     if (available.includes("web")) {
         asked.needs_web = noul("Completing this request will require searching the web or fetching an external page");
     }
@@ -118,7 +109,6 @@ export function decide(answers, available = []) {
 
     return {
         propose,
-        taskKind: choiceValue(answers?.task_kind, "capability"),
         suggestDelegation: nounTrue(answers?.needs_delegation, "capability"),
     };
 }

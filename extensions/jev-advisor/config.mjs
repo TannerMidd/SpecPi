@@ -18,26 +18,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 /** Systems that may run inside a session. Offline scripts are not gated here. */
-export const SYSTEM_NAMES = Object.freeze(["retention", "gap", "sources", "progress", "untrusted", "capability"]);
-
-/**
- * What a confident stuck verdict is allowed to do. `notify` tells the person and cannot be wrong in
- * a way that costs anything; `message` appends a fixed line the model reads before its next
- * request, which changes behaviour.
- *
- * It ships on `notify`. Not because the gate cannot tell the cases apart -- it demonstrably can: on
- * the recorded fixtures a session repeating one failing call scores 0.89 for stuck with the mode at
- * 0.99 confidence, and a session working steadily scores 0.30 and reports "unknown" below the gate.
- * The missing number is the false-positive rate on real sessions, and the two things that bear on it
- * point the other way: running the same taxonomy over the 24 recorded failures left 14 of them
- * ungated, and a wrong nudge costs a turn, which is the exact quantity this system exists to save.
- *
- * So the condition for changing this default is a measurement, not an opinion, and the eval suite
- * is where it comes from: `--harness=specpi-jev` sets `message` and discloses it, because a
- * notification in a headless run reaches nobody and would measure the cost of the system with none
- * of its effect.
- */
-export const NUDGE_MODES = Object.freeze(["notify", "message"]);
+export const SYSTEM_NAMES = Object.freeze(["retention", "gap", "sources", "untrusted", "capability"]);
 
 const MAX_SETTINGS_BYTES = 4096;
 const MAX_CALL_BUDGET = 1024;
@@ -49,7 +30,7 @@ const MAX_TOTAL_BUDGET = 2048;
  * session, and which one won would be decided by event ordering rather than by anyone's policy.
  *
  * So the ceiling is two-level: each system gets its own, and the total is a real constraint because
- * it is deliberately less than their sum -- 2048 against 2274. That relationship is the invariant,
+ * it is deliberately less than their sum -- 1536 against 1570. That relationship is the invariant,
  * not either number: raising the total without raising the per-system ceilings would leave a total
  * no combination of systems could ever reach, which is a limit that reads as a limit and is not
  * one. `tests/jev-advisor.test.mjs` pins the inequality so a future change to one has to consider
@@ -61,7 +42,7 @@ const MAX_TOTAL_BUDGET = 2048;
 export const DEFAULT_BUDGETS = Object.freeze({
     // A backstop, not a working limit, and the number says which. Measured, a full tier-3 task -- a
     // 120-step repair chain over about 25 model requests -- spends 4 to 7 calls, and the busiest
-    // attempt ever recorded spent 12. A session would have to run for days before 2048 bound
+    // attempt ever recorded spent 12. A session would have to run for days before 1536 bound
     // anything a person was actually doing, which is the point: the ceiling should only ever be hit
     // by a loop, and hitting it should therefore be information rather than an inconvenience.
     //
@@ -74,22 +55,23 @@ export const DEFAULT_BUDGETS = Object.freeze({
     // to compact several times spends in the hundreds, so the backstop sat close enough to real
     // use to be reachable by a session that was working correctly.
     //
-    // Cost is not what these are for. A call is about $0.00003, so the whole total is about six
+    // Cost is not what these are for. A call is about $0.00003, so the whole total is about five
     // cents. They bound two things that do not get cheaper with scale: how much digest leaves the
     // machine for a third party, at up to 1 KB a call, and how much awaited latency a runaway loop
-    // can add before something stops it. Two megabytes of digest and an announced stop is the shape
+    // can add before something stops it. About a megabyte and a half of digest and an announced stop is the shape
     // of the trade.
-    total: 2048,
+    //
+    // Lowered from 2048 to 1536 when progress detection was withdrawn. That system was the only one
+    // that could ask every turn, and its 704 left the per-system ceilings summing to 1570 -- below
+    // 2048, so the total could never have bound. 1536 is still far above anything a working session
+    // has spent.
+    total: 1536,
     // The per-system numbers move with the total, because a total the per-system ceilings can never
     // add up to is not a constraint at all -- see below. They are scaled rather than re-derived:
     // each one's rationale is a firing frequency, and none of those frequencies changed.
     retention: 832,
     gap: 192,
     sources: 128,
-    // Turn-level, but gated behind local signals and a four-turn cooldown, so it only spends on
-    // sessions that already look wrong. The ceiling is what stops a genuinely thrashing session
-    // from spending the total on being told it is thrashing.
-    progress: 704,
     // Usually free: when retention is on, system 7's question rides the call retention was already
     // making against the same state. This ceiling only binds when retention is off, or when the
     // fetched result is too small for retention to be interested in it.
@@ -135,12 +117,11 @@ export function regularFile(file, label) {
 /** Every unknown shape collapses to the same all-off default rather than a partial enable. */
 export function defaultSettings() {
     return {
-        schema: 5,
+        schema: 6,
         master: false,
         startup: false,
         systems: Object.fromEntries(SYSTEM_NAMES.map((name) => [name, false])),
         budgets: { ...DEFAULT_BUDGETS },
-        progressNudge: "notify",
     };
 }
 
@@ -221,6 +202,25 @@ function migrateToFive(raw) {
 }
 
 /**
+ * Schema 6 removes progress detection, withdrawn on a replay rather than a solve-rate result.
+ *
+ * Over 174 recorded Terminal-Bench 2 runs where its local gate fired, the stuck verdict did not
+ * predict failure -- within-task AUC 0.46, with the shipped state and with one that added the recent
+ * commands -- and its failure-mode answer echoed its own input 624 times out of 624. A system that
+ * can steer a model has to show it can tell when to; this one could not.
+ *
+ * `systems.progress`, `budgets.progress` and `progressNudge` go, for the reason the compaction
+ * keys went: the hooks they gated no longer exist.
+ */
+function migrateToSix(raw) {
+    const { progress: _system, ...systems } = raw?.systems ?? {};
+    const { progress: _budget, ...budgets } = raw?.budgets ?? {};
+    const { progressNudge: _nudge, ...rest } = raw ?? {};
+
+    return { ...rest, schema: 6, systems, budgets };
+}
+
+/**
  * What the advisor will read, given a settings object, without writing it anywhere.
  *
  * Exported for callers that compose a settings file for somewhere other than this process's own
@@ -237,20 +237,20 @@ export function normalizeSettings(raw) {
 function normalize(raw) {
     const one = raw?.schema === 1 ? migrate(raw) : raw;
     const four = one?.schema === 2 || one?.schema === 3 ? migrateToFour(one) : one;
-    const source = four?.schema === 4 ? migrateToFive(four) : four;
-    if (source?.schema !== 5) {
+    const five = four?.schema === 4 ? migrateToFive(four) : four;
+    const source = five?.schema === 5 ? migrateToSix(five) : five;
+    if (source?.schema !== 6) {
         return defaultSettings();
     }
 
     const systems = Object.fromEntries(SYSTEM_NAMES.map((name) => [name, source.systems?.[name] === true]));
 
     return {
-        schema: 5,
+        schema: 6,
         master: source.master === true,
         startup: source.startup === true,
         systems,
         budgets: normalizeBudgets(source.budgets),
-        progressNudge: NUDGE_MODES.includes(source.progressNudge) ? source.progressNudge : "notify",
     };
 }
 
@@ -283,7 +283,7 @@ export function writeFileAtomic(file, contents) {
 export function saveSettings(settings) {
     // A caller handing back an older shape is migrated rather than reset, so a round trip through
     // an old reader cannot quietly disable the layer.
-    const next = normalize([1, 2, 3, 4].includes(settings?.schema) ? settings : { ...settings, schema: 5 });
+    const next = normalize([1, 2, 3, 4, 5].includes(settings?.schema) ? settings : { ...settings, schema: 6 });
     const file = settingsFile();
     if (fs.existsSync(file)) {
         regularFile(file, "Jev settings");
