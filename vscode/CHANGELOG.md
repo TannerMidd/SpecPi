@@ -1,5 +1,11 @@
 # SpecPi Chat changelog
 
+## 0.15.0
+
+- Follow the advisor to schema 6. Progress detection was withdrawn from the Jev layer after replays showed its stuck verdict did not predict failure, so the panel drops its toggle, its budget row and the "what a stuck verdict may do" setting. A stored preference for any of them is read past, as the compaction keys were in schema 5.
+- Match the advisor's new default session total of 1536 calls, so a save with nothing changed does not rewrite the budget.
+- Describe retention, gap triage and untrusted-content classification as they now behave: retention no longer considers file reads or shell output, gap triage refuses a report that writes out a secret or names a person or machine, and untrusted-content classification covers pages fetched through the shell.
+
 ## 0.14.0
 
 - Drop the command guard from the panel entirely. It is the pinned `specpi-jev-guard` package again rather than the layer's eighth system, and it keeps its own configuration file and its own switch, so it has no row, no budget, no toggle and no trace in the file this panel writes. Schema 4 carries neither the `guard` pair schema 2 held nor the `systems.guard` entry schema 3 held, and a test loads both older shapes through the panel and the advisor to check they agree about dropping them.
