@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi 0.30.1 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.31.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
