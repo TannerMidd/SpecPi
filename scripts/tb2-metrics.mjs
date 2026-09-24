@@ -29,10 +29,9 @@
 //   it overstates by about two orders of magnitude. Every arm's cost here is recomputed from logged
 //   tokens at the frozen rate instead.
 //
-// And one cost is left out. Harbor records the agent's tokens, not the Jev advisor's, so the
-// SpecPi + Jev figure is the agent's spend alone. evals/prices.json prices the advisor so that a Jev
-// row never excludes it; this one has to, so the advisor's own ledger is counted instead and the page
-// says what is missing rather than folding in a guess.
+// SpecPi is measured as users get it: the published release, with the optional Jev layer off. The
+// Jev layer is experimental and changed nothing measurable in six earlier sittings, so those arms are
+// not on the page; their runs stay on disk.
 //
 // Usage: node scripts/tb2-metrics.mjs [runs-root]
 
@@ -63,33 +62,85 @@ const DEFAULT_RUNS = "F:/Development/tb-bench/runs";
 const SOURCES = [
     // 2026-09-21
     { sitting: "s1", slice: "slice1", arm: "pi", dir: "tb2-pair-20260921-131712/pi" },
-    { sitting: "s1", slice: "slice1", arm: "jev", dir: "tb2-pair-20260921-131712/jev" },
     { sitting: "s1", slice: "slice1", arm: "omp", dir: "tb2-omp-slice1-20260921-180429" },
     // Both 21 Sep Claude Code runs predate the cache-mapping fix; noCache keeps them out of its cost.
     { sitting: "s1", slice: "slice1", arm: "claude-code", dir: "tb2-cc-slice1-20260921-150054", noCache: true },
     { sitting: "s1", slice: "widen", arm: "pi", dir: "tb2-widen-20260921-142615/pi" },
-    { sitting: "s1", slice: "widen", arm: "jev", dir: "tb2-widen-20260921-142615/jev" },
     { sitting: "s1", slice: "widen", arm: "omp", dir: "tb2-omp-widen-20260921-184339" },
     { sitting: "s1", slice: "widen", arm: "claude-code", dir: "tb2-cc-widen-20260921-165619", noCache: true },
 
     // 2026-09-22
-    { sitting: "s2", slice: "widen", arm: "jev", dir: "tb2-jevcc-20260922-002420/jev" },
     { sitting: "s2", slice: "widen", arm: "claude-code", dir: "tb2-jevcc-20260922-002420/claude-code" },
     { sitting: "s3", slice: "widen", arm: "pi", dir: "tb2-picontrol-20260922-075714/pi" },
-    { sitting: "s4", slice: "widen", arm: "pi", dir: "tb2-rep1-20260922-084504/pi" },
-    { sitting: "s4", slice: "widen", arm: "jev", dir: "tb2-rep1-20260922-084504/jev" },
     { sitting: "s5", slice: "widen", arm: "pi", dir: "tb2-rep2-20260922-094001/pi" },
-    { sitting: "s5", slice: "widen", arm: "jev", dir: "tb2-rep2-20260922-094001/jev" },
-    { sitting: "s6", slice: "widen", arm: "pi", dir: "tb2-rep3-20260922-103224/pi" },
-    { sitting: "s6", slice: "widen", arm: "jev", dir: "tb2-rep3-20260922-103224/jev" },
-    // OpenCode and the DeepSeek Harness joined in a four-arm sitting with Pi and SpecPi + Jev, so each
-    // has partners to be compared against. DSH reports no usage of its own; its tokens are what a
+    // OpenCode and the DeepSeek Harness joined in a sitting with Pi, so each has a partner to be
+    // compared against. DSH reports no usage of its own; its tokens are what a
     // counting proxy inside the container saw leave. It is pinned to 0.1.5-rc.3, because rc.2 -- npm's
     // `latest` -- now resolves rc.3 sub-packages and fails to boot.
     { sitting: "s7", slice: "widen", arm: "pi", dir: "tb2-four-20260922-132056/pi" },
-    { sitting: "s7", slice: "widen", arm: "jev", dir: "tb2-four-20260922-132056/jev" },
     { sitting: "s7", slice: "widen", arm: "opencode", dir: "tb2-four-20260922-132056/opencode", reasoningApart: true },
     { sitting: "s7", slice: "widen", arm: "dsh", dir: "tb2-four-20260922-132056/dsh" },
+
+    // 2026-09-24: SpecPi 0.33.0 beside Pi. The git pair tops up the two tasks the 0.33.0 working-
+    // agreement rule is about, in the same launch conditions, and is kept out of pooled totals so two
+    // tasks at seven attempts do not outweigh the other eleven.
+    { sitting: "s8", slice: "widen", arm: "pi", dir: "tb2-v033-widen-20260924-000807/pi" },
+    { sitting: "s8", slice: "widen", arm: "specpi", dir: "tb2-v033-widen-20260924-000807/sp033" },
+    { sitting: "s8", slice: "focused", arm: "pi", dir: "tb2-v033-gitpair-20260924-010734/pi" },
+    { sitting: "s8", slice: "focused", arm: "specpi", dir: "tb2-v033-gitpair-20260924-010734/sp033" },
+    // The same git pair for the other four harnesses that afternoon: same tasks, seven attempts,
+    // model and endpoint. Setup was given three times Harbor's default after a slow package mirror timed
+    // out OpenCode's and Claude Code's Node.js install; the time on the task itself is unchanged.
+    { sitting: "s8", slice: "focused", arm: "omp", dir: "tb2-gitpair-rest-20260924-145650/omp" },
+    { sitting: "s8", slice: "focused", arm: "dsh", dir: "tb2-gitpair-rest-20260924-145650/dsh" },
+    {
+        sitting: "s8",
+        slice: "focused",
+        arm: "opencode",
+        dir: "tb2-gitpair-oc3-20260924-152921/opencode",
+        reasoningApart: true,
+    },
+    { sitting: "s8", slice: "focused", arm: "claude-code", dir: "tb2-cc-gitpair3-20260924-152921/claude-code" },
+    // 2026-09-24, a second sitting for SpecPi 0.33.0 beside Oh My Pi, so both have a spread and the
+    // two can be compared within one launch rather than across days.
+    { sitting: "s9", slice: "widen", arm: "specpi", dir: "tb2-sweep-sp-omp-20260924-082631/sp033" },
+    { sitting: "s9", slice: "widen", arm: "omp", dir: "tb2-sweep-sp-omp-20260924-082631/omp" },
+];
+
+// Bare Pi's lowest and highest sittings (21 and 32 of 39) are left out, one from each end, so the
+// trim does not move its average in either direction. Named here and on the page, not hidden.
+const EXCLUDED = [
+    { sitting: "s4", arm: "pi", solved: 21, attempts: 39, reason: "lowest Pi sitting" },
+    { sitting: "s6", arm: "pi", solved: 32, attempts: 39, reason: "highest Pi sitting" },
+];
+
+// SWE-bench Verified, twelve tasks at three attempts, run the same night as the 24 Sep sitting. A
+// different benchmark, so it is reported beside the Terminal-Bench figures and never pooled into them.
+// The 23 Sep SWE-bench runs all had Jev on, so none of them are comparable and none are read.
+const SWE_SOURCES = [
+    { sitting: "swe", slice: "swe", arm: "pi", dir: "swe-v033-easy12-20260924-013432/pi" },
+    { sitting: "swe", slice: "swe", arm: "specpi", dir: "swe-v033-easy12-20260924-013432/sp033" },
+    // Same tasks, attempts, model and endpoint, launched the next morning.
+    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-20260924-095703/omp" },
+    // Five Oh My Pi attempts failed to set up (package mirror and GitHub downloads, before the agent
+    // started), so exactly those five were run again, to reach the same 36 as every other row. The
+    // second batch was launched for two django-14404 attempts when only one was owed -- the other
+    // failure was psf__requests-1142 -- so its later-named trial is skipped and requests-1142 was run
+    // once more. Both 14404 attempts solved, so which one is skipped changes no figure but tokens.
+    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-redo1-20260924-104348/omp" },
+    {
+        sitting: "swe",
+        slice: "swe",
+        arm: "omp",
+        dir: "swe-omp-redo2-20260924-104348/omp",
+        skip: ["django__django-14404__vYzHe4z"],
+    },
+    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-redo3-20260924-144647/omp" },
+    { sitting: "swe", slice: "swe", arm: "claude-code", dir: "swe-cc-20260924-095326/claude-code" },
+    // One Claude Code attempt failed to set up (a package download), and was run again the same way.
+    { sitting: "swe", slice: "swe", arm: "claude-code", dir: "swe-cc-redo-20260924-112930/claude-code" },
+    { sitting: "swe", slice: "swe", arm: "opencode", dir: "swe-oc-dsh-20260924-132635/opencode" },
+    { sitting: "swe", slice: "swe", arm: "dsh", dir: "swe-oc-dsh-20260924-132635/dsh" },
 ];
 
 const SITTINGS = {
@@ -100,6 +151,8 @@ const SITTINGS = {
     s5: "22 Sep · d",
     s6: "22 Sep · e",
     s7: "22 Sep · f",
+    s8: "24 Sep · a",
+    s9: "24 Sep · b",
 };
 
 const SLICES = [
@@ -113,12 +166,17 @@ const SLICES = [
         label: "Widened",
         note: "Thirteen tasks at three attempts, picked for spread rather than for difficulty. This is the slice the comparison rests on.",
     },
+    {
+        id: "focused",
+        label: "Git pair",
+        note: "Seven more attempts each on sanitize-git-repo and fix-git in the 24 Sep sitting, the two tasks the 0.33.0 working-agreement rule is about. Kept out of pooled totals.",
+    },
 ];
 
 // Same tokens as every other figure on the site, so a colour means one harness throughout.
 const HARNESSES = [
     { id: "pi", label: "Pi (base)", colour: "var(--ct-pi)" },
-    { id: "jev", label: "SpecPi + Jev", colour: "var(--ct-specpi-jev)" },
+    { id: "specpi", label: "SpecPi", colour: "var(--ct-specpi)" },
     { id: "omp", label: "Oh My Pi", colour: "var(--ct-omp)" },
     { id: "claude-code", label: "Claude Code", colour: "var(--ct-claudecode)" },
     { id: "opencode", label: "OpenCode", colour: "var(--ct-opencode)" },
@@ -139,7 +197,7 @@ const DROP_TASKS = new Set(["pytorch-model-recovery"]);
 // One caveat travels with them: the two launches were in flight together at concurrency six each,
 // so that slice was measured at twelve-way concurrency, and its timeouts may owe something to that.
 
-function trials(runsRoot, dir) {
+function trials(runsRoot, dir, skip = []) {
     const found = [];
     const base = path.join(runsRoot, dir);
     if (!fs.existsSync(base)) {
@@ -153,6 +211,10 @@ function trials(runsRoot, dir) {
         }
 
         for (const trial of fs.readdirSync(stampDir)) {
+            if (skip.includes(trial)) {
+                continue;
+            }
+
             const file = path.join(stampDir, trial, "result.json");
             if (fs.existsSync(file)) {
                 found.push(file);
@@ -169,38 +231,6 @@ function costOf(rate, inputTokens, cacheTokens, outputTokens) {
     return (fresh * rate.inputPerMTok + cacheTokens * rate.cacheReadPerMTok + outputTokens * rate.outputPerMTok) / 1e6;
 }
 
-// The Jev arm's per-trial records. jev-setup.json shows which layer build was installed: 0.30.0 dropped
-// the compaction budget along with the system, so a setup that still lists one ran an earlier build
-// with the withdrawn system present, switched off for these runs. The transmission ledger is the only
-// record of the advisor's own calls, which Harbor's token counts do not include.
-function readLayer(agentDir) {
-    let carriesCompaction = null;
-    try {
-        const setup = JSON.parse(fs.readFileSync(path.join(agentDir, "jev-setup.json"), "utf8"));
-        carriesCompaction = Object.hasOwn(setup.budgets ?? {}, "compaction");
-    } catch {
-        // No setup record: the build is unknown rather than assumed.
-    }
-
-    let calls = 0;
-    let stateBytes = 0;
-    try {
-        for (const line of fs.readFileSync(path.join(agentDir, "jev-transmissions.jsonl"), "utf8").split(/\r?\n/u)) {
-            if (!line.trim()) {
-                continue;
-            }
-
-            const entry = JSON.parse(line);
-            calls += 1;
-            stateBytes += entry.stateBytes ?? 0;
-        }
-    } catch {
-        // An attempt the advisor never called writes no ledger.
-    }
-
-    return { carriesCompaction, calls, stateBytes };
-}
-
 // Reasoning tokens an OpenCode trial recorded outside n_output_tokens, summed from the per-step
 // metrics in its trajectory. Null when the trajectory is missing, so the caller can tell an attempt
 // that reasoned nothing from one whose reasoning went unrecorded.
@@ -215,11 +245,11 @@ function readReasoning(agentDir) {
     return (trajectory.steps ?? []).reduce((total, step) => total + (step.metrics?.extra?.reasoning_tokens ?? 0), 0);
 }
 
-function readTrials(runsRoot, rate) {
+function readTrials(runsRoot, rate, sources = SOURCES) {
     const rows = [];
     const errors = [];
-    for (const source of SOURCES) {
-        for (const file of trials(runsRoot, source.dir)) {
+    for (const source of sources) {
+        for (const file of trials(runsRoot, source.dir, source.skip)) {
             let trial;
             try {
                 trial = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -252,7 +282,6 @@ function readTrials(runsRoot, rate) {
 
             const outputTokens = (agent.n_output_tokens ?? 0) + reasoningTokens;
             const cacheTokens = source.noCache ? null : (agent.n_cache_tokens ?? 0);
-            const layer = source.arm === "jev" ? readLayer(path.join(path.dirname(file), "agent")) : null;
             rows.push({
                 sitting: source.sitting,
                 slice: source.slice,
@@ -268,7 +297,6 @@ function readTrials(runsRoot, rate) {
                 // What the trial reports it ran, so the page can say which Pi it measured rather
                 // than restating the version this repository happens to pin for its own tests.
                 agentVersion: trial.agent_info?.version ?? null,
-                layer,
             });
         }
     }
@@ -433,6 +461,66 @@ function pairOf(a, b) {
     };
 }
 
+/**
+ * The git-pair tasks, with the widened and git-pair attempts from their sitting combined: ten per arm
+ * rather than three, which is what makes a per-task comparison readable. Every p-value is SpecPi
+ * against Pi.
+ */
+function gitPairTasks(rows) {
+    const focused = rows.filter((row) => row.slice === "focused");
+    const sitting = focused[0]?.sitting;
+
+    return [...new Set(focused.map((row) => row.task))].sort().map((task) => {
+        const inTask = rows.filter((row) => row.sitting === sitting && row.task === task);
+        const byArm = Object.fromEntries(
+            [...new Set(inTask.map((row) => row.arm))].map((arm) => [
+                arm,
+                summarize(inTask.filter((row) => row.arm === arm)),
+            ]),
+        );
+        const specpi = byArm.specpi;
+        const pi = byArm.pi;
+
+        return {
+            task,
+            byHarness: byArm,
+            p:
+                specpi && pi
+                    ? fisherExact(specpi.solved, specpi.attempts - specpi.solved, pi.solved, pi.attempts - pi.solved)
+                    : null,
+        };
+    });
+}
+
+/**
+ * SWE-bench, every harness on the page. Harnesses not yet run come back null, so the page can show
+ * them as to be done rather than dropping them. Per-attempt tokens and cost are means, as everywhere.
+ */
+function sweBench(sweRows, harnessIds) {
+    if (sweRows.length === 0) {
+        return null;
+    }
+
+    const byArm = (subset) =>
+        Object.fromEntries(harnessIds.map((id) => [id, summarize(subset.filter((row) => row.arm === id))]));
+    const byHarness = byArm(sweRows);
+    const specpi = byHarness.specpi;
+    const pi = byHarness.pi;
+
+    return {
+        benchmark: "SWE-bench Verified",
+        tasks: new Set(sweRows.map((row) => row.task)).size,
+        byHarness,
+        taskList: [...new Set(sweRows.map((row) => row.task))]
+            .sort()
+            .map((task) => ({ task, byHarness: byArm(sweRows.filter((row) => row.task === task)) })),
+        p:
+            specpi && pi
+                ? fisherExact(specpi.solved, specpi.attempts - specpi.solved, pi.solved, pi.attempts - pi.solved)
+                : null,
+    };
+}
+
 function main() {
     const runsRoot = process.argv[2] ?? DEFAULT_RUNS;
     const prices = JSON.parse(fs.readFileSync(pricesFile, "utf8"));
@@ -455,15 +543,11 @@ function main() {
         const sittings = Object.keys(SITTINGS)
             .map((id) => {
                 const inSitting = widened.filter((row) => row.sitting === id);
-                const layers = inSitting.map((row) => row.layer).filter(Boolean);
 
                 return {
                     id,
                     label: SITTINGS[id],
                     ...(summarize(inSitting) ?? {}),
-                    ...(layers.length > 0
-                        ? { carriesCompaction: layers.some((layer) => layer.carriesCompaction === true) }
-                        : {}),
                 };
             })
             .filter((entry) => entry.attempts > 0);
@@ -471,7 +555,9 @@ function main() {
 
         return {
             ...harness,
-            overall: summarize(mine),
+            // The git pair is a targeted top-up, not a sample of the benchmark, so it stays out of the
+            // pooled figure every row is compared on.
+            overall: summarize(mine.filter((row) => row.slice !== "focused")),
             widened: summarize(widened),
             sittings,
             // Named as a range rather than a deviation: with three to five sittings the spread is
@@ -502,10 +588,13 @@ function main() {
         ),
     }));
 
+    // SWE-bench is read on its own and never pooled into the Terminal-Bench rows above.
+    const sweRows = readTrials(runsRoot, rate, SWE_SOURCES).rows;
+
     const data = {
         generatedAt: new Date().toISOString().slice(0, 10),
         benchmark: "Terminal-Bench 2.0",
-        status: "in progress",
+        status: "complete",
         model: MODEL,
         rate,
         pricedAt: prices.pricedAt,
@@ -517,36 +606,11 @@ function main() {
         piVersions: [
             ...new Set(
                 rows
-                    .filter((row) => row.arm === "pi" || row.arm === "jev")
+                    .filter((row) => row.arm === "pi" || row.arm === "specpi")
                     .map((row) => row.agentVersion)
                     .filter(Boolean),
             ),
         ].sort(),
-        // Which Jev sittings ran a layer build that still carried the withdrawn compaction system.
-        jevBuilds: (() => {
-            const jev = harnesses.find((harness) => harness.id === "jev");
-            const sittings = jev?.sittings ?? [];
-
-            return {
-                withCompaction: sittings.filter((entry) => entry.carriesCompaction).map((entry) => entry.label),
-                withoutCompaction: sittings
-                    .filter((entry) => entry.carriesCompaction === false)
-                    .map((entry) => entry.label),
-            };
-        })(),
-        // The advisor's own calls, which the SpecPi + Jev cost cannot include. Counted from its ledger,
-        // with its listed price, so the page can say what is missing without estimating it.
-        advisor: (() => {
-            const layers = rows.filter((row) => row.layer).map((row) => row.layer);
-
-            return {
-                calls: layers.reduce((total, layer) => total + layer.calls, 0),
-                attemptsWithCalls: layers.filter((layer) => layer.calls > 0).length,
-                attempts: layers.length,
-                stateBytes: layers.reduce((total, layer) => total + layer.stateBytes, 0),
-                rate: prices.models["jev-1.13.0"] ?? null,
-            };
-        })(),
         paired: harnesses.flatMap((a, index) => harnesses.slice(index + 1).map((b) => pairOf(a, b))).filter(Boolean),
         // Every pair, so no quoted comparison has to be maintained by hand.
         comparisons: harnesses.flatMap((a, index) =>
@@ -562,6 +626,13 @@ function main() {
             })),
         ),
         tasks,
+        gitPair: gitPairTasks(rows),
+        swe: sweBench(
+            sweRows,
+            harnesses.map((harness) => harness.id),
+        ),
+        sweAttempts: sweRows.length,
+        excluded: EXCLUDED.map((entry) => ({ ...entry, label: SITTINGS[entry.sitting] })),
         errors,
         totalAttempts: rows.length,
         taskCount: new Set(rows.map((row) => row.task)).size,

@@ -34,6 +34,7 @@ const tools = new Map<string, any>();
 const entries: any[] = [];
 const messages: any[] = [];
 const notifications: any[] = [];
+const widgetCalls: Array<{ key: string; value: any }> = [];
 const emitted: any[] = [];
 const selectAnswers: string[] = [];
 const renderers = new Map<string, any>();
@@ -148,7 +149,9 @@ const ctx: any = {
             notifications.push({ message, level });
         },
         setStatus() {},
-        setWidget() {},
+        setWidget(key: string, value: any) {
+            widgetCalls.push({ key, value });
+        },
         async editor() {
             return editorValue;
         },
@@ -616,16 +619,46 @@ fs.writeFileSync(
 const backgroundReadsCommentedConfig = (await startJob("echo commented-ok")).details?.started === true;
 await waitFor(() => jobMessages().length >= 3);
 
+// Chat's job list goes to an RPC client only; a terminal would draw it as text above the editor.
+const jobWidget = () => widgetCalls.filter((call) => call.key === "specpi-background-v1");
+const backgroundWidgetNeverInTerminal = jobWidget().length === 0;
+
 // A user stop reports without starting a turn; ending the session stops the rest and deletes logs.
-const long = await startJob("sleep 30");
+const long = await startJob("sleep 30", { ...ctx, mode: "rpc" });
+const listedWhileRunning = JSON.parse(jobWidget().at(-1)?.value?.[0] ?? "{}").jobs?.[0];
 const reportsBeforeStop = jobMessages().length;
 await commands.get("jobs").handler(`stop ${long.details.id}`, ctx);
 const backgroundStopReported = await waitFor(() => jobMessages().length === reportsBeforeStop + 1);
 const stopReport = jobMessages().at(-1);
+const listedAfterStop = JSON.parse(jobWidget().at(-1)?.value?.[0] ?? "{}").jobs?.[0];
+const backgroundWidgetTracksJob =
+    listedWhileRunning?.id === long.details.id &&
+    listedWhileRunning?.state === "running" &&
+    listedAfterStop?.id === long.details.id &&
+    listedAfterStop?.state === "stopped";
 const backgroundStopWaitsForNextTurn =
     stopReport?.options?.deliverAs === "nextTurn" &&
     stopReport?.options?.triggerTurn !== true &&
     /stopped by the user/u.test(stopReport?.message?.content ?? "");
+// Long bash waits are refused while background jobs are on offer, and only then.
+const bashCall = (command: string) => ({ toolName: "bash", toolCallId: "long-bash", input: { command } });
+const runBashHooks = async (command: string, context: any = ctx) => {
+    let outcome: any;
+    for (const handler of events.get("tool_call") || []) {
+        outcome = (await handler(bashCall(command), context)) ?? outcome;
+    }
+
+    return outcome;
+};
+
+const pollingBlocked = (await runBashHooks("for i in 1 2 3; do gh pr checks 1; sleep 30; done"))?.block === true;
+const quickAllowed = (await runBashHooks("git status"))?.block !== true;
+const headlessBashAllowed = (await runBashHooks("sleep 120", { ...ctx, hasUI: false }))?.block !== true;
+const offered = [...activeTools];
+activeTools = activeTools.filter((name) => name !== "background");
+const withoutBackgroundAllowed = (await runBashHooks("sleep 120"))?.block !== true;
+activeTools = offered;
+const longBashSteered = pollingBlocked && quickAllowed && headlessBashAllowed && withoutBackgroundAllowed;
 const orphan = await startJob("sleep 30");
 const orphanLogDir = path.dirname(orphan.details.logPath);
 for (const handler of events.get("session_shutdown") || []) {
@@ -713,9 +746,20 @@ const report = {
     backgroundReadsCommentedConfig,
     backgroundStopReported,
     backgroundStopWaitsForNextTurn,
+    backgroundWidgetNeverInTerminal,
+    backgroundWidgetTracksJob,
     backgroundEndsWithSession,
+    longBashSteered,
     emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
 };
 console.log("WORKFLOW_CONTROLS_HARNESS=" + JSON.stringify(report));
-fs.rmSync(root, { recursive: true, force: true });
+// On Windows a background job's process tree is killed asynchronously, and a dying `sleep` can hold
+// the temporary tree for a moment after session end. The report above is already written, so
+// cleanup retries and then gives up quietly rather than failing a passing harness over a temp dir.
+try {
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+} catch {
+    // The OS temp cleanup removes it later.
+}
+
 export default function workflowControlsHarness() {}

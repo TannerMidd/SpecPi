@@ -23,6 +23,7 @@ import {
     BACKGROUND_MESSAGE,
     BACKGROUND_STATUS,
     BACKGROUND_TOOL,
+    BACKGROUND_WIDGET,
     admission as backgroundAdmissionFor,
     agentDirectory as backgroundAgentDirectory,
     completionText,
@@ -35,6 +36,9 @@ import {
     startedText,
     statusText,
     tailOf,
+    widgetPayload,
+    blockingShellCall,
+    blockingShellReason,
 } from "./background.mjs";
 import {
     canonicalRoot,
@@ -471,7 +475,12 @@ export default function workflowControls(pi: ExtensionAPI) {
 
     const publishJobStatus = () => {
         try {
-            jobsContext?.ui.setStatus(BACKGROUND_STATUS, statusText(jobs?.list() ?? []));
+            const all = jobs?.list() ?? [];
+            jobsContext?.ui.setStatus(BACKGROUND_STATUS, statusText(all));
+            // Chat's jobs panel. A terminal would draw a widget as text above the editor, so only RPC gets it.
+            if (jobsContext?.mode === "rpc") {
+                jobsContext.ui.setWidget(BACKGROUND_WIDGET, all.length > 0 ? [widgetPayload(all)] : undefined);
+            }
         } catch {
             // A status line is a courtesy; a closed UI must not fail the job.
         }
@@ -546,6 +555,24 @@ export default function workflowControls(pi: ExtensionAPI) {
         if (generation === sessionGeneration) {
             snapshots.set(event.toolCallId, snapshot);
         }
+    });
+
+    // A bash call that would hold the conversation while it waits is refused whenever a background job
+    // could run it instead, so the user can keep talking. Guidance alone was not enough: the agent
+    // kept polling CI with sleep loops in bash while the background tool sat unused.
+    pi.on("tool_call", async (event: any, ctx) => {
+        if (event.toolName !== "bash" || ctx.hasUI !== true) {
+            return;
+        }
+
+        const active = typeof pi.getActiveTools === "function" ? pi.getActiveTools() : [];
+        if (!active.includes(BACKGROUND_TOOL)) {
+            return;
+        }
+
+        const why = blockingShellCall(event.input);
+
+        return why ? { block: true, reason: blockingShellReason(why) } : undefined;
     });
 
     pi.on("tool_call", async (event: any, ctx) => {
@@ -1146,7 +1173,10 @@ export default function workflowControls(pi: ExtensionAPI) {
         name: BACKGROUND_TOOL,
         label: "Background",
         description:
-            "Start a long-running shell command (an eval, build or server) without blocking the conversation. It returns at once; the exit code and last lines of output arrive later as a message. Use bash for anything quick, or when the next step needs the output. Bash permission rules apply.",
+            "Start a shell command that may take more than a minute or two (an eval, build, server, test suite, or waiting on CI or a deploy) without blocking the conversation. It returns at once; the exit code and last lines of output arrive later as a message, so never poll or sleep waiting for it. Use bash only for quick commands. Bash permission rules apply.",
+        promptGuidelines: [
+            "Use background, not bash, for anything that may take more than a minute or two or that waits on something (CI, deploys, sleep loops); a long bash call stops the user from talking to you until it returns.",
+        ],
         parameters: Type.Object(
             {
                 command: Type.String({

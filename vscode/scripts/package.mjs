@@ -16,6 +16,7 @@ export const packageFiles = Object.freeze([
     "src/launch.js",
     "src/chat-state.js",
     "src/delegates.js",
+    "src/background-jobs.js",
     "src/permissions.js",
     "src/provider-signin.js",
     "src/permission-settings.js",

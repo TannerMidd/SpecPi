@@ -929,6 +929,106 @@ test(
                 },
             );
 
+            await t.test("the Jobs chip opens a panel that lists, times and stops background jobs", async () => {
+                for (const theme of ["light", "dark"]) {
+                    await withPage(
+                        browser,
+                        fixtures,
+                        { theme, name: `jobs-panel-${theme}`, width: 320 },
+                        async (page) => {
+                            const now = Date.now();
+                            const job = (id, state, extra = {}) => ({
+                                id,
+                                label: `SWE-bench: harness ${id}`,
+                                command: "bash run_swe.sh",
+                                state,
+                                exitCode: null,
+                                startedAt: now - 754_000,
+                                endedAt: null,
+                                ...extra,
+                            });
+                            const jobs = [
+                                job("12", "running"),
+                                job("11", "running", { label: "", command: "npm run check", startedAt: now - 42_000 }),
+                                job("9", "exited", { exitCode: 0, endedAt: now - 60_000 }),
+                                job("7", "stopped", { endedAt: now - 500_000 }),
+                            ];
+                            const chip = page.locator("#jobs-status");
+                            const panel = page.locator("#jobs-panel");
+                            const ready = {
+                                status: "ready",
+                                commands: [{ name: "jobs", description: "List, show or stop background jobs" }],
+                                runtimeStatus: { "specpi-background": "2 background jobs running" },
+                                backgroundJobs: jobs,
+                            };
+                            await setState(page, ready);
+                            assert.equal(await chip.textContent(), "Jobs 2 running");
+                            assert.equal(await chip.evaluate((element) => element.tagName), "BUTTON");
+                            await chip.click();
+                            assert.equal(await panel.isVisible(), true);
+                            assert.equal(await chip.getAttribute("aria-expanded"), "true");
+                            const rows = page.locator(".job-row");
+                            assert.equal(await rows.count(), 4);
+                            assert.match(
+                                await rows.nth(0).locator(".job-meta").textContent(),
+                                /^#12 · running · 12m 3\ds$/u,
+                            );
+                            assert.equal(await rows.nth(1).locator(".job-name").textContent(), "npm run check");
+                            assert.equal(await rows.nth(2).locator(".job-meta").textContent(), "#9 · exit 0 · 11m 34s");
+                            assert.equal(await rows.nth(2).locator(".job-stop").isVisible(), false);
+                            assert.equal(await page.locator("#jobs-stop-all").isVisible(), true);
+                            // The panel stays inside the sidebar, above the footer that opened it.
+                            assert.equal(
+                                await panel.evaluate((element) => {
+                                    const bounds = element.getBoundingClientRect();
+
+                                    return bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0;
+                                }),
+                                true,
+                            );
+                            await page.screenshot({ path: path.join(screenshots, `jobs-panel-${theme}.png`) });
+
+                            await takeMessages(page);
+                            await rows.nth(0).locator(".job-stop").click();
+                            await rows
+                                .nth(2)
+                                .getByRole("button", { name: /Show the output of job 9/u })
+                                .click();
+                            assert.deepEqual(
+                                (await takeMessages(page))
+                                    .filter((message) => message.type === "jobCommand")
+                                    .map(({ action, id, contextToken }) => ({ action, id, contextToken })),
+                                [
+                                    { action: "stop", id: "12", contextToken: "fixture-context-1" },
+                                    { action: "output", id: "9", contextToken: "fixture-context-1" },
+                                ],
+                            );
+                            assert.equal(await rows.nth(0).locator(".job-stop").textContent(), "Stopping…");
+
+                            await page.keyboard.press("Escape");
+                            assert.equal(await panel.isVisible(), false);
+                            assert.equal(await chip.getAttribute("aria-expanded"), "false");
+
+                            // Once nothing runs, the finished jobs can still be opened; with no list at all
+                            // (an older SpecPi) the chip only has the status line and falls back to /jobs.
+                            await setState(page, { ...ready, runtimeStatus: {}, backgroundJobs: jobs.slice(2) });
+                            assert.equal(await chip.textContent(), "Jobs 2 done");
+                            await setState(page, { ...ready, backgroundJobs: undefined });
+                            await chip.click();
+                            assert.equal(await panel.isVisible(), false);
+                            assert.deepEqual(
+                                (await takeMessages(page))
+                                    .filter((message) => message.type === "command")
+                                    .map((message) => message.name),
+                                ["jobs"],
+                            );
+                            await setState(page, { status: "disconnected", backgroundJobs: jobs });
+                            assert.equal(await chip.isVisible(), false);
+                        },
+                    );
+                }
+            });
+
             await t.test("conversation cost reflects Pi's aggregate and keeps usage details accessible", async () => {
                 await withPage(browser, fixtures, { name: "conversation-cost", width: 280 }, async (page) => {
                     const usage = page.locator("#token-status");

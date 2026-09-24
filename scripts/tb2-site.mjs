@@ -36,7 +36,7 @@ const percent = (value) => (value === null ? "not measured" : `${(value * 100).t
 function bySlice(data, { id, title, axisLabel, value, display, step, tick, include = () => true }) {
     const groups = data.slices
         .map((slice) => ({
-            label: `${slice.label} · ${sliceShape(data, slice.id)}`,
+            label: `Terminal-Bench · ${slice.label} · ${sliceShape(data, slice.id)}`,
             bars: data.harnesses
                 .filter((harness) => harness.slices[slice.id] && include(harness.slices[slice.id]))
                 .map((harness) => ({
@@ -47,9 +47,42 @@ function bySlice(data, { id, title, axisLabel, value, display, step, tick, inclu
                 })),
         }))
         .filter((group) => group.bars.length > 0);
+    const swe = sweBand(data, { value, display, include });
+    if (swe) {
+        groups.push(swe);
+    }
+
     const max = niceMax(Math.max(...groups.flatMap((group) => group.bars.map((bar) => bar.value))), step);
 
     return hbars({ id, title, axisLabel, groups, max, tick });
+}
+
+// SWE-bench as its own band beside the Terminal-Bench ones: same scale, never pooled. Every harness
+// gets a row, and one not yet run there shows as TBD rather than disappearing.
+function sweBand(data, { value, display, include = () => true }) {
+    if (!data.swe) {
+        return null;
+    }
+
+    const runs = Object.values(data.swe.byHarness).filter(Boolean);
+    const perTask = [...new Set(runs.map((run) => Math.round(run.attempts / run.tasks)))].join(" and ");
+
+    return {
+        label: `SWE-bench Verified · ${data.swe.tasks} tasks × ${perTask}`,
+        bars: data.harnesses
+            .filter((harness) => {
+                const run = data.swe.byHarness[harness.id];
+
+                return !run || include(run);
+            })
+            .map((harness) => {
+                const run = data.swe.byHarness[harness.id];
+
+                return run
+                    ? { label: harness.label, value: value(run), display: display(run), colour: harness.colour }
+                    : { label: harness.label, value: 0, display: "TBD", colour: harness.colour };
+            }),
+    };
 }
 
 // "13 tasks × 3" reads as the shape of the work, which is what makes an unequal row obvious rather
@@ -59,7 +92,8 @@ function sliceShape(data, sliceId) {
     const tasks = Math.max(...runs.map((run) => run.tasks));
     const attempts = [...new Set(runs.map((run) => Math.round(run.attempts / run.tasks)))].sort((a, b) => a - b);
 
-    return `${tasks} tasks × ${attempts.join(" and ")}`;
+    // Pooled sittings give each harness a different multiple, so name the per-sitting count instead.
+    return attempts.length > 1 ? `${tasks} tasks × ${attempts[0]} per sitting` : `${tasks} tasks × ${attempts[0]}`;
 }
 
 function renderCharts(data) {
@@ -134,9 +168,10 @@ function renderCharts(data) {
     charts["chart-cache"] = hbars({
         id: "chart-cache",
         title: "Prompt cache hit rate",
-        axisLabel: "cached share of prompt tokens, both slices pooled",
+        axisLabel: "cached share of prompt tokens, each benchmark pooled on its own",
         groups: [
             {
+                label: "Terminal-Bench",
                 bars: cached.map((harness) => ({
                     label: harness.label,
                     value: harness.overall.cacheHitRate,
@@ -144,10 +179,17 @@ function renderCharts(data) {
                     colour: harness.colour,
                 })),
             },
-        ],
+            sweBand(data, {
+                value: (run) => run.cacheHitRate ?? 0,
+                display: (run) => percent(run.cacheHitRate),
+            }),
+        ].filter(Boolean),
         max: 1,
         tick: (value) => `${Math.round(value * 100)}%`,
     });
+
+    charts["chart-headtohead"] = renderHeadToHead(data);
+    charts["chart-swe"] = renderSwe(data);
 
     return charts;
 }
@@ -203,12 +245,210 @@ export function orientedPair(data, numerator, denominator) {
     };
 }
 
-// "−30%" for fewer, "+11%" for more: a signed change reads faster than a ratio.
-const change = (ratio) => {
-    const value = Math.round((ratio - 1) * 100);
+// Head to head: SpecPi against bare Pi, in the sittings both ran. One row per measure, each on its
+// own scale, with a dot for each harness and the gap between them drawn as the line joining them.
+// The right-hand column states the change, so the diagram reads without its caption.
+function renderHeadToHead(data) {
+    const pair = orientedPair(data, "specpi", "pi");
+    const colourOf = (id) => data.harnesses.find((entry) => entry.id === id)?.colour ?? "var(--muted)";
+    const piColour = colourOf("pi");
+    const specpiColour = colourOf("specpi");
+    const mean = (values) => values.reduce((total, value) => total + value, 0) / values.length;
+    const sittings = pair?.sittings ?? [];
+    const task = (name) => data.gitPair.find((entry) => entry.task === name);
+    const rows = [];
+    if (pair) {
+        rows.push({
+            label: "Solved",
+            sub: `widened slice · p = ${pair.solved.p.toFixed(2)}`,
+            pi: pair.solved.den / pair.solved.attemptsDen,
+            specpi: pair.solved.num / pair.solved.attemptsNum,
+            max: 1,
+            higherIsBetter: true,
+            text: [`${pair.solved.den}/${pair.solved.attemptsDen}`, `${pair.solved.num}/${pair.solved.attemptsNum}`],
+            kind: "rate",
+        });
+    }
 
-    return value === 0 ? "0%" : `${value > 0 ? "+" : "−"}${Math.abs(value)}%`;
-};
+    for (const name of ["sanitize-git-repo", "fix-git"]) {
+        const entry = task(name);
+        if (!entry?.byHarness.pi || !entry?.byHarness.specpi) {
+            continue;
+        }
+
+        const pi = entry.byHarness.pi;
+        const specpi = entry.byHarness.specpi;
+        rows.push({
+            label: name,
+            sub: `${specpi.attempts} attempts · p = ${entry.p < 0.01 ? entry.p.toFixed(3) : entry.p.toFixed(2)}`,
+            pi: pi.solved / pi.attempts,
+            specpi: specpi.solved / specpi.attempts,
+            max: 1,
+            higherIsBetter: true,
+            text: [`${pi.solved}/${pi.attempts}`, `${specpi.solved}/${specpi.attempts}`],
+            kind: "rate",
+            code: true,
+        });
+    }
+
+    if (sittings.length > 0) {
+        const tokens = [
+            mean(sittings.map((entry) => entry.den.inputTokens)),
+            mean(sittings.map((entry) => entry.num.inputTokens)),
+        ];
+        const cost = [mean(sittings.map((entry) => entry.den.cost)), mean(sittings.map((entry) => entry.num.cost))];
+        rows.push({
+            label: "Prompt tokens",
+            sub: "per attempt",
+            pi: tokens[0],
+            specpi: tokens[1],
+            max: Math.max(...tokens) * 1.15,
+            higherIsBetter: false,
+            text: tokens.map((value) => `${Math.round(value / 1000)}k`),
+            kind: "ratio",
+        });
+        rows.push({
+            label: "Cost",
+            sub: "per attempt",
+            pi: cost[0],
+            specpi: cost[1],
+            max: Math.max(...cost) * 1.15,
+            higherIsBetter: false,
+            text: cost.map((value) => money(value)),
+            kind: "ratio",
+        });
+    }
+
+    return drawDumbbell(
+        "chart-headtohead",
+        "SpecPi against Pi, in the sittings both ran",
+        rows,
+        piColour,
+        specpiColour,
+    );
+}
+
+/**
+ * SWE-bench, the same drawing as the head-to-head: one solve row and the two spend rows.
+ */
+function renderSwe(data) {
+    const swe = data.swe;
+    if (!swe) {
+        return "";
+    }
+
+    const colourOf = (id) => data.harnesses.find((entry) => entry.id === id)?.colour ?? "var(--muted)";
+    const pi = swe.byHarness.pi;
+    const specpi = swe.byHarness.specpi;
+    const spend = (label, key, format) => ({
+        label,
+        sub: "per attempt",
+        pi: pi[key],
+        specpi: specpi[key],
+        max: Math.max(pi[key], specpi[key]) * 1.15,
+        higherIsBetter: false,
+        text: [format(pi[key]), format(specpi[key])],
+        kind: "ratio",
+    });
+    const rows = [
+        {
+            label: "Solved",
+            sub: `${swe.tasks} tasks · p = ${swe.p.toFixed(2)}`,
+            pi: pi.rate,
+            specpi: specpi.rate,
+            max: 1,
+            higherIsBetter: true,
+            text: [`${pi.solved}/${pi.attempts}`, `${specpi.solved}/${specpi.attempts}`],
+            kind: "rate",
+        },
+        spend("Prompt tokens", "inputTokens", (value) => `${Math.round(value / 1000)}k`),
+        spend("Cost", "cost", money),
+    ];
+
+    return drawDumbbell(
+        "chart-swe",
+        "SpecPi against Pi on SWE-bench Verified",
+        rows,
+        colourOf("pi"),
+        colourOf("specpi"),
+    );
+}
+
+function drawDumbbell(id, title, rows, piColour, specpiColour) {
+    // Stacked rows: the label and the change share one line, the track runs full width beneath.
+    // A narrow drawing keeps its text legible at phone width; the figure is capped on wide screens.
+    const width = 480;
+    const left = 8;
+    const right = width - 8;
+    const rowHeight = 66;
+    const top = 30;
+    const height = top + rows.length * rowHeight;
+    const x = (value, max) => left + (Math.max(0, Math.min(value, max)) / max) * (right - left);
+    const parts = [
+        `<circle cx="6" cy="10" r="6" fill="${piColour}" /><text x="18" y="14" class="ct-lb">Pi (base)</text>`,
+        `<circle cx="96" cy="10" r="6" fill="${specpiColour}" /><text x="108" y="14" class="ct-lb">SpecPi</text>`,
+        `<text x="${width}" y="14" text-anchor="end" class="ct-lb">SpecPi vs Pi</text>`,
+    ];
+    rows.forEach((row, index) => {
+        const y = top + index * rowHeight + 16;
+        const track = y + 30;
+        const piX = x(row.pi, row.max);
+        const specpiX = x(row.specpi, row.max);
+        const change =
+            row.kind === "rate" ? Math.round((row.specpi - row.pi) * 100) : Math.round((row.specpi / row.pi - 1) * 100);
+        const better = change === 0 ? null : row.higherIsBetter ? change > 0 : change < 0;
+        const tone = better === null ? "var(--muted)" : better ? specpiColour : "var(--ct-warn, #b45309)";
+        const delta =
+            change === 0
+                ? "level"
+                : `${change > 0 ? "+" : "−"}${Math.abs(change)}${row.kind === "rate" ? " pts" : "%"}`;
+        const label = row.code ? `<tspan font-family="var(--mono)">${esc(row.label)}</tspan>` : esc(row.label);
+        // Equal values would hide Pi's dot under SpecPi's, so Pi becomes a ring around it.
+        const piMark =
+            Math.abs(piX - specpiX) < 1
+                ? `<circle cx="${piX.toFixed(1)}" cy="${track}" r="10.5" fill="none" stroke="${piColour}" stroke-width="2.5"><title>Pi: ${esc(row.text[0])}</title></circle>`
+                : `<circle cx="${piX.toFixed(1)}" cy="${track}" r="7" fill="${piColour}"><title>Pi: ${esc(row.text[0])}</title></circle>`;
+        parts.push(
+            `<text x="0" y="${y}" class="ct-row">${label}<tspan class="ct-sub" dx="8">${esc(row.sub)}</tspan></text>`,
+            `<text x="${width}" y="${y}" text-anchor="end" class="ct-val" style="fill:${tone}">${delta}<tspan class="ct-sub" dx="8">${esc(row.text[0])} → ${esc(row.text[1])}</tspan></text>`,
+            `<line x1="${left}" y1="${track}" x2="${right}" y2="${track}" stroke="var(--line)" stroke-width="2" stroke-linecap="round" />`,
+            `<line x1="${piX.toFixed(1)}" y1="${track}" x2="${specpiX.toFixed(1)}" y2="${track}" stroke="${tone}" stroke-width="4" stroke-linecap="round" opacity=".55" />`,
+            piMark,
+            `<circle cx="${specpiX.toFixed(1)}" cy="${track}" r="7" fill="${specpiColour}"><title>SpecPi: ${esc(row.text[1])}</title></circle>`,
+        );
+    });
+
+    return `<svg class="chart" id="${id}" viewBox="0 0 ${width} ${height}" style="max-width:640px" role="img" preserveAspectRatio="xMidYMid meet" aria-label="${esc(title)}">${parts.join("")}</svg>`;
+}
+
+// Task by task as a heatmap: each cell is shaded by its solve rate, so the hard tasks and the
+// harness-sensitive ones stand out before any number is read.
+// A harness that has not run the benchmark at all gets TBD; one that ran it but not this task, a dash.
+function renderTaskHeatmap(data, tasks = data.tasks, ran = null) {
+    const header = ["Task", ...data.harnesses.map((harness) => harness.label)]
+        .map((cell, index) => `<th${index === 0 ? "" : ' scope="col"'}>${esc(cell)}</th>`)
+        .join("");
+    const body = tasks
+        .map((entry) => {
+            const cells = data.harnesses.map((harness) => {
+                const run = entry.byHarness[harness.id];
+                if (!run) {
+                    return ran && !ran.has(harness.id)
+                        ? `<td class="hm-empty">TBD</td>`
+                        : `<td class="hm-empty">&mdash;</td>`;
+                }
+
+                const rate = run.solved / run.attempts;
+
+                return `<td style="--r:${rate.toFixed(2)}" title="${esc(harness.label)}: ${run.solved} of ${run.attempts}">${run.solved}/${run.attempts}</td>`;
+            });
+
+            return `<tr><th><code>${esc(entry.task)}</code></th>${cells.join("")}</tr>`;
+        })
+        .join("");
+
+    return `<table class="heatmap"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+}
 
 function renderTables(data) {
     const overall = table(
@@ -226,56 +466,30 @@ function renderTables(data) {
         ]),
     );
 
-    // Every sitting, as a grid. This is the evidence for the range column above.
-    const ids = Object.keys(data.sittingLabels);
-    const sittings = table(
-        ["Harness", ...ids.map((id) => esc(data.sittingLabels[id]))],
-        data.harnesses.map((harness) => [
-            esc(harness.label),
-            ...ids.map((id) => {
-                const entry = (harness.sittings ?? []).find((e) => e.id === id);
+    const tables = { "table-overall": overall, "table-tasks": renderTaskHeatmap(data) };
+    if (data.swe) {
+        const ran = new Set(Object.keys(data.swe.byHarness).filter((id) => data.swe.byHarness[id]));
+        tables["table-swe"] = table(
+            ["Harness", "Solved", "Rate", "Prompt tok", "Cache hit", "Cost/attempt"],
+            data.harnesses.map((harness) => {
+                const run = data.swe.byHarness[harness.id];
 
-                return entry ? `${entry.solved}/${entry.attempts}` : "&mdash;";
+                return run
+                    ? [
+                          esc(harness.label),
+                          `${run.solved}/${run.attempts}`,
+                          run.rate.toFixed(3),
+                          thousands(run.inputTokens),
+                          percent(run.cacheHitRate),
+                          money(run.cost),
+                      ]
+                    : [esc(harness.label), "TBD", "TBD", "TBD", "TBD", "TBD"];
             }),
-        ]),
-    );
+        );
+        tables["table-swe-tasks"] = renderTaskHeatmap(data, data.swe.taskList, ran);
+    }
 
-    // The widened slice only. The calibration slice is on the page as the reason the widened one
-    // exists rather than as a result, and a task breakdown of it would invite reading it as one.
-    const tasks = table(
-        ["Task", ...data.harnesses.map((harness) => esc(harness.label))],
-        data.tasks.map((entry) => [
-            `<code>${esc(entry.task)}</code>`,
-            ...data.harnesses.map((harness) => {
-                const run = entry.byHarness[harness.id];
-                if (!run) {
-                    return "&mdash;";
-                }
-
-                const cell = `${run.solved}/${run.attempts}`;
-
-                return run.solved === 0 ? `<strong>${cell}</strong>` : cell;
-            }),
-        ]),
-    );
-
-    // SpecPi + Jev against bare Pi, sitting by sitting, in only the launches that ran both. The pooled
-    // rows above draw on different sittings; this is the comparison that can be attributed.
-    const pair = orientedPair(data, "jev", "pi");
-    const paired = pair
-        ? table(
-              ["Sitting", "Pi solved", "SpecPi + Jev solved", "Prompt tokens", "Cost"],
-              pair.sittings.map((entry) => [
-                  esc(entry.label),
-                  `${entry.den.solved}/${entry.den.attempts}`,
-                  `${entry.num.solved}/${entry.num.attempts}`,
-                  change(entry.tokenRatio),
-                  entry.costRatio === null ? "not comparable" : change(entry.costRatio),
-              ]),
-          )
-        : "";
-
-    return { "table-overall": overall, "table-sittings": sittings, "table-paired": paired, "table-tasks": tasks };
+    return tables;
 }
 
 // The README carries the same headline as the page. Typing it by hand guarantees it drifts, so it
@@ -283,34 +497,19 @@ function renderTables(data) {
 // because the ordering by score is the one this run says not to read.
 function renderReadme(data) {
     const rows = [...data.harnesses].sort((a, b) => a.overall.cost - b.overall.cost);
-    // Derived, not typed. The sentence below already went stale once, quoting p = 0.83 from a run
-    // that a rerun moved to 0.40, and claiming Claude Code's cache was unmeasured after it was.
-    const pValue = data.comparisons.find(
-        (entry) => [entry.a, entry.b].includes("pi") && [entry.a, entry.b].includes("jev"),
-    ).p;
+    // Derived, not typed. A hand-written version of this paragraph went stale twice, quoting a p-value
+    // a rerun had moved and a cache share that had since been measured.
     const piSpread = data.harnesses.find((entry) => entry.id === "pi").spread;
-    const pair = orientedPair(data, "jev", "pi");
-    const pct = (ratio) => `${Math.round(Math.abs(1 - ratio) * 100)}%`;
-    // The range quoted as "fewer" is taken from the sittings where it was fewer. Across all of them it
-    // printed "27-30% fewer" once a sitting went the other way, which is neither.
-    const ratios = pair.sittings.map((entry) => entry.tokenRatio);
-    const lower = ratios.filter((ratio) => ratio < 1);
-    const higher = ratios.filter((ratio) => ratio >= 1);
-    const tokenRange = `${pct(Math.max(...lower)).slice(0, -1)}–${pct(Math.min(...lower))} fewer`;
-    const tokenException =
-        higher.length === 0
-            ? ""
-            : higher.length === 1
-              ? `, ${pct(higher[0])} more in the other`
-              : `, ${pct(Math.min(...higher)).slice(0, -1)}–${pct(Math.max(...higher))} more in the others`;
-    // The pair nearest to separating, named rather than asserted, and paired rather than pooled. Pooled,
-    // Pi against Oh My Pi looks closest at p = 0.15; paired, in the one sitting both ran, it is p = 1.00,
-    // because the pooled gap was Pi's weak sittings rather than anything Oh My Pi did.
+    const pair = orientedPair(data, "specpi", "pi");
+    const sitting = pair.sittings[0];
+    const less = (ratio) => `${Math.round((1 - ratio) * 100)}%`;
     const labelOf = (id) => data.harnesses.find((entry) => entry.id === id).label;
-    const closest = [...data.paired].sort((x, y) => x.solved.p - y.solved.p)[0];
-    // Pooled pairs that clear p < 0.05, leader first. Named rather than left out, because "pooled or
-    // paired" stopped being true once a one-sitting harness joined rows pooled over six.
     const rateOf = (id) => data.harnesses.find((entry) => entry.id === id).overall.rate;
+    const sanitize = data.gitPair.find((entry) => entry.task === "sanitize-git-repo");
+    const fixGit = data.gitPair.find((entry) => entry.task === "fix-git");
+    const cellOf = (entry, id) => `${entry.byHarness[id].solved}/${entry.byHarness[id].attempts}`;
+    // Pooled pairs that clear p < 0.05, leader first. Named rather than left out, but flagged: pooling
+    // sets one harness's sittings against another's.
     const pooledSeparated = data.comparisons
         .filter((entry) => entry.p < 0.05)
         .sort((x, y) => x.p - y.p)
@@ -331,28 +530,51 @@ function renderReadme(data) {
         thousands(harness.overall.inputTokens),
         percent(harness.overall.cacheHitRate),
     ];
+    const tick = "`";
 
     return [
-        `**${data.totalAttempts} scored attempts across ${data.taskCount} tasks and ${data.harnesses.length} harnesses**,`,
-        `all on \`${data.model}\`.`,
+        `**${data.totalAttempts + (data.sweAttempts ?? 0)} scored attempts on two benchmarks and ${data.harnesses.length} harnesses**,`,
+        `all on ${tick}${data.model}${tick}. SpecPi is the published 0.33.0 release, with the experimental Jev layer off.`,
+        "",
+        ...(data.swe ? sweReadme(data) : []),
+        `Terminal-Bench 2.0, ${data.totalAttempts} attempts across ${data.taskCount} tasks:`,
         "",
         "| Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |",
         "| --- | --- | --- | --- | --- | --- |",
         ...rows.map((harness) => `| ${cell(harness).join(" | ")} |`),
         "",
-        `Solve rate does not separate them in the sittings where both ran: Pi against SpecPi + Jev is Fisher p = ${pValue.toFixed(2)}`,
-        `pooled and ${pair.solved.p.toFixed(2)} paired, and the closest paired comparison of any two harnesses is`,
-        `${labelOf(closest.a)} against ${labelOf(closest.b)} at p = ${closest.solved.p.toFixed(2)}. Nor can it at this`,
-        "sample size -- bare Pi, on unchanged software and the same thirteen tasks, spans",
-        `${(piSpread.low * 100).toFixed(0)}-${(piSpread.high * 100).toFixed(0)}% across ${piSpread.sittings} separate sittings, a wider gap than any measured here between two`,
-        `harnesses.${pooledNote}`,
+        `SpecPi and Pi ran side by side in the ${sitting.label} sitting. SpecPi solved ${pair.solved.num}/${pair.solved.attemptsNum}`,
+        `against Pi's ${pair.solved.den}/${pair.solved.attemptsDen} (Fisher p = ${pair.solved.p.toFixed(2)}), sending ${less(sitting.tokenRatio)} fewer prompt tokens and costing`,
+        `${less(sitting.costRatio)} less per attempt. On ${tick}sanitize-git-repo${tick}, with that sitting's extra attempts, SpecPi solved`,
+        `${cellOf(sanitize, "specpi")} against ${cellOf(sanitize, "pi")} (p = ${sanitize.p.toFixed(3)}); ${tick}fix-git${tick} was ${cellOf(fixGit, "specpi")} for both.`,
         "",
-        "The rows pool different sittings, so compare them paired. In the sittings where both ran,",
-        `SpecPi + Jev sent fewer prompt tokens than Pi in ${pair.tokens.lowerIn} of ${pair.tokens.sittings} (${tokenRange}${tokenException}),`,
-        `and cost less in ${pair.cost.lowerIn} of ${pair.cost.sittings}, by about ${pct(pair.cost.typical)}: output tokens are most of the bill.`,
-        "Cost is recomputed from recorded tokens against a dated price file, never taken from a",
-        "harness's self-report, and SpecPi + Jev's excludes the Jev advisor's own calls.",
+        "Overall solve rate is a different matter: one sitting cannot rank harnesses here. Bare Pi, on",
+        `unchanged software and the same thirteen tasks, spans ${(piSpread.low * 100).toFixed(0)}-${(piSpread.high * 100).toFixed(0)}% across ${piSpread.sittings} sittings, a wider gap than any`,
+        `measured between two harnesses.${pooledNote} Cost is recomputed from recorded tokens against a dated`,
+        "price file, never taken from a harness's self-report.",
     ].join("\n");
+}
+
+// SWE-bench leads the README, because it is the closer match to everyday work in a code repository.
+function sweReadme(data) {
+    const swe = data.swe;
+    const pi = swe.byHarness.pi;
+    const specpi = swe.byHarness.specpi;
+    const change = (a, b) => {
+        const value = Math.round((a / b - 1) * 100);
+
+        return value === 0 ? "the same" : `${Math.abs(value)}% ${value > 0 ? "more" : "less"}`;
+    };
+
+    const pending = data.harnesses.filter((harness) => !swe.byHarness[harness.id]).map((harness) => harness.label);
+    const perTask = Math.round(specpi.attempts / specpi.tasks);
+
+    return [
+        `SWE-bench Verified, ${swe.tasks} tasks × ${perTask}: SpecPi solved ${specpi.solved}/${specpi.attempts} against Pi's ${pi.solved}/${pi.attempts}`,
+        `(p = ${swe.p.toFixed(2)}), with ${change(specpi.inputTokens, pi.inputTokens)} prompt tokens and ${change(specpi.cost, pi.cost)} cost per attempt.`,
+        ...(pending.length > 0 ? [`${pending.join(", ")}: to be run.`] : []),
+        "",
+    ];
 }
 
 function main() {

@@ -23,6 +23,9 @@ import { randomUUID } from "node:crypto";
 export const BACKGROUND_TOOL = "background";
 export const BACKGROUND_MESSAGE = "specpi-background";
 export const BACKGROUND_STATUS = "specpi-background";
+/** The structured job list SpecPi Chat draws its jobs panel from. Published to RPC clients only. */
+export const BACKGROUND_WIDGET = "specpi-background-v1";
+export const WIDGET_JOBS = 8;
 
 /** The `shellTools` entry that makes the permission system gate `command` exactly like `bash`. */
 export const SHELL_TOOL_MAPPING = Object.freeze({ commandArgument: "command" });
@@ -270,6 +273,56 @@ export function admission({
 }
 
 // ---------------------------------------------------------------------------------------------
+// Steering long bash calls
+// ---------------------------------------------------------------------------------------------
+
+/** A bash call asking for a timeout above this is a long run; it belongs in a background job. */
+export const LONG_BASH_TIMEOUT_SECONDS = 600;
+
+const LOOP = /\b(?:for|while|until)\b[\s\S]*\bdo\b/u;
+const SLEEPS = /\bsleep\s+(\d+(?:\.\d+)?)([smh]?)\b/gu;
+const WATCHERS = /\bgh\s+run\s+watch\b|\bgh\s+pr\s+checks\b[^\n]*--watch\b|\btail\s+-[a-zA-Z]*f\b|\bwatch\s+-n\b/u;
+
+function seconds(value, unit) {
+    const number = Number(value);
+
+    return unit === "h" ? number * 3600 : unit === "m" ? number * 60 : number;
+}
+
+/**
+ * Whether a bash call would plainly hold the conversation while it waits, and if so why. Only the
+ * unambiguous shapes: a polling loop that sleeps, a single long sleep, a watch command, or a timeout
+ * the caller itself expects to be long. A long build that happens to take minutes is not guessable
+ * from its text and is left to the guidance. Returns undefined when the call is fine.
+ */
+export function blockingShellCall(input) {
+    const command = typeof input?.command === "string" ? input.command : "";
+    const timeout = Number(input?.timeout);
+    if (Number.isFinite(timeout) && timeout > LONG_BASH_TIMEOUT_SECONDS) {
+        return `it asks for a ${Math.round(timeout)}-second timeout`;
+    }
+
+    const sleeps = [...command.matchAll(SLEEPS)].map((match) => seconds(match[1], match[2]));
+    if (LOOP.test(command) && sleeps.some((value) => value >= 10)) {
+        return "it polls in a loop that sleeps between checks";
+    }
+
+    if (sleeps.some((value) => value >= 60)) {
+        return "it sleeps for a minute or more";
+    }
+
+    if (WATCHERS.test(command)) {
+        return "it watches something until it finishes";
+    }
+
+    return undefined;
+}
+
+export function blockingShellReason(why) {
+    return `Not run: this bash call would block the conversation because ${why}, and the user cannot talk to you until it returns. Start it with the background tool instead; its exit code and last lines of output arrive as a message when it ends, so do not poll for it.`;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Jobs
 // ---------------------------------------------------------------------------------------------
 
@@ -472,6 +525,31 @@ export function statusText(jobs) {
     const count = jobs.filter((job) => job.state === "running").length;
 
     return count > 0 ? `${count} background job${count === 1 ? "" : "s"} running` : undefined;
+}
+
+/**
+ * One JSON line for Chat: every running job, then the most recent finished ones, newest first.
+ * Only what /jobs already shows: no output, no log path, no working directory.
+ */
+export function widgetPayload(jobs) {
+    const newestFirst = [...jobs].sort((a, b) => Number(b.id) - Number(a.id));
+    const shown = [
+        ...newestFirst.filter((job) => job.state === "running"),
+        ...newestFirst.filter((job) => job.state !== "running"),
+    ].slice(0, WIDGET_JOBS);
+
+    return JSON.stringify({
+        version: 1,
+        jobs: shown.map((job) => ({
+            id: job.id,
+            label: job.label ?? null,
+            command: job.command,
+            state: job.state,
+            exitCode: Number.isInteger(job.exitCode) ? job.exitCode : null,
+            startedAt: job.startedAt,
+            endedAt: job.endedAt ?? null,
+        })),
+    });
 }
 
 export function listText(jobs, now = Date.now()) {

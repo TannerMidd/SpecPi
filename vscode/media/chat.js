@@ -414,6 +414,41 @@
         return { full, summary: count ? `${count} running` : full };
     }
 
+    function formatElapsed(ms) {
+        const total = Math.max(0, Math.floor(ms / 1000));
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const seconds = total % 60;
+
+        return hours > 0
+            ? `${hours}h ${String(minutes).padStart(2, "0")}m`
+            : minutes > 0
+              ? `${minutes}m ${String(seconds).padStart(2, "0")}s`
+              : `${seconds}s`;
+    }
+
+    /** One row of the jobs panel: what it is, where it stands, and whether it can still be stopped. */
+    function jobRowView(job, now) {
+        const took = formatElapsed((job.endedAt ?? now) - job.startedAt);
+        const outcome =
+            job.state === "running" ? "running" : job.state === "exited" ? `exit ${job.exitCode ?? "?"}` : job.state;
+        const tone =
+            job.state === "running"
+                ? "running"
+                : job.state === "exited" && job.exitCode === 0
+                  ? "ok"
+                  : job.state === "stopped"
+                    ? "stopped"
+                    : "failed";
+
+        return {
+            name: job.label || job.command || `Job ${job.id}`,
+            meta: `#${job.id} · ${outcome} · ${took}`,
+            tone,
+            canStop: job.state === "running",
+        };
+    }
+
     function providerUsageEntries(status) {
         return USAGE_PLUGINS.flatMap((plugin) => {
             const text = status && Object.hasOwn(status, plugin.key) ? runtimeText(status[plugin.key]) : "";
@@ -446,6 +481,8 @@
             GUARD_STATUS_KEY,
             jobsStatusEntry,
             JOBS_STATUS_KEY,
+            jobRowView,
+            formatElapsed,
             cacheHitRate,
         };
     }
@@ -1604,19 +1641,155 @@
         chip.setAttribute("aria-label", detail);
     }
 
-    /** Running background jobs, beside the guard chip. Not a button: /jobs is where they are managed. */
+    // Background jobs, beside the guard chip. SpecPi publishes the job list to Chat, and the chip opens
+    // a small panel over the footer to watch, stop or read them. Stop and Output go through /jobs.
+    let jobsPanelOpen = false;
+    let jobsTimer;
+    const jobRows = new Map();
+    const pendingJobStops = new Map();
+
+    const backgroundJobs = () => (Array.isArray(state.backgroundJobs) ? state.backgroundJobs : []);
+
     function renderJobsStatus(connected) {
         const chip = byId("jobs-status");
         const entry = connected ? jobsStatusEntry(state.runtimeStatus) : undefined;
-        chip.hidden = !entry;
-        if (!entry) {
+        const jobs = connected ? backgroundJobs() : [];
+        const running = jobs.filter((job) => job.state === "running").length;
+        chip.hidden = !entry && jobs.length === 0;
+        if (chip.hidden) {
+            closeJobsPanel(false);
+
             return;
         }
 
-        byId("jobs-value").textContent = entry.summary;
-        const detail = `${entry.full}. Each reports back here when it ends; run /jobs to list or stop them.`;
+        byId("jobs-value").textContent = entry ? entry.summary : running ? `${running} running` : `${jobs.length} done`;
+        const detail = jobs.length
+            ? `${entry?.full ?? "No background jobs running"}. Show this session's jobs, to stop one or read its output.`
+            : `${entry.full}. Each reports back here when it ends; run /jobs to list or stop them.`;
         chip.title = detail;
         chip.setAttribute("aria-label", detail);
+        chip.setAttribute("aria-expanded", String(jobsPanelOpen));
+        if (jobsPanelOpen) {
+            renderJobsPanel();
+        }
+    }
+
+    function renderJobsPanel() {
+        const jobs = backgroundJobs();
+        const now = Date.now();
+        const running = jobs.filter((job) => job.state === "running");
+        for (const [id, since] of pendingJobStops) {
+            const stillRunning = id === "all" ? running.length > 0 : running.some((job) => job.id === id);
+            if (!stillRunning || now - since > 15_000) {
+                pendingJobStops.delete(id);
+            }
+        }
+
+        const canAct =
+            state.commands?.some((command) => command.name === "jobs") &&
+            ["ready", "busy", "retrying", "compacting"].includes(state.status);
+        const nodes = jobs.map((job) => {
+            let row = jobRows.get(job.id);
+            if (!row) {
+                const node = element("li", "job-row");
+                const dot = element("span", "job-dot");
+                dot.setAttribute("aria-hidden", "true");
+                const main = element("div", "job-main");
+                const name = element("span", "job-name");
+                const meta = element("span", "job-meta");
+                main.append(name, meta);
+                const output = element("button", "job-button", "Output");
+                output.type = "button";
+                output.addEventListener("click", () => jobAction("output", job.id));
+                const stop = element("button", "job-button job-stop", "Stop");
+                stop.type = "button";
+                stop.addEventListener("click", () => jobAction("stop", job.id));
+                node.append(dot, main, output, stop);
+                row = { node, name, meta, output, stop };
+                jobRows.set(job.id, row);
+            }
+
+            const view = jobRowView(job, now);
+            const stopping = pendingJobStops.has(job.id) || pendingJobStops.has("all");
+            row.node.dataset.tone = view.tone;
+            row.name.textContent = view.name;
+            row.name.title = job.command;
+            row.meta.textContent = view.meta;
+            row.output.disabled = !canAct;
+            row.output.setAttribute("aria-label", `Show the output of job ${job.id}, ${view.name}`);
+            row.stop.hidden = !view.canStop;
+            row.stop.disabled = !canAct || stopping;
+            row.stop.textContent = stopping ? "Stopping…" : "Stop";
+            row.stop.setAttribute("aria-label", `Stop job ${job.id}, ${view.name}`);
+
+            return row.node;
+        });
+        for (const id of jobRows.keys()) {
+            if (!jobs.some((job) => job.id === id)) {
+                jobRows.delete(id);
+            }
+        }
+
+        const list = byId("jobs-list");
+        // Re-inserting a row would drop the focus of the button that was just used.
+        if (nodes.length !== list.children.length || nodes.some((node, index) => list.children[index] !== node)) {
+            list.replaceChildren(...nodes);
+        }
+
+        byId("jobs-empty").hidden = jobs.length > 0;
+        const stopAll = byId("jobs-stop-all");
+        stopAll.hidden = running.length < 2;
+        stopAll.disabled = !canAct || pendingJobStops.has("all");
+        if (running.length > 0 && !jobsTimer) {
+            jobsTimer = setInterval(renderJobsPanel, 1000);
+        } else if (running.length === 0 && jobsTimer) {
+            clearInterval(jobsTimer);
+            jobsTimer = undefined;
+        }
+    }
+
+    function jobAction(action, id) {
+        if (action === "stop") {
+            pendingJobStops.set(id, Date.now());
+        } else {
+            announce(`Output of job ${id} added to the conversation.`);
+        }
+
+        send({ type: "jobCommand", action, id, contextToken: state.contextToken });
+        renderJobsPanel();
+    }
+
+    function openJobsPanel() {
+        if (backgroundJobs().length === 0) {
+            // A SpecPi that does not publish its job list yet: fall back to the command.
+            send({ type: "command", name: "jobs" });
+
+            return;
+        }
+
+        jobsPanelOpen = true;
+        byId("jobs-panel").hidden = false;
+        byId("jobs-status").setAttribute("aria-expanded", "true");
+        renderJobsPanel();
+        byId("jobs-close").focus();
+    }
+
+    function closeJobsPanel(returnFocus = true) {
+        if (jobsTimer) {
+            clearInterval(jobsTimer);
+            jobsTimer = undefined;
+        }
+
+        if (!jobsPanelOpen) {
+            return;
+        }
+
+        jobsPanelOpen = false;
+        byId("jobs-panel").hidden = true;
+        byId("jobs-status").setAttribute("aria-expanded", "false");
+        if (returnFocus && !byId("jobs-status").hidden) {
+            byId("jobs-status").focus();
+        }
     }
 
     function renderRuntimeStatus() {
@@ -2382,6 +2555,21 @@
         if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             submitMessage();
+        }
+    });
+    byId("jobs-status").addEventListener("click", () => (jobsPanelOpen ? closeJobsPanel() : openJobsPanel()));
+    byId("jobs-close").addEventListener("click", () => closeJobsPanel());
+    byId("jobs-stop-all").addEventListener("click", () => jobAction("stop", "all"));
+    byId("jobs-panel").addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            closeJobsPanel();
+        }
+    });
+    document.addEventListener("pointerdown", (event) => {
+        if (jobsPanelOpen && !event.target.closest?.("#jobs-panel, #jobs-status")) {
+            closeJobsPanel(false);
         }
     });
     document.addEventListener("keydown", (event) => {

@@ -285,6 +285,10 @@
 .chart .ct-sub {
     font-size: 11px;
 }
+.chart tspan.ct-sub {
+    font-weight: 400;
+    fill: var(--muted);
+}
 .chart .ct-val {
     font-size: 12px;
     fill: var(--text);
@@ -501,4 +505,56 @@
 }
 .system-flow .diagram {
     min-width: 640px;
+}
+
+/* Task heatmap: each cell carries its solve rate as --r and is shaded by it, so the hard tasks and
+   the harness-sensitive ones stand out before any number is read. */
+table.heatmap {
+    border-collapse: separate;
+    border-spacing: 3px;
+    width: 100%;
+    font-size: 0.85rem;
+}
+table.heatmap thead th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-align: center;
+    padding: 0 0.3rem 0.4rem;
+    white-space: nowrap;
+}
+table.heatmap thead th:first-child {
+    text-align: left;
+}
+table.heatmap tbody th {
+    text-align: left;
+    font-weight: 400;
+    padding-right: 0.6rem;
+    white-space: nowrap;
+}
+table.heatmap td {
+    text-align: center;
+    padding: 0.45rem 0.3rem;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--ct-specpi) calc(var(--r, 0) * 70%), var(--surface-raised));
+}
+table.heatmap td.hm-empty {
+    background: none;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.method-list {
+    list-style: none;
+    padding: 0;
+}
+.method-list li {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--line);
+}
+.method-list li b {
+    display: inline-block;
+    min-width: 5.5rem;
 }

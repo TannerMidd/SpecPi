@@ -18,6 +18,8 @@ const {
     GUARD_STATUS_KEY,
     jobsStatusEntry,
     JOBS_STATUS_KEY,
+    jobRowView,
+    formatElapsed,
     cacheHitRate,
 } = require("../vscode/media/chat.js");
 
@@ -495,6 +497,31 @@ test("the background jobs chip shows how many are running, and nothing when none
     assert.equal(jobsStatusEntry({}), undefined);
     assert.equal(entry(""), undefined);
     assert.equal(entry("\u001b[31m3 background jobs running\u001b[0m").summary, "3 running");
+});
+
+test("each row of the jobs panel says what the job is, where it stands and whether it can stop", () => {
+    const base = {
+        id: "3",
+        label: "SWE-bench",
+        command: "bash run.sh",
+        startedAt: 1_000,
+        endedAt: null,
+        exitCode: null,
+    };
+    assert.deepEqual(jobRowView({ ...base, state: "running" }, 126_000), {
+        name: "SWE-bench",
+        meta: "#3 · running · 2m 05s",
+        tone: "running",
+        canStop: true,
+    });
+    const ended = { ...base, endedAt: 4_000 };
+    assert.equal(jobRowView({ ...ended, state: "exited", exitCode: 0 }, 9e9).tone, "ok");
+    assert.equal(jobRowView({ ...ended, state: "exited", exitCode: 0 }, 9e9).meta, "#3 · exit 0 · 3s");
+    assert.equal(jobRowView({ ...ended, state: "exited", exitCode: 2 }, 9e9).tone, "failed");
+    assert.equal(jobRowView({ ...ended, state: "stopped" }, 9e9).tone, "stopped");
+    assert.equal(jobRowView({ ...ended, state: "failed" }, 9e9).canStop, false);
+    assert.equal(jobRowView({ ...base, label: "", state: "running" }, 1_000).name, "bash run.sh");
+    assert.equal(formatElapsed(3_725_000), "1h 02m");
 });
 
 test("the command guard's counter is read as the package writes it", () => {

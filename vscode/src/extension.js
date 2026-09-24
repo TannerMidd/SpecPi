@@ -26,6 +26,7 @@ const { editPrompt, forkChat, exportChat, showUsage, markdownTranscript } = requ
 const { findFiles, reviewChanges, relativeFile, workspaceHiddenFilter } = require("./workspace-actions.js");
 const { ImageQueue } = require("./image-queue.js");
 const { DELEGATE_WIDGET, decodeDelegates, delegateCompletionText } = require("./delegates.js");
+const { JOBS_WIDGET, decodeBackgroundJobs } = require("./background-jobs.js");
 const { permissionState, hasDestructiveGuard } = require("./permissions.js");
 const { loadPermissionSettings, savePermissionSettings } = require("./permission-settings.js");
 const { packageSettingsState } = require("./package-state.js");
@@ -259,6 +260,7 @@ class ChatController {
         this.state.status = "connecting";
         this.state.runtimeStatus = {};
         this.state.delegation = undefined;
+        this.state.backgroundJobs = undefined;
         this.state.error = undefined;
         this.state.connectionMessage = "Starting Pi and loading its extensions. This can take up to 90 seconds.";
         this.publish();
@@ -358,6 +360,7 @@ class ChatController {
                     this.state.status = "error";
                     this.state.runtimeStatus = {};
                     this.state.delegation = undefined;
+                    this.state.backgroundJobs = undefined;
                     this.state.error =
                         "Pi stopped. Reconnect to resume this chat. Check Pi and provider setup in a terminal if this repeats.";
                     this.publish();
@@ -403,6 +406,7 @@ class ChatController {
                 resetRunState(this.state);
                 this.state.status = "error";
                 this.state.delegation = undefined;
+                this.state.backgroundJobs = undefined;
                 this.state.connectionMessage = undefined;
                 this.fail(error);
                 throw error;
@@ -466,6 +470,7 @@ class ChatController {
             if (this.runtimeSessionId) {
                 this.delegateSummaries.clear();
                 this.state.delegation = undefined;
+                this.state.backgroundJobs = undefined;
             }
 
             this.runtimeSessionId = runtime.sessionId;
@@ -592,6 +597,7 @@ class ChatController {
         this.state.destructiveGuardSaved = false;
         this.state.runtimeStatus = {};
         this.state.delegation = undefined;
+        this.state.backgroundJobs = undefined;
         this.state.connectionMessage = undefined;
         this.state.queueCount = 0;
         this.publish();
@@ -1438,6 +1444,13 @@ class ChatController {
             return;
         }
 
+        if (request.method === "setWidget" && request.widgetKey === JOBS_WIDGET) {
+            this.state.backgroundJobs = decodeBackgroundJobs(request.widgetLines)?.jobs;
+            this.publish();
+
+            return;
+        }
+
         if (request.method === "setWidget" && request.widgetKey === DELEGATE_WIDGET) {
             const previous = this.state.delegation;
             this.state.delegation = decodeDelegates(request.widgetLines) || undefined;
@@ -1614,6 +1627,34 @@ class ChatController {
                 this.publish();
             }
         }
+    }
+
+    /** Stop a background job, or show its output, through SpecPi's own /jobs command. */
+    async jobCommand(message) {
+        this.requireWorkspace();
+        const client = this.client;
+        const running = (this.state.backgroundJobs || []).filter((job) => job.state === "running");
+        const known = (this.state.backgroundJobs || []).some((job) => job.id === message.id);
+        const valid =
+            message.action === "stop"
+                ? message.id === "all"
+                    ? running.length > 0
+                    : running.some((job) => job.id === message.id)
+                : message.action === "output" && known;
+        if (
+            !client ||
+            !this.isForeground() ||
+            this.transitioning ||
+            message.contextToken !== this.contextToken() ||
+            !["ready", "busy", "retrying", "compacting"].includes(this.state.status) ||
+            !this.state.commands.some((command) => command.name === "jobs") ||
+            !valid
+        ) {
+            throw new Error("That background job is no longer available in the selected conversation.");
+        }
+
+        // An extension command runs at once, even mid-turn, and leaves the draft and queue alone.
+        await client.request("prompt", { message: `/jobs ${message.action} ${message.id}` });
     }
 
     async openCode(reference) {
@@ -2111,6 +2152,9 @@ This rewrites the web access configuration file. Stored provider credentials you
                 break;
             case "stopDelegate":
                 await this.stopDelegate(message);
+                break;
+            case "jobCommand":
+                await this.jobCommand(message);
                 break;
             case "stop":
                 await this.stop();

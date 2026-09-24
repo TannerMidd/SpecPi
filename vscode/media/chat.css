@@ -157,13 +157,32 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .stop-button { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 24px; padding: 3px 7px; color: var(--text); background: transparent; border: 1px solid var(--border); border-radius: 4px; font-size: 10px; }
 .stop-button .icon { width: 11px; height: 11px; fill: currentColor; }
 .send-mode { width: 91px; flex: 0 0 auto; }
-.session-footer { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 4px 2px 0; font-size: 9px; color: var(--muted); height: 32px; }
+.session-footer { position: relative; flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 4px 2px 0; font-size: 9px; color: var(--muted); height: 32px; }
 .footer-status { flex: 1 1 auto; display: flex; align-items: center; min-width: 0; }
 #runtime-status { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #token-status { flex: 0 1 auto; font-family: var(--mono); font-size: var(--chat-small-font-size); }
 #guard-status { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 1 auto; min-width: 0; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
 #guard-status #guard-value { overflow: hidden; text-overflow: ellipsis; }
 #jobs-status { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 0 auto; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
+#jobs-status[aria-expanded="true"] { border-color: var(--vscode-focusBorder, var(--border)); }
+/* The jobs panel opens over the footer, anchored right like the chip that opens it. */
+.jobs-panel { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 20; width: min(360px, calc(100vw - 16px)); padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--vscode-editorWidget-background, var(--surface-raised)); box-shadow: 0 6px 20px rgb(0 0 0 / 28%); color: var(--text); font-size: var(--chat-small-font-size); }
+.jobs-panel-header { display: flex; align-items: center; gap: 6px; padding: 0 0 6px 4px; }
+.jobs-panel-header strong { flex: 1 1 auto; font-weight: 600; }
+.jobs-panel-header .icon-button { width: 22px; height: 22px; padding: 4px; }
+.jobs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+.job-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 5px; }
+.job-row:hover { background: var(--hover); }
+.job-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.job-row[data-tone="running"] .job-dot { background: var(--vscode-charts-blue, #3b8eea); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-charts-blue, #3b8eea) 25%, transparent); }
+.job-row[data-tone="ok"] .job-dot { background: var(--vscode-charts-green, #89d185); }
+.job-row[data-tone="failed"] .job-dot { background: var(--vscode-errorForeground, #f48771); }
+.job-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.job-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-meta { color: var(--muted); font-variant-numeric: tabular-nums; }
+.job-button { flex: 0 0 auto; padding: 2px 7px; border: 1px solid var(--border); border-radius: 4px; background: transparent; font-size: var(--chat-small-font-size); }
+.job-stop:not(:disabled) { color: var(--vscode-errorForeground, #f48771); }
+.jobs-note { margin: 6px 4px 0; color: var(--muted); }
 #cache-status { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 0 auto; padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-raised); white-space: nowrap; font-size: var(--chat-small-font-size); }
 #cache-value, #guard-value, #jobs-value { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 /* The guard's own line, shown as the package formats it. Blocks are the one thing worth

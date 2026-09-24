@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi 0.33.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.34.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
@@ -53,7 +53,7 @@ The solid rows are measured by us, from the request each setup actually sends th
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/context-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 12,010, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 36,658, Codex CLI 41,616, Oh My Pi 66,708, Claude Code 90,460.">
+      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 12,287, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 36,935, Codex CLI 41,616, Oh My Pi 66,708, Claude Code 90,460.">
     </picture>
   </a>
 </p>
@@ -65,7 +65,7 @@ The gap between the two SpecPi bars comes from a few separate switches, so the e
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/capability-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/capability-chart-light.svg" width="880" alt="Bar chart of tool-schema characters each capability adds: Pi built-ins 2,896, Improvement loop 1,601, Capability request 995, Background jobs 657, Goals 1,315, Browser QA 8,234, Delegation 4,453, Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.">
+      <img src="https://tannermidd.github.io/SpecPi/media/capability-chart-light.svg" width="880" alt="Bar chart of tool-schema characters each capability adds: Pi built-ins 2,896, Improvement loop 1,601, Capability request 995, Background jobs 728, Goals 1,315, Browser QA 8,234, Delegation 4,453, Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.">
     </picture>
   </a>
 </p>
@@ -80,30 +80,32 @@ price list, with only the harness changing.
 
 <!-- eval-summary -->
 
-**840 scored attempts across 20 tasks and 6 harnesses**,
-all on `deepseek-v4.1-flash`.
+**947 scored attempts on two benchmarks and 6 harnesses**,
+all on `deepseek-v4.1-flash`. SpecPi is the published 0.33.0 release, with the experimental Jev layer off.
+
+SWE-bench Verified, 12 tasks × 3: SpecPi solved 34/36 against Pi's 34/36
+(p = 1.00), with 2% more prompt tokens and 1% less cost per attempt.
+
+Terminal-Bench 2.0, 731 attempts across 20 tasks:
 
 | Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |
 | --- | --- | --- | --- | --- | --- |
 | OpenCode | 29/39 | 0.744 | $0.0124 | 494,173 | 96.5% |
-| SpecPi + Jev | 197/269 | 0.732 | $0.0142 | 405,712 | 93.6% |
-| Pi (base) | 192/269 | 0.714 | $0.0158 | 451,229 | 92.9% |
-| Oh My Pi | 90/113 | 0.796 | $0.0216 | 1,103,136 | 97.4% |
+| SpecPi | 62/77 | 0.805 | $0.0144 | 407,416 | 92.4% |
+| Pi (base) | 164/230 | 0.713 | $0.0155 | 436,214 | 92.9% |
 | DeepSeek Harness | 21/38 | 0.553 | $0.0226 | 1,126,586 | 95.4% |
+| Oh My Pi | 115/151 | 0.762 | $0.0237 | 1,108,076 | 96.5% |
 | Claude Code | 81/112 | 0.723 | $0.0273 | 670,828 | 95.4% |
 
-Solve rate does not separate them in the sittings where both ran: Pi against SpecPi + Jev is Fisher p = 0.70
-pooled and 0.66 paired, and the closest paired comparison of any two harnesses is
-OpenCode against DeepSeek Harness at p = 0.10. Nor can it at this
-sample size -- bare Pi, on unchanged software and the same thirteen tasks, spans
-54-82% across 6 separate sittings, a wider gap than any measured here between two
-harnesses. Pooled across sittings, Oh My Pi leads DeepSeek Harness (p = 0.005) and SpecPi + Jev leads DeepSeek Harness (p = 0.034), but pooling sets one harness's sittings against another's.
+SpecPi and Pi ran side by side in the 24 Sep · a sitting. SpecPi solved 30/38
+against Pi's 25/39 (Fisher p = 0.21), sending 16% fewer prompt tokens and costing
+22% less per attempt. On `sanitize-git-repo`, with that sitting's extra attempts, SpecPi solved
+10/10 against 3/10 (p = 0.003); `fix-git` was 10/10 for both.
 
-The rows pool different sittings, so compare them paired. In the sittings where both ran,
-SpecPi + Jev sent fewer prompt tokens than Pi in 4 of 5 (7–30% fewer, 27% more in the other),
-and cost less in 4 of 5, by about 5%: output tokens are most of the bill.
-Cost is recomputed from recorded tokens against a dated price file, never taken from a
-harness's self-report, and SpecPi + Jev's excludes the Jev advisor's own calls.
+Overall solve rate is a different matter: one sitting cannot rank harnesses here. Bare Pi, on
+unchanged software and the same thirteen tasks, spans 56-77% across 5 sittings, a wider gap than any
+measured between two harnesses. Pooled across sittings, SpecPi leads DeepSeek Harness (p = 0.007) and Oh My Pi leads DeepSeek Harness (p = 0.015), but pooling sets one harness's sittings against another's. Cost is recomputed from recorded tokens against a dated
+price file, never taken from a harness's self-report.
 
 <!-- /eval-summary -->
 
