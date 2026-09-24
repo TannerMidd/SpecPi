@@ -152,6 +152,9 @@ function renderCharts(data) {
     const release = renderRelease(data);
     charts["chart-release"] = release.chart;
     charts["release-note"] = release.note;
+    charts["chart-release-tokens"] = release.tokens;
+    charts["chart-release-cost"] = release.cost;
+    charts["release-spend-note"] = release.spendNote;
 
     return charts;
 }
@@ -293,7 +296,7 @@ function renderTables(data) {
 function renderRelease(data) {
     const release = data.release;
     if (!release) {
-        return { chart: "", note: "" };
+        return { chart: "", note: "", tokens: "", cost: "", spendNote: "" };
     }
 
     const ids = ["pi", "specpi-031", "specpi"];
@@ -303,38 +306,92 @@ function renderRelease(data) {
         ...release.tasks.map((entry) => [`${entry.task} · widened + git pair`, entry.arms]),
         ...(release.swe ? [[`SWE-bench Verified · ${release.swe.tasks} tasks`, release.swe.arms]] : []),
     ];
-    const chart = hbars({
-        id: "chart-release",
-        title: "Solved, per attempt · 24 Sep release check",
-        axisLabel: "share of attempts reaching reward 1; one sitting, all three arms side by side",
-        groups: measures.map(([label, arms]) => ({
+    const groupsOf = (value, display) =>
+        measures.map(([label, arms]) => ({
             label,
             bars: ids
                 .map((id) => [id, arms?.find((entry) => entry.arm === id)])
                 .filter(([, run]) => run)
                 .map(([id, run]) => ({
                     label: harnessOf(id)?.label ?? id,
-                    value: run.solved / run.attempts,
-                    display: `${run.solved}/${run.attempts}`,
+                    value: value(run),
+                    display: display(run),
                     colour: harnessOf(id)?.colour,
                 })),
-        })),
+        }));
+    const peak = (value) => Math.max(...measures.flatMap(([, arms]) => (arms ?? []).map(value)));
+    const chart = hbars({
+        id: "chart-release",
+        title: "Solved, per attempt · 24 Sep release check",
+        axisLabel: "share of attempts reaching reward 1; one sitting, all three arms side by side",
+        groups: groupsOf(
+            (run) => run.solved / run.attempts,
+            (run) => `${run.solved}/${run.attempts}`,
+        ),
         max: 1,
         tick: (value) => `${Math.round(value * 100)}%`,
+    });
+    // The same bands for spend. Prompt tokens are where a smaller fixed prompt shows first; cost is
+    // what reaches the bill, and output tokens are most of it, so the two do not move together.
+    const tokens = hbars({
+        id: "chart-release-tokens",
+        title: "Prompt tokens per attempt · 24 Sep release check",
+        axisLabel: "tokens sent, summed over the attempt's model calls, mean per attempt",
+        groups: groupsOf(
+            (run) => run.inputTokens,
+            (run) => thousands(run.inputTokens),
+        ),
+        // A multiple of 400k, so the four gridlines fall on round hundreds of thousands.
+        max: niceMax(
+            peak((run) => run.inputTokens),
+            400_000,
+        ),
+        tick: (value) => `${Math.round(value / 1000)}k`,
+    });
+    const cost = hbars({
+        id: "chart-release-cost",
+        title: "Cost per attempt · 24 Sep release check",
+        axisLabel: "USD at the frozen price list, mean per attempt",
+        groups: groupsOf(
+            (run) => run.cost,
+            (run) => money(run.cost),
+        ),
+        // A multiple of $0.008, so the four gridlines fall on round thousandths.
+        max: niceMax(
+            peak((run) => run.cost),
+            0.008,
+        ),
+        tick: (value) => `$${value.toFixed(3)}`,
     });
 
     // Two decimals round p = 0.003 to "0.00", which reads as certainty.
     const pText = (p) => (p < 0.01 ? p.toFixed(3) : Math.min(p, 1).toFixed(2));
     const sanitize = release.tasks.find((entry) => entry.task === "sanitize-git-repo")?.arms ?? [];
     const pOf = (arms, id) => arms.find((entry) => entry.arm === id)?.p;
-    const tokensOf = (id) => release.widened.find((entry) => entry.arm === id)?.inputTokens;
-    const saving = Math.round((1 - tokensOf("specpi") / tokensOf("specpi-031")) * 100);
     const note =
         sanitize.length === 3
-            ? `On <code>sanitize-git-repo</code>, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 separates from 0.31.0 at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "specpi-031"))} and from Pi at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "pi"))}: every failure there had rewritten Git history, destroying the commit the checker compares against. Nothing else separates (<i>p</i>&nbsp;&ge;&nbsp;${pText(Math.min(...[release.widened, ...(release.swe ? [release.swe.arms] : [])].flatMap((arms) => arms.map((entry) => entry.p)).filter((p) => p !== null)))}), and <code>fix-git</code>, which legitimately uses Git's recovery commands, did not move. 0.33.0 sent ${saving}% fewer prompt tokens than 0.31.0 on the widened slice. One sitting: read the level rows as one more point in section 04's spread.`
+            ? `On <code>sanitize-git-repo</code>, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 separates from 0.31.0 at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "specpi-031"))} and from Pi at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "pi"))}: every failure there had rewritten Git history, destroying the commit the checker compares against. Nothing else separates (<i>p</i>&nbsp;&ge;&nbsp;${pText(Math.min(...[release.widened, ...(release.swe ? [release.swe.arms] : [])].flatMap((arms) => arms.map((entry) => entry.p)).filter((p) => p !== null)))}), and <code>fix-git</code>, which legitimately uses Git's recovery commands, did not move. One sitting: read the level rows as one more point in section 04's spread.`
             : "";
 
-    return { chart, note };
+    const change = (id, key, arms) => {
+        const current = arms.find((entry) => entry.arm === "specpi")?.[key];
+        const other = arms.find((entry) => entry.arm === id)?.[key];
+
+        return current && other ? Math.round((current / other - 1) * 100) : null;
+    };
+
+    const signed = (value) => (value === null ? "n/a" : `${value > 0 ? "+" : "−"}${Math.abs(value)}%`);
+    const spendNote = `Against 0.31.0, 0.33.0's prompt tokens per attempt changed by ${measures
+        .map(
+            ([label, arms]) => `${signed(change("specpi-031", "inputTokens", arms ?? []))} on ${label.split(" · ")[0]}`,
+        )
+        .join(", ")}, and its cost per attempt by ${measures
+        .map(([label, arms]) => `${signed(change("specpi-031", "cost", arms ?? []))} on ${label.split(" · ")[0]}`)
+        .join(
+            ", ",
+        )}. Output tokens are most of the bill at these cache rates, so cost does not track prompt tokens one for one.`;
+
+    return { chart, tokens, cost, note, spendNote };
 }
 
 // The README carries the same headline as the page. Typing it by hand guarantees it drifts, so it

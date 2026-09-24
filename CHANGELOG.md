@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Publish the 24 Sep release check on the evaluations page: plain SpecPi, without Jev, for the first time, with 0.31.0 and 0.33.0 beside Pi in one Terminal-Bench 2.0 sitting, a top-up of seven attempts on the two git tasks, and a SWE-bench Verified subset. On `sanitize-git-repo`, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 solved 10 of 10 against 5 for 0.31.0 and 3 for Pi (p = 0.03 and 0.003); `fix-git` held at 10 of 10 for all three, and nothing else separates. 0.33.0 sent 15% fewer prompt tokens than 0.31.0 on the widened slice. A new section 08 charts it, and its caption is written from the same data as the bars.
+- Publish the 24 Sep release check on the evaluations page: plain SpecPi, without Jev, for the first time, with 0.31.0 and 0.33.0 beside Pi in one Terminal-Bench 2.0 sitting, a top-up of seven attempts on the two git tasks, and a SWE-bench Verified subset. On `sanitize-git-repo`, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 solved 10 of 10 against 5 for 0.31.0 and 3 for Pi (p = 0.03 and 0.003); `fix-git` held at 10 of 10 for all three, and nothing else separates. 0.33.0 sent 15% fewer prompt tokens than 0.31.0 on the widened slice and 61% fewer on sanitize-git-repo, but 12% more on SWE-bench. A new section 08 charts solve rate, prompt tokens and cost per attempt for all three arms, with captions written from the same data as the bars.
 - Keep the git top-up out of each harness's pooled total, so two tasks at seven attempts do not outweigh the other eleven, and derive the page's attempt, sitting and unscored-setup counts from the data instead of typing them.
 
 ## 0.33.0 - 2026-09-23
