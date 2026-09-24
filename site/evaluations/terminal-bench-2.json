@@ -2217,10 +2217,437 @@
                 "outputCostShare": 0.6254011473307134,
                 "costIsUpperBound": false,
                 "costAttempts": 36
-            }
+            },
+            "omp": null,
+            "claude-code": null,
+            "opencode": null,
+            "dsh": null
         },
+        "taskList": [
+            {
+                "task": "django__django-11066",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 130154,
+                        "outputTokens": 4002,
+                        "cacheHitRate": 0.94083178175653,
+                        "cost": 0.0039237099999999995,
+                        "outputCostShare": 0.6119718327807102,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 372750,
+                        "outputTokens": 8708,
+                        "cacheHitRate": 0.9700871898054997,
+                        "cost": 0.0079819,
+                        "outputCostShare": 0.6545559327979553,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "django__django-12193",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 292389,
+                        "outputTokens": 7881,
+                        "cacheHitRate": 0.962808678393054,
+                        "cost": 0.007204094,
+                        "outputCostShare": 0.656349014879595,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 427971,
+                        "outputTokens": 8945,
+                        "cacheHitRate": 0.9696357930794376,
+                        "cost": 0.008561378,
+                        "outputCostShare": 0.6269084252558409,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "django__django-13089",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 236446,
+                        "outputTokens": 6541,
+                        "cacheHitRate": 0.9598145874245951,
+                        "cost": 0.006030682,
+                        "outputCostShare": 0.6507721680566144,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 222284,
+                        "outputTokens": 6207,
+                        "cacheHitRate": 0.9583910048871487,
+                        "cost": 0.0057504539999999995,
+                        "outputCostShare": 0.6476010415873251,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "django__django-13512",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 1,
+                        "rate": 0.3333333333333333,
+                        "tasks": 1,
+                        "inputTokens": 301356,
+                        "outputTokens": 7491,
+                        "cacheHitRate": 0.9653068515788065,
+                        "cost": 0.006935553999999999,
+                        "outputCostShare": 0.6480520517899508,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 1,
+                        "rate": 0.3333333333333333,
+                        "tasks": 1,
+                        "inputTokens": 291549,
+                        "outputTokens": 8276,
+                        "cacheHitRate": 0.9606058665886162,
+                        "cost": 0.007528791999999999,
+                        "outputCostShare": 0.6595746037345699,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "django__django-14404",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 248121,
+                        "outputTokens": 6621,
+                        "cacheHitRate": 0.9598757595420514,
+                        "cost": 0.006180646000000001,
+                        "outputCostShare": 0.6427807060944761,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 369694,
+                        "outputTokens": 8970,
+                        "cacheHitRate": 0.9688742301058264,
+                        "cost": 0.00818261,
+                        "outputCostShare": 0.6577363457380958,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "django__django-16801",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 205048,
+                        "outputTokens": 5320,
+                        "cacheHitRate": 0.9365757230432599,
+                        "cost": 0.005718877999999999,
+                        "outputCostShare": 0.5581514415939631,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 176945,
+                        "outputTokens": 4210,
+                        "cacheHitRate": 0.9565626919149866,
+                        "cost": 0.004186675999999999,
+                        "outputCostShare": 0.6033426040133032,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "matplotlib__matplotlib-23476",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 653797,
+                        "outputTokens": 11811,
+                        "cacheHitRate": 0.9677376922806314,
+                        "cost": 0.012148862000000002,
+                        "outputCostShare": 0.5833303563741196,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 700341,
+                        "outputTokens": 10787,
+                        "cacheHitRate": 0.9734834061866975,
+                        "cost": 0.011302911999999998,
+                        "outputCostShare": 0.5725958053995289,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "psf__requests-1142",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 287946,
+                        "outputTokens": 8016,
+                        "cacheHitRate": 0.9573635827972573,
+                        "cost": 0.007477957999999999,
+                        "outputCostShare": 0.6431434891717767,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 200072,
+                        "outputTokens": 7235,
+                        "cacheHitRate": 0.9573087022005411,
+                        "cost": 0.006196592,
+                        "outputCostShare": 0.7005140890347469,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "pytest-dev__pytest-10081",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 745926,
+                        "outputTokens": 14906,
+                        "cacheHitRate": 0.9767975196824707,
+                        "cost": 0.013725556,
+                        "outputCostShare": 0.6516020188908922,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 392409,
+                        "outputTokens": 8915,
+                        "cacheHitRate": 0.9679161010715019,
+                        "cost": 0.008376956,
+                        "outputCostShare": 0.6385374353165995,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "sphinx-doc__sphinx-10435",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 383639,
+                        "outputTokens": 8457,
+                        "cacheHitRate": 0.9636837408779261,
+                        "cost": 0.008273369999999999,
+                        "outputCostShare": 0.6133413590834207,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 314030,
+                        "outputTokens": 6608,
+                        "cacheHitRate": 0.952706267228962,
+                        "cost": 0.007090285999999999,
+                        "outputCostShare": 0.5592158059632574,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "sphinx-doc__sphinx-9367",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 67461,
+                        "outputTokens": 2281,
+                        "cacheHitRate": 0.9126503345159155,
+                        "cost": 0.002437004,
+                        "outputCostShare": 0.5615091317043386,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 106232,
+                        "outputTokens": 3494,
+                        "cacheHitRate": 0.9301905263950598,
+                        "cost": 0.0035050479999999998,
+                        "outputCostShare": 0.5980517242559874,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            },
+            {
+                "task": "sympy__sympy-24539",
+                "byHarness": {
+                    "pi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 82670,
+                        "outputTokens": 2960,
+                        "cacheHitRate": 0.9367364219184711,
+                        "cost": 0.0027930200000000002,
+                        "outputCostShare": 0.6359424565524056,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "specpi": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 129328,
+                        "outputTokens": 3191,
+                        "cacheHitRate": 0.9418945111138604,
+                        "cost": 0.00340724,
+                        "outputCostShare": 0.5619210856881228,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "omp": null,
+                    "claude-code": null,
+                    "opencode": null,
+                    "dsh": null
+                }
+            }
+        ],
         "p": 1.0000000000000038
     },
+    "sweAttempts": 72,
     "excluded": [
         {
             "sitting": "s4",

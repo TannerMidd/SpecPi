@@ -36,7 +36,7 @@ const percent = (value) => (value === null ? "not measured" : `${(value * 100).t
 function bySlice(data, { id, title, axisLabel, value, display, step, tick, include = () => true }) {
     const groups = data.slices
         .map((slice) => ({
-            label: `${slice.label} · ${sliceShape(data, slice.id)}`,
+            label: `Terminal-Bench · ${slice.label} · ${sliceShape(data, slice.id)}`,
             bars: data.harnesses
                 .filter((harness) => harness.slices[slice.id] && include(harness.slices[slice.id]))
                 .map((harness) => ({
@@ -47,9 +47,42 @@ function bySlice(data, { id, title, axisLabel, value, display, step, tick, inclu
                 })),
         }))
         .filter((group) => group.bars.length > 0);
+    const swe = sweBand(data, { value, display, include });
+    if (swe) {
+        groups.push(swe);
+    }
+
     const max = niceMax(Math.max(...groups.flatMap((group) => group.bars.map((bar) => bar.value))), step);
 
     return hbars({ id, title, axisLabel, groups, max, tick });
+}
+
+// SWE-bench as its own band beside the Terminal-Bench ones: same scale, never pooled. Every harness
+// gets a row, and one not yet run there shows as TBD rather than disappearing.
+function sweBand(data, { value, display, include = () => true }) {
+    if (!data.swe) {
+        return null;
+    }
+
+    const runs = Object.values(data.swe.byHarness).filter(Boolean);
+    const perTask = [...new Set(runs.map((run) => Math.round(run.attempts / run.tasks)))].join(" and ");
+
+    return {
+        label: `SWE-bench Verified · ${data.swe.tasks} tasks × ${perTask}`,
+        bars: data.harnesses
+            .filter((harness) => {
+                const run = data.swe.byHarness[harness.id];
+
+                return !run || include(run);
+            })
+            .map((harness) => {
+                const run = data.swe.byHarness[harness.id];
+
+                return run
+                    ? { label: harness.label, value: value(run), display: display(run), colour: harness.colour }
+                    : { label: harness.label, value: 0, display: "TBD", colour: harness.colour };
+            }),
+    };
 }
 
 // "13 tasks × 3" reads as the shape of the work, which is what makes an unequal row obvious rather
@@ -59,7 +92,8 @@ function sliceShape(data, sliceId) {
     const tasks = Math.max(...runs.map((run) => run.tasks));
     const attempts = [...new Set(runs.map((run) => Math.round(run.attempts / run.tasks)))].sort((a, b) => a - b);
 
-    return `${tasks} tasks × ${attempts.join(" and ")}`;
+    // Pooled sittings give each harness a different multiple, so name the per-sitting count instead.
+    return attempts.length > 1 ? `${tasks} tasks × ${attempts[0]} per sitting` : `${tasks} tasks × ${attempts[0]}`;
 }
 
 function renderCharts(data) {
@@ -134,9 +168,10 @@ function renderCharts(data) {
     charts["chart-cache"] = hbars({
         id: "chart-cache",
         title: "Prompt cache hit rate",
-        axisLabel: "cached share of prompt tokens, both slices pooled",
+        axisLabel: "cached share of prompt tokens, Terminal-Bench slices pooled",
         groups: [
             {
+                label: "Terminal-Bench",
                 bars: cached.map((harness) => ({
                     label: harness.label,
                     value: harness.overall.cacheHitRate,
@@ -144,7 +179,11 @@ function renderCharts(data) {
                     colour: harness.colour,
                 })),
             },
-        ],
+            sweBand(data, {
+                value: (run) => run.cacheHitRate ?? 0,
+                display: (run) => percent(run.cacheHitRate),
+            }),
+        ].filter(Boolean),
         max: 1,
         tick: (value) => `${Math.round(value * 100)}%`,
     });
@@ -384,16 +423,19 @@ function drawDumbbell(id, title, rows, piColour, specpiColour) {
 
 // Task by task as a heatmap: each cell is shaded by its solve rate, so the hard tasks and the
 // harness-sensitive ones stand out before any number is read.
-function renderTaskHeatmap(data) {
+// A harness that has not run the benchmark at all gets TBD; one that ran it but not this task, a dash.
+function renderTaskHeatmap(data, tasks = data.tasks, ran = null) {
     const header = ["Task", ...data.harnesses.map((harness) => harness.label)]
         .map((cell, index) => `<th${index === 0 ? "" : ' scope="col"'}>${esc(cell)}</th>`)
         .join("");
-    const body = data.tasks
+    const body = tasks
         .map((entry) => {
             const cells = data.harnesses.map((harness) => {
                 const run = entry.byHarness[harness.id];
                 if (!run) {
-                    return `<td class="hm-empty">&mdash;</td>`;
+                    return ran && !ran.has(harness.id)
+                        ? `<td class="hm-empty">TBD</td>`
+                        : `<td class="hm-empty">&mdash;</td>`;
                 }
 
                 const rate = run.solved / run.attempts;
@@ -424,7 +466,30 @@ function renderTables(data) {
         ]),
     );
 
-    return { "table-overall": overall, "table-tasks": renderTaskHeatmap(data) };
+    const tables = { "table-overall": overall, "table-tasks": renderTaskHeatmap(data) };
+    if (data.swe) {
+        const ran = new Set(Object.keys(data.swe.byHarness).filter((id) => data.swe.byHarness[id]));
+        tables["table-swe"] = table(
+            ["Harness", "Solved", "Rate", "Prompt tok", "Cache hit", "Cost/attempt"],
+            data.harnesses.map((harness) => {
+                const run = data.swe.byHarness[harness.id];
+
+                return run
+                    ? [
+                          esc(harness.label),
+                          `${run.solved}/${run.attempts}`,
+                          run.rate.toFixed(3),
+                          thousands(run.inputTokens),
+                          percent(run.cacheHitRate),
+                          money(run.cost),
+                      ]
+                    : [esc(harness.label), "TBD", "TBD", "TBD", "TBD", "TBD"];
+            }),
+        );
+        tables["table-swe-tasks"] = renderTaskHeatmap(data, data.swe.taskList, ran);
+    }
+
+    return tables;
 }
 
 // The README carries the same headline as the page. Typing it by hand guarantees it drifts, so it
@@ -468,8 +533,11 @@ function renderReadme(data) {
     const tick = "`";
 
     return [
-        `**${data.totalAttempts} scored attempts across ${data.taskCount} tasks and ${data.harnesses.length} harnesses**,`,
+        `**${data.totalAttempts + (data.sweAttempts ?? 0)} scored attempts on two benchmarks and ${data.harnesses.length} harnesses**,`,
         `all on ${tick}${data.model}${tick}. SpecPi is the published 0.33.0 release, with the experimental Jev layer off.`,
+        "",
+        ...(data.swe ? sweReadme(data) : []),
+        `Terminal-Bench 2.0, ${data.totalAttempts} attempts across ${data.taskCount} tasks:`,
         "",
         "| Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |",
         "| --- | --- | --- | --- | --- | --- |",
@@ -485,6 +553,28 @@ function renderReadme(data) {
         `measured between two harnesses.${pooledNote} Cost is recomputed from recorded tokens against a dated`,
         "price file, never taken from a harness's self-report.",
     ].join("\n");
+}
+
+// SWE-bench leads the README, because it is the closer match to everyday work in a code repository.
+function sweReadme(data) {
+    const swe = data.swe;
+    const pi = swe.byHarness.pi;
+    const specpi = swe.byHarness.specpi;
+    const change = (a, b) => {
+        const value = Math.round((a / b - 1) * 100);
+
+        return value === 0 ? "the same" : `${Math.abs(value)}% ${value > 0 ? "more" : "less"}`;
+    };
+
+    const pending = data.harnesses.filter((harness) => !swe.byHarness[harness.id]).map((harness) => harness.label);
+    const perTask = Math.round(specpi.attempts / specpi.tasks);
+
+    return [
+        `SWE-bench Verified, ${swe.tasks} tasks × ${perTask}: SpecPi solved ${specpi.solved}/${specpi.attempts} against Pi's ${pi.solved}/${pi.attempts}`,
+        `(p = ${swe.p.toFixed(2)}), with ${change(specpi.inputTokens, pi.inputTokens)} prompt tokens and ${change(specpi.cost, pi.cost)} cost per attempt.`,
+        ...(pending.length > 0 ? [`${pending.join(", ")}: to be run.`] : []),
+        "",
+    ];
 }
 
 function main() {

@@ -455,26 +455,31 @@ function gitPairTasks(rows) {
 }
 
 /**
- * SWE-bench, SpecPi against Pi. Per-attempt tokens and cost are means, as everywhere on the page.
+ * SWE-bench, every harness on the page. Harnesses not yet run come back null, so the page can show
+ * them as to be done rather than dropping them. Per-attempt tokens and cost are means, as everywhere.
  */
-function sweBench(sweRows) {
-    const byArm = Object.fromEntries(
-        ["pi", "specpi"].map((arm) => [arm, summarize(sweRows.filter((row) => row.arm === arm))]),
-    );
-    if (!byArm.pi || !byArm.specpi) {
+function sweBench(sweRows, harnessIds) {
+    if (sweRows.length === 0) {
         return null;
     }
+
+    const byArm = (subset) =>
+        Object.fromEntries(harnessIds.map((id) => [id, summarize(subset.filter((row) => row.arm === id))]));
+    const byHarness = byArm(sweRows);
+    const specpi = byHarness.specpi;
+    const pi = byHarness.pi;
 
     return {
         benchmark: "SWE-bench Verified",
         tasks: new Set(sweRows.map((row) => row.task)).size,
-        byHarness: byArm,
-        p: fisherExact(
-            byArm.specpi.solved,
-            byArm.specpi.attempts - byArm.specpi.solved,
-            byArm.pi.solved,
-            byArm.pi.attempts - byArm.pi.solved,
-        ),
+        byHarness,
+        taskList: [...new Set(sweRows.map((row) => row.task))]
+            .sort()
+            .map((task) => ({ task, byHarness: byArm(sweRows.filter((row) => row.task === task)) })),
+        p:
+            specpi && pi
+                ? fisherExact(specpi.solved, specpi.attempts - specpi.solved, pi.solved, pi.attempts - pi.solved)
+                : null,
     };
 }
 
@@ -545,6 +550,9 @@ function main() {
         ),
     }));
 
+    // SWE-bench is read on its own and never pooled into the Terminal-Bench rows above.
+    const sweRows = readTrials(runsRoot, rate, SWE_SOURCES).rows;
+
     const data = {
         generatedAt: new Date().toISOString().slice(0, 10),
         benchmark: "Terminal-Bench 2.0",
@@ -581,7 +589,11 @@ function main() {
         ),
         tasks,
         gitPair: gitPairTasks(rows),
-        swe: sweBench(readTrials(runsRoot, rate, SWE_SOURCES).rows),
+        swe: sweBench(
+            sweRows,
+            harnesses.map((harness) => harness.id),
+        ),
+        sweAttempts: sweRows.length,
         excluded: EXCLUDED.map((entry) => ({ ...entry, label: SITTINGS[entry.sitting] })),
         errors,
         totalAttempts: rows.length,

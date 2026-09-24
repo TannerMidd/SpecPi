@@ -80,8 +80,14 @@ price list, with only the harness changing.
 
 <!-- eval-summary -->
 
-**675 scored attempts across 20 tasks and 6 harnesses**,
+**747 scored attempts on two benchmarks and 6 harnesses**,
 all on `deepseek-v4.1-flash`. SpecPi is the published 0.33.0 release, with the experimental Jev layer off.
+
+SWE-bench Verified, 12 tasks × 3: SpecPi solved 34/36 against Pi's 34/36
+(p = 1.00), with 2% more prompt tokens and 1% less cost per attempt.
+Oh My Pi, Claude Code, OpenCode, DeepSeek Harness: to be run.
+
+Terminal-Bench 2.0, 675 attempts across 20 tasks:
 
 | Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |
 | --- | --- | --- | --- | --- | --- |
