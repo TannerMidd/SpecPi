@@ -236,6 +236,8 @@
     --bg: var(--background);
     --ct-pi: #1b5fd6;
     --ct-specpi: #157f4c;
+    /* The previous SpecPi release in a release check: SpecPi's green, lighter, so the two read as one harness. */
+    --ct-specpi-prev: #6fb893;
     --ct-specpi-jev: #4d7c0f;
     --ct-codex: #9a5b00;
     --ct-deepseek: #0e7490;
@@ -246,6 +248,7 @@
 :root[data-theme="dark"] {
     --ct-pi: #5a8ae8;
     --ct-specpi: #3f9e6b;
+    --ct-specpi-prev: #8cc9a8;
     --ct-specpi-jev: #8fbf3f;
     --ct-codex: #c08420;
     --ct-deepseek: #2aa8c4;

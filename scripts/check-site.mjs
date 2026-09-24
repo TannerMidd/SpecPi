@@ -225,7 +225,7 @@ try {
         assert.equal(evaluations.overflow, false, `${name} evaluations overflows`);
         assert.deepEqual(evaluations.missingAnchors, []);
         assert.equal(evaluations.sections, evaluations.navLinks);
-        assert.equal(evaluations.charts, 5, "every chart slot must hold a rendered figure");
+        assert.equal(evaluations.charts, 6, "every chart slot must hold a rendered figure");
         assert.ok(evaluations.tableRows > 0, "the summary table was not generated");
         assert.equal(evaluations.metrics, 4, "headline metrics did not load from terminal-bench-2.json");
         assert.equal(evaluations.unfilled, 0, "a figure quoted in the prose was not filled from the dataset");

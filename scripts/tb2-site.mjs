@@ -149,6 +149,10 @@ function renderCharts(data) {
         tick: (value) => `${Math.round(value * 100)}%`,
     });
 
+    const release = renderRelease(data);
+    charts["chart-release"] = release.chart;
+    charts["release-note"] = release.note;
+
     return charts;
 }
 
@@ -275,7 +279,62 @@ function renderTables(data) {
           )
         : "";
 
-    return { "table-overall": overall, "table-sittings": sittings, "table-paired": paired, "table-tasks": tasks };
+    return {
+        "table-overall": overall,
+        "table-sittings": sittings,
+        "table-paired": paired,
+        "table-tasks": tasks,
+    };
+}
+
+// The 24 Sep release check: plain SpecPi 0.31.0 and 0.33.0 beside Pi in one sitting. One band per
+// measure, one bar per arm, and a caption written from the same data, so no figure quoted beside the
+// chart can drift from the bars.
+function renderRelease(data) {
+    const release = data.release;
+    if (!release) {
+        return { chart: "", note: "" };
+    }
+
+    const ids = ["pi", "specpi-031", "specpi"];
+    const harnessOf = (id) => data.harnesses.find((entry) => entry.id === id);
+    const measures = [
+        ["Terminal-Bench · widened slice", release.widened],
+        ...release.tasks.map((entry) => [`${entry.task} · widened + git pair`, entry.arms]),
+        ...(release.swe ? [[`SWE-bench Verified · ${release.swe.tasks} tasks`, release.swe.arms]] : []),
+    ];
+    const chart = hbars({
+        id: "chart-release",
+        title: "Solved, per attempt · 24 Sep release check",
+        axisLabel: "share of attempts reaching reward 1; one sitting, all three arms side by side",
+        groups: measures.map(([label, arms]) => ({
+            label,
+            bars: ids
+                .map((id) => [id, arms?.find((entry) => entry.arm === id)])
+                .filter(([, run]) => run)
+                .map(([id, run]) => ({
+                    label: harnessOf(id)?.label ?? id,
+                    value: run.solved / run.attempts,
+                    display: `${run.solved}/${run.attempts}`,
+                    colour: harnessOf(id)?.colour,
+                })),
+        })),
+        max: 1,
+        tick: (value) => `${Math.round(value * 100)}%`,
+    });
+
+    // Two decimals round p = 0.003 to "0.00", which reads as certainty.
+    const pText = (p) => (p < 0.01 ? p.toFixed(3) : Math.min(p, 1).toFixed(2));
+    const sanitize = release.tasks.find((entry) => entry.task === "sanitize-git-repo")?.arms ?? [];
+    const pOf = (arms, id) => arms.find((entry) => entry.arm === id)?.p;
+    const tokensOf = (id) => release.widened.find((entry) => entry.arm === id)?.inputTokens;
+    const saving = Math.round((1 - tokensOf("specpi") / tokensOf("specpi-031")) * 100);
+    const note =
+        sanitize.length === 3
+            ? `On <code>sanitize-git-repo</code>, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 separates from 0.31.0 at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "specpi-031"))} and from Pi at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "pi"))}: every failure there had rewritten Git history, destroying the commit the checker compares against. Nothing else separates (<i>p</i>&nbsp;&ge;&nbsp;${pText(Math.min(...[release.widened, ...(release.swe ? [release.swe.arms] : [])].flatMap((arms) => arms.map((entry) => entry.p)).filter((p) => p !== null)))}), and <code>fix-git</code>, which legitimately uses Git's recovery commands, did not move. 0.33.0 sent ${saving}% fewer prompt tokens than 0.31.0 on the widened slice. One sitting: read the level rows as one more point in section 04's spread.`
+            : "";
+
+    return { chart, note };
 }
 
 // The README carries the same headline as the page. Typing it by hand guarantees it drifts, so it
@@ -333,7 +392,7 @@ function renderReadme(data) {
     ];
 
     return [
-        `**${data.totalAttempts} scored attempts across ${data.taskCount} tasks and ${data.harnesses.length} harnesses**,`,
+        `**${data.totalAttempts} scored attempts across ${data.taskCount} tasks and ${data.harnesses.length} harness rows (two SpecPi releases among them)**,`,
         `all on \`${data.model}\`.`,
         "",
         "| Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |",

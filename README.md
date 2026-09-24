@@ -80,24 +80,26 @@ price list, with only the harness changing.
 
 <!-- eval-summary -->
 
-**840 scored attempts across 20 tasks and 6 harnesses**,
+**998 scored attempts across 20 tasks and 8 harness rows (two SpecPi releases among them)**,
 all on `deepseek-v4.1-flash`.
 
 | Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |
 | --- | --- | --- | --- | --- | --- |
+| SpecPi v0.33.0 | 30/38 | 0.789 | $0.0114 | 382,362 | 95.1% |
 | OpenCode | 29/39 | 0.744 | $0.0124 | 494,173 | 96.5% |
+| SpecPi v0.31.0 | 30/39 | 0.769 | $0.0130 | 451,906 | 96.0% |
 | SpecPi + Jev | 197/269 | 0.732 | $0.0142 | 405,712 | 93.6% |
-| Pi (base) | 192/269 | 0.714 | $0.0158 | 451,229 | 92.9% |
+| Pi (base) | 217/308 | 0.705 | $0.0156 | 451,629 | 93.1% |
 | Oh My Pi | 90/113 | 0.796 | $0.0216 | 1,103,136 | 97.4% |
 | DeepSeek Harness | 21/38 | 0.553 | $0.0226 | 1,126,586 | 95.4% |
 | Claude Code | 81/112 | 0.723 | $0.0273 | 670,828 | 95.4% |
 
-Solve rate does not separate them in the sittings where both ran: Pi against SpecPi + Jev is Fisher p = 0.70
+Solve rate does not separate them in the sittings where both ran: Pi against SpecPi + Jev is Fisher p = 0.52
 pooled and 0.66 paired, and the closest paired comparison of any two harnesses is
 OpenCode against DeepSeek Harness at p = 0.10. Nor can it at this
 sample size -- bare Pi, on unchanged software and the same thirteen tasks, spans
-54-82% across 6 separate sittings, a wider gap than any measured here between two
-harnesses. Pooled across sittings, Oh My Pi leads DeepSeek Harness (p = 0.005) and SpecPi + Jev leads DeepSeek Harness (p = 0.034), but pooling sets one harness's sittings against another's.
+54-82% across 7 separate sittings, a wider gap than any measured here between two
+harnesses. Pooled across sittings, Oh My Pi leads DeepSeek Harness (p = 0.005) and SpecPi + Jev leads DeepSeek Harness (p = 0.034) and SpecPi v0.33.0 leads DeepSeek Harness (p = 0.050), but pooling sets one harness's sittings against another's.
 
 The rows pool different sittings, so compare them paired. In the sittings where both ran,
 SpecPi + Jev sent fewer prompt tokens than Pi in 4 of 5 (7–30% fewer, 27% more in the other),

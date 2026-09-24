@@ -90,7 +90,31 @@ const SOURCES = [
     { sitting: "s7", slice: "widen", arm: "jev", dir: "tb2-four-20260922-132056/jev" },
     { sitting: "s7", slice: "widen", arm: "opencode", dir: "tb2-four-20260922-132056/opencode", reasoningApart: true },
     { sitting: "s7", slice: "widen", arm: "dsh", dir: "tb2-four-20260922-132056/dsh" },
+
+    // 2026-09-24: the release check. Plain SpecPi, without Jev, for the first time -- 0.31.0 and
+    // 0.33.0 side by side with Pi, so the two releases between them are the only difference. The
+    // git pair tops up the two tasks the 0.33.0 working-agreement rule is about, in the same launch
+    // conditions, and is kept out of pooled totals so two tasks at seven attempts do not outweigh
+    // the other eleven.
+    { sitting: "s8", slice: "widen", arm: "pi", dir: "tb2-v033-widen-20260924-000807/pi" },
+    { sitting: "s8", slice: "widen", arm: "specpi-031", dir: "tb2-v033-widen-20260924-000807/sp031" },
+    { sitting: "s8", slice: "widen", arm: "specpi", dir: "tb2-v033-widen-20260924-000807/sp033" },
+    { sitting: "s8", slice: "focused", arm: "pi", dir: "tb2-v033-gitpair-20260924-010734/pi" },
+    { sitting: "s8", slice: "focused", arm: "specpi-031", dir: "tb2-v033-gitpair-20260924-010734/sp031" },
+    { sitting: "s8", slice: "focused", arm: "specpi", dir: "tb2-v033-gitpair-20260924-010734/sp033" },
 ];
+
+// SWE-bench Verified, twelve tasks at three attempts, in the same release check. A different
+// benchmark, so it is reported beside the Terminal-Bench figures and never pooled into them.
+const SWE_SOURCES = [
+    { sitting: "swe", slice: "swe", arm: "pi", dir: "swe-v033-easy12-20260924-013432/pi" },
+    { sitting: "swe", slice: "swe", arm: "specpi-031", dir: "swe-v033-easy12-20260924-013432/sp031" },
+    { sitting: "swe", slice: "swe", arm: "specpi", dir: "swe-v033-easy12-20260924-013432/sp033" },
+];
+
+// The release check compares these three, on these tasks.
+const RELEASE_ARMS = ["pi", "specpi-031", "specpi"];
+const RELEASE_TASKS = ["sanitize-git-repo", "fix-git"];
 
 const SITTINGS = {
     s1: "21 Sep",
@@ -100,6 +124,7 @@ const SITTINGS = {
     s5: "22 Sep · d",
     s6: "22 Sep · e",
     s7: "22 Sep · f",
+    s8: "24 Sep",
 };
 
 const SLICES = [
@@ -113,11 +138,18 @@ const SLICES = [
         label: "Widened",
         note: "Thirteen tasks at three attempts, picked for spread rather than for difficulty. This is the slice the comparison rests on.",
     },
+    {
+        id: "focused",
+        label: "Git pair",
+        note: "Seven more attempts each on sanitize-git-repo and fix-git in the 24 Sep release check, the two tasks the 0.33.0 working-agreement rule is about. Kept out of pooled totals.",
+    },
 ];
 
 // Same tokens as every other figure on the site, so a colour means one harness throughout.
 const HARNESSES = [
     { id: "pi", label: "Pi (base)", colour: "var(--ct-pi)" },
+    { id: "specpi", label: "SpecPi v0.33.0", colour: "var(--ct-specpi)" },
+    { id: "specpi-031", label: "SpecPi v0.31.0", colour: "var(--ct-specpi-prev)" },
     { id: "jev", label: "SpecPi + Jev", colour: "var(--ct-specpi-jev)" },
     { id: "omp", label: "Oh My Pi", colour: "var(--ct-omp)" },
     { id: "claude-code", label: "Claude Code", colour: "var(--ct-claudecode)" },
@@ -215,10 +247,10 @@ function readReasoning(agentDir) {
     return (trajectory.steps ?? []).reduce((total, step) => total + (step.metrics?.extra?.reasoning_tokens ?? 0), 0);
 }
 
-function readTrials(runsRoot, rate) {
+function readTrials(runsRoot, rate, sources = SOURCES) {
     const rows = [];
     const errors = [];
-    for (const source of SOURCES) {
+    for (const source of sources) {
         for (const file of trials(runsRoot, source.dir)) {
             let trial;
             try {
@@ -433,6 +465,53 @@ function pairOf(a, b) {
     };
 }
 
+/**
+ * The 24 Sep release check, three arms compared on the two git tasks (widened and git-pair attempts
+ * combined) and on SWE-bench. Every p-value is against SpecPi 0.33.0, the release being checked.
+ */
+function releaseCheck(rows, sweRows) {
+    const compare = (subset) => {
+        const current = summarize(subset.filter((row) => row.arm === "specpi"));
+        if (!current) {
+            return null;
+        }
+
+        return RELEASE_ARMS.map((arm) => {
+            const run = summarize(subset.filter((row) => row.arm === arm));
+            if (!run) {
+                return null;
+            }
+
+            return {
+                arm,
+                solved: run.solved,
+                attempts: run.attempts,
+                inputTokens: run.inputTokens,
+                cost: run.cost,
+                p:
+                    arm === "specpi"
+                        ? null
+                        : fisherExact(
+                              current.solved,
+                              current.attempts - current.solved,
+                              run.solved,
+                              run.attempts - run.solved,
+                          ),
+            };
+        }).filter(Boolean);
+    };
+
+    const check = rows.filter((row) => row.sitting === "s8");
+
+    return {
+        sitting: "s8",
+        tasks: RELEASE_TASKS.map((task) => ({ task, arms: compare(check.filter((row) => row.task === task)) })),
+        widened: compare(check.filter((row) => row.slice === "widen")),
+        swe:
+            sweRows.length > 0 ? { tasks: new Set(sweRows.map((row) => row.task)).size, arms: compare(sweRows) } : null,
+    };
+}
+
 function main() {
     const runsRoot = process.argv[2] ?? DEFAULT_RUNS;
     const prices = JSON.parse(fs.readFileSync(pricesFile, "utf8"));
@@ -471,7 +550,9 @@ function main() {
 
         return {
             ...harness,
-            overall: summarize(mine),
+            // The git pair is a targeted top-up, not a sample of the benchmark, so it stays out of the
+            // pooled figure every row is compared on.
+            overall: summarize(mine.filter((row) => row.slice !== "focused")),
             widened: summarize(widened),
             sittings,
             // Named as a range rather than a deviation: with three to five sittings the spread is
@@ -562,6 +643,7 @@ function main() {
             })),
         ),
         tasks,
+        release: releaseCheck(rows, readTrials(runsRoot, rate, SWE_SOURCES).rows),
         errors,
         totalAttempts: rows.length,
         taskCount: new Set(rows.map((row) => row.task)).size,

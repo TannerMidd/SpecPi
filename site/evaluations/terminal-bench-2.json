@@ -1,5 +1,5 @@
 {
-    "generatedAt": "2026-09-22",
+    "generatedAt": "2026-09-24",
     "benchmark": "Terminal-Bench 2.0",
     "status": "in progress",
     "model": "deepseek-v4.1-flash",
@@ -20,6 +20,11 @@
             "id": "widen",
             "label": "Widened",
             "note": "Thirteen tasks at three attempts, picked for spread rather than for difficulty. This is the slice the comparison rests on."
+        },
+        {
+            "id": "focused",
+            "label": "Git pair",
+            "note": "Seven more attempts each on sanitize-git-repo and fix-git in the 24 Sep release check, the two tasks the 0.33.0 working-agreement rule is about. Kept out of pooled totals."
         }
     ],
     "sittingLabels": {
@@ -29,7 +34,8 @@
         "s4": "22 Sep · c",
         "s5": "22 Sep · d",
         "s6": "22 Sep · e",
-        "s7": "22 Sep · f"
+        "s7": "22 Sep · f",
+        "s8": "24 Sep"
     },
     "harnesses": [
         {
@@ -37,30 +43,30 @@
             "label": "Pi (base)",
             "colour": "var(--ct-pi)",
             "overall": {
-                "attempts": 269,
-                "solved": 192,
-                "rate": 0.7137546468401487,
+                "attempts": 308,
+                "solved": 217,
+                "rate": 0.7045454545454546,
                 "tasks": 20,
-                "inputTokens": 451229,
-                "outputTokens": 16155,
-                "cacheHitRate": 0.9286086862595048,
-                "cost": 0.015781952732341998,
-                "outputCostShare": 0.6141722345206139,
+                "inputTokens": 451629,
+                "outputTokens": 16158,
+                "cacheHitRate": 0.9308943547362841,
+                "cost": 0.01563771758766233,
+                "outputCostShare": 0.6199714413142564,
                 "costIsUpperBound": false,
-                "costAttempts": 269
+                "costAttempts": 308
             },
             "widened": {
-                "attempts": 234,
-                "solved": 162,
-                "rate": 0.6923076923076923,
+                "attempts": 273,
+                "solved": 187,
+                "rate": 0.684981684981685,
                 "tasks": 13,
-                "inputTokens": 471471,
-                "outputTokens": 16922,
-                "cacheHitRate": 0.9283603474019898,
-                "cost": 0.01653248583333333,
-                "outputCostShare": 0.61412422199263,
+                "inputTokens": 469031,
+                "outputTokens": 16816,
+                "cacheHitRate": 0.93087774595186,
+                "cost": 0.016262539989010987,
+                "outputCostShare": 0.6204217160327227,
                 "costIsUpperBound": false,
-                "costAttempts": 234
+                "costAttempts": 273
             },
             "sittings": [
                 {
@@ -152,12 +158,27 @@
                     "outputCostShare": 0.625815720199127,
                     "costIsUpperBound": false,
                     "costAttempts": 39
+                },
+                {
+                    "id": "s8",
+                    "label": "24 Sep",
+                    "attempts": 39,
+                    "solved": 25,
+                    "rate": 0.6410256410256411,
+                    "tasks": 13,
+                    "inputTokens": 454394,
+                    "outputTokens": 16182,
+                    "cacheHitRate": 0.9465497952357365,
+                    "cost": 0.014642864923076922,
+                    "outputCostShare": 0.663082724605952,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
                 }
             ],
             "spread": {
                 "low": 0.5384615384615384,
                 "high": 0.8205128205128205,
-                "sittings": 6
+                "sittings": 7
             },
             "slices": {
                 "slice1": {
@@ -174,17 +195,184 @@
                     "costAttempts": 35
                 },
                 "widen": {
-                    "attempts": 234,
-                    "solved": 162,
-                    "rate": 0.6923076923076923,
+                    "attempts": 273,
+                    "solved": 187,
+                    "rate": 0.684981684981685,
                     "tasks": 13,
-                    "inputTokens": 471471,
-                    "outputTokens": 16922,
-                    "cacheHitRate": 0.9283603474019898,
-                    "cost": 0.01653248583333333,
-                    "outputCostShare": 0.61412422199263,
+                    "inputTokens": 469031,
+                    "outputTokens": 16816,
+                    "cacheHitRate": 0.93087774595186,
+                    "cost": 0.016262539989010987,
+                    "outputCostShare": 0.6204217160327227,
                     "costIsUpperBound": false,
-                    "costAttempts": 234
+                    "costAttempts": 273
+                },
+                "focused": {
+                    "attempts": 14,
+                    "solved": 9,
+                    "rate": 0.6428571428571429,
+                    "tasks": 2,
+                    "inputTokens": 596953,
+                    "outputTokens": 12150,
+                    "cacheHitRate": 0.9475163401195403,
+                    "cost": 0.013686454285714285,
+                    "outputCostShare": 0.53264656462208,
+                    "costIsUpperBound": false,
+                    "costAttempts": 14
+                }
+            }
+        },
+        {
+            "id": "specpi",
+            "label": "SpecPi v0.33.0",
+            "colour": "var(--ct-specpi)",
+            "overall": {
+                "attempts": 38,
+                "solved": 30,
+                "rate": 0.7894736842105263,
+                "tasks": 13,
+                "inputTokens": 382362,
+                "outputTokens": 12515,
+                "cacheHitRate": 0.9509589486850648,
+                "cost": 0.01141266007894737,
+                "outputCostShare": 0.6579632157946811,
+                "costIsUpperBound": false,
+                "costAttempts": 38
+            },
+            "widened": {
+                "attempts": 38,
+                "solved": 30,
+                "rate": 0.7894736842105263,
+                "tasks": 13,
+                "inputTokens": 382362,
+                "outputTokens": 12515,
+                "cacheHitRate": 0.9509589486850648,
+                "cost": 0.01141266007894737,
+                "outputCostShare": 0.6579632157946811,
+                "costIsUpperBound": false,
+                "costAttempts": 38
+            },
+            "sittings": [
+                {
+                    "id": "s8",
+                    "label": "24 Sep",
+                    "attempts": 38,
+                    "solved": 30,
+                    "rate": 0.7894736842105263,
+                    "tasks": 13,
+                    "inputTokens": 382362,
+                    "outputTokens": 12515,
+                    "cacheHitRate": 0.9509589486850648,
+                    "cost": 0.01141266007894737,
+                    "outputCostShare": 0.6579632157946811,
+                    "costIsUpperBound": false,
+                    "costAttempts": 38
+                }
+            ],
+            "spread": null,
+            "slices": {
+                "widen": {
+                    "attempts": 38,
+                    "solved": 30,
+                    "rate": 0.7894736842105263,
+                    "tasks": 13,
+                    "inputTokens": 382362,
+                    "outputTokens": 12515,
+                    "cacheHitRate": 0.9509589486850648,
+                    "cost": 0.01141266007894737,
+                    "outputCostShare": 0.6579632157946811,
+                    "costIsUpperBound": false,
+                    "costAttempts": 38
+                },
+                "focused": {
+                    "attempts": 14,
+                    "solved": 14,
+                    "rate": 1,
+                    "tasks": 2,
+                    "inputTokens": 258503,
+                    "outputTokens": 6465,
+                    "cacheHitRate": 0.8869338013753894,
+                    "cost": 0.00895128342857143,
+                    "outputCostShare": 0.4333744064538296,
+                    "costIsUpperBound": false,
+                    "costAttempts": 14
+                }
+            }
+        },
+        {
+            "id": "specpi-031",
+            "label": "SpecPi v0.31.0",
+            "colour": "var(--ct-specpi-prev)",
+            "overall": {
+                "attempts": 39,
+                "solved": 30,
+                "rate": 0.7692307692307693,
+                "tasks": 13,
+                "inputTokens": 451906,
+                "outputTokens": 14941,
+                "cacheHitRate": 0.9602641777009749,
+                "cost": 0.01295993315384615,
+                "outputCostShare": 0.6917129694834434,
+                "costIsUpperBound": false,
+                "costAttempts": 39
+            },
+            "widened": {
+                "attempts": 39,
+                "solved": 30,
+                "rate": 0.7692307692307693,
+                "tasks": 13,
+                "inputTokens": 451906,
+                "outputTokens": 14941,
+                "cacheHitRate": 0.9602641777009749,
+                "cost": 0.01295993315384615,
+                "outputCostShare": 0.6917129694834434,
+                "costIsUpperBound": false,
+                "costAttempts": 39
+            },
+            "sittings": [
+                {
+                    "id": "s8",
+                    "label": "24 Sep",
+                    "attempts": 39,
+                    "solved": 30,
+                    "rate": 0.7692307692307693,
+                    "tasks": 13,
+                    "inputTokens": 451906,
+                    "outputTokens": 14941,
+                    "cacheHitRate": 0.9602641777009749,
+                    "cost": 0.01295993315384615,
+                    "outputCostShare": 0.6917129694834434,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                }
+            ],
+            "spread": null,
+            "slices": {
+                "widen": {
+                    "attempts": 39,
+                    "solved": 30,
+                    "rate": 0.7692307692307693,
+                    "tasks": 13,
+                    "inputTokens": 451906,
+                    "outputTokens": 14941,
+                    "cacheHitRate": 0.9602641777009749,
+                    "cost": 0.01295993315384615,
+                    "outputCostShare": 0.6917129694834434,
+                    "costIsUpperBound": false,
+                    "costAttempts": 39
+                },
+                "focused": {
+                    "attempts": 14,
+                    "solved": 11,
+                    "rate": 0.7857142857142857,
+                    "tasks": 2,
+                    "inputTokens": 549720,
+                    "outputTokens": 11582,
+                    "cacheHitRate": 0.9310679705002837,
+                    "cost": 0.014168457428571427,
+                    "outputCostShare": 0.490454641891553,
+                    "costIsUpperBound": false,
+                    "costAttempts": 14
                 }
             }
         },
@@ -683,6 +871,96 @@
     "paired": [
         {
             "a": "pi",
+            "b": "specpi",
+            "sittings": [
+                {
+                    "id": "s8",
+                    "label": "24 Sep",
+                    "a": {
+                        "solved": 25,
+                        "attempts": 39,
+                        "inputTokens": 454394,
+                        "cost": 0.014642864923076922
+                    },
+                    "b": {
+                        "solved": 30,
+                        "attempts": 38,
+                        "inputTokens": 382362,
+                        "cost": 0.01141266007894737
+                    },
+                    "tokenRatio": 1.1883869212944802,
+                    "costRatio": 1.2830369801417485
+                }
+            ],
+            "tokens": {
+                "sittings": 1,
+                "lowerIn": 0,
+                "low": 1.1883869212944802,
+                "high": 1.1883869212944802,
+                "typical": 1.1883869212944802
+            },
+            "cost": {
+                "sittings": 1,
+                "lowerIn": 0,
+                "low": 1.2830369801417485,
+                "high": 1.2830369801417485,
+                "typical": 1.2830369801417485
+            },
+            "solved": {
+                "a": 25,
+                "b": 30,
+                "attemptsA": 39,
+                "attemptsB": 38,
+                "p": 0.20789729621879038
+            }
+        },
+        {
+            "a": "pi",
+            "b": "specpi-031",
+            "sittings": [
+                {
+                    "id": "s8",
+                    "label": "24 Sep",
+                    "a": {
+                        "solved": 25,
+                        "attempts": 39,
+                        "inputTokens": 454394,
+                        "cost": 0.014642864923076922
+                    },
+                    "b": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 451906,
+                        "cost": 0.01295993315384615
+                    },
+                    "tokenRatio": 1.00550556974238,
+                    "costRatio": 1.129856516175882
+                }
+            ],
+            "tokens": {
+                "sittings": 1,
+                "lowerIn": 0,
+                "low": 1.00550556974238,
+                "high": 1.00550556974238,
+                "typical": 1.00550556974238
+            },
+            "cost": {
+                "sittings": 1,
+                "lowerIn": 0,
+                "low": 1.129856516175882,
+                "high": 1.129856516175882,
+                "typical": 1.129856516175882
+            },
+            "solved": {
+                "a": 25,
+                "b": 30,
+                "attemptsA": 39,
+                "attemptsB": 39,
+                "p": 0.3206917396538802
+            }
+        },
+        {
+            "a": "pi",
             "b": "jev",
             "sittings": [
                 {
@@ -973,6 +1251,51 @@
             }
         },
         {
+            "a": "specpi",
+            "b": "specpi-031",
+            "sittings": [
+                {
+                    "id": "s8",
+                    "label": "24 Sep",
+                    "a": {
+                        "solved": 30,
+                        "attempts": 38,
+                        "inputTokens": 382362,
+                        "cost": 0.01141266007894737
+                    },
+                    "b": {
+                        "solved": 30,
+                        "attempts": 39,
+                        "inputTokens": 451906,
+                        "cost": 0.01295993315384615
+                    },
+                    "tokenRatio": 0.8461095891623479,
+                    "costRatio": 0.8806110296610911
+                }
+            ],
+            "tokens": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.8461095891623479,
+                "high": 0.8461095891623479,
+                "typical": 0.8461095891623479
+            },
+            "cost": {
+                "sittings": 1,
+                "lowerIn": 1,
+                "low": 0.8806110296610911,
+                "high": 0.8806110296610911,
+                "typical": 0.8806110296610911
+            },
+            "solved": {
+                "a": 30,
+                "b": 30,
+                "attemptsA": 38,
+                "attemptsB": 39,
+                "p": 0.9999999999999735
+            }
+        },
+        {
             "a": "jev",
             "b": "omp",
             "sittings": [
@@ -1258,28 +1581,93 @@
     "comparisons": [
         {
             "a": "pi",
+            "b": "specpi",
+            "p": 0.3430712742390667
+        },
+        {
+            "a": "pi",
+            "b": "specpi-031",
+            "p": 0.45768299009107644
+        },
+        {
+            "a": "pi",
             "b": "jev",
-            "p": 0.7000362596862199
+            "p": 0.5165637132758847
         },
         {
             "a": "pi",
             "b": "omp",
-            "p": 0.09892843511785526
+            "p": 0.06412357625763997
         },
         {
             "a": "pi",
             "b": "claude-code",
-            "p": 0.9011113939040175
+            "p": 0.8080575641762734
         },
         {
             "a": "pi",
             "b": "opencode",
-            "p": 0.849405486720035
+            "p": 0.7102068185567169
         },
         {
             "a": "pi",
             "b": "dsh",
-            "p": 0.058917463028841204
+            "p": 0.06457718974208397
+        },
+        {
+            "a": "specpi",
+            "b": "specpi-031",
+            "p": 0.9999999999999735
+        },
+        {
+            "a": "specpi",
+            "b": "jev",
+            "p": 0.5556432339087961
+        },
+        {
+            "a": "specpi",
+            "b": "omp",
+            "p": 1.0000000000000615
+        },
+        {
+            "a": "specpi",
+            "b": "claude-code",
+            "p": 0.5229305309509487
+        },
+        {
+            "a": "specpi",
+            "b": "opencode",
+            "p": 0.7887342170580519
+        },
+        {
+            "a": "specpi",
+            "b": "dsh",
+            "p": 0.049715053492891174
+        },
+        {
+            "a": "specpi-031",
+            "b": "jev",
+            "p": 0.700845530541123
+        },
+        {
+            "a": "specpi-031",
+            "b": "omp",
+            "p": 0.8200994165505068
+        },
+        {
+            "a": "specpi-031",
+            "b": "claude-code",
+            "p": 0.6758462123234841
+        },
+        {
+            "a": "specpi-031",
+            "b": "opencode",
+            "p": 1.0000000000000167
+        },
+        {
+            "a": "specpi-031",
+            "b": "dsh",
+            "p": 0.05593506706923942
         },
         {
             "a": "jev",
@@ -1337,17 +1725,43 @@
             "task": "cobol-modernization",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 11,
-                    "rate": 0.6111111111111112,
+                    "attempts": 21,
+                    "solved": 14,
+                    "rate": 0.6666666666666666,
                     "tasks": 1,
-                    "inputTokens": 1226136,
-                    "outputTokens": 46757,
-                    "cacheHitRate": 0.9533693030134424,
-                    "cost": 0.04013751333333333,
-                    "outputCostShare": 0.698954610541394,
+                    "inputTokens": 1123307,
+                    "outputTokens": 43609,
+                    "cacheHitRate": 0.9546887967930738,
+                    "cost": 0.037017582285714286,
+                    "outputCostShare": 0.7068424890108979,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 799268,
+                    "outputTokens": 31318,
+                    "cacheHitRate": 0.9690470818495097,
+                    "cost": 0.024825334,
+                    "outputCostShare": 0.7569203298533667,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 1256454,
+                    "outputTokens": 52528,
+                    "cacheHitRate": 0.9849855267322356,
+                    "cost": 0.038059118,
+                    "outputCostShare": 0.8280959112084519,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -1420,17 +1834,43 @@
             "task": "configure-git-webserver",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
+                    "attempts": 21,
                     "solved": 12,
-                    "rate": 0.6666666666666666,
+                    "rate": 0.5714285714285714,
                     "tasks": 1,
-                    "inputTokens": 242542,
-                    "outputTokens": 14382,
-                    "cacheHitRate": 0.9187409737834579,
-                    "cost": 0.012253941333333332,
-                    "outputCostShare": 0.704192479676743,
+                    "inputTokens": 228067,
+                    "outputTokens": 13855,
+                    "cacheHitRate": 0.9219239001323125,
+                    "cost": 0.01161503257142857,
+                    "outputCostShare": 0.7157325725720862,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 1,
+                    "rate": 0.3333333333333333,
+                    "tasks": 1,
+                    "inputTokens": 242457,
+                    "outputTokens": 13586,
+                    "cacheHitRate": 0.9636457873629826,
+                    "cost": 0.010174877999999998,
+                    "outputCostShare": 0.8011693113175412,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 1,
+                    "rate": 0.3333333333333333,
+                    "tasks": 1,
+                    "inputTokens": 135262,
+                    "outputTokens": 6554,
+                    "cacheHitRate": 0.9507277234798638,
+                    "cost": 0.005318092,
+                    "outputCostShare": 0.7394757367868025,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -1503,17 +1943,43 @@
             "task": "extract-elf",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 13,
-                    "rate": 0.7222222222222222,
+                    "attempts": 21,
+                    "solved": 15,
+                    "rate": 0.7142857142857143,
                     "tasks": 1,
-                    "inputTokens": 1121546,
-                    "outputTokens": 29092,
-                    "cacheHitRate": 0.9311212540786962,
-                    "cost": 0.032175885333333334,
-                    "outputCostShare": 0.5424994469978636,
+                    "inputTokens": 1106035,
+                    "outputTokens": 28539,
+                    "cacheHitRate": 0.9296766548017424,
+                    "cost": 0.03187522771428571,
+                    "outputCostShare": 0.537202660835669,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 2,
+                    "rate": 0.6666666666666666,
+                    "tasks": 1,
+                    "inputTokens": 790665,
+                    "outputTokens": 14499,
+                    "cacheHitRate": 0.9622145071975278,
+                    "cost": 0.015463118000000003,
+                    "outputCostShare": 0.5625902874181002,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 2,
+                    "rate": 0.6666666666666666,
+                    "tasks": 1,
+                    "inputTokens": 1050351,
+                    "outputTokens": 35398,
+                    "cacheHitRate": 0.9706060257932743,
+                    "cost": 0.028928332,
+                    "outputCostShare": 0.7341868172696578,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -1586,17 +2052,43 @@
             "task": "fix-git",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 18,
+                    "attempts": 21,
+                    "solved": 21,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 48700,
-                    "outputTokens": 2738,
-                    "cacheHitRate": 0.8248540393289574,
-                    "cost": 0.0030430286666666665,
-                    "outputCostShare": 0.5399445245668626,
+                    "inputTokens": 48101,
+                    "outputTokens": 2731,
+                    "cacheHitRate": 0.8303863033145796,
+                    "cost": 0.002982404857142857,
+                    "outputCostShare": 0.5494894484479784,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 50997,
+                    "outputTokens": 2450,
+                    "cacheHitRate": 0.883497176322945,
+                    "cost": 0.002496368,
+                    "outputCostShare": 0.5888554892547894,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 66541,
+                    "outputTokens": 2202,
+                    "cacheHitRate": 0.8957730109907726,
+                    "cost": 0.002540516,
+                    "outputCostShare": 0.5201305561547338,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -1669,17 +2161,43 @@
             "task": "hf-model-inference",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 17,
-                    "rate": 0.9444444444444444,
+                    "attempts": 21,
+                    "solved": 20,
+                    "rate": 0.9523809523809523,
                     "tasks": 1,
-                    "inputTokens": 30856,
-                    "outputTokens": 2493,
-                    "cacheHitRate": 0.8902860826180817,
-                    "cost": 0.0020857689999999995,
-                    "outputCostShare": 0.7170337015588335,
+                    "inputTokens": 30603,
+                    "outputTokens": 2477,
+                    "cacheHitRate": 0.8946703430075871,
+                    "cost": 0.0020520822857142853,
+                    "outputCostShare": 0.7243513487624,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 66983,
+                    "outputTokens": 3371,
+                    "cacheHitRate": 0.9280716596168201,
+                    "cost": 0.0029319959999999996,
+                    "outputCostShare": 0.6899054432543564,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 59555,
+                    "outputTokens": 2983,
+                    "cacheHitRate": 0.947113312624185,
+                    "cost": 0.0024314659999999997,
+                    "outputCostShare": 0.7360991270287144,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -1752,17 +2270,43 @@
             "task": "multi-source-data-merger",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 18,
+                    "attempts": 21,
+                    "solved": 21,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 70012,
-                    "outputTokens": 6553,
-                    "cacheHitRate": 0.865581346630567,
-                    "cost": 0.005525069333333333,
-                    "outputCostShare": 0.7115989132685395,
+                    "inputTokens": 66602,
+                    "outputTokens": 6352,
+                    "cacheHitRate": 0.8706019965023315,
+                    "cost": 0.005277937714285714,
+                    "outputCostShare": 0.7221110496513196,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 48992,
+                    "outputTokens": 4733,
+                    "cacheHitRate": 0.9013777853376425,
+                    "cost": 0.0036972299999999993,
+                    "outputCostShare": 0.7681426365143635,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 53037,
+                    "outputTokens": 4115,
+                    "cacheHitRate": 0.9428323623131022,
+                    "cost": 0.003073615,
+                    "outputCostShare": 0.8032235657361121,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -1835,17 +2379,43 @@
             "task": "prove-plus-comm",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 16,
-                    "rate": 0.8888888888888888,
+                    "attempts": 21,
+                    "solved": 19,
+                    "rate": 0.9047619047619048,
                     "tasks": 1,
-                    "inputTokens": 24586,
-                    "outputTokens": 2324,
-                    "cacheHitRate": 0.8885434085054459,
-                    "cost": 0.0018709026666666666,
-                    "outputCostShare": 0.745273048232689,
+                    "inputTokens": 24299,
+                    "outputTokens": 2305,
+                    "cacheHitRate": 0.8895003262959239,
+                    "cost": 0.0018506197142857143,
+                    "outputCostShare": 0.7473326695659784,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 58729,
+                    "outputTokens": 3273,
+                    "cacheHitRate": 0.9291892750925148,
+                    "cost": 0.002751312,
+                    "outputCostShare": 0.7137685584186744,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 34967,
+                    "outputTokens": 1626,
+                    "cacheHitRate": 0.912708172467374,
+                    "cost": 0.001529394,
+                    "outputCostShare": 0.6380304878925902,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -1918,17 +2488,43 @@
             "task": "pytorch-model-cli",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
+                    "attempts": 21,
                     "solved": 3,
-                    "rate": 0.16666666666666666,
+                    "rate": 0.14285714285714285,
                     "tasks": 1,
-                    "inputTokens": 185640,
-                    "outputTokens": 9107,
-                    "cacheHitRate": 0.917847816471436,
-                    "cost": 0.008262909166666667,
-                    "outputCostShare": 0.6612844487479239,
+                    "inputTokens": 189412,
+                    "outputTokens": 9393,
+                    "cacheHitRate": 0.9246197134092473,
+                    "cost": 0.008302810142857144,
+                    "outputCostShare": 0.6787719083956963,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 0,
+                    "rate": 0,
+                    "tasks": 1,
+                    "inputTokens": 162915,
+                    "outputTokens": 9438,
+                    "cacheHitRate": 0.9548701265486091,
+                    "cost": 0.0072323380000000005,
+                    "outputCostShare": 0.7829833174279189,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 2,
+                    "rate": 0.6666666666666666,
+                    "tasks": 1,
+                    "inputTokens": 330566,
+                    "outputTokens": 12000,
+                    "cacheHitRate": 0.9586144168890126,
+                    "cost": 0.010202755999999999,
+                    "outputCostShare": 0.7056916778172487,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -2001,17 +2597,43 @@
             "task": "raman-fitting",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
+                    "attempts": 21,
                     "solved": 5,
-                    "rate": 0.2777777777777778,
+                    "rate": 0.23809523809523808,
                     "tasks": 1,
-                    "inputTokens": 1308719,
-                    "outputTokens": 58312,
-                    "cacheHitRate": 0.9421015485291931,
-                    "cost": 0.05005202066666667,
-                    "outputCostShare": 0.6990180656176238,
+                    "inputTokens": 1411470,
+                    "outputTokens": 62004,
+                    "cacheHitRate": 0.9452461452551059,
+                    "cost": 0.052797674285714295,
+                    "outputCostShare": 0.7046257340556016,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 2,
+                    "solved": 1,
+                    "rate": 0.5,
+                    "tasks": 1,
+                    "inputTokens": 2410942,
+                    "outputTokens": 67020,
+                    "cacheHitRate": 0.966049155485523,
+                    "cost": 0.059477289,
+                    "outputCostShare": 0.6760899946196269,
+                    "costIsUpperBound": false,
+                    "costAttempts": 2
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 0,
+                    "rate": 0,
+                    "tasks": 1,
+                    "inputTokens": 657264,
+                    "outputTokens": 39089,
+                    "cacheHitRate": 0.9635422821181352,
+                    "cost": 0.028947654,
+                    "outputCostShare": 0.8102003706414344,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -2084,17 +2706,43 @@
             "task": "sanitize-git-repo",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 3,
-                    "rate": 0.16666666666666666,
+                    "attempts": 21,
+                    "solved": 4,
+                    "rate": 0.19047619047619047,
                     "tasks": 1,
-                    "inputTokens": 1341625,
-                    "outputTokens": 23067,
-                    "cacheHitRate": 0.9144946247174135,
-                    "cost": 0.034728042,
-                    "outputCostShare": 0.3985223238327113,
+                    "inputTokens": 1296758,
+                    "outputTokens": 21723,
+                    "cacheHitRate": 0.9174224037282139,
+                    "cost": 0.032665238285714285,
+                    "outputCostShare": 0.399009575351636,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 469545,
+                    "outputTokens": 9398,
+                    "cacheHitRate": 0.8927791798443173,
+                    "cost": 0.01444795,
+                    "outputCostShare": 0.39026989988199023,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 1,
+                    "rate": 0.3333333333333333,
+                    "tasks": 1,
+                    "inputTokens": 1440778,
+                    "outputTokens": 11772,
+                    "cacheHitRate": 0.9370934922906253,
+                    "cost": 0.024708582000000003,
+                    "outputCostShare": 0.28585209786623933,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -2167,17 +2815,43 @@
             "task": "sqlite-with-gcov",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 18,
+                    "attempts": 21,
+                    "solved": 20,
+                    "rate": 0.9523809523809523,
+                    "tasks": 1,
+                    "inputTokens": 183379,
+                    "outputTokens": 5479,
+                    "cacheHitRate": 0.9129621093988375,
+                    "cost": 0.006183503714285713,
+                    "outputCostShare": 0.5315941313530845,
+                    "costIsUpperBound": false,
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 185342,
-                    "outputTokens": 5718,
-                    "cacheHitRate": 0.9102675469596501,
-                    "cost": 0.006431716666666667,
-                    "outputCostShare": 0.5334345677540729,
+                    "inputTokens": 174855,
+                    "outputTokens": 4897,
+                    "cacheHitRate": 0.9352855503406625,
+                    "cost": 0.005126169,
+                    "outputCostShare": 0.5731765768939729,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 159869,
+                    "outputTokens": 3532,
+                    "cacheHitRate": 0.9437059926147867,
+                    "cost": 0.003921958,
+                    "outputCostShare": 0.54039334434484,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -2250,17 +2924,43 @@
             "task": "tune-mjcf",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 10,
-                    "rate": 0.5555555555555556,
+                    "attempts": 21,
+                    "solved": 12,
+                    "rate": 0.5714285714285714,
                     "tasks": 1,
-                    "inputTokens": 276060,
-                    "outputTokens": 16109,
-                    "cacheHitRate": 0.9064968267716789,
-                    "cost": 0.014288041333333334,
-                    "outputCostShare": 0.6764701408571885,
+                    "inputTokens": 321166,
+                    "outputTokens": 16876,
+                    "cacheHitRate": 0.9202467140940445,
+                    "cost": 0.014854191714285713,
+                    "outputCostShare": 0.6816546309746795,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 2,
+                    "rate": 0.6666666666666666,
+                    "tasks": 1,
+                    "inputTokens": 299244,
+                    "outputTokens": 14798,
+                    "cacheHitRate": 0.9277790340313524,
+                    "cost": 0.012953646,
+                    "outputCostShare": 0.6854440826930117,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 560908,
+                    "outputTokens": 20309,
+                    "cacheHitRate": 0.9719104094969879,
+                    "cost": 0.016184406,
+                    "outputCostShare": 0.7529222882816953,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -2333,17 +3033,43 @@
             "task": "vulnerable-secret",
             "byHarness": {
                 "pi": {
-                    "attempts": 18,
-                    "solved": 18,
+                    "attempts": 21,
+                    "solved": 21,
                     "rate": 1,
                     "tasks": 1,
-                    "inputTokens": 67360,
-                    "outputTokens": 3330,
-                    "cacheHitRate": 0.8114034328073852,
-                    "cost": 0.004067476333333333,
-                    "outputCostShare": 0.4911972853929327,
+                    "inputTokens": 68208,
+                    "outputTokens": 3265,
+                    "cacheHitRate": 0.8229410799621605,
+                    "cost": 0.0039387145714285705,
+                    "outputCostShare": 0.4973196113801014,
                     "costIsUpperBound": false,
-                    "costAttempts": 18
+                    "costAttempts": 21
+                },
+                "specpi": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 71311,
+                    "outputTokens": 2084,
+                    "cacheHitRate": 0.8717536413439785,
+                    "cost": 0.002808496,
+                    "outputCostShare": 0.44514928986902597,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
+                },
+                "specpi-031": {
+                    "attempts": 3,
+                    "solved": 3,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 69231,
+                    "outputTokens": 2123,
+                    "cacheHitRate": 0.886847414212323,
+                    "cost": 0.0026332419999999996,
+                    "outputCostShare": 0.4838142487473616,
+                    "costIsUpperBound": false,
+                    "costAttempts": 3
                 },
                 "jev": {
                     "attempts": 18,
@@ -2413,6 +3139,124 @@
             }
         }
     ],
+    "release": {
+        "sitting": "s8",
+        "tasks": [
+            {
+                "task": "sanitize-git-repo",
+                "arms": [
+                    {
+                        "arm": "pi",
+                        "solved": 3,
+                        "attempts": 10,
+                        "inputTokens": 1112453,
+                        "cost": 0.023558058599999997,
+                        "p": 0.0030959752321981565
+                    },
+                    {
+                        "arm": "specpi-031",
+                        "solved": 5,
+                        "attempts": 10,
+                        "inputTokens": 1154974,
+                        "cost": 0.025348958999999997,
+                        "p": 0.03250773993808054
+                    },
+                    {
+                        "arm": "specpi",
+                        "solved": 10,
+                        "attempts": 10,
+                        "inputTokens": 455924,
+                        "cost": 0.0144419604,
+                        "p": null
+                    }
+                ]
+            },
+            {
+                "task": "fix-git",
+                "arms": [
+                    {
+                        "arm": "pi",
+                        "solved": 10,
+                        "attempts": 10,
+                        "inputTokens": 44899,
+                        "cost": 0.0024751008000000003,
+                        "p": 0.9999999999999929
+                    },
+                    {
+                        "arm": "specpi-031",
+                        "solved": 10,
+                        "attempts": 10,
+                        "inputTokens": 66829,
+                        "cost": 0.0026616107999999994,
+                        "p": 0.9999999999999929
+                    },
+                    {
+                        "arm": "specpi",
+                        "solved": 10,
+                        "attempts": 10,
+                        "inputTokens": 62144,
+                        "cost": 0.0031731317999999994,
+                        "p": null
+                    }
+                ]
+            }
+        ],
+        "widened": [
+            {
+                "arm": "pi",
+                "solved": 25,
+                "attempts": 39,
+                "inputTokens": 454394,
+                "cost": 0.014642864923076922,
+                "p": 0.2078972962187907
+            },
+            {
+                "arm": "specpi-031",
+                "solved": 30,
+                "attempts": 39,
+                "inputTokens": 451906,
+                "cost": 0.01295993315384615,
+                "p": 0.9999999999999735
+            },
+            {
+                "arm": "specpi",
+                "solved": 30,
+                "attempts": 38,
+                "inputTokens": 382362,
+                "cost": 0.01141266007894737,
+                "p": null
+            }
+        ],
+        "swe": {
+            "tasks": 12,
+            "arms": [
+                {
+                    "arm": "pi",
+                    "solved": 34,
+                    "attempts": 36,
+                    "inputTokens": 302913,
+                    "cost": 0.006904111166666667,
+                    "p": 1.0000000000000038
+                },
+                {
+                    "arm": "specpi-031",
+                    "solved": 33,
+                    "attempts": 36,
+                    "inputTokens": 274390,
+                    "cost": 0.006004481666666666,
+                    "p": 0.999999999999988
+                },
+                {
+                    "arm": "specpi",
+                    "solved": 34,
+                    "attempts": 36,
+                    "inputTokens": 308634,
+                    "cost": 0.006839237,
+                    "p": null
+                }
+            ]
+        }
+    },
     "errors": [
         {
             "slice": "widen",
@@ -2425,8 +3269,14 @@
             "arm": "dsh",
             "task": "sqlite-with-gcov",
             "kind": "NonZeroAgentExitCodeError"
+        },
+        {
+            "slice": "widen",
+            "arm": "specpi",
+            "task": "raman-fitting",
+            "kind": "NetworkConnectionError"
         }
     ],
-    "totalAttempts": 840,
+    "totalAttempts": 998,
     "taskCount": 20
 }
