@@ -158,3 +158,27 @@ test("the windowed comparison admits only attempts that ran under the window", (
     assert.equal(ranWindowed({ context: { compactions: 0, peakPromptTokens: 12000 } }, window), true);
     assert.equal(ranWindowed({ context: {} }, window), true);
 });
+
+test("a declared window gets compaction settings that fit inside it", async () => {
+    const { windowedCompaction } = await import("../scripts/eval-harnesses.mjs");
+    // Pi's defaults (reserve 16,384, keep 20,000) triggered at 7,616 tokens of a 24,000 window and
+    // tried to keep more than the window held.
+    assert.deepEqual(windowedCompaction(24000), { reserveTokens: 8192, keepRecentTokens: 7904 });
+    for (const window of [24000, 32000, 64000]) {
+        const { reserveTokens, keepRecentTokens } = windowedCompaction(window);
+        assert.ok(reserveTokens + keepRecentTokens < window, `window ${window}`);
+    }
+
+    // Large windows keep Pi's own ceilings; no window, or one too small to split, writes nothing.
+    assert.deepEqual(windowedCompaction(1000000), { reserveTokens: 8192, keepRecentTokens: 20000 });
+    for (const value of [null, undefined, 0, -1, 8192, "24000"]) {
+        assert.equal(windowedCompaction(value), null, String(value));
+    }
+
+    // Every tier 6 task declares a window this can serve.
+    const tasks = path.join(root, "evals", "tasks");
+    for (const id of fs.readdirSync(tasks).filter((name) => name.startsWith("t6-"))) {
+        const task = JSON.parse(fs.readFileSync(path.join(tasks, id, "task.json"), "utf8"));
+        assert.ok(windowedCompaction(task.contextWindow), id);
+    }
+});

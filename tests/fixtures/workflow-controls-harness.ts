@@ -505,6 +505,21 @@ const restoreRaceKeptRepositoryRoot =
 await commands.get("scope").handler("status", ctx);
 const restoreRaceSurvived = notifications.at(-1).message.startsWith("Scope: src/;");
 
+// request_capability is decided at session start: offered where a human can grant an installed group,
+// withdrawn from a headless session, where it could only ever refuse. Run last so the headless
+// restore cannot disturb the scope scenarios above.
+const capabilityRequestOfferedInteractive = activeAfterFirstStart.includes("request_capability");
+for (const handler of events.get("session_start") || []) {
+    await handler({}, { ...ctx, hasUI: false });
+}
+
+const capabilityRequestWithdrawnHeadless = !activeTools.includes("request_capability");
+for (const handler of events.get("session_start") || []) {
+    await handler({}, ctx);
+}
+
+const capabilityRequestReofferedInteractive = activeTools.includes("request_capability");
+
 const report = {
     commands: [...commands.keys()].sort(),
     toolNames: [...tools.keys()].sort(),
@@ -561,6 +576,9 @@ const report = {
     treeCleared,
     restoreRaceKeptRepositoryRoot,
     restoreRaceSurvived,
+    capabilityRequestOfferedInteractive,
+    capabilityRequestWithdrawnHeadless,
+    capabilityRequestReofferedInteractive,
     emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
 };
 console.log("WORKFLOW_CONTROLS_HARNESS=" + JSON.stringify(report));

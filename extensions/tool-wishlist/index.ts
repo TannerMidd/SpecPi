@@ -13,7 +13,12 @@ import { getMarkdownTheme, type ExtensionAPI } from "@earendil-works/pi-coding-a
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Box, Markdown, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { syncAuthoringTools } from "./authoring-tools.mjs";
+import {
+    improvementSkillPath,
+    observationToolWanted,
+    syncAuthoringTools,
+    syncObservationTool,
+} from "./authoring-tools.mjs";
 import {
     appendWishlistDecision,
     archiveWishlist,
@@ -468,7 +473,7 @@ function improvementPrompt(group: any, context: ImprovementContext = {}) {
 
     lines.push(
         "",
-        "This exact menu selection authorizes implementation of the smallest sufficient intervention in the current SpecPi source checkout. Load and follow the specpi-improve skill. Treat the wishlist evidence as a lead, inspect current behavior, keep scope minimal, and do not ask for another approval unless scope expands or external/remote state would change.",
+        `This exact menu selection authorizes implementation of the smallest sufficient intervention in the current SpecPi source checkout. Read and follow the specpi-improve skill at ${improvementSkillPath()}. Treat the wishlist evidence as a lead, inspect current behavior, keep scope minimal, and do not ask for another approval unless scope expands or external/remote state would change.`,
         "First call record_harness_contract with the exact gap, selection ID, source root, proposed requirements, acceptance checks, paths, rollback, and non-goals. Run direct acceptance checks and focused tests. At the end, call finish_harness_improvement with the gap ID, concise acceptance evidence, and a validation note. That tool independently runs the repository gate, verifies registry integration and frozen policy inputs, runs supported capability validators, records a bounded local receipt, and retires the item. If any check fails, do not retire it; leave it selected and report the blocker.",
     );
 
@@ -586,9 +591,23 @@ export default function toolWishlist(pi: ExtensionAPI) {
         }
     };
 
+    // Offer the observation tool only where a report could land. Decided at session start and on an
+    // explicit /wishlist on|off, never in between, so the cached prompt prefix is not disturbed.
+    const syncObservation = (interactive: boolean) => {
+        let mode = "off";
+        try {
+            mode = readCollectionMode(stateDir);
+        } catch {
+            // An unreadable collection file cannot record anything either.
+        }
+
+        syncObservationTool(pi, observationToolWanted(mode, interactive));
+    };
+
     pi.on("session_start", (_event, ctx) => {
         restoreActiveImprovement(ctx);
         syncAuthoring();
+        syncObservation(ctx.hasUI === true);
     });
 
     pi.on("session_tree", (_event, ctx) => {
@@ -653,13 +672,10 @@ export default function toolWishlist(pi: ExtensionAPI) {
         name: "report_capability_gap",
         label: "Report Capability Gap",
         description:
-            "Privately record a material, reusable capability gap in SpecPi's local wishlist. Report only after reasonable existing tools or workarounds proved insufficient. Do not use for transient failures, command mistakes, credentials or permissions the user must supply, ordinary project-specific work, or speculative nice-to-haves. Never include secrets, source code, full commands, file paths, URLs with private data, or user prompt text. Report a gap at most once per user task. Collection requires an explicit local on/off decision. Only a separately enabled and consented Jev advisor may transmit redacted report samples.",
+            "Privately record, in SpecPi's local wishlist, a material and reusable capability gap that reasonable existing tools or workarounds could not cover. Not for transient failures, command mistakes, credentials or permissions the user must supply, ordinary project work, or speculative nice-to-haves. At most once per gap per task. Never include secrets, source code, full commands, file paths, private URLs, or user prompt text.",
         promptSnippet: "Record recurring, generalizable capability friction without interrupting the user task",
         promptGuidelines: [
-            "Use report_capability_gap only for a material and generalizable missing capability after reasonable existing tools or workarounds have proved insufficient.",
-            "Do not use report_capability_gap for transient errors, model mistakes, missing credentials or permissions, ordinary project-specific work, or speculative nice-to-haves.",
-            "Call report_capability_gap at most once per distinct gap per user task; use a short durable capability phrase without project names, and never include secrets, source code, full commands, private paths, or user prompt text.",
-            "After report_capability_gap, continue the requested task; never treat a report as permission to modify SpecPi or external state.",
+            "After report_capability_gap, continue the requested task; a report never authorizes changing SpecPi or external state.",
         ],
         parameters: Type.Object(
             {
@@ -1450,6 +1466,8 @@ export default function toolWishlist(pi: ExtensionAPI) {
 
             if (action === "on" || action === "off") {
                 await setCollectionMode({ stateDir, mode: action });
+                // A human command, so offering or withdrawing the tool now is the expected cost.
+                syncObservation(ctx.hasUI === true);
                 ctx.ui.notify(
                     `Local wishlist collection is ${action}. Jev transmission requires its own switch and consent.`,
                     "info",

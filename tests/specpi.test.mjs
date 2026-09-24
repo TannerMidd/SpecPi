@@ -993,6 +993,12 @@ test("wishlist extension runs the one-command improvement loop and preserves con
             "finish_harness_improvement",
         ]);
         assert.deepEqual(result.commandNames, ["harness-improvement", "wishlist"]);
+        assert.equal(result.observationWithdrawnHeadlessUndecided, true);
+        assert.equal(result.observationOfferedInteractiveUndecided, true);
+        assert.equal(result.observationWithdrawnWhenOff, true);
+        assert.equal(result.observationStaysWithdrawnWhenOff, true);
+        assert.equal(result.observationOfferedWhenOn, true);
+        assert.equal(result.observationOfferedHeadlessWhenOn, true);
         assert.equal(result.completionToolExposed, true);
         assert.equal(result.lifecycleBypassBlocked, true);
         assert.match(result.consent, /salted task, session, and project hashes locally/);
@@ -1005,6 +1011,13 @@ test("wishlist extension runs the one-command improvement loop and preserves con
         assert.match(
             result.implementationStarted,
             /Begin the selected SpecPi harness improvement: scope-drift-monitor/,
+        );
+        // The skill is hidden from the model's skill list, so the kickoff has to name its file.
+        assert.ok(
+            result.implementationStarted.includes(
+                `Read and follow the specpi-improve skill at ${path.join(repoRoot, "skills", "specpi-improve", "SKILL.md")}.`,
+            ),
+            result.implementationStarted,
         );
         const commands = result.verificationCommands.map((item) => item.args);
         const validatorInvocation = [

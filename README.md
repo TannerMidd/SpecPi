@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi 0.31.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.32.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
@@ -44,7 +44,7 @@ Everything it touches is written down, versioned, and easy to undo.
 
 ## Measured context
 
-This chart shows first-call context from a clean install: all eight pinned packages, the working agreement, and the skills Pi finds. It has not been re-measured since the command guard returned to a pinned package rather than a native system. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
+This chart shows first-call context from a clean install: all eight pinned packages, the working agreement, and the skills Pi finds, in an interactive session with wishlist collection undecided. A headless session, or one with collection off, also leaves out the gap report and capability request tools. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
 
 The solid rows are measured by us, from the request each setup actually sends through one local test provider. That includes OpenCode, the DeepSeek Harness, and Oh My Pi, all measured as installed. The faded Codex CLI and Claude Code rows come from HarnessTax's published numbers, measured under their own setup. Treat those as a rough reference, not a head-to-head test. These are character counts. They say nothing about tokens, cost, or how well each tool does the job. The research page [breaks down the enabled setup by feature](https://tannermidd.github.io/SpecPi/research/#specpi), so you can see what each switch costs on its own.
 
@@ -52,7 +52,7 @@ The solid rows are measured by us, from the request each setup actually sends th
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/context-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 15,069, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 40,203, Codex CLI 41,616, Oh My Pi 65,816, Claude Code 90,460.">
+      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 11,119, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 35,767, Codex CLI 41,616, Oh My Pi 66,708, Claude Code 90,460.">
     </picture>
   </a>
 </p>
@@ -64,7 +64,7 @@ The gap between the two SpecPi bars comes from a few separate switches, so the e
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/capability-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/capability-chart-light.svg" width="880" alt="Bar chart of tool-schema characters each capability adds: Pi built-ins 2,896, Improvement loop 4,214, Goals 1,315, Browser QA 8,046, Delegation 4,453, Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.">
+      <img src="https://tannermidd.github.io/SpecPi/media/capability-chart-light.svg" width="880" alt="Bar chart of tool-schema characters each capability adds: Pi built-ins 2,896, Improvement loop 1,601, Capability request 995, Goals 1,315, Browser QA 8,234, Delegation 4,453, Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.">
     </picture>
   </a>
 </p>

@@ -151,6 +151,7 @@ const CAPABILITY_GROUPS = [
         label: "Improvement loop",
         names: ["report_capability_gap", "record_harness_contract", "finish_harness_improvement"],
     },
+    { label: "Capability request", names: ["request_capability"] },
     { label: "Goals", names: ["create_goal", "get_goal"] },
     { label: "Browser QA", prefix: "browser_", command: "/browser on" },
     { label: "Delegation", names: ["delegate"], command: "/delegate on" },

@@ -5,8 +5,10 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import {
     CAPABILITY_NAMES,
+    CAPABILITY_REQUEST_TOOL,
     capabilityActive,
     capabilityInstalled,
+    capabilityRequestOffered,
     describeCapabilities,
     findCapability,
     missingTools,
@@ -389,6 +391,17 @@ export default function workflowControls(pi: ExtensionAPI) {
         );
     });
 
+    // Decided once per session, before the first request, so the cached prompt prefix is never
+    // disturbed. See capabilityRequestOffered for why a session may not need the tool at all.
+    const applyCapabilityRequest = (ctx: ExtensionContext) => {
+        const allToolNames = typeof pi.getAllTools === "function" ? pi.getAllTools().map((tool) => tool.name) : [];
+        syncToolGroup(
+            pi,
+            [CAPABILITY_REQUEST_TOOL],
+            capabilityRequestOffered({ interactive: ctx.hasUI, allToolNames }),
+        );
+    };
+
     // Web access ships hidden. A missing or unreadable preference means off, and the
     // gate only ever touches its own four tool names.
     let webAccessEnabled = loadStartupActivation();
@@ -397,6 +410,7 @@ export default function workflowControls(pi: ExtensionAPI) {
     pi.on("session_start", (_event, ctx) => {
         webAccessEnabled = loadStartupActivation();
         applyWebAccess();
+        applyCapabilityRequest(ctx);
         beginRestore(ctx);
     });
 
@@ -561,7 +575,7 @@ export default function workflowControls(pi: ExtensionAPI) {
         if (scope.active) {
             const taskStale = scope.taskDigest !== undefined && currentTask?.digest !== scope.taskDigest;
             guidance.push(
-                `[SPECPI SCOPE]\nDeclared paths: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}\nPending outside-scope paths: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}. Do not describe pending paths as accepted scope.${taskStale ? "\nTask-bound scope is stale; do not widen it automatically." : ""}`,
+                `[SPECPI SCOPE]\nDeclared paths: ${scope.entries.map((item) => `${sanitizePathLabel(item.path)}${item.directory ? "/" : ""}`).join(", ")}\nPending outside-scope paths: ${scope.pending.map(sanitizePathLabel).join(", ") || "none"}. Keep outside-scope findings pending until the human allows once, acknowledges them with /scope accept, expands scope with /scope add, or clears it. Acknowledgement does not widen scope, and pending paths are not accepted scope.${taskStale ? "\nTask-bound scope is stale; do not widen it automatically." : ""}`,
             );
         }
 
@@ -905,9 +919,9 @@ export default function workflowControls(pi: ExtensionAPI) {
     };
 
     pi.registerTool({
-        name: "request_capability",
+        name: CAPABILITY_REQUEST_TOOL,
         label: "Request Capability",
-        description: `Ask the user to restore a withdrawn SpecPi tool group for this session. Available groups — ${describeCapabilities()}. Their tools are hidden to keep each request small, and restoring one mid-session also discards the provider's cached prompt prefix, which measured about 20% of a mid-length attempt's cost in this project's own testing — so request a group only when the current task actually needs it, and continue without it if the user declines. The restored tools are usable from your next message and stay available until the session ends. Delegation is not requestable here; ask the user to run /delegate on.`,
+        description: `Ask the user to restore a withdrawn tool group for this session — ${describeCapabilities()}. Hidden tools cannot be called until restored. Ask only when the task needs one: restoring mid-session discards the cached prompt prefix, about 20% of a mid-length task's cost. Restored tools work from your next message; if the user declines, continue without them. Delegation is not requestable; ask the user to run /delegate on.`,
         parameters: Type.Object(
             {
                 capability: StringEnum(CAPABILITY_NAMES, {

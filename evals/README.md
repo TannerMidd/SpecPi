@@ -219,6 +219,12 @@ when `EVAL_FORWARD_URL` is set.
   ambiguous commits, and resource-limited scheduling. 30-minute budget and a
   documentary 600-turn target. See [Tier 5 tasks and analysis plan](TIER5.md)
   for exact scoring, extractable data, controls, and instrumentation limits.
+- **Tier 6** (long sessions): tasks that declare a `contextWindow` so a
+  harness must compact to finish. Pi-family harnesses get compaction settings
+  that fit the window (`windowedCompaction` in `scripts/eval-harnesses.mjs`):
+  Pi's defaults compact at 7,616 tokens of a 24,000 window and try to keep
+  20,000, so earlier tier 6 runs compacted almost every turn. Runs recorded
+  before this setting are not comparable with later ones.
 
 Three earlier attempts at a hard tier all saturated, and their tasks are kept
 in `evals/archive/` rather than deleted, because why they saturated is the

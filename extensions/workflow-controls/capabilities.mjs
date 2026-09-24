@@ -124,6 +124,23 @@ export function capabilityInstalled(allToolNames, capability) {
     return capability.tools.some((name) => known.has(name));
 }
 
+/** The tool the model uses to ask for a withdrawn group. */
+export const CAPABILITY_REQUEST_TOOL = "request_capability";
+
+/** Whether any requestable group is installed, i.e. whether asking for one could ever succeed. */
+export function anyCapabilityInstalled(allToolNames) {
+    return CAPABILITY_NAMES.some((id) => capabilityInstalled(allToolNames, CAPABILITIES[id]));
+}
+
+/**
+ * Whether to offer the request tool at all. It can only ever ask a human, so a session without one
+ * would carry its schema for a tool that always refuses, and a session with no requestable group
+ * installed has nothing to ask for.
+ */
+export function capabilityRequestOffered({ interactive, allToolNames }) {
+    return interactive === true && anyCapabilityInstalled(allToolNames);
+}
+
 /** One catalogue line per capability, for the tool description and its error results. */
 export function describeCapabilities() {
     return CAPABILITY_NAMES.map((id) => `${id}: ${CAPABILITIES[id].summary}`).join("; ");
