@@ -717,5 +717,13 @@ const report = {
     emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
 };
 console.log("WORKFLOW_CONTROLS_HARNESS=" + JSON.stringify(report));
-fs.rmSync(root, { recursive: true, force: true });
+// On Windows a background job's process tree is killed asynchronously, and a dying `sleep` can hold
+// the temporary tree for a moment after session end. The report above is already written, so
+// cleanup retries and then gives up quietly rather than failing a passing harness over a temp dir.
+try {
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+} catch {
+    // The OS temp cleanup removes it later.
+}
+
 export default function workflowControlsHarness() {}
