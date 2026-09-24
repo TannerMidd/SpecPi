@@ -41,7 +41,7 @@
                     ><a href="#migration"><span>06</span>Update &amp; remove</a
                     ><a href="#development"><span>07</span>Development</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.32.0<br />Chat 0.15.0</div>
+                <div class="index-meta">SpecPi 0.33.0<br />Chat 0.16.0</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -125,6 +125,16 @@ specpi doctor</code></pre>
                         report can ask you; <code>/wishlist on</code> and <code>/wishlist off</code> switch
                         collection and the tool with it. The authoring tools appear only during a
                         <code>/harness-improvement</code> selection.
+                    </p>
+                    <p>
+                        Long commands can run as background jobs, so a long eval or build does not hold the
+                        conversation. The agent starts one with the <code>background</code> tool, which returns at
+                        once; when the job ends, its exit code and last lines of output arrive as a message and the
+                        agent picks it up. <code>/jobs</code> lists them, <code>/jobs output &lt;id&gt;</code> shows
+                        recent output, and <code>/jobs stop &lt;id|all&gt;</code> stops them. Your permission rules
+                        for <code>bash</code> apply to every job, jobs end with the session, and the tool is
+                        offered only in interactive sessions. It is also off while the Jev command guard is on,
+                        because the guard checks <code>bash</code> alone.
                     </p>
                     <p>
                         Provider credentials, service configuration, and permission policies follow the upstream
@@ -226,8 +236,8 @@ specpi doctor</code></pre>
                 <section class="doc-section" id="vscode">
                     <h2>SpecPi Chat for VS Code</h2>
                     <p>
-                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.32.0/specpi-chat-0.15.0.vsix"
-                            >Download Chat 0.15.0</a
+                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.33.0/specpi-chat-0.16.0.vsix"
+                            >Download Chat 0.16.0</a
                         >, then run <strong>Extensions: Install from VSIX…</strong> in VS Code. Open a trusted project,
                         select SpecPi in the Activity Bar, and choose <strong>Connect Pi</strong>.
                     </p>
@@ -308,7 +318,7 @@ npm run check:site</code></pre>
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.32.0">v0.32.0</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.33.0">v0.33.0</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>

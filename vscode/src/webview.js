@@ -178,6 +178,7 @@ function getWebviewHtml({
                 </div>
                 <span id="cache-status" title="Cache hit rate: no reported input token usage yet." aria-label="Cache hit rate: unavailable"><span class="cache-label">Cache hit</span> <strong id="cache-value">—</strong></span>
                 <span id="guard-status" title="Command guard" hidden><span class="cache-label">Guard</span> <strong id="guard-value">—</strong></span>
+                <span id="jobs-status" title="Background jobs" hidden><span class="cache-label">Jobs</span> <strong id="jobs-value">—</strong></span>
                 <span id="token-status" title="Session usage"></span>
                 <button id="stop-button" class="stop-button" type="button" title="Stop response" aria-label="Stop response" hidden>${icon("stop")}<span>Stop</span></button>
             </div>

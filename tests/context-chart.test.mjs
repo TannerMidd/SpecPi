@@ -68,7 +68,7 @@ test("published context charts match the recorded installed-profile measurements
 
     // Measured interactively with collection undecided, so the observation tool and the capability
     // request are offered; the authoring tools need a human /harness-improvement selection.
-    for (const name of ["report_capability_gap", "request_capability"]) {
+    for (const name of ["report_capability_gap", "request_capability", "background"]) {
         assert.ok(defaults.toolNames.includes(name), name);
         assert.ok(enabled.toolNames.includes(name), name);
     }

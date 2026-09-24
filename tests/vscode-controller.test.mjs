@@ -1090,8 +1090,9 @@ test("usage plugin status updates remain per-connection, clear on disconnect, an
 });
 
 test("first-class status keys retain bounded slots when generic runtime status is full", async (t) => {
-    // Three reserved keys now: the two usage plugins and the command guard's own counter. A
-    // session that publishes forty generic widgets must not be able to push any of them out,
+    // Four reserved keys now: the two usage plugins, the command guard's own counter and SpecPi's
+    // running background jobs. A session that publishes forty generic widgets must not be able to
+    // push any of them out,
     // because a readout that vanishes under load is worse than one that was never shown.
     const { controller, client } = await connected(t);
     const update = (key, value) =>
@@ -1104,14 +1105,16 @@ test("first-class status keys retain bounded slots when generic runtime status i
     update("aa-codex-usage", "codex 75%");
     update("provider-usage", "claude 25% 5h");
     update("jev-guard", "jev 12 \u00b7 1 blocked");
+    update("specpi-background", "2 background jobs running");
     assert.equal(controller.state.runtimeStatus["aa-codex-usage"], "codex 75%");
     assert.equal(controller.state.runtimeStatus["provider-usage"], "claude 25% 5h");
     assert.equal(controller.state.runtimeStatus["jev-guard"], "jev 12 \u00b7 1 blocked");
-    assert.equal(Object.keys(controller.state.runtimeStatus).length, 27);
+    assert.equal(controller.state.runtimeStatus["specpi-background"], "2 background jobs running");
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 28);
     update("generic-overflow", "Not admitted");
     update("provider-usage", "checking");
     update("jev-guard", "jev 13 \u00b7 1 blocked");
-    assert.equal(Object.keys(controller.state.runtimeStatus).length, 27);
+    assert.equal(Object.keys(controller.state.runtimeStatus).length, 28);
     assert.equal(controller.state.runtimeStatus["provider-usage"], "checking");
     assert.equal(controller.state.runtimeStatus["jev-guard"], "jev 13 \u00b7 1 blocked");
     update("aa-codex-usage", undefined);
@@ -1119,6 +1122,7 @@ test("first-class status keys retain bounded slots when generic runtime status i
     // The guard clears its own line when it is switched off, and that has to free the slot like
     // any other: a stale count beside a guard that is no longer gating is a lie about the session.
     update("jev-guard", undefined);
+    update("specpi-background", undefined);
     update("generic-overflow", "Still not admitted");
     assert.equal(Object.keys(controller.state.runtimeStatus).length, 24);
     assert.equal(Object.hasOwn(controller.state.runtimeStatus, "jev-guard"), false);

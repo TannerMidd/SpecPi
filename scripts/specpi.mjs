@@ -24,6 +24,12 @@ import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
 import { applyInertConfig as applyGuardConfig, configPath as guardConfigPath } from "./jev-guard.mjs";
+import {
+    applyShellToolMapping,
+    manualInstruction as shellToolInstruction,
+    permissionConfigFile,
+    removeShellToolMapping,
+} from "./permission-shell-tools.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const VERSION = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
@@ -41,6 +47,7 @@ const resourcePaths = [
     "extensions/workflow-controls/web-access.mjs",
     "extensions/workflow-controls/capabilities.mjs",
     "extensions/workflow-controls/capability-policy.mjs",
+    "extensions/workflow-controls/background.mjs",
     "extensions/tool-wishlist/index.ts",
     "extensions/tool-wishlist/core.mjs",
     "extensions/tool-wishlist/verification.mjs",
@@ -195,6 +202,9 @@ function printPlan(options = {}) {
     }
 
     console.log(`  ${agentsPath} (SpecPi marker block only)\n  ${manifestPath}`);
+    console.log(
+        `  ${permissionConfigFile(agentDir)} (one shellTools entry, only when the permission system is installed, so bash rules apply to background jobs)`,
+    );
     const wanted = new Set(managedFiles().map(([, target]) => target));
     for (const target of Object.keys(manifest?.files || {})) {
         if (!wanted.has(target)) {
@@ -301,6 +311,9 @@ async function mutate(options, operation) {
         const watched = [
             agentsPath,
             manifestPath,
+            // The permission system's global config: one shellTools entry, backed up and rolled back
+            // with everything else (see permission-shell-tools.mjs).
+            permissionConfigFile(agentDir),
             ...files.map(([, target]) => target),
             ...Object.keys(previous?.files || {}),
         ];
@@ -378,6 +391,24 @@ async function mutate(options, operation) {
                 packagesKeyBeforeExists: Object.hasOwn(before, "packages"),
                 packageChanges: packageChanges(before.packages || [], after.packages || []),
             };
+        }
+
+        // Tell the permission system that the background tool is a shell, so every bash rule applies
+        // to it. Outside the package branch because an existing base keeps its permission system
+        // under --skip-package-install too.
+        if (operation !== "uninstall") {
+            const mapping = applyShellToolMapping(agentDir);
+            if (mapping.reason === "unreadable") {
+                warnings.push(
+                    `Background jobs stay off: could not update the permission system's config because ${mapping.detail}. To enable them, ${shellToolInstruction(agentDir)}.`,
+                );
+            } else if (mapping.replaced) {
+                warnings.push(
+                    `Replaced a "background" shellTools entry in ${permissionConfigFile(agentDir)} that did not gate its command argument; bash rules now apply to background jobs.`,
+                );
+            }
+        } else {
+            removeShellToolMapping(agentDir);
         }
 
         injectTestFailure("after-settings");

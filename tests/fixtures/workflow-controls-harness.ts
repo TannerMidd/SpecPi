@@ -38,6 +38,8 @@ const emitted: any[] = [];
 const selectAnswers: string[] = [];
 const renderers = new Map<string, any>();
 let editorValue = "src/";
+let commandNames: string[] | undefined;
+let projectTrusted = false;
 let confirmAnswer = true;
 let confirmPrompts = 0;
 // Browser QA is a separate package. Start with it absent so the loader has to report an
@@ -79,6 +81,11 @@ const pi: any = {
     },
     sendMessage(message: any, options: any) {
         messages.push({ message, options });
+    },
+    // Mirror Pi: the slash commands every loaded extension registered. Unset means an older Pi
+    // without the call, which background admission must treat as unknown.
+    get getCommands() {
+        return commandNames === undefined ? undefined : () => commandNames!.map((name) => ({ name }));
     },
     events: {
         on() {},
@@ -124,6 +131,7 @@ const ctx: any = {
     mode: "tui",
     hasUI: true,
     isIdle: () => true,
+    isProjectTrusted: () => projectTrusted,
     get sessionManager() {
         return sessionManager;
     },
@@ -520,6 +528,113 @@ for (const handler of events.get("session_start") || []) {
 
 const capabilityRequestReofferedInteractive = activeTools.includes("request_capability");
 
+// Background jobs. Admission fails closed on every condition, and a started job really runs in
+// Pi's own shell runner and reports back as a follow-up message.
+const background = tools.get("background");
+const startSession = async (context: any = ctx) => {
+    for (const handler of events.get("session_start") || []) {
+        await handler({}, context);
+    }
+};
+
+const startJob = async (command: string, context: any = ctx) =>
+    await background.execute("background-call", { command, label: "harness" }, undefined, undefined, context);
+const waitFor = async (predicate: () => boolean, ms = 20000) => {
+    const deadline = Date.now() + ms;
+    while (!predicate() && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    return predicate();
+};
+
+const jobMessages = () => messages.filter((item) => item.message?.customType === "specpi-background");
+const guardFile = path.join(os.homedir(), ".pi", "jev-guard.json");
+const permissionFile = path.join(agentDir, "extensions", "pi-permission-system", "config.json");
+const projectPermissionFile = path.join(ctx.cwd, ".pi", "extensions", "pi-permission-system", "config.json");
+const writeJson = (file: string, value: unknown) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(value));
+};
+
+commandNames = undefined;
+await startSession();
+const backgroundWithdrawnWhenCommandsUnknown = !activeTools.includes("background");
+const backgroundRefusedWhenCommandsUnknown = (await startJob("echo no")).details?.started === false;
+
+commandNames = ["scope", "jobs"];
+await startSession();
+const backgroundOfferedWithoutGates = activeTools.includes("background");
+const backgroundRefusedHeadless = (await startJob("echo no", { ...ctx, hasUI: false })).details?.started === false;
+
+const started = await startJob("echo background-ok");
+const backgroundStarted = started.details?.started === true && started.isError !== true;
+const backgroundReported = await waitFor(() => jobMessages().length === 1);
+const firstJobReport = jobMessages()[0];
+const backgroundReportCarriesOutput =
+    /exit code 0/u.test(firstJobReport?.message?.content ?? "") &&
+    /background-ok/u.test(firstJobReport?.message?.content ?? "");
+const backgroundReportTriggersTurn =
+    firstJobReport?.message?.display === true &&
+    firstJobReport?.options?.triggerTurn === true &&
+    firstJobReport?.options?.deliverAs === "followUp";
+
+// The guard's own default is on; only a saved off lets jobs start while it is installed.
+commandNames = ["scope", "jobs", "jev-guard"];
+fs.rmSync(guardFile, { force: true });
+await startSession();
+const backgroundWithdrawnWithDefaultGuard = !activeTools.includes("background");
+const backgroundRefusedWithDefaultGuard = /command guard is on/u.test(
+    (await startJob("echo no")).content?.[0]?.text ?? "",
+);
+writeJson(guardFile, { enabled: false });
+await startSession();
+const backgroundOfferedWithGuardSavedOff = activeTools.includes("background");
+writeJson(guardFile, { enabled: true });
+const backgroundRefusedWithGuardSavedOn = (await startJob("echo no")).details?.started === false;
+writeJson(guardFile, { enabled: false });
+
+// The permission system must apply bash rules to the command, and a trusted project cannot remap it.
+commandNames = ["scope", "jobs", "jev-guard", "permission-system"];
+fs.rmSync(permissionFile, { force: true });
+const backgroundRefusedWithoutMapping = /does not yet apply bash rules/u.test(
+    (await startJob("echo no")).content?.[0]?.text ?? "",
+);
+writeJson(permissionFile, { shellTools: { background: { commandArgument: "command" } } });
+await startSession();
+const backgroundOfferedWithMapping = activeTools.includes("background");
+writeJson(projectPermissionFile, { shellTools: { background: { commandArgument: "label" } } });
+const backgroundIgnoresUntrustedProject = (await startJob("echo trusted-scope-ok")).details?.started === true;
+projectTrusted = true;
+const backgroundRefusedWhenTrustedProjectRemaps = (await startJob("echo no")).details?.started === false;
+projectTrusted = false;
+fs.rmSync(path.dirname(projectPermissionFile), { recursive: true, force: true });
+fs.writeFileSync(
+    permissionFile,
+    '{ // comments are allowed\n "shellTools": { "background": { "commandArgument": "command" } } }',
+);
+const backgroundReadsCommentedConfig = (await startJob("echo commented-ok")).details?.started === true;
+await waitFor(() => jobMessages().length >= 3);
+
+// A user stop reports without starting a turn; ending the session stops the rest and deletes logs.
+const long = await startJob("sleep 30");
+const reportsBeforeStop = jobMessages().length;
+await commands.get("jobs").handler(`stop ${long.details.id}`, ctx);
+const backgroundStopReported = await waitFor(() => jobMessages().length === reportsBeforeStop + 1);
+const stopReport = jobMessages().at(-1);
+const backgroundStopWaitsForNextTurn =
+    stopReport?.options?.deliverAs === "nextTurn" &&
+    stopReport?.options?.triggerTurn !== true &&
+    /stopped by the user/u.test(stopReport?.message?.content ?? "");
+const orphan = await startJob("sleep 30");
+const orphanLogDir = path.dirname(orphan.details.logPath);
+for (const handler of events.get("session_shutdown") || []) {
+    await handler({}, ctx);
+}
+
+const backgroundEndsWithSession =
+    (await waitFor(() => !fs.existsSync(orphanLogDir))) && jobMessages().length === reportsBeforeStop + 1;
+
 const report = {
     commands: [...commands.keys()].sort(),
     toolNames: [...tools.keys()].sort(),
@@ -579,6 +694,26 @@ const report = {
     capabilityRequestOfferedInteractive,
     capabilityRequestWithdrawnHeadless,
     capabilityRequestReofferedInteractive,
+    backgroundWithdrawnWhenCommandsUnknown,
+    backgroundRefusedWhenCommandsUnknown,
+    backgroundOfferedWithoutGates,
+    backgroundRefusedHeadless,
+    backgroundStarted,
+    backgroundReported,
+    backgroundReportCarriesOutput,
+    backgroundReportTriggersTurn,
+    backgroundWithdrawnWithDefaultGuard,
+    backgroundRefusedWithDefaultGuard,
+    backgroundOfferedWithGuardSavedOff,
+    backgroundRefusedWithGuardSavedOn,
+    backgroundRefusedWithoutMapping,
+    backgroundOfferedWithMapping,
+    backgroundIgnoresUntrustedProject,
+    backgroundRefusedWhenTrustedProjectRemaps,
+    backgroundReadsCommentedConfig,
+    backgroundStopReported,
+    backgroundStopWaitsForNextTurn,
+    backgroundEndsWithSession,
     emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
 };
 console.log("WORKFLOW_CONTROLS_HARNESS=" + JSON.stringify(report));

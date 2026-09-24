@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi 0.32.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.33.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
@@ -38,6 +38,7 @@ It focuses on five things:
 - **Accuracy:** exact version pins, checksums on state, rollback on failure, and proof over promises
 - **Improvement:** local notes become small, checked changes through `/harness-improvement`
 - **Efficiency:** delegation, persistent goals, and browser QA handled by the right tool for the job
+- **Keep talking:** long evals, builds and servers can run as background jobs, so the conversation is not stuck until they finish. The agent hears back when each one ends, and `/jobs` lists or stops them
 - **Lean default:** web access, browser QA, and delegation stay off until you need them. Turn them on for a session with `/webaccess on`, `/browser on`, and `/delegate on` — or let the agent ask when it hits the need, and answer the prompt
 
 Everything it touches is written down, versioned, and easy to undo.
@@ -52,7 +53,7 @@ The solid rows are measured by us, from the request each setup actually sends th
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/context-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 11,119, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 35,767, Codex CLI 41,616, Oh My Pi 66,708, Claude Code 90,460.">
+      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 11,777, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 36,425, Codex CLI 41,616, Oh My Pi 66,708, Claude Code 90,460.">
     </picture>
   </a>
 </p>
@@ -64,7 +65,7 @@ The gap between the two SpecPi bars comes from a few separate switches, so the e
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/capability-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/capability-chart-light.svg" width="880" alt="Bar chart of tool-schema characters each capability adds: Pi built-ins 2,896, Improvement loop 1,601, Capability request 995, Goals 1,315, Browser QA 8,234, Delegation 4,453, Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.">
+      <img src="https://tannermidd.github.io/SpecPi/media/capability-chart-light.svg" width="880" alt="Bar chart of tool-schema characters each capability adds: Pi built-ins 2,896, Improvement loop 1,601, Capability request 995, Background jobs 657, Goals 1,315, Browser QA 8,234, Delegation 4,453, Web access 11,298. Browser QA, Delegation, Web access are hidden until switched on.">
     </picture>
   </a>
 </p>

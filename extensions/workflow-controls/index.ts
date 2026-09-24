@@ -1,5 +1,10 @@
 import path from "node:path";
-import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+    SettingsManager,
+    createLocalBashOperations,
+    type ExtensionAPI,
+    type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
@@ -14,6 +19,23 @@ import {
     missingTools,
 } from "./capabilities.mjs";
 import { allowCapability, askCapability, autoAllowed, loadAutoAllowed, policyPath } from "./capability-policy.mjs";
+import {
+    BACKGROUND_MESSAGE,
+    BACKGROUND_STATUS,
+    BACKGROUND_TOOL,
+    admission as backgroundAdmissionFor,
+    agentDirectory as backgroundAgentDirectory,
+    completionText,
+    createJobManager,
+    effectiveShellMapping,
+    guardEnabled,
+    listText,
+    pruneStaleLogs,
+    sessionLogDir,
+    startedText,
+    statusText,
+    tailOf,
+} from "./background.mjs";
 import {
     canonicalRoot,
     compareWorktreeSnapshots,
@@ -407,16 +429,104 @@ export default function workflowControls(pi: ExtensionAPI) {
     let webAccessEnabled = loadStartupActivation();
     const applyWebAccess = () => syncToolGroup(pi, WEB_TOOL_NAMES, webAccessEnabled);
 
+    // Background jobs. The admission rules live in background.mjs and are re-checked at every start;
+    // the tool is only offered to a session where a start could succeed, decided before the first
+    // request so the cached prompt prefix is never disturbed.
+    let jobs: ReturnType<typeof createJobManager> | undefined;
+    let jobsContext: ExtensionContext | undefined;
+    const hasCommand = (names: string[] | undefined, name: string) =>
+        names?.some((entry) => entry === name || entry.startsWith(`${name}:`)) === true;
+    const backgroundAdmission = (ctx: ExtensionContext, running = 0) => {
+        let names: string[] | undefined;
+        try {
+            names =
+                typeof pi.getCommands === "function" ? pi.getCommands().map((command: any) => command.name) : undefined;
+        } catch {
+            names = undefined;
+        }
+
+        const trusted = typeof ctx.isProjectTrusted === "function" && ctx.isProjectTrusted() === true;
+        const permissionInstalled = hasCommand(names, "permission-system");
+        let mapping;
+        let mappingError;
+        if (permissionInstalled) {
+            try {
+                mapping = effectiveShellMapping({ agentDir: backgroundAgentDirectory(), cwd: ctx.cwd, trusted });
+            } catch (error) {
+                mappingError = safeMessage(error);
+            }
+        }
+
+        return backgroundAdmissionFor({
+            interactive: ctx.hasUI === true,
+            commandsKnown: names !== undefined,
+            guardInstalled: hasCommand(names, "jev-guard"),
+            guard: guardEnabled({ cwd: ctx.cwd, trusted }),
+            permissionInstalled,
+            mapping,
+            mappingError,
+            running,
+        });
+    };
+
+    const publishJobStatus = () => {
+        try {
+            jobsContext?.ui.setStatus(BACKGROUND_STATUS, statusText(jobs?.list() ?? []));
+        } catch {
+            // A status line is a courtesy; a closed UI must not fail the job.
+        }
+    };
+
+    const reportJob = (job: any) => {
+        publishJobStatus();
+        // A job the user stopped is news for the next prompt, not a reason to start a turn.
+        const stoppedByUser = job.state === "stopped" && job.stoppedBy === "user";
+        pi.sendMessage(
+            {
+                customType: BACKGROUND_MESSAGE,
+                content: completionText(job),
+                display: true,
+                details: { id: job.id, state: job.state, exitCode: job.exitCode, logPath: job.logPath },
+            },
+            stoppedByUser ? { deliverAs: "nextTurn" } : { triggerTurn: true, deliverAs: "followUp" },
+        );
+    };
+
+    // Pi's own local runner, with the session's shell settings, so a job starts exactly as `bash`
+    // would run it and its process tree is cleaned up the same way when Pi exits.
+    const runJob = (command: string, cwd: string, options: any) => {
+        const settings = SettingsManager.create(cwd, backgroundAgentDirectory());
+        const prefix = settings.getShellCommandPrefix();
+
+        return createLocalBashOperations({ shellPath: settings.getShellPath() }).exec(
+            prefix ? `${prefix}\n${command}` : command,
+            cwd,
+            options,
+        );
+    };
+
+    const endJobs = () => {
+        jobs?.close();
+        jobs = undefined;
+        publishJobStatus();
+    };
+
     pi.on("session_start", (_event, ctx) => {
         webAccessEnabled = loadStartupActivation();
         applyWebAccess();
         applyCapabilityRequest(ctx);
+        endJobs();
+        jobsContext = ctx;
+        pruneStaleLogs();
+        syncToolGroup(pi, [BACKGROUND_TOOL], backgroundAdmission(ctx).ok);
         beginRestore(ctx);
     });
 
     pi.on("session_tree", (_event, ctx) => beginRestore(ctx));
 
     pi.on("session_shutdown", (_event, ctx) => {
+        endJobs();
+        jobsContext = undefined;
         sessionGeneration += 1;
         snapshots.clear();
         latestSnapshot = undefined;
@@ -1029,6 +1139,98 @@ export default function workflowControls(pi: ExtensionAPI) {
                 ],
                 details: { activated: true, capability: capability.id, tools: [...capability.tools], standing },
             };
+        },
+    });
+
+    pi.registerTool({
+        name: BACKGROUND_TOOL,
+        label: "Background",
+        description:
+            "Start a long-running shell command (an eval, build or server) without blocking the conversation. It returns at once; the exit code and last lines of output arrive later as a message. Use bash for anything quick, or when the next step needs the output. Bash permission rules apply.",
+        parameters: Type.Object(
+            {
+                command: Type.String({
+                    description: "Shell command, run as bash would run it in the session directory",
+                }),
+                label: Type.Optional(Type.String({ maxLength: 80, description: "Short name shown to the user" })),
+            },
+            { additionalProperties: false },
+        ),
+        async execute(_toolCallId, params: any, _signal, _onUpdate, ctx: ExtensionContext) {
+            const verdict = backgroundAdmission(ctx, jobs?.running() ?? 0);
+            if (!verdict.ok) {
+                return {
+                    content: [{ type: "text" as const, text: verdict.reason }],
+                    isError: true,
+                    details: { started: false },
+                };
+            }
+
+            const command = typeof params.command === "string" ? params.command : "";
+            if (command.trim().length === 0) {
+                return {
+                    content: [{ type: "text" as const, text: "Give the command to run." }],
+                    isError: true,
+                    details: { started: false },
+                };
+            }
+
+            jobsContext = ctx;
+            jobs ??= createJobManager({ run: runJob, logDir: sessionLogDir(), report: reportJob });
+            const job = jobs.start({ command, cwd: ctx.cwd, label: params.label });
+            publishJobStatus();
+
+            return {
+                content: [{ type: "text" as const, text: startedText(job) }],
+                details: { started: true, id: job.id, logPath: job.logPath },
+            };
+        },
+    });
+
+    pi.registerCommand("jobs", {
+        description: "List, show or stop this session's background jobs",
+        getArgumentCompletions: (prefix: string) =>
+            ["list", "output", "stop"]
+                .filter((value) => value.startsWith(prefix.trim().toLowerCase()))
+                .map((value) => ({ value, label: value })),
+        handler: async (args, ctx) => {
+            const [actionRaw = "list", target] = args.trim().split(/\s+/u).filter(Boolean);
+            const action = actionRaw.toLowerCase();
+            const all = jobs?.list() ?? [];
+            if (action === "list") {
+                ctx.ui.notify(listText(all), "info");
+
+                return;
+            }
+
+            if (action === "output") {
+                const job = target ? jobs?.get(target) : undefined;
+                if (!job) {
+                    ctx.ui.notify("Usage: /jobs output <id>. Run /jobs to see the ids.", "error");
+
+                    return;
+                }
+
+                ctx.ui.notify(`${tailOf(job.tail) || "(no output yet)"}\n\nFull log: ${job.logPath}`, "info");
+
+                return;
+            }
+
+            if (action === "stop") {
+                const targets =
+                    target === "all" ? all.filter((job) => job.state === "running") : [jobs?.get(target ?? "")];
+                const stopped = targets.filter((job) => job && jobs?.stop(job.id, "user")).map((job) => job!.id);
+                ctx.ui.notify(
+                    stopped.length > 0
+                        ? `Stopping background job${stopped.length === 1 ? "" : "s"} ${stopped.join(", ")}.`
+                        : "No running job matches. Usage: /jobs stop <id|all>.",
+                    stopped.length > 0 ? "info" : "error",
+                );
+
+                return;
+            }
+
+            ctx.ui.notify("Usage: /jobs [list|output <id>|stop <id|all>]", "error");
         },
     });
 
