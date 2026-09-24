@@ -7,7 +7,7 @@ Chat uses the models, provider accounts, and extensions you've already set up in
 ## Get started
 
 1. **Set up Pi.** Install [Pi](https://github.com/earendil-works/pi) and confirm it runs in a terminal. You can sign in to a provider there with `/login`, or let Chat open that terminal for you in step 3.
-2. **Open your project.** Download the [SpecPi Chat 0.15.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.31.0/specpi-chat-0.15.0.vsix), run **Extensions: Install from VSIX…** in VS Code, then open and trust your project folder.
+2. **Open your project.** Download the [SpecPi Chat 0.15.0 VSIX](https://github.com/TannerMidd/SpecPi/releases/download/v0.32.0/specpi-chat-0.15.0.vsix), run **Extensions: Install from VSIX…** in VS Code, then open and trust your project folder.
 3. **Start chatting.** Click **SpecPi** in the Activity Bar and choose **Connect Pi**. If Pi has no provider yet, Chat says so and offers **Sign in to a provider**, which opens Pi in a terminal for `/login` and reloads Pi when you close it. Pick a model and send your first message.
 
 Requires VS Code **1.96+**, Node.js **22.19+**, and Pi **0.84.4** for the reviewed default base. For SSH, WSL, or containers, Pi and the extension need to be installed on the workspace host. Browser-only VS Code isn't supported.

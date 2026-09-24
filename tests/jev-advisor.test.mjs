@@ -46,7 +46,19 @@ import * as untrusted from "../extensions/jev-advisor/questions/untrusted.mjs";
 import * as capabilities from "../extensions/jev-advisor/questions/capabilities.mjs";
 import { GUARD_PIN, applyInertConfig, configPath, desiredConfig, readConfig } from "../scripts/jev-guard.mjs";
 import { basePackages } from "../scripts/packages.mjs";
-import { AUTHORING_TOOL_NAMES, syncAuthoringTools } from "../extensions/tool-wishlist/authoring-tools.mjs";
+import {
+    AUTHORING_TOOL_NAMES,
+    OBSERVATION_TOOL_NAME,
+    improvementSkillPath,
+    observationToolWanted,
+    syncAuthoringTools,
+    syncObservationTool,
+} from "../extensions/tool-wishlist/authoring-tools.mjs";
+import {
+    BROWSER_TOOL_NAMES,
+    CAPABILITY_REQUEST_TOOL,
+    capabilityRequestOffered,
+} from "../extensions/workflow-controls/capabilities.mjs";
 
 /** Every test gets its own agent directory so nothing reads or writes the developer's real state. */
 function withAgentDir(run) {
@@ -1471,7 +1483,7 @@ test("schema 4 drops every trace of the guard, from either shape it took", () =>
     });
 });
 
-test("authoring tools follow the selection, and the observation tool is never withdrawn", () => {
+test("authoring tools follow the selection and leave every other tool alone", () => {
     let active = ["bash", "read", "report_capability_gap", "request_capability", ...AUTHORING_TOOL_NAMES];
     const pi = {
         getActiveTools: () => [...active],
@@ -1482,8 +1494,8 @@ test("authoring tools follow the selection, and the observation tool is never wi
 
     assert.equal(syncAuthoringTools(pi, false), true);
     assert.deepEqual(active, ["bash", "read", "report_capability_gap", "request_capability"]);
-    assert.ok(active.includes("report_capability_gap"), "the observation tool must always stay offered");
-    assert.ok(active.includes("request_capability"), "the escape hatch must always stay offered");
+    assert.ok(active.includes("report_capability_gap"), "authoring sync must not touch the observation tool");
+    assert.ok(active.includes("request_capability"), "authoring sync must not touch the escape hatch");
 
     // Idempotent: a no-op must not churn the active set, which would cost the cached prefix.
     assert.equal(syncAuthoringTools(pi, false), false);
@@ -1495,6 +1507,49 @@ test("authoring tools follow the selection, and the observation tool is never wi
 
     assert.equal(syncAuthoringTools(pi, true), false);
     assert.equal(syncAuthoringTools({}, true), false, "an API without the tool accessors is a no-op");
+});
+
+test("the observation tool is offered only where a report could be recorded", () => {
+    // On records; undecided asks the human on first use, so it needs one; off never records.
+    assert.equal(observationToolWanted("on", true), true);
+    assert.equal(observationToolWanted("on", false), true);
+    assert.equal(observationToolWanted("undecided", true), true);
+    assert.equal(observationToolWanted("undecided", false), false);
+    assert.equal(observationToolWanted("off", true), false);
+    assert.equal(observationToolWanted("off", false), false);
+
+    let active = ["bash", "read", OBSERVATION_TOOL_NAME, CAPABILITY_REQUEST_TOOL];
+    const pi = {
+        getActiveTools: () => [...active],
+        setActiveTools: (next) => {
+            active = [...next];
+        },
+    };
+    assert.equal(syncObservationTool(pi, false), true);
+    assert.deepEqual(active, ["bash", "read", CAPABILITY_REQUEST_TOOL], "only the observation tool leaves");
+    assert.equal(syncObservationTool(pi, false), false, "a no-op must not churn the cached prefix");
+    assert.equal(syncObservationTool(pi, true), true);
+    assert.ok(active.includes(OBSERVATION_TOOL_NAME));
+});
+
+test("the capability request is offered only where a human could grant an installed group", () => {
+    const withBrowser = ["read", "bash", ...BROWSER_TOOL_NAMES];
+    assert.equal(capabilityRequestOffered({ interactive: true, allToolNames: withBrowser }), true);
+    assert.equal(capabilityRequestOffered({ interactive: false, allToolNames: withBrowser }), false);
+    assert.equal(capabilityRequestOffered({ interactive: undefined, allToolNames: withBrowser }), false);
+    assert.equal(
+        capabilityRequestOffered({ interactive: true, allToolNames: ["read", "bash"] }),
+        false,
+        "a core-only install has nothing to ask for",
+    );
+});
+
+test("the improvement skill stays out of the model's skill list and is reachable by path", () => {
+    const file = improvementSkillPath();
+    assert.ok(fs.existsSync(file), file);
+    const frontmatter = fs.readFileSync(file, "utf8").split("---")[1];
+    assert.match(frontmatter, /^name: specpi-improve$/mu);
+    assert.match(frontmatter, /^disable-model-invocation: true$/mu);
 });
 
 test("required evidence survives budgeting, or the broker abstains without spending a call", async () => {

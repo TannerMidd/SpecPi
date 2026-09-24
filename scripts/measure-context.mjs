@@ -185,6 +185,40 @@ async function startProvider() {
 }
 
 /** Tool schemas and instruction text from one recorded request body. */
+/**
+ * Where a Pi request's instruction characters go, split at the section openings Pi's system prompt
+ * builder emits: plain headings in the pinned Pi, XML-style tags in later releases. Each section runs
+ * to the next one; the preamble and working directory are `other`. Pi rows only: foreign harnesses
+ * structure their prompts differently, and a breakdown of theirs would be a guess.
+ */
+const SECTION_MARKERS = Object.freeze({
+    tools: ["<tools>", "Available tools:"],
+    guidelines: ["<rules>", "Guidelines:"],
+    docs: ["<docs>", "Pi documentation ("],
+    project_context: ["<project_context>"],
+    skills: ["<skills>", "The following skills provide"],
+    other: ["<cwd>", "Current working directory:"],
+});
+
+function instructionSections(text) {
+    const starts = [];
+    for (const [name, markers] of Object.entries(SECTION_MARKERS)) {
+        const found = markers.map((marker) => text.indexOf(marker)).filter((index) => index !== -1);
+        if (found.length > 0) {
+            starts.push({ name, index: Math.min(...found) });
+        }
+    }
+
+    starts.sort((a, b) => a.index - b.index);
+    const sections = Object.fromEntries(Object.keys(SECTION_MARKERS).map((name) => [name, 0]));
+    sections.other = starts[0]?.index ?? text.length;
+    starts.forEach(({ name, index }, position) => {
+        sections[name] += (starts[position + 1]?.index ?? text.length) - index;
+    });
+
+    return sections;
+}
+
 function summarize(body) {
     const tools = body.tools ?? [];
     const instructions = body.messages.filter((message) => ["system", "developer"].includes(message.role));
@@ -302,18 +336,26 @@ async function measure(label, selectedAgentDir, enabled = false) {
         const { toolNames } = summary;
         if (selectedAgentDir === agentDir) {
             assert.ok(instructionText.includes("SpecPi Working Agreement"), "Installed AGENTS guidance missing");
-            assert.ok(instructionText.includes("specpi-improve"), "Installed skill discovery missing");
+            // The improvement skill runs only from a /harness-improvement selection, so it is kept out
+            // of the model's skill list; `check:pi-package` still proves Pi discovers it.
+            assert.ok(!instructionText.includes("specpi-improve"), "Improvement skill leaked into the prompt");
             assert.equal(toolNames.includes("browser_open"), enabled);
             assert.equal(
                 toolNames.includes("delegate"),
                 enabled,
                 JSON.stringify({ toolNames, events: events.filter((event) => event.type === "extension_ui_request") }),
             );
-            // Wishlist tools are always active. Optional capabilities ship hidden: the
-            // enabled profile opted browser QA, delegation and web access in; the
+            // An interactive session with collection undecided can still be asked for consent, so the
+            // observation tool and the capability request are offered. The authoring tools need a
+            // human /harness-improvement selection, and there is none here. Optional capabilities
+            // ship hidden: the enabled profile opted browser QA, delegation and web access in; the
             // default profile must contain none of them.
-            for (const tool of ["report_capability_gap", "record_harness_contract", "finish_harness_improvement"]) {
+            for (const tool of ["report_capability_gap", "request_capability"]) {
                 assert.ok(toolNames.includes(tool), `Installed tool missing: ${tool}`);
+            }
+
+            for (const tool of ["record_harness_contract", "finish_harness_improvement"]) {
+                assert.ok(!toolNames.includes(tool), `Authoring tool offered without a selection: ${tool}`);
             }
 
             for (const tool of ["web_search", "source_check", "fetch_content", "get_search_content"]) {
@@ -325,6 +367,7 @@ async function measure(label, selectedAgentDir, enabled = false) {
             label,
             harness: "Pi",
             ...summary,
+            instructionSections: instructionSections(instructionText),
             installedGuidance: selectedAgentDir === agentDir,
             browserAndDelegationEnabled: enabled,
         };
@@ -582,7 +625,11 @@ process.exit(0);`,
     assert.ok(line, "Missing resource report");
     const resources = JSON.parse(line.slice("RESOURCES=".length));
     assert.deepEqual(resources.errors, []);
-    assert.equal(resources.count, basePackages.length + 2);
+    // Every pinned package brings one extension, plus SpecPi's own first-party extension families.
+    const firstParty = fs
+        .readdirSync(path.join(root, "extensions"), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory()).length;
+    assert.equal(resources.count, basePackages.length + firstParty);
     const results = [];
     for (const [label, selected, enabled] of [
         ["Pi (stock)", stockDir, false],
@@ -658,7 +705,7 @@ process.exit(0);`,
         ...(ompCli ? { ohMyPiVersion: ompVersion } : {}),
         ...(ocCli ? { opencodeVersion: ocVersion } : {}),
         ...(dshCli ? { deepseekHarnessVersion: dshVersion } : {}),
-        method: "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on; the improvement loop's wishlist tools are always active, gated at execution by collection consent and the human selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. The DeepSeek Harness is a separate Node application measured as installed on the same terms with this machine's own harness home excluded through DSH_HOME; only the provider route and default model are declared, through its own patch layer, and its auxiliary session-title request is excluded because it carries no tool schema. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
+        method: "Actual first OpenAI-completions request to a local synthetic provider. Compact tool JSON plus system/developer text, counted as JavaScript UTF-16 code units. User prompt and transport envelope excluded. Empty workspace, disposable home, all installed resources and AGENTS enabled. No personal settings or credentials. Optional capabilities ship hidden: browser QA, delegation and web access appear only after /browser on, /delegate on and /webaccess on. Pi runs in RPC mode, which is interactive, with wishlist collection undecided, so the observation tool and the capability request are offered; a headless session or one with collection off omits them, and the authoring tools appear only during a human /harness-improvement selection. The enabled profile runs /browser on, /delegate on and /webaccess on; no goal, scope or improvement selection is active. Oh My Pi is a separate Bun-based fork of Pi, measured as installed on the same terms with only local rule and extension discovery disabled; nothing is added to it and its figure is ours, not a published one. OpenCode is a separate Bun-compiled binary, measured as installed on the same terms with this machine's own config, auth and data excluded through XDG redirects; its session title is pinned so the turn sends exactly one model call, the conversation request. The DeepSeek Harness is a separate Node application measured as installed on the same terms with this machine's own harness home excluded through DSH_HOME; only the provider route and default model are declared, through its own patch layer, and its auxiliary session-title request is excluded because it carries no tool schema. Counts include temporary path text and may vary with host, path lengths, date and provider encoding. Not a token, cost or task-quality measurement.",
         results,
     };
     console.log(

@@ -54,6 +54,33 @@ function declaredWindow(task) {
     return task?.contextWindow === 200000 ? null : (task?.contextWindow ?? null);
 }
 
+const EVAL_MAX_TOKENS = 8192;
+
+/**
+ * Compaction settings that fit a declared window, for the Pi family.
+ *
+ * Pi's defaults assume a large window: it compacts once context passes the window minus a 16,384
+ * token reserve, then keeps the latest 20,000 tokens. Under tier 6's 24,000-token window that is a
+ * trigger at 7,616 tokens and a keep target larger than the window itself, so every Pi-family
+ * harness compacted almost every turn and could reclaim almost nothing -- and the fixed prompt, which
+ * compaction never removes, took most of what was left. The window test was measuring that
+ * misconfiguration rather than retention.
+ *
+ * The reserve matches the model's declared output limit, which is what it exists to hold, and the
+ * keep target is half of what remains. Null when no window is declared, so tiers 1 to 5 keep Pi's
+ * defaults and their published config files are unchanged.
+ */
+export function windowedCompaction(contextWindow, maxTokens = EVAL_MAX_TOKENS) {
+    if (!Number.isSafeInteger(contextWindow) || contextWindow <= 0) {
+        return null;
+    }
+
+    const reserveTokens = Math.min(16384, maxTokens);
+    const keepRecentTokens = Math.min(20000, Math.floor((contextWindow - reserveTokens) / 2));
+
+    return keepRecentTokens > 0 ? { reserveTokens, keepRecentTokens } : null;
+}
+
 function providerConfig(proxyUrl, model, contextWindow) {
     return JSON.stringify({
         providers: {
@@ -68,7 +95,7 @@ function providerConfig(proxyUrl, model, contextWindow) {
                         reasoning: false,
                         input: ["text"],
                         contextWindow,
-                        maxTokens: 8192,
+                        maxTokens: EVAL_MAX_TOKENS,
                         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
                     },
                 ],
@@ -185,7 +212,16 @@ async function runPiRpc({
         fs.writeFileSync(path.join(agentDir, "models.json"), providerConfig(proxyUrl, model, task.contextWindow));
         const settingsFile = path.join(agentDir, "settings.json");
         const settings = fs.existsSync(settingsFile) ? JSON.parse(fs.readFileSync(settingsFile, "utf8")) : {};
-        fs.writeFileSync(settingsFile, JSON.stringify({ ...settings, defaultProvider: "eval", defaultModel: model }));
+        const compaction = windowedCompaction(declaredWindow(task));
+        fs.writeFileSync(
+            settingsFile,
+            JSON.stringify({
+                ...settings,
+                defaultProvider: "eval",
+                defaultModel: model,
+                ...(compaction ? { compaction: { ...settings.compaction, ...compaction } } : {}),
+            }),
+        );
         args = [cli, "--mode", "rpc", "--no-session", "--provider", "eval", "--model", model];
     }
 
@@ -899,10 +935,9 @@ function writeToolWithdrawal(agentDir) {
  * `agents` drops the installed global AGENTS.md: the layer's working agreement, and on one captured
  * request 4.2 KB of the 8.5 KB SpecPi adds to a plain Pi request.
  *
- * `tools` withdraws the two tools SpecPi's own extensions add. Neither can act in an unattended run:
- * `request_capability` answers that restoring a group needs an interactive user, and
- * `report_capability_gap` that collection is undecided. Both register unconditionally, so a headless
- * session ships their schema and prompt guidance for nothing -- 3.7 KB of one captured request.
+ * `tools` withdraws the two tools SpecPi's own extensions add. SpecPi already omits both from a
+ * headless session, and from one with collection off, but these runs use RPC mode, which counts as
+ * interactive: both are offered, and neither can act, since nobody answers the prompts they raise.
  *
  * It withdraws rather than deletes, and that is the whole reason this target can exist. Deleting
  * the extension directories does not work: `tool-wishlist` imports

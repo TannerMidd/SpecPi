@@ -41,7 +41,7 @@
                     ><a href="#migration"><span>06</span>Update &amp; remove</a
                     ><a href="#development"><span>07</span>Development</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.31.0<br />Chat 0.15.0</div>
+                <div class="index-meta">SpecPi 0.32.0<br />Chat 0.15.0</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -120,9 +120,11 @@ specpi doctor</code></pre>
                         <code>/capability allow browser</code> grants that group without asking again and
                         <code>/capability ask browser</code> restores the prompt; <code>/capability</code> shows
                         both states. A grant still announces itself when it fires and never applies to a headless
-                        session. The improvement loop's tools
-                        are always offered; <code>/wishlist on</code> and <code>/wishlist off</code> govern local
-                        collection, which gates recording rather than visibility.
+                        session, and the agent is not offered the request in a headless one. The gap report tool is
+                        offered while local collection is on, or undecided in an interactive session so its first
+                        report can ask you; <code>/wishlist on</code> and <code>/wishlist off</code> switch
+                        collection and the tool with it. The authoring tools appear only during a
+                        <code>/harness-improvement</code> selection.
                     </p>
                     <p>
                         Provider credentials, service configuration, and permission policies follow the upstream
@@ -224,7 +226,7 @@ specpi doctor</code></pre>
                 <section class="doc-section" id="vscode">
                     <h2>SpecPi Chat for VS Code</h2>
                     <p>
-                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.31.0/specpi-chat-0.15.0.vsix"
+                        <a href="https://github.com/TannerMidd/SpecPi/releases/download/v0.32.0/specpi-chat-0.15.0.vsix"
                             >Download Chat 0.15.0</a
                         >, then run <strong>Extensions: Install from VSIX…</strong> in VS Code. Open a trusted project,
                         select SpecPi in the Activity Bar, and choose <strong>Connect Pi</strong>.
@@ -306,7 +308,7 @@ npm run check:site</code></pre>
         <footer class="site-footer wrap">
             <a class="brand" href="../"
                 ><img src="../logo.svg" width="28" height="28" alt="" /><strong>SpecPi</strong></a
-            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.31.0">v0.31.0</a>
+            ><a class="edition" href="https://github.com/TannerMidd/SpecPi/releases/tag/v0.32.0">v0.32.0</a>
             <nav aria-label="Footer navigation">
                 <a href="https://github.com/TannerMidd/SpecPi/blob/main/SECURITY.md">Security</a
                 ><a href="https://github.com/TannerMidd/SpecPi/blob/main/LICENSE">MIT</a>

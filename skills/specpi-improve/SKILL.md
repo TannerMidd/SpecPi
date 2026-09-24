@@ -1,6 +1,7 @@
 ---
 name: specpi-improve
 description: Turns a selected SpecPi capability-gap wishlist item into a minimal, evidence-backed, reversible improvement. Use when the user asks to improve SpecPi from its wishlist, act on a selected gap, or complete the notice-to-retire loop.
+disable-model-invocation: true
 ---
 
 # SpecPi Improve

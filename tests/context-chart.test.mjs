@@ -11,10 +11,18 @@ test("published context charts match the recorded installed-profile measurements
     assert.equal(report.schema, 1);
     // What the recorded run actually covered, which must not be edited to match the current pin
     // list even when the two agree — re-run scripts/measure-context.mjs and replace the record.
-    assert.equal(report.packages.length, 7);
-    assert.equal(report.loadedExtensionCount, 9);
+    assert.equal(report.packages.length, 8);
+    assert.equal(report.loadedExtensionCount, 11);
     assert.deepEqual(staleChartFiles(report), []);
-    const [stock, defaults, openCode, deepSeek, enabled, ohMyPi] = report.results;
+    // Rows are read by label: the record keeps whatever order the measurement ran in.
+    const row = (label) => report.results.find((entry) => entry.label === label) ?? { label: undefined };
+    const stock = row("Pi (stock)");
+    const defaults = row("SpecPi default");
+    const openCode = row("OpenCode");
+    const deepSeek = row("DeepSeek Harness");
+    const enabled = row("SpecPi enabled");
+    const ohMyPi = row("Oh My Pi");
+    assert.equal(report.results.length, 6);
 
     // Oh My Pi, OpenCode and the DeepSeek Harness are separate harnesses measured on the same
     // terms, never published figures. The Oh My Pi row may be carried forward from a same-terms
@@ -58,11 +66,22 @@ test("published context charts match the recorded installed-profile measurements
         assert.ok(enabled.toolNames.includes(name));
     }
 
-    // Wishlist tools are always active; collection consent and the human
-    // selection gate execution, not visibility.
-    for (const name of ["report_capability_gap", "record_harness_contract", "finish_harness_improvement"]) {
+    // Measured interactively with collection undecided, so the observation tool and the capability
+    // request are offered; the authoring tools need a human /harness-improvement selection.
+    for (const name of ["report_capability_gap", "request_capability"]) {
         assert.ok(defaults.toolNames.includes(name), name);
         assert.ok(enabled.toolNames.includes(name), name);
+    }
+
+    for (const name of ["record_harness_contract", "finish_harness_improvement"]) {
+        assert.ok(!defaults.toolNames.includes(name), name);
+        assert.ok(!enabled.toolNames.includes(name), name);
+    }
+
+    // The improvement skill is out of the model's skill list, and the working agreement is short.
+    for (const row of [defaults, enabled]) {
+        assert.equal(row.instructionSections.skills, 0, `${row.label} still lists a skill`);
+        assert.ok(row.instructionSections.project_context < 1500, `${row.label} working agreement grew`);
     }
 });
 

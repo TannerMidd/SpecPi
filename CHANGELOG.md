@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.32.0 - 2026-09-23
+
+- Send less on every request. SpecPi's first request was 14,022 characters against Pi's 5,521, and that overhead rides every turn and is never removed by compaction. Measured again with all eight pins, the interactive default is now 11,119. A headless session drops the two tools below as well, which the measured parts put at about 8,300: SpecPi's overhead falls from 8,501 characters to about 2,800.
+- Trim the installed working agreement from about 2,400 characters to 1,300, keeping the rules that shape ordinary work, including the restraint that wins `sanitize-git-repo` on Terminal-Bench. The `/scope` rule moves into the scope notice SpecPi already adds while scope is active. The wishlist and credential rules already live in the improvement skill, and the web and browser rule now lives in `request_capability`'s own description.
+- Offer `report_capability_gap` only where a report could land: collection on, or undecided in an interactive session, where its first report asks for consent. With collection off, or undecided in a headless session, it could only ever answer "Not recorded". `/wishlist on` and `/wishlist off` switch it with collection. Its four guidance lines, which repeated its description, are now one.
+- Offer `request_capability` only to an interactive session with a requestable group installed. Headless, it could only refuse. Its description is shorter too.
+- Keep the improvement skill out of the model's skill list. It only ever runs from a `/harness-improvement` selection, so the kickoff now names its file, and Pi still lists it as a command.
+- Repair `scripts/measure-context.mjs`, which failed on 0.31.0: it expected two first-party extensions and authoring tools that no longer ship by default. It now records where each Pi row's instruction characters go, section by section. The published record and charts are re-measured; Oh My Pi runs again (18.2.5), so its row is no longer carried forward.
+- Give tier 6's Pi-family harnesses compaction settings that fit the declared window. Pi's defaults compact at 7,616 tokens of a 24,000 window and try to keep 20,000, so earlier runs compacted almost every turn; plain SpecPi compacted 17-19 times on the marathon task against Pi's 5-7, because its fixed prompt took most of what was left. Runs from before this setting are not comparable.
+- Note on the evaluations page that `configure-git-webserver` measures a cleanup habit. Its checker's push never succeeded for any harness, so every pass came from a test file left in the web root. That also qualifies a claim in 0.31.0: SpecPi + Jev's self-stopped failures outnumber Pi's only because of this task. Without it they are level, 31 against 32.
+- Consider a background-task system and do not build one. In the Terminal-Bench transcripts agents already start servers with `nohup` or `&`, tool timeouts are about one in eighteen attempts, and the one task that spends minutes blocked in commands (`tune-mjcf`) times out equally in both arms. Both earlier background-task integrations were removed, and a new one would add tool schema to every request.
+- SpecPi Chat 0.15.0 needs no change: it runs Pi interactively, so both tools stay available to it, and its command menu still lists the improvement skill.
+
 ## 0.31.0 - 2026-09-22
 
 - Report Terminal-Bench 2.0 per sitting rather than per run. Bare Pi -- unchanged software, the same thirteen tasks, the same machine -- solved 21, 22, 30, 30 and 32 of 39 across five launches, so a figure from one run is not evidence about a harness. The page pools every sitting, publishes each harness's per-sitting range beside its rate, and charts the spread directly.

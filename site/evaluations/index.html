@@ -52,7 +52,7 @@
                     <a href="#cache"><span>06</span>Cache</a>
                     <a href="#tasks"><span>07</span>Task by task</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.31.0<br />Pi <span data-eval="pi-version"></span><br /><span id="meta-generated"></span><br /><span id="meta-status"></span></div>
+                <div class="index-meta">SpecPi 0.32.0<br />Pi <span data-eval="pi-version"></span><br /><span id="meta-generated"></span><br /><span id="meta-status"></span></div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -278,6 +278,13 @@
                     <div class="table-scroll" id="table-tasks">
                         <!-- table-tasks --><table class="numeric"><thead><tr><th>Task</th><th>Pi (base)</th><th>SpecPi + Jev</th><th>Oh My Pi</th><th>Claude Code</th><th>OpenCode</th><th>DeepSeek Harness</th></tr></thead><tbody><tr><th><code>cobol-modernization</code></th><td>11/18</td><td>17/18</td><td>5/6</td><td>3/6</td><td>2/3</td><td>3/3</td></tr><tr><th><code>configure-git-webserver</code></th><td>12/18</td><td>2/18</td><td>2/6</td><td>2/5</td><td>3/3</td><td>1/3</td></tr><tr><th><code>extract-elf</code></th><td>13/18</td><td>10/18</td><td>5/6</td><td>3/6</td><td>3/3</td><td>2/3</td></tr><tr><th><code>fix-git</code></th><td>18/18</td><td>17/18</td><td>6/6</td><td>5/6</td><td>3/3</td><td>3/3</td></tr><tr><th><code>hf-model-inference</code></th><td>17/18</td><td>18/18</td><td>4/6</td><td>6/6</td><td>3/3</td><td>1/3</td></tr><tr><th><code>multi-source-data-merger</code></th><td>18/18</td><td>18/18</td><td>6/6</td><td>6/6</td><td>3/3</td><td>3/3</td></tr><tr><th><code>prove-plus-comm</code></th><td>16/18</td><td>18/18</td><td>6/6</td><td>6/6</td><td>3/3</td><td>3/3</td></tr><tr><th><code>pytorch-model-cli</code></th><td>3/18</td><td>3/18</td><td>1/6</td><td>3/6</td><td><strong>0/3</strong></td><td>1/3</td></tr><tr><th><code>raman-fitting</code></th><td>5/18</td><td>6/18</td><td>3/6</td><td><strong>0/6</strong></td><td>2/3</td><td>1/3</td></tr><tr><th><code>sanitize-git-repo</code></th><td>3/18</td><td>12/18</td><td>5/6</td><td>2/6</td><td>3/3</td><td><strong>0/3</strong></td></tr><tr><th><code>sqlite-with-gcov</code></th><td>18/18</td><td>17/18</td><td>4/6</td><td>6/6</td><td><strong>0/3</strong></td><td><strong>0/2</strong></td></tr><tr><th><code>tune-mjcf</code></th><td>10/18</td><td>10/18</td><td>6/6</td><td>2/6</td><td>1/3</td><td><strong>0/3</strong></td></tr><tr><th><code>vulnerable-secret</code></th><td>18/18</td><td>17/18</td><td>6/6</td><td>6/6</td><td>3/3</td><td>3/3</td></tr></tbody></table><!-- /table-tasks -->
                     </div>
+                    <p class="figure-note">
+                        Read the <code>configure-git-webserver</code> row as a cleanup habit, not server setup. Its
+                        checker pushes as a <code>git</code> user with a fixed password, a login the task tells the
+                        agent not to set up, and in the recorded runs that push never succeeded for any harness. It
+                        then fetches <code>hello.html</code>, so every pass came from a test file the agent left in
+                        the web root; an agent that cleans up so the user's own first commit works fails the task.
+                    </p>
                 </section>
 
             </div>

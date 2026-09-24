@@ -20,7 +20,15 @@ export default async function wishlistExtensionHarness() {
     const execs: any[] = [];
     let failNextCheck = true;
     let failNextValidator = false;
+    // Mirror Pi: every registered tool starts active, and setActiveTools replaces the set.
+    let activeTools: string[] = ["read", "bash", "edit", "write", "report_capability_gap"];
     const fakePi: any = {
+        getActiveTools() {
+            return [...activeTools];
+        },
+        setActiveTools(names: string[]) {
+            activeTools = [...names];
+        },
         on(name: string, handler: any) {
             const handlers = events.get(name) ?? [];
             handlers.push(handler);
@@ -159,6 +167,19 @@ export default async function wishlistExtensionHarness() {
         throw new Error("Wishlist extension did not register its public surfaces");
     }
 
+    // The observation tool is offered only where a report could land. Collection starts undecided:
+    // a headless session can never answer the consent prompt, an interactive one can.
+    const startSession = async (context: any) => {
+        for (const handler of events.get("session_start") ?? []) {
+            await handler({}, context);
+        }
+    };
+
+    await startSession({ ...ctx, hasUI: false });
+    const observationWithdrawnHeadlessUndecided = !activeTools.includes("report_capability_gap");
+    await startSession(ctx);
+    const observationOfferedInteractiveUndecided = activeTools.includes("report_capability_gap");
+
     const gap = {
         capability: "Local audio transcription",
         scenario: "Transcribe a local recording",
@@ -295,8 +316,24 @@ export default async function wishlistExtensionHarness() {
         renderedPath.includes("report%0Aroot%E2%80%A8format%E2%80%AE%25%60file.md") &&
         !/[\u2028\u202e`]/u.test(renderedPath);
 
+    // Switching collection is a human command, so the tool follows it at once.
+    await wishlist.handler("off", ctx);
+    const observationWithdrawnWhenOff = !activeTools.includes("report_capability_gap");
+    await startSession(ctx);
+    const observationStaysWithdrawnWhenOff = !activeTools.includes("report_capability_gap");
+    await wishlist.handler("on", ctx);
+    const observationOfferedWhenOn = activeTools.includes("report_capability_gap");
+    await startSession({ ...ctx, hasUI: false });
+    const observationOfferedHeadlessWhenOn = activeTools.includes("report_capability_gap");
+
     process.stdout.write(
         `SPECPI_WISHLIST_HARNESS=${JSON.stringify({
+            observationWithdrawnHeadlessUndecided,
+            observationOfferedInteractiveUndecided,
+            observationWithdrawnWhenOff,
+            observationStaysWithdrawnWhenOff,
+            observationOfferedWhenOn,
+            observationOfferedHeadlessWhenOn,
             reportPathRenderingSafe,
             toolNames: tools.map((tool) => tool.name),
             commandNames: [...commands.keys()],
