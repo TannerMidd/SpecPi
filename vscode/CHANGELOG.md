@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.17.0
+
+- Open a small jobs panel from the footer's Jobs chip. It lists this session's background jobs, running ones first, with a live timer for each; finished ones show their exit code and how long they took. Each running job has a Stop button, and several running at once get a Stop all. Output shows a job's latest lines in the conversation. Both go through SpecPi's own `/jobs` command, and only for a job SpecPi listed, so Chat adds no way to stop a process of its own. The chip also stays while only finished jobs remain, so they can still be read; with an older SpecPi that does not publish the list, clicking it types `/jobs` instead.
+
 ## 0.16.0
 
 - Show SpecPi's running background jobs as a chip in the session footer, beside the command guard's counter, so a long eval stays visible while the conversation carries on. It reads the status line the extension publishes, reserves a slot for it so other widgets cannot push it out, and disappears when no job is running. `/jobs` in the command menu lists and stops them; a finished job's report appears in the transcript as a notice.

@@ -178,7 +178,13 @@ function getWebviewHtml({
                 </div>
                 <span id="cache-status" title="Cache hit rate: no reported input token usage yet." aria-label="Cache hit rate: unavailable"><span class="cache-label">Cache hit</span> <strong id="cache-value">—</strong></span>
                 <span id="guard-status" title="Command guard" hidden><span class="cache-label">Guard</span> <strong id="guard-value">—</strong></span>
-                <span id="jobs-status" title="Background jobs" hidden><span class="cache-label">Jobs</span> <strong id="jobs-value">—</strong></span>
+                <button id="jobs-status" type="button" title="Background jobs" aria-haspopup="true" aria-expanded="false" aria-controls="jobs-panel" hidden><span class="cache-label">Jobs</span> <strong id="jobs-value">—</strong></button>
+                <div id="jobs-panel" class="jobs-panel" role="region" aria-label="Background jobs" hidden>
+                    <div class="jobs-panel-header"><strong>Background jobs</strong><button id="jobs-stop-all" class="job-button job-stop" type="button" hidden>Stop all</button><button id="jobs-close" class="icon-button" type="button" aria-label="Close background jobs">${icon("close")}</button></div>
+                    <ul id="jobs-list" class="jobs-list"></ul>
+                    <p id="jobs-empty" class="jobs-note">No background jobs in this session.</p>
+                    <p class="jobs-note">Each job reports in the conversation when it ends. Output shows its latest lines there.</p>
+                </div>
                 <span id="token-status" title="Session usage"></span>
                 <button id="stop-button" class="stop-button" type="button" title="Stop response" aria-label="Stop response" hidden>${icon("stop")}<span>Stop</span></button>
             </div>

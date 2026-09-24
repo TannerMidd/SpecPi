@@ -23,6 +23,9 @@ import { randomUUID } from "node:crypto";
 export const BACKGROUND_TOOL = "background";
 export const BACKGROUND_MESSAGE = "specpi-background";
 export const BACKGROUND_STATUS = "specpi-background";
+/** The structured job list SpecPi Chat draws its jobs panel from. Published to RPC clients only. */
+export const BACKGROUND_WIDGET = "specpi-background-v1";
+export const WIDGET_JOBS = 8;
 
 /** The `shellTools` entry that makes the permission system gate `command` exactly like `bash`. */
 export const SHELL_TOOL_MAPPING = Object.freeze({ commandArgument: "command" });
@@ -522,6 +525,31 @@ export function statusText(jobs) {
     const count = jobs.filter((job) => job.state === "running").length;
 
     return count > 0 ? `${count} background job${count === 1 ? "" : "s"} running` : undefined;
+}
+
+/**
+ * One JSON line for Chat: every running job, then the most recent finished ones, newest first.
+ * Only what /jobs already shows: no output, no log path, no working directory.
+ */
+export function widgetPayload(jobs) {
+    const newestFirst = [...jobs].sort((a, b) => Number(b.id) - Number(a.id));
+    const shown = [
+        ...newestFirst.filter((job) => job.state === "running"),
+        ...newestFirst.filter((job) => job.state !== "running"),
+    ].slice(0, WIDGET_JOBS);
+
+    return JSON.stringify({
+        version: 1,
+        jobs: shown.map((job) => ({
+            id: job.id,
+            label: job.label ?? null,
+            command: job.command,
+            state: job.state,
+            exitCode: Number.isInteger(job.exitCode) ? job.exitCode : null,
+            startedAt: job.startedAt,
+            endedAt: job.endedAt ?? null,
+        })),
+    });
 }
 
 export function listText(jobs, now = Date.now()) {

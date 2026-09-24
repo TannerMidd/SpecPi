@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createRequire } from "node:module";
 import test from "node:test";
 import {
     MAX_LOG_BYTES,
@@ -16,6 +17,7 @@ import {
     pruneStaleLogs,
     readJsonc,
     tailOf,
+    widgetPayload,
 } from "../extensions/workflow-controls/background.mjs";
 import {
     applyShellToolMapping,
@@ -278,4 +280,44 @@ test("bash calls that would hold the conversation are recognised, ordinary ones 
     }
 
     assert.match(blockingShellReason("it sleeps"), /background tool/u);
+});
+
+test("Chat's job list carries what /jobs shows, running first, and nothing from the log", () => {
+    const { decodeBackgroundJobs } = createRequire(import.meta.url)("../vscode/src/background-jobs.js");
+    const job = (id, state, extra = {}) => ({
+        id: String(id),
+        label: `job ${id}`,
+        command: `run ${id}`,
+        cwd: "/secret/project",
+        logPath: "/secret/log",
+        tail: "private output",
+        state,
+        exitCode: state === "exited" ? 0 : undefined,
+        startedAt: 1_000 * id,
+        endedAt: state === "running" ? undefined : 1_000 * id + 500,
+        ...extra,
+    });
+    const jobs = [
+        ...Array.from({ length: 9 }, (_, index) => job(index + 1, "exited")),
+        job(10, "running"),
+        job(11, "stopped", { label: undefined }),
+    ];
+    const line = widgetPayload(jobs);
+    assert.doesNotMatch(line, /secret|private output/u);
+    const decoded = decodeBackgroundJobs([line]);
+    assert.deepEqual(
+        decoded.jobs.map((item) => item.id),
+        ["10", "11", "9", "8", "7", "6", "5", "4"],
+    );
+    assert.deepEqual(decoded.jobs[0], {
+        id: "10",
+        label: "job 10",
+        command: "run 10",
+        state: "running",
+        exitCode: null,
+        startedAt: 10_000,
+        endedAt: null,
+    });
+    assert.equal(decoded.jobs[1].label, "");
+    assert.equal(decoded.jobs[2].exitCode, 0);
 });

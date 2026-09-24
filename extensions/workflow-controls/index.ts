@@ -23,6 +23,7 @@ import {
     BACKGROUND_MESSAGE,
     BACKGROUND_STATUS,
     BACKGROUND_TOOL,
+    BACKGROUND_WIDGET,
     admission as backgroundAdmissionFor,
     agentDirectory as backgroundAgentDirectory,
     completionText,
@@ -35,6 +36,7 @@ import {
     startedText,
     statusText,
     tailOf,
+    widgetPayload,
     blockingShellCall,
     blockingShellReason,
 } from "./background.mjs";
@@ -473,7 +475,12 @@ export default function workflowControls(pi: ExtensionAPI) {
 
     const publishJobStatus = () => {
         try {
-            jobsContext?.ui.setStatus(BACKGROUND_STATUS, statusText(jobs?.list() ?? []));
+            const all = jobs?.list() ?? [];
+            jobsContext?.ui.setStatus(BACKGROUND_STATUS, statusText(all));
+            // Chat's jobs panel. A terminal would draw a widget as text above the editor, so only RPC gets it.
+            if (jobsContext?.mode === "rpc") {
+                jobsContext.ui.setWidget(BACKGROUND_WIDGET, all.length > 0 ? [widgetPayload(all)] : undefined);
+            }
         } catch {
             // A status line is a courtesy; a closed UI must not fail the job.
         }

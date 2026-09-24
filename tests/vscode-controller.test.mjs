@@ -2550,6 +2550,66 @@ test("oversized same-session history preserves visible messages during manual re
     assert.equal(controller.state.error, undefined);
 });
 
+test("the background jobs panel stops and shows jobs only through /jobs, and only jobs Pi listed", async (t) => {
+    const { controller, client } = await connected(t, {
+        request(type) {
+            return type === "get_commands" ? { commands: [{ name: "jobs" }] } : undefined;
+        },
+    });
+    const job = (id, state) => ({
+        id,
+        label: `job ${id}`,
+        command: "sleep 9",
+        state,
+        exitCode: null,
+        startedAt: 5,
+        endedAt: null,
+    });
+    client.emit("event", {
+        type: "extension_ui_request",
+        method: "setWidget",
+        widgetKey: "specpi-background-v1",
+        widgetLines: [
+            JSON.stringify({
+                version: 1,
+                jobs: [job("4", "running"), { ...job("2", "exited"), exitCode: 0, endedAt: 9 }],
+            }),
+        ],
+    });
+    assert.deepEqual(
+        controller.state.backgroundJobs.map((item) => item.id),
+        ["4", "2"],
+    );
+    assert.equal(controller.state.runtimeStatus["specpi-background-v1"], undefined);
+    const token = controller.state.contextToken;
+    await controller.handleMessage({ type: "jobCommand", action: "stop", id: "4", contextToken: token });
+    await controller.handleMessage({ type: "jobCommand", action: "output", id: "2", contextToken: token });
+    await controller.handleMessage({ type: "jobCommand", action: "stop", id: "all", contextToken: token });
+    assert.deepEqual(
+        client.requests.filter((item) => item.type === "prompt").map((item) => item.args.message),
+        ["/jobs stop 4", "/jobs output 2", "/jobs stop all"],
+    );
+    // A finished job cannot be stopped, an unknown one cannot be named, and the action is fixed.
+    for (const message of [
+        { action: "stop", id: "2" },
+        { action: "stop", id: "7" },
+        { action: "output", id: "7" },
+        { action: "stop; rm", id: "4" },
+        { action: "stop", id: "4", contextToken: "stale" },
+    ]) {
+        await assert.rejects(controller.handleMessage({ type: "jobCommand", contextToken: token, ...message }));
+    }
+
+    assert.equal(client.requests.filter((item) => item.type === "prompt").length, 3);
+    client.emit("event", {
+        type: "extension_ui_request",
+        method: "setWidget",
+        widgetKey: "specpi-background-v1",
+        widgetLines: undefined,
+    });
+    assert.equal(controller.state.backgroundJobs, undefined);
+});
+
 test("delegate progress stays live during parent streaming and Stop targets only the observed attempt", async (t) => {
     const gate = deferred();
     const { controller, client, posted } = await connected(t, {
