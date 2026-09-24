@@ -53,7 +53,7 @@ The solid rows are measured by us, from the request each setup actually sends th
   <a href="https://tannermidd.github.io/SpecPi/research/#specpi">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://tannermidd.github.io/SpecPi/media/context-chart-dark.svg">
-      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 11,777, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 36,425, Codex CLI 41,616, Oh My Pi 66,708, Claude Code 90,460.">
+      <img src="https://tannermidd.github.io/SpecPi/media/context-chart-light.svg" width="880" alt="Bar chart of characters sent on the first model call: Pi stock 5,521, SpecPi default 12,010, OpenCode 31,043, DeepSeek Harness 31,743, SpecPi enabled 36,658, Codex CLI 41,616, Oh My Pi 66,708, Claude Code 90,460.">
     </picture>
   </a>
 </p>

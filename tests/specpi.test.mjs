@@ -96,6 +96,9 @@ test("minimal installer completes the lifecycle without changing settings or pri
         ),
     );
     runCli(agentDir, "doctor");
+    const agreement = fs.readFileSync(path.join(agentDir, "AGENTS.md"), "utf8");
+    assert.match(agreement, /^Human guidance$/mu, "the human's own guidance survives");
+    assert.match(agreement, /Take no irreversible step the request did not ask for/u);
     const retained = path.join(agentDir, "extensions/workflow-controls/index.ts");
     fs.appendFileSync(retained, "\n// local change\n");
     assert.notEqual(invokeCli(agentDir, ["update", "--yes"]).status, 0);

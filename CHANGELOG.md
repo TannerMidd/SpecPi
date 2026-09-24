@@ -8,6 +8,7 @@
 - Turn background jobs off while the Jev command guard is on, because the guard only checks `bash`. Its saved state is read the way the guard reads it. A guard switched on for one session only is invisible to other extensions, so that case is documented rather than guessed at.
 - Offer the tool only to interactive sessions where a start could succeed, decided before the first request. Eval runs never see it, so their tool surface is unchanged.
 - Pair with SpecPi Chat 0.16.0, which shows running jobs in the session footer.
+- Say plainly in the working agreement that irreversible steps nobody asked for are off the table: rewriting Git history, pruning reflogs or objects, force-pushing, deleting data that cannot be restored. The agent does the reversible part, then says what remains and offers it. On Terminal-Bench's `sanitize-git-repo`, every attempt from either arm that left Git history alone passed, and every failure had rewritten it, destroying the commit the checker compares against. SpecPi's "reversible" wording already halved how often that happened (9 of 18 attempts against Pi's 17 of 18), which is why it led that task 12/18 to 3/18. The explicit rule targets the remaining 9. It is also the better behaviour outside a benchmark: purging keys from history breaks existing clones and needs a force-push, so it is a decision to offer, not to take. It adds 233 characters to every request, and its effect on the benchmark is not yet measured.
 
 ## 0.32.0 - 2026-09-23
 
