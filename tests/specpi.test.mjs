@@ -89,7 +89,7 @@ test("minimal installer completes the lifecycle without changing settings or pri
     fs.writeFileSync(path.join(agentDir, "AGENTS.md"), "Human guidance\n");
     runCli(agentDir, "install", "--yes");
     const manifest = JSON.parse(fs.readFileSync(manifestPath));
-    assert.equal(Object.keys(manifest.files).length, 31);
+    assert.equal(Object.keys(manifest.files).length, 32);
     assert.ok(
         Object.keys(manifest.files).every((file) =>
             /workflow-controls|tool-wishlist|jev-advisor|specpi-improve/.test(file),
@@ -109,6 +109,51 @@ test("minimal installer completes the lifecycle without changing settings or pri
     for (const [relative, content] of canaries) {
         assert.equal(fs.readFileSync(path.join(agentDir, relative), "utf8"), content);
     }
+});
+
+test("installer gates background jobs through the permission system and removes only its own entry", (t) => {
+    const { agentDir } = installerFixture(t);
+    const permissionFile = path.join(agentDir, "extensions", "pi-permission-system", "config.json");
+    const userConfig = {
+        yoloMode: false,
+        permission: { "*": "ask", bash: { "rm *": "deny" } },
+        shellTools: { exec_command: { commandArgument: "cmd" } },
+    };
+    fs.mkdirSync(path.dirname(permissionFile), { recursive: true });
+    fs.writeFileSync(permissionFile, `${JSON.stringify(userConfig)}\n`);
+
+    // Without the package the file is left exactly as it was.
+    runCli(agentDir, "install", "--yes");
+    assert.deepEqual(JSON.parse(fs.readFileSync(permissionFile, "utf8")), userConfig);
+    runCli(agentDir, "uninstall", "--yes");
+
+    const manifest = path.join(agentDir, "npm", "node_modules", "@gotgenes", "pi-permission-system", "package.json");
+    fs.mkdirSync(path.dirname(manifest), { recursive: true });
+    fs.writeFileSync(manifest, JSON.stringify({ name: "@gotgenes/pi-permission-system", version: "32.0.2" }));
+    const planned = runCli(agentDir, "plan");
+    assert.match(planned.stdout, /one shellTools entry/u);
+
+    // A failure after the write rolls the file back byte for byte.
+    const before = fs.readFileSync(permissionFile);
+    const failed = invokeCli(agentDir, ["install", "--yes"], {
+        SPECPI_TESTING: "1",
+        SPECPI_TEST_FAIL_POINT: "after-settings",
+    });
+    assert.notEqual(failed.status, 0);
+    assert.match(failed.stderr, /rolled back/u);
+    assert.deepEqual(fs.readFileSync(permissionFile), before);
+
+    runCli(agentDir, "install", "--yes");
+    const installed = JSON.parse(fs.readFileSync(permissionFile, "utf8"));
+    assert.deepEqual(installed.permission, userConfig.permission);
+    assert.equal(installed.yoloMode, false);
+    assert.deepEqual(installed.shellTools, {
+        exec_command: { commandArgument: "cmd" },
+        background: { commandArgument: "command" },
+    });
+
+    runCli(agentDir, "uninstall", "--yes");
+    assert.deepEqual(JSON.parse(fs.readFileSync(permissionFile, "utf8")), userConfig);
 });
 
 test("legacy migration retires modified extras and runtimes with backup, preserves user settings, and rolls back", (t) => {

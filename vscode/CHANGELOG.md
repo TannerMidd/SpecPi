@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.16.0
+
+- Show SpecPi's running background jobs as a chip in the session footer, beside the command guard's counter, so a long eval stays visible while the conversation carries on. It reads the status line the extension publishes, reserves a slot for it so other widgets cannot push it out, and disappears when no job is running. `/jobs` in the command menu lists and stops them; a finished job's report appears in the transcript as a notice.
+
 ## 0.15.0
 
 - Follow the advisor to schema 6. Progress detection was withdrawn from the Jev layer after replays showed its stuck verdict did not predict failure, so the panel drops its toggle, its budget row and the "what a stuck verdict may do" setting. A stored preference for any of them is read past, as the compaction keys were in schema 5.

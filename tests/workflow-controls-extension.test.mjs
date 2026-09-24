@@ -18,10 +18,11 @@ test("workflow-controls extension composes scope and improvement contract lifecy
     const match = output.match(/WORKFLOW_CONTROLS_HARNESS=(.+)/u);
     assert.ok(match, output);
     const report = JSON.parse(match[1]);
-    assert.deepEqual(report.commands, ["capability", "scope", "webaccess"]);
-    // The capability request is the only tool this extension offers, and it stays active all
-    // session: everything else it controls is withdrawn until a human grants it.
-    assert.deepEqual(report.toolNames, ["request_capability"]);
+    assert.deepEqual(report.commands, ["capability", "jobs", "scope", "webaccess"]);
+    // The capability request and background jobs are the only tools this extension offers; each is
+    // offered only to sessions that can use it, and everything else it controls is withdrawn until a
+    // human grants it.
+    assert.deepEqual(report.toolNames, ["background", "request_capability"]);
     for (const [name, value] of Object.entries(report)) {
         if (!["commands", "toolNames"].includes(name)) {
             assert.equal(value, true, name);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.33.0 - 2026-09-23
+
+- Run long commands as background jobs, so a long eval or build no longer holds the conversation. 0.32.0 judged a background-task system not worth building from Terminal-Bench transcripts, which measure task outcomes and cannot see the actual cost: a person unable to say anything until a many-minute command returns. The `background` tool starts a command and returns at once; when the job ends, its exit code and last lines of output arrive as a follow-up message and the agent picks it up. `/jobs` lists jobs, shows recent output and stops them.
+- Keep it one small tool that only starts jobs, 657 characters of schema. Status needs no tool, because the result arrives on its own, and stopping is a human command. Jobs run through Pi's own shell runner with the session's shell settings, are limited to four at once, log to capped owner-only files, and end with the session, which deletes their logs.
+- Apply every `bash` permission rule to background jobs. The installer records `background` in the permission system's `shellTools`, which gates its command through the same stack as `bash`, and removes the entry at uninstall. Before every start the extension checks the effective mapping, including a trusted project's, and refuses without it.
+- Turn background jobs off while the Jev command guard is on, because the guard only checks `bash`. Its saved state is read the way the guard reads it. A guard switched on for one session only is invisible to other extensions, so that case is documented rather than guessed at.
+- Offer the tool only to interactive sessions where a start could succeed, decided before the first request. Eval runs never see it, so their tool surface is unchanged.
+- Pair with SpecPi Chat 0.16.0, which shows running jobs in the session footer.
+
 ## 0.32.0 - 2026-09-23
 
 - Send less on every request. SpecPi's first request was 14,022 characters against Pi's 5,521, and that overhead rides every turn and is never removed by compaction. Measured again with all eight pins, the interactive default is now 11,119. A headless session drops the two tools below as well, which the measured parts put at about 8,300: SpecPi's overhead falls from 8,501 characters to about 2,800.

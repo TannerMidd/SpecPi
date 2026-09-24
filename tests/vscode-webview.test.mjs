@@ -16,6 +16,8 @@ const {
     providerUsageEntries,
     guardStatusEntry,
     GUARD_STATUS_KEY,
+    jobsStatusEntry,
+    JOBS_STATUS_KEY,
     cacheHitRate,
 } = require("../vscode/media/chat.js");
 
@@ -482,6 +484,17 @@ test("webview rendering contains no executable string or HTML insertion sinks", 
         assert.doesNotMatch(script, /\blocalStorage\b|\bsessionStorage\b/u, name);
         assert.doesNotMatch(script, /\bfetch\s*\(|\bnew\s+(?:XMLHttpRequest|WebSocket|EventSource)\s*\(/u, name);
     }
+});
+
+test("the background jobs chip shows how many are running, and nothing when none are", () => {
+    const entry = (text) => jobsStatusEntry({ [JOBS_STATUS_KEY]: text });
+    assert.deepEqual(entry("2 background jobs running"), { full: "2 background jobs running", summary: "2 running" });
+    assert.deepEqual(entry("1 background job running"), { full: "1 background job running", summary: "1 running" });
+    // An unrecognised line is shown whole; absent or empty means no job is running.
+    assert.equal(entry("jobs busy").summary, "jobs busy");
+    assert.equal(jobsStatusEntry({}), undefined);
+    assert.equal(entry(""), undefined);
+    assert.equal(entry("\u001b[31m3 background jobs running\u001b[0m").summary, "3 running");
 });
 
 test("the command guard's counter is read as the package writes it", () => {

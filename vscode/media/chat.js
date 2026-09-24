@@ -398,6 +398,22 @@
         return { full, summary: summary || full, blocked: /\u00b7 \d+ blocked\b/u.test(full) };
     }
 
+    // SpecPi's background jobs publish "N background job(s) running" while any are running and clear
+    // the key when none are, so presence is the whole condition, as with the guard. The chip is what
+    // tells someone mid-conversation that a long run is still going; /jobs lists and stops them.
+    const JOBS_STATUS_KEY = "specpi-background";
+
+    function jobsStatusEntry(status) {
+        const full = runtimeText(status?.[JOBS_STATUS_KEY]);
+        if (!full) {
+            return undefined;
+        }
+
+        const count = /^(\d+)\b/u.exec(full)?.[1];
+
+        return { full, summary: count ? `${count} running` : full };
+    }
+
     function providerUsageEntries(status) {
         return USAGE_PLUGINS.flatMap((plugin) => {
             const text = status && Object.hasOwn(status, plugin.key) ? runtimeText(status[plugin.key]) : "";
@@ -428,6 +444,8 @@
             providerUsageEntries,
             guardStatusEntry,
             GUARD_STATUS_KEY,
+            jobsStatusEntry,
+            JOBS_STATUS_KEY,
             cacheHitRate,
         };
     }
@@ -1586,6 +1604,21 @@
         chip.setAttribute("aria-label", detail);
     }
 
+    /** Running background jobs, beside the guard chip. Not a button: /jobs is where they are managed. */
+    function renderJobsStatus(connected) {
+        const chip = byId("jobs-status");
+        const entry = connected ? jobsStatusEntry(state.runtimeStatus) : undefined;
+        chip.hidden = !entry;
+        if (!entry) {
+            return;
+        }
+
+        byId("jobs-value").textContent = entry.summary;
+        const detail = `${entry.full}. Each reports back here when it ends; run /jobs to list or stop them.`;
+        chip.title = detail;
+        chip.setAttribute("aria-label", detail);
+    }
+
     function renderRuntimeStatus() {
         const connected = ["connecting", "ready", "busy", "retrying", "compacting"].includes(state.status);
         const usage = connected ? providerUsageEntries(state.runtimeStatus) : [];
@@ -1593,6 +1626,7 @@
             ([key, value]) =>
                 typeof value === "string" &&
                 key !== GUARD_STATUS_KEY &&
+                key !== JOBS_STATUS_KEY &&
                 !USAGE_PLUGINS.some((plugin) => plugin.key === key),
         );
         const signature = JSON.stringify([entries, usage]);
@@ -2050,6 +2084,7 @@
         byId("cache-status").title = cacheDetails;
         byId("cache-status").setAttribute("aria-label", cacheDetails);
         renderGuardStatus(connected);
+        renderJobsStatus(connected);
         const contextLabel =
             typeof percent === "number" && Number.isFinite(percent)
                 ? `Context ${Math.round(percent)}%`

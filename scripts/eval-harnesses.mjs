@@ -1047,6 +1047,9 @@ async function prepareSpecpiHome({ workspaceDir, homeDir }) {
     ablateSpecpi(agentDir);
     const permissionDir = path.join(agentDir, "extensions", "pi-permission-system");
     fs.mkdirSync(permissionDir, { recursive: true });
+    // Written whole, which also drops the installer's shellTools entry for background jobs. That is
+    // deliberate: without it the background tool is never offered, so an eval row keeps the tool
+    // surface it was always measured with, and an unattended run has nobody to report back to anyway.
     fs.writeFileSync(path.join(permissionDir, "config.json"), JSON.stringify({ yoloMode: true }));
 
     return { agentDir };
