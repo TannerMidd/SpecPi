@@ -110,12 +110,24 @@ const SWE_SOURCES = [
     // Same tasks, attempts, model and endpoint, launched the next morning.
     { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-20260924-095703/omp" },
     // Five Oh My Pi attempts failed to set up (package mirror and GitHub downloads, before the agent
-    // started), so exactly those five were run again, to reach the same 36 as every other row.
+    // started), so exactly those five were run again, to reach the same 36 as every other row. The
+    // second batch was launched for two django-14404 attempts when only one was owed -- the other
+    // failure was psf__requests-1142 -- so its later-named trial is skipped and requests-1142 was run
+    // once more. Both 14404 attempts solved, so which one is skipped changes no figure but tokens.
     { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-redo1-20260924-104348/omp" },
-    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-redo2-20260924-104348/omp" },
+    {
+        sitting: "swe",
+        slice: "swe",
+        arm: "omp",
+        dir: "swe-omp-redo2-20260924-104348/omp",
+        skip: ["django__django-14404__vYzHe4z"],
+    },
+    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-redo3-20260924-144647/omp" },
     { sitting: "swe", slice: "swe", arm: "claude-code", dir: "swe-cc-20260924-095326/claude-code" },
     // One Claude Code attempt failed to set up (a package download), and was run again the same way.
     { sitting: "swe", slice: "swe", arm: "claude-code", dir: "swe-cc-redo-20260924-112930/claude-code" },
+    { sitting: "swe", slice: "swe", arm: "opencode", dir: "swe-oc-dsh-20260924-132635/opencode" },
+    { sitting: "swe", slice: "swe", arm: "dsh", dir: "swe-oc-dsh-20260924-132635/dsh" },
 ];
 
 const SITTINGS = {
@@ -172,7 +184,7 @@ const DROP_TASKS = new Set(["pytorch-model-recovery"]);
 // One caveat travels with them: the two launches were in flight together at concurrency six each,
 // so that slice was measured at twelve-way concurrency, and its timeouts may owe something to that.
 
-function trials(runsRoot, dir) {
+function trials(runsRoot, dir, skip = []) {
     const found = [];
     const base = path.join(runsRoot, dir);
     if (!fs.existsSync(base)) {
@@ -186,6 +198,10 @@ function trials(runsRoot, dir) {
         }
 
         for (const trial of fs.readdirSync(stampDir)) {
+            if (skip.includes(trial)) {
+                continue;
+            }
+
             const file = path.join(stampDir, trial, "result.json");
             if (fs.existsSync(file)) {
                 found.push(file);
@@ -220,7 +236,7 @@ function readTrials(runsRoot, rate, sources = SOURCES) {
     const rows = [];
     const errors = [];
     for (const source of sources) {
-        for (const file of trials(runsRoot, source.dir)) {
+        for (const file of trials(runsRoot, source.dir, source.skip)) {
             let trial;
             try {
                 trial = JSON.parse(fs.readFileSync(file, "utf8"));
