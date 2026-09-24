@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "measuredAt": "2026-09-24T02:55:39.753Z",
+    "measuredAt": "2026-09-24T03:17:06.224Z",
     "specpiVersion": "0.33.0",
     "piVersion": "0.84.4",
     "nodeVersion": "v24.18.0",
@@ -39,7 +39,7 @@
             },
             "toolSchemaChars": 2901,
             "instructionChars": 2620,
-            "requestSha256": "c454422519e3452ef1f76a51f947a05dd0d1c7cf075e3569992d6a6878db060a",
+            "requestSha256": "b924b24e6510323389fbe78288eb14c6aefaab6b4ca4530a57d65c8640043e48",
             "instructionSections": {
                 "tools": 341,
                 "guidelines": 836,
@@ -78,13 +78,13 @@
                 "get_goal": 698
             },
             "toolSchemaChars": 7474,
-            "instructionChars": 4303,
-            "requestSha256": "9937e7bfe4becc3417a8005480ccdd61673df5a086212cb0a799f31582f7c0ba",
+            "instructionChars": 4536,
+            "requestSha256": "2f25681f3a8e0c6da6504374800ae3cea3df6269fac32dcd155b889e4c9a8269",
             "instructionSections": {
                 "tools": 478,
                 "guidelines": 1122,
                 "docs": 1207,
-                "project_context": 1257,
+                "project_context": 1490,
                 "skills": 0,
                 "other": 239
             },
@@ -156,13 +156,13 @@
                 "get_search_content": 1539
             },
             "toolSchemaChars": 31478,
-            "instructionChars": 4947,
-            "requestSha256": "c60b2b122dee6370dfed3bb12b6ea1487ff5f877fba480174db8d2d5ab8cb6a4",
+            "instructionChars": 5180,
+            "requestSha256": "0ef14993075f9c8e6b6c06d860a0647bd6172556a24340c4d519a278184328b7",
             "instructionSections": {
                 "tools": 1122,
                 "guidelines": 1122,
                 "docs": 1207,
-                "project_context": 1257,
+                "project_context": 1490,
                 "skills": 0,
                 "other": 239
             },
@@ -201,7 +201,7 @@
             },
             "toolSchemaChars": 48467,
             "instructionChars": 18241,
-            "requestSha256": "7f60b8fd1930ea0384f636f5f57b8763fd163695752df6058bed85bb840f3a0d"
+            "requestSha256": "aeaf5b195f44f23f0bf09e6b0a19f26aec6db5383bb313edd3736d5397435c18"
         },
         {
             "label": "OpenCode",
@@ -233,7 +233,7 @@
             },
             "toolSchemaChars": 21464,
             "instructionChars": 9579,
-            "requestSha256": "dde186ab31c8d1a22a78cbad25302dc449a5cacac19a576d55ef6def4d453eb6"
+            "requestSha256": "6ed7f57edc09f064c4a235897a54f46d7eda01c25291fcc16b45dcece1e0250b"
         },
         {
             "label": "DeepSeek Harness",
@@ -295,7 +295,7 @@
             },
             "toolSchemaChars": 27057,
             "instructionChars": 4686,
-            "requestSha256": "1d543d735f4fe2fe2077ac30197501d184c1f0351c26e13c93b3196f45d2642e"
+            "requestSha256": "69c023d3f7471b5f9c3d2cb804bf99898c0a5bf8bb095fd92f4aec4521b14cb9"
         }
     ]
 }
