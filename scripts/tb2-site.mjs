@@ -168,7 +168,7 @@ function renderCharts(data) {
     charts["chart-cache"] = hbars({
         id: "chart-cache",
         title: "Prompt cache hit rate",
-        axisLabel: "cached share of prompt tokens, Terminal-Bench slices pooled",
+        axisLabel: "cached share of prompt tokens, each benchmark pooled on its own",
         groups: [
             {
                 label: "Terminal-Bench",

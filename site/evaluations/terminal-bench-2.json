@@ -2218,8 +2218,32 @@
                 "costIsUpperBound": false,
                 "costAttempts": 36
             },
-            "omp": null,
-            "claude-code": null,
+            "omp": {
+                "attempts": 36,
+                "solved": 35,
+                "rate": 0.9722222222222222,
+                "tasks": 12,
+                "inputTokens": 373792,
+                "outputTokens": 7098,
+                "cacheHitRate": 0.9418819071648508,
+                "cost": 0.008573744333333334,
+                "outputCostShare": 0.4967413498411994,
+                "costIsUpperBound": false,
+                "costAttempts": 36
+            },
+            "claude-code": {
+                "attempts": 36,
+                "solved": 35,
+                "rate": 0.9722222222222222,
+                "tasks": 12,
+                "inputTokens": 744689,
+                "outputTokens": 12350,
+                "cacheHitRate": 0.9604154218172921,
+                "cost": 0.013977177833333333,
+                "outputCostShare": 0.5301368241159127,
+                "costIsUpperBound": false,
+                "costAttempts": 36
+            },
             "opencode": null,
             "dsh": null
         },
@@ -2253,8 +2277,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 478094,
+                        "outputTokens": 8154,
+                        "cacheHitRate": 0.9539211954134542,
+                        "cost": 0.009564892,
+                        "outputCostShare": 0.5114746721656658,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 788426,
+                        "outputTokens": 15100,
+                        "cacheHitRate": 0.9665160008607864,
+                        "cost": 0.015306230000000002,
+                        "outputCostShare": 0.5919289073795441,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2288,8 +2336,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 470955,
+                        "outputTokens": 8841,
+                        "cacheHitRate": 0.9699207143494146,
+                        "cost": 0.008799868,
+                        "outputCostShare": 0.6028044966129037,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 887236,
+                        "outputTokens": 13492,
+                        "cacheHitRate": 0.9746767769705681,
+                        "cost": 0.014059853999999998,
+                        "outputCostShare": 0.5757812278847277,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2323,8 +2395,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 361527,
+                        "outputTokens": 8056,
+                        "cacheHitRate": 0.9158191043361446,
+                        "cost": 0.010392129999999998,
+                        "outputCostShare": 0.4651404476271948,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 928368,
+                        "outputTokens": 17841,
+                        "cacheHitRate": 0.9524039317741815,
+                        "cost": 0.019984944,
+                        "outputCostShare": 0.5356232171578765,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2358,8 +2454,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 2,
+                        "rate": 0.6666666666666666,
+                        "tasks": 1,
+                        "inputTokens": 367300,
+                        "outputTokens": 6467,
+                        "cacheHitRate": 0.9643842777164192,
+                        "cost": 0.006905106,
+                        "outputCostShare": 0.5619319964096133,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 2,
+                        "rate": 0.6666666666666666,
+                        "tasks": 1,
+                        "inputTokens": 724940,
+                        "outputTokens": 11448,
+                        "cacheHitRate": 0.9611678386405134,
+                        "cost": 0.013181817999999998,
+                        "outputCostShare": 0.5210813864976743,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2393,8 +2513,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 4,
+                        "solved": 4,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 290863,
+                        "outputTokens": 6662,
+                        "cacheHitRate": 0.944499644162372,
+                        "cost": 0.007242509999999999,
+                        "outputCostShare": 0.5518666871015712,
+                        "costIsUpperBound": false,
+                        "costAttempts": 4
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 757927,
+                        "outputTokens": 10506,
+                        "cacheHitRate": 0.9611057529287121,
+                        "cost": 0.012910594,
+                        "outputCostShare": 0.4882347008975729,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2428,8 +2572,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 450447,
+                        "outputTokens": 5836,
+                        "cacheHitRate": 0.9110239384433685,
+                        "cost": 0.010744354,
+                        "outputCostShare": 0.3258827845769042,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 577246,
+                        "outputTokens": 5521,
+                        "cacheHitRate": 0.959035974820686,
+                        "cost": 0.00852055,
+                        "outputCostShare": 0.388801192411288,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2463,8 +2631,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 446711,
+                        "outputTokens": 8356,
+                        "cacheHitRate": 0.9230360546034949,
+                        "cost": 0.011407891999999998,
+                        "outputCostShare": 0.43950275826594437,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 931946,
+                        "outputTokens": 17345,
+                        "cacheHitRate": 0.9614294395560257,
+                        "cost": 0.01848705,
+                        "outputCostShare": 0.5629454131405498,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2498,8 +2690,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 2,
+                        "solved": 2,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 410504,
+                        "outputTokens": 7654,
+                        "cacheHitRate": 0.956016209362405,
+                        "cost": 0.008478069,
+                        "outputCostShare": 0.541679950941659,
+                        "costIsUpperBound": false,
+                        "costAttempts": 2
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 692312,
+                        "outputTokens": 13700,
+                        "cacheHitRate": 0.9571638220917736,
+                        "cost": 0.014656367999999998,
+                        "outputCostShare": 0.5608483629777856,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2533,8 +2749,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 421926,
+                        "outputTokens": 8004,
+                        "cacheHitRate": 0.9503601345260658,
+                        "cost": 0.009146794,
+                        "outputCostShare": 0.5250145570130911,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 732902,
+                        "outputTokens": 16370,
+                        "cacheHitRate": 0.9511344177595448,
+                        "cost": 0.017285514,
+                        "outputCostShare": 0.5682330302703177,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2568,8 +2808,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 408734,
+                        "outputTokens": 8879,
+                        "cacheHitRate": 0.9262298758523276,
+                        "cost": 0.010986194,
+                        "outputCostShare": 0.48493591138113884,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 987184,
+                        "outputTokens": 16193,
+                        "cacheHitRate": 0.9763093890266357,
+                        "cost": 0.016115442,
+                        "outputCostShare": 0.6029000011293516,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2603,8 +2867,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 242347,
+                        "outputTokens": 4237,
+                        "cacheHitRate": 0.9514084507042253,
+                        "cost": 0.005000112,
+                        "outputCostShare": 0.5083886120950891,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 262284,
+                        "outputTokens": 4847,
+                        "cacheHitRate": 0.9547297906978813,
+                        "cost": 0.005440481999999999,
+                        "outputCostShare": 0.5345482256902974,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2638,8 +2926,32 @@
                         "costIsUpperBound": false,
                         "costAttempts": 3
                     },
-                    "omp": null,
-                    "claude-code": null,
+                    "omp": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 175972,
+                        "outputTokens": 4364,
+                        "cacheHitRate": 0.9426954288182211,
+                        "cost": 0.004628864,
+                        "outputCostShare": 0.5657111550479772,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
+                    "claude-code": {
+                        "attempts": 3,
+                        "solved": 3,
+                        "rate": 1,
+                        "tasks": 1,
+                        "inputTokens": 665495,
+                        "outputTokens": 5832,
+                        "cacheHitRate": 0.9357891172681574,
+                        "cost": 0.011777287999999999,
+                        "outputCostShare": 0.2971142422601876,
+                        "costIsUpperBound": false,
+                        "costAttempts": 3
+                    },
                     "opencode": null,
                     "dsh": null
                 }
@@ -2647,7 +2959,7 @@
         ],
         "p": 1.0000000000000038
     },
-    "sweAttempts": 72,
+    "sweAttempts": 144,
     "excluded": [
         {
             "sitting": "s4",

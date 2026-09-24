@@ -107,6 +107,15 @@ const EXCLUDED = [
 const SWE_SOURCES = [
     { sitting: "swe", slice: "swe", arm: "pi", dir: "swe-v033-easy12-20260924-013432/pi" },
     { sitting: "swe", slice: "swe", arm: "specpi", dir: "swe-v033-easy12-20260924-013432/sp033" },
+    // Same tasks, attempts, model and endpoint, launched the next morning.
+    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-20260924-095703/omp" },
+    // Five Oh My Pi attempts failed to set up (package mirror and GitHub downloads, before the agent
+    // started), so exactly those five were run again, to reach the same 36 as every other row.
+    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-redo1-20260924-104348/omp" },
+    { sitting: "swe", slice: "swe", arm: "omp", dir: "swe-omp-redo2-20260924-104348/omp" },
+    { sitting: "swe", slice: "swe", arm: "claude-code", dir: "swe-cc-20260924-095326/claude-code" },
+    // One Claude Code attempt failed to set up (a package download), and was run again the same way.
+    { sitting: "swe", slice: "swe", arm: "claude-code", dir: "swe-cc-redo-20260924-112930/claude-code" },
 ];
 
 const SITTINGS = {
