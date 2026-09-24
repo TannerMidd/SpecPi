@@ -12,7 +12,7 @@
         <meta property="og:title" content="Evaluations · SpecPi" />
         <meta
             property="og:description"
-            content="Terminal-Bench 2.0, seven harnesses, one model. An in-progress run, published as it stands."
+            content="Terminal-Bench 2.0, six harnesses, one model. An in-progress run, published as it stands."
         />
         <meta property="og:type" content="article" />
         <meta property="og:url" content="https://tannermidd.github.io/SpecPi/evaluations/" />
@@ -44,231 +44,108 @@
             <aside class="wiki-sidebar" aria-label="Evaluation contents">
                 <p>SPECPI / EVALUATIONS</p>
                 <nav>
-                    <a href="#summary"><span>01</span>Summary</a>
-                    <a href="#method"><span>02</span>Method</a>
-                    <a href="#solved"><span>03</span>Solve rate</a>
-                    <a href="#sittings"><span>04</span>Sitting spread</a>
-                    <a href="#spend"><span>05</span>Tokens and cost</a>
-                    <a href="#cache"><span>06</span>Cache</a>
-                    <a href="#tasks"><span>07</span>Task by task</a>
-                    <a href="#release"><span>08</span>Release check</a>
+                    <a href="#summary"><span>01</span>Head to head</a>
+                    <a href="#swe"><span>02</span>SWE-bench</a>
+                    <a href="#solved"><span>03</span>All harnesses</a>
+                    <a href="#spend"><span>04</span>Spend</a>
+                    <a href="#sittings"><span>05</span>Noise</a>
+                    <a href="#tasks"><span>06</span>Task by task</a>
+                    <a href="#method"><span>07</span>Method</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.33.0<br />Pi <span data-eval="pi-version"></span><br /><span id="meta-generated"></span><br /><span id="meta-status"></span></div>
+                <div class="index-meta">SpecPi 0.34.0<br />Pi <span data-eval="pi-version"></span><br /><span id="meta-generated"></span><br /><span id="meta-status"></span></div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
                     <p class="eyebrow">Evaluations</p>
-                    <h1>Seven harnesses.<br />One benchmark.</h1>
+                    <h1>Six harnesses.<br />One model.</h1>
                     <p class="wiki-summary">
-                        Pi, SpecPi, SpecPi&nbsp;+&nbsp;Jev, Oh My Pi, Claude Code, OpenCode and the DeepSeek Harness on
-                        <a class="text-link" href="https://www.tbench.ai/">Terminal-Bench 2.0</a>.
-                        Same model and endpoint.
+                        <a class="text-link" href="https://www.tbench.ai/">Terminal-Bench 2.0</a>, one model, one
+                        endpoint. Only the harness changes.
                     </p>
                     <p class="wiki-release-note">
-                        <b><span data-eval="total-attempts"></span> attempts over <span data-eval="sitting-count"></span>
-                            sittings.</b> Plain SpecPi joins in the last, a release check of 0.33.0 against 0.31.0.
-                        <a class="text-link" href="./terminal-bench-2.json">View the data.</a>
+                        <b><span data-eval="total-attempts"></span> attempts · <span data-eval="sitting-count"></span>
+                            sittings.</b> SpecPi v0.33.0, Jev off.
+                        <a class="text-link" href="./terminal-bench-2.json">Data</a>
                     </p>
                 </div>
 
+                <div class="metric-row" id="metric-row"></div>
+
                 <section class="doc-section" id="summary">
                     <header>
-                        <h2>Summary</h2>
+                        <h2>Head to head</h2>
                         <span>01</span>
                     </header>
-                    <p>
-                        No pair of harnesses differs significantly on solve rate in the sittings where both
-                        ran.<span data-eval="pooled-separations" data-eval-optional></span> In the sittings where both ran, SpecPi&nbsp;+&nbsp;Jev sent fewer prompt tokens than bare
-                        Pi in <b data-eval="paired-token-count"></b>, by <b data-eval="paired-token-range"></b
-                        ><span data-eval="paired-token-exception" data-eval-optional></span>.
-                        It cost less in <b data-eval="paired-cost-count"></b>, by about
-                        <b data-eval="paired-cost-typical"></b>: output tokens are
-                        <b data-eval="output-share"></b> of every harness's bill, so a prompt-token saving moves
-                        cost much less than it looks.
-                    </p>
-                    <div class="metric-row" id="metric-row"></div>
-                    <div class="callout callout-warn">
-                        <p>
-                            <strong>One sitting cannot support a claim here.</strong>
-                            Bare Pi &mdash; unchanged software, the same thirteen tasks, the same machine &mdash;
-                            solved <b data-eval="pi-sitting-scores"></b> of 39 across
-                            <span data-eval="pi-sitting-count"></span> launches. That
-                            <span data-eval="pi-swing-solves"></span>-solve spread is wider than any gap this
-                            benchmark has measured between two harnesses.
-                        </p>
-                        <p>
-                            Every figure below is therefore pooled across sittings, and section 04 shows the
-                            per-sitting spread rather than hiding it inside a mean. Comparisons between harnesses
-                            use only the sittings where both ran. An earlier reading that set two separate runs
-                            side by side appeared to show a SpecPi advantage; it did not survive being repeated.
-                        </p>
-                    </div>
+                    <figure class="chart-figure">
+                        <!-- chart-headtohead --><svg class="chart" id="chart-headtohead" viewBox="0 0 480 360" style="max-width:640px" role="img" preserveAspectRatio="xMidYMid meet" aria-label="SpecPi against Pi, in the sittings both ran"><circle cx="6" cy="10" r="6" fill="var(--ct-pi)" /><text x="18" y="14" class="ct-lb">Pi (base)</text><circle cx="96" cy="10" r="6" fill="var(--ct-specpi)" /><text x="108" y="14" class="ct-lb">SpecPi</text><text x="480" y="14" text-anchor="end" class="ct-lb">SpecPi vs Pi</text><text x="0" y="46" class="ct-row">Solved<tspan class="ct-sub" dx="8">widened slice · p = 0.21</tspan></text><text x="480" y="46" text-anchor="end" class="ct-val" style="fill:var(--ct-specpi)">+15 pts<tspan class="ct-sub" dx="8">25/39 → 30/38</tspan></text><line x1="8" y1="76" x2="472" y2="76" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="305.4" y1="76" x2="374.3" y2="76" stroke="var(--ct-specpi)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="305.4" cy="76" r="7" fill="var(--ct-pi)"><title>Pi: 25/39</title></circle><circle cx="374.3" cy="76" r="7" fill="var(--ct-specpi)"><title>SpecPi: 30/38</title></circle><text x="0" y="112" class="ct-row"><tspan font-family="var(--mono)">sanitize-git-repo</tspan><tspan class="ct-sub" dx="8">10 attempts · p = 0.003</tspan></text><text x="480" y="112" text-anchor="end" class="ct-val" style="fill:var(--ct-specpi)">+70 pts<tspan class="ct-sub" dx="8">3/10 → 10/10</tspan></text><line x1="8" y1="142" x2="472" y2="142" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="147.2" y1="142" x2="472.0" y2="142" stroke="var(--ct-specpi)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="147.2" cy="142" r="7" fill="var(--ct-pi)"><title>Pi: 3/10</title></circle><circle cx="472.0" cy="142" r="7" fill="var(--ct-specpi)"><title>SpecPi: 10/10</title></circle><text x="0" y="178" class="ct-row"><tspan font-family="var(--mono)">fix-git</tspan><tspan class="ct-sub" dx="8">10 attempts · p = 1.00</tspan></text><text x="480" y="178" text-anchor="end" class="ct-val" style="fill:var(--muted)">level<tspan class="ct-sub" dx="8">10/10 → 10/10</tspan></text><line x1="8" y1="208" x2="472" y2="208" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="472.0" y1="208" x2="472.0" y2="208" stroke="var(--muted)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="472.0" cy="208" r="10.5" fill="none" stroke="var(--ct-pi)" stroke-width="2.5"><title>Pi: 10/10</title></circle><circle cx="472.0" cy="208" r="7" fill="var(--ct-specpi)"><title>SpecPi: 10/10</title></circle><text x="0" y="244" class="ct-row">Prompt tokens<tspan class="ct-sub" dx="8">per attempt</tspan></text><text x="480" y="244" text-anchor="end" class="ct-val" style="fill:var(--ct-specpi)">−16%<tspan class="ct-sub" dx="8">454k → 382k</tspan></text><line x1="8" y1="274" x2="472" y2="274" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="411.5" y1="274" x2="347.5" y2="274" stroke="var(--ct-specpi)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="411.5" cy="274" r="7" fill="var(--ct-pi)"><title>Pi: 454k</title></circle><circle cx="347.5" cy="274" r="7" fill="var(--ct-specpi)"><title>SpecPi: 382k</title></circle><text x="0" y="310" class="ct-row">Cost<tspan class="ct-sub" dx="8">per attempt</tspan></text><text x="480" y="310" text-anchor="end" class="ct-val" style="fill:var(--ct-specpi)">−22%<tspan class="ct-sub" dx="8">$0.0146 → $0.0114</tspan></text><line x1="8" y1="340" x2="472" y2="340" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="411.5" y1="340" x2="322.5" y2="340" stroke="var(--ct-specpi)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="411.5" cy="340" r="7" fill="var(--ct-pi)"><title>Pi: $0.0146</title></circle><circle cx="322.5" cy="340" r="7" fill="var(--ct-specpi)"><title>SpecPi: $0.0114</title></circle></svg><!-- /chart-headtohead -->
+                        <figcaption class="figure-note">
+                            SpecPi against bare Pi, same sitting, same tasks. Green is better for SpecPi.
+                        </figcaption>
+                    </figure>
                 </section>
 
-                <section class="doc-section" id="method">
+                <section class="doc-section" id="swe">
                     <header>
-                        <h2>How it is measured</h2>
+                        <h2>SWE-bench</h2>
                         <span>02</span>
                     </header>
-                    <ul>
-                        <li>
-                            <b>Setup:</b> <code>deepseek-v4.1-flash</code>, one endpoint,
-                            <a class="text-link" href="https://github.com/laude-institute/harbor">Harbor</a> on Docker.
-                        </li>
-                        <li>
-                            <b>Trials:</b> 7 calibration tasks &times; 5 attempts; 13 widened tasks &times; 3 per
-                            sitting (Oh My Pi &times; 6), repeated across the sittings in section 04. The 24 Sep
-                            release check adds seven attempts on two git tasks and a SWE-bench Verified subset; see
-                            section 08.
-                        </li>
-                        <li>
-                            <b>Scoring:</b> Harbor rewards and token counts. Costs use the
-                            <a class="text-link" href="https://github.com/TannerMidd/SpecPi/blob/main/evals/prices.json"
-                                >frozen price list</a
-                            >.
-                            One broken task excluded; <span data-eval="unscored-count"></span> failed setups unscored.
-                        </li>
-                        <li>
-                            <b>OpenCode and the DeepSeek Harness:</b> one sitting each, run beside Pi and
-                            SpecPi&nbsp;+&nbsp;Jev. OpenCode's reasoning tokens are read from its trajectory, because
-                            Harbor leaves them out of its output count. The DeepSeek Harness reports no usage, so a
-                            proxy inside the container counts what it sends. It is pinned to 0.1.5-rc.3, since the
-                            current <code>latest</code> no longer starts. OpenCode's three <code>sqlite-with-gcov</code>
-                            attempts stalled after their first minute, waiting on a model response that never
-                            closed, and are scored as failures like any other timeout.
-                        </li>
-                        <li>
-                            <b>Builds:</b> every Pi-derived trial reported Pi <span data-eval="pi-version"></span>.
-                            <span data-eval="jev-build-note"></span>
-                        </li>
-                        <li>
-                            <b>Not in the cost:</b> SpecPi&nbsp;+&nbsp;Jev's figure is the agent's own tokens. Harbor
-                            does not record the Jev advisor's calls &mdash; its own ledger shows
-                            <span data-eval="advisor-calls"></span> &mdash; so they are left out rather than
-                            estimated. At the advisor's listed <span data-eval="advisor-price"></span> per million
-                            input tokens, with output free, they are small beside the agent's spend.
-                        </li>
-                    </ul>
+                    <figure class="chart-figure">
+                        <!-- chart-swe --><svg class="chart" id="chart-swe" viewBox="0 0 480 228" style="max-width:640px" role="img" preserveAspectRatio="xMidYMid meet" aria-label="SpecPi against Pi on SWE-bench Verified"><circle cx="6" cy="10" r="6" fill="var(--ct-pi)" /><text x="18" y="14" class="ct-lb">Pi (base)</text><circle cx="96" cy="10" r="6" fill="var(--ct-specpi)" /><text x="108" y="14" class="ct-lb">SpecPi</text><text x="480" y="14" text-anchor="end" class="ct-lb">SpecPi vs Pi</text><text x="0" y="46" class="ct-row">Solved<tspan class="ct-sub" dx="8">12 tasks · p = 1.00</tspan></text><text x="480" y="46" text-anchor="end" class="ct-val" style="fill:var(--muted)">level<tspan class="ct-sub" dx="8">34/36 → 34/36</tspan></text><line x1="8" y1="76" x2="472" y2="76" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="446.2" y1="76" x2="446.2" y2="76" stroke="var(--muted)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="446.2" cy="76" r="10.5" fill="none" stroke="var(--ct-pi)" stroke-width="2.5"><title>Pi: 34/36</title></circle><circle cx="446.2" cy="76" r="7" fill="var(--ct-specpi)"><title>SpecPi: 34/36</title></circle><text x="0" y="112" class="ct-row">Prompt tokens<tspan class="ct-sub" dx="8">per attempt</tspan></text><text x="480" y="112" text-anchor="end" class="ct-val" style="fill:var(--ct-warn, #b45309)">+2%<tspan class="ct-sub" dx="8">303k → 309k</tspan></text><line x1="8" y1="142" x2="472" y2="142" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="404.0" y1="142" x2="411.5" y2="142" stroke="var(--ct-warn, #b45309)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="404.0" cy="142" r="7" fill="var(--ct-pi)"><title>Pi: 303k</title></circle><circle cx="411.5" cy="142" r="7" fill="var(--ct-specpi)"><title>SpecPi: 309k</title></circle><text x="0" y="178" class="ct-row">Cost<tspan class="ct-sub" dx="8">per attempt</tspan></text><text x="480" y="178" text-anchor="end" class="ct-val" style="fill:var(--ct-specpi)">−1%<tspan class="ct-sub" dx="8">$0.0069 → $0.0068</tspan></text><line x1="8" y1="208" x2="472" y2="208" stroke="var(--line)" stroke-width="2" stroke-linecap="round" /><line x1="411.5" y1="208" x2="407.7" y2="208" stroke="var(--ct-specpi)" stroke-width="4" stroke-linecap="round" opacity=".55" /><circle cx="411.5" cy="208" r="7" fill="var(--ct-pi)"><title>Pi: $0.0069</title></circle><circle cx="407.7" cy="208" r="7" fill="var(--ct-specpi)"><title>SpecPi: $0.0068</title></circle></svg><!-- /chart-swe -->
+                        <figcaption class="figure-note">
+                            <a class="text-link" href="https://www.swebench.com/">SWE-bench Verified</a>, 12 tasks × 3
+                            attempts, same night and model. Level: this benchmark does not separate the two.
+                        </figcaption>
+                    </figure>
                 </section>
 
                 <section class="doc-section" id="solved">
                     <header>
-                        <h2>Solve rate</h2>
+                        <h2>All harnesses</h2>
                         <span>03</span>
                     </header>
-                    <p>
-                        Pooled over every sitting, Pi solves <b data-eval="pi-pooled"></b> and
-                        SpecPi&nbsp;+&nbsp;Jev <b data-eval="jev-pooled"></b>, Fisher
-                        <i>p</i>&nbsp;=&nbsp;<span data-eval="pi-jev-p"></span>. Restricted to the sittings where
-                        both ran, it is <b data-eval="paired-solved"></b>, <i>p</i>&nbsp;=&nbsp;<span
-                            data-eval="paired-solved-p"
-                        ></span>. No pair of harnesses separates in the sittings where both ran. The <b>per-sitting range</b> column is the one to read beside each rate.
-                    </p>
                     <figure class="chart-figure">
-                        <!-- chart-solve --><svg class="chart" id="chart-solve" viewBox="0 0 720 496" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Solved, per attempt"><text x="0" y="18" class="ct-lb">Solved, per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="460" stroke="var(--line)" opacity=".85" /><text x="150.0" y="477" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="260.0" y="477" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="370.0" y="477" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="480.0" y="477" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="590.0" y="477" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="377.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="535.1" y="78" class="ct-val">30/35</text><rect x="150.0" y="87" width="402.3" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="560.3" y="100" class="ct-val">32/35</text><rect x="150.0" y="109" width="389.7" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="547.7" y="122" class="ct-val">31/35</text><rect x="150.0" y="131" width="389.7" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">Claude Code</text><text x="547.7" y="144" class="ct-val">31/35</text><text x="0" y="179" class="ct-row">Widened · 13 tasks × 3 and 6 and 18 and 21</text><rect x="150.0" y="186" width="301.4" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">Pi (base)</text><text x="459.4" y="199" class="ct-val">187/273</text><rect x="150.0" y="208" width="347.4" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="505.4" y="221" class="ct-val">30/38</text><rect x="150.0" y="230" width="338.5" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="496.5" y="243" class="ct-val">30/39</text><rect x="150.0" y="252" width="310.3" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="468.3" y="265" class="ct-val">165/234</text><rect x="150.0" y="274" width="332.8" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="490.8" y="287" class="ct-val">59/78</text><rect x="150.0" y="296" width="285.7" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">Claude Code</text><text x="443.7" y="309" class="ct-val">50/77</text><rect x="150.0" y="318" width="327.2" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">OpenCode</text><text x="485.2" y="331" class="ct-val">29/39</text><rect x="150.0" y="340" width="243.2" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="353" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="401.2" y="353" class="ct-val">21/38</text><text x="0" y="388" class="ct-row">Git pair · 2 tasks × 7</text><rect x="150.0" y="395" width="282.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="408" text-anchor="end" class="ct-sub">Pi (base)</text><text x="440.9" y="408" class="ct-val">9/14</text><rect x="150.0" y="417" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="430" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="598.0" y="430" class="ct-val">14/14</text><rect x="150.0" y="439" width="345.7" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="452" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="503.7" y="452" class="ct-val">11/14</text><text x="0" y="490" class="ct-ax">share of attempts reaching reward 1</text></svg><!-- /chart-solve -->
+                        <!-- chart-solve --><svg class="chart" id="chart-solve" viewBox="0 0 720 408" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Solved, per attempt"><text x="0" y="18" class="ct-lb">Solved, per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="372" stroke="var(--line)" opacity=".85" /><text x="150.0" y="389" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="260.0" y="389" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="370.0" y="389" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="480.0" y="389" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="590.0" y="389" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="377.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="535.1" y="78" class="ct-val">30/35</text><rect x="150.0" y="87" width="389.7" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="547.7" y="100" class="ct-val">31/35</text><rect x="150.0" y="109" width="389.7" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Claude Code</text><text x="547.7" y="122" class="ct-val">31/35</text><text x="0" y="157" class="ct-row">Widened · 13 tasks × 3 and 6 and 9 and 15</text><rect x="150.0" y="164" width="302.4" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">Pi (base)</text><text x="460.4" y="177" class="ct-val">134/195</text><rect x="150.0" y="186" width="354.3" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">SpecPi</text><text x="512.3" y="199" class="ct-val">62/77</text><rect x="150.0" y="208" width="318.6" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="476.6" y="221" class="ct-val">84/116</text><rect x="150.0" y="230" width="285.7" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">Claude Code</text><text x="443.7" y="243" class="ct-val">50/77</text><rect x="150.0" y="252" width="327.2" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">OpenCode</text><text x="485.2" y="265" class="ct-val">29/39</text><rect x="150.0" y="274" width="243.2" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="401.2" y="287" class="ct-val">21/38</text><text x="0" y="322" class="ct-row">Git pair · 2 tasks × 7</text><rect x="150.0" y="329" width="282.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="342" text-anchor="end" class="ct-sub">Pi (base)</text><text x="440.9" y="342" class="ct-val">9/14</text><rect x="150.0" y="351" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="364" text-anchor="end" class="ct-sub">SpecPi</text><text x="598.0" y="364" class="ct-val">14/14</text><text x="0" y="402" class="ct-ax">share of attempts reaching reward 1</text></svg><!-- /chart-solve -->
                         <figcaption class="figure-note">
-                            Reward 1 counts as solved. A duplicate launch gave Oh My Pi six widened attempts per
-                            task and 12-way concurrency, versus three attempts and six-way concurrency for the others.
+                            Reward 1 counts as solved. Pooled across sittings; the range column says how much one
+                            sitting moves.
                         </figcaption>
                     </figure>
                     <div class="table-scroll" id="table-overall">
-                        <!-- table-overall --><table class="numeric"><thead><tr><th>Harness</th><th>Solved</th><th>Rate</th><th>Per-sitting range</th><th>Prompt tok</th><th>Cache hit</th><th>Cost/attempt</th></tr></thead><tbody><tr><th>Pi (base)</th><td>217/308</td><td>0.705</td><td>54&ndash;82% (7)</td><td>451,629</td><td>93.1%</td><td>$0.0156</td></tr><tr><th>SpecPi v0.33.0</th><td>30/38</td><td>0.789</td><td>one sitting</td><td>382,362</td><td>95.1%</td><td>$0.0114</td></tr><tr><th>SpecPi v0.31.0</th><td>30/39</td><td>0.769</td><td>one sitting</td><td>451,906</td><td>96.0%</td><td>$0.0130</td></tr><tr><th>SpecPi + Jev</th><td>197/269</td><td>0.732</td><td>59&ndash;77% (6)</td><td>405,712</td><td>93.6%</td><td>$0.0142</td></tr><tr><th>Oh My Pi</th><td>90/113</td><td>0.796</td><td>one sitting</td><td>1,103,136</td><td>97.4%</td><td>$0.0216</td></tr><tr><th>Claude Code</th><td>81/112</td><td>0.723</td><td>64&ndash;66% (2)</td><td>670,828</td><td>95.4%</td><td>$0.0273</td></tr><tr><th>OpenCode</th><td>29/39</td><td>0.744</td><td>one sitting</td><td>494,173</td><td>96.5%</td><td>$0.0124</td></tr><tr><th>DeepSeek Harness</th><td>21/38</td><td>0.553</td><td>one sitting</td><td>1,126,586</td><td>95.4%</td><td>$0.0226</td></tr></tbody></table><!-- /table-overall -->
+                        <!-- table-overall --><table class="numeric"><thead><tr><th>Harness</th><th>Solved</th><th>Rate</th><th>Per-sitting range</th><th>Prompt tok</th><th>Cache hit</th><th>Cost/attempt</th></tr></thead><tbody><tr><th>Pi (base)</th><td>164/230</td><td>0.713</td><td>56&ndash;77% (5)</td><td>436,214</td><td>92.9%</td><td>$0.0155</td></tr><tr><th>SpecPi</th><td>62/77</td><td>0.805</td><td>79&ndash;82% (2)</td><td>407,416</td><td>92.4%</td><td>$0.0144</td></tr><tr><th>Oh My Pi</th><td>115/151</td><td>0.762</td><td>66&ndash;76% (2)</td><td>1,108,076</td><td>96.5%</td><td>$0.0237</td></tr><tr><th>Claude Code</th><td>81/112</td><td>0.723</td><td>64&ndash;66% (2)</td><td>670,828</td><td>95.4%</td><td>$0.0273</td></tr><tr><th>OpenCode</th><td>29/39</td><td>0.744</td><td>one sitting</td><td>494,173</td><td>96.5%</td><td>$0.0124</td></tr><tr><th>DeepSeek Harness</th><td>21/38</td><td>0.553</td><td>one sitting</td><td>1,126,586</td><td>95.4%</td><td>$0.0226</td></tr></tbody></table><!-- /table-overall -->
                     </div>
-                </section>
-
-                <section class="doc-section" id="sittings">
-                    <header>
-                        <h2>How much a sitting moves</h2>
-                        <span>04</span>
-                    </header>
-                    <p>
-                        Each bar is one launch of 39 attempts on the same thirteen tasks, same model, same
-                        endpoint, same machine. Nothing changed between them except the hour.
-                    </p>
-                    <figure class="chart-figure">
-                        <!-- chart-sittings --><svg class="chart" id="chart-sittings" viewBox="0 0 720 496" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Solve rate, one bar per sitting"><text x="0" y="18" class="ct-lb">Solve rate, one bar per sitting</text><line x1="150.0" y1="34" x2="150.0" y2="460" stroke="var(--line)" opacity=".85" /><text x="150.0" y="477" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="260.0" y="477" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="370.0" y="477" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="480.0" y="477" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="590.0" y="477" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Pi (base) · 54-82%</text><rect x="150.0" y="65" width="338.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">21 Sep</text><text x="496.5" y="78" class="ct-val">30/39</text><rect x="150.0" y="87" width="248.2" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">22 Sep · b</text><text x="406.2" y="100" class="ct-val">22/39</text><rect x="150.0" y="109" width="236.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">22 Sep · c</text><text x="394.9" y="122" class="ct-val">21/39</text><rect x="150.0" y="131" width="338.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">22 Sep · d</text><text x="496.5" y="144" class="ct-val">30/39</text><rect x="150.0" y="153" width="361.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="166" text-anchor="end" class="ct-sub">22 Sep · e</text><text x="519.0" y="166" class="ct-val">32/39</text><rect x="150.0" y="175" width="304.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="188" text-anchor="end" class="ct-sub">22 Sep · f</text><text x="462.6" y="188" class="ct-val">27/39</text><rect x="150.0" y="197" width="282.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="210" text-anchor="end" class="ct-sub">24 Sep</text><text x="440.1" y="210" class="ct-val">25/39</text><text x="0" y="245" class="ct-row">SpecPi + Jev · 59-77%</text><rect x="150.0" y="252" width="338.5" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">21 Sep</text><text x="496.5" y="265" class="ct-val">30/39</text><rect x="150.0" y="274" width="338.5" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">22 Sep · a</text><text x="496.5" y="287" class="ct-val">30/39</text><rect x="150.0" y="296" width="293.3" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">22 Sep · c</text><text x="451.3" y="309" class="ct-val">26/39</text><rect x="150.0" y="318" width="338.5" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">22 Sep · d</text><text x="496.5" y="331" class="ct-val">30/39</text><rect x="150.0" y="340" width="293.3" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="353" text-anchor="end" class="ct-sub">22 Sep · e</text><text x="451.3" y="353" class="ct-val">26/39</text><rect x="150.0" y="362" width="259.5" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="375" text-anchor="end" class="ct-sub">22 Sep · f</text><text x="417.5" y="375" class="ct-val">23/39</text><text x="0" y="410" class="ct-row">Claude Code · 64-66%</text><rect x="150.0" y="417" width="289.5" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="430" text-anchor="end" class="ct-sub">21 Sep</text><text x="447.5" y="430" class="ct-val">25/38</text><rect x="150.0" y="439" width="282.1" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="452" text-anchor="end" class="ct-sub">22 Sep · a</text><text x="440.1" y="452" class="ct-val">25/39</text><text x="0" y="490" class="ct-ax">widened slice only; each bar is one launch of 39 attempts</text></svg><!-- /chart-sittings -->
-                        <figcaption class="figure-note">
-                            Widened slice only. The range beside each harness name is its lowest and highest
-                            sitting.
-                        </figcaption>
-                    </figure>
-                    <p>
-                        <b>Bare Pi spans <span data-eval="pi-range"></span>.</b> That is
-                        <span data-eval="pi-swing-solves"></span> solves of 39, from software that did not change.
-                        Against that, the <span data-eval="pooled-gap"></span>-point pooled gap between Pi and
-                        SpecPi&nbsp;+&nbsp;Jev is not something this benchmark can resolve at 39 attempts a
-                        sitting.
-                    </p>
-                    <div class="table-scroll" id="table-sittings">
-                        <!-- table-sittings --><table class="numeric"><thead><tr><th>Harness</th><th>21 Sep</th><th>22 Sep · a</th><th>22 Sep · b</th><th>22 Sep · c</th><th>22 Sep · d</th><th>22 Sep · e</th><th>22 Sep · f</th><th>24 Sep</th></tr></thead><tbody><tr><th>Pi (base)</th><td>30/39</td><td>&mdash;</td><td>22/39</td><td>21/39</td><td>30/39</td><td>32/39</td><td>27/39</td><td>25/39</td></tr><tr><th>SpecPi v0.33.0</th><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>30/38</td></tr><tr><th>SpecPi v0.31.0</th><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>30/39</td></tr><tr><th>SpecPi + Jev</th><td>30/39</td><td>30/39</td><td>&mdash;</td><td>26/39</td><td>30/39</td><td>26/39</td><td>23/39</td><td>&mdash;</td></tr><tr><th>Oh My Pi</th><td>59/78</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr><tr><th>Claude Code</th><td>25/38</td><td>25/39</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr><tr><th>OpenCode</th><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>29/39</td><td>&mdash;</td></tr><tr><th>DeepSeek Harness</th><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>21/38</td><td>&mdash;</td></tr></tbody></table><!-- /table-sittings -->
-                    </div>
-                    <p>
-                        This is the reason the page reports pooled figures and publishes the spread beside them.
-                        A single sitting of this benchmark will support almost any conclusion someone wants from
-                        it, including two opposite ones on consecutive runs.
-                    </p>
                 </section>
 
                 <section class="doc-section" id="spend">
                     <header>
-                        <h2>Tokens and cost</h2>
-                        <span>05</span>
+                        <h2>Spend</h2>
+                        <span>04</span>
                     </header>
-                    <p>
-                        The charts pool every sitting, and the rows draw on different ones, so they describe
-                        levels rather than compare harnesses. The comparison is the table after them: only the
-                        sittings where both ran.
-                    </p>
                     <figure class="chart-figure">
-                        <!-- chart-tokens --><svg class="chart" id="chart-tokens" viewBox="0 0 720 496" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt tokens per attempt"><text x="0" y="18" class="ct-lb">Prompt tokens per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="460" stroke="var(--line)" opacity=".85" /><text x="150.0" y="477" text-anchor="middle" class="ct-ax">0k</text><line x1="260.0" y1="34" x2="260.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="260.0" y="477" text-anchor="middle" class="ct-ax">375k</text><line x1="370.0" y1="34" x2="370.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="370.0" y="477" text-anchor="middle" class="ct-ax">750k</text><line x1="480.0" y1="34" x2="480.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="480.0" y="477" text-anchor="middle" class="ct-ax">1125k</text><line x1="590.0" y1="34" x2="590.0" y2="460" stroke="var(--line)" opacity=".45" /><text x="590.0" y="477" text-anchor="middle" class="ct-ax">1500k</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="92.7" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="250.7" y="78" class="ct-val">315,895</text><rect x="150.0" y="87" width="79.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="237.0" y="100" class="ct-val">269,423</text><rect x="150.0" y="109" width="181.6" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="339.6" y="122" class="ct-val">618,939</text><rect x="150.0" y="131" width="136.1" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">Claude Code</text><text x="294.1" y="144" class="ct-val">463,868</text><text x="0" y="179" class="ct-row">Widened · 13 tasks × 3 and 6 and 18 and 21</text><rect x="150.0" y="186" width="137.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">Pi (base)</text><text x="295.6" y="199" class="ct-val">469,031</text><rect x="150.0" y="208" width="112.2" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="270.2" y="221" class="ct-val">382,362</text><rect x="150.0" y="230" width="132.6" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="290.6" y="243" class="ct-val">451,906</text><rect x="150.0" y="252" width="125.0" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="283.0" y="265" class="ct-val">426,097</text><rect x="150.0" y="274" width="387.3" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="545.3" y="287" class="ct-val">1,320,404</text><rect x="150.0" y="296" width="224.4" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">Claude Code</text><text x="382.4" y="309" class="ct-val">764,901</text><rect x="150.0" y="318" width="145.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">OpenCode</text><text x="303.0" y="331" class="ct-val">494,173</text><rect x="150.0" y="340" width="330.5" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="353" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="488.5" y="353" class="ct-val">1,126,586</text><text x="0" y="388" class="ct-row">Git pair · 2 tasks × 7</text><rect x="150.0" y="395" width="175.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="408" text-anchor="end" class="ct-sub">Pi (base)</text><text x="333.1" y="408" class="ct-val">596,953</text><rect x="150.0" y="417" width="75.8" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="430" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="233.8" y="430" class="ct-val">258,503</text><rect x="150.0" y="439" width="161.3" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="452" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="319.3" y="452" class="ct-val">549,720</text><text x="0" y="490" class="ct-ax">tokens sent, summed over the attempt's model calls</text></svg><!-- /chart-tokens -->
+                        <!-- chart-tokens --><svg class="chart" id="chart-tokens" viewBox="0 0 720 408" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt tokens per attempt"><text x="0" y="18" class="ct-lb">Prompt tokens per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="372" stroke="var(--line)" opacity=".85" /><text x="150.0" y="389" text-anchor="middle" class="ct-ax">0k</text><line x1="260.0" y1="34" x2="260.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="260.0" y="389" text-anchor="middle" class="ct-ax">375k</text><line x1="370.0" y1="34" x2="370.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="370.0" y="389" text-anchor="middle" class="ct-ax">750k</text><line x1="480.0" y1="34" x2="480.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="480.0" y="389" text-anchor="middle" class="ct-ax">1125k</text><line x1="590.0" y1="34" x2="590.0" y2="372" stroke="var(--line)" opacity=".45" /><text x="590.0" y="389" text-anchor="middle" class="ct-ax">1500k</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="92.7" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="250.7" y="78" class="ct-val">315,895</text><rect x="150.0" y="87" width="181.6" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="339.6" y="100" class="ct-val">618,939</text><rect x="150.0" y="109" width="136.1" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Claude Code</text><text x="294.1" y="122" class="ct-val">463,868</text><text x="0" y="157" class="ct-row">Widened · 13 tasks × 3 and 6 and 9 and 15</text><rect x="150.0" y="164" width="134.3" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">Pi (base)</text><text x="292.3" y="177" class="ct-val">457,810</text><rect x="150.0" y="186" width="119.5" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">SpecPi</text><text x="277.5" y="199" class="ct-val">407,416</text><rect x="150.0" y="208" width="368.3" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="526.3" y="221" class="ct-val">1,255,661</text><rect x="150.0" y="230" width="224.4" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">Claude Code</text><text x="382.4" y="243" class="ct-val">764,901</text><rect x="150.0" y="252" width="145.0" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">OpenCode</text><text x="303.0" y="265" class="ct-val">494,173</text><rect x="150.0" y="274" width="330.5" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="488.5" y="287" class="ct-val">1,126,586</text><text x="0" y="322" class="ct-row">Git pair · 2 tasks × 7</text><rect x="150.0" y="329" width="175.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="342" text-anchor="end" class="ct-sub">Pi (base)</text><text x="333.1" y="342" class="ct-val">596,953</text><rect x="150.0" y="351" width="75.8" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="364" text-anchor="end" class="ct-sub">SpecPi</text><text x="233.8" y="364" class="ct-val">258,503</text><text x="0" y="402" class="ct-ax">tokens sent, summed over the attempt's model calls</text></svg><!-- /chart-tokens -->
+                    </figure>
+                    <figure class="chart-figure">
+                        <!-- chart-cost --><svg class="chart" id="chart-cost" viewBox="0 0 720 386" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Cost per attempt"><text x="0" y="18" class="ct-lb">Cost per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="350" stroke="var(--line)" opacity=".85" /><text x="150.0" y="367" text-anchor="middle" class="ct-ax">$0.000</text><line x1="260.0" y1="34" x2="260.0" y2="350" stroke="var(--line)" opacity=".45" /><text x="260.0" y="367" text-anchor="middle" class="ct-ax">$0.007</text><line x1="370.0" y1="34" x2="370.0" y2="350" stroke="var(--line)" opacity=".45" /><text x="370.0" y="367" text-anchor="middle" class="ct-ax">$0.015</text><line x1="480.0" y1="34" x2="480.0" y2="350" stroke="var(--line)" opacity=".45" /><text x="480.0" y="367" text-anchor="middle" class="ct-ax">$0.022</text><line x1="590.0" y1="34" x2="590.0" y2="350" stroke="var(--line)" opacity=".45" /><text x="590.0" y="367" text-anchor="middle" class="ct-ax">$0.030</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="157.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="315.9" y="78" class="ct-val">$0.0108</text><rect x="150.0" y="87" width="178.3" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="336.3" y="100" class="ct-val">$0.0122</text><text x="0" y="135" class="ct-row">Widened · 13 tasks × 3 and 6 and 9 and 15</text><rect x="150.0" y="142" width="239.2" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="155" text-anchor="end" class="ct-sub">Pi (base)</text><text x="397.2" y="155" class="ct-val">$0.0163</text><rect x="150.0" y="164" width="210.5" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">SpecPi</text><text x="368.5" y="177" class="ct-val">$0.0144</text><rect x="150.0" y="186" width="399.2" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="557.2" y="199" class="ct-val">$0.0272</text><rect x="150.0" y="208" width="401.0" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">Claude Code</text><text x="559.0" y="221" class="ct-val">$0.0273</text><rect x="150.0" y="230" width="182.3" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">OpenCode</text><text x="340.3" y="243" class="ct-val">$0.0124</text><rect x="150.0" y="252" width="331.6" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="489.6" y="265" class="ct-val">$0.0226</text><text x="0" y="300" class="ct-row">Git pair · 2 tasks × 7</text><rect x="150.0" y="307" width="200.7" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="320" text-anchor="end" class="ct-sub">Pi (base)</text><text x="358.7" y="320" class="ct-val">$0.0137</text><rect x="150.0" y="329" width="131.3" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="342" text-anchor="end" class="ct-sub">SpecPi</text><text x="289.3" y="342" class="ct-val">$0.0090</text><text x="0" y="380" class="ct-ax">USD at the frozen price list, for the rows whose cached share was recorded</text></svg><!-- /chart-cost -->
                         <figcaption class="figure-note">
-                            Mean prompt tokens per attempt, including cache rereads, pooled across sittings.
+                            Output tokens are <b data-eval="output-share"></b> of every bill, so cost does not track
+                            prompt tokens one for one.
                         </figcaption>
                     </figure>
                     <figure class="chart-figure">
-                        <!-- chart-cost --><svg class="chart" id="chart-cost" viewBox="0 0 720 474" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Cost per attempt"><text x="0" y="18" class="ct-lb">Cost per attempt</text><line x1="150.0" y1="34" x2="150.0" y2="438" stroke="var(--line)" opacity=".85" /><text x="150.0" y="455" text-anchor="middle" class="ct-ax">$0.000</text><line x1="260.0" y1="34" x2="260.0" y2="438" stroke="var(--line)" opacity=".45" /><text x="260.0" y="455" text-anchor="middle" class="ct-ax">$0.007</text><line x1="370.0" y1="34" x2="370.0" y2="438" stroke="var(--line)" opacity=".45" /><text x="370.0" y="455" text-anchor="middle" class="ct-ax">$0.015</text><line x1="480.0" y1="34" x2="480.0" y2="438" stroke="var(--line)" opacity=".45" /><text x="480.0" y="455" text-anchor="middle" class="ct-ax">$0.022</text><line x1="590.0" y1="34" x2="590.0" y2="438" stroke="var(--line)" opacity=".45" /><text x="590.0" y="455" text-anchor="middle" class="ct-ax">$0.030</text><text x="0" y="58" class="ct-row">Calibration · 7 tasks × 5</text><rect x="150.0" y="65" width="157.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="315.9" y="78" class="ct-val">$0.0108</text><rect x="150.0" y="87" width="117.4" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="275.4" y="100" class="ct-val">$0.0080</text><rect x="150.0" y="109" width="178.3" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="336.3" y="122" class="ct-val">$0.0122</text><text x="0" y="157" class="ct-row">Widened · 13 tasks × 3 and 6 and 18 and 21</text><rect x="150.0" y="164" width="238.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">Pi (base)</text><text x="396.5" y="177" class="ct-val">$0.0163</text><rect x="150.0" y="186" width="167.4" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="325.4" y="199" class="ct-val">$0.0114</text><rect x="150.0" y="208" width="190.1" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="348.1" y="221" class="ct-val">$0.0130</text><rect x="150.0" y="230" width="222.1" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="380.1" y="243" class="ct-val">$0.0151</text><rect x="150.0" y="252" width="379.4" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="265" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="537.4" y="265" class="ct-val">$0.0259</text><rect x="150.0" y="274" width="401.0" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="287" text-anchor="end" class="ct-sub">Claude Code</text><text x="559.0" y="287" class="ct-val">$0.0273</text><rect x="150.0" y="296" width="182.3" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="309" text-anchor="end" class="ct-sub">OpenCode</text><text x="340.3" y="309" class="ct-val">$0.0124</text><rect x="150.0" y="318" width="331.6" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="331" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="489.6" y="331" class="ct-val">$0.0226</text><text x="0" y="366" class="ct-row">Git pair · 2 tasks × 7</text><rect x="150.0" y="373" width="200.7" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="386" text-anchor="end" class="ct-sub">Pi (base)</text><text x="358.7" y="386" class="ct-val">$0.0137</text><rect x="150.0" y="395" width="131.3" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="408" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="289.3" y="408" class="ct-val">$0.0090</text><rect x="150.0" y="417" width="207.8" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="430" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="365.8" y="430" class="ct-val">$0.0142</text><text x="0" y="468" class="ct-ax">USD at the frozen price list, for the rows whose cached share was recorded</text></svg><!-- /chart-cost -->
-                        <figcaption class="figure-note">
-                            Mean cost per attempt, pooled across sittings. Claude Code's calibration slice ran
-                            before its cache was recorded, so it has no bar there rather than an upper bound drawn
-                            as one.
-                        </figcaption>
+                        <!-- chart-cache --><svg class="chart" id="chart-cache" viewBox="0 0 720 213" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt cache hit rate"><text x="0" y="18" class="ct-lb">Prompt cache hit rate</text><line x1="150.0" y1="34" x2="150.0" y2="177" stroke="var(--line)" opacity=".85" /><text x="150.0" y="194" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="177" stroke="var(--line)" opacity=".45" /><text x="260.0" y="194" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="177" stroke="var(--line)" opacity=".45" /><text x="370.0" y="194" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="177" stroke="var(--line)" opacity=".45" /><text x="480.0" y="194" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="177" stroke="var(--line)" opacity=".45" /><text x="590.0" y="194" text-anchor="middle" class="ct-ax">100%</text><rect x="150.0" y="46" width="408.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="59" text-anchor="end" class="ct-sub">Pi (base)</text><text x="566.6" y="59" class="ct-val">92.9%</text><rect x="150.0" y="68" width="406.8" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="81" text-anchor="end" class="ct-sub">SpecPi</text><text x="564.8" y="81" class="ct-val">92.4%</text><rect x="150.0" y="90" width="424.7" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="103" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="582.7" y="103" class="ct-val">96.5%</text><rect x="150.0" y="112" width="419.6" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="125" text-anchor="end" class="ct-sub">Claude Code</text><text x="577.6" y="125" class="ct-val">95.4%</text><rect x="150.0" y="134" width="424.7" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="147" text-anchor="end" class="ct-sub">OpenCode</text><text x="582.7" y="147" class="ct-val">96.5%</text><rect x="150.0" y="156" width="419.8" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="169" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="577.8" y="169" class="ct-val">95.4%</text><text x="0" y="207" class="ct-ax">cached share of prompt tokens, both slices pooled</text></svg><!-- /chart-cache -->
                     </figure>
-                    <div class="table-scroll" id="table-paired">
-                        <!-- table-paired --><table class="numeric"><thead><tr><th>Sitting</th><th>Pi solved</th><th>SpecPi + Jev solved</th><th>Prompt tokens</th><th>Cost</th></tr></thead><tbody><tr><th>21 Sep</th><td>30/39</td><td>30/39</td><td>−30%</td><td>−21%</td></tr><tr><th>22 Sep · c</th><td>21/39</td><td>26/39</td><td>−7%</td><td>+11%</td></tr><tr><th>22 Sep · d</th><td>30/39</td><td>30/39</td><td>−11%</td><td>−12%</td></tr><tr><th>22 Sep · e</th><td>32/39</td><td>26/39</td><td>−9%</td><td>−1%</td></tr><tr><th>22 Sep · f</th><td>27/39</td><td>23/39</td><td>+27%</td><td>0%</td></tr></tbody></table><!-- /table-paired -->
-                    </div>
-                    <p>
-                        SpecPi&nbsp;+&nbsp;Jev against bare Pi, change per sitting. Prompt tokens fell in
-                        <b data-eval="paired-token-count"></b>; cost fell in <b data-eval="paired-cost-count"></b>,
-                        by about <b data-eval="paired-cost-typical"></b>. The saving shows more in tokens than in
-                        cost because output tokens, not prompt tokens, are <b data-eval="output-share"></b> of
-                        the spend at these cache rates.
-                    </p>
-                    <p>
-                        Claude Code, set against SpecPi&nbsp;+&nbsp;Jev in the sittings where both ran, sent
-                        <b data-eval="cc-jev-tokens"></b> the prompt tokens and cost <b data-eval="cc-jev-cost"></b>
-                        as much. Its pooled row understates that: all of its measured cost comes from one sitting,
-                        and it was the cheapest SpecPi&nbsp;+&nbsp;Jev ran in.
-                    </p>
-                    <p>
-                        OpenCode and the DeepSeek Harness each have one sitting, shared with bare Pi. There,
-                        OpenCode sent <b data-eval="oc-pi-tokens"></b> Pi's prompt tokens and cost
-                        <b data-eval="oc-pi-cost"></b> as much; the DeepSeek Harness sent
-                        <b data-eval="dsh-pi-tokens"></b> and cost <b data-eval="dsh-pi-cost"></b> as much. One
-                        sitting is a level, not a verdict.
-                    </p>
                 </section>
 
-                <section class="doc-section" id="cache">
+                <section class="doc-section" id="sittings">
                     <header>
-                        <h2>Cache</h2>
-                        <span>06</span>
+                        <h2>Noise</h2>
+                        <span>05</span>
                     </header>
                     <figure class="chart-figure">
-                        <!-- chart-cache --><svg class="chart" id="chart-cache" viewBox="0 0 720 257" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt cache hit rate"><text x="0" y="18" class="ct-lb">Prompt cache hit rate</text><line x1="150.0" y1="34" x2="150.0" y2="221" stroke="var(--line)" opacity=".85" /><text x="150.0" y="238" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="221" stroke="var(--line)" opacity=".45" /><text x="260.0" y="238" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="221" stroke="var(--line)" opacity=".45" /><text x="370.0" y="238" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="221" stroke="var(--line)" opacity=".45" /><text x="480.0" y="238" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="221" stroke="var(--line)" opacity=".45" /><text x="590.0" y="238" text-anchor="middle" class="ct-ax">100%</text><rect x="150.0" y="46" width="409.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="59" text-anchor="end" class="ct-sub">Pi (base)</text><text x="567.6" y="59" class="ct-val">93.1%</text><rect x="150.0" y="68" width="418.4" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="81" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="576.4" y="81" class="ct-val">95.1%</text><rect x="150.0" y="90" width="422.5" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="103" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="580.5" y="103" class="ct-val">96.0%</text><rect x="150.0" y="112" width="411.7" height="17" rx="2" fill="var(--ct-specpi-jev)" opacity="1" /><text x="140" y="125" text-anchor="end" class="ct-sub">SpecPi + Jev</text><text x="569.7" y="125" class="ct-val">93.6%</text><rect x="150.0" y="134" width="428.4" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="147" text-anchor="end" class="ct-sub">Oh My Pi</text><text x="586.4" y="147" class="ct-val">97.4%</text><rect x="150.0" y="156" width="419.6" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="169" text-anchor="end" class="ct-sub">Claude Code</text><text x="577.6" y="169" class="ct-val">95.4%</text><rect x="150.0" y="178" width="424.7" height="17" rx="2" fill="var(--ct-opencode)" opacity="1" /><text x="140" y="191" text-anchor="end" class="ct-sub">OpenCode</text><text x="582.7" y="191" class="ct-val">96.5%</text><rect x="150.0" y="200" width="419.8" height="17" rx="2" fill="var(--ct-deepseek)" opacity="1" /><text x="140" y="213" text-anchor="end" class="ct-sub">DeepSeek Harness</text><text x="577.8" y="213" class="ct-val">95.4%</text><text x="0" y="251" class="ct-ax">cached share of prompt tokens, both slices pooled</text></svg><!-- /chart-cache -->
+                        <!-- chart-sittings --><svg class="chart" id="chart-sittings" viewBox="0 0 720 441" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Solve rate, one bar per sitting"><text x="0" y="18" class="ct-lb">Solve rate, one bar per sitting</text><line x1="150.0" y1="34" x2="150.0" y2="405" stroke="var(--line)" opacity=".85" /><text x="150.0" y="422" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="405" stroke="var(--line)" opacity=".45" /><text x="260.0" y="422" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="405" stroke="var(--line)" opacity=".45" /><text x="370.0" y="422" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="405" stroke="var(--line)" opacity=".45" /><text x="480.0" y="422" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="405" stroke="var(--line)" opacity=".45" /><text x="590.0" y="422" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Pi (base) · 56-77%</text><rect x="150.0" y="65" width="338.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">21 Sep</text><text x="496.5" y="78" class="ct-val">30/39</text><rect x="150.0" y="87" width="248.2" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">22 Sep · b</text><text x="406.2" y="100" class="ct-val">22/39</text><rect x="150.0" y="109" width="338.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">22 Sep · d</text><text x="496.5" y="122" class="ct-val">30/39</text><rect x="150.0" y="131" width="304.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="144" text-anchor="end" class="ct-sub">22 Sep · f</text><text x="462.6" y="144" class="ct-val">27/39</text><rect x="150.0" y="153" width="282.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="166" text-anchor="end" class="ct-sub">24 Sep · a</text><text x="440.1" y="166" class="ct-val">25/39</text><text x="0" y="201" class="ct-row">SpecPi · 79-82%</text><rect x="150.0" y="208" width="347.4" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">24 Sep · a</text><text x="505.4" y="221" class="ct-val">30/38</text><rect x="150.0" y="230" width="361.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="243" text-anchor="end" class="ct-sub">24 Sep · b</text><text x="519.0" y="243" class="ct-val">32/39</text><text x="0" y="278" class="ct-row">Oh My Pi · 66-76%</text><rect x="150.0" y="285" width="332.8" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="298" text-anchor="end" class="ct-sub">21 Sep</text><text x="490.8" y="298" class="ct-val">59/78</text><rect x="150.0" y="307" width="289.5" height="17" rx="2" fill="var(--ct-omp)" opacity="1" /><text x="140" y="320" text-anchor="end" class="ct-sub">24 Sep · b</text><text x="447.5" y="320" class="ct-val">25/38</text><text x="0" y="355" class="ct-row">Claude Code · 64-66%</text><rect x="150.0" y="362" width="289.5" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="375" text-anchor="end" class="ct-sub">21 Sep</text><text x="447.5" y="375" class="ct-val">25/38</text><rect x="150.0" y="384" width="282.1" height="17" rx="2" fill="var(--ct-claudecode)" opacity="1" /><text x="140" y="397" text-anchor="end" class="ct-sub">22 Sep · a</text><text x="440.1" y="397" class="ct-val">25/39</text><text x="0" y="435" class="ct-ax">widened slice only; each bar is one launch of 39 attempts</text></svg><!-- /chart-sittings -->
                         <figcaption class="figure-note">
-                            Both slices pooled. Claude Code's rate comes from the attempts whose cached share was
-                            recorded; an earlier reporting bug left its 21 Sep runs unrecorded, which is not the same
-                            as zero.
+                            Same software, same tasks, different hour. Bare Pi spans
+                            <b data-eval="pi-range"></b> across <span data-eval="pi-sitting-count"></span> sittings,
+                            wider than most gaps between harnesses.
                         </figcaption>
                     </figure>
                 </section>
@@ -276,43 +153,30 @@
                 <section class="doc-section" id="tasks">
                     <header>
                         <h2>Task by task</h2>
-                        <span>07</span>
+                        <span>06</span>
                     </header>
-                    <p>Solved / scored attempts in the widened slice.</p>
                     <div class="table-scroll" id="table-tasks">
-                        <!-- table-tasks --><table class="numeric"><thead><tr><th>Task</th><th>Pi (base)</th><th>SpecPi v0.33.0</th><th>SpecPi v0.31.0</th><th>SpecPi + Jev</th><th>Oh My Pi</th><th>Claude Code</th><th>OpenCode</th><th>DeepSeek Harness</th></tr></thead><tbody><tr><th><code>cobol-modernization</code></th><td>14/21</td><td>3/3</td><td>3/3</td><td>17/18</td><td>5/6</td><td>3/6</td><td>2/3</td><td>3/3</td></tr><tr><th><code>configure-git-webserver</code></th><td>12/21</td><td>1/3</td><td>1/3</td><td>2/18</td><td>2/6</td><td>2/5</td><td>3/3</td><td>1/3</td></tr><tr><th><code>extract-elf</code></th><td>15/21</td><td>2/3</td><td>2/3</td><td>10/18</td><td>5/6</td><td>3/6</td><td>3/3</td><td>2/3</td></tr><tr><th><code>fix-git</code></th><td>21/21</td><td>3/3</td><td>3/3</td><td>17/18</td><td>6/6</td><td>5/6</td><td>3/3</td><td>3/3</td></tr><tr><th><code>hf-model-inference</code></th><td>20/21</td><td>3/3</td><td>3/3</td><td>18/18</td><td>4/6</td><td>6/6</td><td>3/3</td><td>1/3</td></tr><tr><th><code>multi-source-data-merger</code></th><td>21/21</td><td>3/3</td><td>3/3</td><td>18/18</td><td>6/6</td><td>6/6</td><td>3/3</td><td>3/3</td></tr><tr><th><code>prove-plus-comm</code></th><td>19/21</td><td>3/3</td><td>3/3</td><td>18/18</td><td>6/6</td><td>6/6</td><td>3/3</td><td>3/3</td></tr><tr><th><code>pytorch-model-cli</code></th><td>3/21</td><td><strong>0/3</strong></td><td>2/3</td><td>3/18</td><td>1/6</td><td>3/6</td><td><strong>0/3</strong></td><td>1/3</td></tr><tr><th><code>raman-fitting</code></th><td>5/21</td><td>1/2</td><td><strong>0/3</strong></td><td>6/18</td><td>3/6</td><td><strong>0/6</strong></td><td>2/3</td><td>1/3</td></tr><tr><th><code>sanitize-git-repo</code></th><td>4/21</td><td>3/3</td><td>1/3</td><td>12/18</td><td>5/6</td><td>2/6</td><td>3/3</td><td><strong>0/3</strong></td></tr><tr><th><code>sqlite-with-gcov</code></th><td>20/21</td><td>3/3</td><td>3/3</td><td>17/18</td><td>4/6</td><td>6/6</td><td><strong>0/3</strong></td><td><strong>0/2</strong></td></tr><tr><th><code>tune-mjcf</code></th><td>12/21</td><td>2/3</td><td>3/3</td><td>10/18</td><td>6/6</td><td>2/6</td><td>1/3</td><td><strong>0/3</strong></td></tr><tr><th><code>vulnerable-secret</code></th><td>21/21</td><td>3/3</td><td>3/3</td><td>17/18</td><td>6/6</td><td>6/6</td><td>3/3</td><td>3/3</td></tr></tbody></table><!-- /table-tasks -->
+                        <!-- table-tasks --><table class="heatmap"><thead><tr><th>Task</th><th scope="col">Pi (base)</th><th scope="col">SpecPi</th><th scope="col">Oh My Pi</th><th scope="col">Claude Code</th><th scope="col">OpenCode</th><th scope="col">DeepSeek Harness</th></tr></thead><tbody><tr><th><code>cobol-modernization</code></th><td style="--r:0.67" title="Pi (base): 10 of 15">10/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:0.78" title="Oh My Pi: 7 of 9">7/9</td><td style="--r:0.50" title="Claude Code: 3 of 6">3/6</td><td style="--r:0.67" title="OpenCode: 2 of 3">2/3</td><td style="--r:1.00" title="DeepSeek Harness: 3 of 3">3/3</td></tr><tr><th><code>configure-git-webserver</code></th><td style="--r:0.67" title="Pi (base): 10 of 15">10/15</td><td style="--r:0.50" title="SpecPi: 3 of 6">3/6</td><td style="--r:0.33" title="Oh My Pi: 3 of 9">3/9</td><td style="--r:0.40" title="Claude Code: 2 of 5">2/5</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:0.33" title="DeepSeek Harness: 1 of 3">1/3</td></tr><tr><th><code>extract-elf</code></th><td style="--r:0.67" title="Pi (base): 10 of 15">10/15</td><td style="--r:0.83" title="SpecPi: 5 of 6">5/6</td><td style="--r:0.78" title="Oh My Pi: 7 of 9">7/9</td><td style="--r:0.50" title="Claude Code: 3 of 6">3/6</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:0.67" title="DeepSeek Harness: 2 of 3">2/3</td></tr><tr><th><code>fix-git</code></th><td style="--r:1.00" title="Pi (base): 15 of 15">15/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:1.00" title="Oh My Pi: 9 of 9">9/9</td><td style="--r:0.83" title="Claude Code: 5 of 6">5/6</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:1.00" title="DeepSeek Harness: 3 of 3">3/3</td></tr><tr><th><code>hf-model-inference</code></th><td style="--r:0.93" title="Pi (base): 14 of 15">14/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:0.67" title="Oh My Pi: 6 of 9">6/9</td><td style="--r:1.00" title="Claude Code: 6 of 6">6/6</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:0.33" title="DeepSeek Harness: 1 of 3">1/3</td></tr><tr><th><code>multi-source-data-merger</code></th><td style="--r:1.00" title="Pi (base): 15 of 15">15/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:1.00" title="Oh My Pi: 9 of 9">9/9</td><td style="--r:1.00" title="Claude Code: 6 of 6">6/6</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:1.00" title="DeepSeek Harness: 3 of 3">3/3</td></tr><tr><th><code>prove-plus-comm</code></th><td style="--r:0.87" title="Pi (base): 13 of 15">13/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:1.00" title="Oh My Pi: 9 of 9">9/9</td><td style="--r:1.00" title="Claude Code: 6 of 6">6/6</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:1.00" title="DeepSeek Harness: 3 of 3">3/3</td></tr><tr><th><code>pytorch-model-cli</code></th><td style="--r:0.20" title="Pi (base): 3 of 15">3/15</td><td style="--r:0.00" title="SpecPi: 0 of 6">0/6</td><td style="--r:0.11" title="Oh My Pi: 1 of 9">1/9</td><td style="--r:0.50" title="Claude Code: 3 of 6">3/6</td><td style="--r:0.00" title="OpenCode: 0 of 3">0/3</td><td style="--r:0.33" title="DeepSeek Harness: 1 of 3">1/3</td></tr><tr><th><code>raman-fitting</code></th><td style="--r:0.20" title="Pi (base): 3 of 15">3/15</td><td style="--r:0.40" title="SpecPi: 2 of 5">2/5</td><td style="--r:0.44" title="Oh My Pi: 4 of 9">4/9</td><td style="--r:0.00" title="Claude Code: 0 of 6">0/6</td><td style="--r:0.67" title="OpenCode: 2 of 3">2/3</td><td style="--r:0.33" title="DeepSeek Harness: 1 of 3">1/3</td></tr><tr><th><code>sanitize-git-repo</code></th><td style="--r:0.07" title="Pi (base): 1 of 15">1/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:0.78" title="Oh My Pi: 7 of 9">7/9</td><td style="--r:0.33" title="Claude Code: 2 of 6">2/6</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:0.00" title="DeepSeek Harness: 0 of 3">0/3</td></tr><tr><th><code>sqlite-with-gcov</code></th><td style="--r:0.93" title="Pi (base): 14 of 15">14/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:0.78" title="Oh My Pi: 7 of 9">7/9</td><td style="--r:1.00" title="Claude Code: 6 of 6">6/6</td><td style="--r:0.00" title="OpenCode: 0 of 3">0/3</td><td style="--r:0.00" title="DeepSeek Harness: 0 of 2">0/2</td></tr><tr><th><code>tune-mjcf</code></th><td style="--r:0.73" title="Pi (base): 11 of 15">11/15</td><td style="--r:0.67" title="SpecPi: 4 of 6">4/6</td><td style="--r:0.78" title="Oh My Pi: 7 of 9">7/9</td><td style="--r:0.33" title="Claude Code: 2 of 6">2/6</td><td style="--r:0.33" title="OpenCode: 1 of 3">1/3</td><td style="--r:0.00" title="DeepSeek Harness: 0 of 3">0/3</td></tr><tr><th><code>vulnerable-secret</code></th><td style="--r:1.00" title="Pi (base): 15 of 15">15/15</td><td style="--r:1.00" title="SpecPi: 6 of 6">6/6</td><td style="--r:1.00" title="Oh My Pi: 8 of 8">8/8</td><td style="--r:1.00" title="Claude Code: 6 of 6">6/6</td><td style="--r:1.00" title="OpenCode: 3 of 3">3/3</td><td style="--r:1.00" title="DeepSeek Harness: 3 of 3">3/3</td></tr></tbody></table><!-- /table-tasks -->
                     </div>
                     <p class="figure-note">
-                        Read the <code>configure-git-webserver</code> row as a cleanup habit, not server setup. Its
-                        checker pushes as a <code>git</code> user with a fixed password, a login the task tells the
-                        agent not to set up, and in the recorded runs that push never succeeded for any harness. It
-                        then fetches <code>hello.html</code>, so every pass came from a test file the agent left in
-                        the web root; an agent that cleans up so the user's own first commit works fails the task.
+                        Widened slice, solved / attempts, shaded by rate. <code>configure-git-webserver</code> only
+                        passes when a test file is left behind: its checker's own push never succeeds.
                     </p>
                 </section>
 
-                <section class="doc-section" id="release">
+                <section class="doc-section" id="method">
                     <header>
-                        <h2>Release check</h2>
-                        <span>08</span>
+                        <h2>Method</h2>
+                        <span>07</span>
                     </header>
-                    <p>
-                        Plain SpecPi, without Jev, for the first time: 0.31.0 and 0.33.0 side by side with Pi in
-                        one sitting on 24 Sep, so the two releases between them are the only difference.
-                    </p>
-                    <figure class="chart-figure">
-                        <!-- chart-release --><svg class="chart" id="chart-release" viewBox="0 0 720 463" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Solved, per attempt · 24 Sep release check"><text x="0" y="18" class="ct-lb">Solved, per attempt · 24 Sep release check</text><line x1="150.0" y1="34" x2="150.0" y2="427" stroke="var(--line)" opacity=".85" /><text x="150.0" y="444" text-anchor="middle" class="ct-ax">0%</text><line x1="260.0" y1="34" x2="260.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="260.0" y="444" text-anchor="middle" class="ct-ax">25%</text><line x1="370.0" y1="34" x2="370.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="370.0" y="444" text-anchor="middle" class="ct-ax">50%</text><line x1="480.0" y1="34" x2="480.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="480.0" y="444" text-anchor="middle" class="ct-ax">75%</text><line x1="590.0" y1="34" x2="590.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="590.0" y="444" text-anchor="middle" class="ct-ax">100%</text><text x="0" y="58" class="ct-row">Terminal-Bench · widened slice</text><rect x="150.0" y="65" width="282.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="440.1" y="78" class="ct-val">25/39</text><rect x="150.0" y="87" width="338.5" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="496.5" y="100" class="ct-val">30/39</text><rect x="150.0" y="109" width="347.4" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="505.4" y="122" class="ct-val">30/38</text><text x="0" y="157" class="ct-row">sanitize-git-repo · widened + git pair</text><rect x="150.0" y="164" width="132.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">Pi (base)</text><text x="290.0" y="177" class="ct-val">3/10</text><rect x="150.0" y="186" width="220.0" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="378.0" y="199" class="ct-val">5/10</text><rect x="150.0" y="208" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="598.0" y="221" class="ct-val">10/10</text><text x="0" y="256" class="ct-row">fix-git · widened + git pair</text><rect x="150.0" y="263" width="440.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="276" text-anchor="end" class="ct-sub">Pi (base)</text><text x="598.0" y="276" class="ct-val">10/10</text><rect x="150.0" y="285" width="440.0" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="298" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="598.0" y="298" class="ct-val">10/10</text><rect x="150.0" y="307" width="440.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="320" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="598.0" y="320" class="ct-val">10/10</text><text x="0" y="355" class="ct-row">SWE-bench Verified · 12 tasks</text><rect x="150.0" y="362" width="415.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="375" text-anchor="end" class="ct-sub">Pi (base)</text><text x="573.6" y="375" class="ct-val">34/36</text><rect x="150.0" y="384" width="403.3" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="397" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="561.3" y="397" class="ct-val">33/36</text><rect x="150.0" y="406" width="415.6" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="419" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="573.6" y="419" class="ct-val">34/36</text><text x="0" y="457" class="ct-ax">share of attempts reaching reward 1; one sitting, all three arms side by side</text></svg><!-- /chart-release -->
-                        <figcaption class="figure-note"><!-- release-note -->On <code>sanitize-git-repo</code>, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 separates from 0.31.0 at <i>p</i>&nbsp;=&nbsp;0.03 and from Pi at <i>p</i>&nbsp;=&nbsp;0.003: every failure there had rewritten Git history, destroying the commit the checker compares against. Nothing else separates (<i>p</i>&nbsp;&ge;&nbsp;0.21), and <code>fix-git</code>, which legitimately uses Git's recovery commands, did not move. One sitting: read the level rows as one more point in section 04's spread.<!-- /release-note --></figcaption>
-                    </figure>
-                    <figure class="chart-figure">
-                        <!-- chart-release-tokens --><svg class="chart" id="chart-release-tokens" viewBox="0 0 720 463" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Prompt tokens per attempt · 24 Sep release check"><text x="0" y="18" class="ct-lb">Prompt tokens per attempt · 24 Sep release check</text><line x1="150.0" y1="34" x2="150.0" y2="427" stroke="var(--line)" opacity=".85" /><text x="150.0" y="444" text-anchor="middle" class="ct-ax">0k</text><line x1="260.0" y1="34" x2="260.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="260.0" y="444" text-anchor="middle" class="ct-ax">300k</text><line x1="370.0" y1="34" x2="370.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="370.0" y="444" text-anchor="middle" class="ct-ax">600k</text><line x1="480.0" y1="34" x2="480.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="480.0" y="444" text-anchor="middle" class="ct-ax">900k</text><line x1="590.0" y1="34" x2="590.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="590.0" y="444" text-anchor="middle" class="ct-ax">1200k</text><text x="0" y="58" class="ct-row">Terminal-Bench · widened slice</text><rect x="150.0" y="65" width="166.6" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="324.6" y="78" class="ct-val">454,394</text><rect x="150.0" y="87" width="165.7" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="323.7" y="100" class="ct-val">451,906</text><rect x="150.0" y="109" width="140.2" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="298.2" y="122" class="ct-val">382,362</text><text x="0" y="157" class="ct-row">sanitize-git-repo · widened + git pair</text><rect x="150.0" y="164" width="407.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">Pi (base)</text><text x="565.9" y="177" class="ct-val">1,112,453</text><rect x="150.0" y="186" width="423.5" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="581.5" y="199" class="ct-val">1,154,974</text><rect x="150.0" y="208" width="167.2" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="325.2" y="221" class="ct-val">455,924</text><text x="0" y="256" class="ct-row">fix-git · widened + git pair</text><rect x="150.0" y="263" width="16.5" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="276" text-anchor="end" class="ct-sub">Pi (base)</text><text x="174.5" y="276" class="ct-val">44,899</text><rect x="150.0" y="285" width="24.5" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="298" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="182.5" y="298" class="ct-val">66,829</text><rect x="150.0" y="307" width="22.8" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="320" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="180.8" y="320" class="ct-val">62,144</text><text x="0" y="355" class="ct-row">SWE-bench Verified · 12 tasks</text><rect x="150.0" y="362" width="111.1" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="375" text-anchor="end" class="ct-sub">Pi (base)</text><text x="269.1" y="375" class="ct-val">302,913</text><rect x="150.0" y="384" width="100.6" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="397" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="258.6" y="397" class="ct-val">274,390</text><rect x="150.0" y="406" width="113.2" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="419" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="271.2" y="419" class="ct-val">308,634</text><text x="0" y="457" class="ct-ax">tokens sent, summed over the attempt's model calls, mean per attempt</text></svg><!-- /chart-release-tokens -->
-                    </figure>
-                    <figure class="chart-figure">
-                        <!-- chart-release-cost --><svg class="chart" id="chart-release-cost" viewBox="0 0 720 463" role="img" preserveAspectRatio="xMidYMid meet" aria-label="Cost per attempt · 24 Sep release check"><text x="0" y="18" class="ct-lb">Cost per attempt · 24 Sep release check</text><line x1="150.0" y1="34" x2="150.0" y2="427" stroke="var(--line)" opacity=".85" /><text x="150.0" y="444" text-anchor="middle" class="ct-ax">$0.000</text><line x1="260.0" y1="34" x2="260.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="260.0" y="444" text-anchor="middle" class="ct-ax">$0.008</text><line x1="370.0" y1="34" x2="370.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="370.0" y="444" text-anchor="middle" class="ct-ax">$0.016</text><line x1="480.0" y1="34" x2="480.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="480.0" y="444" text-anchor="middle" class="ct-ax">$0.024</text><line x1="590.0" y1="34" x2="590.0" y2="427" stroke="var(--line)" opacity=".45" /><text x="590.0" y="444" text-anchor="middle" class="ct-ax">$0.032</text><text x="0" y="58" class="ct-row">Terminal-Bench · widened slice</text><rect x="150.0" y="65" width="201.3" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="78" text-anchor="end" class="ct-sub">Pi (base)</text><text x="359.3" y="78" class="ct-val">$0.0146</text><rect x="150.0" y="87" width="178.2" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="100" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="336.2" y="100" class="ct-val">$0.0130</text><rect x="150.0" y="109" width="156.9" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="122" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="314.9" y="122" class="ct-val">$0.0114</text><text x="0" y="157" class="ct-row">sanitize-git-repo · widened + git pair</text><rect x="150.0" y="164" width="323.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="177" text-anchor="end" class="ct-sub">Pi (base)</text><text x="481.9" y="177" class="ct-val">$0.0236</text><rect x="150.0" y="186" width="348.5" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="199" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="506.5" y="199" class="ct-val">$0.0253</text><rect x="150.0" y="208" width="198.6" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="221" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="356.6" y="221" class="ct-val">$0.0144</text><text x="0" y="256" class="ct-row">fix-git · widened + git pair</text><rect x="150.0" y="263" width="34.0" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="276" text-anchor="end" class="ct-sub">Pi (base)</text><text x="192.0" y="276" class="ct-val">$0.0025</text><rect x="150.0" y="285" width="36.6" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="298" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="194.6" y="298" class="ct-val">$0.0027</text><rect x="150.0" y="307" width="43.6" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="320" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="201.6" y="320" class="ct-val">$0.0032</text><text x="0" y="355" class="ct-row">SWE-bench Verified · 12 tasks</text><rect x="150.0" y="362" width="94.9" height="17" rx="2" fill="var(--ct-pi)" opacity="1" /><text x="140" y="375" text-anchor="end" class="ct-sub">Pi (base)</text><text x="252.9" y="375" class="ct-val">$0.0069</text><rect x="150.0" y="384" width="82.6" height="17" rx="2" fill="var(--ct-specpi-prev)" opacity="1" /><text x="140" y="397" text-anchor="end" class="ct-sub">SpecPi v0.31.0</text><text x="240.6" y="397" class="ct-val">$0.0060</text><rect x="150.0" y="406" width="94.0" height="17" rx="2" fill="var(--ct-specpi)" opacity="1" /><text x="140" y="419" text-anchor="end" class="ct-sub">SpecPi v0.33.0</text><text x="252.0" y="419" class="ct-val">$0.0068</text><text x="0" y="457" class="ct-ax">USD at the frozen price list, mean per attempt</text></svg><!-- /chart-release-cost -->
-                        <figcaption class="figure-note"><!-- release-spend-note -->Against 0.31.0, 0.33.0's prompt tokens per attempt changed by −15% on Terminal-Bench, −61% on sanitize-git-repo, −7% on fix-git, +12% on SWE-bench Verified, and its cost per attempt by −12% on Terminal-Bench, −43% on sanitize-git-repo, +19% on fix-git, +14% on SWE-bench Verified. Output tokens are most of the bill at these cache rates, so cost does not track prompt tokens one for one.<!-- /release-spend-note --></figcaption>
-                    </figure>
+                    <ul class="method-list">
+                        <li><b>Model</b> <code>deepseek-v4.1-flash</code> through one endpoint, run by <a class="text-link" href="https://github.com/laude-institute/harbor">Harbor</a> on Docker.</li>
+                        <li><b>Tasks</b> 7 calibration × 5 attempts, 13 widened × 3 per sitting, plus 7 more on each git task. SWE-bench is kept apart, never pooled in.</li>
+                        <li><b>SpecPi</b> the published 0.33.0 with Jev off. Earlier SpecPi + Jev rows are not shown: the layer changed nothing measurable.</li>
+                        <li><b>Cost</b> recomputed from logged tokens at a <a class="text-link" href="https://github.com/TannerMidd/SpecPi/blob/main/evals/prices.json">frozen price list</a>.</li>
+                        <li><b>Left out</b> one broken task; <span data-eval="unscored-count"></span> failed setups. <span data-eval="excluded-note"></span></li>
+                    </ul>
                 </section>
-
             </div>
         </main>
         <footer class="site-footer wrap">
@@ -322,9 +186,8 @@
         </footer>
         <script src="../page.js"></script>
         <script>
-            // The dataset is the single source of truth for the page: the headline metrics, the run
-            // date and every figure quoted in the prose are read from it rather than typed in, so a
-            // regenerated run cannot leave a sentence contradicting a bar.
+            // Every number on the page comes from the dataset, so a regenerated run cannot leave a caption
+            // contradicting a chart.
             fetch("./terminal-bench-2.json")
                 .then((response) => response.json())
                 .then((data) => {
@@ -332,125 +195,27 @@
                     if (generated) {
                         generated.textContent = `Run ${data.generatedAt}`;
                     }
-                    // The dataset carries its own status, so a finished run stops the page
-                    // calling itself provisional without anyone remembering to edit the prose.
+
                     const status = document.getElementById("meta-status");
                     if (status && data.status) {
                         status.textContent = `Run ${data.status}`;
                     }
 
-                    const rates = data.harnesses.map((entry) => entry.overall.rate);
                     const byId = (id) => data.harnesses.find((entry) => entry.id === id);
                     const pi = byId("pi");
-                    const jev = byId("jev");
                     const pct = (value) => `${Math.round(value * 100)}%`;
-                    const fewer = (ratio) => `${Math.round(Math.abs(1 - ratio) * 100)}%`;
-
-                    // A pair is stored in harness order; read it as `num` against `den` either way round.
-                    const pairOf = (num, den) => {
-                        const found = data.paired.find(
-                            (entry) => (entry.a === num && entry.b === den) || (entry.a === den && entry.b === num),
-                        );
-                        if (!found) {
-                            return null;
-                        }
-
-                        const flip = found.a !== num;
-                        const orient = (summary) =>
-                            summary && flip
-                                ? {
-                                      ...summary,
-                                      lowerIn: summary.sittings - summary.lowerIn,
-                                      low: 1 / summary.high,
-                                      high: 1 / summary.low,
-                                      typical: 1 / summary.typical,
-                                  }
-                                : summary;
-                        const solved = flip
-                            ? [found.solved.b, found.solved.attemptsB, found.solved.a, found.solved.attemptsA]
-                            : [found.solved.a, found.solved.attemptsA, found.solved.b, found.solved.attemptsB];
-
-                        const tokenRatios = found.sittings.map((entry) =>
-                            flip ? 1 / entry.tokenRatio : entry.tokenRatio,
-                        );
-
-                        return {
-                            tokens: orient(found.tokens),
-                            cost: orient(found.cost),
-                            tokenRatios,
-                            solved,
-                            p: found.solved.p,
-                        };
-                    };
-                    // Every comparison between harnesses below is paired: only the sittings where both
-                    // ran. Pooling across sittings is what produced the earlier claims this page no
-                    // longer makes, because a sitting moves bare Pi further than any harness does.
-                    const jevPi = pairOf("jev", "pi");
-                    const ccJev = pairOf("claude-code", "jev");
-                    const ocPi = pairOf("opencode", "pi");
-                    const dshPi = pairOf("dsh", "pi");
-                    const times = (summary) => (summary ? `${summary.typical.toFixed(1)}×` : "not comparable");
-                    // Pooled comparisons that clear p < 0.05, named with the leader first. They set one
-                    // harness's sittings against another's, which is why the claim above is paired.
-                    const pooledSeparated = data.comparisons
-                        .filter((entry) => entry.p < 0.05)
-                        .sort((x, y) => x.p - y.p)
-                        .map((entry) => {
-                            const [lead, trail] =
-                                byId(entry.a).overall.rate >= byId(entry.b).overall.rate
-                                    ? [byId(entry.a), byId(entry.b)]
-                                    : [byId(entry.b), byId(entry.a)];
-
-                            return `${lead.label} leads ${trail.label} (p = ${entry.p.toFixed(3)})`;
-                        });
-                    const pooledNote =
-                        pooledSeparated.length === 0
-                            ? ""
-                            : ` Pooled across sittings, ${pooledSeparated.join(" and ")}, but pooling sets one harness's sittings against another's, and bare Pi alone spans ${pct(pi.spread.low)} to ${pct(pi.spread.high)} across its own.`;
+                    const pair = data.paired.find((entry) => [entry.a, entry.b].includes("specpi") && [entry.a, entry.b].includes("pi"));
+                    const tokenRatio = pair.tokens.typical;
+                    const specpiTokens = pair.a === "specpi" ? tokenRatio : 1 / tokenRatio;
+                    const sanitize = data.gitPair.find((entry) => entry.task === "sanitize-git-repo");
+                    const cellOf = (entry, id) => `${entry.byHarness[id].solved}/${entry.byHarness[id].attempts}`;
                     const shares = data.harnesses.map((entry) => entry.overall.outputCostShare);
-                    // The "fewer" range comes from the sittings where it was fewer, and any sitting that
-                    // went the other way is named beside it rather than folded into the range.
-                    const lowerTokens = jevPi.tokenRatios.filter((ratio) => ratio < 1);
-                    const higherTokens = jevPi.tokenRatios.filter((ratio) => ratio >= 1);
-                    const tokenRange = `${fewer(Math.max(...lowerTokens)).slice(0, -1)}–${fewer(Math.min(...lowerTokens))}`;
-                    const tokenException =
-                        higherTokens.length === 0
-                            ? ""
-                            : higherTokens.length === 1
-                              ? `, and sent ${fewer(higherTokens[0])} more in the other`
-                              : `, and sent ${fewer(Math.min(...higherTokens)).slice(0, -1)}–${fewer(Math.max(...higherTokens))} more in the others`;
-                    const piScores = pi.sittings.map((entry) => entry.solved).sort((a, b) => a - b);
-                    const piSwingSolves = piScores[piScores.length - 1] - piScores[0];
-                    const piJevP = data.comparisons.find(
-                        (entry) => [entry.a, entry.b].includes("pi") && [entry.a, entry.b].includes("jev"),
-                    ).p;
-                    const builds = data.jevBuilds;
-                    const buildNote =
-                        builds.withCompaction.length > 0
-                            ? `SpecPi + Jev ran two layer builds: the one in the ${builds.withCompaction.join(", ")} sitting still carried the withdrawn compaction system, switched off for these runs, and later sittings ran one without it.`
-                            : "SpecPi + Jev ran one layer build throughout.";
-                    // Fixed text rather than data: every sitting's recorded jev-setup.json lists it among the systems on.
-                    const withdrawnNote =
-                        " Every sitting also ran progress detection, since withdrawn: replayed over these runs, its verdict did not predict which attempts would fail.";
-                    const advisor = data.advisor;
 
                     const metrics = [
-                        [
-                            data.totalAttempts.toLocaleString(),
-                            `attempts · ${data.taskCount} tasks · ${data.harnesses.length} harness rows`,
-                        ],
-                        [
-                            `${((pi.spread.high - pi.spread.low) * 100).toFixed(0)} pts`,
-                            `bare Pi against itself, across ${pi.spread.sittings} sittings`,
-                        ],
-                        [
-                            `${((Math.max(...rates) - Math.min(...rates)) * 100).toFixed(1)} pts`,
-                            "between the best and worst harness, pooled",
-                        ],
-                        [
-                            tokenRange,
-                            `fewer prompt tokens, SpecPi + Jev vs Pi, in ${jevPi.tokens.lowerIn} of ${jevPi.tokens.sittings} paired sittings`,
-                        ],
+                        [data.totalAttempts.toLocaleString(), `attempts · ${data.harnesses.length} harnesses`],
+                        [`${cellOf(sanitize, "specpi")} vs ${cellOf(sanitize, "pi")}`, "sanitize-git-repo, SpecPi vs Pi"],
+                        [`−${Math.round((1 - specpiTokens) * 100)}%`, "prompt tokens, SpecPi vs Pi"],
+                        [`${pct(pi.spread.low)}–${pct(pi.spread.high)}`, "bare Pi, sitting to sitting"],
                     ];
                     const row = document.getElementById("metric-row");
                     if (row) {
@@ -465,34 +230,14 @@
                     const quoted = {
                         "pi-version": data.piVersions.join(", "),
                         "total-attempts": data.totalAttempts.toLocaleString(),
-                        "sitting-count": String(Object.keys(data.sittingLabels).length),
+                        "sitting-count": String(new Set(data.harnesses.flatMap((entry) => entry.sittings.map((sitting) => sitting.id))).size),
                         "unscored-count": String(data.errors.length),
-                        "paired-token-count": `${jevPi.tokens.lowerIn} of ${jevPi.tokens.sittings}`,
-                        "paired-token-range": tokenRange,
-                        "paired-token-exception": tokenException,
-                        "pooled-separations": pooledNote,
-                        "paired-cost-count": `${jevPi.cost.lowerIn} of ${jevPi.cost.sittings}`,
-                        "paired-cost-typical": fewer(jevPi.cost.typical),
+                        "excluded-note": data.excluded.length
+                            ? `Bare Pi's lowest and highest sittings, one from each end: ${data.excluded.map((entry) => `${entry.label} (${entry.solved}/${entry.attempts})`).join(" and ")}.`
+                            : "",
                         "output-share": `${pct(Math.min(...shares)).slice(0, -1)}–${pct(Math.max(...shares))}`,
-                        "pi-sitting-scores": `${piScores.slice(0, -1).join(", ")} and ${piScores[piScores.length - 1]}`,
-                        "pi-sitting-count": String(piScores.length),
-                        "pi-swing-solves": String(piSwingSolves),
-                        "pi-pooled": `${pi.overall.solved}/${pi.overall.attempts}`,
-                        "jev-pooled": `${jev.overall.solved}/${jev.overall.attempts}`,
-                        "pi-jev-p": piJevP.toFixed(2),
-                        "paired-solved": `${jevPi.solved[2]}/${jevPi.solved[3]} against ${jevPi.solved[0]}/${jevPi.solved[1]}`,
-                        "paired-solved-p": jevPi.p.toFixed(2),
                         "pi-range": `${pct(pi.spread.low)} to ${pct(pi.spread.high)}`,
-                        "pooled-gap": String(Math.round(Math.abs(jev.overall.rate - pi.overall.rate) * 100)),
-                        "jev-build-note": buildNote + withdrawnNote,
-                        "advisor-calls": `${advisor.calls} calls across ${advisor.attemptsWithCalls} of ${advisor.attempts} attempts`,
-                        "advisor-price": advisor.rate ? `$${advisor.rate.inputPerMTok}` : "unpriced",
-                        "cc-jev-tokens": `${ccJev.tokens.typical.toFixed(1)}×`,
-                        "cc-jev-cost": ccJev.cost ? `${ccJev.cost.typical.toFixed(1)}×` : "not comparable",
-                        "oc-pi-tokens": times(ocPi.tokens),
-                        "oc-pi-cost": times(ocPi.cost),
-                        "dsh-pi-tokens": times(dshPi.tokens),
-                        "dsh-pi-cost": times(dshPi.cost),
+                        "pi-sitting-count": String(pi.sittings.length),
                     };
                     for (const [name, value] of Object.entries(quoted)) {
                         for (const node of document.querySelectorAll(`[data-eval="${name}"]`)) {

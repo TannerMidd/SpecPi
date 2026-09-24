@@ -270,6 +270,56 @@ export function admission({
 }
 
 // ---------------------------------------------------------------------------------------------
+// Steering long bash calls
+// ---------------------------------------------------------------------------------------------
+
+/** A bash call asking for a timeout above this is a long run; it belongs in a background job. */
+export const LONG_BASH_TIMEOUT_SECONDS = 600;
+
+const LOOP = /\b(?:for|while|until)\b[\s\S]*\bdo\b/u;
+const SLEEPS = /\bsleep\s+(\d+(?:\.\d+)?)([smh]?)\b/gu;
+const WATCHERS = /\bgh\s+run\s+watch\b|\bgh\s+pr\s+checks\b[^\n]*--watch\b|\btail\s+-[a-zA-Z]*f\b|\bwatch\s+-n\b/u;
+
+function seconds(value, unit) {
+    const number = Number(value);
+
+    return unit === "h" ? number * 3600 : unit === "m" ? number * 60 : number;
+}
+
+/**
+ * Whether a bash call would plainly hold the conversation while it waits, and if so why. Only the
+ * unambiguous shapes: a polling loop that sleeps, a single long sleep, a watch command, or a timeout
+ * the caller itself expects to be long. A long build that happens to take minutes is not guessable
+ * from its text and is left to the guidance. Returns undefined when the call is fine.
+ */
+export function blockingShellCall(input) {
+    const command = typeof input?.command === "string" ? input.command : "";
+    const timeout = Number(input?.timeout);
+    if (Number.isFinite(timeout) && timeout > LONG_BASH_TIMEOUT_SECONDS) {
+        return `it asks for a ${Math.round(timeout)}-second timeout`;
+    }
+
+    const sleeps = [...command.matchAll(SLEEPS)].map((match) => seconds(match[1], match[2]));
+    if (LOOP.test(command) && sleeps.some((value) => value >= 10)) {
+        return "it polls in a loop that sleeps between checks";
+    }
+
+    if (sleeps.some((value) => value >= 60)) {
+        return "it sleeps for a minute or more";
+    }
+
+    if (WATCHERS.test(command)) {
+        return "it watches something until it finishes";
+    }
+
+    return undefined;
+}
+
+export function blockingShellReason(why) {
+    return `Not run: this bash call would block the conversation because ${why}, and the user cannot talk to you until it returns. Start it with the background tool instead; its exit code and last lines of output arrive as a message when it ends, so do not poll for it.`;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Jobs
 // ---------------------------------------------------------------------------------------------
 

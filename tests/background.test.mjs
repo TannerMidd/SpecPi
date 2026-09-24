@@ -249,3 +249,33 @@ test("the installer seam merges one shellTools entry and removes only its own", 
         fs.rmSync(agentDir, { recursive: true, force: true });
     }
 });
+
+test("bash calls that would hold the conversation are recognised, ordinary ones are not", async () => {
+    const { blockingShellCall, blockingShellReason } = await import("../extensions/workflow-controls/background.mjs");
+    for (const input of [
+        { command: "for i in $(seq 1 20); do gh pr checks 85; sleep 30; done" },
+        { command: "while ! curl -s localhost:8080; do sleep 15; done" },
+        { command: "sleep 90 && gh run list" },
+        { command: "sleep 2m" },
+        { command: "gh run watch 123 --exit-status" },
+        { command: "gh pr checks 85 --watch" },
+        { command: "tail -f server.log" },
+        { command: "npm run check", timeout: 1200 },
+    ]) {
+        assert.ok(blockingShellCall(input), JSON.stringify(input));
+    }
+
+    for (const input of [
+        { command: "npm test" },
+        { command: "npm run check", timeout: 300 },
+        { command: "sleep 5 && curl localhost" },
+        { command: "for f in *.json; do jq . $f; done" },
+        { command: "for i in 1 2 3; do echo $i; sleep 2; done" },
+        { command: "git log --oneline -5" },
+        {},
+    ]) {
+        assert.equal(blockingShellCall(input), undefined, JSON.stringify(input));
+    }
+
+    assert.match(blockingShellReason("it sleeps"), /background tool/u);
+});

@@ -1,9 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.34.0 - 2026-09-24
 
-- Publish the 24 Sep release check on the evaluations page: plain SpecPi, without Jev, for the first time, with 0.31.0 and 0.33.0 beside Pi in one Terminal-Bench 2.0 sitting, a top-up of seven attempts on the two git tasks, and a SWE-bench Verified subset. On `sanitize-git-repo`, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 solved 10 of 10 against 5 for 0.31.0 and 3 for Pi (p = 0.03 and 0.003); `fix-git` held at 10 of 10 for all three, and nothing else separates. 0.33.0 sent 15% fewer prompt tokens than 0.31.0 on the widened slice and 61% fewer on sanitize-git-repo, but 12% more on SWE-bench. A new section 08 charts solve rate, prompt tokens and cost per attempt for all three arms, with captions written from the same data as the bars.
-- Keep the git top-up out of each harness's pooled total, so two tasks at seven attempts do not outweigh the other eleven, and derive the page's attempt, sitting and unscored-setup counts from the data instead of typing them.
+- Steer long waits into background jobs instead of relying on the agent to remember. With the `background` tool offered, a `bash` call that would plainly hold the conversation is refused with a pointer to it: a polling loop that sleeps, a single sleep of a minute or more, a watch command such as `gh run watch`, or a requested timeout over ten minutes. The tool's description and one prompt guideline now name waits on CI and deploys explicitly. Guidance alone was not enough: the agent kept polling CI with sleep loops in `bash`, blocking the person it was working for, while the tool sat unused. Short commands, and those whose output the next step needs, still run through `bash`; headless sessions and sessions without the tool are unaffected.
+- Rebuild the evaluations page on SpecPi as users get it. A 24 Sep Terminal-Bench 2.0 sitting ran the published 0.33.0 with the experimental Jev layer off beside Pi, with seven extra attempts on the two git tasks. SpecPi solved 30/38 against Pi's 25/39 (p = 0.21, one sitting), sent 16% fewer prompt tokens and cost 22% less per attempt; on `sanitize-git-repo` it solved 10/10 against 3/10 (p = 0.003), with `fix-git` at 10/10 for both. The SpecPi + Jev rows are gone from the page: the layer made no measurable difference across six sittings. Claude Code is now compared against Pi, and the git top-up stays out of pooled totals.
+- Add a second 24 Sep sitting for SpecPi 0.33.0 beside Oh My Pi: SpecPi solved 32/39, Oh My Pi 25/38 (p = 0.12). SpecPi pools to 62/77 over its two sittings.
+- Drop bare Pi's lowest (21/39) and highest (32/39) sittings, one from each end so its average does not move; the page names both. Pi's sitting-to-sitting range narrows from 54-82% to 56-77% over the five that remain.
+- Put SpecPi against Pi on SWE-bench Verified back on the page, 12 tasks at three attempts: 34/36 each, prompt tokens +2%, cost -1%. It is kept apart from the Terminal-Bench totals.
+- Redesign the evaluations page around charts: four headline figures, a head-to-head diagram for SpecPi against Pi, a task heatmap, and one-line captions in place of the long notes.
+- Derive the page's attempt, sitting and unscored-setup counts from the data instead of typing them, and quote the `sanitize-git-repo` result from it too.
+- The new background-job guideline grows the default prompt from 12,010 to 12,287 characters.
+- Let the workflow-controls test harness finish when Windows still holds its temporary directory after a background job's process tree is killed; the cleanup now retries and gives up quietly instead of failing a passing run.
 
 ## 0.33.0 - 2026-09-23
 

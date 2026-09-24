@@ -149,12 +149,8 @@ function renderCharts(data) {
         tick: (value) => `${Math.round(value * 100)}%`,
     });
 
-    const release = renderRelease(data);
-    charts["chart-release"] = release.chart;
-    charts["release-note"] = release.note;
-    charts["chart-release-tokens"] = release.tokens;
-    charts["chart-release-cost"] = release.cost;
-    charts["release-spend-note"] = release.spendNote;
+    charts["chart-headtohead"] = renderHeadToHead(data);
+    charts["chart-swe"] = renderSwe(data);
 
     return charts;
 }
@@ -210,12 +206,207 @@ export function orientedPair(data, numerator, denominator) {
     };
 }
 
-// "−30%" for fewer, "+11%" for more: a signed change reads faster than a ratio.
-const change = (ratio) => {
-    const value = Math.round((ratio - 1) * 100);
+// Head to head: SpecPi against bare Pi, in the sittings both ran. One row per measure, each on its
+// own scale, with a dot for each harness and the gap between them drawn as the line joining them.
+// The right-hand column states the change, so the diagram reads without its caption.
+function renderHeadToHead(data) {
+    const pair = orientedPair(data, "specpi", "pi");
+    const colourOf = (id) => data.harnesses.find((entry) => entry.id === id)?.colour ?? "var(--muted)";
+    const piColour = colourOf("pi");
+    const specpiColour = colourOf("specpi");
+    const mean = (values) => values.reduce((total, value) => total + value, 0) / values.length;
+    const sittings = pair?.sittings ?? [];
+    const task = (name) => data.gitPair.find((entry) => entry.task === name);
+    const rows = [];
+    if (pair) {
+        rows.push({
+            label: "Solved",
+            sub: `widened slice · p = ${pair.solved.p.toFixed(2)}`,
+            pi: pair.solved.den / pair.solved.attemptsDen,
+            specpi: pair.solved.num / pair.solved.attemptsNum,
+            max: 1,
+            higherIsBetter: true,
+            text: [`${pair.solved.den}/${pair.solved.attemptsDen}`, `${pair.solved.num}/${pair.solved.attemptsNum}`],
+            kind: "rate",
+        });
+    }
 
-    return value === 0 ? "0%" : `${value > 0 ? "+" : "−"}${Math.abs(value)}%`;
-};
+    for (const name of ["sanitize-git-repo", "fix-git"]) {
+        const entry = task(name);
+        if (!entry?.byHarness.pi || !entry?.byHarness.specpi) {
+            continue;
+        }
+
+        const pi = entry.byHarness.pi;
+        const specpi = entry.byHarness.specpi;
+        rows.push({
+            label: name,
+            sub: `${specpi.attempts} attempts · p = ${entry.p < 0.01 ? entry.p.toFixed(3) : entry.p.toFixed(2)}`,
+            pi: pi.solved / pi.attempts,
+            specpi: specpi.solved / specpi.attempts,
+            max: 1,
+            higherIsBetter: true,
+            text: [`${pi.solved}/${pi.attempts}`, `${specpi.solved}/${specpi.attempts}`],
+            kind: "rate",
+            code: true,
+        });
+    }
+
+    if (sittings.length > 0) {
+        const tokens = [
+            mean(sittings.map((entry) => entry.den.inputTokens)),
+            mean(sittings.map((entry) => entry.num.inputTokens)),
+        ];
+        const cost = [mean(sittings.map((entry) => entry.den.cost)), mean(sittings.map((entry) => entry.num.cost))];
+        rows.push({
+            label: "Prompt tokens",
+            sub: "per attempt",
+            pi: tokens[0],
+            specpi: tokens[1],
+            max: Math.max(...tokens) * 1.15,
+            higherIsBetter: false,
+            text: tokens.map((value) => `${Math.round(value / 1000)}k`),
+            kind: "ratio",
+        });
+        rows.push({
+            label: "Cost",
+            sub: "per attempt",
+            pi: cost[0],
+            specpi: cost[1],
+            max: Math.max(...cost) * 1.15,
+            higherIsBetter: false,
+            text: cost.map((value) => money(value)),
+            kind: "ratio",
+        });
+    }
+
+    return drawDumbbell(
+        "chart-headtohead",
+        "SpecPi against Pi, in the sittings both ran",
+        rows,
+        piColour,
+        specpiColour,
+    );
+}
+
+/**
+ * SWE-bench, the same drawing as the head-to-head: one solve row and the two spend rows.
+ */
+function renderSwe(data) {
+    const swe = data.swe;
+    if (!swe) {
+        return "";
+    }
+
+    const colourOf = (id) => data.harnesses.find((entry) => entry.id === id)?.colour ?? "var(--muted)";
+    const pi = swe.byHarness.pi;
+    const specpi = swe.byHarness.specpi;
+    const spend = (label, key, format) => ({
+        label,
+        sub: "per attempt",
+        pi: pi[key],
+        specpi: specpi[key],
+        max: Math.max(pi[key], specpi[key]) * 1.15,
+        higherIsBetter: false,
+        text: [format(pi[key]), format(specpi[key])],
+        kind: "ratio",
+    });
+    const rows = [
+        {
+            label: "Solved",
+            sub: `${swe.tasks} tasks · p = ${swe.p.toFixed(2)}`,
+            pi: pi.rate,
+            specpi: specpi.rate,
+            max: 1,
+            higherIsBetter: true,
+            text: [`${pi.solved}/${pi.attempts}`, `${specpi.solved}/${specpi.attempts}`],
+            kind: "rate",
+        },
+        spend("Prompt tokens", "inputTokens", (value) => `${Math.round(value / 1000)}k`),
+        spend("Cost", "cost", money),
+    ];
+
+    return drawDumbbell(
+        "chart-swe",
+        "SpecPi against Pi on SWE-bench Verified",
+        rows,
+        colourOf("pi"),
+        colourOf("specpi"),
+    );
+}
+
+function drawDumbbell(id, title, rows, piColour, specpiColour) {
+    // Stacked rows: the label and the change share one line, the track runs full width beneath.
+    // A narrow drawing keeps its text legible at phone width; the figure is capped on wide screens.
+    const width = 480;
+    const left = 8;
+    const right = width - 8;
+    const rowHeight = 66;
+    const top = 30;
+    const height = top + rows.length * rowHeight;
+    const x = (value, max) => left + (Math.max(0, Math.min(value, max)) / max) * (right - left);
+    const parts = [
+        `<circle cx="6" cy="10" r="6" fill="${piColour}" /><text x="18" y="14" class="ct-lb">Pi (base)</text>`,
+        `<circle cx="96" cy="10" r="6" fill="${specpiColour}" /><text x="108" y="14" class="ct-lb">SpecPi</text>`,
+        `<text x="${width}" y="14" text-anchor="end" class="ct-lb">SpecPi vs Pi</text>`,
+    ];
+    rows.forEach((row, index) => {
+        const y = top + index * rowHeight + 16;
+        const track = y + 30;
+        const piX = x(row.pi, row.max);
+        const specpiX = x(row.specpi, row.max);
+        const change =
+            row.kind === "rate" ? Math.round((row.specpi - row.pi) * 100) : Math.round((row.specpi / row.pi - 1) * 100);
+        const better = change === 0 ? null : row.higherIsBetter ? change > 0 : change < 0;
+        const tone = better === null ? "var(--muted)" : better ? specpiColour : "var(--ct-warn, #b45309)";
+        const delta =
+            change === 0
+                ? "level"
+                : `${change > 0 ? "+" : "−"}${Math.abs(change)}${row.kind === "rate" ? " pts" : "%"}`;
+        const label = row.code ? `<tspan font-family="var(--mono)">${esc(row.label)}</tspan>` : esc(row.label);
+        // Equal values would hide Pi's dot under SpecPi's, so Pi becomes a ring around it.
+        const piMark =
+            Math.abs(piX - specpiX) < 1
+                ? `<circle cx="${piX.toFixed(1)}" cy="${track}" r="10.5" fill="none" stroke="${piColour}" stroke-width="2.5"><title>Pi: ${esc(row.text[0])}</title></circle>`
+                : `<circle cx="${piX.toFixed(1)}" cy="${track}" r="7" fill="${piColour}"><title>Pi: ${esc(row.text[0])}</title></circle>`;
+        parts.push(
+            `<text x="0" y="${y}" class="ct-row">${label}<tspan class="ct-sub" dx="8">${esc(row.sub)}</tspan></text>`,
+            `<text x="${width}" y="${y}" text-anchor="end" class="ct-val" style="fill:${tone}">${delta}<tspan class="ct-sub" dx="8">${esc(row.text[0])} → ${esc(row.text[1])}</tspan></text>`,
+            `<line x1="${left}" y1="${track}" x2="${right}" y2="${track}" stroke="var(--line)" stroke-width="2" stroke-linecap="round" />`,
+            `<line x1="${piX.toFixed(1)}" y1="${track}" x2="${specpiX.toFixed(1)}" y2="${track}" stroke="${tone}" stroke-width="4" stroke-linecap="round" opacity=".55" />`,
+            piMark,
+            `<circle cx="${specpiX.toFixed(1)}" cy="${track}" r="7" fill="${specpiColour}"><title>SpecPi: ${esc(row.text[1])}</title></circle>`,
+        );
+    });
+
+    return `<svg class="chart" id="${id}" viewBox="0 0 ${width} ${height}" style="max-width:640px" role="img" preserveAspectRatio="xMidYMid meet" aria-label="${esc(title)}">${parts.join("")}</svg>`;
+}
+
+// Task by task as a heatmap: each cell is shaded by its solve rate, so the hard tasks and the
+// harness-sensitive ones stand out before any number is read.
+function renderTaskHeatmap(data) {
+    const header = ["Task", ...data.harnesses.map((harness) => harness.label)]
+        .map((cell, index) => `<th${index === 0 ? "" : ' scope="col"'}>${esc(cell)}</th>`)
+        .join("");
+    const body = data.tasks
+        .map((entry) => {
+            const cells = data.harnesses.map((harness) => {
+                const run = entry.byHarness[harness.id];
+                if (!run) {
+                    return `<td class="hm-empty">&mdash;</td>`;
+                }
+
+                const rate = run.solved / run.attempts;
+
+                return `<td style="--r:${rate.toFixed(2)}" title="${esc(harness.label)}: ${run.solved} of ${run.attempts}">${run.solved}/${run.attempts}</td>`;
+            });
+
+            return `<tr><th><code>${esc(entry.task)}</code></th>${cells.join("")}</tr>`;
+        })
+        .join("");
+
+    return `<table class="heatmap"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>`;
+}
 
 function renderTables(data) {
     const overall = table(
@@ -233,165 +424,7 @@ function renderTables(data) {
         ]),
     );
 
-    // Every sitting, as a grid. This is the evidence for the range column above.
-    const ids = Object.keys(data.sittingLabels);
-    const sittings = table(
-        ["Harness", ...ids.map((id) => esc(data.sittingLabels[id]))],
-        data.harnesses.map((harness) => [
-            esc(harness.label),
-            ...ids.map((id) => {
-                const entry = (harness.sittings ?? []).find((e) => e.id === id);
-
-                return entry ? `${entry.solved}/${entry.attempts}` : "&mdash;";
-            }),
-        ]),
-    );
-
-    // The widened slice only. The calibration slice is on the page as the reason the widened one
-    // exists rather than as a result, and a task breakdown of it would invite reading it as one.
-    const tasks = table(
-        ["Task", ...data.harnesses.map((harness) => esc(harness.label))],
-        data.tasks.map((entry) => [
-            `<code>${esc(entry.task)}</code>`,
-            ...data.harnesses.map((harness) => {
-                const run = entry.byHarness[harness.id];
-                if (!run) {
-                    return "&mdash;";
-                }
-
-                const cell = `${run.solved}/${run.attempts}`;
-
-                return run.solved === 0 ? `<strong>${cell}</strong>` : cell;
-            }),
-        ]),
-    );
-
-    // SpecPi + Jev against bare Pi, sitting by sitting, in only the launches that ran both. The pooled
-    // rows above draw on different sittings; this is the comparison that can be attributed.
-    const pair = orientedPair(data, "jev", "pi");
-    const paired = pair
-        ? table(
-              ["Sitting", "Pi solved", "SpecPi + Jev solved", "Prompt tokens", "Cost"],
-              pair.sittings.map((entry) => [
-                  esc(entry.label),
-                  `${entry.den.solved}/${entry.den.attempts}`,
-                  `${entry.num.solved}/${entry.num.attempts}`,
-                  change(entry.tokenRatio),
-                  entry.costRatio === null ? "not comparable" : change(entry.costRatio),
-              ]),
-          )
-        : "";
-
-    return {
-        "table-overall": overall,
-        "table-sittings": sittings,
-        "table-paired": paired,
-        "table-tasks": tasks,
-    };
-}
-
-// The 24 Sep release check: plain SpecPi 0.31.0 and 0.33.0 beside Pi in one sitting. One band per
-// measure, one bar per arm, and a caption written from the same data, so no figure quoted beside the
-// chart can drift from the bars.
-function renderRelease(data) {
-    const release = data.release;
-    if (!release) {
-        return { chart: "", note: "", tokens: "", cost: "", spendNote: "" };
-    }
-
-    const ids = ["pi", "specpi-031", "specpi"];
-    const harnessOf = (id) => data.harnesses.find((entry) => entry.id === id);
-    const measures = [
-        ["Terminal-Bench · widened slice", release.widened],
-        ...release.tasks.map((entry) => [`${entry.task} · widened + git pair`, entry.arms]),
-        ...(release.swe ? [[`SWE-bench Verified · ${release.swe.tasks} tasks`, release.swe.arms]] : []),
-    ];
-    const groupsOf = (value, display) =>
-        measures.map(([label, arms]) => ({
-            label,
-            bars: ids
-                .map((id) => [id, arms?.find((entry) => entry.arm === id)])
-                .filter(([, run]) => run)
-                .map(([id, run]) => ({
-                    label: harnessOf(id)?.label ?? id,
-                    value: value(run),
-                    display: display(run),
-                    colour: harnessOf(id)?.colour,
-                })),
-        }));
-    const peak = (value) => Math.max(...measures.flatMap(([, arms]) => (arms ?? []).map(value)));
-    const chart = hbars({
-        id: "chart-release",
-        title: "Solved, per attempt · 24 Sep release check",
-        axisLabel: "share of attempts reaching reward 1; one sitting, all three arms side by side",
-        groups: groupsOf(
-            (run) => run.solved / run.attempts,
-            (run) => `${run.solved}/${run.attempts}`,
-        ),
-        max: 1,
-        tick: (value) => `${Math.round(value * 100)}%`,
-    });
-    // The same bands for spend. Prompt tokens are where a smaller fixed prompt shows first; cost is
-    // what reaches the bill, and output tokens are most of it, so the two do not move together.
-    const tokens = hbars({
-        id: "chart-release-tokens",
-        title: "Prompt tokens per attempt · 24 Sep release check",
-        axisLabel: "tokens sent, summed over the attempt's model calls, mean per attempt",
-        groups: groupsOf(
-            (run) => run.inputTokens,
-            (run) => thousands(run.inputTokens),
-        ),
-        // A multiple of 400k, so the four gridlines fall on round hundreds of thousands.
-        max: niceMax(
-            peak((run) => run.inputTokens),
-            400_000,
-        ),
-        tick: (value) => `${Math.round(value / 1000)}k`,
-    });
-    const cost = hbars({
-        id: "chart-release-cost",
-        title: "Cost per attempt · 24 Sep release check",
-        axisLabel: "USD at the frozen price list, mean per attempt",
-        groups: groupsOf(
-            (run) => run.cost,
-            (run) => money(run.cost),
-        ),
-        // A multiple of $0.008, so the four gridlines fall on round thousandths.
-        max: niceMax(
-            peak((run) => run.cost),
-            0.008,
-        ),
-        tick: (value) => `$${value.toFixed(3)}`,
-    });
-
-    // Two decimals round p = 0.003 to "0.00", which reads as certainty.
-    const pText = (p) => (p < 0.01 ? p.toFixed(3) : Math.min(p, 1).toFixed(2));
-    const sanitize = release.tasks.find((entry) => entry.task === "sanitize-git-repo")?.arms ?? [];
-    const pOf = (arms, id) => arms.find((entry) => entry.arm === id)?.p;
-    const note =
-        sanitize.length === 3
-            ? `On <code>sanitize-git-repo</code>, which the 0.33.0 rule against unrequested irreversible steps is about, 0.33.0 separates from 0.31.0 at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "specpi-031"))} and from Pi at <i>p</i>&nbsp;=&nbsp;${pText(pOf(sanitize, "pi"))}: every failure there had rewritten Git history, destroying the commit the checker compares against. Nothing else separates (<i>p</i>&nbsp;&ge;&nbsp;${pText(Math.min(...[release.widened, ...(release.swe ? [release.swe.arms] : [])].flatMap((arms) => arms.map((entry) => entry.p)).filter((p) => p !== null)))}), and <code>fix-git</code>, which legitimately uses Git's recovery commands, did not move. One sitting: read the level rows as one more point in section 04's spread.`
-            : "";
-
-    const change = (id, key, arms) => {
-        const current = arms.find((entry) => entry.arm === "specpi")?.[key];
-        const other = arms.find((entry) => entry.arm === id)?.[key];
-
-        return current && other ? Math.round((current / other - 1) * 100) : null;
-    };
-
-    const signed = (value) => (value === null ? "n/a" : `${value > 0 ? "+" : "−"}${Math.abs(value)}%`);
-    const spendNote = `Against 0.31.0, 0.33.0's prompt tokens per attempt changed by ${measures
-        .map(
-            ([label, arms]) => `${signed(change("specpi-031", "inputTokens", arms ?? []))} on ${label.split(" · ")[0]}`,
-        )
-        .join(", ")}, and its cost per attempt by ${measures
-        .map(([label, arms]) => `${signed(change("specpi-031", "cost", arms ?? []))} on ${label.split(" · ")[0]}`)
-        .join(
-            ", ",
-        )}. Output tokens are most of the bill at these cache rates, so cost does not track prompt tokens one for one.`;
-
-    return { chart, tokens, cost, note, spendNote };
+    return { "table-overall": overall, "table-tasks": renderTaskHeatmap(data) };
 }
 
 // The README carries the same headline as the page. Typing it by hand guarantees it drifts, so it
@@ -399,34 +432,19 @@ function renderRelease(data) {
 // because the ordering by score is the one this run says not to read.
 function renderReadme(data) {
     const rows = [...data.harnesses].sort((a, b) => a.overall.cost - b.overall.cost);
-    // Derived, not typed. The sentence below already went stale once, quoting p = 0.83 from a run
-    // that a rerun moved to 0.40, and claiming Claude Code's cache was unmeasured after it was.
-    const pValue = data.comparisons.find(
-        (entry) => [entry.a, entry.b].includes("pi") && [entry.a, entry.b].includes("jev"),
-    ).p;
+    // Derived, not typed. A hand-written version of this paragraph went stale twice, quoting a p-value
+    // a rerun had moved and a cache share that had since been measured.
     const piSpread = data.harnesses.find((entry) => entry.id === "pi").spread;
-    const pair = orientedPair(data, "jev", "pi");
-    const pct = (ratio) => `${Math.round(Math.abs(1 - ratio) * 100)}%`;
-    // The range quoted as "fewer" is taken from the sittings where it was fewer. Across all of them it
-    // printed "27-30% fewer" once a sitting went the other way, which is neither.
-    const ratios = pair.sittings.map((entry) => entry.tokenRatio);
-    const lower = ratios.filter((ratio) => ratio < 1);
-    const higher = ratios.filter((ratio) => ratio >= 1);
-    const tokenRange = `${pct(Math.max(...lower)).slice(0, -1)}–${pct(Math.min(...lower))} fewer`;
-    const tokenException =
-        higher.length === 0
-            ? ""
-            : higher.length === 1
-              ? `, ${pct(higher[0])} more in the other`
-              : `, ${pct(Math.min(...higher)).slice(0, -1)}–${pct(Math.max(...higher))} more in the others`;
-    // The pair nearest to separating, named rather than asserted, and paired rather than pooled. Pooled,
-    // Pi against Oh My Pi looks closest at p = 0.15; paired, in the one sitting both ran, it is p = 1.00,
-    // because the pooled gap was Pi's weak sittings rather than anything Oh My Pi did.
+    const pair = orientedPair(data, "specpi", "pi");
+    const sitting = pair.sittings[0];
+    const less = (ratio) => `${Math.round((1 - ratio) * 100)}%`;
     const labelOf = (id) => data.harnesses.find((entry) => entry.id === id).label;
-    const closest = [...data.paired].sort((x, y) => x.solved.p - y.solved.p)[0];
-    // Pooled pairs that clear p < 0.05, leader first. Named rather than left out, because "pooled or
-    // paired" stopped being true once a one-sitting harness joined rows pooled over six.
     const rateOf = (id) => data.harnesses.find((entry) => entry.id === id).overall.rate;
+    const sanitize = data.gitPair.find((entry) => entry.task === "sanitize-git-repo");
+    const fixGit = data.gitPair.find((entry) => entry.task === "fix-git");
+    const cellOf = (entry, id) => `${entry.byHarness[id].solved}/${entry.byHarness[id].attempts}`;
+    // Pooled pairs that clear p < 0.05, leader first. Named rather than left out, but flagged: pooling
+    // sets one harness's sittings against another's.
     const pooledSeparated = data.comparisons
         .filter((entry) => entry.p < 0.05)
         .sort((x, y) => x.p - y.p)
@@ -447,27 +465,25 @@ function renderReadme(data) {
         thousands(harness.overall.inputTokens),
         percent(harness.overall.cacheHitRate),
     ];
+    const tick = "`";
 
     return [
-        `**${data.totalAttempts} scored attempts across ${data.taskCount} tasks and ${data.harnesses.length} harness rows (two SpecPi releases among them)**,`,
-        `all on \`${data.model}\`.`,
+        `**${data.totalAttempts} scored attempts across ${data.taskCount} tasks and ${data.harnesses.length} harnesses**,`,
+        `all on ${tick}${data.model}${tick}. SpecPi is the published 0.33.0 release, with the experimental Jev layer off.`,
         "",
         "| Harness | Solved | Rate | Cost/attempt | Prompt tokens | Cache hit |",
         "| --- | --- | --- | --- | --- | --- |",
         ...rows.map((harness) => `| ${cell(harness).join(" | ")} |`),
         "",
-        `Solve rate does not separate them in the sittings where both ran: Pi against SpecPi + Jev is Fisher p = ${pValue.toFixed(2)}`,
-        `pooled and ${pair.solved.p.toFixed(2)} paired, and the closest paired comparison of any two harnesses is`,
-        `${labelOf(closest.a)} against ${labelOf(closest.b)} at p = ${closest.solved.p.toFixed(2)}. Nor can it at this`,
-        "sample size -- bare Pi, on unchanged software and the same thirteen tasks, spans",
-        `${(piSpread.low * 100).toFixed(0)}-${(piSpread.high * 100).toFixed(0)}% across ${piSpread.sittings} separate sittings, a wider gap than any measured here between two`,
-        `harnesses.${pooledNote}`,
+        `SpecPi and Pi ran side by side in the ${sitting.label} sitting. SpecPi solved ${pair.solved.num}/${pair.solved.attemptsNum}`,
+        `against Pi's ${pair.solved.den}/${pair.solved.attemptsDen} (Fisher p = ${pair.solved.p.toFixed(2)}), sending ${less(sitting.tokenRatio)} fewer prompt tokens and costing`,
+        `${less(sitting.costRatio)} less per attempt. On ${tick}sanitize-git-repo${tick}, with that sitting's extra attempts, SpecPi solved`,
+        `${cellOf(sanitize, "specpi")} against ${cellOf(sanitize, "pi")} (p = ${sanitize.p.toFixed(3)}); ${tick}fix-git${tick} was ${cellOf(fixGit, "specpi")} for both.`,
         "",
-        "The rows pool different sittings, so compare them paired. In the sittings where both ran,",
-        `SpecPi + Jev sent fewer prompt tokens than Pi in ${pair.tokens.lowerIn} of ${pair.tokens.sittings} (${tokenRange}${tokenException}),`,
-        `and cost less in ${pair.cost.lowerIn} of ${pair.cost.sittings}, by about ${pct(pair.cost.typical)}: output tokens are most of the bill.`,
-        "Cost is recomputed from recorded tokens against a dated price file, never taken from a",
-        "harness's self-report, and SpecPi + Jev's excludes the Jev advisor's own calls.",
+        "Overall solve rate is a different matter: one sitting cannot rank harnesses here. Bare Pi, on",
+        `unchanged software and the same thirteen tasks, spans ${(piSpread.low * 100).toFixed(0)}-${(piSpread.high * 100).toFixed(0)}% across ${piSpread.sittings} sittings, a wider gap than any`,
+        `measured between two harnesses.${pooledNote} Cost is recomputed from recorded tokens against a dated`,
+        "price file, never taken from a harness's self-report.",
     ].join("\n");
 }
 

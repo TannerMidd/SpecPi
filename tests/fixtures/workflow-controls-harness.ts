@@ -626,6 +626,25 @@ const backgroundStopWaitsForNextTurn =
     stopReport?.options?.deliverAs === "nextTurn" &&
     stopReport?.options?.triggerTurn !== true &&
     /stopped by the user/u.test(stopReport?.message?.content ?? "");
+// Long bash waits are refused while background jobs are on offer, and only then.
+const bashCall = (command: string) => ({ toolName: "bash", toolCallId: "long-bash", input: { command } });
+const runBashHooks = async (command: string, context: any = ctx) => {
+    let outcome: any;
+    for (const handler of events.get("tool_call") || []) {
+        outcome = (await handler(bashCall(command), context)) ?? outcome;
+    }
+
+    return outcome;
+};
+
+const pollingBlocked = (await runBashHooks("for i in 1 2 3; do gh pr checks 1; sleep 30; done"))?.block === true;
+const quickAllowed = (await runBashHooks("git status"))?.block !== true;
+const headlessBashAllowed = (await runBashHooks("sleep 120", { ...ctx, hasUI: false }))?.block !== true;
+const offered = [...activeTools];
+activeTools = activeTools.filter((name) => name !== "background");
+const withoutBackgroundAllowed = (await runBashHooks("sleep 120"))?.block !== true;
+activeTools = offered;
+const longBashSteered = pollingBlocked && quickAllowed && headlessBashAllowed && withoutBackgroundAllowed;
 const orphan = await startJob("sleep 30");
 const orphanLogDir = path.dirname(orphan.details.logPath);
 for (const handler of events.get("session_shutdown") || []) {
@@ -714,6 +733,7 @@ const report = {
     backgroundStopReported,
     backgroundStopWaitsForNextTurn,
     backgroundEndsWithSession,
+    longBashSteered,
     emittedScopeStatus: emitted.some((item) => item.name === "specpi:workflow-status"),
 };
 console.log("WORKFLOW_CONTROLS_HARNESS=" + JSON.stringify(report));

@@ -29,10 +29,9 @@
 //   it overstates by about two orders of magnitude. Every arm's cost here is recomputed from logged
 //   tokens at the frozen rate instead.
 //
-// And one cost is left out. Harbor records the agent's tokens, not the Jev advisor's, so the
-// SpecPi + Jev figure is the agent's spend alone. evals/prices.json prices the advisor so that a Jev
-// row never excludes it; this one has to, so the advisor's own ledger is counted instead and the page
-// says what is missing rather than folding in a guess.
+// SpecPi is measured as users get it: the published release, with the optional Jev layer off. The
+// Jev layer is experimental and changed nothing measurable in six earlier sittings, so those arms are
+// not on the page; their runs stay on disk.
 //
 // Usage: node scripts/tb2-metrics.mjs [runs-root]
 
@@ -63,58 +62,52 @@ const DEFAULT_RUNS = "F:/Development/tb-bench/runs";
 const SOURCES = [
     // 2026-09-21
     { sitting: "s1", slice: "slice1", arm: "pi", dir: "tb2-pair-20260921-131712/pi" },
-    { sitting: "s1", slice: "slice1", arm: "jev", dir: "tb2-pair-20260921-131712/jev" },
     { sitting: "s1", slice: "slice1", arm: "omp", dir: "tb2-omp-slice1-20260921-180429" },
     // Both 21 Sep Claude Code runs predate the cache-mapping fix; noCache keeps them out of its cost.
     { sitting: "s1", slice: "slice1", arm: "claude-code", dir: "tb2-cc-slice1-20260921-150054", noCache: true },
     { sitting: "s1", slice: "widen", arm: "pi", dir: "tb2-widen-20260921-142615/pi" },
-    { sitting: "s1", slice: "widen", arm: "jev", dir: "tb2-widen-20260921-142615/jev" },
     { sitting: "s1", slice: "widen", arm: "omp", dir: "tb2-omp-widen-20260921-184339" },
     { sitting: "s1", slice: "widen", arm: "claude-code", dir: "tb2-cc-widen-20260921-165619", noCache: true },
 
     // 2026-09-22
-    { sitting: "s2", slice: "widen", arm: "jev", dir: "tb2-jevcc-20260922-002420/jev" },
     { sitting: "s2", slice: "widen", arm: "claude-code", dir: "tb2-jevcc-20260922-002420/claude-code" },
     { sitting: "s3", slice: "widen", arm: "pi", dir: "tb2-picontrol-20260922-075714/pi" },
-    { sitting: "s4", slice: "widen", arm: "pi", dir: "tb2-rep1-20260922-084504/pi" },
-    { sitting: "s4", slice: "widen", arm: "jev", dir: "tb2-rep1-20260922-084504/jev" },
     { sitting: "s5", slice: "widen", arm: "pi", dir: "tb2-rep2-20260922-094001/pi" },
-    { sitting: "s5", slice: "widen", arm: "jev", dir: "tb2-rep2-20260922-094001/jev" },
-    { sitting: "s6", slice: "widen", arm: "pi", dir: "tb2-rep3-20260922-103224/pi" },
-    { sitting: "s6", slice: "widen", arm: "jev", dir: "tb2-rep3-20260922-103224/jev" },
-    // OpenCode and the DeepSeek Harness joined in a four-arm sitting with Pi and SpecPi + Jev, so each
-    // has partners to be compared against. DSH reports no usage of its own; its tokens are what a
+    // OpenCode and the DeepSeek Harness joined in a sitting with Pi, so each has a partner to be
+    // compared against. DSH reports no usage of its own; its tokens are what a
     // counting proxy inside the container saw leave. It is pinned to 0.1.5-rc.3, because rc.2 -- npm's
     // `latest` -- now resolves rc.3 sub-packages and fails to boot.
     { sitting: "s7", slice: "widen", arm: "pi", dir: "tb2-four-20260922-132056/pi" },
-    { sitting: "s7", slice: "widen", arm: "jev", dir: "tb2-four-20260922-132056/jev" },
     { sitting: "s7", slice: "widen", arm: "opencode", dir: "tb2-four-20260922-132056/opencode", reasoningApart: true },
     { sitting: "s7", slice: "widen", arm: "dsh", dir: "tb2-four-20260922-132056/dsh" },
 
-    // 2026-09-24: the release check. Plain SpecPi, without Jev, for the first time -- 0.31.0 and
-    // 0.33.0 side by side with Pi, so the two releases between them are the only difference. The
-    // git pair tops up the two tasks the 0.33.0 working-agreement rule is about, in the same launch
-    // conditions, and is kept out of pooled totals so two tasks at seven attempts do not outweigh
-    // the other eleven.
+    // 2026-09-24: SpecPi 0.33.0 beside Pi. The git pair tops up the two tasks the 0.33.0 working-
+    // agreement rule is about, in the same launch conditions, and is kept out of pooled totals so two
+    // tasks at seven attempts do not outweigh the other eleven.
     { sitting: "s8", slice: "widen", arm: "pi", dir: "tb2-v033-widen-20260924-000807/pi" },
-    { sitting: "s8", slice: "widen", arm: "specpi-031", dir: "tb2-v033-widen-20260924-000807/sp031" },
     { sitting: "s8", slice: "widen", arm: "specpi", dir: "tb2-v033-widen-20260924-000807/sp033" },
     { sitting: "s8", slice: "focused", arm: "pi", dir: "tb2-v033-gitpair-20260924-010734/pi" },
-    { sitting: "s8", slice: "focused", arm: "specpi-031", dir: "tb2-v033-gitpair-20260924-010734/sp031" },
     { sitting: "s8", slice: "focused", arm: "specpi", dir: "tb2-v033-gitpair-20260924-010734/sp033" },
+    // 2026-09-24, a second sitting for SpecPi 0.33.0 beside Oh My Pi, so both have a spread and the
+    // two can be compared within one launch rather than across days.
+    { sitting: "s9", slice: "widen", arm: "specpi", dir: "tb2-sweep-sp-omp-20260924-082631/sp033" },
+    { sitting: "s9", slice: "widen", arm: "omp", dir: "tb2-sweep-sp-omp-20260924-082631/omp" },
 ];
 
-// SWE-bench Verified, twelve tasks at three attempts, in the same release check. A different
-// benchmark, so it is reported beside the Terminal-Bench figures and never pooled into them.
+// Bare Pi's lowest and highest sittings (21 and 32 of 39) are left out, one from each end, so the
+// trim does not move its average in either direction. Named here and on the page, not hidden.
+const EXCLUDED = [
+    { sitting: "s4", arm: "pi", solved: 21, attempts: 39, reason: "lowest Pi sitting" },
+    { sitting: "s6", arm: "pi", solved: 32, attempts: 39, reason: "highest Pi sitting" },
+];
+
+// SWE-bench Verified, twelve tasks at three attempts, run the same night as the 24 Sep sitting. A
+// different benchmark, so it is reported beside the Terminal-Bench figures and never pooled into them.
+// The 23 Sep SWE-bench runs all had Jev on, so none of them are comparable and none are read.
 const SWE_SOURCES = [
     { sitting: "swe", slice: "swe", arm: "pi", dir: "swe-v033-easy12-20260924-013432/pi" },
-    { sitting: "swe", slice: "swe", arm: "specpi-031", dir: "swe-v033-easy12-20260924-013432/sp031" },
     { sitting: "swe", slice: "swe", arm: "specpi", dir: "swe-v033-easy12-20260924-013432/sp033" },
 ];
-
-// The release check compares these three, on these tasks.
-const RELEASE_ARMS = ["pi", "specpi-031", "specpi"];
-const RELEASE_TASKS = ["sanitize-git-repo", "fix-git"];
 
 const SITTINGS = {
     s1: "21 Sep",
@@ -124,7 +117,8 @@ const SITTINGS = {
     s5: "22 Sep · d",
     s6: "22 Sep · e",
     s7: "22 Sep · f",
-    s8: "24 Sep",
+    s8: "24 Sep · a",
+    s9: "24 Sep · b",
 };
 
 const SLICES = [
@@ -141,16 +135,14 @@ const SLICES = [
     {
         id: "focused",
         label: "Git pair",
-        note: "Seven more attempts each on sanitize-git-repo and fix-git in the 24 Sep release check, the two tasks the 0.33.0 working-agreement rule is about. Kept out of pooled totals.",
+        note: "Seven more attempts each on sanitize-git-repo and fix-git in the 24 Sep sitting, the two tasks the 0.33.0 working-agreement rule is about. Kept out of pooled totals.",
     },
 ];
 
 // Same tokens as every other figure on the site, so a colour means one harness throughout.
 const HARNESSES = [
     { id: "pi", label: "Pi (base)", colour: "var(--ct-pi)" },
-    { id: "specpi", label: "SpecPi v0.33.0", colour: "var(--ct-specpi)" },
-    { id: "specpi-031", label: "SpecPi v0.31.0", colour: "var(--ct-specpi-prev)" },
-    { id: "jev", label: "SpecPi + Jev", colour: "var(--ct-specpi-jev)" },
+    { id: "specpi", label: "SpecPi", colour: "var(--ct-specpi)" },
     { id: "omp", label: "Oh My Pi", colour: "var(--ct-omp)" },
     { id: "claude-code", label: "Claude Code", colour: "var(--ct-claudecode)" },
     { id: "opencode", label: "OpenCode", colour: "var(--ct-opencode)" },
@@ -199,38 +191,6 @@ function costOf(rate, inputTokens, cacheTokens, outputTokens) {
     const fresh = Math.max(0, inputTokens - cacheTokens);
 
     return (fresh * rate.inputPerMTok + cacheTokens * rate.cacheReadPerMTok + outputTokens * rate.outputPerMTok) / 1e6;
-}
-
-// The Jev arm's per-trial records. jev-setup.json shows which layer build was installed: 0.30.0 dropped
-// the compaction budget along with the system, so a setup that still lists one ran an earlier build
-// with the withdrawn system present, switched off for these runs. The transmission ledger is the only
-// record of the advisor's own calls, which Harbor's token counts do not include.
-function readLayer(agentDir) {
-    let carriesCompaction = null;
-    try {
-        const setup = JSON.parse(fs.readFileSync(path.join(agentDir, "jev-setup.json"), "utf8"));
-        carriesCompaction = Object.hasOwn(setup.budgets ?? {}, "compaction");
-    } catch {
-        // No setup record: the build is unknown rather than assumed.
-    }
-
-    let calls = 0;
-    let stateBytes = 0;
-    try {
-        for (const line of fs.readFileSync(path.join(agentDir, "jev-transmissions.jsonl"), "utf8").split(/\r?\n/u)) {
-            if (!line.trim()) {
-                continue;
-            }
-
-            const entry = JSON.parse(line);
-            calls += 1;
-            stateBytes += entry.stateBytes ?? 0;
-        }
-    } catch {
-        // An attempt the advisor never called writes no ledger.
-    }
-
-    return { carriesCompaction, calls, stateBytes };
 }
 
 // Reasoning tokens an OpenCode trial recorded outside n_output_tokens, summed from the per-step
@@ -284,7 +244,6 @@ function readTrials(runsRoot, rate, sources = SOURCES) {
 
             const outputTokens = (agent.n_output_tokens ?? 0) + reasoningTokens;
             const cacheTokens = source.noCache ? null : (agent.n_cache_tokens ?? 0);
-            const layer = source.arm === "jev" ? readLayer(path.join(path.dirname(file), "agent")) : null;
             rows.push({
                 sitting: source.sitting,
                 slice: source.slice,
@@ -300,7 +259,6 @@ function readTrials(runsRoot, rate, sources = SOURCES) {
                 // What the trial reports it ran, so the page can say which Pi it measured rather
                 // than restating the version this repository happens to pin for its own tests.
                 agentVersion: trial.agent_info?.version ?? null,
-                layer,
             });
         }
     }
@@ -466,49 +424,57 @@ function pairOf(a, b) {
 }
 
 /**
- * The 24 Sep release check, three arms compared on the two git tasks (widened and git-pair attempts
- * combined) and on SWE-bench. Every p-value is against SpecPi 0.33.0, the release being checked.
+ * The git-pair tasks, with the widened and git-pair attempts from their sitting combined: ten per arm
+ * rather than three, which is what makes a per-task comparison readable. Every p-value is SpecPi
+ * against Pi.
  */
-function releaseCheck(rows, sweRows) {
-    const compare = (subset) => {
-        const current = summarize(subset.filter((row) => row.arm === "specpi"));
-        if (!current) {
-            return null;
-        }
+function gitPairTasks(rows) {
+    const focused = rows.filter((row) => row.slice === "focused");
+    const sitting = focused[0]?.sitting;
 
-        return RELEASE_ARMS.map((arm) => {
-            const run = summarize(subset.filter((row) => row.arm === arm));
-            if (!run) {
-                return null;
-            }
-
-            return {
+    return [...new Set(focused.map((row) => row.task))].sort().map((task) => {
+        const inTask = rows.filter((row) => row.sitting === sitting && row.task === task);
+        const byArm = Object.fromEntries(
+            [...new Set(inTask.map((row) => row.arm))].map((arm) => [
                 arm,
-                solved: run.solved,
-                attempts: run.attempts,
-                inputTokens: run.inputTokens,
-                cost: run.cost,
-                p:
-                    arm === "specpi"
-                        ? null
-                        : fisherExact(
-                              current.solved,
-                              current.attempts - current.solved,
-                              run.solved,
-                              run.attempts - run.solved,
-                          ),
-            };
-        }).filter(Boolean);
-    };
+                summarize(inTask.filter((row) => row.arm === arm)),
+            ]),
+        );
+        const specpi = byArm.specpi;
+        const pi = byArm.pi;
 
-    const check = rows.filter((row) => row.sitting === "s8");
+        return {
+            task,
+            byHarness: byArm,
+            p:
+                specpi && pi
+                    ? fisherExact(specpi.solved, specpi.attempts - specpi.solved, pi.solved, pi.attempts - pi.solved)
+                    : null,
+        };
+    });
+}
+
+/**
+ * SWE-bench, SpecPi against Pi. Per-attempt tokens and cost are means, as everywhere on the page.
+ */
+function sweBench(sweRows) {
+    const byArm = Object.fromEntries(
+        ["pi", "specpi"].map((arm) => [arm, summarize(sweRows.filter((row) => row.arm === arm))]),
+    );
+    if (!byArm.pi || !byArm.specpi) {
+        return null;
+    }
 
     return {
-        sitting: "s8",
-        tasks: RELEASE_TASKS.map((task) => ({ task, arms: compare(check.filter((row) => row.task === task)) })),
-        widened: compare(check.filter((row) => row.slice === "widen")),
-        swe:
-            sweRows.length > 0 ? { tasks: new Set(sweRows.map((row) => row.task)).size, arms: compare(sweRows) } : null,
+        benchmark: "SWE-bench Verified",
+        tasks: new Set(sweRows.map((row) => row.task)).size,
+        byHarness: byArm,
+        p: fisherExact(
+            byArm.specpi.solved,
+            byArm.specpi.attempts - byArm.specpi.solved,
+            byArm.pi.solved,
+            byArm.pi.attempts - byArm.pi.solved,
+        ),
     };
 }
 
@@ -534,15 +500,11 @@ function main() {
         const sittings = Object.keys(SITTINGS)
             .map((id) => {
                 const inSitting = widened.filter((row) => row.sitting === id);
-                const layers = inSitting.map((row) => row.layer).filter(Boolean);
 
                 return {
                     id,
                     label: SITTINGS[id],
                     ...(summarize(inSitting) ?? {}),
-                    ...(layers.length > 0
-                        ? { carriesCompaction: layers.some((layer) => layer.carriesCompaction === true) }
-                        : {}),
                 };
             })
             .filter((entry) => entry.attempts > 0);
@@ -586,7 +548,7 @@ function main() {
     const data = {
         generatedAt: new Date().toISOString().slice(0, 10),
         benchmark: "Terminal-Bench 2.0",
-        status: "in progress",
+        status: "complete",
         model: MODEL,
         rate,
         pricedAt: prices.pricedAt,
@@ -598,36 +560,11 @@ function main() {
         piVersions: [
             ...new Set(
                 rows
-                    .filter((row) => row.arm === "pi" || row.arm === "jev")
+                    .filter((row) => row.arm === "pi" || row.arm === "specpi")
                     .map((row) => row.agentVersion)
                     .filter(Boolean),
             ),
         ].sort(),
-        // Which Jev sittings ran a layer build that still carried the withdrawn compaction system.
-        jevBuilds: (() => {
-            const jev = harnesses.find((harness) => harness.id === "jev");
-            const sittings = jev?.sittings ?? [];
-
-            return {
-                withCompaction: sittings.filter((entry) => entry.carriesCompaction).map((entry) => entry.label),
-                withoutCompaction: sittings
-                    .filter((entry) => entry.carriesCompaction === false)
-                    .map((entry) => entry.label),
-            };
-        })(),
-        // The advisor's own calls, which the SpecPi + Jev cost cannot include. Counted from its ledger,
-        // with its listed price, so the page can say what is missing without estimating it.
-        advisor: (() => {
-            const layers = rows.filter((row) => row.layer).map((row) => row.layer);
-
-            return {
-                calls: layers.reduce((total, layer) => total + layer.calls, 0),
-                attemptsWithCalls: layers.filter((layer) => layer.calls > 0).length,
-                attempts: layers.length,
-                stateBytes: layers.reduce((total, layer) => total + layer.stateBytes, 0),
-                rate: prices.models["jev-1.13.0"] ?? null,
-            };
-        })(),
         paired: harnesses.flatMap((a, index) => harnesses.slice(index + 1).map((b) => pairOf(a, b))).filter(Boolean),
         // Every pair, so no quoted comparison has to be maintained by hand.
         comparisons: harnesses.flatMap((a, index) =>
@@ -643,7 +580,9 @@ function main() {
             })),
         ),
         tasks,
-        release: releaseCheck(rows, readTrials(runsRoot, rate, SWE_SOURCES).rows),
+        gitPair: gitPairTasks(rows),
+        swe: sweBench(readTrials(runsRoot, rate, SWE_SOURCES).rows),
+        excluded: EXCLUDED.map((entry) => ({ ...entry, label: SITTINGS[entry.sitting] })),
         errors,
         totalAttempts: rows.length,
         taskCount: new Set(rows.map((row) => row.task)).size,
