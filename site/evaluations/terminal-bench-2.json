@@ -382,6 +382,19 @@
                     "outputCostShare": 0.6177285242181769,
                     "costIsUpperBound": false,
                     "costAttempts": 116
+                },
+                "focused": {
+                    "attempts": 14,
+                    "solved": 11,
+                    "rate": 0.7857142857142857,
+                    "tasks": 2,
+                    "inputTokens": 804713,
+                    "outputTokens": 17616,
+                    "cacheHitRate": 0.9571375909718987,
+                    "cost": 0.018054223285714287,
+                    "outputCostShare": 0.5854459237210687,
+                    "costIsUpperBound": false,
+                    "costAttempts": 14
                 }
             }
         },
@@ -478,6 +491,19 @@
                     "outputCostShare": 0.7322040837323495,
                     "costIsUpperBound": false,
                     "costAttempts": 39
+                },
+                "focused": {
+                    "attempts": 14,
+                    "solved": 7,
+                    "rate": 0.5,
+                    "tasks": 2,
+                    "inputTokens": 796484,
+                    "outputTokens": 12587,
+                    "cacheHitRate": 0.9657763605963784,
+                    "cost": 0.013948918285714285,
+                    "outputCostShare": 0.5414367614865129,
+                    "costIsUpperBound": false,
+                    "costAttempts": 14
                 }
             }
         },
@@ -542,6 +568,19 @@
                     "outputCostShare": 0.6777993709108318,
                     "costIsUpperBound": false,
                     "costAttempts": 39
+                },
+                "focused": {
+                    "attempts": 14,
+                    "solved": 12,
+                    "rate": 0.8571428571428571,
+                    "tasks": 2,
+                    "inputTokens": 367313,
+                    "outputTokens": 8491,
+                    "cacheHitRate": 0.9381743352638925,
+                    "cost": 0.009534513857142856,
+                    "outputCostShare": 0.5343009697535406,
+                    "costIsUpperBound": false,
+                    "costAttempts": 14
                 }
             }
         },
@@ -606,6 +645,19 @@
                     "outputCostShare": 0.5135297693648304,
                     "costIsUpperBound": false,
                     "costAttempts": 38
+                },
+                "focused": {
+                    "attempts": 14,
+                    "solved": 13,
+                    "rate": 0.9285714285714286,
+                    "tasks": 2,
+                    "inputTokens": 728400,
+                    "outputTokens": 15841,
+                    "cacheHitRate": 0.9558578489056249,
+                    "cost": 0.01641618342857143,
+                    "outputCostShare": 0.5789696167764206,
+                    "costIsUpperBound": false,
+                    "costAttempts": 14
                 }
             }
         }
@@ -2151,6 +2203,58 @@
                     "outputCostShare": 0.598519103429615,
                     "costIsUpperBound": false,
                     "costAttempts": 10
+                },
+                "omp": {
+                    "attempts": 7,
+                    "solved": 7,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 487382,
+                    "outputTokens": 15714,
+                    "cacheHitRate": 0.9478983044687154,
+                    "cost": 0.014623465714285714,
+                    "outputCostShare": 0.6447504236341864,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
+                },
+                "dsh": {
+                    "attempts": 7,
+                    "solved": 7,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 147937,
+                    "outputTokens": 5579,
+                    "cacheHitRate": 0.9202390597523845,
+                    "cost": 0.005525918571428571,
+                    "outputCostShare": 0.6057945634378047,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
+                },
+                "opencode": {
+                    "attempts": 7,
+                    "solved": 7,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 106376,
+                    "outputTokens": 2937,
+                    "cacheHitRate": 0.9627937520899558,
+                    "cost": 0.0026628762857142858,
+                    "outputCostShare": 0.6616690631086665,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
+                },
+                "claude-code": {
+                    "attempts": 7,
+                    "solved": 7,
+                    "rate": 1,
+                    "tasks": 1,
+                    "inputTokens": 211104,
+                    "outputTokens": 5927,
+                    "cacheHitRate": 0.9663260313629901,
+                    "cost": 0.005234664857142857,
+                    "outputCostShare": 0.6793885617564711,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
                 }
             },
             "p": 0.9999999999999929
@@ -2183,6 +2287,58 @@
                     "outputCostShare": 0.39221545019608284,
                     "costIsUpperBound": false,
                     "costAttempts": 10
+                },
+                "omp": {
+                    "attempts": 7,
+                    "solved": 4,
+                    "rate": 0.5714285714285714,
+                    "tasks": 1,
+                    "inputTokens": 1122044,
+                    "outputTokens": 19518,
+                    "cacheHitRate": 0.9611508593058202,
+                    "cost": 0.021484980857142854,
+                    "outputCostShare": 0.5450811066915011,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
+                },
+                "dsh": {
+                    "attempts": 7,
+                    "solved": 6,
+                    "rate": 0.8571428571428571,
+                    "tasks": 1,
+                    "inputTokens": 1308863,
+                    "outputTokens": 26102,
+                    "cacheHitRate": 0.9598837289892658,
+                    "cost": 0.027306448285714293,
+                    "outputCostShare": 0.5735411381481226,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
+                },
+                "opencode": {
+                    "attempts": 7,
+                    "solved": 5,
+                    "rate": 0.7142857142857143,
+                    "tasks": 1,
+                    "inputTokens": 628249,
+                    "outputTokens": 14044,
+                    "cacheHitRate": 0.9340057383941683,
+                    "cost": 0.01640615142857143,
+                    "outputCostShare": 0.5136279022868251,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
+                },
+                "claude-code": {
+                    "attempts": 7,
+                    "solved": 0,
+                    "rate": 0,
+                    "tasks": 1,
+                    "inputTokens": 1381863,
+                    "outputTokens": 19248,
+                    "cacheHitRate": 0.9656923886309613,
+                    "cost": 0.022663171714285713,
+                    "outputCostShare": 0.5095731084216796,
+                    "costIsUpperBound": false,
+                    "costAttempts": 7
                 }
             },
             "p": 0.0030959752321981565
@@ -3316,6 +3472,6 @@
             "kind": "NetworkConnectionError"
         }
     ],
-    "totalAttempts": 675,
+    "totalAttempts": 731,
     "taskCount": 20
 }

@@ -88,6 +88,19 @@ const SOURCES = [
     { sitting: "s8", slice: "widen", arm: "specpi", dir: "tb2-v033-widen-20260924-000807/sp033" },
     { sitting: "s8", slice: "focused", arm: "pi", dir: "tb2-v033-gitpair-20260924-010734/pi" },
     { sitting: "s8", slice: "focused", arm: "specpi", dir: "tb2-v033-gitpair-20260924-010734/sp033" },
+    // The same git pair for the other four harnesses that afternoon: same tasks, seven attempts,
+    // model and endpoint. Setup was given three times Harbor's default after a slow package mirror timed
+    // out OpenCode's and Claude Code's Node.js install; the time on the task itself is unchanged.
+    { sitting: "s8", slice: "focused", arm: "omp", dir: "tb2-gitpair-rest-20260924-145650/omp" },
+    { sitting: "s8", slice: "focused", arm: "dsh", dir: "tb2-gitpair-rest-20260924-145650/dsh" },
+    {
+        sitting: "s8",
+        slice: "focused",
+        arm: "opencode",
+        dir: "tb2-gitpair-oc3-20260924-152921/opencode",
+        reasoningApart: true,
+    },
+    { sitting: "s8", slice: "focused", arm: "claude-code", dir: "tb2-cc-gitpair3-20260924-152921/claude-code" },
     // 2026-09-24, a second sitting for SpecPi 0.33.0 beside Oh My Pi, so both have a spread and the
     // two can be compared within one launch rather than across days.
     { sitting: "s9", slice: "widen", arm: "specpi", dir: "tb2-sweep-sp-omp-20260924-082631/sp033" },
