@@ -49,8 +49,8 @@ Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMi
 
 | | LANCET Nano (local) | Jev (hosted, previous guard) |
 | --- | ---: | ---: |
-| Risky commands caught | 91.7% | 96.8% |
-| Safe commands wrongly stopped | 9.4% | 7.8% |
+| Risky commands caught | 89.0% | 96.8% |
+| Safe commands wrongly stopped | 6.2% | 7.8% |
 | Cost per check | $0 | per request |
 | Network | none | every check |
 
