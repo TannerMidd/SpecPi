@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Give the LANCET command guard its own page on the website, covering how it decides, what it costs to run, how it compares with Jev, and its limits. It is linked from every page header and from the package list. The README gains a section on it. The header moves its links onto their own row from 900 px, so ten links still fit at tablet widths.
+- Prepare `specpi-lancet-guard` 0.2.0, which pins LANCET Nano v0.4.0 (CodeT5+ 220M base, same tokenizer and runtime). On LANCET's release benchmark it catches 89.0% of risky commands, against 85.8%, and 72% of risky secrets commands, against 66%, while wrongly stopping 6.2% of safe ones, against 5.5%. The parity fixture is re-recorded with v0.4.0's `classify.py`. Users who update must run `/lancet-guard setup` again; a guard saved as on fails closed until they do. SpecPi's default pin stays at 0.1.0 until 0.2.0 is published.
 
 ## 0.35.0 - 2026-09-26
 

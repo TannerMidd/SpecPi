@@ -1,12 +1,12 @@
 {
-    "source": "LANCET Nano v0.3.0 classify.py (LancetNano), onnxruntime 1.30.0, tokenizers 0.23.2",
+    "source": "LANCET Nano v0.4.0 classify.py (LancetNano), onnxruntime 1.30.0, tokenizers 0.23.2",
     "cases": [
         {
             "command": "git status --short",
             "shell": "bash",
             "ids": [1, 6845, 1267, 1493, 6620, 2],
             "reason": null,
-            "score": 0.016104429067184716,
+            "score": 0.019537934464021984,
             "classification": "not_flagged"
         },
         {
@@ -14,7 +14,7 @@
             "shell": "bash",
             "ids": [1, 24229, 1842, 2],
             "reason": null,
-            "score": 0.017912580005780398,
+            "score": 0.018675482354693716,
             "classification": "not_flagged"
         },
         {
@@ -22,7 +22,7 @@
             "shell": "bash",
             "ids": [1, 24229, 3808, 1493, 3860, 1071, 2],
             "reason": null,
-            "score": 0.9076746067367025,
+            "score": 0.8917724709684943,
             "classification": "risky"
         },
         {
@@ -30,7 +30,7 @@
             "shell": "bash",
             "ids": [1, 3251, 300, 11821, 4871, 15865, 10975, 2],
             "reason": null,
-            "score": 0.018389317556122747,
+            "score": 0.019690801563443907,
             "classification": "not_flagged"
         },
         {
@@ -41,7 +41,7 @@
                 632, 17, 2333, 2207, 8236, 18, 5387, 19, 89, 2
             ],
             "reason": null,
-            "score": 0.9010155714857675,
+            "score": 0.8800794341566489,
             "classification": "risky"
         },
         {
@@ -49,7 +49,7 @@
             "shell": "bash",
             "ids": [1, 8864, 300, 5809, 756, 67, 6400, 597, 15147, 9039, 2],
             "reason": null,
-            "score": 0.9072512590050766,
+            "score": 0.8839500773335116,
             "classification": "risky"
         },
         {
@@ -57,7 +57,7 @@
             "shell": "bash",
             "ids": [1, 8864, 300, 5809, 263, 19, 3510, 20308, 2],
             "reason": null,
-            "score": 0.9077081318442385,
+            "score": 0.8917353738855295,
             "classification": "risky"
         },
         {
@@ -65,31 +65,31 @@
             "shell": "bash",
             "ids": [1, 4720, 263, 300, 529, 19962, 1330, 11, 300, 3733, 2],
             "reason": null,
-            "score": 0.8324709082823617,
-            "classification": "review"
+            "score": 0.02289291758687321,
+            "classification": "not_flagged"
         },
         {
             "command": "git push --force origin main",
             "shell": "bash",
             "ids": [1, 6845, 1817, 1493, 5734, 4026, 2774, 2],
             "reason": null,
-            "score": 0.895125934825495,
-            "classification": "review"
+            "score": 0.8804866855617463,
+            "classification": "risky"
         },
         {
             "command": "git reset --hard HEAD~3",
             "shell": "bash",
             "ids": [1, 6845, 2715, 1493, 20379, 14792, 98, 23, 2],
             "reason": null,
-            "score": 0.8872893201610981,
-            "classification": "review"
+            "score": 0.891885115479785,
+            "classification": "risky"
         },
         {
             "command": "git clean -fdx",
             "shell": "bash",
             "ids": [1, 6845, 2721, 300, 8313, 92, 2],
-            "reason": null,
-            "score": 0.8401212298348785,
+            "reason": "uncertainty-band",
+            "score": 0.865861155797768,
             "classification": "review"
         },
         {
@@ -97,23 +97,23 @@
             "shell": "bash",
             "ids": [1, 13660, 1086, 1493, 8864, 300, 90, 342, 27824, 2564, 524, 84, 558, 462, 3085, 342, 2564, 699, 2],
             "reason": null,
-            "score": 0.9081721025701943,
+            "score": 0.8915234466032983,
             "classification": "risky"
         },
         {
             "command": "chmod 600 ~/.ssh/config",
             "shell": "bash",
             "ids": [1, 343, 1711, 14707, 4871, 15865, 10975, 19, 1425, 2],
-            "reason": null,
-            "score": 0.02717845898519809,
-            "classification": "not_flagged"
+            "reason": "uncertainty-band",
+            "score": 0.845115866236646,
+            "classification": "review"
         },
         {
             "command": "sudo apt-get install -y jq",
             "shell": "bash",
             "ids": [1, 20566, 279, 337, 17, 588, 3799, 300, 93, 20656, 2],
             "reason": null,
-            "score": 0.019128603309306824,
+            "score": 0.021884740696516233,
             "classification": "not_flagged"
         },
         {
@@ -121,7 +121,7 @@
             "shell": "bash",
             "ids": [1, 16104, 3799, 3285, 631, 22, 18, 1578, 18, 23, 2],
             "reason": null,
-            "score": 0.019285058773197035,
+            "score": 0.022476640346696858,
             "classification": "not_flagged"
         },
         {
@@ -130,8 +130,8 @@
             "ids": [
                 1, 13504, 300, 2556, 4559, 2333, 2207, 8236, 18, 5387, 19, 5425, 18, 674, 300, 83, 3799, 18, 674, 2
             ],
-            "reason": null,
-            "score": 0.7983121634754698,
+            "reason": "uncertainty-band",
+            "score": 0.83443738470417,
             "classification": "review"
         },
         {
@@ -139,7 +139,7 @@
             "shell": "bash",
             "ids": [1, 8103, 300, 81, 2395, 3813, 300, 85, 7434, 19, 2],
             "reason": null,
-            "score": 0.018060215559335988,
+            "score": 0.019337536787236147,
             "classification": "not_flagged"
         },
         {
@@ -149,7 +149,7 @@
                 1, 12946, 315, 6530, 7767, 13295, 14209, 19, 4757, 20686, 4211, 6, 1671, 4871, 15865, 28734, 1310, 2
             ],
             "reason": null,
-            "score": 0.9144382262001987,
+            "score": 0.8904523446918464,
             "classification": "risky"
         },
         {
@@ -159,16 +159,16 @@
                 1, 3353, 30335, 300, 80, 571, 288, 6573, 31, 3376, 14609, 380, 380, 380, 380, 342, 5645, 19, 92, 13506,
                 289, 571, 4422, 30335, 300, 2
             ],
-            "reason": null,
-            "score": 0.03030309010072256,
-            "classification": "not_flagged"
+            "reason": "uncertainty-band",
+            "score": 0.8666775768410148,
+            "classification": "review"
         },
         {
             "command": "aws s3 rm s3://bucket --recursive",
             "shell": "bash",
             "ids": [1, 6850, 272, 23, 6692, 272, 23, 2207, 7242, 1493, 10543, 2],
             "reason": null,
-            "score": 0.9223172884708737,
+            "score": 0.9008789758484437,
             "classification": "risky"
         },
         {
@@ -176,7 +176,7 @@
             "shell": "bash",
             "ids": [1, 21528, 386, 80, 1430, 1981, 12449, 2],
             "reason": null,
-            "score": 0.9002083433942054,
+            "score": 0.9052131328825118,
             "classification": "risky"
         },
         {
@@ -184,15 +184,15 @@
             "shell": "bash",
             "ids": [1, 387, 20107, 5546, 300, 6079, 17, 12908, 537, 2],
             "reason": null,
-            "score": 0.8917972900882151,
-            "classification": "review"
+            "score": 0.9034312241512373,
+            "classification": "risky"
         },
         {
             "command": "psql -c 'DROP TABLE users;'",
             "shell": "bash",
             "ids": [1, 1121, 1217, 300, 71, 296, 18768, 7567, 3677, 4359, 2],
             "reason": null,
-            "score": 0.9060328778737765,
+            "score": 0.8902576242178678,
             "classification": "risky"
         },
         {
@@ -200,7 +200,7 @@
             "shell": "bash",
             "ids": [1, 8189, 300, 71, 2],
             "reason": null,
-            "score": 0.019059994975099984,
+            "score": 0.02020435802374282,
             "classification": "not_flagged"
         },
         {
@@ -208,7 +208,7 @@
             "shell": "bash",
             "ids": [1, 14202, 300, 73, 342, 4757, 19, 674, 1728, 18, 20, 18, 20, 18, 21, 1059, 6334, 24, 2],
             "reason": null,
-            "score": 0.9030258736428484,
+            "score": 0.8869288435465615,
             "classification": "risky"
         },
         {
@@ -216,7 +216,7 @@
             "shell": "bash",
             "ids": [1, 11718, 276, 94, 74, 5114, 18, 88, 9764, 1705, 19, 597, 7180, 300, 80, 76, 5114, 18, 88, 9764, 2],
             "reason": null,
-            "score": 0.019147252511763777,
+            "score": 0.01985104254633411,
             "classification": "not_flagged"
         },
         {
@@ -224,23 +224,23 @@
             "shell": "bash",
             "ids": [1, 730, 300, 77, 296, 87, 19, 11351, 19, 3215, 19, 75, 11, 1705, 30987, 2924, 2],
             "reason": null,
-            "score": 0.021654714982226462,
+            "score": 0.020000261214357593,
             "classification": "not_flagged"
         },
         {
             "command": "npx prettier --write .",
             "shell": "bash",
             "ids": [1, 82, 4430, 675, 748, 2453, 1493, 2626, 263, 2],
-            "reason": null,
-            "score": 0.025315538629615126,
-            "classification": "not_flagged"
+            "reason": "uncertainty-band",
+            "score": 0.8511089795600697,
+            "classification": "review"
         },
         {
             "command": "node scripts/build.mjs --prod",
             "shell": "bash",
             "ids": [1, 2159, 8873, 19, 3510, 18, 81, 2924, 1493, 17672, 2],
             "reason": null,
-            "score": 0.020971461112766595,
+            "score": 0.02173162702049751,
             "classification": "not_flagged"
         },
         {
@@ -248,23 +248,23 @@
             "shell": "bash",
             "ids": [1, 3074, 571, 23366, 300, 77, 1147, 2],
             "reason": null,
-            "score": 0.9125093516227692,
-            "classification": "risky"
+            "score": 0.023684705616583757,
+            "classification": "not_flagged"
         },
         {
             "command": "gh release create v1.0.0 --notes 'x'",
             "shell": "bash",
             "ids": [1, 17680, 3992, 752, 331, 21, 18, 20, 18, 20, 1493, 12903, 296, 92, 11, 2],
             "reason": null,
-            "score": 0.12895817575541946,
-            "classification": "not_flagged"
+            "score": 0.880473796056248,
+            "classification": "risky"
         },
         {
             "command": "npm version patch && git push --tags",
             "shell": "bash",
             "ids": [1, 24229, 1177, 4729, 597, 5071, 1817, 1493, 4156, 2],
             "reason": null,
-            "score": 0.6798710245350855,
+            "score": 0.10460018891716094,
             "classification": "not_flagged"
         },
         {
@@ -272,7 +272,7 @@
             "shell": "bash",
             "ids": [1, 32, 87, 34, 8864, 300, 5809, 342, 1757, 87, 34, 2],
             "reason": null,
-            "score": 0.8982184675851114,
+            "score": 0.8993434424265386,
             "classification": "risky"
         },
         {
@@ -280,7 +280,7 @@
             "shell": "bash",
             "ids": [1, 12946, 411, 6982, 34, 411, 1683, 34, 411, 4455, 34, 7765, 87, 34, 2],
             "reason": null,
-            "score": 0.02398163158716224,
+            "score": 0.031205452638741735,
             "classification": "not_flagged"
         },
         {
@@ -291,7 +291,7 @@
                 164, 230, 235, 11, 597, 7180, 2
             ],
             "reason": null,
-            "score": 0.02235077443838461,
+            "score": 0.020616587762619553,
             "classification": "not_flagged"
         },
         {
@@ -302,7 +302,7 @@
                 163, 227, 251, 7526, 163, 227, 252, 2
             ],
             "reason": null,
-            "score": 0.0232992824532567,
+            "score": 0.027380137573710973,
             "classification": "not_flagged"
         },
         {
@@ -313,7 +313,7 @@
                 244, 107, 163, 227, 240, 177, 258, 244, 105, 2731, 2
             ],
             "reason": null,
-            "score": 0.7476632168537849,
+            "score": 0.03387475110423545,
             "classification": "not_flagged"
         },
         {
@@ -321,7 +321,7 @@
             "shell": "bash",
             "ids": [1, 69, 206, 203, 70, 202, 71, 2],
             "reason": null,
-            "score": 0.6836276259191232,
+            "score": 0.02201923927474442,
             "classification": "not_flagged"
         },
         {
@@ -329,7 +329,7 @@
             "shell": "bash",
             "ids": [1, 225, 7676, 3476, 2],
             "reason": null,
-            "score": 0.029250094279843722,
+            "score": 0.023541771250990065,
             "classification": "not_flagged"
         },
         {
@@ -337,7 +337,7 @@
             "shell": "bash",
             "ids": [1, 26453, 565, 2],
             "reason": null,
-            "score": 0.020725678336382513,
+            "score": 0.02450923819048232,
             "classification": "not_flagged"
         },
         {
@@ -345,7 +345,7 @@
             "shell": "bash",
             "ids": [1, 92, 131, 259, 93, 163, 227, 106, 94, 164, 227, 227, 91, 2],
             "reason": null,
-            "score": 0.03931542949644169,
+            "score": 0.7894196559902626,
             "classification": "not_flagged"
         },
         {
@@ -353,7 +353,7 @@
             "shell": "bash",
             "ids": [1, 73, 141, 228, 276, 1727, 132, 107, 9583, 132, 112, 537, 2],
             "reason": null,
-            "score": 0.08045963202050431,
+            "score": 0.03632670837118082,
             "classification": "not_flagged"
         },
         {
@@ -361,23 +361,23 @@
             "shell": "bash",
             "ids": [1, 19752, 1404, 732, 5614, 467, 17784, 2898, 8081, 518, 1807, 2],
             "reason": null,
-            "score": 0.0269258842252857,
+            "score": 0.024851387218591415,
             "classification": "not_flagged"
         },
         {
             "command": "echo $((1+2)) && x=${HOME:-/}",
             "shell": "bash",
             "ids": [1, 12946, 271, 12443, 21, 15, 22, 3719, 597, 619, 13295, 95, 14209, 30, 17, 19, 97, 2],
-            "reason": null,
-            "score": 0.2213562290531289,
-            "classification": "not_flagged"
+            "reason": "uncertainty-band",
+            "score": 0.8595474538355969,
+            "classification": "review"
         },
         {
             "command": "next",
             "shell": "bash",
             "ids": [1, 131, 232, 4285, 2],
             "reason": null,
-            "score": 0.046036700719905836,
+            "score": 0.025120269262333537,
             "classification": "not_flagged"
         },
         {
@@ -385,7 +385,7 @@
             "shell": "bash",
             "ids": [1, 3251, 163, 227, 238, 7124, 176, 124, 128, 70, 362, 2],
             "reason": null,
-            "score": 0.01988109496768077,
+            "score": 0.02048388921048562,
             "classification": "not_flagged"
         },
         {
@@ -393,15 +393,15 @@
             "shell": "bash",
             "ids": [1, 132, 128, 226, 194, 16277, 2],
             "reason": null,
-            "score": 0.829995881718467,
-            "classification": "review"
+            "score": 0.022682993414121062,
+            "classification": "not_flagged"
         },
         {
             "command": "printf '%s\n' 123 4.5e6 0x1F",
             "shell": "bash",
             "ids": [1, 1461, 1995, 87, 203, 11, 17335, 1059, 18, 25, 73, 26, 374, 92, 21, 42, 2],
             "reason": null,
-            "score": 0.020445396762311524,
+            "score": 0.02166901946984934,
             "classification": "not_flagged"
         },
         {
@@ -425,7 +425,7 @@
             "shell": "bash",
             "ids": [1, 176, 124, 128, 2],
             "reason": null,
-            "score": 0.17430713102891615,
+            "score": 0.020417946917022294,
             "classification": "not_flagged"
         },
         {
@@ -487,7 +487,7 @@
                 378, 2
             ],
             "reason": null,
-            "score": 0.09537595060621598,
+            "score": 0.42076419398449255,
             "classification": "not_flagged"
         },
         {
@@ -522,7 +522,7 @@
                 23537, 2
             ],
             "reason": null,
-            "score": 0.15012465956117385,
+            "score": 0.02386229735956313,
             "classification": "not_flagged"
         }
     ]
