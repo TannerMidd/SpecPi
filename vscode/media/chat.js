@@ -370,14 +370,14 @@
             .trim();
     }
 
-    // specpi-jev-guard publishes one status line per session: `jev 12`, then `jev 12 · 1 blocked`
+    // specpi-lancet-guard publishes one status line per session: `lancet 12`, then `lancet 12 · 1 blocked`
     // once it has stopped something, and the last verdict after that. It is the package's own
     // string and is rendered as such -- Chat neither recounts it from the session records nor
     // reformats it, because a second reader of that contract is a second thing to keep in step.
     //
     // The key is absent whenever the guard is off or its audit display is, so presence alone is the
     // right condition for showing the chip: nothing here has to ask whether the guard is running.
-    const GUARD_STATUS_KEY = "jev-guard";
+    const GUARD_STATUS_KEY = "lancet-guard";
 
     /**
      * The count for the chip and the whole line for the tooltip.
@@ -1636,7 +1636,7 @@
 
         byId("guard-value").textContent = entry.summary;
         chip.dataset.blocked = String(entry.blocked);
-        const detail = `specpi-jev-guard: ${entry.full}. Classifier calls this session, and blocked calls once there are any.`;
+        const detail = `specpi-lancet-guard: ${entry.full}. Commands LANCET scored this session, and blocked calls once there are any.`;
         chip.title = detail;
         chip.setAttribute("aria-label", detail);
     }

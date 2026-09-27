@@ -51,7 +51,7 @@ function withinWorkspace(root, candidate) {
 const ACTIVE_STATUSES = new Set(["busy", "retrying", "compacting"]);
 // Status keys Chat renders as first-class readouts rather than generic rows, so a session
 // full of other widgets cannot crowd them out of the bounded map below.
-const USAGE_STATUS_KEYS = new Set(["aa-codex-usage", "provider-usage", "jev-guard", "specpi-background"]);
+const USAGE_STATUS_KEYS = new Set(["aa-codex-usage", "provider-usage", "lancet-guard", "specpi-background"]);
 
 class ChatController {
     constructor(context, options = {}) {

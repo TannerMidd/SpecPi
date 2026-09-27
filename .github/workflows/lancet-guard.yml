@@ -1,0 +1,36 @@
+name: lancet-guard
+
+on:
+  push:
+    paths: ["packages/lancet-guard/**", ".github/workflows/lancet-guard*.yml"]
+  pull_request:
+    paths: ["packages/lancet-guard/**", ".github/workflows/lancet-guard*.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/lancet-guard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+      - run: npm ci --ignore-scripts --omit=peer
+      # The parity and model-backed tests need the real model. This runs the real setup download from
+      # the pinned LANCET-model GitHub release and verifies every digest, so it also fails if that
+      # release asset is missing or has changed.
+      - name: Fetch the pinned LANCET model
+        shell: bash
+        run: echo "LANCET_MODEL_DIR=$(node scripts/fetch-model.mjs "${RUNNER_TEMP}/lancet-agent")" >> "${GITHUB_ENV}"
+      - run: npm run check
+      - run: git diff --check

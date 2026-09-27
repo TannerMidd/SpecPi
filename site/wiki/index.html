@@ -133,8 +133,8 @@ specpi doctor</code></pre>
                         agent picks it up. <code>/jobs</code> lists them, <code>/jobs output &lt;id&gt;</code> shows
                         recent output, and <code>/jobs stop &lt;id|all&gt;</code> stops them. Your permission rules
                         for <code>bash</code> apply to every job, jobs end with the session, and the tool is
-                        offered only in interactive sessions. It is also off while the Jev command guard is on,
-                        because the guard checks <code>bash</code> alone.
+                        offered only in interactive sessions. When the LANCET command guard is on, it checks each
+                        job's command the same way it checks <code>bash</code>.
                     </p>
                     <p>
                         Provider credentials, service configuration, and permission policies follow the upstream

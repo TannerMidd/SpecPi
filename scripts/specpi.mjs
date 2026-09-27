@@ -23,7 +23,7 @@ import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
 import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
-import { applyInertConfig as applyGuardConfig, configPath as guardConfigPath } from "./jev-guard.mjs";
+import { RETIRED_GUARD_NOTICE, RETIRED_GUARD_PIN, retiredGuardWasOn } from "./lancet-guard.mjs";
 import {
     applyShellToolMapping,
     manualInstruction as shellToolInstruction,
@@ -366,24 +366,15 @@ async function mutate(options, operation) {
                 runBrowserQA(agentDir, "setup");
             }
 
-            // specpi-jev-guard's own default is enabled:true, so a freshly installed base would
-            // start gating shell and file calls through a third-party service before anyone asked
-            // for it — and with no key it fails closed, which means a first install that refuses to
-            // run commands. This is the only place SpecPi touches that package's configuration:
-            // between installer runs the guard's own /jev-guard commands own it, so the write does
-            // not repeat at session start and a saved `--global` choice survives every restart.
-            try {
-                const guard = applyGuardConfig();
-                if (guard.disarmed) {
-                    // The one case where establishing the default takes something away. An
-                    // installer run that silently switched off a gate the user had switched on is
-                    // exactly the kind of quiet security change this file refuses to make.
-                    warnings.push(
-                        `Switched the Jev command guard off in ${guardConfigPath()}. SpecPi installs it inert and asserts that on every install and update; run /jev-guard on --global in Pi to turn it back on.`,
-                    );
-                }
-            } catch (error) {
-                console.log(`SpecPi: could not write the Jev guard's inert settings: ${error.message}`);
+            // The LANCET guard ships off and owns its own switch, so SpecPi writes nothing into its
+            // configuration. Retiring the Jev guard it replaced is the one change here that can take
+            // a gate away from someone, so that case is said out loud rather than done quietly.
+            if (
+                previous?.basePackages?.includes(RETIRED_GUARD_PIN) &&
+                !basePackages.includes(RETIRED_GUARD_PIN) &&
+                retiredGuardWasOn()
+            ) {
+                warnings.push(RETIRED_GUARD_NOTICE);
             }
 
             packageState = {

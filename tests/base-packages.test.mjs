@@ -100,7 +100,7 @@ test("the default base is exactly the eight human-selected pinned packages", () 
         "npm:pi-goal-x@0.31.2",
         "npm:@sreetej510/pi-usage@0.10.0",
         "npm:@gotgenes/pi-permission-system@32.0.2",
-        "npm:specpi-jev-guard@0.4.0",
+        "npm:specpi-lancet-guard@0.1.0",
     ]);
 });
 
@@ -151,8 +151,8 @@ test("default lifecycle installs each pin through Pi, preserves filters, and res
 
 test("base-package tests isolate the calling home's enabled guard", (t) => {
     const f = fixture(t);
-    const guard = path.join(f.root, ".pi", "jev-guard.json");
-    const before = '{"enabled":true,"backend":"openrouter","uncertain":"ask"}\n';
+    const guard = path.join(f.root, ".pi", "lancet-guard.json");
+    const before = '{"enabled":true,"risky":"ask"}\n';
     fs.mkdirSync(path.dirname(guard), { recursive: true });
     fs.writeFileSync(guard, before);
     const result = runPiFixture(cli, {
@@ -178,6 +178,7 @@ test("updates retire only unchanged SpecPi-added retired package entries", async
         ["pi-lens", "4.1.6"],
         ["betterwright", "2.8.1"],
         ["pi-subagents", "0.67.0"],
+        ["specpi-jev-guard", "0.4.0"],
     ]) {
         for (const modified of [false, true]) {
             await t.test(`${name}: ${modified ? "user edit survives" : "owned entry retires"}`, (t) => {
@@ -220,6 +221,37 @@ test("updates retire only unchanged SpecPi-added retired package entries", async
                 assert.deepEqual(JSON.parse(fs.readFileSync(f.settings)).packages, modified ? [current] : undefined);
             });
         }
+    }
+});
+
+test("retiring the Jev guard says so when it was on, and touches neither guard's settings", (t) => {
+    for (const wasOn of [true, false]) {
+        const f = fixture(t);
+        f.run("install", "--yes");
+        const jev = path.join(f.root, ".pi", "jev-guard.json");
+        const jevBytes = JSON.stringify({ enabled: wasOn, backend: "openrouter" });
+        fs.mkdirSync(path.dirname(jev), { recursive: true });
+        fs.writeFileSync(jev, jevBytes);
+        const retired = "npm:specpi-jev-guard@0.4.0";
+        const settings = JSON.parse(fs.readFileSync(f.settings));
+        settings.packages.push(retired);
+        fs.writeFileSync(f.settings, JSON.stringify(settings));
+        const manifestPath = path.join(f.agent, "specpi/manifest.json");
+        const manifest = JSON.parse(fs.readFileSync(manifestPath));
+        manifest.basePackages.push(retired);
+        manifest.packageChanges.push({ identity: "npm:specpi-jev-guard", beforeExists: false, installed: retired });
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+
+        const result = f.run("update", "--yes");
+        const output = result.stdout + result.stderr;
+        assert.equal(/Jev command guard was on/u.test(output), wasOn, output);
+        assert.equal(JSON.parse(fs.readFileSync(f.settings)).packages.includes(retired), false);
+        assert.equal(fs.readFileSync(jev, "utf8"), jevBytes, "the old guard's file is read, never written");
+        assert.equal(
+            fs.existsSync(path.join(f.root, ".pi", "lancet-guard.json")),
+            false,
+            "SpecPi never arms or writes the new guard",
+        );
     }
 });
 

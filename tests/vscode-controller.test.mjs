@@ -1104,28 +1104,28 @@ test("first-class status keys retain bounded slots when generic runtime status i
     assert.equal(Object.keys(controller.state.runtimeStatus).length, 24);
     update("aa-codex-usage", "codex 75%");
     update("provider-usage", "claude 25% 5h");
-    update("jev-guard", "jev 12 \u00b7 1 blocked");
+    update("lancet-guard", "lancet 12 \u00b7 1 blocked");
     update("specpi-background", "2 background jobs running");
     assert.equal(controller.state.runtimeStatus["aa-codex-usage"], "codex 75%");
     assert.equal(controller.state.runtimeStatus["provider-usage"], "claude 25% 5h");
-    assert.equal(controller.state.runtimeStatus["jev-guard"], "jev 12 \u00b7 1 blocked");
+    assert.equal(controller.state.runtimeStatus["lancet-guard"], "lancet 12 \u00b7 1 blocked");
     assert.equal(controller.state.runtimeStatus["specpi-background"], "2 background jobs running");
     assert.equal(Object.keys(controller.state.runtimeStatus).length, 28);
     update("generic-overflow", "Not admitted");
     update("provider-usage", "checking");
-    update("jev-guard", "jev 13 \u00b7 1 blocked");
+    update("lancet-guard", "lancet 13 \u00b7 1 blocked");
     assert.equal(Object.keys(controller.state.runtimeStatus).length, 28);
     assert.equal(controller.state.runtimeStatus["provider-usage"], "checking");
-    assert.equal(controller.state.runtimeStatus["jev-guard"], "jev 13 \u00b7 1 blocked");
+    assert.equal(controller.state.runtimeStatus["lancet-guard"], "lancet 13 \u00b7 1 blocked");
     update("aa-codex-usage", undefined);
     update("provider-usage", undefined);
     // The guard clears its own line when it is switched off, and that has to free the slot like
     // any other: a stale count beside a guard that is no longer gating is a lie about the session.
-    update("jev-guard", undefined);
+    update("lancet-guard", undefined);
     update("specpi-background", undefined);
     update("generic-overflow", "Still not admitted");
     assert.equal(Object.keys(controller.state.runtimeStatus).length, 24);
-    assert.equal(Object.hasOwn(controller.state.runtimeStatus, "jev-guard"), false);
+    assert.equal(Object.hasOwn(controller.state.runtimeStatus, "lancet-guard"), false);
     assert.equal(Object.hasOwn(controller.state.runtimeStatus, "generic-overflow"), false);
 });
 

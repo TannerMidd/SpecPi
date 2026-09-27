@@ -886,21 +886,21 @@ test(
                         await setState(page, { status: "ready", runtimeStatus: {} });
                         assert.equal(await guard.isVisible(), false);
 
-                        await setState(page, { status: "ready", runtimeStatus: { "jev-guard": "jev 12" } });
+                        await setState(page, { status: "ready", runtimeStatus: { "lancet-guard": "lancet 12" } });
                         assert.equal(await guard.isVisible(), true);
-                        assert.equal(await value.textContent(), "jev 12");
+                        assert.equal(await value.textContent(), "lancet 12");
                         assert.equal(await guard.getAttribute("data-blocked"), "false");
 
                         // The chip keeps the count; the whole line lives in the tooltip, where a long
                         // one cannot push the footer around.
                         await setState(page, {
                             status: "ready",
-                            runtimeStatus: { "jev-guard": "jev 12 · 1 blocked · bash 0.91 blocked" },
+                            runtimeStatus: { "lancet-guard": "lancet 12 · 1 blocked · bash 0.91 blocked" },
                         });
-                        assert.equal(await value.textContent(), "jev 12");
+                        assert.equal(await value.textContent(), "lancet 12");
                         assert.equal(await guard.getAttribute("data-blocked"), "true");
                         assert.match(await guard.getAttribute("title"), /1 blocked · bash 0\.91 blocked/u);
-                        assert.match(await guard.getAttribute("aria-label"), /specpi-jev-guard/u);
+                        assert.match(await guard.getAttribute("aria-label"), /specpi-lancet-guard/u);
 
                         // It is a readout, not a control: the guard is configured in Pi, not here.
                         assert.equal(await guard.evaluate((element) => element.tagName), "SPAN");
@@ -921,7 +921,7 @@ test(
                         assert.equal(await guard.isVisible(), false);
 
                         // And the guard clearing its own line clears the chip.
-                        await setState(page, { status: "ready", runtimeStatus: { "jev-guard": "jev 3" } });
+                        await setState(page, { status: "ready", runtimeStatus: { "lancet-guard": "lancet 3" } });
                         assert.equal(await guard.isVisible(), true);
                         await setState(page, { status: "ready", runtimeStatus: {} });
                         assert.equal(await guard.isVisible(), false);

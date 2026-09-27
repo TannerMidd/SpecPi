@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Replace the Jev command guard with a local one. `specpi-lancet-guard` 0.1.0, new in `packages/lancet-guard`, takes the eighth pin from `specpi-jev-guard` 0.4.0. It scores shell commands with LANCET Nano v0.3.0, a 110M-parameter CodeT5-base classifier, on the CPU through ONNX Runtime: no API key, and commands never leave the machine. It keeps the Jev guard's local rules in front of the model. A risky verdict asks, Nano's unsure band asks, PowerShell and commands LANCET cannot read ask, and protected writes ask. A missing or damaged model fails closed.
+- Ship it off. `/lancet-guard setup` downloads the model once as the release ZIP from the pinned LANCET-model GitHub release, which works where Hugging Face is blocked. The ZIP and each of the three files taken from it are refused unless their SHA-256 matches. `/lancet-guard on` switches the guard on for a session and `--global` saves that. SpecPi no longer writes any guard configuration, so a saved choice survives updates. An update retires the old Jev guard pin, and says so if that guard was switched on.
+- Gate background jobs with the guard instead of refusing them while it is on: it checks the `background` tool's command as it checks `bash`.
+- Match LANCET Nano's Python runtime exactly. A Node port of its tokenizer and scoring gave identical token ids and bands on 7,170 commands, with scores within 2.2e-16, at about 23 ms a command and 275 MB once loaded.
+- Skip onnxruntime-node's CUDA download during package installation (`ONNXRUNTIME_NODE_INSTALL=skip`). The guard never uses the GPU.
+
 ## 0.34.0 - 2026-09-24
 
 - Steer long waits into background jobs instead of relying on the agent to remember. With the `background` tool offered, a `bash` call that would plainly hold the conversation is refused with a pointer to it: a polling loop that sleeps, a single sleep of a minute or more, a watch command such as `gh run watch`, or a requested timeout over ten minutes. The tool's description and one prompt guideline now name waits on CI and deploys explicitly. Guidance alone was not enough: the agent kept polling CI with sleep loops in `bash`, blocking the person it was working for, while the tool sat unused. Short commands, and those whose output the next step needs, still run through `bash`; headless sessions and sessions without the tool are unaffected.

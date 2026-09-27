@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
-            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, five systems that use it, the pinned command guard beside them, and what it has actually measured."
+            content="How SpecPi's optional Jev layer works: a typed classifier answering questions about session state, five systems that use it, the local command guard beside them, and what it has actually measured."
         />
         <meta property="og:title" content="The Jev layer · SpecPi" />
         <meta
@@ -103,11 +103,12 @@
                 <section class="doc-section" id="where">
                     <header><h2>Where it sits</h2><span>02</span></header>
                     <p>
-                        The layer has two halves that share a key and nothing else. The <strong>advisor</strong> is
-                        first-party SpecPi code that answers questions about session state and never holds authority:
-                        it cannot call a tool, grant a capability or allow an action. The <strong>guard</strong> is a
-                        separate pinned package, <code>specpi-jev-guard</code>, and the one exception: it scores
-                        commands before the permission system sees them, and can refuse one.
+                        The <strong>advisor</strong> is first-party SpecPi code that answers questions about session
+                        state and never holds authority: it cannot call a tool, grant a capability or allow an
+                        action. The <strong>command guard</strong> beside it is a separate pinned package,
+                        <code>specpi-lancet-guard</code>, and the one exception: it scores commands before
+                        they run, and can refuse one. It does not use Jev or a key, and it scores
+                        commands without the network.
                     </p>
                     <figure class="chart-figure">
                         <svg
@@ -502,22 +503,22 @@
                 <section class="doc-section" id="guard">
                     <header><h2>The guard, and why it fails closed</h2><span>08</span></header>
                     <p>
-                        The command guard is not one of the five systems above. It is
-                        <code>specpi-jev-guard</code>, a separate pinned package with its own gate, its own
+                        The command guard is not one of the five systems above, and it does not use Jev. It is
+                        <code>specpi-lancet-guard</code>, a separate pinned package with its own gate, its own
                         configuration file and its own commands, and it is the only thing SpecPi installs that can
-                        take a tool call away. SpecPi pins it and ships it <strong>inert</strong>: the package's own
-                        default is on, so a fresh install would otherwise start gating shell and file calls on day
-                        one. SpecPi writes <code>enabled: false</code> instead. Turning it on is a human act, and
-                        <code>/jev-guard setup</code> is the command that does it &mdash; no switch in SpecPi will.
+                        take a tool call away. It scores commands with LANCET, a small classifier that runs on your
+                        CPU: no key, and nothing leaves the machine. It ships <strong>off</strong>, and SpecPi never
+                        writes its configuration. <code>/lancet-guard setup</code> downloads and verifies the model
+                        and offers to turn it on; <code>/lancet-guard on</code> does it for a session and
+                        <code>--global</code> saves it. It replaced <code>specpi-jev-guard</code>, which scored
+                        commands with Jev through OpenRouter.
                     </p>
                     <p>
                         It <strong>fails closed</strong>, and that is the trade to understand before switching it on.
-                        With no key, an unreachable endpoint, or an answer it cannot parse, the call does not go
-                        through. In a session with no one to ask, the middle band blocks too unless
-                        <code>uncertain</code> is set to <code>allow</code>. So an outage stops gated work until the
-                        guard is switched off again. There is no setting that hands the decision back to
-                        <code>@gotgenes/pi-permission-system</code> instead &mdash; which is what decides every call
-                        while the guard is off, exactly as it did before the package existed.
+                        With the model missing or damaged, the commands the rules leave open do not go through. In a
+                        session with no one to ask, an ask blocks too unless <code>uncertain</code> is set to
+                        <code>allow</code>. <code>@gotgenes/pi-permission-system</code> decides every call after it,
+                        and every call while it is off.
                     </p>
                     <ul>
                         <li>
@@ -528,16 +529,15 @@
                             <code>disallowedCommands</code> are consulted before anything is sent.
                         </li>
                         <li>
-                            <strong>Jev scores what is left,</strong> 0 to 1. At or above
-                            <code>blockThreshold</code> the call is blocked; at or above <code>askThreshold</code> you
-                            are asked; below, it runs. Set those from evidence rather than instinct:
-                            <code>/jev-guard check</code> scores a command without running it, so you can put the
-                            thresholds in the gap between the commands you must stop and the ones you must not.
+                            <strong>LANCET scores what is left.</strong> A command it flags as risky asks you (or
+                            blocks, with <code>"risky": "block"</code>); one it does not flag runs. It reads Bash
+                            only, so PowerShell and over-long commands always ask. <code>/lancet-guard check</code>
+                            scores a command without running it.
                         </li>
                         <li>
-                            <strong>Writes are judged by target.</strong> Ordinary project files pass locally. Paths
-                            outside the workspace, and paths matching <code>protectedPaths</code>
-                            (<code>.env*</code>, keys, <code>.ssh/</code>), go to Jev.
+                            <strong>Writes are judged by target.</strong> Ordinary project files pass. Paths outside
+                            the workspace, and paths matching <code>protectedPaths</code> (<code>.env*</code>, keys,
+                            <code>.ssh/</code>), ask.
                         </li>
                         <li>
                             <strong>Once a person is asked, silence means no.</strong> A dismissed dialog is not
@@ -545,25 +545,19 @@
                         </li>
                     </ul>
                     <p>
-                        From 0.4.0 the guard publishes a per-session counter &mdash; classifier calls, blocked
-                        calls once there are any, and the last verdict. In the terminal it is a footer line; in
+                        The guard publishes a per-session counter &mdash; commands LANCET scored, blocked calls
+                        once there are any, and the last verdict. In the terminal it is a footer line; in
                         SpecPi Chat it sits in the session footer beside the token and cache readouts, showing the
                         count and turning amber once something has been blocked, with the full line in the tooltip.
                         Chat renders the package's own string and nothing more: it is a readout, not a control, and
                         it disappears when the guard is off. Every judged call is also written to Pi's session file,
-                        which is the durable audit trail. <code>/jev-guard audit off</code> turns the line off
+                        which is the durable audit trail. <code>/lancet-guard audit off</code> turns the line off
                         without touching that record.
                     </p>
                     <p>
-                        SpecPi asserts only three fields in <code>~/.pi/jev-guard.json</code> and merges them into
-                        whatever is there, so your thresholds, command lists and protected paths survive:
-                        <code>enabled: false</code>, <code>uncertain: "ask"</code> and
-                        <code>backend: "openrouter"</code>. That happens at install and update and nowhere else, so
-                        between installer runs the switch is entirely the package's: <code>/jev-guard on</code> for
-                        this session, <code>--global</code> to save it, and a saved choice survives every restart.
-                        The next <code>specpi update</code> does assert the off posture again, and says so when that
-                        switched something off &mdash; otherwise a stale <code>enabled: true</code> from before the
-                        package was last unpinned would arm the gate the moment it came back.
+                        Updating from a SpecPi that pinned <code>specpi-jev-guard</code> retires that package's entry.
+                        If it was switched on, the update says so: the LANCET guard does not inherit that setting and
+                        starts off.
                     </p>
                 </section>
 
@@ -711,8 +705,8 @@
                     </div>
                     <p>
                         The guard row is kept as measured and labelled for what it was: this run used the
-                        short-lived native guard, and command gating has since returned to the
-                        <code>specpi-jev-guard</code> package, which these runs do not install. The other three rows
+                        short-lived native guard, and command gating now belongs to the
+                        <code>specpi-lancet-guard</code> package, which these runs do not install. The other three rows
                         describe systems the layer still ships.
                     </p>
                     <p>
@@ -843,11 +837,7 @@ environment only and reported a missing key for people whose OpenRouter login wo
                         returns a bare 401.
                     </p>
                     <p>
-                        The command guard used to be the exception: before its 0.3.0 the package read
-                        <code>OPENROUTER_API_KEY</code> from the environment and nothing else, so a key stored by
-                        <code>/login</code> served the advisor and was invisible to it. It now resolves the same
-                        credential in the same order, so one key covers both halves and there is no second thing to
-                        configure.
+                        The command guard needs no key at all: it scores commands locally with LANCET.
                     </p>
                     <p>
                         Retention, storage, and logging of sent data follow OpenRouter and TypeSafe rules, not

@@ -6,8 +6,8 @@
 // anything -- see key-source.mjs.
 //
 // The command guard is not here at all. It is a separate pinned package that keeps its own
-// configuration and its own switch, and nothing in this file tracks it -- see scripts/jev-guard.mjs
-// for the one place SpecPi touches it, which is install time.
+// configuration and its own switch, and nothing in this file tracks it. It is specpi-lancet-guard,
+// which scores commands locally and does not use Jev.
 //
 // The file is SpecPi's own, hardened the same way as web-access and capability-policy: atomic
 // write, mode 0600, symlinks refused, and a missing or unreadable file read as off.
