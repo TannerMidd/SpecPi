@@ -36,24 +36,48 @@ describe("parity with LANCET Nano's Python runtime", { skip }, () => {
         }
     });
 
-    it("scores and decides exactly as classify.py does, on the CPU", async () => {
+    it("scores and decides as classify.py does, on the CPU", async (t) => {
+        // The fixture was recorded on Windows x64. There Node matches it to rounding error. ONNX
+        // Runtime's INT8 kernels differ by CPU family (Apple Silicon's ARM kernels give scores about
+        // 1e-8 away), so other architectures get a small tolerance. Every fixture score sits at least
+        // 1e-3 from both thresholds, so this tolerance cannot hide a changed decision, and the
+        // decisions themselves must match exactly everywhere.
+        const tolerance = process.arch === "x64" ? 1e-9 : 1e-4;
         const ort = createRequire(import.meta.url)("onnxruntime-node");
         const classifier = await LancetClassifier.load(REAL, ort);
+        const decisions = [];
+        const scores = [];
+        let largest = 0;
         try {
             for (const row of cases) {
                 const result = await classifier.score(row.command, row.shell);
                 const label = JSON.stringify(row.command).slice(0, 80);
-                assert.equal(result.classification, row.classification, label);
                 assert.equal(result.executionAuthorized, false);
-                if (row.score === null) {
-                    assert.equal(result.score, null, label);
-                } else {
-                    assert.ok(Math.abs(result.score - row.score) < 1e-9, `${label}: ${result.score} vs ${row.score}`);
+                if (result.classification !== row.classification) {
+                    decisions.push(`${label}: ${result.classification} vs ${row.classification}`);
+                }
+
+                if (row.score === null || result.score === null) {
+                    if (row.score !== result.score) {
+                        scores.push(`${label}: ${result.score} vs ${row.score}`);
+                    }
+
+                    continue;
+                }
+
+                const difference = Math.abs(result.score - row.score);
+                largest = Math.max(largest, difference);
+                if (difference >= tolerance) {
+                    scores.push(`${label}: ${result.score} vs ${row.score}`);
                 }
             }
         } finally {
             await classifier.release();
         }
+
+        t.diagnostic(`${process.platform}/${process.arch}: largest score difference ${largest}`);
+        assert.deepEqual(decisions, [], "decisions differ from classify.py");
+        assert.deepEqual(scores, [], `scores differ by ${tolerance} or more`);
     });
 
     it("refuses a model file that does not match its pinned digest", () => {

@@ -77,7 +77,7 @@ These figures come from LANCET's own release benchmark (`lancet-bench-1`, 793 co
 - The benchmark's labels were written by the LANCET developer, an AI agent, so this is diagnostic evidence, not independent acceptance. Jev also saw task context; Nano sees only the command.
 - It is weakest on commands that print or exfiltrate secrets, on network and remote execution, and on infrastructure-as-code. The local rules and the permission system still apply.
 - About **23 ms** per command (95th percentile 40 ms) on a Ryzen 9 3900X, after a one-off load of about 0.65 s that adds roughly 275 MB to Pi's memory. It only loads once the guard is on or you run `check`.
-- The runtime is a Node port of Nano's Python `classify.py`, using the same ONNX Runtime release. On 7,170 commands it produced identical token ids and identical bands; scores differed by at most 2.2e-16.
+- The runtime is a Node port of Nano's Python `classify.py`, using the same ONNX Runtime release. On 7,170 commands on Windows x64 it produced identical token ids and identical bands, with scores within 2.2e-16. ONNX Runtime's INT8 arithmetic differs slightly by CPU family: on Apple Silicon, scores move by about 1e-8.
 
 ONNX Runtime 1.30.0 ships CPU binaries for Windows x64/arm64, Linux x64/arm64 and macOS arm64. Intel Macs are not supported; there the guard fails closed and should be left off.
 
