@@ -43,6 +43,19 @@ It focuses on five things:
 
 Everything it touches is written down, versioned, and easy to undo.
 
+## A local command guard
+
+Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMidd/LANCET-model), a 110M-parameter classifier, can check it on your own CPU. It takes about 23 ms, needs no API key, sends nothing over the network, and costs nothing per check. Fixed rules settle the obvious cases first, blocking `rm -rf /` and passing `git status`, and the model scores the rest. A risky or uncertain verdict asks you before anything runs.
+
+| | LANCET Nano (local) | Jev (hosted, previous guard) |
+| --- | ---: | ---: |
+| Risky commands caught | 85.8% | 96.8% |
+| Safe commands wrongly stopped | 5.5% | 7.8% |
+| Cost per check | $0 | per request |
+| Network | none | every check |
+
+Scores are from LANCET's 793-command release benchmark, classifier alone. The guard ships off. Run `/lancet-guard setup` in Pi once to download the model (about 100 MB, verified by SHA-256) and switch it on. [How it works, what it costs, and its limits](https://tannermidd.github.io/SpecPi/lancet/).
+
 ## Measured context
 
 This chart shows first-call context from a clean install: all eight pinned packages, the working agreement, and the skills Pi finds, in an interactive session with wishlist collection undecided. A headless session, or one with collection off, also leaves out the gap report and capability request tools. "Enabled" means browser QA, delegation, and web access are switched on, with no goal, scope, or improvement selection active.
@@ -135,6 +148,7 @@ Full setup options, package details, and requirements: [website](https://tannerm
 | --- | --- |
 | [Packages](https://tannermidd.github.io/SpecPi/#packages) | The eight pinned packages and what each provides |
 | [Scope control](https://tannermidd.github.io/SpecPi/wiki/#scope) | `/scope` commands and drift monitoring |
+| [Command guard](https://tannermidd.github.io/SpecPi/lancet/) | LANCET, the local classifier that checks shell commands before they run |
 | [Improvement loop](https://tannermidd.github.io/SpecPi/#loop) | Local wishlist, `/harness-improvement`, and retirement with evidence |
 | [SpecPi Chat](https://tannermidd.github.io/SpecPi/#vscode-chat) | VS Code frontend and VSIX install · [Chat guide](https://github.com/TannerMidd/SpecPi/blob/main/vscode/README.md) |
 | [Updating](https://tannermidd.github.io/SpecPi/#updating) | Update, uninstall, and migration notes |

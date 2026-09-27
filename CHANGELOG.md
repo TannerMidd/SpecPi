@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Give the LANCET command guard its own page on the website, covering how it decides, what it costs to run, how it compares with Jev, and its limits. It is linked from every page header and from the package list. The README gains a section on it. The header moves its links onto their own row from 900 px, so ten links still fit at tablet widths.
+
 ## 0.35.0 - 2026-09-26
 
 - Replace the Jev command guard with a local one. `specpi-lancet-guard` 0.1.0, new in `packages/lancet-guard`, takes the eighth pin from `specpi-jev-guard` 0.4.0. It scores shell commands with LANCET Nano v0.3.0, a 110M-parameter CodeT5-base classifier, on the CPU through ONNX Runtime: no API key, and commands never leave the machine. It keeps the Jev guard's local rules in front of the model. A risky verdict asks, Nano's unsure band asks, PowerShell and commands LANCET cannot read ask, and protected writes ask. A missing or damaged model fails closed.
