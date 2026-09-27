@@ -1,6 +1,6 @@
 {
   "name": "specpi-lancet-guard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Local, CPU-only command guard for Pi: the LANCET classifier scores shell calls on your machine, with no API key and no network after a one-time checksum-verified model download",
   "author": "Tanner Middleton",
   "license": "MIT",

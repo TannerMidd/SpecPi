@@ -7,7 +7,7 @@ import { MODEL_ARCHIVE } from "../src/model-manifest.mjs";
 import { installModel, modelDirectory, modelState, modelVerified } from "../src/model-store.mjs";
 
 // The real release ZIP, when one is available, lets the success path run against the real bytes:
-// LANCET_MODEL_ARCHIVE=<path to lancet-v0.4.0-nano-cpu-int8.zip>. Without it that case is skipped;
+// LANCET_MODEL_ARCHIVE=<path to lancet-v0.4.1-nano-cpu-int8.zip>. Without it that case is skipped;
 // CI covers it end to end by downloading the model through installModel itself.
 const ARCHIVE = process.env.LANCET_MODEL_ARCHIVE;
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "lancet-store-"));

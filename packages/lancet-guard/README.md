@@ -1,13 +1,13 @@
 # specpi-lancet-guard
 
-A local, CPU-only command guard for [Pi](https://pi.dev). Before a shell command runs, [LANCET Nano](https://github.com/TannerMidd/LANCET-model) v0.4.0 scores it on your machine: a 110M-parameter CodeT5+ 220M encoder, fine-tuned to flag risky Bash, running as INT8 ONNX. No API key, no account, and no network once the model is downloaded.
+A local, CPU-only command guard for [Pi](https://pi.dev). Before a shell command runs, [LANCET Nano](https://github.com/TannerMidd/LANCET-model) v0.4.1 scores it on your machine: a 110M-parameter CodeT5+ 220M encoder, fine-tuned to flag risky Bash, running as INT8 ONNX. No API key, no account, and no network once the model is downloaded.
 
 It is off until you turn it on.
 
 ## Install
 
 ```
-pi install npm:specpi-lancet-guard@0.2.0
+pi install npm:specpi-lancet-guard@0.3.0
 ```
 
 SpecPi installs it by default. The package carries code only; the model is fetched once, by you:
@@ -16,9 +16,9 @@ SpecPi installs it by default. The package carries code only; the model is fetch
 /lancet-guard setup
 ```
 
-Setup downloads the release ZIP (about 100 MB) from the pinned [LANCET-model GitHub release](https://github.com/TannerMidd/LANCET-model/releases/tag/v0.4.0), refuses it unless its SHA-256 matches the digest built into this package, extracts only the three model files (111 MB on disk) and checks each against its own digest. It then runs two sample commands and asks whether to turn the guard on: for this session, or saved for future ones.
+Setup downloads the release ZIP (about 100 MB) from the pinned [LANCET-model GitHub release](https://github.com/TannerMidd/LANCET-model/releases/tag/v0.4.1), refuses it unless its SHA-256 matches the digest built into this package, extracts only the three model files (111 MB on disk) and checks each against its own digest. It then runs two sample commands and asks whether to turn the guard on: for this session, or saved for future ones.
 
-Each package release accepts exactly one model. After updating from 0.1.0, run `/lancet-guard setup` again to fetch v0.4.0: until you do, a guard you saved as on blocks what the local rules leave open, as it does whenever the model is missing. The v0.3.0 model stays in `<pi-agent-dir>/lancet-guard/lancet-nano-v0.3.0-int8/` and is no longer used; you can delete that folder.
+Each package release accepts exactly one model. After updating from an earlier version, run `/lancet-guard setup` again to fetch v0.4.1: until you do, a guard you saved as on blocks what the local rules leave open, as it does whenever the model is missing. Older models stay in `<pi-agent-dir>/lancet-guard/` (for example `lancet-nano-v0.4.0-int8/`) and are no longer used; you can delete those folders.
 
 ## Use
 
@@ -70,17 +70,19 @@ With no UI to ask (print or RPC mode without a client), an "ask" becomes a block
 
 These figures come from LANCET's own release benchmark (`lancet-bench-1`, 793 commands, one scoring pass), classifier alone, before the local rules:
 
-| | Nano v0.4.0 (this guard) | Nano v0.3.0 | Jev (hosted, the old guard) |
-| --- | ---: | ---: | ---: |
-| Risky commands caught | 89.0% | 85.8% | 96.8% |
-| Safe commands wrongly stopped | 6.2% | 5.5% | 7.8% |
-| Risky secrets commands caught | 72% | 66% | 98% |
+| | Nano v0.4.1 (this guard) | Nano v0.4.0 | Nano v0.3.0 | Jev (hosted, the old guard) |
+| --- | ---: | ---: | ---: | ---: |
+| Risky commands caught | 91.7% | 89.0% | 85.8% | 96.8% |
+| Safe commands wrongly stopped | 9.4% | 6.2% | 5.5% | 7.8% |
+| Risky secrets commands caught | 77% | 72% | 66% | 98% |
+
+v0.4.1 has the same weights as v0.4.0; only its `review` threshold is lower (0.303, from 0.819), so it asks about more borderline commands. Its `risky` threshold is unchanged, so it blocks nothing v0.4.0 did not. Expect about one safe command in eleven to ask, against one in sixteen.
 
 - The benchmark's labels were written by the LANCET developer, an AI agent, so this is diagnostic evidence, not independent acceptance. Jev also saw task context; Nano sees only the command.
-- On ShellRisk-Bench's test split (4,194 commands, labelled upstream), v0.4.0 caught 60.6% of risky commands and stopped 2.3% of safe ones, against 46.6% and 6.1% for v0.3.0.
-- It is weakest on network and remote execution (59% caught on the release benchmark) and on commands that print or exfiltrate secrets. The local rules and the permission system still apply.
-- About **23 ms** per command (95th percentile 40 ms) on a Ryzen 9 3900X, after a one-off load of about 0.65 s that adds roughly 275 MB to Pi's memory. That was measured with v0.3.0; v0.4.0 has the same size and architecture, and LANCET's release run timed the two within 0.3 ms of each other. It only loads once the guard is on or you run `check`.
-- The runtime is a Node port of Nano's Python `classify.py`, using the same ONNX Runtime release; v0.4.0 kept both `classify.py` and the tokenizer unchanged. On 7,170 commands with v0.3.0, on the same machine (Windows x64), the port produced identical token ids and identical bands, with scores within 2.2e-16. With v0.4.0 it matches the 58-command parity fixture exactly in ids and bands, with scores within 3.5e-18. ONNX Runtime's INT8 arithmetic depends on the CPU's instruction set: on Apple Silicon and on some x64 CPUs, CI measured scores up to 0.03 away from that reference. Every reference command still landed in the same band there, but a command scoring very close to a threshold can land in a different one on a different CPU. That is true of LANCET's own Python runtime too.
+- On ShellRisk-Bench's test split (4,194 commands, labelled upstream), v0.4.1 caught 70.5% of risky commands and stopped 3.1% of safe ones, against 60.6% and 2.3% for v0.4.0 and 46.6% and 6.1% for v0.3.0.
+- It is weakest on network and remote execution and on commands that print or exfiltrate secrets. The local rules and the permission system still apply.
+- About **23 ms** per command (95th percentile 40 ms) on a Ryzen 9 3900X, after a one-off load of about 0.65 s that adds roughly 275 MB to Pi's memory. That was measured with v0.3.0; v0.4.0 and v0.4.1 have the same size and architecture, and LANCET's release run timed v0.3.0 and v0.4.0 within 0.3 ms of each other. It only loads once the guard is on or you run `check`.
+- The runtime is a Node port of Nano's Python `classify.py`, using the same ONNX Runtime release; v0.4.0 and v0.4.1 kept both `classify.py` and the tokenizer unchanged. On 7,170 commands with v0.3.0, on the same machine (Windows x64), the port produced identical token ids and identical bands, with scores within 2.2e-16. With v0.4.1 it matches the 58-command parity fixture exactly in ids and bands, with scores within 3.5e-18. ONNX Runtime's INT8 arithmetic depends on the CPU's instruction set: on Apple Silicon and on some x64 CPUs, CI measured scores up to 0.03 away from that reference. Every reference command still landed in the same band there, but a command scoring very close to a threshold can land in a different one on a different CPU. That is true of LANCET's own Python runtime too.
 
 ONNX Runtime 1.30.0 ships CPU binaries for Windows x64/arm64, Linux x64/arm64 and macOS arm64. Intel Macs are not supported; there the guard fails closed and should be left off.
 
@@ -88,4 +90,4 @@ LANCET is experimental. It is not a sandbox and does not make running commands s
 
 ## License
 
-Package code: MIT. The local rules are copied under MIT from specpi-jev-guard. The model is LANCET Nano v0.4.0, Apache-2.0, fine-tuned from Salesforce CodeT5+ 220M (BSD-3-Clause); its release ZIP carries the full licenses, notices and model card. Third-party details: [THIRD_PARTY.md](THIRD_PARTY.md).
+Package code: MIT. The local rules are copied under MIT from specpi-jev-guard. The model is LANCET Nano v0.4.1, Apache-2.0, fine-tuned from Salesforce CodeT5+ 220M (BSD-3-Clause); its release ZIP carries the full licenses, notices and model card. Third-party details: [THIRD_PARTY.md](THIRD_PARTY.md).
