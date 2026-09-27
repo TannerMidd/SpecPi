@@ -37,15 +37,16 @@ describe("parity with LANCET Nano's Python runtime", { skip }, () => {
     });
 
     it("scores and decides as classify.py does, on the CPU", async (t) => {
-        // The fixture was recorded on Windows x64, and on x64 Node matches it to rounding error. ONNX
-        // Runtime's INT8 kernels are not the same on every CPU family: on Apple Silicon, CI measured
-        // scores up to 0.031 away from the x64 reference. That is the runtime, not this port, since
-        // token ids are checked exactly above and the calibration is the same code everywhere. So
-        // elsewhere scores get a 0.05 tolerance; a gross port bug would still fail it. Decisions must
-        // match everywhere. They did on every fixture case on Apple Silicon with the pinned runtime,
-        // but a command near a threshold could land in another band on another CPU, and if one ever
-        // does, this is where it should show up rather than be tolerated away.
-        const tolerance = process.arch === "x64" ? 1e-9 : 0.05;
+        // The fixture was recorded on a Ryzen 9 3900X (Windows x64). ONNX Runtime picks INT8 kernels
+        // by the CPU's instruction set, not only its architecture: CI measured scores up to 0.031 away
+        // from the reference on Apple Silicon and on one Windows x64 runner, while another Windows
+        // runner and Linux matched to 3e-17. That is the runtime, not this port, since token ids are
+        // checked exactly above and the calibration is the same code everywhere. So scores get a 0.05
+        // tolerance, which a gross port bug would still exceed. Decisions must match everywhere. They
+        // did on every fixture case on every runner, but a command near a threshold could land in
+        // another band on another CPU, and if one ever does, this is where it should show up rather
+        // than be tolerated away. The largest difference is reported so drift stays visible.
+        const tolerance = 0.05;
         const ort = createRequire(import.meta.url)("onnxruntime-node");
         const classifier = await LancetClassifier.load(REAL, ort);
         const decisions = [];
