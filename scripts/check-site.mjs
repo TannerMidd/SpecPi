@@ -26,6 +26,7 @@ const documents = [
     "site/research/index.html",
     "site/evaluations/index.html",
     "site/jev/index.html",
+    "site/lancet/index.html",
 ];
 for (const file of documents) {
     const text = await fs.readFile(path.join(root, file), "utf8");
@@ -56,7 +57,7 @@ const routes = new Map([
     ["/SpecPi/theme.js", ["theme.js", "text/javascript"]],
     ["/SpecPi/page.js", ["page.js", "text/javascript"]],
     ["/SpecPi/logo.svg", ["logo.svg", "image/svg+xml"]],
-    ...["wiki", "research", "evaluations", "jev", "why-pi", "single-agent"].map((name) => [
+    ...["wiki", "research", "evaluations", "jev", "lancet", "why-pi", "single-agent"].map((name) => [
         `/SpecPi/${name}/`,
         [`${name}/index.html`, "text/html"],
     ]),
@@ -277,6 +278,33 @@ try {
             jev.boxes.length > 0 && jev.boxes.every((fill) => !["rgb(0, 0, 0)", "none"].includes(fill)),
             "diagram surfaces must resolve their theme tokens",
         );
+
+        await page.getByRole("link", { name: "LANCET", exact: true }).click();
+        await page.waitForURL(`${origin}/SpecPi/lancet/`);
+        assert.ok((await page.locator(".index-meta").innerText()).includes(manifest.version));
+        assert.equal(await page.locator("html").getAttribute("data-theme"), colorScheme);
+        const lancet = await page.evaluate(() => ({
+            overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            missingAnchors: [...document.querySelectorAll('a[href^="#"]')]
+                .map((link) => link.getAttribute("href").slice(1))
+                .filter((id) => !document.getElementById(id)),
+            sections: document.querySelectorAll(".doc-section").length,
+            navLinks: document.querySelectorAll(".wiki-sidebar nav a").length,
+            boxes: [...document.querySelectorAll(".diagram .dg-box, .diagram .dg-box-accent")].map(
+                (box) => getComputedStyle(box).fill,
+            ),
+        }));
+        assert.equal(lancet.overflow, false, `${name} LANCET page overflows`);
+        assert.deepEqual(lancet.missingAnchors, []);
+        assert.equal(lancet.sections, lancet.navLinks);
+        assert.ok(
+            lancet.boxes.length > 0 && lancet.boxes.every((fill) => !["rgb(0, 0, 0)", "none"].includes(fill)),
+            "LANCET diagram surfaces must resolve their theme tokens",
+        );
+        await page.screenshot({ path: path.join(screenshots, `lancet-${name}.png`), fullPage: true });
+        await page
+            .locator("#decides figure")
+            .screenshot({ path: path.join(screenshots, `lancet-diagram-${name}.png`) });
         process.stdout.write(`Site ${name}: PASS\n`);
     }
 

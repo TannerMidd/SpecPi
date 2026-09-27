@@ -515,7 +515,9 @@ pre {
         padding: 0.75rem 1rem;
     }
 }
-@media (max-width: 800px) {
+/* The primary navigation takes its own row before its links run out of room, which ten links do
+   a little above the tablet breakpoint. */
+@media (max-width: 900px) {
     .site-header {
         flex-wrap: wrap;
         gap: 0.5rem 1rem;
@@ -532,6 +534,8 @@ pre {
     .theme-toggle {
         margin-left: auto;
     }
+}
+@media (max-width: 800px) {
     .hero-grid {
         grid-template-columns: 1fr;
         gap: 2rem;
