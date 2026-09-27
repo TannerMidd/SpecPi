@@ -100,7 +100,7 @@ test("the default base is exactly the eight human-selected pinned packages", () 
         "npm:pi-goal-x@0.31.2",
         "npm:@sreetej510/pi-usage@0.10.0",
         "npm:@gotgenes/pi-permission-system@32.0.2",
-        "npm:specpi-lancet-guard@0.2.0",
+        "npm:specpi-lancet-guard@0.3.0",
     ]);
 });
 
