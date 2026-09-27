@@ -1,6 +1,6 @@
 # SpecPi Chat changelog
 
-## Unreleased
+## 0.18.0
 
 - Show the LANCET command guard's counter (`lancet-guard` status key) in the footer chip in place of the retired Jev guard's.
 
