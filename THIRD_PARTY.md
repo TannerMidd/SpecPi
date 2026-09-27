@@ -11,7 +11,7 @@ Development formatting uses Prettier **3.9.6** (MIT), ESLint **10.9.1** (MIT), `
 
 ## Default packages
 
-Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.1.0, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
+Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.2.0, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
 
 SpecPi requests exact npm dependency saves for these pins and checks installed top-level versions before completing installation. The override applies to package acquisition without changing the user's global npm configuration.
 
@@ -42,7 +42,7 @@ Worth stating plainly, because it is the part a reader is most likely to assume 
 
 ## LANCET command guard
 
-`packages/lancet-guard` is first-party source, released independently as `specpi-lancet-guard`. Its one production dependency is `onnxruntime-node` 1.30.0 (MIT, Microsoft), pinned exactly, which bundles prebuilt ONNX Runtime CPU libraries; SpecPi's installer sets `ONNXRUNTIME_NODE_INSTALL=skip` so its install script does not fetch the CUDA libraries it would otherwise download on Linux x64. Its local rules are copied under MIT from `specpi-jev-guard` 0.4.0. The model is not bundled: `/lancet-guard setup` downloads LANCET Nano v0.3.0 (Apache-2.0) from the `TannerMidd/LANCET-model` GitHub release, pinned by SHA-256. It was fine-tuned from Salesforce CodeT5-base (Apache-2.0); its model card and notices in the release record the training-data sources. The guard makes no other network connection. See its [dependency notices](packages/lancet-guard/THIRD_PARTY.md) and [security boundary](packages/lancet-guard/SECURITY.md).
+`packages/lancet-guard` is first-party source, released independently as `specpi-lancet-guard`. Its one production dependency is `onnxruntime-node` 1.30.0 (MIT, Microsoft), pinned exactly, which bundles prebuilt ONNX Runtime CPU libraries; SpecPi's installer sets `ONNXRUNTIME_NODE_INSTALL=skip` so its install script does not fetch the CUDA libraries it would otherwise download on Linux x64. Its local rules are copied under MIT from `specpi-jev-guard` 0.4.0. The model is not bundled: `/lancet-guard setup` downloads LANCET Nano v0.4.0 (Apache-2.0) from the `TannerMidd/LANCET-model` GitHub release, pinned by SHA-256. It was fine-tuned from Salesforce CodeT5+ 220M (BSD-3-Clause); its model card and notices in the release record the training-data sources. The guard makes no other network connection. See its [dependency notices](packages/lancet-guard/THIRD_PARTY.md) and [security boundary](packages/lancet-guard/SECURITY.md).
 
 ## Standalone delegation and experiments
 
