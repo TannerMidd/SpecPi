@@ -51,7 +51,7 @@
                     ><a href="#model"><span>05</span>The model</a><a href="#setup"><span>06</span>Turning it on</a
                     ><a href="#limits"><span>07</span>Limits</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.35.0<br />Guard 0.1.0<br />Off by default</div>
+                <div class="index-meta">SpecPi 0.35.0<br />Guard 0.2.0<br />Off by default</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -79,11 +79,11 @@
                         ><span class="metric-label">per check: no API key, no account, no network</span>
                     </div>
                     <div>
-                        <span class="metric-value">85.8%</span
+                        <span class="metric-value">89.0%</span
                         ><span class="metric-label">of risky commands caught on LANCET's release benchmark</span>
                     </div>
                     <div>
-                        <span class="metric-value">5.5%</span
+                        <span class="metric-value">6.2%</span
                         ><span class="metric-label">of safe commands wrongly stopped, fewer than hosted Jev</span>
                     </div>
                 </div>
@@ -259,9 +259,10 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><th>LANCET Nano v0.3.0 (this guard)</th><td>85.8%</td><td>5.5%</td><td>66%</td><td>your CPU</td></tr>
+                                <tr><th>LANCET Nano v0.4.0 (this guard)</th><td>89.0%</td><td>6.2%</td><td>72%</td><td>your CPU</td></tr>
                                 <tr><th>Jev (hosted, the old guard)</th><td>96.8%</td><td>7.8%</td><td>98%</td><td>hosted API</td></tr>
                                 <tr><th>Laya (421M parameters)</th><td>68.5%</td><td>37.8%</td><td>48%</td><td>GPU</td></tr>
+                                <tr><th>LANCET Nano v0.3.0</th><td>85.8%</td><td>5.5%</td><td>66%</td><td>your CPU</td></tr>
                                 <tr><th>LANCET Nano v0.2.0</th><td>73.6%</td><td>6.2%</td><td>24%</td><td>your CPU</td></tr>
                             </tbody>
                         </table>
@@ -273,7 +274,7 @@
                         </li>
                         <li>
                             <strong>Jev still catches more.</strong> Most of the gap is secrets: commands that print
-                            or send credentials. Nano catches two thirds of those, Jev nearly all.
+                            or send credentials. Nano catches almost three quarters of those, Jev nearly all.
                         </li>
                         <li>
                             <strong>Nano works with less.</strong> Jev and Laya were given the task the agent was
@@ -290,22 +291,24 @@
                 <section class="doc-section" id="model">
                     <header><h2>The model</h2><span>05</span></header>
                     <p>
-                        LANCET Nano v0.3.0 is Salesforce's CodeT5-base encoder, 110 million parameters, fine-tuned
+                        LANCET Nano v0.4.0 is Salesforce's CodeT5+ 220M encoder, 110 million parameters, fine-tuned
                         to score Bash commands and quantized to 8-bit integers so it runs well on an ordinary CPU.
-                        Model: Apache-2.0. Runtime: MIT.
+                        Model: Apache-2.0, on a BSD-3-Clause base. Runtime: MIT.
                     </p>
                     <ul>
                         <li>
                             <strong>Labels from documentation, not from another model.</strong> Its training labels
                             come from the wording of human-written examples in tldr-pages, from AWS's own API
                             definitions (including which fields are marked sensitive), from the Azure, GitHub,
-                            kubectl and Docker command references, and from LANCET's authored pairs. No language
-                            model or hosted API produced a label.
+                            kubectl and Docker command references, from ShellRisk-Bench's training split as labelled
+                            upstream, and from LANCET's authored pairs and red-team corpus. No language model or
+                            hosted API produced a label.
                         </li>
                         <li>
                             <strong>The same answers as LANCET's own runtime.</strong> The guard runs a Node port of
-                            LANCET's Python runtime. On 7,170 commands it produced identical tokens and identical
-                            answers, on the same ONNX Runtime release.
+                            LANCET's Python runtime. On 7,170 commands with v0.3.0 it produced identical tokens and
+                            identical answers, on the same ONNX Runtime release. v0.4.0 keeps that tokenizer and
+                            runtime, and the port matches it on the guard's parity set.
                         </li>
                         <li>
                             <strong>Verified before it runs.</strong> Setup downloads the release ZIP from GitHub and
@@ -349,8 +352,8 @@
                             that the command is safe.
                         </li>
                         <li>
-                            <strong>Secrets are its weakest area</strong>, followed by network and remote execution and
-                            infrastructure-as-code. The permission system and your own review still apply.
+                            <strong>Network and remote execution are its weakest area</strong>, followed by commands
+                            that print or send secrets. The permission system and your own review still apply.
                         </li>
                         <li><strong>Bash only.</strong> Other shells always ask.</li>
                         <li>
