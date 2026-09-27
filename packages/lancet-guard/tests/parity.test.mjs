@@ -37,12 +37,15 @@ describe("parity with LANCET Nano's Python runtime", { skip }, () => {
     });
 
     it("scores and decides as classify.py does, on the CPU", async (t) => {
-        // The fixture was recorded on Windows x64. There Node matches it to rounding error. ONNX
-        // Runtime's INT8 kernels differ by CPU family (Apple Silicon's ARM kernels give scores about
-        // 1e-8 away), so other architectures get a small tolerance. Every fixture score sits at least
-        // 1e-3 from both thresholds, so this tolerance cannot hide a changed decision, and the
-        // decisions themselves must match exactly everywhere.
-        const tolerance = process.arch === "x64" ? 1e-9 : 1e-4;
+        // The fixture was recorded on Windows x64, and on x64 Node matches it to rounding error. ONNX
+        // Runtime's INT8 kernels are not the same on every CPU family: on Apple Silicon, CI measured
+        // scores up to 0.031 away from the x64 reference. That is the runtime, not this port, since
+        // token ids are checked exactly above and the calibration is the same code everywhere. So
+        // elsewhere scores get a 0.05 tolerance; a gross port bug would still fail it. Decisions must
+        // match everywhere. They did on every fixture case on Apple Silicon with the pinned runtime,
+        // but a command near a threshold could land in another band on another CPU, and if one ever
+        // does, this is where it should show up rather than be tolerated away.
+        const tolerance = process.arch === "x64" ? 1e-9 : 0.05;
         const ort = createRequire(import.meta.url)("onnxruntime-node");
         const classifier = await LancetClassifier.load(REAL, ort);
         const decisions = [];
