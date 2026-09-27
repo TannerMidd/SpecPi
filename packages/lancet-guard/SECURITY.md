@@ -4,11 +4,11 @@ This package is trusted host code running with Pi's privileges. It is a **second
 
 ## What leaves the machine
 
-Nothing, during use. Commands are scored in-process by ONNX Runtime on the CPU; they are never sent anywhere and never executed by the guard. The only network access is the model download that `/lancet-guard setup` performs when a human runs it: one ZIP from the pinned `https://github.com/TannerMidd/LANCET-model/releases/download/v0.3.0/` release, following GitHub's redirect to its release-asset host. Installing the package, starting a session and switching the guard on download nothing.
+Nothing, during use. Commands are scored in-process by ONNX Runtime on the CPU; they are never sent anywhere and never executed by the guard. The only network access is the model download that `/lancet-guard setup` performs when a human runs it: one ZIP from the pinned `https://github.com/TannerMidd/LANCET-model/releases/download/v0.4.0/` release, following GitHub's redirect to its release-asset host. Installing the package, starting a session and switching the guard on download nothing.
 
 ## Model integrity
 
-The archive's and the model files' SHA-256 digests and sizes are compiled into `src/model-manifest.mjs`. The ZIP is streamed to a private staging directory, capped at its pinned size, and discarded unless its digest matches. Only then does `src/zip.mjs` read it: it extracts the three named files, inflates each to its pinned size and no further, and refuses encrypted entries, ZIP64 and any compression other than Deflate or stored. Each extracted file must match its own digest. The ZIP is deleted and only a complete, verified set is renamed into `<pi-agent-dir>/lancet-guard/lancet-nano-v0.3.0-int8/`. Every file is verified again each time the model is loaded, so a model directory that is replaced or damaged afterwards fails closed rather than scoring. The release host is a transport, not a trust root: a different model needs a new package release with new digests.
+The archive's and the model files' SHA-256 digests and sizes are compiled into `src/model-manifest.mjs`. The ZIP is streamed to a private staging directory, capped at its pinned size, and discarded unless its digest matches. Only then does `src/zip.mjs` read it: it extracts the three named files, inflates each to its pinned size and no further, and refuses encrypted entries, ZIP64 and any compression other than Deflate or stored. Each extracted file must match its own digest. The ZIP is deleted and only a complete, verified set is renamed into `<pi-agent-dir>/lancet-guard/lancet-nano-v0.4.0-int8/`. Every file is verified again each time the model is loaded, so a model directory that is replaced or damaged afterwards fails closed rather than scoring. The release host is a transport, not a trust root: a different model needs a new package release with new digests.
 
 ## Defaults and failure
 
@@ -18,7 +18,7 @@ When on, it fails closed: if the model is missing, fails verification, or ONNX R
 
 ## Model limits
 
-LANCET is an experimental classifier. `not_flagged` is not a claim of safety. It reads Bash only, sees the command text and nothing else (not the task, not the files it touches), and on its own release benchmark missed about one risky command in seven, and a third of the risky commands that print or exfiltrate secrets. A command it is unsure about is `review`, which asks. Obfuscated or novel commands may score low. Keep the permission system and your own review in place; this guard adds to them.
+LANCET is an experimental classifier. `not_flagged` is not a claim of safety. It reads Bash only, sees the command text and nothing else (not the task, not the files it touches), and on its own release benchmark missed about one risky command in nine, and more than a quarter of the risky commands that print or exfiltrate secrets. A command it is unsure about is `review`, which asks. Obfuscated or novel commands may score low. Keep the permission system and your own review in place; this guard adds to them.
 
 ## Dependencies
 
