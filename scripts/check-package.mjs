@@ -72,7 +72,7 @@ const requiredFiles = [
     "package.json",
     "scripts/lib.mjs",
     "scripts/lock.mjs",
-    "scripts/jev-guard.mjs",
+    "scripts/lancet-guard.mjs",
     "scripts/packages.mjs",
     "scripts/permission-shell-tools.mjs",
     "scripts/specpi.mjs",

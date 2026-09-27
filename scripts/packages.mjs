@@ -94,6 +94,10 @@ export function installBasePackages(agentDir) {
                 PI_CODING_AGENT_DIR: agentDir,
                 npm_config_save_exact: "true",
                 NPM_CONFIG_SAVE_EXACT: "true",
+                // onnxruntime-node (the LANCET guard's runtime) bundles its CPU binaries, but on
+                // Linux x64 its install script would also fetch CUDA libraries from NuGet. The guard
+                // is CPU-only, so skip that download.
+                ONNXRUNTIME_NODE_INSTALL: "skip",
             },
             stdio: "inherit",
             windowsHide: true,

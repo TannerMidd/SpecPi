@@ -525,24 +525,24 @@ test("each row of the jobs panel says what the job is, where it stands and wheth
 });
 
 test("the command guard's counter is read as the package writes it", () => {
-    // specpi-jev-guard 0.4.0 publishes one status line per session and Chat renders it rather than
+    // specpi-lancet-guard 0.1.0 publishes one status line per session and Chat renders it rather than
     // recounting anything: the four shapes below are the ones its README documents. The chip shows
     // the leading count and the tooltip shows the whole line, so a format this does not recognise
     // degrades to showing all of it rather than to showing nothing.
     const entry = (text) => guardStatusEntry({ [GUARD_STATUS_KEY]: text });
 
-    assert.deepEqual(entry("jev 12"), { full: "jev 12", summary: "jev 12", blocked: false });
-    assert.deepEqual(entry("jev 12 · 1 blocked"), {
-        full: "jev 12 · 1 blocked",
-        summary: "jev 12",
+    assert.deepEqual(entry("lancet 12"), { full: "lancet 12", summary: "lancet 12", blocked: false });
+    assert.deepEqual(entry("lancet 12 · 1 blocked"), {
+        full: "lancet 12 · 1 blocked",
+        summary: "lancet 12",
         blocked: true,
     });
-    assert.equal(entry("jev 12 · bash 0.04").summary, "jev 12");
-    assert.equal(entry("jev 12 · bash 0.04").blocked, false, "a verdict is not a block");
-    assert.equal(entry("jev 12 · 3 blocked · bash 0.91 blocked").blocked, true);
+    assert.equal(entry("lancet 12 · bash 0.04").summary, "lancet 12");
+    assert.equal(entry("lancet 12 · bash 0.04").blocked, false, "a verdict is not a block");
+    assert.equal(entry("lancet 12 · 3 blocked · bash 0.91 blocked").blocked, true);
 
     // A line with no separator is shown whole rather than dropped.
-    assert.equal(entry("jev 4000").summary, "jev 4000");
+    assert.equal(entry("lancet 4000").summary, "lancet 4000");
 
     // Absent, empty and non-string all mean "the guard is not reporting", which is exactly the
     // state the package leaves behind when it is switched off or its audit display is. Nothing
@@ -556,9 +556,13 @@ test("the command guard's counter is read as the package writes it", () => {
 
     // Control sequences in a third party's status string never reach the DOM, the same way every
     // other runtime status is cleaned.
-    assert.equal(entry("\u001b[31mjev 7\u001b[0m · 1 blocked").summary, "jev 7");
+    assert.equal(entry("\u001b[31mlancet 7\u001b[0m · 1 blocked").summary, "lancet 7");
 
     // And it is not left in the generic runtime list as well, which would show it twice under a
     // raw key beside whatever else a session happens to publish.
-    assert.equal(providerUsageEntries({ [GUARD_STATUS_KEY]: "jev 12" }).length, 0, "the guard is not provider usage");
+    assert.equal(
+        providerUsageEntries({ [GUARD_STATUS_KEY]: "lancet 12" }).length,
+        0,
+        "the guard is not provider usage",
+    );
 });

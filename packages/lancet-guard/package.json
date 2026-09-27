@@ -1,0 +1,45 @@
+{
+  "name": "specpi-lancet-guard",
+  "version": "0.1.0",
+  "description": "Local, CPU-only command guard for Pi: the LANCET classifier scores shell calls on your machine, with no API key and no network after a one-time checksum-verified model download",
+  "author": "Tanner Middleton",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TannerMidd/SpecPi.git",
+    "directory": "packages/lancet-guard"
+  },
+  "keywords": ["pi-package", "pi-coding-agent", "guardrails", "security", "lancet", "onnx"],
+  "files": ["src", "README.md", "SECURITY.md", "THIRD_PARTY.md", "LICENSE"],
+  "pi": { "extensions": ["./src/index.ts"] },
+  "engines": { "node": ">=22.19.0" },
+  "dependencies": {
+    "onnxruntime-node": "1.30.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true },
+    "@earendil-works/pi-tui": { "optional": true }
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.84.4",
+    "@earendil-works/pi-coding-agent": "0.84.4",
+    "@earendil-works/pi-tui": "0.84.4",
+    "@types/node": "22.20.1",
+    "typescript": "6.0.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "check:types": "tsc -p tsconfig.json",
+    "test": "node --test tests/*.test.mjs",
+    "check:package": "node scripts/check-package.mjs",
+    "check": "npm run check:types && npm test && npm run check:package"
+  }
+}

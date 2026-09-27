@@ -1,12 +1,12 @@
 # npm release
 
-This guide covers the root `specpi` package. Each package under `packages/` releases independently, with its own release process, tag prefix and publish workflow: [Browser QA](packages/browser-qa/NPM_RELEASE.md) (`browser-qa-v*`), [Delegation](packages/delegation/NPM_RELEASE.md) (`delegation-v*`) and [Experiments](packages/experiments/NPM_RELEASE.md) (`experiments-v*`). Package-only releases do not invoke the root publisher.
+This guide covers the root `specpi` package. Each package under `packages/` releases independently, with its own release process, tag prefix and publish workflow: [Browser QA](packages/browser-qa/NPM_RELEASE.md) (`browser-qa-v*`), [Delegation](packages/delegation/NPM_RELEASE.md) (`delegation-v*`), [Experiments](packages/experiments/NPM_RELEASE.md) (`experiments-v*`) and [LANCET guard](packages/lancet-guard/NPM_RELEASE.md) (`lancet-guard-v*`). Package-only releases do not invoke the root publisher.
 
 Publishing, tags, deprecation, ownership changes and GitHub Releases require explicit human approval. Publication is a post-merge operation: never publish from an unmerged commit. npm versions are immutable.
 
 ## Prepare
 
-1. This candidate is SpecPi **0.34.0**, paired with the Chat **0.17.0** VSIX. Browser QA **0.3.0** is already independently published; do not republish or edit its source as part of this release. Choose an unused version; update `package.json`, the dated `CHANGELOG.md` entry, README, and the website. Check Chat's version and VSIX download links. Preserve historical changelog entries.
+1. This candidate is SpecPi **0.35.0**, paired with the Chat **0.18.0** VSIX. Browser QA **0.3.0** and LANCET guard **0.1.0** are already independently published; do not republish or edit their source as part of this release. Choose an unused version; update `package.json`, the dated `CHANGELOG.md` entry, README, and the website. Check Chat's version and VSIX download links. Preserve historical changelog entries.
 2. Validate:
 
     ```sh

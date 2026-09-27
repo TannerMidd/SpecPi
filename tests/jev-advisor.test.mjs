@@ -44,7 +44,7 @@ import * as gap from "../extensions/jev-advisor/questions/gap.mjs";
 import * as sources from "../extensions/jev-advisor/questions/sources.mjs";
 import * as untrusted from "../extensions/jev-advisor/questions/untrusted.mjs";
 import * as capabilities from "../extensions/jev-advisor/questions/capabilities.mjs";
-import { GUARD_PIN, applyInertConfig, configPath, desiredConfig, readConfig } from "../scripts/jev-guard.mjs";
+import { GUARD_PIN } from "../scripts/lancet-guard.mjs";
 import { basePackages } from "../scripts/packages.mjs";
 import {
     AUTHORING_TOOL_NAMES,
@@ -149,19 +149,6 @@ function withAgentDir(run) {
             throw error;
         },
     );
-}
-
-/**
- * The pinned guard, as far as the seam can see it: a manifest under the agent's npm directory. The
- * seam identifies the package by name from that file and nothing else, so a real install is not
- * needed to exercise what SpecPi asserts into its configuration.
- */
-function installFakeGuard(dir, version = "0.4.0") {
-    const root = path.join(dir, "npm", "node_modules", "specpi-jev-guard");
-    fs.mkdirSync(root, { recursive: true });
-    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "specpi-jev-guard", version }));
-
-    return root;
 }
 
 const enabledSettings = (overrides = {}) => ({
@@ -1381,57 +1368,6 @@ test("the guard and the permission system are both pinned", () => {
         basePackages.some((entry) => entry.startsWith("npm:@gotgenes/pi-permission-system@")),
         "the permission system must stay pinned: it is what decides every call while the guard is off",
     );
-});
-
-test("the installer seam only ever writes the guard off, and never arms it", () => {
-    withAgentDir(() => {
-        // The real specpi-jev-guard schema, not an invented one: applyPatch only reads these names.
-        const config = desiredConfig();
-        assert.equal(config.enabled, false, "the guard's own default is enabled:true, so SpecPi must override it");
-        assert.equal(config.backend, "openrouter", "one OpenRouter credential must serve the advisor and the guard");
-        assert.equal(config.uncertain, "ask");
-        assert.equal(Object.hasOwn(config, "askThreshold"), false, "thresholds stay the package's business");
-
-        // There is no armed form of it. SpecPi has no command that turns the guard on, so a seam
-        // that could produce `enabled: true` would have no caller and one obvious wrong use.
-        assert.equal(desiredConfig(true).enabled, false, "the seam takes no argument that arms the guard");
-        assert.equal(applyInertConfig().reason, "not-installed", "an absent guard is never configured into existence");
-    });
-});
-
-test("a fresh install writes the guard's inert posture, and says so when that disarms one", () => {
-    withAgentDir((dir) => {
-        installFakeGuard(dir);
-
-        // The guard's own DEFAULT_SETTINGS.enabled is true and it reads its file per tool call, so
-        // an absent file means an active guard. With no key that fails closed on every gated call,
-        // which is a first install that will not run commands.
-        assert.equal(readConfig(), undefined, "no settings file yet");
-        const created = applyInertConfig();
-        assert.equal(created.reason, "created");
-        assert.equal(created.disarmed, false, "nothing was taken away; there was nothing there");
-        assert.equal(readConfig().enabled, false);
-
-        assert.equal(applyInertConfig().applied, false, "an unchanged config must not be rewritten");
-        assert.equal(applyInertConfig().reason, "already-current");
-
-        // A user's own thresholds and globs survive; only SpecPi's three fields are asserted. And
-        // switching off a gate the user switched on is the one change the run has to announce --
-        // writing only when the file is absent would instead leave a stale `enabled: true` from
-        // before the package was last unpinned to arm the gate the moment it came back.
-        fs.writeFileSync(
-            configPath(),
-            JSON.stringify({ enabled: true, backend: "typesafe", askThreshold: 0.6, safeCommands: ["ls *"] }),
-        );
-        const disarmed = applyInertConfig();
-        assert.equal(disarmed.reason, "updated");
-        assert.equal(disarmed.disarmed, true, "the run has to be able to report this one");
-        const merged = readConfig();
-        assert.equal(merged.enabled, false);
-        assert.equal(merged.backend, "openrouter", "the backend is re-pinned so one credential still serves both");
-        assert.equal(merged.askThreshold, 0.6, "a user threshold must not be clobbered");
-        assert.deepEqual(merged.safeCommands, ["ls *"]);
-    });
 });
 
 test("nothing in the advisor reaches the command guard", () => {

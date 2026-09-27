@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## 0.18.0
+
+- Show the LANCET command guard's counter (`lancet-guard` status key) in the footer chip in place of the retired Jev guard's.
+
 ## 0.17.0
 
 - Open a small jobs panel from the footer's Jobs chip. It lists this session's background jobs, running ones first, with a live timer for each; finished ones show their exit code and how long they took. Each running job has a Stop button, and several running at once get a Stop all. Output shows a job's latest lines in the conversation. Both go through SpecPi's own `/jobs` command, and only for a job SpecPi listed, so Chat adds no way to stop a process of its own. The chip also stays while only finished jobs remain, so they can still be read; with an older SpecPi that does not publish the list, clicking it types `/jobs` instead.
