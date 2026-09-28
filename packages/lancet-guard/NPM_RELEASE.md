@@ -20,4 +20,4 @@ Stop on failed gates. If a registry readback times out, inspect the published ve
 
 ## Model release prerequisite
 
-The package downloads its model as `lancet-v0.4.0-nano-cpu-int8.zip` from the `v0.4.0` release of `TannerMidd/LANCET-model`. `src/model-manifest.mjs` pins the archive's size and SHA-256 and the three model files inside it. CI fetches and verifies it with `scripts/fetch-model.mjs`, so a missing or altered asset fails the checks. Never replace a published release's assets: a new model needs a new release tag and a new package version with new digests.
+The package downloads its model as `lancet-v0.4.1-nano-cpu-int8.zip` from the `v0.4.1` release of `TannerMidd/LANCET-model`. `src/model-manifest.mjs` pins the archive's size and SHA-256 and the three model files inside it. CI fetches and verifies it with `scripts/fetch-model.mjs`, so a missing or altered asset fails the checks. Never replace a published release's assets: a new model needs a new release tag and a new package version with new digests.
