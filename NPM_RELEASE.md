@@ -6,7 +6,7 @@ Publishing, tags, deprecation, ownership changes and GitHub Releases require exp
 
 ## Prepare
 
-1. This candidate is SpecPi **0.36.0**, paired with the Chat **0.18.0** VSIX. Browser QA **0.3.0** and LANCET guard **0.3.0** are already independently published; do not republish or edit their source as part of this release. Choose an unused version; update `package.json`, the dated `CHANGELOG.md` entry, README, and the website. Check Chat's version and VSIX download links. Preserve historical changelog entries.
+1. This candidate is SpecPi **0.36.1**, paired with the Chat **0.18.0** VSIX. Browser QA **0.3.0** and LANCET guard **0.3.0** are already independently published; do not republish or edit their source as part of this release. Choose an unused version; update `package.json`, the dated `CHANGELOG.md` entry, README, and the website. Check Chat's version and VSIX download links. Preserve historical changelog entries.
 2. Validate:
 
     ```sh
