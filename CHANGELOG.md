@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.36.1 - 2026-09-27
 
-- Pin `specpi-lancet-guard` 0.3.0, which scores with LANCET Nano v0.4.1. Its weights, tokenizer and `classify.py` are identical to v0.4.0; only the `review` threshold drops from 0.819 to 0.303, so it asks about more borderline commands and blocks nothing v0.4.0 did not. On LANCET's release benchmark it catches 91.7% of risky commands, against 89.0%, and 77% of risky secrets commands, against 72%, while stopping 9.4% of safe ones, against 6.2%. The parity fixture is re-recorded with v0.4.1's `classify.py`: ids and scores are unchanged and two of 58 cases move from `not_flagged` to `review`. Users who update must run `/lancet-guard setup` again; a guard saved as on fails closed until they do. The root security model, third-party notes, README and website describe v0.4.1, and the website no longer says the guard stops fewer safe commands than Jev (9.4% against 7.8%).
+- Pin `specpi-lancet-guard` 0.3.0, which scores with LANCET Nano v0.4.1. Its weights, tokenizer and `classify.py` are identical to v0.4.0; only the `review` threshold drops from 0.819 to 0.303, so it asks about more borderline commands and blocks nothing v0.4.0 did not. On LANCET's release benchmark it catches 91.7% of risky commands, against 89.0%, and 77% of risky secrets commands, against 72%, while stopping 9.4% of safe ones, against 6.2%. The parity fixture is re-recorded with v0.4.1's `classify.py`: ids and scores are unchanged and two of 58 cases move from `not_flagged` to `review`. Users who update must run `/lancet-guard setup` again; a guard saved as on fails closed until they do. The root security model, third-party notes, README and website describe v0.4.1, and the website no longer says the guard stops fewer safe commands than Jev (9.4% against 7.8%). SpecPi Chat stays at 0.18.0.
 
 ## 0.36.0 - 2026-09-27
 
