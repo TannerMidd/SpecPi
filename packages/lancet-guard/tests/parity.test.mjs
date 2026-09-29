@@ -1,5 +1,5 @@
 // The Node runtime must give the answers LANCET Nano's Python runtime gives. The fixture was
-// recorded with Nano v0.4.1's classify.py (onnxruntime 1.30.0, tokenizers 0.23.2) over authored commands
+// recorded with Nano v0.4.2's classify.py (onnxruntime 1.30.0, tokenizers 0.23.2) over authored commands
 // chosen to stress the tokenizer: Unicode letters and digits, combining marks, emoji, every
 // whitespace class the two regex engines disagree on, special-token spellings, and inputs at and
 // past the length limits. Command strings are model inputs only and are never executed.
