@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi 0.36.1 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.36.2 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
@@ -49,8 +49,8 @@ Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMi
 
 | | LANCET Nano (local) | Jev (hosted, previous guard) |
 | --- | ---: | ---: |
-| Risky commands caught | 91.7% | 96.8% |
-| Safe commands wrongly stopped | 9.4% | 7.8% |
+| Risky commands caught | 92.4% | 96.8% |
+| Safe commands wrongly stopped | 9.9% | 7.8% |
 | Cost per check | $0 | per request |
 | Network | none | every check |
 

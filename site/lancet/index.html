@@ -51,7 +51,7 @@
                     ><a href="#model"><span>05</span>The model</a><a href="#setup"><span>06</span>Turning it on</a
                     ><a href="#limits"><span>07</span>Limits</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.36.1<br />Guard 0.3.0<br />Off by default</div>
+                <div class="index-meta">SpecPi 0.36.2<br />Guard 0.4.0<br />Off by default</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -79,11 +79,11 @@
                         ><span class="metric-label">per check: no API key, no account, no network</span>
                     </div>
                     <div>
-                        <span class="metric-value">91.7%</span
+                        <span class="metric-value">92.4%</span
                         ><span class="metric-label">of risky commands caught on LANCET's release benchmark</span>
                     </div>
                     <div>
-                        <span class="metric-value">9.4%</span
+                        <span class="metric-value">9.9%</span
                         ><span class="metric-label">of safe commands wrongly stopped, on the same benchmark</span>
                     </div>
                 </div>
@@ -259,9 +259,10 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><th>LANCET Nano v0.4.1 (this guard)</th><td>91.7%</td><td>9.4%</td><td>77%</td><td>your CPU</td></tr>
+                                <tr><th>LANCET Nano v0.4.2 (this guard)</th><td>92.4%</td><td>9.9%</td><td>78%</td><td>your CPU</td></tr>
                                 <tr><th>Jev (hosted, the old guard)</th><td>96.8%</td><td>7.8%</td><td>98%</td><td>hosted API</td></tr>
                                 <tr><th>Laya (421M parameters)</th><td>68.5%</td><td>37.8%</td><td>48%</td><td>GPU</td></tr>
+                                <tr><th>LANCET Nano v0.4.1</th><td>91.7%</td><td>9.4%</td><td>77%</td><td>your CPU</td></tr>
                                 <tr><th>LANCET Nano v0.4.0</th><td>89.0%</td><td>6.2%</td><td>72%</td><td>your CPU</td></tr>
                                 <tr><th>LANCET Nano v0.3.0</th><td>85.8%</td><td>5.5%</td><td>66%</td><td>your CPU</td></tr>
                                 <tr><th>LANCET Nano v0.2.0</th><td>73.6%</td><td>6.2%</td><td>24%</td><td>your CPU</td></tr>
@@ -270,9 +271,11 @@
                     </div>
                     <ul>
                         <li>
-                            <strong>v0.4.1 asks more, to catch more.</strong> It is v0.4.0 with a lower threshold for
-                            asking, so it stops slightly more safe commands than Jev did, about one in eleven. Its
-                            threshold for blocking is unchanged, so it blocks nothing v0.4.0 did not.
+                            <strong>v0.4.2 is newly trained, and asks more than it blocks.</strong> On this benchmark
+                            it is close to v0.4.1 and stops slightly more safe commands than Jev did, about one in ten.
+                            More of what it catches comes back as a question rather than a block. On a 513-command
+                            neutral set it stops 7.0% of safe commands, against 16.9% for v0.4.1, but on ShellRisk-Bench
+                            it catches 60.1% of risky commands, against 70.5%.
                         </li>
                         <li>
                             <strong>Jev still catches more.</strong> Most of the gap is secrets: commands that print
@@ -293,7 +296,7 @@
                 <section class="doc-section" id="model">
                     <header><h2>The model</h2><span>05</span></header>
                     <p>
-                        LANCET Nano v0.4.1 is Salesforce's CodeT5+ 220M encoder, 110 million parameters, fine-tuned
+                        LANCET Nano v0.4.2 is Salesforce's CodeT5+ 220M encoder, 110 million parameters, fine-tuned
                         to score Bash commands and quantized to 8-bit integers so it runs well on an ordinary CPU.
                         Model: Apache-2.0, on a BSD-3-Clause base. Runtime: MIT.
                     </p>
@@ -309,7 +312,7 @@
                         <li>
                             <strong>The same answers as LANCET's own runtime.</strong> The guard runs a Node port of
                             LANCET's Python runtime. On 7,170 commands with v0.3.0 it produced identical tokens and
-                            identical answers, on the same ONNX Runtime release. v0.4.1 keeps that tokenizer and
+                            identical answers, on the same ONNX Runtime release. v0.4.2 keeps that tokenizer and
                             runtime, and the port matches it on the guard's parity set.
                         </li>
                         <li>

@@ -15,7 +15,7 @@ import os from "node:os";
 import path from "node:path";
 
 /** Must match the pin in templates/settings.json. */
-export const GUARD_PIN = "npm:specpi-lancet-guard@0.3.0";
+export const GUARD_PIN = "npm:specpi-lancet-guard@0.4.0";
 
 export const RETIRED_GUARD_PIN = "npm:specpi-jev-guard@0.4.0";
 
