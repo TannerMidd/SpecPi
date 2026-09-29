@@ -287,6 +287,32 @@
                         </li>
                     </ul>
                     <p>
+                        v0.4.2 is a newly trained model, so it is worth a second look on other sets. Both are scored
+                        the same way, once, at each model's shipped thresholds:
+                    </p>
+                    <div class="table-scroll">
+                        <table class="numeric">
+                            <thead>
+                                <tr>
+                                    <th>Benchmark</th><th>Model</th><th>Risky caught</th><th>Safe wrongly stopped</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><th>Neutral set (513 commands)</th><td>v0.4.2</td><td>91.0%</td><td>7.0%</td></tr>
+                                <tr><th>Neutral set (513 commands)</th><td>v0.4.1</td><td>66.5%</td><td>16.9%</td></tr>
+                                <tr><th>ShellRisk-Bench test (4,194 commands)</th><td>v0.4.2</td><td>60.1%</td><td>2.7%</td></tr>
+                                <tr><th>ShellRisk-Bench test (4,194 commands)</th><td>v0.4.1</td><td>70.5%</td><td>3.1%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>
+                        The neutral set is 66 commands from an outside coding-agent benchmark and 447 from the Shell
+                        Safety v2 test split, which v0.4.2 never trained on. On it, v0.4.2 interrupts far fewer safe
+                        commands and misses far fewer risky ones. On ShellRisk-Bench it catches fewer risky commands
+                        than v0.4.1. LANCET's Triage Score, which combines the three sets, is 82.7 for v0.4.2 against
+                        69.7 for v0.4.1.
+                    </p>
+                    <p>
                         Per-area results and charts are on the
                         <a href="https://github.com/TannerMidd/LANCET-model">LANCET-model page</a>, and the full
                         method is in its <a href="https://github.com/TannerMidd/LANCET-model/blob/main/bundle/MODEL_CARD.md">model card</a>.
@@ -298,6 +324,7 @@
                     <p>
                         LANCET Nano v0.4.2 is Salesforce's CodeT5+ 220M encoder, 110 million parameters, fine-tuned
                         to score Bash commands and quantized to 8-bit integers so it runs well on an ordinary CPU.
+                        v0.4.2 was trained afresh from that base on a larger, more balanced mix of 43,418 examples.
                         Model: Apache-2.0, on a BSD-3-Clause base. Runtime: MIT.
                     </p>
                     <ul>
@@ -305,9 +332,10 @@
                             <strong>Labels from documentation, not from another model.</strong> Its training labels
                             come from the wording of human-written examples in tldr-pages, from AWS's own API
                             definitions (including which fields are marked sensitive), from the Azure, GitHub,
-                            kubectl and Docker command references, from ShellRisk-Bench's training split as labelled
-                            upstream, and from LANCET's authored pairs and red-team corpus. No language model or
-                            hosted API produced a label.
+                            kubectl and Docker command references, from ShellRisk-Bench's and Shell Safety v2's
+                            training splits as labelled upstream, and from LANCET's authored pairs, contrast sets of
+                            risky commands with safe look-alikes, and red-team corpus. No language model or hosted API
+                            produced a label.
                         </li>
                         <li>
                             <strong>The same answers as LANCET's own runtime.</strong> The guard runs a Node port of
