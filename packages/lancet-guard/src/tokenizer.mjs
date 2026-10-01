@@ -62,7 +62,8 @@ export class ByteLevelBpe {
 
         // As the Rust library reads the file: lines without their line ending, the `#version`
         // header skipped, then one `left right` pair per line, ranked in file order. A pair or a
-        // result outside the vocabulary, a blank line or a duplicate pair is refused.
+        // result outside the vocabulary and a blank line are refused, as there; so is a duplicate
+        // pair, which the library would silently re-rank.
         const lines = merges.split("\n");
         if (lines.at(-1) === "") {
             lines.pop();

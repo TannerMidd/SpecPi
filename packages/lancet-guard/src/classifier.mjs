@@ -105,7 +105,8 @@ function readHead(spec, bytes) {
         spec.order !== "C" ||
         !Number.isInteger(hidden) ||
         hidden <= 0 ||
-        !(spec.normEps > 0) ||
+        !Number.isFinite(spec.normEps) ||
+        spec.normEps <= 0 ||
         !Array.isArray(spec.tensors) ||
         spec.tensors.length !== shapes.size
     ) {
@@ -364,6 +365,7 @@ export class LancetClassifier {
             score,
             classification: band,
             riskLogit: risk,
+            windows: parts.length,
             reason: band === "review" ? "uncertainty-band" : null,
         });
     }

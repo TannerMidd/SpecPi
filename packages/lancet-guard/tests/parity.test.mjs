@@ -47,8 +47,8 @@ describe("windows", () => {
             }
         }
 
-        assert.throws(() => windows([], 512, 64), /Empty input/u);
-        assert.throws(() => windows([5], 512, 510), /invalid window/u);
+        assert.throws(() => windows([], 512, 64), /Empty input or invalid window contract/u);
+        assert.throws(() => windows([5], 512, 510), /Empty input or invalid window contract/u);
     });
 });
 
@@ -70,20 +70,24 @@ describe("parity with LANCET Nano's Python runtime", { skip }, () => {
 
     it("scores and decides as classify.py does, on the CPU", async (t) => {
         // The fixture was recorded on a Ryzen 9 3900X (Windows x64). ONNX Runtime picks INT8 kernels
-        // by the CPU's instruction set, not only its architecture: CI measured scores up to 0.031 away
-        // from the reference on Apple Silicon and on one Windows x64 runner, while another Windows
-        // runner and Linux matched to 3e-17. That is the runtime, not this port, since token ids are
-        // checked exactly above and the calibration is the same code everywhere. So scores get a 0.05
-        // tolerance, which a gross port bug would still exceed. Decisions must match everywhere. They
+        // by the CPU's instruction set, not only its architecture: with v0.4.3, CI measured scores up
+        // to 0.015 away from the reference on Apple Silicon and 0.003 on Linux and Windows x64, and
+        // earlier models drifted by up to 0.031 on one Windows x64 runner. That is the runtime, not
+        // this port, since token ids and windows are checked exactly above and the head is the same
+        // code everywhere. So scores get a 0.05 tolerance and risk logits, which set the band, 1.0:
+        // near the risky threshold 0.05 of score spans several logits, and a pooling or head bug would
+        // still exceed either. Decisions must match everywhere. They
         // did on every fixture case on every runner, but a command near a threshold could land in
         // another band on another CPU, and if one ever does, this is where it should show up rather
         // than be tolerated away. The largest difference is reported so drift stays visible.
         const tolerance = 0.05;
+        const logitTolerance = 1;
         const ort = createRequire(import.meta.url)("onnxruntime-node");
         const classifier = await LancetClassifier.load(REAL, ort);
         const decisions = [];
         const scores = [];
         let largest = 0;
+        let largestLogit = 0;
         try {
             for (const row of cases) {
                 const result = await classifier.score(row.command, row.shell);
@@ -102,18 +106,24 @@ describe("parity with LANCET Nano's Python runtime", { skip }, () => {
                 }
 
                 const difference = Math.abs(result.score - row.score);
+                const logitDifference = Math.abs(result.riskLogit - row.riskLogit);
                 largest = Math.max(largest, difference);
-                if (difference >= tolerance) {
-                    scores.push(`${label}: ${result.score} vs ${row.score}`);
+                largestLogit = Math.max(largestLogit, logitDifference);
+                if (difference >= tolerance || !(logitDifference < logitTolerance)) {
+                    scores.push(
+                        `${label}: ${result.score} vs ${row.score}, logit ${result.riskLogit} vs ${row.riskLogit}`,
+                    );
                 }
             }
         } finally {
             await classifier.release();
         }
 
-        t.diagnostic(`${process.platform}/${process.arch}: largest score difference ${largest}`);
+        t.diagnostic(
+            `${process.platform}/${process.arch}: largest score difference ${largest}, risk logit ${largestLogit}`,
+        );
         assert.deepEqual(decisions, [], "decisions differ from classify.py");
-        assert.deepEqual(scores, [], `scores differ by ${tolerance} or more`);
+        assert.deepEqual(scores, [], `scores differ by ${tolerance} or logits by ${logitTolerance} or more`);
     });
 
     it("refuses a model file that does not match its pinned digest", () => {

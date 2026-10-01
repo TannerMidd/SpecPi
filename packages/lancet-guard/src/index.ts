@@ -483,8 +483,12 @@ export default function lancetGuard(pi: ExtensionAPI) {
                     const started = performance.now();
                     const verdict = await (await classifier(modelDirectory())).score(rest, "bash");
                     const ms = Math.round(performance.now() - started);
+                    const long =
+                        verdict.classification === "not_flagged" && (verdict.windows ?? 1) > 1
+                            ? " — longer than 512 tokens, so the guard still asks"
+                            : "";
                     ctx.ui.notify(
-                        `LANCET: ${verdict.classification}${typeof verdict.score === "number" ? ` (score ${verdict.score.toFixed(3)})` : ""}${verdict.reason ? ` — ${verdict.reason}` : ""} [${ms}ms]`,
+                        `LANCET: ${verdict.classification}${typeof verdict.score === "number" ? ` (score ${verdict.score.toFixed(3)})` : ""}${verdict.reason ? ` — ${verdict.reason}` : ""}${long} [${ms}ms]`,
                         verdict.classification === "not_flagged" ? "info" : "warning",
                     );
                 } catch (error) {

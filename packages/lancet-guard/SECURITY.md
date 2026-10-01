@@ -16,9 +16,11 @@ The guard ships **off** and SpecPi never switches it on. It is on only when you 
 
 When on, it fails closed: if the model is missing, fails verification, or ONNX Runtime cannot load, commands the local rules leave open are blocked. With no UI to ask, an "ask" becomes a block unless `uncertain` is set to `allow`.
 
+A `not_flagged` verdict lets a command run without asking. That now includes PowerShell, which LANCET reads since v0.4.3 and the guard asked about unconditionally before. It never includes a command longer than one 512-token window: LANCET reads such a command in full, but a `not_flagged` verdict on it asks, because harmless lines put in front of a risky command pull it under the review threshold once it spans a second window.
+
 ## Model limits
 
-LANCET is an experimental classifier. `not_flagged` is not a claim of safety. It reads Bash, PowerShell and cmd, with less coverage of the last two, and sees the command text and nothing else (not the task, not the files it touches). On lancet-bench-2-next, its release benchmark, it missed more than one risky command in five, and it is weakest on credentials, Windows and macOS administration and deceptive previews. A long command is read in full, but one risky line among many harmless ones can score low. A command it is unsure about is `review`, which asks. Obfuscated or novel commands may score low. Keep the permission system and your own review in place; this guard adds to them.
+LANCET is an experimental classifier. `not_flagged` is not a claim of safety. It reads Bash, PowerShell and cmd, with less coverage of the last two, and sees the command text and nothing else (not the task, not the files it touches). On lancet-bench-2-next, its release benchmark, it missed more than one risky command in five, and it is weakest on credentials, Windows and macOS administration and deceptive previews. Harmless lines around a risky command lower its score: within one window most such commands still ask, but not all. A command it is unsure about is `review`, which asks. Obfuscated or novel commands may score low. Keep the permission system and your own review in place; this guard adds to them.
 
 ## Dependencies
 

@@ -8,6 +8,7 @@
             "windows": [[0, 4, 0]],
             "reason": null,
             "score": 0.0526869344205953,
+            "riskLogit": -7.478714278595267,
             "classification": "not_flagged"
         },
         {
@@ -17,6 +18,7 @@
             "windows": [[0, 2, 0]],
             "reason": null,
             "score": 0.04720002159669496,
+            "riskLogit": -7.709727956697712,
             "classification": "not_flagged"
         },
         {
@@ -26,6 +28,7 @@
             "windows": [[0, 5, 0]],
             "reason": "uncertainty-band",
             "score": 0.990493317240229,
+            "riskLogit": 7.560758197458331,
             "classification": "review"
         },
         {
@@ -35,6 +38,7 @@
             "windows": [[0, 6, 0]],
             "reason": null,
             "score": 0.05653844353714657,
+            "riskLogit": -7.329771262857282,
             "classification": "not_flagged"
         },
         {
@@ -47,6 +51,7 @@
             "windows": [[0, 27, 0]],
             "reason": null,
             "score": 0.9921964596778826,
+            "riskLogit": 7.958197598555758,
             "classification": "risky"
         },
         {
@@ -56,6 +61,7 @@
             "windows": [[0, 9, 0]],
             "reason": "uncertainty-band",
             "score": 0.9875725280570525,
+            "riskLogit": 7.020153975502104,
             "classification": "review"
         },
         {
@@ -65,6 +71,7 @@
             "windows": [[0, 7, 0]],
             "reason": null,
             "score": 0.1510094257007883,
+            "riskLogit": -5.158456502899501,
             "classification": "not_flagged"
         },
         {
@@ -74,6 +81,7 @@
             "windows": [[0, 9, 0]],
             "reason": null,
             "score": 0.07468339525361192,
+            "riskLogit": -6.735501445534867,
             "classification": "not_flagged"
         },
         {
@@ -83,6 +91,7 @@
             "windows": [[0, 6, 0]],
             "reason": "uncertainty-band",
             "score": 0.9852806219120586,
+            "riskLogit": 6.677712874246197,
             "classification": "review"
         },
         {
@@ -92,6 +101,7 @@
             "windows": [[0, 7, 0]],
             "reason": "uncertainty-band",
             "score": 0.9899778658813997,
+            "riskLogit": 7.454337681146414,
             "classification": "review"
         },
         {
@@ -101,6 +111,7 @@
             "windows": [[0, 5, 0]],
             "reason": null,
             "score": 0.09663168024733326,
+            "riskLogit": -6.173368713953556,
             "classification": "not_flagged"
         },
         {
@@ -110,6 +121,7 @@
             "windows": [[0, 17, 0]],
             "reason": null,
             "score": 0.9934287011478984,
+            "riskLogit": 8.303689052007677,
             "classification": "risky"
         },
         {
@@ -119,6 +131,7 @@
             "windows": [[0, 8, 0]],
             "reason": "uncertainty-band",
             "score": 0.7964335890478955,
+            "riskLogit": 1.0103506820444144,
             "classification": "review"
         },
         {
@@ -128,6 +141,7 @@
             "windows": [[0, 9, 0]],
             "reason": null,
             "score": 0.06756914628383258,
+            "riskLogit": -6.950582142262311,
             "classification": "not_flagged"
         },
         {
@@ -137,6 +151,7 @@
             "windows": [[0, 9, 0]],
             "reason": null,
             "score": 0.07023269644391449,
+            "riskLogit": -6.867709233103156,
             "classification": "not_flagged"
         },
         {
@@ -146,6 +161,7 @@
             "windows": [[0, 18, 0]],
             "reason": "uncertainty-band",
             "score": 0.9732266246677235,
+            "riskLogit": 5.459157331682041,
             "classification": "review"
         },
         {
@@ -155,6 +171,7 @@
             "windows": [[0, 9, 0]],
             "reason": null,
             "score": 0.044650826653817643,
+            "riskLogit": -7.82587180925802,
             "classification": "not_flagged"
         },
         {
@@ -164,6 +181,7 @@
             "windows": [[0, 16, 0]],
             "reason": null,
             "score": 0.993995551766935,
+            "riskLogit": 8.484872706506088,
             "classification": "risky"
         },
         {
@@ -176,6 +194,7 @@
             "windows": [[0, 24, 0]],
             "reason": "uncertainty-band",
             "score": 0.9859890694537072,
+            "riskLogit": 6.777595598512332,
             "classification": "review"
         },
         {
@@ -185,6 +204,7 @@
             "windows": [[0, 10, 0]],
             "reason": null,
             "score": 0.9926997822810649,
+            "riskLogit": 8.092278050832775,
             "classification": "risky"
         },
         {
@@ -194,6 +214,7 @@
             "windows": [[0, 6, 0]],
             "reason": null,
             "score": 0.9927381730155882,
+            "riskLogit": 8.102878663732415,
             "classification": "risky"
         },
         {
@@ -203,6 +224,7 @@
             "windows": [[0, 8, 0]],
             "reason": null,
             "score": 0.9919834840748661,
+            "riskLogit": 7.904028819821736,
             "classification": "risky"
         },
         {
@@ -212,6 +234,7 @@
             "windows": [[0, 9, 0]],
             "reason": null,
             "score": 0.9923956961849877,
+            "riskLogit": 8.010216602079684,
             "classification": "risky"
         },
         {
@@ -221,6 +244,7 @@
             "windows": [[0, 3, 0]],
             "reason": "uncertainty-band",
             "score": 0.607735185582474,
+            "riskLogit": -0.838479644092368,
             "classification": "review"
         },
         {
@@ -230,6 +254,7 @@
             "windows": [[0, 17, 0]],
             "reason": null,
             "score": 0.9937193872257812,
+            "riskLogit": 8.394571936581624,
             "classification": "risky"
         },
         {
@@ -239,6 +264,7 @@
             "windows": [[0, 19, 0]],
             "reason": null,
             "score": 0.05340754627505854,
+            "riskLogit": -7.450083123999683,
             "classification": "not_flagged"
         },
         {
@@ -248,6 +274,7 @@
             "windows": [[0, 15, 0]],
             "reason": null,
             "score": 0.04653882412531927,
+            "riskLogit": -7.7392684869041055,
             "classification": "not_flagged"
         },
         {
@@ -257,6 +284,7 @@
             "windows": [[0, 8, 0]],
             "reason": null,
             "score": 0.06991820605835997,
+            "riskLogit": -6.877341237659707,
             "classification": "not_flagged"
         },
         {
@@ -266,6 +294,7 @@
             "windows": [[0, 9, 0]],
             "reason": null,
             "score": 0.06504472126698929,
+            "riskLogit": -7.031972066695783,
             "classification": "not_flagged"
         },
         {
@@ -275,6 +304,7 @@
             "windows": [[0, 6, 0]],
             "reason": "uncertainty-band",
             "score": 0.9762273731854597,
+            "riskLogit": 5.702551475683299,
             "classification": "review"
         },
         {
@@ -284,6 +314,7 @@
             "windows": [[0, 14, 0]],
             "reason": "uncertainty-band",
             "score": 0.9703110823161665,
+            "riskLogit": 5.246869228814301,
             "classification": "review"
         },
         {
@@ -293,6 +324,7 @@
             "windows": [[0, 8, 0]],
             "reason": "uncertainty-band",
             "score": 0.8560516933729146,
+            "riskLogit": 1.8460522092243425,
             "classification": "review"
         },
         {
@@ -302,6 +334,7 @@
             "windows": [[0, 10, 0]],
             "reason": null,
             "score": 0.9913143536855523,
+            "riskLogit": 7.742681066642034,
             "classification": "risky"
         },
         {
@@ -311,6 +344,7 @@
             "windows": [[0, 13, 0]],
             "reason": null,
             "score": 0.07784068425902792,
+            "riskLogit": -6.646039833893864,
             "classification": "not_flagged"
         },
         {
@@ -323,6 +357,7 @@
             "windows": [[0, 26, 0]],
             "reason": null,
             "score": 0.05590350811685352,
+            "riskLogit": -7.353654184649013,
             "classification": "not_flagged"
         },
         {
@@ -335,6 +370,7 @@
             "windows": [[0, 26, 0]],
             "reason": null,
             "score": 0.06859954189834949,
+            "riskLogit": -6.918169823005794,
             "classification": "not_flagged"
         },
         {
@@ -347,6 +383,7 @@
             "windows": [[0, 30, 0]],
             "reason": "uncertainty-band",
             "score": 0.3203401646044313,
+            "riskLogit": -3.2135323030875362,
             "classification": "review"
         },
         {
@@ -356,6 +393,7 @@
             "windows": [[0, 6, 0]],
             "reason": null,
             "score": 0.1092335513931781,
+            "riskLogit": -5.9006798626537424,
             "classification": "not_flagged"
         },
         {
@@ -365,6 +403,7 @@
             "windows": [[0, 3, 0]],
             "reason": null,
             "score": 0.08879571564710279,
+            "riskLogit": -6.3593894870734875,
             "classification": "not_flagged"
         },
         {
@@ -374,6 +413,7 @@
             "windows": [[0, 2, 0]],
             "reason": null,
             "score": 0.1750668184620698,
+            "riskLogit": -4.806051546907864,
             "classification": "not_flagged"
         },
         {
@@ -383,6 +423,7 @@
             "windows": [[0, 12, 0]],
             "reason": null,
             "score": 0.1805093426999946,
+            "riskLogit": -4.731738618288107,
             "classification": "not_flagged"
         },
         {
@@ -392,6 +433,7 @@
             "windows": [[0, 11, 0]],
             "reason": null,
             "score": 0.25911674096118276,
+            "riskLogit": -3.8089971452886537,
             "classification": "not_flagged"
         },
         {
@@ -401,6 +443,7 @@
             "windows": [[0, 10, 0]],
             "reason": null,
             "score": 0.102646814958172,
+            "riskLogit": -6.039512181310318,
             "classification": "not_flagged"
         },
         {
@@ -410,6 +453,7 @@
             "windows": [[0, 16, 0]],
             "reason": "uncertainty-band",
             "score": 0.9609031298969554,
+            "riskLogit": 4.678036029380829,
             "classification": "review"
         },
         {
@@ -419,6 +463,7 @@
             "windows": [[0, 3, 0]],
             "reason": "uncertainty-band",
             "score": 0.30703559183827206,
+            "riskLogit": -3.336886158732316,
             "classification": "review"
         },
         {
@@ -428,6 +473,7 @@
             "windows": [[0, 10, 0]],
             "reason": null,
             "score": 0.06467134787884438,
+            "riskLogit": -7.044258487794682,
             "classification": "not_flagged"
         },
         {
@@ -437,6 +483,7 @@
             "windows": [[0, 5, 0]],
             "reason": null,
             "score": 0.1284131717262438,
+            "riskLogit": -5.534383315953429,
             "classification": "not_flagged"
         },
         {
@@ -446,6 +493,7 @@
             "windows": [[0, 15, 0]],
             "reason": null,
             "score": 0.045952405663911816,
+            "riskLogit": -7.765804050923463,
             "classification": "not_flagged"
         },
         {
@@ -453,6 +501,7 @@
             "shell": "bash",
             "reason": "empty-command",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -460,6 +509,7 @@
             "shell": "bash",
             "reason": "empty-command",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -469,6 +519,7 @@
             "windows": [[0, 3, 0]],
             "reason": null,
             "score": 0.12367097745839774,
+            "riskLogit": -5.620312449431874,
             "classification": "not_flagged"
         },
         {
@@ -476,6 +527,7 @@
             "shell": "bash",
             "reason": "empty-command",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -483,6 +535,7 @@
             "shell": "bash",
             "reason": "nul-byte",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -492,6 +545,7 @@
             "windows": [[0, 7, 0]],
             "reason": null,
             "score": 0.09013800075396397,
+            "riskLogit": -6.326503074878269,
             "classification": "not_flagged"
         },
         {
@@ -499,6 +553,7 @@
             "shell": "bash",
             "reason": "raw-input-too-long",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -554,6 +609,7 @@
             ],
             "reason": null,
             "score": 0.11739238579768035,
+            "riskLogit": -5.738548437018444,
             "classification": "not_flagged"
         },
         {
@@ -576,6 +632,7 @@
             "windows": [[0, 251, 0]],
             "reason": "uncertainty-band",
             "score": 0.40430755532339036,
+            "riskLogit": -2.485734423665952,
             "classification": "review"
         },
         {
@@ -611,6 +668,7 @@
             "windows": [[0, 375, 0]],
             "reason": "uncertainty-band",
             "score": 0.4764105567645541,
+            "riskLogit": -1.9007169669791084,
             "classification": "review"
         },
         {
@@ -620,6 +678,7 @@
             "windows": [[0, 15, 0]],
             "reason": null,
             "score": 0.993301937384827,
+            "riskLogit": 8.265300523195947,
             "classification": "risky"
         },
         {
@@ -629,6 +688,7 @@
             "windows": [[0, 18, 0]],
             "reason": null,
             "score": 0.060301947127226904,
+            "riskLogit": -7.193175898689835,
             "classification": "not_flagged"
         },
         {
@@ -641,6 +701,7 @@
             "windows": [[0, 31, 0]],
             "reason": "uncertainty-band",
             "score": 0.9901805345236504,
+            "riskLogit": 7.49551965268059,
             "classification": "review"
         },
         {
@@ -650,6 +711,7 @@
             "windows": [[0, 8, 0]],
             "reason": null,
             "score": 0.04397259242136111,
+            "riskLogit": -7.857836851583629,
             "classification": "not_flagged"
         },
         {
@@ -659,6 +721,7 @@
             "windows": [[0, 14, 0]],
             "reason": null,
             "score": 0.9926849993120651,
+            "riskLogit": 8.088210864680685,
             "classification": "risky"
         },
         {
@@ -668,6 +731,7 @@
             "windows": [[0, 11, 0]],
             "reason": null,
             "score": 0.9938259334217554,
+            "riskLogit": 8.428934149246015,
             "classification": "risky"
         },
         {
@@ -677,6 +741,7 @@
             "windows": [[0, 11, 0]],
             "reason": "uncertainty-band",
             "score": 0.5309306566690072,
+            "riskLogit": -1.4650112472196393,
             "classification": "review"
         },
         {
@@ -684,6 +749,7 @@
             "shell": "zsh",
             "reason": "unsupported-shell",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -691,6 +757,7 @@
             "shell": "fish",
             "reason": "unsupported-shell",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -698,6 +765,7 @@
             "shell": "Bash",
             "reason": "unsupported-shell",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         },
         {
@@ -738,6 +806,7 @@
             "windows": [[0, 510, 0]],
             "reason": null,
             "score": 0.1115550714976585,
+            "riskLogit": -5.853499126514286,
             "classification": "not_flagged"
         },
         {
@@ -782,6 +851,7 @@
             ],
             "reason": null,
             "score": 0.11581583477177353,
+            "riskLogit": -5.7690953198979935,
             "classification": "not_flagged"
         },
         {
@@ -852,6 +922,7 @@
             ],
             "reason": null,
             "score": 0.11255200918044715,
+            "riskLogit": -5.833501408403103,
             "classification": "not_flagged"
         },
         {
@@ -923,6 +994,7 @@
             ],
             "reason": null,
             "score": 0.1166998500462349,
+            "riskLogit": -5.751922720654161,
             "classification": "not_flagged"
         },
         {
@@ -992,6 +1064,7 @@
             ],
             "reason": null,
             "score": 0.26352135322595865,
+            "riskLogit": -3.763455376639718,
             "classification": "not_flagged"
         },
         {
@@ -1061,6 +1134,7 @@
             ],
             "reason": null,
             "score": 0.10068801331888202,
+            "riskLogit": -6.0823183006921475,
             "classification": "not_flagged"
         },
         {
@@ -1481,6 +1555,7 @@
             ],
             "reason": null,
             "score": 0.08431953001866083,
+            "riskLogit": -6.472403517960598,
             "classification": "not_flagged"
         },
         {
@@ -1488,6 +1563,7 @@
             "shell": "bash",
             "reason": "raw-input-too-long",
             "score": null,
+            "riskLogit": null,
             "classification": "review"
         }
     ]

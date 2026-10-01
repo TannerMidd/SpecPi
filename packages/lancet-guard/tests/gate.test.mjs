@@ -60,6 +60,33 @@ describe("LANCET verdicts", () => {
         assert.deepEqual(calls, [["npm test", "bash"]]);
     });
 
+    it("a command longer than one window is never cleared, but a risky one still blocks", async () => {
+        const long = await judgeCommand(
+            "build.sh",
+            "bash",
+            S,
+            scorer({ classification: "not_flagged", score: 0.1, reason: null, windows: 2 }).score,
+        );
+        assert.equal(long.action, "ask");
+        assert.equal(long.source, "lancet");
+        assert.equal(long.score, 0.1);
+        assert.match(long.reason, /512 tokens/u);
+        const risky = await judgeCommand(
+            "build.sh",
+            "bash",
+            { ...S, risky: "block" },
+            scorer({ classification: "risky", score: 0.99, reason: null, windows: 2 }).score,
+        );
+        assert.equal(risky.action, "block");
+        const short = await judgeCommand(
+            "build.sh",
+            "bash",
+            S,
+            scorer({ classification: "not_flagged", score: 0.1, reason: null, windows: 1 }).score,
+        );
+        assert.equal(short.action, "allow");
+    });
+
     it("risky asks by default and blocks when configured to", async () => {
         const { score } = scorer({ classification: "risky", score: 0.9, reason: null });
         const asked = await judgeCommand("npm publish", "bash", S, score);

@@ -16,6 +16,8 @@ export interface LancetVerdict {
     classification: "risky" | "not_flagged" | "review";
     score: number | null;
     reason: string | null;
+    /** How many 512-token windows LANCET read the command in. */
+    windows?: number;
 }
 
 export type Scorer = (command: string, shell: string) => Promise<LancetVerdict>;
@@ -89,6 +91,18 @@ export async function judgeCommand(
         }
 
         return { action: "ask", source: "lancet", reason, score: verdict.score };
+    }
+
+    // A command longer than one window is scored but never cleared. Harmless lines put in front of
+    // a risky command pull its score under the review threshold once it spans a second window, so a
+    // `not_flagged` verdict there asks, as every command that long did before LANCET could read it.
+    if ((verdict.windows ?? 1) > 1) {
+        return {
+            action: "ask",
+            source: "lancet",
+            reason: "LANCET does not clear commands longer than 512 tokens",
+            score: verdict.score,
+        };
     }
 
     // `not_flagged` is not a claim of safety, only that LANCET did not flag it. The permission
