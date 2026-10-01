@@ -335,7 +335,7 @@ export default function lancetGuard(pi: ExtensionAPI) {
             if (ctx.hasUI) {
                 const ok = await ctx.ui.confirm(
                     "Download the LANCET model?",
-                    "LANCET Nano v0.4.2: about 100 MB from the pinned LANCET-model GitHub release, 111 MB on disk. The archive and every file taken from it are checked against SHA-256 digests built into this package before use. After this, the guard needs no network.",
+                    "LANCET Nano v0.4.3: about 109 MB from the pinned LANCET-model GitHub release, 116 MB on disk. The archive and every file taken from it are checked against SHA-256 digests built into this package before use. After this, the guard needs no network.",
                 );
                 if (!ok) {
                     ctx.ui.notify("Setup cancelled; nothing was downloaded.", "info");

@@ -1,13 +1,13 @@
 # specpi-lancet-guard
 
-A local, CPU-only command guard for [Pi](https://pi.dev). Before a shell command runs, [LANCET Nano](https://github.com/TannerMidd/LANCET-model) v0.4.2 scores it on your machine: a 110M-parameter CodeT5+ 220M encoder, fine-tuned to flag risky Bash, running as INT8 ONNX. No API key, no account, and no network once the model is downloaded.
+A local, CPU-only command guard for [Pi](https://pi.dev). Before a shell command runs, [LANCET Nano](https://github.com/TannerMidd/LANCET-model) v0.4.3 scores it on your machine: a 111M-parameter CodeT5+ 220M encoder, fine-tuned to flag risky Bash, PowerShell and cmd commands, running as INT8 ONNX. No API key, no account, and no network once the model is downloaded.
 
 It is off until you turn it on.
 
 ## Install
 
 ```
-pi install npm:specpi-lancet-guard@0.4.0
+pi install npm:specpi-lancet-guard@0.5.0
 ```
 
 SpecPi installs it by default. The package carries code only; the model is fetched once, by you:
@@ -16,9 +16,9 @@ SpecPi installs it by default. The package carries code only; the model is fetch
 /lancet-guard setup
 ```
 
-Setup downloads the release ZIP (about 100 MB) from the pinned [LANCET-model GitHub release](https://github.com/TannerMidd/LANCET-model/releases/tag/v0.4.2), refuses it unless its SHA-256 matches the digest built into this package, extracts only the three model files (111 MB on disk) and checks each against its own digest. It then runs two sample commands and asks whether to turn the guard on: for this session, or saved for future ones.
+Setup downloads the release ZIP (about 109 MB) from the pinned [LANCET-model GitHub release](https://github.com/TannerMidd/LANCET-model/releases/tag/v0.4.3), refuses it unless its SHA-256 matches the digest built into this package, extracts only the six model files (the encoder, its pooling head, the tokenizer and the thresholds; 116 MB on disk) and checks each against its own digest. It then runs two sample commands and asks whether to turn the guard on: for this session, or saved for future ones.
 
-Each package release accepts exactly one model. After updating from an earlier version, run `/lancet-guard setup` again to fetch v0.4.2: until you do, a guard you saved as on blocks what the local rules leave open, as it does whenever the model is missing. Older models stay in `<pi-agent-dir>/lancet-guard/` (for example `lancet-nano-v0.4.1-int8/`) and are no longer used; you can delete those folders.
+Each package release accepts exactly one model. After updating from an earlier version, run `/lancet-guard setup` again to fetch v0.4.3: until you do, a guard you saved as on blocks what the local rules leave open, as it does whenever the model is missing. Older models stay in `<pi-agent-dir>/lancet-guard/` (for example `lancet-nano-v0.4.2-int8/`) and are no longer used; you can delete those folders.
 
 ## Use
 
@@ -39,7 +39,7 @@ For `bash`, `powershell` and SpecPi's `background` tool:
 
 1. **Local rules first**, the same ones specpi-jev-guard uses: hard-deny patterns (recursive deletion of `/`, a home or system directory, `mkfs`, raw device writes, `curl | sh`, fork bombs…) block; provably read-only commands (`ls`, `git status`, `rg` with read-only flags…) pass; your `safeCommands`, `allowedCommands` and `disallowedCommands` globs apply. LANCET cannot overrule these.
 2. **LANCET scores the rest.** `risky` asks you (or blocks, with `"risky": "block"`); `review`, Nano's band for commands it is unsure about, always asks; `not_flagged` runs.
-3. **What LANCET cannot read asks.** It reads Bash only, so PowerShell always asks, as do commands over 8,192 bytes or 512 tokens. Nothing is truncated.
+3. **What LANCET cannot read asks.** It reads Bash, PowerShell and cmd: `bash` and `background` calls are scored as Bash, `powershell` calls as PowerShell. Commands over 8,192 bytes ask. Nothing is truncated: a command longer than one 512-token window is read as overlapping windows, every token once.
 
 For `write` and `edit`, LANCET is not involved: ordinary project files pass, and protected paths (`.env*`, keys, `.ssh`, `.git`, `node_modules`) or anything outside the workspace ask.
 
@@ -68,21 +68,26 @@ With no UI to ask (print or RPC mode without a client), an "ask" becomes a block
 
 ## What to expect
 
-These figures come from LANCET's own release benchmark (`lancet-bench-1`, 793 commands, one scoring pass), classifier alone, before the local rules:
+These figures come from LANCET's v0.4.3 release evaluation: the classifier alone, before the local rules, each benchmark scored once at the shipped thresholds. None of the three was used to train, tune or calibrate v0.4.3.
 
-| | Nano v0.4.2 (this guard) | Nano v0.4.1 | Nano v0.4.0 | Nano v0.3.0 | Jev (hosted, the old guard) |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Risky commands caught | 92.4% | 91.7% | 89.0% | 85.8% | 96.8% |
-| Safe commands wrongly stopped | 9.9% | 9.4% | 6.2% | 5.5% | 7.8% |
-| Risky secrets commands caught | 78% | 77% | 72% | 66% | 98% |
+| | Nano v0.4.3 (this guard) | Nano v0.4.2 | Jev (hosted, the old guard) |
+| --- | ---: | ---: | ---: |
+| Triage Score, three benchmarks (7,911 commands) | 68.3 | 54.4 | 38.9 |
+| lancet-bench-2-next (3,204): risky commands caught | 78.0% | 78.0% | 95.1% |
+| lancet-bench-2-next: safe commands wrongly stopped | 12.4% | 20.0% | 21.8% |
+| lancet-bench-2-next: risky commands in the `risky` band | 50.0% | 17.7% | 62.0% |
+| ShellRisk-Bench test (4,194): caught / stopped | 64.8% / 3.0% | 60.1% / 2.7% | 67.9% / 20.9% |
+| Neutral set (513): caught / stopped | 85.8% / 5.6% | 91.0% / 7.0% | 97.2% / 30.2% |
 
-v0.4.2 is a newly trained model, on a larger and more balanced mix that adds Shell Safety v2's training split and authored contrast sets of agent-style, `exec`-style and shell-escape commands with safe look-alikes. On this benchmark it is close to v0.4.1: it catches slightly more and stops slightly more. It differs on other sets. On LANCET's 513-command neutral set it stops 7.0% of safe commands (v0.4.1: 16.9%) and catches 91.0% of risky ones (66.5%); on ShellRisk-Bench it catches less (see below). More of what it catches comes back as `review`, which asks, rather than `risky`, which blocks or asks. Expect about one safe command in ten to ask on this benchmark.
+The Triage Score gives a point for each risky command asked about or blocked, and scales the total down in proportion when more than 10% of safe commands are stopped; the three benchmarks are weighted by size. lancet-bench-2-next replaces lancet-bench-1, the 793-command Bash benchmark earlier releases of this guard reported. It is built as 1,602 risky/safe twins from 289 scenarios in 40 areas, each repeated inside subshells, functions, pipelines and other wrappers, in Bash (3,066 commands), PowerShell (102) and cmd (36). It is much harder, so every guard scores lower on it: v0.4.2 caught 92.4% of lancet-bench-1's risky commands and 78.0% of these. lancet-bench-1 was retired and used to train v0.4.3, so it no longer gives a fair figure.
 
-- The benchmark's labels were written by the LANCET developer, an AI agent, so this is diagnostic evidence, not independent acceptance. Jev also saw task context; Nano sees only the command.
-- On ShellRisk-Bench's test split (4,194 commands, labelled upstream), v0.4.2 caught 60.1% of risky commands and stopped 2.7% of safe ones, against 70.5% and 3.1% for v0.4.1, 60.6% and 2.3% for v0.4.0 and 46.6% and 6.1% for v0.3.0.
-- It is weakest on network and remote execution and on commands that print or exfiltrate secrets. The local rules and the permission system still apply.
-- About **23 ms** per command (95th percentile 40 ms) on a Ryzen 9 3900X, after a one-off load of about 0.65 s that adds roughly 275 MB to Pi's memory. That was measured with v0.3.0; v0.4.0, v0.4.1 and v0.4.2 have the same size and architecture, and LANCET's release run timed v0.3.0 and v0.4.0 within 0.3 ms of each other. It only loads once the guard is on or you run `check`.
-- The runtime is a Node port of Nano's Python `classify.py`, using the same ONNX Runtime release; v0.4.0, v0.4.1 and v0.4.2 kept both `classify.py` and the tokenizer unchanged. On 7,170 commands with v0.3.0, on the same machine (Windows x64), the port produced identical token ids and identical bands, with scores within 2.2e-16. With v0.4.2 it matches the 58-command parity fixture exactly in ids and bands, with scores within 1.1e-16. ONNX Runtime's INT8 arithmetic depends on the CPU's instruction set: on Apple Silicon and on some x64 CPUs, CI measured scores up to 0.03 away from that reference. Every reference command still landed in the same band there, but a command scoring very close to a threshold can land in a different one on a different CPU. That is true of LANCET's own Python runtime too.
+On lancet-bench-2-next, v0.4.3 catches what v0.4.2 did while stopping far fewer safe commands: about one in eight, against one in five. It is also more decisive: half of the benchmark's risky commands come back `risky`, which asks (or blocks, with `"risky": "block"`), against 17.7% for v0.4.2, which put most of what it caught in `review`, which always asks. On ShellRisk-Bench it catches more at about the same rate of safe commands stopped; the neutral set is the one place it gives ground.
+
+- lancet-bench-2-next is LANCET's own benchmark, kept private so it stays unseen, so this is diagnostic evidence, not independent acceptance. ShellRisk-Bench is labelled upstream and the neutral set comes from outside parties. Jev also saw task context; Nano sees only the command.
+- PowerShell and cmd are new in v0.4.3 and less covered than Bash, in training and in the benchmark. Its weakest areas on lancet-bench-2-next are credentials, Windows administration, macOS administration and deceptive previews. The local rules and the permission system still apply.
+- A risky line inside a long script scores lower than it does alone. In a check of six risky commands, each was still flagged after 3 or 19 harmless lines; after 60 such lines (about 1,000 tokens), three of the six were not flagged.
+- About **9 ms** per command (95th percentile 17 ms) on a Ryzen 9 3900X, after a one-off load of about half a second that adds roughly 180 MB of memory. Long commands cost more, about a quarter of a second per full 512-token window: a command of 1,000 tokens takes about 0.5 s, and one at the 8,192-byte limit can need 19 windows and about 5 s. LANCET's Python runtime takes the same time on the same machine. It only loads once the guard is on or you run `check`.
+- The runtime is a Node port of Nano's Python `classify.py`, using the same ONNX Runtime release; v0.4.3 brought a new `classify.py` for the windowed format and keeps the CodeT5 tokenizer of earlier releases. On the 76-command parity fixture, recorded with v0.4.3's own runtime on the same machine (Windows x64), the port matches it exactly in token ids, windows and bands, with scores within 6.7e-16. ONNX Runtime's INT8 arithmetic depends on the CPU's instruction set: with earlier models, CI measured scores up to 0.03 away from the reference on Apple Silicon and on some x64 CPUs. Every reference command still landed in the same band there, but a command scoring very close to a threshold can land in a different one on a different CPU. That is true of LANCET's own Python runtime too.
 
 ONNX Runtime 1.30.0 ships CPU binaries for Windows x64/arm64, Linux x64/arm64 and macOS arm64. Intel Macs are not supported; there the guard fails closed and should be left off.
 
@@ -90,4 +95,4 @@ LANCET is experimental. It is not a sandbox and does not make running commands s
 
 ## License
 
-Package code: MIT. The local rules are copied under MIT from specpi-jev-guard. The model is LANCET Nano v0.4.2, Apache-2.0, fine-tuned from Salesforce CodeT5+ 220M (BSD-3-Clause); its release ZIP carries the full licenses, notices and model card. Third-party details: [THIRD_PARTY.md](THIRD_PARTY.md).
+Package code: MIT. The local rules are copied under MIT from specpi-jev-guard. The model is LANCET Nano v0.4.3, Apache-2.0, fine-tuned from Salesforce CodeT5+ 220M (BSD-3-Clause); its release ZIP carries the full licenses, notices and model card. Third-party details: [THIRD_PARTY.md](THIRD_PARTY.md).

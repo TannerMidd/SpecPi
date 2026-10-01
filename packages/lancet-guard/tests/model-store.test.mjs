@@ -3,11 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
-import { MODEL_ARCHIVE } from "../src/model-manifest.mjs";
+import { MODEL_ARCHIVE, MODEL_FILES } from "../src/model-manifest.mjs";
 import { installModel, modelDirectory, modelState, modelVerified } from "../src/model-store.mjs";
 
 // The real release ZIP, when one is available, lets the success path run against the real bytes:
-// LANCET_MODEL_ARCHIVE=<path to lancet-v0.4.2-nano-cpu-int8.zip>. Without it that case is skipped;
+// LANCET_MODEL_ARCHIVE=<path to lancet-v0.4.3-nano-cpu-int8.zip>. Without it that case is skipped;
 // CI covers it end to end by downloading the model through installModel itself.
 const ARCHIVE = process.env.LANCET_MODEL_ARCHIVE;
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "lancet-store-"));
@@ -119,7 +119,7 @@ describe("model download", () => {
             });
             assert.equal(first.reason, "downloaded");
             assert.ok(modelVerified(target));
-            assert.deepEqual(fs.readdirSync(target).sort(), ["model-int8.onnx", "model.json", "tokenizer.json"]);
+            assert.deepEqual(fs.readdirSync(target).sort(), Object.keys(MODEL_FILES).sort());
             assert.deepEqual(leftovers(dir), [path.basename(target)], "no staging, archive or replaced copy left");
             const second = await installModel({
                 agentDir: dir,

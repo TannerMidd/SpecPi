@@ -29,13 +29,12 @@ export type GateDecision =
 
 /** Human-readable meaning of LANCET's `review` reasons. */
 const REVIEW_REASONS: Record<string, string> = {
-    "unsupported-shell": "LANCET only reads Bash, so it cannot judge this shell",
+    "unsupported-shell": "LANCET reads Bash, PowerShell and cmd, so it cannot judge this shell",
     "command-not-string": "the command is not text",
     "empty-command": "the command is blank",
     "nul-byte": "the command contains a NUL byte",
     "invalid-unicode": "the command is not valid Unicode",
     "raw-input-too-long": "the command is longer than LANCET reads (8,192 bytes)",
-    "token-input-too-long": "the command is longer than LANCET reads (512 tokens)",
     "nonfinite-model-output": "LANCET produced no usable score for this command",
 };
 

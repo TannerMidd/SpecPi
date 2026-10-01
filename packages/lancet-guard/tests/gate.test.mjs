@@ -80,12 +80,13 @@ describe("LANCET verdicts", () => {
     });
 
     it("a command LANCET cannot read asks, whatever the risky policy", async () => {
-        const { score, calls } = scorer({ classification: "review", score: null, reason: "unsupported-shell" });
-        const decision = await judgeCommand("Remove-Item x", "powershell", { ...S, risky: "block" }, score);
+        const command = `Remove-Item ${"x".repeat(9000)}`;
+        const { score, calls } = scorer({ classification: "review", score: null, reason: "raw-input-too-long" });
+        const decision = await judgeCommand(command, "powershell", { ...S, risky: "block" }, score);
         assert.equal(decision.action, "ask");
         assert.equal(decision.source, "unsupported");
-        assert.match(decision.reason, /only reads Bash/u);
-        assert.deepEqual(calls, [["Remove-Item x", "powershell"]]);
+        assert.match(decision.reason, /8,192 bytes/u);
+        assert.deepEqual(calls, [[command, "powershell"]]);
     });
 
     it("fails closed when the model is unavailable", async () => {
@@ -105,7 +106,6 @@ describe("LANCET verdicts", () => {
             "nul-byte",
             "invalid-unicode",
             "raw-input-too-long",
-            "token-input-too-long",
             "nonfinite-model-output",
         ]) {
             assert.notEqual(reviewReason(reason), reviewReason(null), reason);
