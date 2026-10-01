@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.37.0 - 2026-10-01
 
+- Pair with SpecPi Chat 0.19.0, which shows a codemode run as one tool card: the script, the tool calls it made and its output.
 - Move the reviewed Pi base to 1.0.0. Development fixtures, package checks and the docs pin `@earendil-works/pi-coding-agent`, `pi-ai` and `pi-tui` 1.0.0 in place of 0.84.4.
 - Pin `pi-goal-x` 0.32.0, which widens its declared Pi support from `<0.85.0` to `<2.0.0`; 0.31.2 refused Pi 1.0.
 - Turn on Pi's built-in codemode tool by default. Install and update add `+codemode` to `defaultTools` in Pi's settings, after `pi --version` confirms Pi 0.99 or later. Older Pi would read the entry as a plain tool list and lose its default tools, so the installer warns and adds nothing there. An existing choice is left alone: `defaultTools` that already names codemode (including `-codemode`), is empty or is not an array, or `-builtin:codemode` in `extensions`. Uninstall removes only the entry SpecPi added. Nested tool calls from codemode scripts pass through the same `tool_call` handlers as direct calls, so scope, the permission system and the LANCET guard still apply.
