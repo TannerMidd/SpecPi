@@ -11,7 +11,7 @@ Development formatting uses Prettier **3.9.6** (MIT), ESLint **10.9.1** (MIT), `
 
 ## Default packages
 
-Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.4.0, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
+Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.5.0, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
 
 SpecPi requests exact npm dependency saves for these pins and checks installed top-level versions before completing installation. The override applies to package acquisition without changing the user's global npm configuration.
 
@@ -24,7 +24,7 @@ SpecPi requests exact npm dependency saves for these pins and checks installed t
 | pi-goal-x                      | 0.31.2  | [tmonk/pi-goal-x](https://github.com/tmonk/pi-goal-x)                     |
 | @sreetej510/pi-usage           | 0.10.0  | [Sreetej510/pi-extensions](https://github.com/Sreetej510/pi-extensions)   |
 | @gotgenes/pi-permission-system | 32.0.2  | [gotgenes/pi-packages](https://github.com/gotgenes/pi-packages)           |
-| specpi-lancet-guard            | 0.1.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/lancet-guard) |
+| specpi-lancet-guard            | 0.5.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/lancet-guard) |
 
 Transitive dependencies and their notices remain in Pi's npm installation tree. Top-level pins do not freeze upstream dependency ranges or constitute a full transitive security audit. Pi invokes npm with its upstream package-management semantics, including dependency lifecycle scripts. Browser QA has no install hook: confirmed SpecPi install/update explicitly invokes its installed Node setup bin, unless acquisition or browser setup is skipped. It downloads package-pinned Chromium without installing OS libraries. BetterWright is optional/manual and retains its own Bun-based setup; SpecPi neither removes Bun nor deletes user-owned tools. Usage reporting and web packages make their own provider/service connections. Consult upstream licenses and security policies before redistributing their components.
 
@@ -42,7 +42,7 @@ Worth stating plainly, because it is the part a reader is most likely to assume 
 
 ## LANCET command guard
 
-`packages/lancet-guard` is first-party source, released independently as `specpi-lancet-guard`. Its one production dependency is `onnxruntime-node` 1.30.0 (MIT, Microsoft), pinned exactly, which bundles prebuilt ONNX Runtime CPU libraries; SpecPi's installer sets `ONNXRUNTIME_NODE_INSTALL=skip` so its install script does not fetch the CUDA libraries it would otherwise download on Linux x64. Its local rules are copied under MIT from `specpi-jev-guard` 0.4.0. The model is not bundled: `/lancet-guard setup` downloads LANCET Nano v0.4.2 (Apache-2.0) from the `TannerMidd/LANCET-model` GitHub release, pinned by SHA-256. It was fine-tuned from Salesforce CodeT5+ 220M (BSD-3-Clause); its model card and notices in the release record the training-data sources. The guard makes no other network connection. See its [dependency notices](packages/lancet-guard/THIRD_PARTY.md) and [security boundary](packages/lancet-guard/SECURITY.md).
+`packages/lancet-guard` is first-party source, released independently as `specpi-lancet-guard`. Its one production dependency is `onnxruntime-node` 1.30.0 (MIT, Microsoft), pinned exactly, which bundles prebuilt ONNX Runtime CPU libraries; SpecPi's installer sets `ONNXRUNTIME_NODE_INSTALL=skip` so its install script does not fetch the CUDA libraries it would otherwise download on Linux x64. Its local rules are copied under MIT from `specpi-jev-guard` 0.4.0. The model is not bundled: `/lancet-guard setup` downloads LANCET Nano v0.4.3 (Apache-2.0) from the `TannerMidd/LANCET-model` GitHub release, pinned by SHA-256. It was fine-tuned from Salesforce CodeT5+ 220M (BSD-3-Clause); its model card and notices in the release record the training-data sources. The guard makes no other network connection. See its [dependency notices](packages/lancet-guard/THIRD_PARTY.md) and [security boundary](packages/lancet-guard/SECURITY.md).
 
 ## Standalone delegation and experiments
 
