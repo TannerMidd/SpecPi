@@ -3,7 +3,7 @@
 // The model is not in the npm package. `/lancet-guard setup` fetches the pinned release ZIP from
 // GitHub, and nothing else ever downloads it: not install, not session start, not switching the
 // guard on. The ZIP is streamed to a private staging directory, capped at its expected size, and
-// refused unless its SHA-256 matches model-manifest.mjs. Only then are the three model files
+// refused unless its SHA-256 matches model-manifest.mjs. Only then are the pinned model files
 // extracted, each refused unless its own digest matches. The ZIP is deleted, and only a complete,
 // verified set is renamed into place, so an interrupted or tampered download leaves the previous
 // state, never a partial model.
@@ -15,7 +15,7 @@ import path from "node:path";
 import { MODEL_ARCHIVE, MODEL_FILES, MODEL_ID } from "./model-manifest.mjs";
 import { extractEntries } from "./zip.mjs";
 
-// About 100 MB; generous enough for a slow connection, bounded so a stalled one ends.
+// About 109 MB; generous enough for a slow connection, bounded so a stalled one ends.
 const DOWNLOAD_TIMEOUT_MS = 900_000;
 
 export function agentDirectory(env = process.env) {

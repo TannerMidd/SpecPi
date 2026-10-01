@@ -16,6 +16,8 @@ export interface LancetVerdict {
     classification: "risky" | "not_flagged" | "review";
     score: number | null;
     reason: string | null;
+    /** How many 512-token windows LANCET read the command in. */
+    windows?: number;
 }
 
 export type Scorer = (command: string, shell: string) => Promise<LancetVerdict>;
@@ -29,13 +31,12 @@ export type GateDecision =
 
 /** Human-readable meaning of LANCET's `review` reasons. */
 const REVIEW_REASONS: Record<string, string> = {
-    "unsupported-shell": "LANCET only reads Bash, so it cannot judge this shell",
+    "unsupported-shell": "LANCET reads Bash, PowerShell and cmd, so it cannot judge this shell",
     "command-not-string": "the command is not text",
     "empty-command": "the command is blank",
     "nul-byte": "the command contains a NUL byte",
     "invalid-unicode": "the command is not valid Unicode",
     "raw-input-too-long": "the command is longer than LANCET reads (8,192 bytes)",
-    "token-input-too-long": "the command is longer than LANCET reads (512 tokens)",
     "nonfinite-model-output": "LANCET produced no usable score for this command",
 };
 
@@ -90,6 +91,19 @@ export async function judgeCommand(
         }
 
         return { action: "ask", source: "lancet", reason, score: verdict.score };
+    }
+
+    // A command longer than one window is scored but never cleared. Harmless lines put in front of
+    // a risky command pull its score under the review threshold once it spans a second window, so a
+    // `not_flagged` verdict there asks, as every command that long did before LANCET could read it.
+    // A verdict that does not say it fitted one window is not cleared either.
+    if (verdict.windows !== 1) {
+        return {
+            action: "ask",
+            source: "lancet",
+            reason: "LANCET does not clear commands longer than one 512-token window",
+            score: verdict.score,
+        };
     }
 
     // `not_flagged` is not a claim of safety, only that LANCET did not flag it. The permission

@@ -1,8 +1,11 @@
 // The Node runtime must give the answers LANCET Nano's Python runtime gives. The fixture was
-// recorded with Nano v0.4.2's classify.py (onnxruntime 1.30.0, tokenizers 0.23.2) over authored commands
-// chosen to stress the tokenizer: Unicode letters and digits, combining marks, emoji, every
-// whitespace class the two regex engines disagree on, special-token spellings, and inputs at and
-// past the length limits. Command strings are model inputs only and are never executed.
+// recorded with Nano v0.4.3's classify.py (numpy 2.5.3, onnxruntime 1.30.0, tokenizers 0.23.2) over
+// authored commands chosen to stress the tokenizer and the windowing: Unicode letters and digits,
+// combining marks, emoji, every whitespace class the two regex engines disagree on, special-token
+// spellings, PowerShell and cmd, unsupported shells, payloads at each window boundary, and inputs
+// at and past the byte limit. Each window is recorded as [start, end, firstOwned] over the
+// payload, read off classify.py's own windows() and checked there to rebuild its windows exactly.
+// Command strings are model inputs only and are never executed.
 //
 // The model is not in the package, so these run when LANCET_MODEL_DIR points at a verified copy
 // (the release ZIP's model/ directory, or what /lancet-guard setup installs) and are skipped
@@ -14,44 +17,77 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { LancetClassifier, readVerified } from "../src/classifier.mjs";
-import { ByteLevelBpe } from "../src/tokenizer.mjs";
+import { LancetClassifier, loadTokenizer, readVerified, windows } from "../src/classifier.mjs";
 
 const REAL = process.env.LANCET_MODEL_DIR;
 const skip = !REAL && "LANCET_MODEL_DIR not set";
 const { cases } = JSON.parse(fs.readFileSync(new URL("./fixtures/parity.json", import.meta.url), "utf8"));
 
+function framed(ids, layout) {
+    return layout.map(([start, end, first]) => ({
+        ids: [1, ...ids.slice(start, end), 2],
+        owned: [0, ...ids.slice(start, end).map((_, offset) => (start + offset >= first ? 1 : 0)), 0],
+    }));
+}
+
+describe("windows", () => {
+    it("covers every token exactly once, at and across each boundary", () => {
+        for (const length of [1, 510, 511, 956, 957, 8189]) {
+            const payload = Array.from({ length }, (_, index) => index + 3);
+            const parts = windows(payload, 512, 64);
+            const owned = parts.flatMap((part) => part.ids.filter((_, index) => part.owned[index]));
+            assert.deepEqual(owned, payload, `${length} tokens`);
+            assert.ok(parts.every((part) => part.ids.length <= 512 && part.ids[0] === 1 && part.ids.at(-1) === 2));
+            for (let index = 1; index < parts.length; index++) {
+                assert.deepEqual(
+                    parts[index].ids.slice(1, 65),
+                    parts[index - 1].ids.slice(-65, -1),
+                    "64-token overlap",
+                );
+            }
+        }
+
+        assert.throws(() => windows([], 512, 64), /Empty input or invalid window contract/u);
+        assert.throws(() => windows([5], 512, 510), /Empty input or invalid window contract/u);
+    });
+});
+
 describe("parity with LANCET Nano's Python runtime", { skip }, () => {
-    it("tokenizes exactly as Hugging Face tokenizers does", () => {
-        const tokenizer = new ByteLevelBpe(JSON.parse(readVerified(REAL, "tokenizer.json").toString("utf8")));
+    it("tokenizes and windows exactly as classify.py does", () => {
         const meta = JSON.parse(readVerified(REAL, "model.json").toString("utf8"));
-        const classifier = new LancetClassifier(meta, tokenizer, undefined, undefined);
+        const classifier = new LancetClassifier(meta, loadTokenizer(REAL));
         for (const row of cases) {
             const encoded = classifier.encode(row.command, row.shell);
+            const label = JSON.stringify(row.command).slice(0, 80);
             if (row.ids) {
-                assert.deepEqual(encoded.ids, row.ids, JSON.stringify(row.command).slice(0, 80));
+                assert.deepEqual(encoded.ids, row.ids, label);
+                assert.deepEqual(encoded.windows, framed(row.ids, row.windows), label);
             } else {
-                assert.equal(encoded.reason, row.reason, JSON.stringify(row.command).slice(0, 80));
+                assert.equal(encoded.reason, row.reason, label);
             }
         }
     });
 
     it("scores and decides as classify.py does, on the CPU", async (t) => {
         // The fixture was recorded on a Ryzen 9 3900X (Windows x64). ONNX Runtime picks INT8 kernels
-        // by the CPU's instruction set, not only its architecture: CI measured scores up to 0.031 away
-        // from the reference on Apple Silicon and on one Windows x64 runner, while another Windows
-        // runner and Linux matched to 3e-17. That is the runtime, not this port, since token ids are
-        // checked exactly above and the calibration is the same code everywhere. So scores get a 0.05
-        // tolerance, which a gross port bug would still exceed. Decisions must match everywhere. They
+        // by the CPU's instruction set, not only its architecture: with v0.4.3, CI measured scores up
+        // to 0.015 away from the reference on Apple Silicon and 0.003 on Linux and Windows x64, and
+        // earlier models drifted by up to 0.031 on one Windows x64 runner. That is the runtime, not
+        // this port, since token ids and windows are checked exactly above and the head is the same
+        // code everywhere. So scores get a 0.05 tolerance and risk logits, which set the band, 1.0:
+        // near the risky threshold 0.05 of score spans several logits, and a pooling or head bug would
+        // still exceed either. Decisions must match everywhere. They
         // did on every fixture case on every runner, but a command near a threshold could land in
         // another band on another CPU, and if one ever does, this is where it should show up rather
         // than be tolerated away. The largest difference is reported so drift stays visible.
         const tolerance = 0.05;
+        const logitTolerance = 1;
         const ort = createRequire(import.meta.url)("onnxruntime-node");
         const classifier = await LancetClassifier.load(REAL, ort);
         const decisions = [];
         const scores = [];
         let largest = 0;
+        let largestLogit = 0;
         try {
             for (const row of cases) {
                 const result = await classifier.score(row.command, row.shell);
@@ -70,18 +106,24 @@ describe("parity with LANCET Nano's Python runtime", { skip }, () => {
                 }
 
                 const difference = Math.abs(result.score - row.score);
+                const logitDifference = Math.abs(result.riskLogit - row.riskLogit);
                 largest = Math.max(largest, difference);
-                if (difference >= tolerance) {
-                    scores.push(`${label}: ${result.score} vs ${row.score}`);
+                largestLogit = Math.max(largestLogit, logitDifference);
+                if (difference >= tolerance || !(logitDifference < logitTolerance)) {
+                    scores.push(
+                        `${label}: ${result.score} vs ${row.score}, logit ${result.riskLogit} vs ${row.riskLogit}`,
+                    );
                 }
             }
         } finally {
             await classifier.release();
         }
 
-        t.diagnostic(`${process.platform}/${process.arch}: largest score difference ${largest}`);
+        t.diagnostic(
+            `${process.platform}/${process.arch}: largest score difference ${largest}, risk logit ${largestLogit}`,
+        );
         assert.deepEqual(decisions, [], "decisions differ from classify.py");
-        assert.deepEqual(scores, [], `scores differ by ${tolerance} or more`);
+        assert.deepEqual(scores, [], `scores differ by ${tolerance} or logits by ${logitTolerance} or more`);
     });
 
     it("refuses a model file that does not match its pinned digest", () => {

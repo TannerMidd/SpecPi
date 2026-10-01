@@ -1,17 +1,17 @@
-// Byte-level BPE encoder for LANCET's tokenizer.json.
+// Byte-level BPE encoder for LANCET's vocab.json and merges.txt.
 //
-// LANCET was trained with the Hugging Face `tokenizers` library, and this file has to produce
-// exactly the same token ids it does. It covers only the configuration LANCET ships, and the
-// loader refuses anything else rather than guessing:
+// LANCET's runtime loads those two files with the Hugging Face `tokenizers` library as
+// `ByteLevelBPETokenizer(vocab.json, merges.txt)`, and this file has to produce exactly the same
+// token ids it does. That class's defaults are the whole configuration, and this covers only them:
 //
 //   - no normalizer;
 //   - a ByteLevel pre-tokenizer with the GPT-2 split pattern and no prefix space;
 //   - a BPE model with no dropout, no unknown token and no subword affixes;
-//   - special tokens that are never recognised inside command text. The Python runtime sets
-//     `encode_special_tokens = True`, so a command containing `</s>` is tokenized as ordinary
-//     characters and cannot forge a sequence boundary. Encoding here never looks for them.
+//   - no special tokens. A command containing `</s>` is tokenized as ordinary characters and
+//     cannot forge a sequence boundary; the runtime adds the real ones around each window itself.
 //
-// Parity with the Python library is checked by tests/tokenizer-parity.test.mjs against ids the
+// The loader refuses a merges file it cannot read the way the Rust library does, rather than
+// guessing. Parity with the Python library is checked by tests/parity.test.mjs against ids the
 // reference runtime recorded.
 
 // Oniguruma's Unicode `\s`, which the Rust library uses, is the White_Space property. JavaScript's
@@ -50,41 +50,45 @@ function expect(condition, message) {
 }
 
 export class ByteLevelBpe {
-    /** @param {any} spec parsed tokenizer.json */
-    constructor(spec) {
-        const model = spec?.model;
-        const pre = spec?.pre_tokenizer;
-        expect(spec?.normalizer === null || spec?.normalizer === undefined, "normalizer");
-        expect(pre?.type === "ByteLevel" && pre.add_prefix_space === false && pre.use_regex !== false, "pre-tokenizer");
-        expect(model?.type === "BPE", "model type");
-        expect(model.dropout === null || model.dropout === undefined, "dropout");
-        expect(!model.continuing_subword_prefix && !model.end_of_word_suffix, "subword affixes");
-        expect(model.byte_fallback !== true && model.ignore_merges !== true, "fallback or merge mode");
-        expect(model.vocab && typeof model.vocab === "object" && Array.isArray(model.merges), "vocabulary");
+    /**
+     * @param {Record<string, number>} vocab parsed vocab.json
+     * @param {string} merges the text of merges.txt
+     */
+    constructor(vocab, merges) {
+        expect(vocab !== null && typeof vocab === "object" && !Array.isArray(vocab), "vocabulary");
+        this.vocab = new Map(Object.entries(vocab));
+        expect([...this.vocab.values()].every(Number.isInteger), "vocabulary ids");
+        expect(typeof merges === "string", "merges");
 
-        this.vocab = new Map(Object.entries(model.vocab));
+        // As the Rust library reads the file: lines without their line ending, the `#version`
+        // header skipped, then one `left right` pair per line, ranked in file order. A pair or a
+        // result outside the vocabulary and a blank line are refused, as there; so is a duplicate
+        // pair, which the library would silently re-rank.
+        const lines = merges.split("\n");
+        if (lines.at(-1) === "") {
+            lines.pop();
+        }
+
         this.ranks = new Map();
-        model.merges.forEach((merge, rank) => {
-            const [left, right] = Array.isArray(merge) ? merge : String(merge).split(" ");
-            expect(typeof left === "string" && typeof right === "string", "merge entry");
-            const key = `${left} ${right}`;
-            if (!this.ranks.has(key)) {
-                this.ranks.set(key, rank);
+        for (const raw of lines) {
+            const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+            if (line.startsWith("#version")) {
+                continue;
             }
-        });
-        this.special = new Map();
-        for (const token of spec.added_tokens ?? []) {
-            this.special.set(token.content, token.id);
+
+            const parts = line.split(" ");
+            expect(
+                parts.length === 2 &&
+                    this.vocab.has(parts[0]) &&
+                    this.vocab.has(parts[1]) &&
+                    this.vocab.has(parts[0] + parts[1]),
+                `merge ${this.ranks.size + 1}`,
+            );
+            expect(!this.ranks.has(line), `duplicate merge ${line}`);
+            this.ranks.set(line, this.ranks.size);
         }
 
         this.cache = new Map();
-    }
-
-    tokenId(token) {
-        const id = this.special.get(token) ?? this.vocab.get(token);
-        expect(Number.isInteger(id), `missing token ${token}`);
-
-        return id;
     }
 
     /** Token ids for `text`, with no special tokens added and none recognised. */

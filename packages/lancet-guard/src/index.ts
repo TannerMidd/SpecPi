@@ -335,7 +335,7 @@ export default function lancetGuard(pi: ExtensionAPI) {
             if (ctx.hasUI) {
                 const ok = await ctx.ui.confirm(
                     "Download the LANCET model?",
-                    "LANCET Nano v0.4.2: about 100 MB from the pinned LANCET-model GitHub release, 111 MB on disk. The archive and every file taken from it are checked against SHA-256 digests built into this package before use. After this, the guard needs no network.",
+                    "LANCET Nano v0.4.3: about 109 MB from the pinned LANCET-model GitHub release, 116 MB on disk. The archive and every file taken from it are checked against SHA-256 digests built into this package before use. After this, the guard needs no network.",
                 );
                 if (!ok) {
                     ctx.ui.notify("Setup cancelled; nothing was downloaded.", "info");
@@ -483,8 +483,12 @@ export default function lancetGuard(pi: ExtensionAPI) {
                     const started = performance.now();
                     const verdict = await (await classifier(modelDirectory())).score(rest, "bash");
                     const ms = Math.round(performance.now() - started);
+                    const long =
+                        verdict.classification === "not_flagged" && verdict.windows !== 1
+                            ? " — longer than one 512-token window, so the guard still asks"
+                            : "";
                     ctx.ui.notify(
-                        `LANCET: ${verdict.classification}${typeof verdict.score === "number" ? ` (score ${verdict.score.toFixed(3)})` : ""}${verdict.reason ? ` — ${verdict.reason}` : ""} [${ms}ms]`,
+                        `LANCET: ${verdict.classification}${typeof verdict.score === "number" ? ` (score ${verdict.score.toFixed(3)})` : ""}${verdict.reason ? ` — ${verdict.reason}` : ""}${long} [${ms}ms]`,
                         verdict.classification === "not_flagged" ? "info" : "warning",
                     );
                 } catch (error) {

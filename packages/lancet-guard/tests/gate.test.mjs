@@ -52,12 +52,46 @@ describe("local rules decide before LANCET", () => {
 
 describe("LANCET verdicts", () => {
     it("not_flagged runs, with its score recorded", async () => {
-        const { score, calls } = scorer({ classification: "not_flagged", score: 0.1, reason: null });
+        const { score, calls } = scorer({ classification: "not_flagged", score: 0.1, reason: null, windows: 1 });
         const decision = await judgeCommand("npm test", "bash", S, score);
         assert.equal(decision.action, "allow");
         assert.equal(decision.source, "lancet");
         assert.equal(decision.score, 0.1);
         assert.deepEqual(calls, [["npm test", "bash"]]);
+    });
+
+    it("a command longer than one window is never cleared, but a risky one still blocks", async () => {
+        const long = await judgeCommand(
+            "build.sh",
+            "bash",
+            S,
+            scorer({ classification: "not_flagged", score: 0.1, reason: null, windows: 2 }).score,
+        );
+        assert.equal(long.action, "ask");
+        assert.equal(long.source, "lancet");
+        assert.equal(long.score, 0.1);
+        assert.match(long.reason, /512-token window/u);
+        const unsized = await judgeCommand(
+            "build.sh",
+            "bash",
+            S,
+            scorer({ classification: "not_flagged", score: 0.1, reason: null }).score,
+        );
+        assert.equal(unsized.action, "ask", "a verdict that does not say it fitted one window is not cleared");
+        const risky = await judgeCommand(
+            "build.sh",
+            "bash",
+            { ...S, risky: "block" },
+            scorer({ classification: "risky", score: 0.99, reason: null, windows: 2 }).score,
+        );
+        assert.equal(risky.action, "block");
+        const short = await judgeCommand(
+            "build.sh",
+            "bash",
+            S,
+            scorer({ classification: "not_flagged", score: 0.1, reason: null, windows: 1 }).score,
+        );
+        assert.equal(short.action, "allow");
     });
 
     it("risky asks by default and blocks when configured to", async () => {
@@ -80,12 +114,13 @@ describe("LANCET verdicts", () => {
     });
 
     it("a command LANCET cannot read asks, whatever the risky policy", async () => {
-        const { score, calls } = scorer({ classification: "review", score: null, reason: "unsupported-shell" });
-        const decision = await judgeCommand("Remove-Item x", "powershell", { ...S, risky: "block" }, score);
+        const command = `Remove-Item ${"x".repeat(9000)}`;
+        const { score, calls } = scorer({ classification: "review", score: null, reason: "raw-input-too-long" });
+        const decision = await judgeCommand(command, "powershell", { ...S, risky: "block" }, score);
         assert.equal(decision.action, "ask");
         assert.equal(decision.source, "unsupported");
-        assert.match(decision.reason, /only reads Bash/u);
-        assert.deepEqual(calls, [["Remove-Item x", "powershell"]]);
+        assert.match(decision.reason, /8,192 bytes/u);
+        assert.deepEqual(calls, [[command, "powershell"]]);
     });
 
     it("fails closed when the model is unavailable", async () => {
@@ -105,7 +140,6 @@ describe("LANCET verdicts", () => {
             "nul-byte",
             "invalid-unicode",
             "raw-input-too-long",
-            "token-input-too-long",
             "nonfinite-model-output",
         ]) {
             assert.notEqual(reviewReason(reason), reviewReason(null), reason);
