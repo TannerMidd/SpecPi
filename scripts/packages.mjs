@@ -66,7 +66,7 @@ export function packageChanges(before, after) {
     });
 }
 
-export function installBasePackages(agentDir) {
+function resolvePiCommand() {
     const requested = process.env.SPECPI_PI || "pi";
     const hasPath = path.isAbsolute(requested) || /[/\\]/.test(requested);
     const suffixes =
@@ -78,15 +78,74 @@ export function installBasePackages(agentDir) {
         : (process.env.PATH || process.env.Path || "")
               .split(path.delimiter)
               .flatMap((directory) => suffixes.map((suffix) => path.resolve(directory, `${requested}${suffix}`)));
-    const command = candidates.find((file) => fs.existsSync(file) && fs.statSync(file).isFile());
+
+    return candidates.find((file) => fs.existsSync(file) && fs.statSync(file).isFile());
+}
+
+function runPi(command, args, options) {
+    if (/\.[cm]?js$/i.test(command)) {
+        return spawnSync(process.execPath, [command, ...args], options);
+    }
+
+    if (process.platform === "win32" && /\.(cmd|bat)$/i.test(command)) {
+        // Environment expansion keeps paths with spaces and shell metacharacters one quoted argument.
+        const env = { ...options.env };
+        const line = [command, ...args]
+            .map((value, index) => {
+                if (/["\r\n]/.test(value)) {
+                    throw new Error("Unsupported quote or newline in Pi command path");
+                }
+
+                const key = `SPECPI_PACKAGE_ARG_${index}`;
+                env[key] = value;
+
+                return `"%${key}%"`;
+            })
+            .join(" ");
+
+        return spawnSync(line, [], {
+            ...options,
+            env,
+            shell: process.env.ComSpec || process.env.COMSPEC || "cmd.exe",
+        });
+    }
+
+    return spawnSync(command, args, options);
+}
+
+// The version of the Pi CLI SpecPi would install with, or undefined when it cannot be read.
+export function piVersion(agentDir) {
+    const command = resolvePiCommand();
+    if (!command) {
+        return undefined;
+    }
+
+    try {
+        const result = runPi(command, ["--version"], {
+            cwd: agentDir,
+            env: { ...process.env, PI_CODING_AGENT_DIR: agentDir },
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 30_000,
+            windowsHide: true,
+        });
+        const match = result.status === 0 ? /^\s*v?(\d+)\.(\d+)\.(\d+)\b/u.exec(result.stdout || "") : null;
+
+        return match ? match.slice(1, 4).map(Number) : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+export function installBasePackages(agentDir) {
+    const command = resolvePiCommand();
     if (!command) {
         throw new Error("Pi was not found. Install Pi, put pi on PATH, or set SPECPI_PI to its CLI path.");
     }
 
     for (const source of basePackages) {
         console.log(`Installing ${source}`);
-        const args = ["install", source];
-        const options = {
+        const result = runPi(command, ["install", source], {
             cwd: agentDir,
             // Later installs must not re-resolve earlier pins through npm's default caret ranges.
             env: {
@@ -101,33 +160,7 @@ export function installBasePackages(agentDir) {
             },
             stdio: "inherit",
             windowsHide: true,
-        };
-        let result;
-        if (/\.[cm]?js$/i.test(command)) {
-            result = spawnSync(process.execPath, [command, ...args], options);
-        } else if (process.platform === "win32" && /\.(cmd|bat)$/i.test(command)) {
-            // Environment expansion keeps paths with spaces and shell metacharacters one quoted argument.
-            const values = [command, ...args];
-            const line = values
-                .map((value, index) => {
-                    if (/["\r\n]/.test(value)) {
-                        throw new Error("Unsupported quote or newline in Pi command path");
-                    }
-
-                    const key = `SPECPI_PACKAGE_ARG_${index}`;
-                    options.env[key] = value;
-
-                    return `"%${key}%"`;
-                })
-                .join(" ");
-            result = spawnSync(line, [], {
-                ...options,
-                shell: process.env.ComSpec || process.env.COMSPEC || "cmd.exe",
-            });
-        } else {
-            result = spawnSync(command, args, options);
-        }
-
+        });
         if (result.error || result.status !== 0) {
             throw new Error(
                 `Pi installation failed for ${source}: ${result.error?.message || `exit ${result.status}`}`,

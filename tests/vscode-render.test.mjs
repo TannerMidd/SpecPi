@@ -149,6 +149,76 @@ function sampleMessages() {
     ];
 }
 
+// A codemode run as Pi 1.0 reports it over RPC: the script's own events, its nested tool events
+// (which carry parentToolCallId), and the updates in which codemode lists the calls it made.
+function codemodeMessages({ settled = true } = {}) {
+    const code = [
+        'const source = await tools.read({ path: "src/sidebar.js" });',
+        'const tests = await tools.bash({ command: "npm test -- --grep sidebar --reporter dot --bail --timeout 20000" });',
+        'text("sidebar.js has " + source.split("\\n").length + " lines");',
+        "return { passed: tests.includes('passing') };",
+    ].join("\n");
+    const read = { id: "call-1/1", name: "read", args: '{"path":"src/sidebar.js"}' };
+    const bash = {
+        id: "call-1/2",
+        name: "bash",
+        args: '{"command":"npm test -- --grep sidebar --reporter dot --bail --timeout 20000"}',
+    };
+    const state = createState();
+    const update = (calls) =>
+        applyEvent(state, {
+            type: "tool_execution_update",
+            toolCallId: "call-1",
+            toolName: "codemode",
+            args: { code },
+            partialResult: { content: [], details: { calls } },
+        });
+    applyEvent(state, { type: "tool_execution_start", toolCallId: "call-1", toolName: "codemode", args: { code } });
+    applyEvent(state, {
+        type: "tool_execution_start",
+        toolCallId: read.id,
+        toolName: "read",
+        args: { path: "src/sidebar.js" },
+        parentToolCallId: "call-1",
+    });
+    update([
+        { ...read, status: "ok", durationMs: 6.6 },
+        { ...bash, status: "running" },
+    ]);
+    if (settled) {
+        update([
+            { ...read, status: "ok", durationMs: 6.6 },
+            { ...bash, status: "error", durationMs: 1840, error: "Blocked by the permission system: npm test" },
+        ]);
+        applyEvent(state, {
+            type: "tool_execution_end",
+            toolCallId: "call-1",
+            toolName: "codemode",
+            result: {
+                content: [
+                    { type: "text", text: "Script failed\nWall time 1.9 seconds\nOutput:\n" },
+                    { type: "text", text: "sidebar.js has 412 lines" },
+                    { type: "text", text: "Script error:\nError: Blocked by the permission system: npm test" },
+                ],
+                details: {
+                    calls: [
+                        { ...read, status: "ok", durationMs: 6.6 },
+                        {
+                            ...bash,
+                            status: "error",
+                            durationMs: 1840,
+                            error: "Blocked by the permission system: npm test",
+                        },
+                    ],
+                },
+            },
+            isError: true,
+        });
+    }
+
+    return [{ id: "user-1", role: "user", text: "Check the sidebar file and run its tests." }, ...state.messages];
+}
+
 function sampleHistory() {
     const now = Date.now();
 
@@ -600,6 +670,99 @@ test(
                             );
                         });
                     });
+                }
+            }
+
+            for (const theme of Object.keys(themes)) {
+                for (const width of [280, 768]) {
+                    await t.test(
+                        `codemode shows its script, tool calls and output at ${width}px in ${theme}`,
+                        async () => {
+                            const name = `codemode-${theme}-${width}`;
+                            await withPage(browser, fixtures, { theme, width, name }, async (page) => {
+                                await setState(page, {
+                                    status: "busy",
+                                    messages: codemodeMessages({ settled: false }),
+                                });
+                                assert.equal(await page.locator(".tool-card").count(), 1, "nested calls are not cards");
+                                assert.equal(
+                                    await page.locator(".tool-card .tool-state").textContent(),
+                                    "Running\u2026 \u00b7 2 tool calls",
+                                );
+                                assert.deepEqual(
+                                    await page
+                                        .locator(".tool-call")
+                                        .evaluateAll((items) => items.map((item) => item.dataset.status)),
+                                    ["ok", "running"],
+                                );
+                                assert.equal(
+                                    await page.locator(".tool-output").textContent(),
+                                    "Waiting for output\u2026",
+                                );
+                                await assertLayout(page, width);
+                                await page.screenshot({ path: path.join(screenshots, `${name}-running.png`) });
+
+                                await setState(page, { messages: codemodeMessages() });
+                                const card = page.locator(".tool-card");
+                                assert.equal(await card.count(), 1);
+                                assert.equal(await card.locator(".tool-name").textContent(), "codemode");
+                                assert.equal(
+                                    await card.locator(".tool-state").textContent(),
+                                    "Failed \u00b7 2 tool calls \u00b7 1.9 s",
+                                );
+                                assert.deepEqual(await card.locator(".tool-section-label").allTextContents(), [
+                                    "Script",
+                                    "Tool calls",
+                                    "Output",
+                                ]);
+                                assert.match(
+                                    await card.locator(".tool-script").textContent(),
+                                    /^const source = await tools\.read/u,
+                                );
+                                assert.deepEqual(await card.locator(".tool-call-name").allTextContents(), [
+                                    "read",
+                                    "bash",
+                                ]);
+                                assert.deepEqual(
+                                    await card
+                                        .locator(".tool-call-status")
+                                        .evaluateAll((items) => items.map((item) => item.getAttribute("aria-label"))),
+                                    ["Completed", "Failed"],
+                                );
+                                assert.deepEqual(await card.locator(".tool-call-metrics").allTextContents(), [
+                                    "7 ms",
+                                    "1.8 s",
+                                ]);
+                                assert.equal(
+                                    await card.locator(".tool-call-error").textContent(),
+                                    "Blocked by the permission system: npm test",
+                                );
+                                const output = await card.locator(".tool-output").textContent();
+                                assert.ok(output.startsWith("sidebar.js has 412 lines"), output);
+                                assert.ok(
+                                    !output.includes("Wall time"),
+                                    "Pi's header is shown as the duration instead",
+                                );
+                                const args = await card
+                                    .locator(".tool-call-args")
+                                    .nth(1)
+                                    .evaluate((node) => ({
+                                        clipped: node.scrollWidth > node.clientWidth,
+                                        title: node.title,
+                                    }));
+                                assert.ok(args.title.includes("--timeout 20000"), "the full arguments stay available");
+                                if (width === 280) {
+                                    assert.ok(
+                                        args.clipped,
+                                        "long arguments are ellipsized rather than wrapping the row",
+                                    );
+                                }
+
+                                await assertLayout(page, width);
+                                await card.screenshot({ path: path.join(screenshots, `${name}.png`) });
+                            });
+                        },
+                    );
                 }
             }
 

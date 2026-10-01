@@ -10,19 +10,29 @@ import {
     AGENTS_START,
     SHELL_END,
     SHELL_START,
+    codemodeSettingChange,
     deepEqual,
     deletePath,
+    enableCodemode,
     readPath,
     removeManagedBlock,
     restorePackageChanges,
     setPath,
     sha256,
+    supportsCodemode,
     upsertManagedBlock,
 } from "./lib.mjs";
 import { validateCapabilityRegistry } from "../extensions/tool-wishlist/registry.mjs";
 import { runValidator } from "../extensions/tool-wishlist/validators.mjs";
 import { acquireSpecPiLock } from "./lock.mjs";
-import { basePackages, checkBasePackages, installBasePackages, packageChanges, runBrowserQA } from "./packages.mjs";
+import {
+    basePackages,
+    checkBasePackages,
+    installBasePackages,
+    packageChanges,
+    piVersion,
+    runBrowserQA,
+} from "./packages.mjs";
 import { RETIRED_GUARD_NOTICE, RETIRED_GUARD_PIN, retiredGuardWasOn } from "./lancet-guard.mjs";
 import {
     applyShellToolMapping,
@@ -84,8 +94,9 @@ Usage:
   specpi doctor
   specpi uninstall [--yes]
 
-Installs /scope, the harness improvement loop, and eight pinned packages.
-The base is tested with Pi 0.84.4. Run specpi plan to see package versions.
+Installs /scope, the harness improvement loop, and eight pinned packages,
+and turns on Pi's codemode tool. The base is tested with Pi 1.0.0.
+Run specpi plan to see package versions.
 --skip-package-install installs only the core, or preserves an existing base on update.
 --skip-browser-install skips Chromium setup, not package acquisition or doctor checks.
 --force replaces modified retained resources after backing them up.
@@ -205,6 +216,9 @@ function printPlan(options = {}) {
     console.log(
         `  ${permissionConfigFile(agentDir)} (one shellTools entry, only when the permission system is installed, so bash rules apply to background jobs)`,
     );
+    console.log(
+        `  ${settingsPath} (adds "+codemode" to defaultTools on Pi 0.99 or later, unless defaultTools already mentions codemode, is empty, or codemode is disabled; uninstall removes only that entry)`,
+    );
     const wanted = new Set(managedFiles().map(([, target]) => target));
     for (const target of Object.keys(manifest?.files || {})) {
         if (!wanted.has(target)) {
@@ -235,7 +249,7 @@ function printPlan(options = {}) {
             : "After package acquisition, run the installed Browser QA Node bin to download Chromium and verify offline rendering, pixel comparison, and accessibility. No Bun or OS library installation.",
     );
     console.log(
-        "Only package settings are merged. No theme or shell integration. Wishlist collection starts off. Backups precede mutation; downloaded packages, browser-cache bytes and upstream script effects cannot be rolled back or removed by uninstall.",
+        "Only package settings and that defaultTools entry are merged. No theme or shell integration. Wishlist collection starts off. Backups precede mutation; downloaded packages, browser-cache bytes and upstream script effects cannot be rolled back or removed by uninstall.",
     );
 }
 
@@ -258,6 +272,44 @@ function restoreLegacySettings(manifest, warnings) {
     }
 
     writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
+}
+
+// Takes back the "+codemode" entry a previous install added, leaving the rest of defaultTools alone.
+function restoreCodemodeSetting(manifest, warnings) {
+    if (!manifest?.codemodeSetting) {
+        return;
+    }
+
+    const settings = readJson(settingsPath, {});
+    restoreSettingChanges(settings, [codemodeSettingChange(manifest.codemodeSetting)], warnings);
+    writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
+}
+
+// Turns on Pi's codemode tool through defaultTools. Returns the manifest record, or undefined when
+// nothing was added because the user already chose, or Pi is too old to read the entry safely.
+function applyCodemodeSetting(warnings) {
+    const version = piVersion(agentDir);
+    if (!supportsCodemode(version)) {
+        warnings.push(
+            `Codemode left off: it needs Pi 0.99 or later, and ${version ? `Pi ${version.join(".")} was found` : "the Pi version could not be read"}. Update Pi, then run specpi update.`,
+        );
+
+        return undefined;
+    }
+
+    const settings = readJson(settingsPath, {});
+    const result = enableCodemode(settings);
+    if (result.skipped === "invalid") {
+        warnings.push("Codemode left off: defaultTools in settings.json is not an array; preserved it as it is.");
+    }
+
+    if (!result.change) {
+        return undefined;
+    }
+
+    writeJson(settingsPath, settings, existingMode(settingsPath, 0o600));
+
+    return result.change;
 }
 
 function removeLegacyShell(manifest) {
@@ -317,9 +369,9 @@ async function mutate(options, operation) {
             ...files.map(([, target]) => target),
             ...Object.keys(previous?.files || {}),
         ];
-        if (!options.skipPackages || previous?.settingsChanges?.length || previous?.packageChanges?.length) {
-            watched.push(settingsPath);
-        }
+        // Always watched: codemode's defaultTools entry is added on every install and update, and
+        // removed on uninstall, whether or not packages are installed.
+        watched.push(settingsPath);
 
         if (previous?.shellRc) {
             watched.push(previous.shellRc);
@@ -338,6 +390,7 @@ async function mutate(options, operation) {
         const warnings = [];
         const preserveBase = operation !== "uninstall" && options.skipPackages && previous?.basePackages?.length;
         restoreLegacySettings(preserveBase ? { ...previous, packageChanges: [] } : previous, warnings);
+        restoreCodemodeSetting(previous, warnings);
         removeLegacyShell(previous);
         let packageState = preserveBase
             ? {
@@ -401,6 +454,8 @@ async function mutate(options, operation) {
         } else {
             removeShellToolMapping(agentDir);
         }
+
+        const codemodeSetting = operation === "uninstall" ? undefined : applyCodemodeSetting(warnings);
 
         injectTestFailure("after-settings");
         const records = {};
@@ -481,6 +536,7 @@ async function mutate(options, operation) {
                 blockFiles: { agents: previous?.blockFiles?.agents || { existed: transaction.get(agentsPath).exists } },
                 files: records,
                 ...packageState,
+                ...(codemodeSetting ? { codemodeSetting } : {}),
                 backups: [...(previous?.backups || []), path.relative(stateDir, backupDir)],
             });
         }

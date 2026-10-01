@@ -213,11 +213,11 @@ function writeFakePi(directory) {
     if (process.platform === "win32") {
         fs.writeFileSync(
             path.join(directory, "pi.cmd"),
-            '@echo off\r\nif "%~1"=="--version" (echo 0.84.4& exit /b 0)\r\nexit /b 0\r\n',
+            '@echo off\r\nif "%~1"=="--version" (echo 1.0.0& exit /b 0)\r\nexit /b 0\r\n',
         );
     } else {
         const target = path.join(directory, "pi");
-        fs.writeFileSync(target, '#!/bin/sh\nif [ "$1" = "--version" ]; then echo 0.84.4; fi\nexit 0\n');
+        fs.writeFileSync(target, '#!/bin/sh\nif [ "$1" = "--version" ]; then echo 1.0.0; fi\nexit 0\n');
         fs.chmodSync(target, 0o755);
     }
 }

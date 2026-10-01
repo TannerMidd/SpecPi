@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi 0.36.4 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.37.0 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
@@ -128,7 +128,7 @@ published figures.
 
 ## Install
 
-Requires Node.js 22.19+, Git, npm, and an existing Pi installation on PATH.
+Requires Node.js 22.19+, Git, npm, and an existing Pi installation on PATH. The base is tested with Pi 1.0.0.
 
 ```sh
 npm install --global specpi@latest
@@ -138,6 +138,8 @@ specpi doctor
 ```
 
 `plan` shows what will change without modifying anything. Restart Pi after install.
+
+Install also turns on Pi's built-in [codemode](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/codemode.md) tool, which lets the model run a short sandboxed script that calls several tools at once. It does this by adding `+codemode` to `defaultTools` in Pi's `settings.json`, only on Pi 0.99 or later. To keep it off, put `-codemode` there instead; SpecPi leaves an existing choice alone, and uninstall removes only the entry it added.
 
 Full setup options, package details, and requirements: [website](https://tannermidd.github.io/SpecPi/#install).
 

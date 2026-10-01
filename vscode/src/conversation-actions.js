@@ -307,7 +307,29 @@ function markdownTranscript(state) {
         }
 
         if (typeof message.input === "string" && message.input) {
-            lines.push("### Tool input", "", codeBlock(valueText(message.input, 16_000)), "");
+            lines.push(
+                message.toolName === "codemode" ? "### Script" : "### Tool input",
+                "",
+                codeBlock(valueText(message.input, 16_000)),
+                "",
+            );
+        }
+
+        const calls = Array.isArray(message.calls) ? message.calls.slice(-100) : [];
+        if (calls.length) {
+            const rows = calls.map((call) => {
+                const status = valueText(call?.status, 16) || "running";
+                const args = valueText(call?.args, 400);
+                const error = valueText(call?.error, 600);
+
+                return `${status}: ${valueText(call?.name, 128) || "tool"}${args ? ` ${args}` : ""}${error ? `\n  ${error.replace(/\n/gu, "\n  ")}` : ""}`;
+            });
+            const omitted = Number(message.callsOmitted) || 0;
+            if (omitted > 0) {
+                rows.unshift(`(${omitted} earlier calls not shown)`);
+            }
+
+            lines.push("### Tool calls", "", codeBlock(rows.join("\n")), "");
         }
 
         if (typeof message.thinking === "string" && message.thinking) {

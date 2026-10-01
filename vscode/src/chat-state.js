@@ -3,6 +3,7 @@
 const { normalizeImage } = require("./images.js");
 const { projectFileContext, MAX_ATTACHMENTS } = require("./context.js");
 const { delegateResultText } = require("./delegates.js");
+const { callsDisplayLength, codemodeCalls, codemodeOutput, codemodeScript, isCodemode } = require("./codemode.js");
 
 const MAX_MESSAGES = 500;
 const MAX_MESSAGE_CHARS = 100_000;
@@ -44,7 +45,12 @@ function safeModel(model) {
     return result;
 }
 
-function toolInput(args) {
+function toolInput(args, toolName) {
+    const script = isCodemode(toolName) ? codemodeScript(args) : undefined;
+    if (script !== undefined) {
+        return bounded(script, MAX_TOOL_INPUT_CHARS);
+    }
+
     try {
         return bounded(JSON.stringify(args, null, 2), MAX_TOOL_INPUT_CHARS);
     } catch {
@@ -68,7 +74,14 @@ function createState(overrides = {}) {
     };
     state.model = safeModel(state.model);
     state.models = Array.isArray(state.models) ? state.models.map(safeModel).filter(Boolean).slice(0, 1_000) : [];
-    internal.set(state, { nextId: 0, activeId: null, runActive: false, blocks: new Map(), usage: {} });
+    internal.set(state, {
+        nextId: 0,
+        activeId: null,
+        runActive: false,
+        blocks: new Map(),
+        usage: {},
+        nested: new Map(),
+    });
     replaceMessages(state, state.messages);
 
     return state;
@@ -76,7 +89,14 @@ function createState(overrides = {}) {
 
 function metadata(state) {
     if (!internal.has(state)) {
-        internal.set(state, { nextId: 0, activeId: null, runActive: false, blocks: new Map(), usage: {} });
+        internal.set(state, {
+            nextId: 0,
+            activeId: null,
+            runActive: false,
+            blocks: new Map(),
+            usage: {},
+            nested: new Map(),
+        });
     }
 
     return internal.get(state);
@@ -194,7 +214,8 @@ function projectMessage(state, message, id) {
 
     // Separate attached source before the normal display truncation; otherwise
     // large snapshots lose their closing envelope and flood the transcript.
-    const content = message.content ?? message.text;
+    const codemode = role === "tool" && isCodemode(message.toolName) ? codemodeOutput(message.content) : undefined;
+    const content = codemode ? codemode.content : (message.content ?? message.text);
     const displayContent = Array.isArray(content)
         ? content
               .slice(0, 1_000)
@@ -251,6 +272,11 @@ function projectMessage(state, message, id) {
         if (typeof message.input === "string") {
             result.input = bounded(message.input, MAX_TOOL_INPUT_CHARS);
         }
+
+        Object.assign(result, nestedCallFields(message.toolName, message.details, message.nestedCalls));
+        if (codemode?.wallSeconds !== undefined) {
+            result.wallSeconds = codemode.wallSeconds;
+        }
     }
 
     if (message.isRunning !== undefined) {
@@ -262,6 +288,14 @@ function projectMessage(state, message, id) {
     }
 
     return result;
+}
+
+// The calls a tool made through other tools, shown inside its card. Codemode publishes them as
+// `details.calls`; any tool's stored result also carries Pi's bounded `nestedCalls` record.
+function nestedCallFields(toolName, details, nestedCalls) {
+    const { calls, omitted } = codemodeCalls(isCodemode(toolName) ? details : undefined, nestedCalls);
+
+    return calls.length || omitted ? { calls, ...(omitted ? { callsOmitted: omitted } : {}) } : {};
 }
 
 function trimMessages(state) {
@@ -318,7 +352,7 @@ function trimMessages(state) {
             (total, file) => total + file.label.length + file.detail.length,
             0,
         );
-        const textBudget = MAX_MESSAGE_CHARS - (message.input?.length || 0) - fileChars;
+        const textBudget = MAX_MESSAGE_CHARS - (message.input?.length || 0) - fileChars - callsDisplayLength(message);
         if (message.text.endsWith(IMAGE_LIMIT_NOTICE)) {
             message.text = `${bounded(message.text.slice(0, -IMAGE_LIMIT_NOTICE.length).trimEnd(), textBudget - IMAGE_LIMIT_NOTICE.length - 2)}\n\n${IMAGE_LIMIT_NOTICE}`;
         } else {
@@ -338,7 +372,12 @@ function trimMessages(state) {
             (total, file) => total + file.label.length + file.detail.length,
             0,
         );
-        const length = message.text.length + (message.thinking?.length || 0) + (message.input?.length || 0) + fileChars;
+        const length =
+            message.text.length +
+            (message.thinking?.length || 0) +
+            (message.input?.length || 0) +
+            fileChars +
+            callsDisplayLength(message);
         if (size + length > MAX_TRANSCRIPT_CHARS) {
             break;
         }
@@ -364,6 +403,7 @@ function replaceMessages(state, messages) {
     value.messageCost = 0;
     value.usage = {};
     value.blocks.clear();
+    value.nested.clear();
     state.messages = [];
     if (Array.isArray(messages)) {
         let toolCalls = [];
@@ -379,7 +419,7 @@ function replaceMessages(state, messages) {
                 if (projected.role === "tool") {
                     const call = toolCalls.find((part) => part.id === message.toolCallId);
                     if (call) {
-                        projected.input = toolInput(call.arguments);
+                        projected.input = toolInput(call.arguments, message.toolName);
                     }
                 }
 
@@ -406,6 +446,14 @@ function upsert(state, message) {
     } else {
         if (message.role === "tool" && message.input === undefined && state.messages[index].input !== undefined) {
             message.input = state.messages[index].input;
+        }
+
+        // A tool result message may not repeat the nested calls its live events already listed.
+        if (message.role === "tool" && message.calls === undefined && state.messages[index].calls !== undefined) {
+            message.calls = state.messages[index].calls;
+            if (state.messages[index].callsOmitted) {
+                message.callsOmitted = state.messages[index].callsOmitted;
+            }
         }
 
         state.messages[index] = message;
@@ -570,10 +618,51 @@ function resetRunState(state) {
     value.activeId = null;
     value.usage = {};
     value.blocks.clear();
+    value.nested.clear();
     state.queueCount = 0;
     for (const message of state.messages) {
         message.isRunning = false;
     }
+}
+
+// A tool call made from inside another tool. Pi keeps these out of the transcript, so Chat shows
+// them inside the calling tool's card instead of as cards of their own. Codemode reports its calls
+// in its own updates; for any other calling tool they are built from these events.
+function applyNestedToolEvent(state, event) {
+    const parentId = bounded(event.parentToolCallId, 256);
+    const index = state.messages.findIndex((message) => message.id === parentId && message.role === "tool");
+    if (index === -1 || isCodemode(state.messages[index].toolName)) {
+        return;
+    }
+
+    const parent = state.messages[index];
+    const value = metadata(state);
+    const callId = typeof event.toolCallId === "string" ? event.toolCallId : "";
+    const records = value.nested.get(parentId) || new Map();
+    value.nested.set(parentId, records);
+    const record = records.get(callId) || { name: event.toolName, args: undefined, status: "running" };
+    if (event.args !== undefined && record.args === undefined) {
+        try {
+            record.args = JSON.stringify(event.args);
+        } catch {
+            record.args = "";
+        }
+    }
+
+    if (event.type === "tool_execution_start") {
+        record.startedAt = Date.now();
+    } else if (event.type === "tool_execution_end") {
+        record.status = event.isError ? "error" : "ok";
+        record.durationMs = record.startedAt === undefined ? undefined : Date.now() - record.startedAt;
+        if (event.isError) {
+            record.error = projectContent(event.result?.content).text;
+        }
+    }
+
+    records.set(callId, record);
+    const { calls, omitted } = codemodeCalls({ calls: [...records.values()] });
+    state.messages[index] = { ...parent, calls, ...(omitted ? { callsOmitted: omitted } : {}) };
+    trimMessages(state);
 }
 
 function applyEvent(state, event) {
@@ -645,28 +734,41 @@ function applyEvent(state, event) {
     } else if (event.type === "message_update") {
         applyDelta(state, event.assistantMessageEvent);
         setUsage(state, event.usage || event.assistantMessageEvent?.partial?.usage, true);
+    } else if (
+        ["tool_execution_start", "tool_execution_update", "tool_execution_end"].includes(event.type) &&
+        typeof event.parentToolCallId === "string"
+    ) {
+        applyNestedToolEvent(state, event);
     } else if (["tool_execution_start", "tool_execution_update", "tool_execution_end"].includes(event.type)) {
         const id = typeof event.toolCallId === "string" ? bounded(event.toolCallId, 256) : nextId(state, "tool");
         const existing = state.messages.find((message) => message.id === id);
-        const projectedContent = projectContent(
-            event.type === "tool_execution_start" ? [] : (event.partialResult || event.result)?.content,
-            existing?.images,
-        );
+        const toolName = event.toolName || existing?.toolName;
+        const result = event.type === "tool_execution_start" ? undefined : event.partialResult || event.result;
+        const codemode = isCodemode(toolName) ? codemodeOutput(result?.content) : undefined;
+        const projectedContent = projectContent(codemode ? codemode.content : result?.content, existing?.images);
         if ((event.toolName || existing?.toolName) === "delegate") {
             projectedContent.text =
                 delegateResultText((event.partialResult || event.result)?.details) ?? projectedContent.text;
         }
 
+        // Calls reported by codemode itself, or folded in from nested events for any other tool.
+        const calls = isCodemode(toolName)
+            ? nestedCallFields(toolName, result?.details)
+            : existing?.calls
+              ? { calls: existing.calls, ...(existing.callsOmitted ? { callsOmitted: existing.callsOmitted } : {}) }
+              : {};
         upsert(state, {
             id,
             role: "tool",
-            toolName: bounded(event.toolName || existing?.toolName || "tool", 128),
+            toolName: bounded(toolName || "tool", 128),
             input:
                 event.type === "tool_execution_start"
-                    ? toolInput(event.args)
-                    : (existing?.input ?? (event.args === undefined ? undefined : toolInput(event.args))),
+                    ? toolInput(event.args, toolName)
+                    : (existing?.input ?? (event.args === undefined ? undefined : toolInput(event.args, toolName))),
             text: projectedContent.text,
             ...(projectedContent.images.length ? { images: projectedContent.images } : {}),
+            ...calls,
+            ...(codemode?.wallSeconds !== undefined ? { wallSeconds: codemode.wallSeconds } : {}),
             isError: Boolean(event.isError),
             isRunning: event.type !== "tool_execution_end",
         });

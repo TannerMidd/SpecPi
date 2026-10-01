@@ -26,6 +26,7 @@ function fixture(t) {
 import fs from 'node:fs';
 import path from 'node:path';
 const args = process.argv.slice(2);
+if (args[0] === '--version') { console.log('1.0.0'); process.exit(0); }
 if (process.env.npm_config_save_exact !== 'true' || process.env.NPM_CONFIG_SAVE_EXACT !== 'true') {
     throw new Error('Pi must save exact npm versions for every package install');
 }
@@ -97,7 +98,7 @@ test("the default base is exactly the eight human-selected pinned packages", () 
         "npm:specpi-browser-qa@0.3.0",
         "npm:specpi-delegation@0.2.0",
         "npm:specpi-experiments@0.1.0",
-        "npm:pi-goal-x@0.31.2",
+        "npm:pi-goal-x@0.32.0",
         "npm:@sreetej510/pi-usage@0.10.0",
         "npm:@gotgenes/pi-permission-system@32.0.2",
         "npm:specpi-lancet-guard@0.6.0",
@@ -129,6 +130,7 @@ test("default lifecycle installs each pin through Pi, preserves filters, and res
     const installed = JSON.parse(fs.readFileSync(f.settings));
     assert.deepEqual(installed.packages[1], { ...before.packages[1], source: basePackages[0] });
     assert.equal(installed.theme, before.theme);
+    assert.deepEqual(installed.defaultTools, ["+codemode"]);
     assert.equal(installed.packages.length, basePackages.length + 3);
     assert.deepEqual(installed.packages.slice(2, 4), before.packages.slice(2, 4));
     f.run("doctor");
@@ -257,9 +259,11 @@ test("retiring the Jev guard says so when it was on, and touches neither guard's
 
 test("failed package acquisition restores configuration and managed files with explicit cache limitation", (t) => {
     const f = fixture(t);
-    const before = '{"theme":"user"}\n';
-    fs.writeFileSync(f.settings, before);
+    fs.writeFileSync(f.settings, '{"theme":"user"}\n');
     f.run("install", "--yes", "--skip-package-install");
+    // A core-only install still turns codemode on, so the rollback target is the installed settings.
+    const before = fs.readFileSync(f.settings, "utf8");
+    assert.deepEqual(JSON.parse(before), { theme: "user", defaultTools: ["+codemode"] });
     const manifest = path.join(f.agent, "specpi/manifest.json");
     const oldManifest = fs.readFileSync(manifest, "utf8");
     const failed = f.invoke(["update", "--yes"], { FAKE_FAIL: basePackages[2] });
@@ -273,9 +277,9 @@ test("failed package acquisition restores configuration and managed files with e
 
 test("package version drift fails installation and restores the previous managed configuration", (t) => {
     const f = fixture(t);
-    const before = '{"theme":"user"}\n';
-    fs.writeFileSync(f.settings, before);
+    fs.writeFileSync(f.settings, '{"theme":"user"}\n');
     f.run("install", "--yes", "--skip-package-install");
+    const before = fs.readFileSync(f.settings, "utf8");
     const manifest = path.join(f.agent, "specpi/manifest.json");
     const oldManifest = fs.readFileSync(manifest, "utf8");
     const drifted = basePackages.find((entry) => entry.startsWith("npm:pi-goal-x@"));
@@ -352,7 +356,7 @@ test("core-only lifecycle never acquires or checks a browser", (t) => {
 test("failed Chromium setup rolls back managed configuration while browser bytes may remain", (t) => {
     const f = fixture(t);
     f.run("install", "--yes", "--skip-package-install");
-    const files = ["specpi/manifest.json", "AGENTS.md", "extensions/workflow-controls/index.ts"];
+    const files = ["settings.json", "specpi/manifest.json", "AGENTS.md", "extensions/workflow-controls/index.ts"];
     const before = files.map((file) => fs.readFileSync(path.join(f.agent, file), "utf8"));
     const failed = f.invoke(["update", "--yes"], { FAKE_BROWSER_FAIL: "setup" });
     assert.notEqual(failed.status, 0);
@@ -362,7 +366,7 @@ test("failed Chromium setup rolls back managed configuration while browser bytes
         files.map((file) => fs.readFileSync(path.join(f.agent, file), "utf8")),
         before,
     );
-    assert.equal(fs.existsSync(f.settings), false);
+    assert.deepEqual(JSON.parse(fs.readFileSync(f.settings, "utf8")), { defaultTools: ["+codemode"] });
     assert.equal(fs.existsSync(path.join(f.agent, "fake-chromium-ready")), true);
     f.run("doctor");
 });

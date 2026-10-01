@@ -11,7 +11,7 @@ import { runPiFixture } from "./pi-test-harness.mjs";
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const piRoot = path.join(repoRoot, "node_modules/@earendil-works/pi-coding-agent");
 const piCli = path.join(piRoot, "dist/cli.js");
-assert.equal(JSON.parse(fs.readFileSync(path.join(piRoot, "package.json"))).version, "0.84.4");
+assert.equal(JSON.parse(fs.readFileSync(path.join(piRoot, "package.json"))).version, "1.0.0");
 const cli = path.join(repoRoot, "scripts/specpi.mjs");
 const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "specpi-base-check-")));
 const agentDir = path.join(root, "agent");
@@ -47,6 +47,7 @@ try {
 
     assert.match(run(cli, ["doctor"]), /Browser QA is ready\./u);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).packages, basePackages);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).defaultTools, ["+codemode"]);
     const probe = path.join(root, "resource-probe.mjs");
     fs.writeFileSync(
         probe,
@@ -64,7 +65,7 @@ console.log('SPECPI_BASE=' + JSON.stringify({
 process.exit(0);
 `,
     );
-    console.log("Loading all default resources together through Pi 0.84.4.");
+    console.log("Loading all default resources together through Pi 1.0.0.");
     const output = run(probe, []);
     const line = output.split(/\r?\n/).find((entry) => entry.startsWith("SPECPI_BASE="));
     assert.ok(line, output);
@@ -124,6 +125,7 @@ process.exit(0);
     run(cli, ["doctor"]);
     run(cli, ["uninstall", "--yes"]);
     assert.equal(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).packages, undefined);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(agentDir, "settings.json"))).defaultTools, undefined);
     assert.equal(fs.readFileSync(authPath, "utf8"), "{}\n");
     console.log(
         `OK: ${basePackages.length} package pins acquired, ${resources.paths.length} extensions loaded without errors or tool collisions, all 14 Browser QA registrations and Chromium readiness, lifecycle and synthetic auth canary verified.`,

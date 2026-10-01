@@ -733,3 +733,26 @@ test("usage uses Pi's actual stats, keeps unknown context distinct from zero, an
     assert.equal(await showUsage(stale.controller, stale.vscode), false);
     assert.deepEqual(stale.picks, []);
 });
+
+test("Markdown export shows a codemode script and the tool calls it made", () => {
+    const markdown = markdownTranscript({
+        messages: [
+            {
+                role: "tool",
+                toolName: "codemode",
+                input: "const a = await tools.read({ path: 'a.txt' });",
+                calls: [
+                    { name: "read", status: "ok", args: '{"path":"a.txt"}' },
+                    { name: "bash", status: "error", args: '{"command":"ls"}', error: "denied\nby policy" },
+                ],
+                callsOmitted: 2,
+                text: "done",
+            },
+        ],
+    });
+    assert.match(markdown, /### Script\n\n```\nconst a = await tools\.read/u);
+    assert.match(
+        markdown,
+        /### Tool calls\n\n```\n\(2 earlier calls not shown\)\nok: read \{"path":"a\.txt"\}\nerror: bash \{"command":"ls"\}\n {2}denied\n {2}by policy\n```/u,
+    );
+});
