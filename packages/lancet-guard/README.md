@@ -7,7 +7,7 @@ It is off until you turn it on.
 ## Install
 
 ```
-pi install npm:specpi-lancet-guard@0.5.0
+pi install npm:specpi-lancet-guard@0.6.0
 ```
 
 SpecPi installs it by default. The package carries code only; the model is fetched once, by you:
@@ -28,6 +28,7 @@ Each package release accepts exactly one model. After updating from an earlier v
 | `/lancet-guard setup`                      | Download and verify the model, self-test, offer to turn it on   |
 | `/lancet-guard on` / `off`                 | Switch it for this session                                      |
 | `/lancet-guard on --global` / `off --global` | Switch it and save that as the default for future sessions    |
+| `/lancet-guard mode <ask\|block>`          | Choose what a `risky` verdict does, saved for future sessions (see [Modes](#modes)) |
 | `/lancet-guard check <command>`            | Score a command without running it                              |
 | `/lancet-guard audit <transcript\|status\|off>` | Where decisions are shown; every one is still written to the session file |
 
@@ -38,10 +39,19 @@ Each package release accepts exactly one model. After updating from an earlier v
 For `bash`, `powershell` and SpecPi's `background` tool:
 
 1. **Local rules first**, the same ones specpi-jev-guard uses: hard-deny patterns (recursive deletion of `/`, a home or system directory, `mkfs`, raw device writes, `curl | sh`, fork bombs…) block; provably read-only commands (`ls`, `git status`, `rg` with read-only flags…) pass; your `safeCommands`, `allowedCommands` and `disallowedCommands` globs apply. LANCET cannot overrule these.
-2. **LANCET scores the rest.** `risky` asks you (or blocks, with `"risky": "block"`); `review`, Nano's band for commands it is unsure about, always asks; `not_flagged` runs.
+2. **LANCET scores the rest.** `risky` asks you, or blocks in block mode; `review`, Nano's band for commands it is unsure about, always asks; `not_flagged` runs.
 3. **What LANCET cannot read or clear asks.** It reads Bash, PowerShell and cmd: `bash` and `background` calls are scored as Bash, `powershell` calls as PowerShell, so a PowerShell command it does not flag now runs instead of asking. Commands over 8,192 bytes ask. A command longer than one 512-token window is read in full, as overlapping windows, but LANCET never clears it: `risky` and `review` act as usual, and `not_flagged` asks, as every command that long did before v0.4.3 (see below).
 
 For `write` and `edit`, LANCET is not involved: ordinary project files pass, and protected paths (`.env*`, keys, `.ssh`, `.git`, `node_modules`) or anything outside the workspace ask.
+
+### Modes
+
+`/lancet-guard mode` chooses between two modes and saves the choice as `risky` in `~/.pi/lancet-guard.json`:
+
+- **ask** (the default): `risky` and `review` both ask.
+- **block**: `risky` is blocked outright and, as with the hard-deny rules, Pi stops the agent once that batch of tool calls finishes; `review` still asks. Fewer prompts, at the cost of a safe command LANCET misjudges being blocked and stopping the run.
+
+The mode covers LANCET's verdicts only. In both, the local hard-deny rules and your `disallowedCommands` block, and so does a missing or damaged model (see below). A trusted project's `.pi/lancet-guard.json` can set its own `risky`, which wins inside that project; `/lancet-guard mode ask` or `block` says so when it does.
 
 With no UI to ask (print or RPC mode without a client), an "ask" becomes a block unless you set `"uncertain": "allow"`.
 
@@ -81,7 +91,7 @@ These figures come from LANCET's v0.4.3 release evaluation: the classifier alone
 
 The Triage Score gives a point for each risky command asked about or blocked, and scales the total down in proportion when more than 10% of safe commands are stopped; the three benchmarks are weighted by size. lancet-bench-2-next replaces lancet-bench-1, the 793-command Bash benchmark earlier releases of this guard reported. It is built as 1,602 risky/safe twins from 289 scenarios in 40 areas, each repeated inside subshells, functions, pipelines and other wrappers, in Bash (3,066 commands), PowerShell (102) and cmd (36). It is much harder, so every guard scores lower on it: v0.4.2 caught 92.4% of lancet-bench-1's risky commands and 78.0% of these. lancet-bench-1 was retired and used to train v0.4.3, so it no longer gives a fair figure.
 
-On lancet-bench-2-next, v0.4.3 catches what v0.4.2 did while stopping far fewer safe commands: about one in eight, against one in five. It is also more decisive: half of the benchmark's risky commands come back `risky`, which asks (or blocks, with `"risky": "block"`), against 17.7% for v0.4.2, which put most of what it caught in `review`, which always asks. On ShellRisk-Bench it catches more at about the same rate of safe commands stopped; the neutral set is the one place it gives ground.
+On lancet-bench-2-next, v0.4.3 catches what v0.4.2 did while stopping far fewer safe commands: about one in eight, against one in five. It is also more decisive: half of the benchmark's risky commands come back `risky`, which asks (or blocks, in block mode), against 17.7% for v0.4.2, which put most of what it caught in `review`, which always asks. On ShellRisk-Bench it catches more at about the same rate of safe commands stopped; the neutral set is the one place it gives ground.
 
 - lancet-bench-2-next is LANCET's own benchmark, kept private so it stays unseen, so this is diagnostic evidence, not independent acceptance. ShellRisk-Bench is labelled upstream and the neutral set comes from outside parties. Jev also saw task context; Nano sees only the command.
 - PowerShell and cmd are new in v0.4.3 and less covered than Bash, in training and in the benchmark. Its weakest areas on lancet-bench-2-next are credentials, Windows administration, macOS administration and deceptive previews. The local rules and the permission system still apply.

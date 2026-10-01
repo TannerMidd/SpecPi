@@ -22,7 +22,7 @@ const { modelDirectory } = await import("../src/model-store.mjs");
 const { MODEL_FILES } = await import("../src/model-manifest.mjs");
 const settingsFile = path.join(home, ".pi", "lancet-guard.json");
 
-function instance({ hasUI = false, answer } = {}) {
+function instance({ hasUI = false, answer, trusted = false } = {}) {
     const handlers = {};
     const commands = {};
     const entries = [];
@@ -41,7 +41,7 @@ function instance({ hasUI = false, answer } = {}) {
     const ctx = {
         cwd: path.join(temporary, "repo"),
         hasUI,
-        isProjectTrusted: () => false,
+        isProjectTrusted: () => trusted,
         signal: undefined,
         sessionManager: { getEntries: () => entries, getBranch: () => [] },
         ui: {
@@ -95,6 +95,49 @@ describe("off unless turned on", () => {
         const guard = instance();
         await guard.command("off --global");
         assert.equal(JSON.parse(fs.readFileSync(settingsFile, "utf8")).enabled, false);
+    });
+});
+
+describe("mode", () => {
+    it("saves the risky policy, keeps the rest of the file, and shows it in status", async () => {
+        fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
+        fs.writeFileSync(settingsFile, JSON.stringify({ enabled: false, custom: "kept" }));
+        const guard = instance();
+        await guard.command("mode block");
+        assert.deepEqual(JSON.parse(fs.readFileSync(settingsFile, "utf8")), {
+            enabled: false,
+            custom: "kept",
+            risky: "block",
+        });
+        assert.match(guard.notes.at(-1).text, /risky verdicts block/u);
+        await guard.command("");
+        assert.match(guard.notes.at(-1).text, /^mode: block /mu);
+        await guard.command("mode ask");
+        assert.equal(JSON.parse(fs.readFileSync(settingsFile, "utf8")).risky, "ask");
+    });
+
+    it("reports the current mode, refuses anything else, and writes nothing", async () => {
+        const guard = instance();
+        await guard.command("mode");
+        assert.match(guard.notes.at(-1).text, /mode: ask/u);
+        await guard.command("mode allow");
+        assert.equal(guard.notes.at(-1).level, "error");
+        assert.equal(fs.existsSync(settingsFile), false);
+    });
+
+    it("says when a trusted project's file overrides the saved mode", async () => {
+        const project = path.join(temporary, "repo", ".pi", "lancet-guard.json");
+        fs.mkdirSync(path.dirname(project), { recursive: true });
+        fs.writeFileSync(project, JSON.stringify({ risky: "ask" }));
+        try {
+            const guard = instance({ trusted: true });
+            await guard.command("mode block");
+            assert.equal(JSON.parse(fs.readFileSync(settingsFile, "utf8")).risky, "block");
+            assert.equal(guard.notes.at(-1).level, "warning");
+            assert.match(guard.notes.at(-1).text, /so ask applies here/u);
+        } finally {
+            fs.rmSync(path.join(temporary, "repo"), { recursive: true, force: true });
+        }
     });
 });
 

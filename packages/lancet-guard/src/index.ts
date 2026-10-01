@@ -5,8 +5,8 @@
  *   1. Local rules first: hard-deny patterns, the read-only fast pass, and the user's
  *      safe/allowed/disallowed lists. LANCET is never consulted for these.
  *   2. Shell commands the rules leave open are scored by LANCET Nano on this machine. `risky` asks
- *      (or blocks, if configured), `review` (unsure) asks, `not_flagged` runs, and anything LANCET
- *      cannot read asks.
+ *      (or blocks, in `/lancet-guard mode block`), `review` (unsure) asks, `not_flagged` runs, and
+ *      anything LANCET cannot read asks.
  *   3. Writes and edits to protected or out-of-workspace paths ask; LANCET does not read files.
  *   4. Fail closed: a missing or damaged model blocks unjudged calls instead of passing them.
  *
@@ -28,10 +28,11 @@ import {
     formatGuardStatus,
     middleBandWithoutUI,
     parseAuditDisplay,
+    parseRiskyPolicy,
     resolveEnabled,
     truncate,
 } from "./rules.ts";
-import type { AuditDisplay, GuardSettings } from "./rules.ts";
+import type { AuditDisplay, GuardSettings, RiskyPolicy } from "./rules.ts";
 import { SETTINGS_FILE, loadSettings, saveGlobalSettings } from "./settings.ts";
 import { classifier, classifierLoaded } from "./runtime.mjs";
 import { installModel, modelDirectory, modelState } from "./model-store.mjs";
@@ -39,9 +40,15 @@ import { installModel, modelDirectory, modelState } from "./model-store.mjs";
 const AUDIT_TYPE = "lancet-guard";
 const SHELL_TOOLS = new Set(["bash", "powershell", "background"]);
 const FILE_TOOLS = new Set(["write", "edit"]);
-const KNOWN_SUBCOMMANDS = new Set(["status", "setup", "on", "off", "check", "audit"]);
+const KNOWN_SUBCOMMANDS = new Set(["status", "setup", "on", "off", "mode", "check", "audit"]);
 const CACHE_LIMIT = 200;
-const USAGE = "/lancet-guard [status | setup | on | off [--global] | check <cmd> | audit <transcript|status|off>]";
+const USAGE =
+    "/lancet-guard [status | setup | on | off [--global] | mode <ask|block> | check <cmd> | audit <transcript|status|off>]";
+/** What each mode does with LANCET's verdicts. The local hard-deny rules block in both. */
+const MODE_EFFECT: Record<RiskyPolicy, string> = {
+    ask: "risky and review verdicts both ask",
+    block: "risky verdicts block, review verdicts ask",
+};
 
 interface AuditRecord {
     tool: string;
@@ -396,9 +403,10 @@ export default function lancetGuard(pi: ExtensionAPI) {
     }
 
     pi.registerCommand("lancet-guard", {
-        description: "Local LANCET command guard: status | setup | on | off [--global] | check <cmd> | audit <where>",
+        description:
+            "Local LANCET command guard: status | setup | on | off [--global] | mode <ask|block> | check <cmd> | audit <where>",
         getArgumentCompletions: (prefix: string) => {
-            const items = ["status", "setup", "on", "off", "check ", "audit "]
+            const items = ["status", "setup", "on", "off", "mode ", "check ", "audit "]
                 .filter((value) => value.startsWith(prefix))
                 .map((value) => ({ value, label: value }));
 
@@ -442,6 +450,31 @@ export default function lancetGuard(pi: ExtensionAPI) {
 
             if (sub === "setup") {
                 await setup(ctx);
+
+                return;
+            }
+
+            if (sub === "mode") {
+                const mode = parseRiskyPolicy(rest);
+                if (!mode) {
+                    const current = settingsFor(ctx).risky;
+                    ctx.ui.notify(
+                        `lancet-guard mode: ${current} (${MODE_EFFECT[current]}). Usage: /lancet-guard mode <ask|block>`,
+                        rest === "" ? "info" : "error",
+                    );
+
+                    return;
+                }
+
+                saveGlobalSettings(globalSettingsPath(), { risky: mode });
+                const effective = settingsFor(ctx).risky;
+                let message = `lancet-guard mode: ${mode} (${MODE_EFFECT[mode]}), saved (${globalSettingsPath()}). The local hard-deny rules still block.`;
+                // A trusted project's file is layered over the global one, so it can outvote this.
+                if (effective !== mode) {
+                    message += ` This project's ${CONFIG_DIR_NAME}/${SETTINGS_FILE} sets "risky": "${effective}", so ${effective} applies here.`;
+                }
+
+                ctx.ui.notify(message, effective === mode ? "info" : "warning");
 
                 return;
             }
@@ -515,11 +548,11 @@ export default function lancetGuard(pi: ExtensionAPI) {
                     `lancet-guard: ${state.enabled ? "ON" : "OFF"}${state.source === "session" ? " for this session" : ""}`,
                     ...(state.source === "session" ? [`saved setting: ${settings.enabled ? "on" : "off"}`] : []),
                     `model: ${model.installed ? "installed" : model.problem}${classifierLoaded() ? ", loaded" : ""} (${modelDirectory()})`,
-                    `risky: ${settings.risky}, no-UI policy: uncertain=${settings.uncertain}`,
+                    `mode: ${settings.risky} (${MODE_EFFECT[settings.risky]}), no-UI policy: uncertain=${settings.uncertain}`,
                     `audit display: ${settings.auditDisplay}`,
                     `cached verdicts this session: ${verdicts.size}`,
                     `config: ${globalSettingsPath()}`,
-                    "setup: /lancet-guard setup · toggle: /lancet-guard on | off (--global to save)",
+                    "setup: /lancet-guard setup · toggle: /lancet-guard on | off (--global to save) · mode: /lancet-guard mode ask | block",
                 ].join("\n"),
                 "info",
             );

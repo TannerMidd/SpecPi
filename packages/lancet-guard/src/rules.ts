@@ -1209,6 +1209,10 @@ export function parseAuditDisplay(value: unknown): AuditDisplay | undefined {
     return value === "transcript" || value === "status" || value === "off" ? value : undefined;
 }
 
+export function parseRiskyPolicy(value: unknown): RiskyPolicy | undefined {
+    return value === "ask" || value === "block" ? value : undefined;
+}
+
 /** The fields of an audit record the footer line is built from. */
 export interface AuditStatusInput {
     tool: string;
