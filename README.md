@@ -47,14 +47,13 @@ Everything it touches is written down, versioned, and easy to undo.
 
 Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMidd/LANCET-model), a 111M-parameter classifier, can check it on your own CPU. It reads Bash, PowerShell and cmd, takes about 10 ms for a typical command, needs no API key, sends nothing over the network, and costs nothing per check. Fixed rules settle the obvious cases first, blocking `rm -rf /` and passing `git status`, and the model scores the rest. A risky or uncertain verdict asks you before anything runs; `/lancet-guard mode block` blocks risky ones outright instead.
 
-| | LANCET Nano v0.4.3 |
-| --- | ---: |
-| Triage Score | 68.3 |
-| Safe commands wrongly stopped | 9.0% |
-| Cost per check | $0 |
-| Network | none |
+<p align="center">
+  <a href="https://tannermidd.github.io/SpecPi/lancet/">
+    <img src="site/media/lancet-comparison.webp" width="880" alt="Bar chart of Triage Score (higher is better) for 14 command guards on the same 7,911 commands. LANCET Nano v0.4.3 scores 68.3, catching 77.0% of risky commands while stopping 9.0% of safe ones. Next are Jev 38.9, verdict-shell-safety 32.4, Kestrel 30.7, ModernBERT bash 23.2, dcg 19.8, AutoShell-0.8B 19.2, Gyra 17.9, bash-classify 14.3, Laya 13.3, bev-decider 13.3, laya-cli-gate 12.5, sh-guard 10.9 and Shieldstral-1.0-3B 6.1.">
+  </a>
+</p>
 
-Both figures are taken across three benchmarks, 7,911 commands in total, weighted by size: lancet-bench-2-next (1,602 risky commands and their safe look-alikes), the ShellRisk-Bench test split, and a 513-command neutral set. The [Triage Score](https://github.com/TannerMidd/LANCET-model) gives a guard a point for each risky command it asks about or blocks, and shrinks in proportion once it stops more than 10% of safe commands. The guard ships off. Run `/lancet-guard setup` in Pi once to download the model (about 109 MB, verified by SHA-256) and switch it on. [How it works, what it costs, and its limits](https://tannermidd.github.io/SpecPi/lancet/).
+Every guard in the chart was scored once, at its own shipped setting, on the same three benchmarks, 7,911 commands in total, weighted by size: lancet-bench-2-next (1,602 risky commands and their safe look-alikes), the ShellRisk-Bench test split, and a 513-command neutral set. The [Triage Score](https://github.com/TannerMidd/LANCET-model) gives a guard a point for each risky command it asks about or blocks, and shrinks in proportion once it stops more than 10% of safe commands. The guard ships off. Run `/lancet-guard setup` in Pi once to download the model (about 109 MB, verified by SHA-256) and switch it on. [How it works, what it costs, and its limits](https://tannermidd.github.io/SpecPi/lancet/).
 
 ## Measured context
 
