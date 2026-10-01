@@ -1,5 +1,9 @@
 # SpecPi Chat changelog
 
+## Unreleased
+
+- Show Pi codemode runs as one tool card. The card shows the script as code, lists each tool call the script made with its status, arguments, duration and any error, and then the script output. Pi's "Script completed" header becomes a duration in the card's summary. The script's nested tool events used to become separate cards; Pi keeps them out of the transcript, so they also vanished on reload. Live runs and reloaded conversations now show the same card. Tool calls made from inside any other tool are listed inside that tool's card the same way, and Markdown export includes the script and its calls.
+
 ## 0.18.0
 
 - Show the LANCET command guard's counter (`lancet-guard` status key) in the footer chip in place of the retired Jev guard's.

@@ -1256,6 +1256,68 @@
         return container;
     }
 
+    const NESTED_CALL_STATES = {
+        running: ["…", "Running"],
+        ok: ["✓", "Completed"],
+        error: ["✗", "Failed"],
+        cancelled: ["⊘", "Cancelled"],
+    };
+
+    function formatDuration(ms) {
+        return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+    }
+
+    // The calls a tool made from inside itself, such as a codemode script's tool calls.
+    function nestedCallList(message) {
+        const list = element("ol", "tool-calls");
+        list.setAttribute("aria-label", "Tool calls");
+        const omitted = Number(message.callsOmitted) || 0;
+        if (omitted > 0) {
+            list.append(
+                element("li", "tool-call tool-call-omitted", `${omitted} earlier ${omitted === 1 ? "call" : "calls"}`),
+            );
+        }
+
+        for (const call of message.calls || []) {
+            const [glyph, label] = NESTED_CALL_STATES[call?.status] || NESTED_CALL_STATES.running;
+            const item = element("li", "tool-call");
+            item.dataset.status = NESTED_CALL_STATES[call?.status] ? call.status : "running";
+            const line = element("div", "tool-call-line");
+            const icon = element("span", "tool-call-status", glyph);
+            icon.setAttribute("role", "img");
+            icon.setAttribute("aria-label", label);
+            icon.title = label;
+            line.append(icon, element("span", "tool-call-name", String(call?.name || "tool")));
+            if (call?.args) {
+                const args = element("span", "tool-call-args", String(call.args));
+                args.title = String(call.args);
+                line.append(args);
+            }
+
+            const metrics = [];
+            if (Number.isFinite(call?.durationMs)) {
+                metrics.push(formatDuration(call.durationMs));
+            }
+
+            if (Number.isFinite(call?.cost) && call.cost > 0) {
+                metrics.push(`$${call.cost >= 0.01 ? call.cost.toFixed(2) : call.cost.toPrecision(2)}`);
+            }
+
+            if (metrics.length) {
+                line.append(element("span", "tool-call-metrics", metrics.join(" · ")));
+            }
+
+            item.append(line);
+            if (call?.error) {
+                item.append(element("div", "tool-call-error", String(call.error)));
+            }
+
+            list.append(item);
+        }
+
+        return list;
+    }
+
     function renderMessage(message, existing) {
         const role = ["user", "assistant", "tool", "notice"].includes(message.role) ? message.role : "notice";
         const article = existing || element("article");
@@ -1277,22 +1339,35 @@
                     message.toolName === "delegate" ? "Delegate activity" : message.toolName || "Tool",
                 ),
             );
-            summary.append(
-                element(
-                    "span",
-                    "tool-state",
-                    message.isRunning
-                        ? "Running…"
-                        : message.isError
-                          ? "Failed"
-                          : message.toolName === "delegate"
-                            ? "Reported"
-                            : "Completed",
-                ),
-            );
+            const codemode = message.toolName === "codemode";
+            const calls = Array.isArray(message.calls) ? message.calls : [];
+            const facts = [
+                message.isRunning
+                    ? "Running…"
+                    : message.isError
+                      ? "Failed"
+                      : message.toolName === "delegate"
+                        ? "Reported"
+                        : "Completed",
+            ];
+            const callCount = calls.length + (Number(message.callsOmitted) || 0);
+            if (callCount) {
+                facts.push(`${callCount} tool ${callCount === 1 ? "call" : "calls"}`);
+            }
+
+            if (!message.isRunning && Number.isFinite(message.wallSeconds)) {
+                facts.push(`${message.wallSeconds} s`);
+            }
+
+            summary.append(element("span", "tool-state", facts.join(" · ")));
             details.append(summary);
             if (message.input) {
-                if (message.toolName === "delegate") {
+                if (codemode) {
+                    details.append(
+                        element("div", "tool-section-label", "Script"),
+                        element("pre", "tool-input tool-script", message.input),
+                    );
+                } else if (message.toolName === "delegate") {
                     const input = element("details", "delegate-input");
                     input.open = delegateInputOpen;
                     input.append(
@@ -1305,8 +1380,15 @@
                         element("div", "tool-section-label", "Input"),
                         element("pre", "tool-input", message.input),
                     );
-                    details.append(element("div", "tool-section-label", "Result"));
                 }
+            }
+
+            if (callCount) {
+                details.append(element("div", "tool-section-label", "Tool calls"), nestedCallList(message));
+            }
+
+            if ((message.input && message.toolName !== "delegate") || callCount) {
+                details.append(element("div", "tool-section-label", codemode ? "Output" : "Result"));
             }
 
             details.append(
@@ -1400,6 +1482,9 @@
                 message.thinking,
                 message.toolName,
                 message.input,
+                message.calls,
+                message.callsOmitted,
+                message.wallSeconds,
                 message.isError,
                 message.isRunning,
                 message.files,

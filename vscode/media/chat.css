@@ -119,6 +119,19 @@ button:hover:not(:disabled) { background-color: var(--hover); }
 .tool-section-label { font-size: 9px; color: var(--muted); padding: 6px 9px 0; border-top: 1px solid var(--border); }
 .tool-input { margin: 0; padding: 5px 9px 9px; font: 11px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; }
 .tool-section-label + .tool-output { border-top: 0; padding-top: 5px; }
+.tool-calls { list-style: none; margin: 0; padding: 4px 9px 8px; font: 11px/1.6 var(--mono); max-height: 220px; overflow: auto; }
+.tool-call { min-width: 0; }
+.tool-call-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.tool-call-status { flex: 0 0 1.1em; text-align: center; color: var(--muted); }
+.tool-call[data-status="ok"] .tool-call-status { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #73c991)); }
+.tool-call[data-status="error"] .tool-call-status { color: var(--error); }
+.tool-call[data-status="running"] .tool-call-status { color: var(--accent); }
+.tool-call-name { flex: 0 0 auto; color: var(--text); }
+.tool-call-args { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.tool-call-metrics { flex: 0 0 auto; margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tool-call-error { margin: 0 0 2px calc(1.1em + 6px); color: var(--error); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool-call-omitted { color: var(--muted); padding-left: calc(1.1em + 6px); }
+.tool-section-label + .tool-calls { padding-top: 2px; }
 .tool-card.is-error { border-color: var(--error); }
 .tool-card.is-error .tool-state { color: var(--error); }
 .message-tool { border-top: 0; padding: 0; }
@@ -326,7 +339,7 @@ body.vscode-high-contrast .message-copy, body.vscode-high-contrast-light .messag
 .text-button, .queue-notice, .slash-name, .slash-description, .request-option,
 .request-actions .primary-button { font-size: var(--chat-small-font-size); }
 .provider-usage, .runtime-details, .runtime-details dt, .reasoning-content,
-.code-block pre code, .tool-output, .tool-input, .request-message { font-size: var(--chat-reading-font-size); }
+.code-block pre code, .tool-output, .tool-input, .tool-calls, .request-message { font-size: var(--chat-reading-font-size); }
 .markdown h2 { font-size: 19px; }
 .markdown h3 { font-size: 17px; }
 .markdown h4, .markdown h5, .markdown h6 { font-size: 15px; }

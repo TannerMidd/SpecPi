@@ -699,3 +699,183 @@ test("VS Code omitted image notices survive bounded tool inputs and later assist
         /^More context\n\n\[Image display omitted: transcript image limit reached.\]/u,
     );
 });
+
+test("codemode is one card: script as input, nested calls inside it, Pi's header as a duration", () => {
+    const code = 'const a = await tools.read({ path: "a.txt" });\r\nreturn a;';
+    const calls = [
+        { id: "cm/1", name: "read", args: '{"path":"a.txt"}', status: "ok", durationMs: 4 },
+        { id: "cm/2", name: "bash", args: '{"command":"rm -rf /"}', status: "error", durationMs: 1, error: "denied" },
+    ];
+    const state = stateModule.createState();
+    stateModule.applyEvent(state, {
+        type: "tool_execution_start",
+        toolCallId: "cm",
+        toolName: "codemode",
+        args: { code },
+    });
+    for (const nested of ["tool_execution_start", "tool_execution_end"]) {
+        stateModule.applyEvent(state, {
+            type: nested,
+            toolCallId: "cm/1",
+            toolName: "read",
+            args: { path: "a.txt" },
+            result: { content: [{ type: "text", text: "secret file body" }] },
+            parentToolCallId: "cm",
+        });
+    }
+
+    stateModule.applyEvent(state, {
+        type: "tool_execution_update",
+        toolCallId: "cm",
+        toolName: "codemode",
+        partialResult: { content: [], details: { calls: [{ ...calls[0], status: "running" }] } },
+    });
+    assert.equal(state.messages.length, 1, "nested calls never become cards of their own");
+    assert.equal(state.messages[0].isRunning, true);
+    assert.deepEqual(state.messages[0].calls, [
+        { name: "read", status: "running", args: '{"path":"a.txt"}', durationMs: 4 },
+    ]);
+    assert.equal(state.messages[0].input, 'const a = await tools.read({ path: "a.txt" });\nreturn a;');
+
+    const result = {
+        content: [
+            { type: "text", text: "Script failed\nWall time 0.3 seconds\nOutput:\n" },
+            { type: "text", text: "partial output" },
+        ],
+        details: { calls },
+    };
+    stateModule.applyEvent(state, {
+        type: "tool_execution_end",
+        toolCallId: "cm",
+        toolName: "codemode",
+        result,
+        isError: true,
+    });
+    const live = state.messages[0];
+    assert.equal(live.text, "partial output");
+    assert.equal(live.wallSeconds, 0.3);
+    assert.equal(live.isError, true);
+    assert.deepEqual(
+        live.calls.map((call) => [call.name, call.status, call.error]),
+        [
+            ["read", "ok", undefined],
+            ["bash", "error", "denied"],
+        ],
+    );
+    assert.ok(!JSON.stringify(state.messages).includes("secret file body"), "nested results stay out of the card");
+
+    // A reloaded conversation shows the same card from the stored tool result.
+    const restored = stateModule
+        .createState({
+            messages: [
+                { role: "assistant", content: [{ type: "toolCall", id: "cm", name: "codemode", arguments: { code } }] },
+                { role: "toolResult", toolCallId: "cm", toolName: "codemode", isError: true, ...result },
+            ],
+        })
+        .messages.find((message) => message.role === "tool");
+    for (const key of ["text", "input", "calls", "wallSeconds", "isError", "toolName"]) {
+        assert.deepEqual(restored[key], live[key], key);
+    }
+});
+
+test("nested calls of other tools are folded into their card, live and from Pi's nestedCalls record", () => {
+    const state = stateModule.createState();
+    stateModule.applyEvent(state, { type: "tool_execution_start", toolCallId: "p", toolName: "orchestrate", args: {} });
+    stateModule.applyEvent(state, {
+        type: "tool_execution_start",
+        toolCallId: "p/1",
+        toolName: "write",
+        args: { path: "x.txt" },
+        parentToolCallId: "p",
+    });
+    stateModule.applyEvent(state, {
+        type: "tool_execution_end",
+        toolCallId: "p/1",
+        toolName: "write",
+        result: { content: [{ type: "text", text: "Outside declared scope" }] },
+        isError: true,
+        parentToolCallId: "p",
+    });
+    stateModule.applyEvent(state, {
+        type: "tool_execution_end",
+        toolCallId: "p",
+        toolName: "orchestrate",
+        result: { content: [{ type: "text", text: "done" }] },
+    });
+    assert.equal(state.messages.length, 1);
+    assert.deepEqual(
+        state.messages[0].calls.map(({ name, status, args, error }) => ({ name, status, args, error })),
+        [{ name: "write", status: "error", args: '{"path":"x.txt"}', error: "Outside declared scope" }],
+    );
+    // The tool result message that follows does not wipe the calls its events listed.
+    stateModule.applyEvent(state, {
+        type: "message_end",
+        message: {
+            role: "toolResult",
+            toolCallId: "p",
+            toolName: "orchestrate",
+            content: [{ type: "text", text: "done" }],
+        },
+    });
+    assert.equal(state.messages[0].calls.length, 1);
+    // A nested event whose parent is unknown is ignored rather than shown as a stray card.
+    stateModule.applyEvent(state, {
+        type: "tool_execution_start",
+        toolCallId: "q/1",
+        toolName: "bash",
+        parentToolCallId: "q",
+    });
+    assert.equal(state.messages.length, 1);
+
+    const restored = stateModule.createState({
+        messages: [
+            {
+                role: "toolResult",
+                toolCallId: "p",
+                toolName: "orchestrate",
+                content: [{ type: "text", text: "done" }],
+                details: { calls: [{ name: "ignored", status: "ok" }] },
+                nestedCalls: {
+                    calls: [
+                        {
+                            id: "p/1",
+                            name: "write",
+                            status: "error",
+                            arguments: { path: "x.txt" },
+                            error: "Outside declared scope",
+                        },
+                    ],
+                },
+            },
+        ],
+    }).messages[0];
+    assert.deepEqual(restored.calls, [
+        { name: "write", status: "error", args: '{"path":"x.txt"}', error: "Outside declared scope" },
+    ]);
+});
+
+test("codemode call lists are bounded, sanitized and counted against the transcript budget", () => {
+    const many = Array.from({ length: 130 }, (_, index) => ({
+        name: `tool\u001b[31m${index}`,
+        args: "x".repeat(5_000),
+        status: index % 2 ? "ok" : "bogus",
+        error: "e".repeat(5_000),
+        durationMs: -1,
+        cost: Number.NaN,
+    }));
+    const state = stateModule.createState();
+    stateModule.applyEvent(state, {
+        type: "tool_execution_end",
+        toolCallId: "cm",
+        toolName: "codemode",
+        result: { content: [{ type: "text", text: "out" }], details: { calls: many } },
+    });
+    const { calls, callsOmitted } = state.messages[0];
+    assert.equal(calls.length, 100);
+    assert.equal(callsOmitted, 30);
+    assert.equal(calls[0].name, "tool30", "terminal escapes are stripped");
+    assert.ok(calls.every((call) => call.args.length <= 400 && (call.error?.length ?? 0) <= 600));
+    assert.ok(calls.every((call) => ["ok", "running"].includes(call.status)));
+    assert.ok(calls.every((call) => call.durationMs === undefined && call.cost === undefined));
+    assert.ok(calls.filter((call) => call.status === "ok").every((call) => call.error === undefined));
+});
