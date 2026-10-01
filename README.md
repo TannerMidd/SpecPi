@@ -28,7 +28,7 @@
 
 ---
 
-SpecPi 0.36.3 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
+SpecPi 0.36.4 is a small starting point for the [Pi coding agent](https://pi.dev/). It is one opinionated setup for how the agent should work, not a marketplace of plugins.
 
 At the center are two built-in extensions. **Scope control** keeps each task to the files it said it would touch. The **improvement loop** turns repeated friction into small, tested changes to the setup, instead of letting prompts and workarounds pile up. Around those are eight hand-picked packages, each locked to an exact version and checked before anything installs, plus **SpecPi Chat**, a VS Code panel for working alongside the agent.
 
@@ -45,16 +45,16 @@ Everything it touches is written down, versioned, and easy to undo.
 
 ## A local command guard
 
-Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMidd/LANCET-model), a 111M-parameter classifier, can check it on your own CPU. It reads Bash, PowerShell and cmd, takes about 10 ms for a typical command, needs no API key, sends nothing over the network, and costs nothing per check. Fixed rules settle the obvious cases first, blocking `rm -rf /` and passing `git status`, and the model scores the rest. A risky or uncertain verdict asks you before anything runs.
+Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMidd/LANCET-model), a 111M-parameter classifier, can check it on your own CPU. It reads Bash, PowerShell and cmd, takes about 10 ms for a typical command, needs no API key, sends nothing over the network, and costs nothing per check. Fixed rules settle the obvious cases first, blocking `rm -rf /` and passing `git status`, and the model scores the rest. A risky or uncertain verdict asks you before anything runs; `/lancet-guard mode block` blocks risky ones outright instead.
 
-| | LANCET Nano (local) | Jev (hosted, previous guard) |
-| --- | ---: | ---: |
-| Risky commands caught | 78.0% | 95.1% |
-| Safe commands wrongly stopped | 12.4% | 21.8% |
-| Cost per check | $0 | per request |
-| Network | none | every check |
+| | LANCET Nano v0.4.3 |
+| --- | ---: |
+| Triage Score | 68.3 |
+| Safe commands wrongly stopped | 9.0% |
+| Cost per check | $0 |
+| Network | none |
 
-Scores are from lancet-bench-2-next, LANCET's 3,204-command release benchmark of risky commands and their safe look-alikes, classifier alone. The guard ships off. Run `/lancet-guard setup` in Pi once to download the model (about 109 MB, verified by SHA-256) and switch it on. [How it works, what it costs, and its limits](https://tannermidd.github.io/SpecPi/lancet/).
+Both figures are taken across three benchmarks, 7,911 commands in total, weighted by size: lancet-bench-2-next (1,602 risky commands and their safe look-alikes), the ShellRisk-Bench test split, and a 513-command neutral set. The [Triage Score](https://github.com/TannerMidd/LANCET-model) gives a guard a point for each risky command it asks about or blocks, and shrinks in proportion once it stops more than 10% of safe commands. The guard ships off. Run `/lancet-guard setup` in Pi once to download the model (about 109 MB, verified by SHA-256) and switch it on. [How it works, what it costs, and its limits](https://tannermidd.github.io/SpecPi/lancet/).
 
 ## Measured context
 

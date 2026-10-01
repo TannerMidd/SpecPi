@@ -51,7 +51,7 @@
                     ><a href="#model"><span>05</span>The model</a><a href="#setup"><span>06</span>Turning it on</a
                     ><a href="#limits"><span>07</span>Limits</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.36.3<br />Guard 0.5.0<br />Off by default</div>
+                <div class="index-meta">SpecPi 0.36.4<br />Guard 0.6.0<br />Off by default</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -190,7 +190,7 @@
                         </li>
                         <li>
                             <strong>Three answers from the model.</strong> <code>risky</code> asks you before the
-                            command runs, or blocks it if you set <code>"risky": "block"</code>. <code>review</code>
+                            command runs, or blocks it in block mode (<code>/lancet-guard mode block</code>). <code>review</code>
                             is Nano's band for commands it is unsure about, and it always asks. <code>not_flagged</code>
                             runs.
                         </li>
@@ -384,6 +384,11 @@
                         <li>
                             <code>/lancet-guard on</code> or <code>off</code>: switch it for this session. Add
                             <code>--global</code> to save that as your default.
+                        </li>
+                        <li>
+                            <code>/lancet-guard mode ask</code> or <code>block</code>: choose whether a
+                            <code>risky</code> verdict asks you, the default, or is blocked outright, which also
+                            stops the agent. It is saved for future sessions; <code>review</code> asks either way.
                         </li>
                         <li><code>/lancet-guard check &lt;command&gt;</code>: score a command without running it.</li>
                         <li><code>/lancet-guard</code>: show whether it is on, and the model's state.</li>
