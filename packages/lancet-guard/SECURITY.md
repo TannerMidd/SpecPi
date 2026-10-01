@@ -16,6 +16,8 @@ The guard ships **off** and SpecPi never switches it on. It is on only when you 
 
 When on, it fails closed: if the model is missing, fails verification, or ONNX Runtime cannot load, commands the local rules leave open are blocked. With no UI to ask, an "ask" becomes a block unless `uncertain` is set to `allow`.
 
+`risky` verdicts ask by default. `/lancet-guard mode block` saves `"risky": "block"` to `~/.pi/lancet-guard.json` so they are blocked instead, and `/lancet-guard mode ask` restores the default; `review` always asks. The mode changes only what happens to a `risky` verdict. Block mode blocks it with or without a UI; in ask mode with no UI, `uncertain` decides, so `"uncertain": "allow"` lets it run. A trusted project's file can set its own mode, which wins inside that project.
+
 A `not_flagged` verdict lets a command run without asking. That now includes PowerShell, which LANCET reads since v0.4.3 and the guard asked about unconditionally before. It never includes a command longer than one 512-token window: LANCET reads such a command in full, but a `not_flagged` verdict on it asks, because harmless lines put in front of a risky command pull it under the review threshold once it spans a second window.
 
 ## Model limits

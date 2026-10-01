@@ -8,7 +8,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_SETTINGS, parseAuditDisplay } from "./rules.ts";
+import { DEFAULT_SETTINGS, parseAuditDisplay, parseRiskyPolicy } from "./rules.ts";
 import type { GuardSettings } from "./rules.ts";
 
 export const SETTINGS_FILE = "lancet-guard.json";
@@ -36,8 +36,9 @@ export function applyPatch(target: GuardSettings, patch: Record<string, unknown>
         target.enabled = patch["enabled"];
     }
 
-    if (patch["risky"] === "ask" || patch["risky"] === "block") {
-        target.risky = patch["risky"];
+    const risky = parseRiskyPolicy(patch["risky"]);
+    if (risky) {
+        target.risky = risky;
     }
 
     if (patch["uncertain"] === "allow" || patch["uncertain"] === "ask" || patch["uncertain"] === "deny") {
