@@ -94,9 +94,9 @@
     "check": "npm run format:check && npm run check:syntax && npm test && npm run check:package && npm run check:vscode"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.4",
-    "@earendil-works/pi-ai": "0.84.4",
-    "@earendil-works/pi-tui": "0.84.4",
+    "@earendil-works/pi-coding-agent": "1.0.0",
+    "@earendil-works/pi-ai": "1.0.0",
+    "@earendil-works/pi-tui": "1.0.0",
     "typebox": "1.3.7",
     "playwright": "1.62.1",
     "@stylistic/eslint-plugin": "5.10.0",

@@ -128,7 +128,7 @@ published figures.
 
 ## Install
 
-Requires Node.js 22.19+, Git, npm, and an existing Pi installation on PATH.
+Requires Node.js 22.19+, Git, npm, and an existing Pi installation on PATH. The base is tested with Pi 1.0.0.
 
 ```sh
 npm install --global specpi@latest
@@ -138,6 +138,8 @@ specpi doctor
 ```
 
 `plan` shows what will change without modifying anything. Restart Pi after install.
+
+Install also turns on Pi's built-in [codemode](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/codemode.md) tool, which lets the model run a short sandboxed script that calls several tools at once. It does this by adding `+codemode` to `defaultTools` in Pi's `settings.json`, only on Pi 0.99 or later. To keep it off, put `-codemode` there instead; SpecPi leaves an existing choice alone, and uninstall removes only the entry it added.
 
 Full setup options, package details, and requirements: [website](https://tannermidd.github.io/SpecPi/#install).
 

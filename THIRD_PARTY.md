@@ -5,13 +5,13 @@ SpecPi's npm artifact contains first-party source and no bundled runtime depende
 - `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, and `@earendil-works/pi-tui`: MIT, from [Pi](https://github.com/earendil-works/pi).
 - `typebox`: MIT, from [TypeBox](https://github.com/sinclairzx81/typebox).
 
-Development fixtures pin Pi packages to **0.84.4** and TypeBox to **1.3.7**. Host installations retain their upstream licenses and manage provider connections themselves. SpecPi does not install or configure providers.
+Development fixtures pin Pi packages to **1.0.0** and TypeBox to **1.3.7**. Host installations retain their upstream licenses and manage provider connections themselves. SpecPi does not install or configure providers.
 
 Development formatting uses Prettier **3.9.6** (MIT), ESLint **10.9.1** (MIT), `@stylistic/eslint-plugin` **5.10.0** (MIT), `@typescript-eslint/parser` **8.68.0** (BSD-2-Clause), and TypeScript **6.0.3** (Apache-2.0). Exact versions are recorded in `package.json`; installed packages retain upstream notices. Git and Node.js are external prerequisites.
 
 ## Default packages
 
-Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.6.0, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
+Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.6.0, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. `pi-goal-x` 0.32.0 was reviewed on 2026-10-01 against its 0.31.2 archive: it widens Pi support to `<2.0.0` and adds goal scheduling and prompt-cache retention, with no new network, process or install-script use. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
 
 SpecPi requests exact npm dependency saves for these pins and checks installed top-level versions before completing installation. The override applies to package acquisition without changing the user's global npm configuration.
 
@@ -21,7 +21,7 @@ SpecPi requests exact npm dependency saves for these pins and checks installed t
 | specpi-browser-qa              | 0.3.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/browser-qa-v0.3.0/packages/browser-qa) |
 | specpi-delegation              | 0.2.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/delegation) |
 | specpi-experiments             | 0.1.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/experiments) |
-| pi-goal-x                      | 0.31.2  | [tmonk/pi-goal-x](https://github.com/tmonk/pi-goal-x)                     |
+| pi-goal-x                      | 0.32.0  | [tmonk/pi-goal-x](https://github.com/tmonk/pi-goal-x)                     |
 | @sreetej510/pi-usage           | 0.10.0  | [Sreetej510/pi-extensions](https://github.com/Sreetej510/pi-extensions)   |
 | @gotgenes/pi-permission-system | 32.0.2  | [gotgenes/pi-packages](https://github.com/gotgenes/pi-packages)           |
 | specpi-lancet-guard            | 0.6.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/lancet-guard) |
@@ -30,7 +30,7 @@ Transitive dependencies and their notices remain in Pi's npm installation tree. 
 
 Pi Lens is no longer a default package. Normal updates retire only unchanged entries added by SpecPi; independent or modified entries and downloaded bytes remain, with their upstream notices. Restart Pi to unload Lens.
 
-The combined base is tested with Pi 0.84.4. Pi Goal X declares Pi `>=0.83.0 <0.85.0`; compatibility with newer hosts is not assumed. SpecPi's former custom browser, structural-search, background-task, and native command-guard implementations, DonSeTch, and Pi themes have been removed; command gating is the pinned `specpi-lancet-guard` package's. Its delegation and experiment implementations were not discarded: they now ship as the independent `specpi-delegation` and `specpi-experiments` packages described below. Removal restores owned package settings but does not delete downloaded upstream packages or tools. Retired private runtimes remain in local backups with their notices.
+The combined base is tested with Pi 1.0.0. Pi Goal X declares Pi `>=0.83.0 <2.0.0`; compatibility with newer hosts is not assumed. SpecPi's former custom browser, structural-search, background-task, and native command-guard implementations, DonSeTch, and Pi themes have been removed; command gating is the pinned `specpi-lancet-guard` package's. Its delegation and experiment implementations were not discarded: they now ship as the independent `specpi-delegation` and `specpi-experiments` packages described below. Removal restores owned package settings but does not delete downloaded upstream packages or tools. Retired private runtimes remain in local backups with their notices.
 
 ## Network services
 

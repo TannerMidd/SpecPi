@@ -75,6 +75,64 @@ export function restorePackageChanges(current, changes, warnings = []) {
     return result;
 }
 
+export const CODEMODE_ENTRY = "+codemode";
+// Pi 0.99.0 added codemode and `+name` entries in defaultTools. Older Pi reads "+codemode" as a
+// plain tool name that replaces its defaults, which would leave the session with no built-in tools.
+export const CODEMODE_MIN_PI = [0, 99, 0];
+
+export function supportsCodemode(version) {
+    if (!Array.isArray(version)) {
+        return false;
+    }
+
+    for (let index = 0; index < CODEMODE_MIN_PI.length; index += 1) {
+        if (version[index] !== CODEMODE_MIN_PI[index]) {
+            return version[index] > CODEMODE_MIN_PI[index];
+        }
+    }
+
+    return true;
+}
+
+// Adds "+codemode" to defaultTools unless the user already decided about codemode or built-in tools.
+// Returns what was there before so uninstall can take back only SpecPi's entry.
+export function enableCodemode(settings) {
+    if (Array.isArray(settings.extensions) && settings.extensions.includes("-builtin:codemode")) {
+        return { skipped: "extension-disabled" };
+    }
+
+    const current = settings.defaultTools;
+    if (current !== undefined && !Array.isArray(current)) {
+        return { skipped: "invalid" };
+    }
+
+    // An empty list turns every built-in tool off; adding a +name entry would turn the defaults back on.
+    if (Array.isArray(current) && current.length === 0) {
+        return { skipped: "no-builtin-tools" };
+    }
+
+    if ((current || []).some((entry) => ["codemode", "+codemode", "-codemode"].includes(entry))) {
+        return { skipped: "configured" };
+    }
+
+    settings.defaultTools = [...(current || []), CODEMODE_ENTRY];
+
+    return {
+        change: { beforeExists: current !== undefined, ...(current === undefined ? {} : { before: current }) },
+    };
+}
+
+// The settings-change record restoreSettingChanges understands. The path and entry are fixed here, never
+// read from the manifest, so a stale or edited manifest cannot point a restore at another setting.
+export function codemodeSettingChange(record) {
+    return {
+        path: ["defaultTools"],
+        beforeExists: record?.beforeExists === true,
+        ...(record?.beforeExists === true && Array.isArray(record.before) ? { before: record.before } : {}),
+        managedArrayEntries: [CODEMODE_ENTRY],
+    };
+}
+
 function markerRange(text, start, end) {
     const startIndex = text.indexOf(start);
     const endIndex = text.indexOf(end);

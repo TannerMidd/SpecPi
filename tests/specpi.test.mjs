@@ -35,12 +35,14 @@ import {
     AGENTS_END,
     AGENTS_START,
     deletePath,
+    enableCodemode,
     mergePackages,
     packageIdentity,
     readPath,
     removeManagedBlock,
     setPath,
     sha256,
+    supportsCodemode,
     upsertManagedBlock,
 } from "../scripts/lib.mjs";
 
@@ -264,10 +266,102 @@ test("migration preserves a removed or non-array package setting", (t) => {
     }
 });
 
+test("codemode is added only where Pi can read it and the user has not already decided", () => {
+    assert.equal(supportsCodemode(undefined), false);
+    assert.equal(supportsCodemode([0, 84, 4]), false);
+    assert.equal(supportsCodemode([0, 98, 9]), false);
+    assert.equal(supportsCodemode([0, 99, 0]), true);
+    assert.equal(supportsCodemode([1, 0, 0]), true);
+
+    const fresh = {};
+    assert.deepEqual(enableCodemode(fresh), { change: { beforeExists: false } });
+    assert.deepEqual(fresh.defaultTools, ["+codemode"]);
+    const replaced = { defaultTools: ["read", "bash"] };
+    assert.deepEqual(enableCodemode(replaced), { change: { beforeExists: true, before: ["read", "bash"] } });
+    assert.deepEqual(replaced.defaultTools, ["read", "bash", "+codemode"]);
+
+    for (const [settings, reason] of [
+        [{ defaultTools: ["-codemode"] }, "configured"],
+        [{ defaultTools: ["read", "codemode"] }, "configured"],
+        [{ defaultTools: ["+codemode"] }, "configured"],
+        // An empty list means no built-in tools; a +name entry would bring the defaults back.
+        [{ defaultTools: [] }, "no-builtin-tools"],
+        [{ defaultTools: "read" }, "invalid"],
+        [{ extensions: ["-builtin:codemode"] }, "extension-disabled"],
+    ]) {
+        const before = structuredClone(settings);
+        assert.deepEqual(enableCodemode(settings), { skipped: reason });
+        assert.deepEqual(settings, before);
+    }
+});
+
+test("installer turns codemode on, keeps it on across updates, and uninstall takes back only its entry", (t) => {
+    const { root, agentDir, manifestPath } = installerFixture(t);
+    fs.mkdirSync(agentDir);
+    const fakePi = path.join(root, "fake-pi.mjs");
+    fs.writeFileSync(fakePi, "console.log(process.env.FAKE_PI_VERSION);\n");
+    const settingsPath = path.join(agentDir, "settings.json");
+    const settings = () => JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+    const env = (version) => ({ SPECPI_PI: fakePi, FAKE_PI_VERSION: version });
+    const run = (args, version = "1.0.0") => {
+        const result = invokeCli(agentDir, args, env(version));
+        assert.equal(result.status, 0, result.stdout + result.stderr);
+
+        return result;
+    };
+
+    fs.writeFileSync(settingsPath, JSON.stringify({ theme: "user", defaultTools: ["read", "bash"] }));
+    assert.match(run(["plan"]).stdout, /\+codemode/u);
+    assert.deepEqual(settings().defaultTools, ["read", "bash"], "plan does not mutate");
+
+    const failed = invokeCli(agentDir, ["install", "--yes"], {
+        ...env("1.0.0"),
+        SPECPI_TESTING: "1",
+        SPECPI_TEST_FAIL_POINT: "after-settings",
+    });
+    assert.notEqual(failed.status, 0);
+    assert.deepEqual(settings(), { theme: "user", defaultTools: ["read", "bash"] }, "rolled back");
+
+    run(["install", "--yes"]);
+    assert.deepEqual(settings(), { theme: "user", defaultTools: ["read", "bash", "+codemode"] });
+    run(["update", "--yes"]);
+    assert.deepEqual(settings().defaultTools, ["read", "bash", "+codemode"], "no duplicate entry");
+    run(["uninstall", "--yes"]);
+    assert.deepEqual(settings(), { theme: "user", defaultTools: ["read", "bash"] });
+
+    // With no defaultTools before, uninstall removes the key it created.
+    fs.writeFileSync(settingsPath, JSON.stringify({ theme: "user" }));
+    run(["install", "--yes"]);
+    assert.deepEqual(settings().defaultTools, ["+codemode"]);
+    assert.deepEqual(JSON.parse(fs.readFileSync(manifestPath)).codemodeSetting, { beforeExists: false });
+
+    // An explicit opt-out added after install survives updates and uninstall.
+    fs.writeFileSync(settingsPath, JSON.stringify({ theme: "user", defaultTools: ["+codemode", "-codemode"] }));
+    run(["update", "--yes"]);
+    assert.deepEqual(settings().defaultTools, ["-codemode"]);
+    assert.equal(JSON.parse(fs.readFileSync(manifestPath)).codemodeSetting, undefined);
+    run(["uninstall", "--yes"]);
+    assert.deepEqual(settings(), { theme: "user", defaultTools: ["-codemode"] });
+
+    // Pi before 0.99 would read "+codemode" as a plain tool list and drop its defaults.
+    fs.writeFileSync(settingsPath, JSON.stringify({ theme: "user" }));
+    const old = run(["install", "--yes"], "0.84.4");
+    assert.match(old.stderr, /Codemode left off: it needs Pi 0\.99 or later, and Pi 0\.84\.4 was found/u);
+    assert.deepEqual(settings(), { theme: "user" });
+    run(["uninstall", "--yes"], "0.84.4");
+});
+
 function invokeCli(agentDir, args, extraEnv = {}) {
     return spawnSync(process.execPath, [cli, ...args, "--skip-package-install"], {
         cwd: repoRoot,
-        env: { ...process.env, ...extraEnv, PI_CODING_AGENT_DIR: agentDir },
+        // A Pi CLI that does not exist keeps these runs independent of whatever pi is on PATH:
+        // its version cannot be read, so codemode is left off unless a test supplies a fake Pi.
+        env: {
+            ...process.env,
+            SPECPI_PI: path.join(repoRoot, "tests", "fixtures", "no-such-pi.mjs"),
+            ...extraEnv,
+            PI_CODING_AGENT_DIR: agentDir,
+        },
         encoding: "utf8",
     });
 }

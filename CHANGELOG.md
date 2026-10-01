@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Move the reviewed Pi base to 1.0.0. Development fixtures, package checks and the docs pin `@earendil-works/pi-coding-agent`, `pi-ai` and `pi-tui` 1.0.0 in place of 0.84.4.
+- Pin `pi-goal-x` 0.32.0, which widens its declared Pi support from `<0.85.0` to `<2.0.0`; 0.31.2 refused Pi 1.0.
+- Turn on Pi's built-in codemode tool by default. Install and update add `+codemode` to `defaultTools` in Pi's settings, after `pi --version` confirms Pi 0.99 or later. Older Pi would read the entry as a plain tool list and lose its default tools, so the installer warns and adds nothing there. An existing choice is left alone: `defaultTools` that already names codemode (including `-codemode`), is empty or is not an array, or `-builtin:codemode` in `extensions`. Uninstall removes only the entry SpecPi added. Nested tool calls from codemode scripts pass through the same `tool_call` handlers as direct calls, so scope, the permission system and the LANCET guard still apply.
+
 ## 0.36.4 - 2026-10-01
 
 - Pin `specpi-lancet-guard` 0.6.0, which adds `/lancet-guard mode <ask|block>`. Choosing what a `risky` verdict does used to mean editing `~/.pi/lancet-guard.json` by hand; the command saves `risky` there and keeps the rest of the file. Ask stays the default. Block mode blocks a `risky` verdict and stops the agent, as the hard-deny rules do; `review` asks in both modes, and the local rules and a missing model block in both. Status shows the mode, and setting one warns when a trusted project's `.pi/lancet-guard.json` overrides it there. The model is unchanged, LANCET Nano v0.4.3, so updating needs no new `/lancet-guard setup`.

@@ -14,7 +14,7 @@ const npmCli = process.env.npm_execpath;
 const artifactIndex = process.argv.indexOf("--artifact");
 const artifactPath = artifactIndex >= 0 ? process.argv[artifactIndex + 1] : undefined;
 const piPackage = "@earendil-works/pi-coding-agent";
-const piVersion = "0.84.4";
+const piVersion = "1.0.0";
 const specpiVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
 const hostPeerPackages = [
     "@earendil-works/pi-ai",

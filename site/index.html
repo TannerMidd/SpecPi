@@ -97,8 +97,9 @@ specpi doctor</code></pre>
                     </div>
                     <p class="copy-status" data-copy-status role="status"></p>
                     <p class="install-detail">
-                        Node.js 22.19+ · npm · Git · existing Pi on PATH<br />Tested with Pi 0.84.4. Review the plan,
-                        confirm, then restart Pi.
+                        Node.js 22.19+ · npm · Git · existing Pi on PATH<br />Tested with Pi 1.0.0. Review the plan,
+                        confirm, then restart Pi. Install turns on Pi's codemode tool; put <code>-codemode</code> in
+                        <code>defaultTools</code> to keep it off.
                     </p>
                     <details class="install-options">
                         <summary>Updating or installing only the core?</summary>
@@ -168,7 +169,7 @@ specpi doctor</code></pre>
                     <li data-package="pi-goal-x">
                         <div>
                             <a href="https://github.com/tmonk/pi-goal-x">pi-goal-x</a
-                            ><span class="package-version">0.31.2</span>
+                            ><span class="package-version">0.32.0</span>
                         </div>
                         <p>Persistent goals and progress</p>
                     </li>
@@ -205,7 +206,7 @@ specpi doctor</code></pre>
                     Confirmed install/update sets up Chromium with Node, not Bun. Use
                     <code>--skip-browser-install</code> to skip setup; <code>specpi doctor</code> checks real QA
                     readiness offline. OS libraries require manual installation. Browser QA is not general-browser
-                    feature parity; BetterWright remains optional/manual. Pi Goal X supports Pi ≥0.83.0 and &lt;0.85.0.
+                    feature parity; BetterWright remains optional/manual. Pi Goal X supports Pi ≥0.83.0 and &lt;2.0.0.
                 </p>
             </section>
             <section class="chat-install wrap" id="vscode-chat" aria-labelledby="chat-title">
