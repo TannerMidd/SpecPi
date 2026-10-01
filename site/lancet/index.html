@@ -7,7 +7,7 @@
         <meta name="theme-color" content="#fafbfc" />
         <meta
             name="description"
-            content="SpecPi's command guard: LANCET Nano, a 110M-parameter classifier that scores every shell command on your own CPU in about 23 ms, with no API key, no network and no per-call cost."
+            content="SpecPi's command guard: LANCET Nano, a 111M-parameter classifier that scores shell commands on your own CPU in about 10 ms, with no API key, no network and no per-call cost."
         />
         <meta property="og:title" content="LANCET command guard · SpecPi" />
         <meta
@@ -51,7 +51,7 @@
                     ><a href="#model"><span>05</span>The model</a><a href="#setup"><span>06</span>Turning it on</a
                     ><a href="#limits"><span>07</span>Limits</a>
                 </nav>
-                <div class="index-meta">SpecPi 0.36.2<br />Guard 0.4.0<br />Off by default</div>
+                <div class="index-meta">SpecPi 0.36.2<br />Guard 0.5.0<br />Off by default</div>
             </aside>
             <div class="wiki-content">
                 <div class="wiki-intro">
@@ -71,19 +71,19 @@
 
                 <div class="metric-row">
                     <div>
-                        <span class="metric-value">~23 ms</span
-                        ><span class="metric-label">per command, on the CPU</span>
+                        <span class="metric-value">~10 ms</span
+                        ><span class="metric-label">per typical command, on the CPU</span>
                     </div>
                     <div>
                         <span class="metric-value">$0</span
                         ><span class="metric-label">per check: no API key, no account, no network</span>
                     </div>
                     <div>
-                        <span class="metric-value">92.4%</span
+                        <span class="metric-value">78.0%</span
                         ><span class="metric-label">of risky commands caught on LANCET's release benchmark</span>
                     </div>
                     <div>
-                        <span class="metric-value">9.9%</span
+                        <span class="metric-value">12.4%</span
                         ><span class="metric-label">of safe commands wrongly stopped, on the same benchmark</span>
                     </div>
                 </div>
@@ -95,7 +95,8 @@
                         commands the agent sends to <code>bash</code>, <code>powershell</code> and SpecPi's
                         <code>background</code> tool, and checks each one before it runs. The judge is
                         <a href="https://github.com/TannerMidd/LANCET-model">LANCET Nano</a>, a code-trained
-                        language model fine-tuned for one job: telling risky Bash from routine Bash.
+                        language model fine-tuned for one job: telling risky shell commands from routine ones, in Bash,
+                        PowerShell and cmd.
                     </p>
                     <p>
                         It runs inside Pi, on your processor, through ONNX Runtime. Commands are read as text and
@@ -129,7 +130,7 @@
 
                             <rect x="8" y="24" width="120" height="52" rx="7" class="dg-box" />
                             <text x="68" y="46" text-anchor="middle" class="dg-title">Shell command</text>
-                            <text x="68" y="63" text-anchor="middle" class="dg-note">bash, background</text>
+                            <text x="68" y="63" text-anchor="middle" class="dg-note">bash, powershell</text>
 
                             <rect x="168" y="24" width="140" height="52" rx="7" class="dg-box" />
                             <text x="238" y="46" text-anchor="middle" class="dg-title">Local rules</text>
@@ -138,7 +139,7 @@
                             <rect x="360" y="24" width="160" height="52" rx="7" class="dg-box-accent" />
                             <text x="440" y="41" text-anchor="middle" class="dg-tag">ON YOUR CPU</text>
                             <text x="440" y="57" text-anchor="middle" class="dg-title">LANCET Nano</text>
-                            <text x="440" y="71" text-anchor="middle" class="dg-note">~23 ms</text>
+                            <text x="440" y="71" text-anchor="middle" class="dg-note">~10 ms</text>
 
                             <path d="M128 50 H166" class="dg-flow" marker-end="url(#l1)" />
                             <path d="M308 50 H358" class="dg-flow" marker-end="url(#l2)" />
@@ -194,9 +195,11 @@
                             runs.
                         </li>
                         <li>
-                            <strong>What it cannot read, it asks about.</strong> Nano reads Bash only, so PowerShell
-                            always asks, as do commands over 8,192 bytes or 512 tokens. Nothing is silently
-                            truncated.
+                            <strong>What it cannot read or clear, it asks about.</strong> Nano reads Bash, PowerShell
+                            and cmd, so a PowerShell command it does not flag now runs. A command over 8,192 bytes
+                            asks. A command longer than one 512-token window is read in full, as overlapping windows,
+                            but never cleared: if Nano does not flag it, the guard still asks, because padding can
+                            hide a risky line (see <a href="#limits">Limits</a>).
                         </li>
                         <li>
                             <strong>File writes are judged by where they go.</strong> Ordinary project files pass.
@@ -226,17 +229,20 @@
                                 <tr><th>Cost per check</th><td>$0</td></tr>
                                 <tr><th>Network per check</th><td>none</td></tr>
                                 <tr><th>API key or account</th><td>none</td></tr>
-                                <tr><th>Time per command</th><td>~23 ms (95th percentile ~40 ms)</td></tr>
-                                <tr><th>Memory, once loaded</th><td>~275 MB</td></tr>
-                                <tr><th>Loading, once per session</th><td>~0.65 s</td></tr>
-                                <tr><th>Disk</th><td>111 MB</td></tr>
-                                <tr><th>One-time download</th><td>~100 MB, from GitHub</td></tr>
+                                <tr><th>Time per command</th><td>~10 ms (95th percentile under 30 ms)</td></tr>
+                                <tr><th>Long commands</th><td>~0.3 s per 512-token window</td></tr>
+                                <tr><th>Memory, once loaded</th><td>~180 MB</td></tr>
+                                <tr><th>Loading, once per session</th><td>~0.6 s</td></tr>
+                                <tr><th>Disk</th><td>116 MB</td></tr>
+                                <tr><th>One-time download</th><td>~109 MB, from GitHub</td></tr>
                                 <tr><th>GPU</th><td>not used</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <p>
-                        Times are from a Ryzen 9 3900X, one command at a time. Nothing is loaded while the guard is
+                        Times are from a Ryzen 9 3900X, one command at a time, on a desktop running other programs; they
+                        varied by about half between runs, and LANCET's own Python runtime took the same time,
+                        measured side by side. Nothing is loaded while the guard is
                         off, and most commands never reach the model at all, because the rules settle them first.
                         It adds nothing to the agent's prompt either: SpecPi's first request is 12,287 characters, the
                         same as with the Jev guard it replaced.
@@ -246,50 +252,52 @@
                 <section class="doc-section" id="measured">
                     <header><h2>How well it does</h2><span>04</span></header>
                     <p>
-                        These results come from <code>lancet-bench-1</code>, LANCET's release benchmark: 409 risky
-                        and 384 safe commands across 37 tool areas, frozen before v0.3.0's training data existed and
-                        scored once per model. Each model was scored on its own, without SpecPi's rules in front.
+                        These results come from LANCET's v0.4.3 release evaluation: 7,911 commands from three
+                        benchmarks, none of them used to train, tune or calibrate it. Each guard was scored once, at
+                        its shipped setting, without SpecPi's rules in front. The Triage Score gives a point for every
+                        risky command asked about or blocked, and shrinks in proportion when more than 10% of safe
+                        commands are stopped. Caught and stopped are averaged over the three benchmarks, weighted by
+                        size as the score is.
                     </p>
                     <div class="table-scroll">
                         <table class="numeric">
                             <thead>
                                 <tr>
-                                    <th>Model</th><th>Risky caught</th><th>Safe wrongly stopped</th
-                                    ><th>Secrets caught</th><th>Runs on</th>
+                                    <th>Model</th><th>Triage Score</th><th>Risky caught</th
+                                    ><th>Safe wrongly stopped</th><th>Runs on</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><th>LANCET Nano v0.4.2 (this guard)</th><td>92.4%</td><td>9.9%</td><td>78%</td><td>your CPU</td></tr>
-                                <tr><th>Jev (hosted, the old guard)</th><td>96.8%</td><td>7.8%</td><td>98%</td><td>hosted API</td></tr>
-                                <tr><th>Laya (421M parameters)</th><td>68.5%</td><td>37.8%</td><td>48%</td><td>GPU</td></tr>
-                                <tr><th>LANCET Nano v0.4.1</th><td>91.7%</td><td>9.4%</td><td>77%</td><td>your CPU</td></tr>
-                                <tr><th>LANCET Nano v0.4.0</th><td>89.0%</td><td>6.2%</td><td>72%</td><td>your CPU</td></tr>
-                                <tr><th>LANCET Nano v0.3.0</th><td>85.8%</td><td>5.5%</td><td>66%</td><td>your CPU</td></tr>
-                                <tr><th>LANCET Nano v0.2.0</th><td>73.6%</td><td>6.2%</td><td>24%</td><td>your CPU</td></tr>
+                                <tr><th>LANCET Nano v0.4.3 (this guard)</th><td>68.3</td><td>77.0%</td><td>9.0%</td><td>your CPU</td></tr>
+                                <tr><th>LANCET Nano v0.4.2</th><td>54.4</td><td>77.1%</td><td>13.7%</td><td>your CPU</td></tr>
+                                <tr><th>LANCET Nano v0.4.0</th><td>47.1</td><td>55.7%</td><td>10.5%</td><td>your CPU</td></tr>
+                                <tr><th>LANCET Nano v0.4.1</th><td>44.9</td><td>67.9%</td><td>14.6%</td><td>your CPU</td></tr>
+                                <tr><th>LANCET Nano v0.3.0</th><td>44.7</td><td>55.3%</td><td>11.6%</td><td>your CPU</td></tr>
+                                <tr><th>Jev (hosted, the old guard)</th><td>38.9</td><td>90.0%</td><td>23.4%</td><td>hosted API</td></tr>
+                                <tr><th>Laya (421M parameters)</th><td>13.3</td><td>87.3%</td><td>69.6%</td><td>GPU</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <ul>
                         <li>
-                            <strong>v0.4.2 is newly trained, and asks more than it blocks.</strong> On this benchmark
-                            it is close to v0.4.1 and stops slightly more safe commands than Jev did, about one in ten.
-                            More of what it catches comes back as a question rather than a block. On a 513-command
-                            neutral set it stops 7.0% of safe commands, against 16.9% for v0.4.1, but on ShellRisk-Bench
-                            it catches 60.1% of risky commands, against 70.5%.
+                            <strong>v0.4.3 interrupts less and decides more.</strong> On lancet-bench-2-next, LANCET's
+                            release benchmark, it catches the same 78.0% of risky commands as v0.4.2 while stopping
+                            12.4% of safe ones instead of 20.0%: about one in eight rather than one in five. Half of
+                            the benchmark's risky commands come back <code>risky</code>, against 17.7% for v0.4.2, so
+                            fewer land in the unsure middle.
                         </li>
                         <li>
-                            <strong>Jev still catches more.</strong> Most of the gap is secrets: commands that print
-                            or send credentials. Nano catches about three quarters of those, Jev nearly all.
+                            <strong>Jev still catches more, and stops more.</strong> It catches 95.1% of
+                            lancet-bench-2-next's risky commands but stops 21.8% of its safe ones. It was also given
+                            the task the agent was working on; Nano sees only the command.
                         </li>
                         <li>
-                            <strong>Nano works with less.</strong> Jev and Laya were given the task the agent was
-                            working on; Nano sees only the command.
+                            <strong>PowerShell and cmd are new.</strong> v0.4.2 could only ask about them. The
+                            benchmark has 102 PowerShell and 36 cmd commands, so the evidence there is thinner than
+                            for Bash.
                         </li>
                     </ul>
-                    <p>
-                        v0.4.2 is a newly trained model, so it is worth a second look on other sets. Both are scored
-                        the same way, once, at each model's shipped thresholds:
-                    </p>
+                    <p>Each benchmark on its own, at each model's shipped thresholds:</p>
                     <div class="table-scroll">
                         <table class="numeric">
                             <thead>
@@ -298,19 +306,27 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><th>Neutral set (513 commands)</th><td>v0.4.2</td><td>91.0%</td><td>7.0%</td></tr>
-                                <tr><th>Neutral set (513 commands)</th><td>v0.4.1</td><td>66.5%</td><td>16.9%</td></tr>
+                                <tr><th>lancet-bench-2-next (3,204 commands)</th><td>v0.4.3</td><td>78.0%</td><td>12.4%</td></tr>
+                                <tr><th>lancet-bench-2-next (3,204 commands)</th><td>v0.4.2</td><td>78.0%</td><td>20.0%</td></tr>
+                                <tr><th>lancet-bench-2-next (3,204 commands)</th><td>Jev</td><td>95.1%</td><td>21.8%</td></tr>
+                                <tr><th>ShellRisk-Bench test (4,194 commands)</th><td>v0.4.3</td><td>64.8%</td><td>3.0%</td></tr>
                                 <tr><th>ShellRisk-Bench test (4,194 commands)</th><td>v0.4.2</td><td>60.1%</td><td>2.7%</td></tr>
-                                <tr><th>ShellRisk-Bench test (4,194 commands)</th><td>v0.4.1</td><td>70.5%</td><td>3.1%</td></tr>
+                                <tr><th>ShellRisk-Bench test (4,194 commands)</th><td>Jev</td><td>67.9%</td><td>20.9%</td></tr>
+                                <tr><th>Neutral set (513 commands)</th><td>v0.4.3</td><td>85.8%</td><td>5.6%</td></tr>
+                                <tr><th>Neutral set (513 commands)</th><td>v0.4.2</td><td>91.0%</td><td>7.0%</td></tr>
+                                <tr><th>Neutral set (513 commands)</th><td>Jev</td><td>97.2%</td><td>30.2%</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <p>
-                        The neutral set is 66 commands from an outside coding-agent benchmark and 447 from the Shell
-                        Safety v2 test split, which v0.4.2 never trained on. On it, v0.4.2 interrupts far fewer safe
-                        commands and misses far fewer risky ones. On ShellRisk-Bench it catches fewer risky commands
-                        than v0.4.1. LANCET's Triage Score, which combines the three sets, is 82.7 for v0.4.2 against
-                        69.7 for v0.4.1.
+                        <strong>A harder benchmark.</strong> Earlier versions of this page used lancet-bench-1, 793
+                        Bash commands on which the best guards were near the ceiling: v0.4.2 caught 92.4% there.
+                        lancet-bench-2-next has 3,204 commands built as 1,602 risky/safe twins from 289 scenarios in
+                        40 areas, each repeated inside subshells, functions, pipelines and other wrappers, in Bash,
+                        PowerShell and cmd. Every guard scores lower on it. lancet-bench-1 was retired and is now part
+                        of LANCET's training data. lancet-bench-2-next is LANCET's own, kept private so it stays
+                        unseen; ShellRisk-Bench is labelled upstream, and the neutral set is 66 commands from an
+                        outside coding-agent benchmark and 447 from the Shell Safety v2 test split.
                     </p>
                     <p>
                         Per-area results and charts are on the
@@ -322,9 +338,12 @@
                 <section class="doc-section" id="model">
                     <header><h2>The model</h2><span>05</span></header>
                     <p>
-                        LANCET Nano v0.4.2 is Salesforce's CodeT5+ 220M encoder, 110 million parameters, fine-tuned
-                        to score Bash commands and quantized to 8-bit integers so it runs well on an ordinary CPU.
-                        v0.4.2 was trained afresh from that base on a larger, more balanced mix of 43,418 examples.
+                        LANCET Nano v0.4.3 is Salesforce's CodeT5+ 220M encoder, fine-tuned to score Bash, PowerShell
+                        and cmd commands and quantized to 8-bit integers so it runs well on an ordinary CPU, with a
+                        small head that pools its output: 111 million parameters in all. A command longer than the
+                        encoder's 512-token window is read as overlapping windows, so nothing is cut off. v0.4.3 was
+                        trained afresh from that base on 55,827 labelled examples, including a new curriculum of
+                        21,544 risky/safe twins across the three shells.
                         Model: Apache-2.0, on a BSD-3-Clause base. Runtime: MIT.
                     </p>
                     <ul>
@@ -333,19 +352,19 @@
                             come from the wording of human-written examples in tldr-pages, from AWS's own API
                             definitions (including which fields are marked sensitive), from the Azure, GitHub,
                             kubectl and Docker command references, from ShellRisk-Bench's and Shell Safety v2's
-                            training splits as labelled upstream, and from LANCET's authored pairs, contrast sets of
-                            risky commands with safe look-alikes, and red-team corpus. No language model or hosted API
+                            training splits as labelled upstream, and from LANCET's own authored risky/safe twins and
+                            contrast sets of risky commands with safe look-alikes. No language model or hosted API
                             produced a label.
                         </li>
                         <li>
                             <strong>The same answers as LANCET's own runtime.</strong> The guard runs a Node port of
-                            LANCET's Python runtime. On 7,170 commands with v0.3.0 it produced identical tokens and
-                            identical answers, on the same ONNX Runtime release. v0.4.2 keeps that tokenizer and
-                            runtime, and the port matches it on the guard's parity set.
+                            LANCET's Python runtime, on the same ONNX Runtime release. v0.4.3 brought a new runtime
+                            for windowed reading; the port follows it and matches it on the guard's 76-command parity
+                            set: the same tokens, the same windows and the same answers, with scores within 1e-15.
                         </li>
                         <li>
                             <strong>Verified before it runs.</strong> Setup downloads the release ZIP from GitHub and
-                            refuses it unless its SHA-256 matches the digest built into the package. The three model
+                            refuses it unless its SHA-256 matches the digest built into the package. The six model
                             files are then extracted and checked one by one, and checked again every time the model
                             loads. A tampered or damaged model is refused, never scored.
                         </li>
@@ -385,10 +404,24 @@
                             that the command is safe.
                         </li>
                         <li>
-                            <strong>Network and remote execution are its weakest area</strong>, followed by commands
-                            that print or send secrets. The permission system and your own review still apply.
+                            <strong>Credentials, Windows and macOS administration, and deceptive previews are its
+                            weakest areas</strong> on lancet-bench-2-next. The permission system and your own review
+                            still apply.
                         </li>
-                        <li><strong>Bash only.</strong> Other shells always ask.</li>
+                        <li>
+                            <strong>PowerShell and cmd are newer than Bash.</strong> They have less training data and
+                            fewer benchmark commands behind them. Other shells ask.
+                        </li>
+                        <li>
+                            <strong>Padding dilutes.</strong> Harmless lines in front of a risky command lower its
+                            score. Within one window most such commands still ask, but not all: one in nine came back
+                            not flagged in four of twelve padded runs. Past one window, anywhere from one to all nine
+                            did, so the guard asks about every command that long that Nano does not flag.
+                        </li>
+                        <li>
+                            <strong>Long commands take longer.</strong> About 0.3 s per 512-token window, 5 to 8 s at
+                            the 8,192-byte limit. Anything longer asks.
+                        </li>
                         <li>
                             <strong>Scores vary slightly by CPU.</strong> ONNX Runtime's 8-bit arithmetic differs
                             between processor types, by up to about 0.03, so a command right at a threshold can land

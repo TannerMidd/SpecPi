@@ -45,16 +45,16 @@ Everything it touches is written down, versioned, and easy to undo.
 
 ## A local command guard
 
-Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMidd/LANCET-model), a 110M-parameter classifier, can check it on your own CPU. It takes about 23 ms, needs no API key, sends nothing over the network, and costs nothing per check. Fixed rules settle the obvious cases first, blocking `rm -rf /` and passing `git status`, and the model scores the rest. A risky or uncertain verdict asks you before anything runs.
+Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMidd/LANCET-model), a 111M-parameter classifier, can check it on your own CPU. It reads Bash, PowerShell and cmd, takes about 10 ms for a typical command, needs no API key, sends nothing over the network, and costs nothing per check. Fixed rules settle the obvious cases first, blocking `rm -rf /` and passing `git status`, and the model scores the rest. A risky or uncertain verdict asks you before anything runs.
 
 | | LANCET Nano (local) | Jev (hosted, previous guard) |
 | --- | ---: | ---: |
-| Risky commands caught | 92.4% | 96.8% |
-| Safe commands wrongly stopped | 9.9% | 7.8% |
+| Risky commands caught | 78.0% | 95.1% |
+| Safe commands wrongly stopped | 12.4% | 21.8% |
 | Cost per check | $0 | per request |
 | Network | none | every check |
 
-Scores are from LANCET's 793-command release benchmark, classifier alone. The guard ships off. Run `/lancet-guard setup` in Pi once to download the model (about 100 MB, verified by SHA-256) and switch it on. [How it works, what it costs, and its limits](https://tannermidd.github.io/SpecPi/lancet/).
+Scores are from lancet-bench-2-next, LANCET's 3,204-command release benchmark of risky commands and their safe look-alikes, classifier alone. The guard ships off. Run `/lancet-guard setup` in Pi once to download the model (about 109 MB, verified by SHA-256) and switch it on. [How it works, what it costs, and its limits](https://tannermidd.github.io/SpecPi/lancet/).
 
 ## Measured context
 
