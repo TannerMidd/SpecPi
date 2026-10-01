@@ -191,6 +191,7 @@ describe("with the model installed", { skip: !REAL && "LANCET_MODEL_DIR not set"
         await guard.command("on");
         const blocked = await guard.call("bash", { command });
         assert.equal(blocked.block, true);
+        assert.match(blocked.reason, /512-token window/u);
         assert.equal(guard.entries.at(-1).data.source, "lancet");
     });
 

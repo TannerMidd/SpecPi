@@ -96,11 +96,12 @@ export async function judgeCommand(
     // A command longer than one window is scored but never cleared. Harmless lines put in front of
     // a risky command pull its score under the review threshold once it spans a second window, so a
     // `not_flagged` verdict there asks, as every command that long did before LANCET could read it.
-    if ((verdict.windows ?? 1) > 1) {
+    // A verdict that does not say it fitted one window is not cleared either.
+    if (verdict.windows !== 1) {
         return {
             action: "ask",
             source: "lancet",
-            reason: "LANCET does not clear commands longer than 512 tokens",
+            reason: "LANCET does not clear commands longer than one 512-token window",
             score: verdict.score,
         };
     }

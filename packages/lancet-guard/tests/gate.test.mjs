@@ -52,7 +52,7 @@ describe("local rules decide before LANCET", () => {
 
 describe("LANCET verdicts", () => {
     it("not_flagged runs, with its score recorded", async () => {
-        const { score, calls } = scorer({ classification: "not_flagged", score: 0.1, reason: null });
+        const { score, calls } = scorer({ classification: "not_flagged", score: 0.1, reason: null, windows: 1 });
         const decision = await judgeCommand("npm test", "bash", S, score);
         assert.equal(decision.action, "allow");
         assert.equal(decision.source, "lancet");
@@ -70,7 +70,14 @@ describe("LANCET verdicts", () => {
         assert.equal(long.action, "ask");
         assert.equal(long.source, "lancet");
         assert.equal(long.score, 0.1);
-        assert.match(long.reason, /512 tokens/u);
+        assert.match(long.reason, /512-token window/u);
+        const unsized = await judgeCommand(
+            "build.sh",
+            "bash",
+            S,
+            scorer({ classification: "not_flagged", score: 0.1, reason: null }).score,
+        );
+        assert.equal(unsized.action, "ask", "a verdict that does not say it fitted one window is not cleared");
         const risky = await judgeCommand(
             "build.sh",
             "bash",
