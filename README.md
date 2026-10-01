@@ -49,7 +49,7 @@ Before the agent runs a shell command, [LANCET Nano](https://github.com/TannerMi
 
 <p align="center">
   <a href="https://tannermidd.github.io/SpecPi/lancet/">
-    <img src="site/media/lancet-comparison.webp" width="880" alt="Bar chart of Triage Score (higher is better) for 14 command guards on the same 7,911 commands. LANCET Nano v0.4.3 scores 68.3, catching 77.0% of risky commands while stopping 9.0% of safe ones. Next are Jev 38.9, verdict-shell-safety 32.4, Kestrel 30.7, ModernBERT bash 23.2, dcg 19.8, AutoShell-0.8B 19.2, Gyra 17.9, bash-classify 14.3, Laya 13.3, bev-decider 13.3, laya-cli-gate 12.5, sh-guard 10.9 and Shieldstral-1.0-3B 6.1.">
+    <img src="https://tannermidd.github.io/SpecPi/media/lancet-comparison.webp" width="880" alt="Bar chart of Triage Score (higher is better) for 14 command guards on the same 7,911 commands. LANCET Nano v0.4.3 scores 68.3, catching 77.0% of risky commands while stopping 9.0% of safe ones. Next are Jev 38.9, verdict-shell-safety 32.4, Kestrel 30.7, ModernBERT bash 23.2, dcg 19.8, AutoShell-0.8B 19.2, Gyra 17.9, bash-classify 14.3, Laya 13.3, bev-decider 13.3, laya-cli-gate 12.5, sh-guard 10.9 and Shieldstral-1.0-3B 6.1.">
   </a>
 </p>
 
