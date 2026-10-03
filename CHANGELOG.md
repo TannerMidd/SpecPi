@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.37.1 - 2026-10-03
+
+- Pin `specpi-lancet-guard` 0.6.1, which fixes `/lancet-guard setup` failing inside the prebuilt Pi binary with "ONNX Runtime could not be loaded on this platform: Cannot find package 'onnxruntime-node'". Pi installed from its release download, for example through mise, is a compiled Bun binary that could not resolve the guard's installed `onnxruntime-node`; Pi installed through npm runs on Node and was unaffected. The model is unchanged, LANCET Nano v0.4.3, so updating needs no new `/lancet-guard setup`. SpecPi Chat stays at 0.19.0.
+
 ## 0.37.0 - 2026-10-01
 
 - Pair with SpecPi Chat 0.19.0, which shows a codemode run as one tool card: the script, the tool calls it made and its output.
