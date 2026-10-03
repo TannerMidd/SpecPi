@@ -11,7 +11,7 @@ Development formatting uses Prettier **3.9.6** (MIT), ESLint **10.9.1** (MIT), `
 
 ## Default packages
 
-Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.6.0, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. `pi-goal-x` 0.32.0 was reviewed on 2026-10-01 against its 0.31.2 archive: it widens Pi support to `<2.0.0` and adds goal scheduling and prompt-cache retention, with no new network, process or install-script use. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
+Reviewed on 2026-09-16 against published npm metadata and integrity-verified source archives, and `specpi-lancet-guard` 0.6.1, which replaces `specpi-jev-guard` 0.4.0, from source in this repository. `pi-goal-x` 0.32.0 was reviewed on 2026-10-01 against its 0.31.2 archive: it widens Pi support to `<2.0.0` and adds goal scheduling and prompt-cache retention, with no new network, process or install-script use. All eight top-level packages declare the MIT license. Pins are authoritative in `templates/settings.json`.
 
 SpecPi requests exact npm dependency saves for these pins and checks installed top-level versions before completing installation. The override applies to package acquisition without changing the user's global npm configuration.
 
@@ -24,7 +24,7 @@ SpecPi requests exact npm dependency saves for these pins and checks installed t
 | pi-goal-x                      | 0.32.0  | [tmonk/pi-goal-x](https://github.com/tmonk/pi-goal-x)                     |
 | @sreetej510/pi-usage           | 0.10.0  | [Sreetej510/pi-extensions](https://github.com/Sreetej510/pi-extensions)   |
 | @gotgenes/pi-permission-system | 32.0.2  | [gotgenes/pi-packages](https://github.com/gotgenes/pi-packages)           |
-| specpi-lancet-guard            | 0.6.0   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/lancet-guard) |
+| specpi-lancet-guard            | 0.6.1   | [TannerMidd/SpecPi](https://github.com/TannerMidd/SpecPi/tree/main/packages/lancet-guard) |
 
 Transitive dependencies and their notices remain in Pi's npm installation tree. Top-level pins do not freeze upstream dependency ranges or constitute a full transitive security audit. Pi invokes npm with its upstream package-management semantics, including dependency lifecycle scripts. Browser QA has no install hook: confirmed SpecPi install/update explicitly invokes its installed Node setup bin, unless acquisition or browser setup is skipped. It downloads package-pinned Chromium without installing OS libraries. BetterWright is optional/manual and retains its own Bun-based setup; SpecPi neither removes Bun nor deletes user-owned tools. Usage reporting and web packages make their own provider/service connections. Consult upstream licenses and security policies before redistributing their components.
 
