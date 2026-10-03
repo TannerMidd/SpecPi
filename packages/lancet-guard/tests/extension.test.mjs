@@ -19,6 +19,7 @@ after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const { default: register } = await import("../src/index.ts");
 const { modelDirectory } = await import("../src/model-store.mjs");
+const { classifier, useRuntimeImporter } = await import("../src/runtime.mjs");
 const { MODEL_FILES } = await import("../src/model-manifest.mjs");
 const settingsFile = path.join(home, ".pi", "lancet-guard.json");
 
@@ -178,6 +179,27 @@ describe("a saved-on guard with no model fails closed", () => {
     it("off --global keeps the rest of the file", async () => {
         await instance().command("off --global");
         assert.deepEqual(JSON.parse(fs.readFileSync(settingsFile, "utf8")), { enabled: false, custom: "kept" });
+    });
+});
+
+describe("ONNX Runtime", () => {
+    // Inside Pi's compiled binary only code Pi's loader transpiles can resolve installed packages,
+    // so runtime.mjs's own import() fails there even with onnxruntime-node installed.
+    it("is imported through the extension, not by runtime.mjs", async () => {
+        useRuntimeImporter(async () => {
+            throw new Error("runtime.mjs imported it itself");
+        });
+        instance();
+        const target = modelDirectory(agent);
+        fs.mkdirSync(target, { recursive: true });
+        for (const [name, expected] of Object.entries(MODEL_FILES)) {
+            const file = path.join(target, name);
+            fs.writeFileSync(file, "");
+            fs.truncateSync(file, expected.bytes);
+        }
+
+        // The zero-filled files fail their checksum, which is only checked once the import resolved.
+        await assert.rejects(classifier(target), /failed its checksum/u);
     });
 });
 

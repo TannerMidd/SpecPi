@@ -34,7 +34,7 @@ import {
 } from "./rules.ts";
 import type { AuditDisplay, GuardSettings, RiskyPolicy } from "./rules.ts";
 import { SETTINGS_FILE, loadSettings, saveGlobalSettings } from "./settings.ts";
-import { classifier, classifierLoaded } from "./runtime.mjs";
+import { classifier, classifierLoaded, useRuntimeImporter } from "./runtime.mjs";
 import { installModel, modelDirectory, modelState } from "./model-store.mjs";
 
 const AUDIT_TYPE = "lancet-guard";
@@ -88,6 +88,10 @@ function oneLine(text: string, max = 160): string {
 }
 
 export default function lancetGuard(pi: ExtensionAPI) {
+    // Imported from here, not from runtime.mjs: only code Pi's loader transpiles can resolve
+    // installed packages inside Pi's compiled binary. Still lazy, so a guard that is off never loads it.
+    useRuntimeImporter(() => import("onnxruntime-node"));
+
     const session = { enabled: undefined as boolean | undefined };
     const verdicts = new Map<string, LancetVerdict>();
     let auditDisplay: AuditDisplay = DEFAULT_SETTINGS.auditDisplay;
