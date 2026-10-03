@@ -7,7 +7,7 @@ It is off until you turn it on.
 ## Install
 
 ```
-pi install npm:specpi-lancet-guard@0.6.0
+pi install npm:specpi-lancet-guard@0.6.1
 ```
 
 SpecPi installs it by default. The package carries code only; the model is fetched once, by you:

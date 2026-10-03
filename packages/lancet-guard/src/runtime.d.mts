@@ -10,5 +10,6 @@ export interface LoadedClassifier {
     }>;
 }
 
+export function useRuntimeImporter(importer: () => Promise<unknown>): void;
 export function classifier(directory?: string): Promise<LoadedClassifier>;
 export function classifierLoaded(): boolean;
